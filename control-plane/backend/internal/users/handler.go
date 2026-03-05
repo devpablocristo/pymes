@@ -1,18 +1,31 @@
 package users
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/handler/dto"
+	userdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/users/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
-type Handler struct {
-	uc *Usecases
+type usecasesPort interface {
+	GetMe(ctx context.Context, actor string) (userdomain.User, error)
+	ListMembers(ctx context.Context, orgID string) ([]userdomain.Member, error)
+	ListAPIKeys(ctx context.Context, orgID string) ([]userdomain.APIKey, error)
+	CreateAPIKey(ctx context.Context, orgID, name, createdBy string, scopes []string) (userdomain.APIKey, string, error)
+	DeleteAPIKey(ctx context.Context, orgID, keyID string) error
+	RotateAPIKey(ctx context.Context, orgID, keyID string) (userdomain.APIKey, string, error)
 }
 
-func NewHandler(uc *Usecases) *Handler {
+type Handler struct {
+	uc usecasesPort
+}
+
+func NewHandler(uc usecasesPort) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -29,7 +42,7 @@ func (h *Handler) GetMe(c *gin.Context) {
 	auth := handlers.GetAuthContext(c)
 	me, err := h.uc.GetMe(c.Request.Context(), auth.Actor)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, me)
@@ -44,7 +57,7 @@ func (h *Handler) ListMembers(c *gin.Context) {
 	}
 	members, err := h.uc.ListMembers(c.Request.Context(), orgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": members})
@@ -59,7 +72,7 @@ func (h *Handler) ListAPIKeys(c *gin.Context) {
 	}
 	keys, err := h.uc.ListAPIKeys(c.Request.Context(), orgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": keys})
@@ -81,7 +94,7 @@ func (h *Handler) CreateAPIKey(c *gin.Context) {
 
 	key, raw, err := h.uc.CreateAPIKey(c.Request.Context(), orgID, req.Name, auth.Actor, req.Scopes)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"key": key, "raw_key": raw})
@@ -95,7 +108,7 @@ func (h *Handler) DeleteAPIKey(c *gin.Context) {
 		return
 	}
 	if err := h.uc.DeleteAPIKey(c.Request.Context(), orgID, c.Param("id")); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -110,7 +123,7 @@ func (h *Handler) RotateAPIKey(c *gin.Context) {
 	}
 	key, raw, err := h.uc.RotateAPIKey(c.Request.Context(), orgID, c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"key": key, "raw_key": raw})

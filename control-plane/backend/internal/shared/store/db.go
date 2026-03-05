@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"gorm.io/driver/postgres"
@@ -31,6 +32,8 @@ func NewDB(databaseURL string, log zerolog.Logger) (*gorm.DB, error) {
 	}
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
 
 	log.Info().Msg("connected to PostgreSQL")
 	return db, nil

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/usecases/domain"
 	"github.com/rs/zerolog"
+
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type EmailSender interface {
@@ -44,7 +46,7 @@ func (u *Usecases) GetPreferencesByActor(ctx context.Context, actor string) ([]d
 	_ = ctx
 	userID, _, ok := u.repo.GetUserByExternalID(actor)
 	if !ok {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
 	return u.repo.GetPreferences(userID), nil
 }
@@ -53,10 +55,10 @@ func (u *Usecases) UpdatePreferenceByActor(ctx context.Context, actor, notifType
 	_ = ctx
 	userID, _, ok := u.repo.GetUserByExternalID(actor)
 	if !ok {
-		return domain.Preference{}, fmt.Errorf("user not found")
+		return domain.Preference{}, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
 	if strings.TrimSpace(notifType) == "" || strings.TrimSpace(channel) == "" {
-		return domain.Preference{}, fmt.Errorf("notification_type and channel are required")
+		return domain.Preference{}, fmt.Errorf("notification_type and channel are required: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.UpsertPreference(userID, strings.TrimSpace(notifType), strings.TrimSpace(channel), enabled), nil
 }
@@ -77,7 +79,7 @@ func (u *Usecases) Notify(ctx context.Context, orgID uuid.UUID, notifType string
 func (u *Usecases) NotifyUser(ctx context.Context, userExternalID string, notifType string, data map[string]string) error {
 	userID, email, ok := u.repo.GetUserByExternalID(userExternalID)
 	if !ok {
-		return fmt.Errorf("user not found")
+		return fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
 	return u.sendToUser(ctx, uuid.Nil, userID, email, notifType, data)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type RepositoryPort interface {
@@ -28,7 +29,7 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 func (u *Usecases) Create(ctx context.Context, name, slug, externalID, actor string) (domain.Organization, error) {
 	_ = ctx
 	if strings.TrimSpace(name) == "" {
-		return domain.Organization{}, fmt.Errorf("name is required")
+		return domain.Organization{}, fmt.Errorf("name is required: %w", httperrors.ErrBadInput)
 	}
 	org := u.repo.CreateOrg(name, slug, externalID, actor)
 	if u.audit != nil {

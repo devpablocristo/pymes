@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type RepositoryPort interface {
@@ -44,7 +46,7 @@ func (u *Usecases) GetTenantSettings(ctx context.Context, orgID string) (domain.
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, fmt.Errorf("invalid org_id")
+		return domain.TenantSettings{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.GetTenantSettings(id), nil
 }
@@ -53,7 +55,7 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID, plan string,
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, fmt.Errorf("invalid org_id")
+		return domain.TenantSettings{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.UpdateTenantSettings(id, plan, hardLimits, actor), nil
 }
@@ -62,7 +64,7 @@ func (u *Usecases) ListActivity(ctx context.Context, orgID string, limit int) ([
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid org_id")
+		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.ListActivity(id, limit), nil
 }

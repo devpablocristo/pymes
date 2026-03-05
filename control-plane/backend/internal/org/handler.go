@@ -1,17 +1,25 @@
 package org
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org/handler/dto"
+	orgdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/org/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
-type Handler struct {
-	uc *Usecases
+type usecasesPort interface {
+	Create(ctx context.Context, name, slug, externalID, actor string) (orgdomain.Organization, error)
 }
 
-func NewHandler(uc *Usecases) *Handler {
+type Handler struct {
+	uc usecasesPort
+}
+
+func NewHandler(uc usecasesPort) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -28,7 +36,7 @@ func (h *Handler) CreateOrg(c *gin.Context) {
 
 	org, err := h.uc.Create(c.Request.Context(), req.Name, req.Slug, req.ExternalID, req.Actor)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, org)

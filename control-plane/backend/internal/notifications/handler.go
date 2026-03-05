@@ -1,18 +1,27 @@
 package notifications
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/handler/dto"
+	notifdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
-type Handler struct {
-	uc *Usecases
+type usecasesPort interface {
+	GetPreferencesByActor(ctx context.Context, actor string) ([]notifdomain.Preference, error)
+	UpdatePreferenceByActor(ctx context.Context, actor, notifType, channel string, enabled bool) (notifdomain.Preference, error)
 }
 
-func NewHandler(uc *Usecases) *Handler {
+type Handler struct {
+	uc usecasesPort
+}
+
+func NewHandler(uc usecasesPort) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -25,7 +34,7 @@ func (h *Handler) GetPreferences(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	prefs, err := h.uc.GetPreferencesByActor(c.Request.Context(), authCtx.Actor)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": prefs})
@@ -40,7 +49,7 @@ func (h *Handler) UpdatePreference(c *gin.Context) {
 	}
 	pref, err := h.uc.UpdatePreferenceByActor(c.Request.Context(), authCtx.Actor, req.NotificationType, req.Channel, req.Enabled)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, pref)

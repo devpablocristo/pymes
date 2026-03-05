@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/rs/zerolog"
 	"github.com/stripe/stripe-go/v81"
+
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type RepositoryPort interface {
@@ -67,7 +69,7 @@ func (u *Usecases) GetBillingStatus(ctx context.Context, orgID string) (domain.B
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.BillingSummary{}, fmt.Errorf("invalid org_id")
+		return domain.BillingSummary{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	ts := u.repo.GetTenantSettings(id)
 	return domain.BillingSummary{
@@ -86,7 +88,7 @@ func (u *Usecases) CreateCheckoutSession(ctx context.Context, orgID, planCode, s
 	}
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return "", fmt.Errorf("invalid org_id")
+		return "", fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	plan := normalizePlan(planCode)
 	priceID := strings.TrimSpace(u.priceIDs[plan])
@@ -140,11 +142,11 @@ func (u *Usecases) CreatePortalSession(ctx context.Context, orgID, returnURL, ac
 	}
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return "", fmt.Errorf("invalid org_id")
+		return "", fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	ts := u.repo.GetTenantSettings(id)
 	if ts.StripeCustomerID == nil || *ts.StripeCustomerID == "" {
-		return "", fmt.Errorf("stripe customer not found for org")
+		return "", fmt.Errorf("stripe customer not found for org: %w", httperrors.ErrNotFound)
 	}
 
 	portal, err := u.stripe.CreatePortalSession(&stripe.BillingPortalSessionParams{

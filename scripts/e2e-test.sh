@@ -81,6 +81,18 @@ assert_json_field() {
     fi
 }
 
+assert_condition() {
+    local name="$1" ok="$2" detail="${3:-}"
+    TOTAL=$((TOTAL + 1))
+    if [ "$ok" = "1" ]; then
+        PASS=$((PASS + 1))
+        printf "  %-50s %s %s\n" "$name" "$(green "PASS")" "$detail"
+    else
+        FAIL=$((FAIL + 1))
+        printf "  %-50s %s %s\n" "$name" "$(red "FAIL")" "$detail"
+    fi
+}
+
 # Capture body from assert_status for further checks
 BODY=""
 assert_status_capture() {
@@ -199,6 +211,62 @@ assert_status "PUT /v1/notifications/preferences" PUT "$BASE_URL/v1/notification
 echo ""
 bold "▸ Billing"
 assert_status_capture "GET /v1/billing/status" GET "$BASE_URL/v1/billing/status" 200
+
+# ── Core Negocio (Prompt 01) ──
+echo ""
+bold "▸ Core Negocio"
+TS="$(date +%s)"
+
+assert_status_capture "POST /v1/customers (create)" POST "$BASE_URL/v1/customers" 201 \
+    -d "{\"type\":\"person\",\"name\":\"E2E Cliente $TS\",\"email\":\"e2e-cliente-$TS@local.dev\"}"
+CUSTOMER_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+assert_status_capture "POST /v1/products (create)" POST "$BASE_URL/v1/products" 201 \
+    -d "{\"type\":\"product\",\"sku\":\"E2E-SKU-$TS\",\"name\":\"E2E Producto $TS\",\"price\":100,\"cost_price\":50,\"track_stock\":true}"
+PRODUCT_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+if [ -n "$PRODUCT_ID" ] && [ "$PRODUCT_ID" != "" ]; then
+    assert_status "POST /v1/inventory/:product_id/adjust" POST "$BASE_URL/v1/inventory/$PRODUCT_ID/adjust" 200 \
+        -d '{"quantity":20,"notes":"e2e initial stock"}' > /dev/null
+fi
+
+assert_status_capture "POST /v1/sales (create)" POST "$BASE_URL/v1/sales" 201 \
+    -d "{\"customer_id\":\"$CUSTOMER_ID\",\"customer_name\":\"E2E Cliente $TS\",\"payment_method\":\"cash\",\"items\":[{\"product_id\":\"$PRODUCT_ID\",\"description\":\"E2E Producto $TS\",\"quantity\":2,\"unit_price\":100}]}"
+SALE_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+if [ -n "$PRODUCT_ID" ] && [ "$PRODUCT_ID" != "" ]; then
+    assert_status_capture "GET /v1/inventory/:product_id" GET "$BASE_URL/v1/inventory/$PRODUCT_ID" 200
+    STOCK_QTY=$(echo "$BODY" | python3 -c "import sys,json; v=json.load(sys.stdin).get('quantity',-999); print(v)" 2>/dev/null || echo "-999")
+    if [ "$STOCK_QTY" = "18" ] || [ "$STOCK_QTY" = "18.0" ]; then
+        assert_condition "stock decremented by sale (20 -> 18)" 1 "quantity=$STOCK_QTY"
+    else
+        assert_condition "stock decremented by sale (20 -> 18)" 0 "quantity=$STOCK_QTY"
+    fi
+fi
+
+assert_status_capture "GET /v1/cashflow?type=income" GET "$BASE_URL/v1/cashflow?type=income&limit=50" 200
+HAS_SALE_CASH=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(1 if any((it.get('reference_type')=='sale' and it.get('type')=='income') for it in d.get('items',[])) else 0)" 2>/dev/null || echo "0")
+assert_condition "cashflow has sale income movement" "$HAS_SALE_CASH"
+
+assert_status_capture "POST /v1/quotes (create)" POST "$BASE_URL/v1/quotes" 201 \
+    -d "{\"customer_id\":\"$CUSTOMER_ID\",\"customer_name\":\"E2E Cliente $TS\",\"items\":[{\"product_id\":\"$PRODUCT_ID\",\"description\":\"E2E Producto $TS\",\"quantity\":1,\"unit_price\":100}]}"
+QUOTE_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+if [ -n "$QUOTE_ID" ] && [ "$QUOTE_ID" != "" ]; then
+    assert_status_capture "POST /v1/quotes/:id/to-sale" POST "$BASE_URL/v1/quotes/$QUOTE_ID/to-sale" 200 \
+        -d '{"payment_method":"transfer"}'
+    assert_status_capture "GET /v1/quotes/:id after to-sale" GET "$BASE_URL/v1/quotes/$QUOTE_ID" 200
+    QUOTE_STATUS=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+    if [ "$QUOTE_STATUS" = "accepted" ]; then
+        assert_condition "quote accepted after to-sale" 1 "status=$QUOTE_STATUS"
+    else
+        assert_condition "quote accepted after to-sale" 0 "status=$QUOTE_STATUS"
+    fi
+fi
+
+assert_status "GET /v1/reports/sales-summary" GET "$BASE_URL/v1/reports/sales-summary?from=2020-01-01&to=2099-12-31" 200 > /dev/null
+assert_status "GET /v1/reports/sales-by-product" GET "$BASE_URL/v1/reports/sales-by-product?from=2020-01-01&to=2099-12-31" 200 > /dev/null
+assert_status "GET /v1/reports/profit-margin" GET "$BASE_URL/v1/reports/profit-margin?from=2020-01-01&to=2099-12-31" 200 > /dev/null
 
 # ── Orgs (public) ──
 echo ""

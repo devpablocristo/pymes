@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS cash_movements;
+DROP TABLE IF EXISTS sale_items;
+DROP TABLE IF EXISTS sales;
+DROP TABLE IF EXISTS quote_items;
+DROP TABLE IF EXISTS quotes;
+DROP TABLE IF EXISTS stock_movements;
+DROP TABLE IF EXISTS stock_levels;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS suppliers;
+DROP TABLE IF EXISTS customers;

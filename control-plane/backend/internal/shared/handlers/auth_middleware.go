@@ -61,14 +61,14 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			if rawKey != "" {
 				key, ok := m.keyResolver.ResolveAPIKey(rawKey)
 				if ok {
-					actor := strings.TrimSpace(c.GetHeader("X-Actor"))
-					if actor == "" {
-						actor = "api_key:" + key.ID.String()
-					}
-					role := strings.TrimSpace(c.GetHeader("X-Role"))
-					if role == "" {
-						role = "service"
-					}
+				actor := sanitizeHeader(c.GetHeader("X-Actor"), 128)
+				if actor == "" {
+					actor = "api_key:" + key.ID.String()
+				}
+				role := sanitizeHeader(c.GetHeader("X-Role"), 32)
+				if role == "" {
+					role = "service"
+				}
 					reqScopes := splitCSV(c.GetHeader("X-Scopes"))
 					scopes := key.Scopes
 					if len(reqScopes) > 0 {
@@ -141,6 +141,19 @@ func splitCSV(v string) []string {
 		res = append(res, p)
 	}
 	return res
+}
+
+func sanitizeHeader(v string, maxLen int) string {
+	v = strings.TrimSpace(v)
+	if len(v) > maxLen {
+		v = v[:maxLen]
+	}
+	for _, ch := range v {
+		if ch < 32 || ch == 127 {
+			return ""
+		}
+	}
+	return v
 }
 
 func intersectScopes(a, b []string) []string {

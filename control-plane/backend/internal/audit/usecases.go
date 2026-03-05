@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type RepositoryPort interface {
@@ -37,7 +39,7 @@ func (u *Usecases) List(ctx context.Context, orgID string, limit int) ([]domain.
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid org_id")
+		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.List(id, limit), nil
 }
@@ -46,7 +48,7 @@ func (u *Usecases) Export(ctx context.Context, orgID, format string) (string, st
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid org_id")
+		return "", "", fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
 	switch strings.ToLower(format) {
 	case "", "csv":
@@ -67,6 +69,6 @@ func (u *Usecases) Export(ctx context.Context, orgID, format string) (string, st
 		}
 		return "jsonl", strings.Join(lines, "\n"), nil
 	default:
-		return "", "", fmt.Errorf("unsupported format: %s", format)
+		return "", "", fmt.Errorf("unsupported format %s: %w", format, httperrors.ErrBadInput)
 	}
 }

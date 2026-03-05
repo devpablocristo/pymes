@@ -1,19 +1,30 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin/handler/dto"
+	admindomain "github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/authz"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
-type Handler struct {
-	uc *Usecases
+type usecasesPort interface {
+	GetBootstrap(ctx context.Context, orgID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
+	GetTenantSettings(ctx context.Context, orgID string) (admindomain.TenantSettings, error)
+	UpdateTenantSettings(ctx context.Context, orgID, plan string, hardLimits map[string]any, actor *string) (admindomain.TenantSettings, error)
+	ListActivity(ctx context.Context, orgID string, limit int) ([]admindomain.ActivityEvent, error)
 }
 
-func NewHandler(uc *Usecases) *Handler {
+type Handler struct {
+	uc usecasesPort
+}
+
+func NewHandler(uc usecasesPort) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -32,7 +43,7 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 	}
 	payload, err := h.uc.GetBootstrap(c.Request.Context(), authCtx.OrgID, authCtx.Role, authCtx.Scopes, authCtx.Actor, authCtx.AuthMethod)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, payload)
@@ -46,7 +57,7 @@ func (h *Handler) GetTenantSettings(c *gin.Context) {
 	}
 	settings, err := h.uc.GetTenantSettings(c.Request.Context(), authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, settings)
@@ -65,7 +76,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 	}
 	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, req.PlanCode, req.HardLimits, &authCtx.Actor)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, updated)
@@ -79,7 +90,7 @@ func (h *Handler) ListActivity(c *gin.Context) {
 	}
 	items, err := h.uc.ListActivity(c.Request.Context(), authCtx.OrgID, 200)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})

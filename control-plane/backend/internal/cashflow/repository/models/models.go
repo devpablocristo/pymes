@@ -1,0 +1,24 @@
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type CashMovementModel struct {
+	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
+	OrgID         uuid.UUID `gorm:"type:uuid;index;not null"`
+	Type          string    `gorm:"not null"`
+	Amount        float64   `gorm:"type:numeric(15,2);not null"`
+	Currency      string    `gorm:"not null"`
+	Category      string
+	Description   string
+	PaymentMethod string
+	ReferenceType string
+	ReferenceID   *uuid.UUID `gorm:"type:uuid"`
+	CreatedBy     string
+	CreatedAt     time.Time
+}
+
+func (CashMovementModel) TableName() string { return "cash_movements" }

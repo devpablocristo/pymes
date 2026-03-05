@@ -9,19 +9,27 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
-	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
 	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/clerkwebhook"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/app"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/store"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
+	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
 )
 
 func InitializeApp() *app.App {
@@ -45,6 +53,14 @@ func InitializeApp() *app.App {
 	adminRepo := admin.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
 	billingRepo := billing.NewRepository(db)
+	customersRepo := customers.NewRepository(db)
+	suppliersRepo := suppliers.NewRepository(db)
+	productsRepo := products.NewRepository(db)
+	inventoryRepo := inventory.NewRepository(db)
+	cashflowRepo := cashflow.NewRepository(db)
+	salesRepo := sales.NewRepository(db)
+	quotesRepo := quotes.NewRepository(db)
+	reportsRepo := reports.NewRepository(db)
 
 	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
@@ -52,6 +68,14 @@ func InitializeApp() *app.App {
 	orgUC := org.NewUsecases(orgRepo, auditUC)
 	usersUC := users.NewUsecases(usersRepo)
 	adminUC := admin.NewUsecases(adminRepo)
+	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC)
+	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC)
+	customersUC := customers.NewUsecases(customersRepo, auditUC)
+	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
+	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
+	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC)
+	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
+	reportsUC := reports.NewUsecases(reportsRepo)
 
 	emailSender, err := notifications.NewEmailSender(cfg.NotificationBackend, logger)
 	if err != nil {
@@ -72,6 +96,14 @@ func InitializeApp() *app.App {
 	orgHandler := org.NewHandler(orgUC)
 	usersHandler := users.NewHandler(usersUC)
 	adminHandler := admin.NewHandler(adminUC)
+	customersHandler := customers.NewHandler(customersUC)
+	suppliersHandler := suppliers.NewHandler(suppliersUC)
+	productsHandler := products.NewHandler(productsUC)
+	inventoryHandler := inventory.NewHandler(inventoryUC)
+	cashflowHandler := cashflow.NewHandler(cashflowUC)
+	salesHandler := sales.NewHandler(salesUC)
+	quotesHandler := quotes.NewHandler(quotesUC)
+	reportsHandler := reports.NewHandler(reportsUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	billingHandler := billing.NewHandler(billingUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
@@ -95,6 +127,14 @@ func InitializeApp() *app.App {
 	auditHandler.RegisterRoutes(authGroup)
 	notificationHandler.RegisterRoutes(authGroup)
 	billingHandler.RegisterAuthRoutes(authGroup)
+	customersHandler.RegisterRoutes(authGroup)
+	suppliersHandler.RegisterRoutes(authGroup)
+	productsHandler.RegisterRoutes(authGroup)
+	inventoryHandler.RegisterRoutes(authGroup)
+	cashflowHandler.RegisterRoutes(authGroup)
+	salesHandler.RegisterRoutes(authGroup)
+	quotesHandler.RegisterRoutes(authGroup)
+	reportsHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }

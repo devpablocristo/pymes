@@ -1,17 +1,26 @@
 package audit
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	auditdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
-type Handler struct {
-	uc *Usecases
+type usecasesPort interface {
+	List(ctx context.Context, orgID string, limit int) ([]auditdomain.Entry, error)
+	Export(ctx context.Context, orgID, format string) (string, string, error)
 }
 
-func NewHandler(uc *Usecases) *Handler {
+type Handler struct {
+	uc usecasesPort
+}
+
+func NewHandler(uc usecasesPort) *Handler {
 	return &Handler{uc: uc}
 }
 
@@ -24,7 +33,7 @@ func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	entries, err := h.uc.List(c.Request.Context(), authCtx.OrgID, 200)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": entries})
@@ -34,7 +43,7 @@ func (h *Handler) Export(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	format, content, err := h.uc.Export(c.Request.Context(), authCtx.OrgID, c.Query("format"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httperrors.Respond(c, err)
 		return
 	}
 	if format == "csv" {

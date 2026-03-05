@@ -68,46 +68,88 @@ export function APIKeysPage() {
   }
 
   return (
-    <div className="card">
-      <h1>API Keys</h1>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <p>Org: {orgID || 'N/A'}</p>
-      <form onSubmit={onCreate} className="row">
-        <input placeholder="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
-        <input value={scopes} onChange={(e) => setScopes(e.target.value)} style={{ minWidth: 360 }} />
-        <button type="submit">Crear API key</button>
-      </form>
+    <>
+      <div className="page-header">
+        <h1>API Keys</h1>
+        <p>Crea y administra las claves de acceso a la API</p>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
       {newRawKey && (
-        <div className="card" style={{ marginTop: '1rem', borderColor: '#ffc857' }}>
-          <strong>Raw key (solo visible una vez):</strong>
-          <pre>{newRawKey}</pre>
+        <div className="alert alert-warning">
+          <strong>Clave generada (solo visible una vez):</strong>&nbsp;
+          <code>{newRawKey}</code>
         </div>
       )}
-      <table style={{ width: '100%', marginTop: '1rem' }}>
-        <thead>
-          <tr>
-            <th align="left">Name</th>
-            <th align="left">Prefix</th>
-            <th align="left">Scopes</th>
-            <th align="left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {keys.map((key) => (
-            <tr key={key.id}>
-              <td>{key.name}</td>
-              <td>{key.key_prefix}</td>
-              <td>{key.scopes.join(', ')}</td>
-              <td className="row">
-                <button className="secondary" onClick={() => void onRotate(key.id)}>
-                  Rotar
-                </button>
-                <button onClick={() => void onDelete(key.id)}>Revocar</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Nueva API Key</h2>
+          {orgID && <span className="badge badge-neutral">Org: {orgID}</span>}
+        </div>
+        <form onSubmit={onCreate} className="form-row">
+          <div className="form-group grow">
+            <label>Nombre</label>
+            <input placeholder="Mi clave de produccion" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="form-group grow">
+            <label>Scopes</label>
+            <input value={scopes} onChange={(e) => setScopes(e.target.value)} />
+          </div>
+          <button type="submit" className="btn-primary">Crear</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Claves existentes</h2>
+          <span className="badge badge-neutral">{keys.length}</span>
+        </div>
+        {keys.length === 0 ? (
+          <div className="empty-state">
+            <p>No hay API keys creadas</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Prefijo</th>
+                  <th>Scopes</th>
+                  <th>Creada</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((key) => (
+                  <tr key={key.id}>
+                    <td style={{ fontWeight: 500 }}>{key.name}</td>
+                    <td><code>{key.key_prefix}</code></td>
+                    <td>
+                      {key.scopes.map((s) => (
+                        <span key={s} className="badge badge-neutral" style={{ marginRight: '0.25rem' }}>{s}</span>
+                      ))}
+                    </td>
+                    <td className="mono">{new Date(key.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <div className="actions-row">
+                        <button className="btn-secondary btn-sm" onClick={() => void onRotate(key.id)}>
+                          Rotar
+                        </button>
+                        <button className="btn-danger btn-sm" onClick={() => void onDelete(key.id)}>
+                          Revocar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

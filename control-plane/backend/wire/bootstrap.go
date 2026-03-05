@@ -9,6 +9,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
+	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
 	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/clerkwebhook"
@@ -30,6 +31,10 @@ func InitializeApp() *app.App {
 	db, err := store.NewDB(cfg.DatabaseURL, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to connect to database")
+	}
+
+	if err := migrations.Run(db, logger); err != nil {
+		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
 	identityUC := buildIdentityUsecases(cfg, logger)

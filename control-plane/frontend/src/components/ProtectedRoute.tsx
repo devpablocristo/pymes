@@ -11,7 +11,13 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
   const { isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
   if (!isLoaded) {
-    return <div className="container">Cargando...</div>;
+    return (
+      <div className="app-layout">
+        <div className="main-content">
+          <div className="spinner" />
+        </div>
+      </div>
+    );
   }
   if (!isSignedIn) {
     return <Navigate to="/login" state={{ from: location }} replace />;

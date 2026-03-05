@@ -34,31 +34,54 @@ export function NotificationPreferencesPage() {
   }
 
   return (
-    <div className="card">
-      <h1>Notification Preferences</h1>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <table style={{ width: '100%' }}>
-        <thead>
-          <tr>
-            <th align="left">Type</th>
-            <th align="left">Channel</th>
-            <th align="left">Enabled</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={`${item.notification_type}-${item.channel}`}>
-              <td>{item.notification_type}</td>
-              <td>{item.channel}</td>
-              <td>
-                <button className="secondary" onClick={() => void toggle(item)}>
-                  {item.enabled ? 'On' : 'Off'}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="page-header">
+        <h1>Notificaciones</h1>
+        <p>Configura como y donde recibis alertas</p>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Preferencias</h2>
+          <span className="badge badge-neutral">{items.length} reglas</span>
+        </div>
+        {items.length === 0 ? (
+          <div className="empty-state">
+            <p>Sin preferencias configuradas</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Canal</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={`${item.notification_type}-${item.channel}`}>
+                    <td style={{ fontWeight: 500 }}>{item.notification_type}</td>
+                    <td>
+                      <span className="badge badge-neutral">{item.channel}</span>
+                    </td>
+                    <td>
+                      <label className="toggle" onClick={() => void toggle(item)}>
+                        <input type="checkbox" checked={item.enabled} readOnly />
+                        <span className="toggle-track" />
+                        <span className="toggle-thumb" />
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -6,7 +6,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -18,3 +20,47 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  backend:
+    build:
+      context: ./control-plane/backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8100:8080"
+    volumes:
+      - ./control-plane/backend:/app
+      - backend_go_mod:/go/pkg/mod
+      - backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      SMTP_HOST: mailhog
+      FRONTEND_URL: http://localhost:5180
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./control-plane/frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5180:5173"
+    volumes:
+      - ./control-plane/frontend/src:/app/src
+      - ./control-plane/frontend/public:/app/public
+      - ./control-plane/frontend/index.html:/app/index.html
+      - ./control-plane/frontend/vite.config.ts:/app/vite.config.ts
+      - ./control-plane/frontend/tsconfig.json:/app/tsconfig.json
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: http://localhost:8100
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  backend_go_mod:
+  backend_go_build:

@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { createCheckout, createPortal, getBillingStatus } from '../lib/api';
 import type { BillingStatus } from '../lib/types';
 
+const plans = [
+  { code: 'starter', name: 'Starter', description: 'Para equipos pequenos' },
+  { code: 'growth', name: 'Growth', description: 'Para empresas en crecimiento' },
+  { code: 'enterprise', name: 'Enterprise', description: 'Para grandes organizaciones' },
+];
+
 export function BillingPage() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [error, setError] = useState('');
@@ -43,17 +49,70 @@ export function BillingPage() {
   }
 
   return (
-    <div className="card">
-      <h1>Billing</h1>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <div className="row">
-        <button onClick={() => void upgrade('growth')}>Upgrade a Growth</button>
-        <button onClick={() => void upgrade('enterprise')}>Upgrade a Enterprise</button>
-        <button className="secondary" onClick={() => void openPortal()}>
-          Manage billing
-        </button>
+    <>
+      <div className="page-header">
+        <h1>Billing</h1>
+        <p>Gestiona tu plan y metodo de pago</p>
       </div>
-      <pre>{JSON.stringify(status, null, 2)}</pre>
-    </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {status && (
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-label">Plan actual</div>
+            <div className="stat-value" style={{ textTransform: 'capitalize' }}>{status.plan_code}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Estado</div>
+            <div className="stat-value">
+              <span className={`badge ${status.status === 'active' ? 'badge-success' : 'badge-warning'}`}>
+                {status.status}
+              </span>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Fin del periodo</div>
+            <div className="stat-value mono" style={{ fontSize: '1rem' }}>
+              {status.current_period_end ? new Date(status.current_period_end).toLocaleDateString() : '---'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Planes disponibles</h2>
+          <button className="btn-secondary btn-sm" onClick={() => void openPortal()}>
+            Gestionar pagos
+          </button>
+        </div>
+        <div className="plans-grid">
+          {plans.map((plan) => (
+            <div
+              key={plan.code}
+              className={`plan-card${status?.plan_code === plan.code ? ' current' : ''}`}
+            >
+              <h3>{plan.name}</h3>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+                {plan.description}
+              </p>
+              <div className="plan-badge">
+                {status?.plan_code === plan.code ? (
+                  <span className="badge badge-success">Plan actual</span>
+                ) : (
+                  <button
+                    className="btn-primary btn-sm"
+                    onClick={() => void upgrade(plan.code)}
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }

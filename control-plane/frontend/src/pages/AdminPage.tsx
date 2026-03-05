@@ -36,22 +36,47 @@ export function AdminPage() {
   }
 
   return (
-    <div className="card">
-      <h1>Admin</h1>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <form onSubmit={onSubmit} className="row" style={{ alignItems: 'center' }}>
-        <label>Plan</label>
-        <select value={planCode} onChange={(e) => setPlanCode(e.target.value)}>
-          <option value="starter">starter</option>
-          <option value="growth">growth</option>
-          <option value="enterprise">enterprise</option>
-        </select>
-        <button type="submit">Actualizar settings</button>
-      </form>
-      <h3>Tenant settings</h3>
-      <pre>{JSON.stringify(settings, null, 2)}</pre>
-      <h3>Audit (últimos eventos)</h3>
-      <pre>{JSON.stringify(activity.slice(0, 20), null, 2)}</pre>
-    </div>
+    <>
+      <div className="page-header">
+        <h1>Admin</h1>
+        <p>Configuracion del tenant y registro de actividad</p>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Tenant Settings</h2>
+        </div>
+        <form onSubmit={onSubmit} className="form-row">
+          <div className="form-group">
+            <label>Plan</label>
+            <select value={planCode} onChange={(e) => setPlanCode(e.target.value)}>
+              <option value="starter">Starter</option>
+              <option value="growth">Growth</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <button type="submit" className="btn-primary">Actualizar</button>
+        </form>
+        {settings && (
+          <pre style={{ marginTop: '1rem' }}>{JSON.stringify(settings, null, 2)}</pre>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Audit Log</h2>
+          <span className="badge badge-neutral">{activity.length} eventos</span>
+        </div>
+        {activity.length === 0 ? (
+          <div className="empty-state">
+            <p>Sin eventos registrados</p>
+          </div>
+        ) : (
+          <pre>{JSON.stringify(activity.slice(0, 20), null, 2)}</pre>
+        )}
+      </div>
+    </>
   );
 }

@@ -125,11 +125,11 @@ export function APIKeysPage() {
               <tbody>
                 {keys.map((key) => (
                   <tr key={key.id}>
-                    <td style={{ fontWeight: 500 }}>{key.name}</td>
+                    <td className="text-semibold">{key.name}</td>
                     <td><code>{key.key_prefix}</code></td>
                     <td>
                       {key.scopes.map((s) => (
-                        <span key={s} className="badge badge-neutral" style={{ marginRight: '0.25rem' }}>{s}</span>
+                        <span key={s} className="badge badge-neutral">{s}</span>
                       ))}
                     </td>
                     <td className="mono">{new Date(key.created_at).toLocaleDateString()}</td>

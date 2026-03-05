@@ -47,8 +47,3 @@ module "monitoring" {
   source = "./modules/monitoring"
   name   = var.project_name
 }
-
-module "ecr" {
-  source = "./modules/ecr"
-  name   = var.project_name
-}

@@ -64,7 +64,7 @@ export function NotificationPreferencesPage() {
               <tbody>
                 {items.map((item) => (
                   <tr key={`${item.notification_type}-${item.channel}`}>
-                    <td style={{ fontWeight: 500 }}>{item.notification_type}</td>
+                    <td className="text-semibold">{item.notification_type}</td>
                     <td>
                       <span className="badge badge-neutral">{item.channel}</span>
                     </td>

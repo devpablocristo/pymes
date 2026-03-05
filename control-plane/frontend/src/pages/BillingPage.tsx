@@ -61,7 +61,7 @@ export function BillingPage() {
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Plan actual</div>
-            <div className="stat-value" style={{ textTransform: 'capitalize' }}>{status.plan_code}</div>
+            <div className="stat-value text-capitalize">{status.plan_code}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Estado</div>
@@ -73,7 +73,7 @@ export function BillingPage() {
           </div>
           <div className="stat-card">
             <div className="stat-label">Fin del periodo</div>
-            <div className="stat-value mono" style={{ fontSize: '1rem' }}>
+            <div className="stat-value mono stat-value-sm">
               {status.current_period_end ? new Date(status.current_period_end).toLocaleDateString() : '---'}
             </div>
           </div>
@@ -94,7 +94,7 @@ export function BillingPage() {
               className={`plan-card${status?.plan_code === plan.code ? ' current' : ''}`}
             >
               <h3>{plan.name}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
+              <p className="text-secondary">
                 {plan.description}
               </p>
               <div className="plan-badge">

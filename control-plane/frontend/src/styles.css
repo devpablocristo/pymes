@@ -685,6 +685,28 @@ code {
   margin-top: 0.75rem;
 }
 
+/* ── Utility classes ── */
+.text-capitalize {
+  text-transform: capitalize;
+}
+
+.text-semibold {
+  font-weight: 500;
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.stat-value-sm {
+  font-size: 1rem;
+}
+
+.badge + .badge {
+  margin-left: 0.25rem;
+}
+
 /* ── Actions row ── */
 .actions-row {
   display: flex;

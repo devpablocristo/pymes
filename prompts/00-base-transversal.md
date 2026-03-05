@@ -37,83 +37,89 @@ Verticales futuros (NO implementar ahora, solo diseñar la base para soportarlos
 ## Estructura del proyecto
 
 ```
-pymes/
+pymes/                          # Monorepo raíz
 ├── .github/workflows/
-│   ├── ci.yml              # Tests, lint, build
-│   └── deploy.yml          # Build → zip → Lambda update + S3 sync
-├── infra/                  # Terraform
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── terraform.tfvars.example
-│   └── modules/
-│       ├── networking/     # VPC, subnets, security groups
-│       ├── database/       # RDS + RDS Proxy
-│       ├── lambda/         # Lambda functions + API Gateway
-│       ├── cdn/            # S3 + CloudFront
-│       ├── secrets/        # Secrets Manager
-│       └── monitoring/     # CloudWatch
-├── backend/
-│   ├── cmd/
-│   │   ├── lambda/         # Lambda entrypoint
-│   │   │   └── main.go
-│   │   └── local/          # Local dev server (Gin directo)
-│   │       └── main.go
-│   ├── internal/
-│   │   ├── identity/       # Clerk JWKS verification
-│   │   ├── clerkwebhook/   # Clerk webhook handler
-│   │   ├── billing/        # Stripe billing
-│   │   ├── notifications/  # Email notifications (SES/SMTP/Noop)
-│   │   ├── admin/          # Admin console, tenant settings
-│   │   ├── users/          # User management, API keys
-│   │   ├── org/            # Organization CRUD
-│   │   ├── audit/          # Audit log
-│   │   ├── shared/
-│   │   │   ├── handlers/   # Auth middleware
-│   │   │   └── authz/      # Permissions, scopes
-│   │   └── verticals/      # Plugin point for verticals (empty for now)
-│   ├── pkg/
-│   │   ├── http/errors/    # Structured HTTP errors
-│   │   ├── utils/          # AES-GCM, SHA256, canonical JSON
-│   │   └── types/          # Context keys, error codes
-│   ├── migrations/
-│   │   ├── 0001_base_schema.up.sql
-│   │   ├── 0001_base_schema.down.sql
-│   │   ├── 0002_billing.up.sql
-│   │   ├── 0002_billing.down.sql
-│   │   ├── 0003_notifications.up.sql
-│   │   └── 0003_notifications.down.sql
-│   ├── wire/               # DI providers
-│   ├── go.mod
-│   └── go.sum
-├── frontend/
-│   ├── src/
-│   │   ├── app/App.tsx
-│   │   ├── api/client.ts   # HTTP client with Clerk JWT
-│   │   ├── lib/
-│   │   │   ├── api.ts      # API functions
-│   │   │   ├── types.ts    # TypeScript types
-│   │   │   └── auth.ts     # clerkEnabled flag
-│   │   ├── components/
-│   │   │   ├── Shell.tsx
-│   │   │   ├── ProtectedRoute.tsx
-│   │   │   └── AuthTokenBridge.tsx
-│   │   └── pages/
-│   │       ├── LoginPage.tsx
-│   │       ├── SignupPage.tsx
-│   │       ├── DashboardPage.tsx
-│   │       ├── SettingsPage.tsx
-│   │       ├── BillingPage.tsx
-│   │       ├── AdminPage.tsx
-│   │       ├── NotificationPreferencesPage.tsx
-│   │       └── APIKeysPage.tsx
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   └── index.html
-├── .env.example
-├── docker-compose.yml      # Dev local: postgres, mailhog
+│   ├── ci.yml                  # Tests, lint, build
+│   └── deploy.yml              # Build → zip → Lambda update + S3 sync
+├── go.work                     # Go workspace
+├── pkgs/go-pkg/                # Librería Go compartida entre servicios
+├── docker-compose.yml          # Dev: postgres, mailhog, backend (Air), frontend (Vite)
 ├── Makefile
+├── .env.example
+├── control-plane/              # Servicio base transversal (auth, billing, tenants, admin)
+│   ├── infra/                  # Terraform
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   ├── terraform.tfvars.example
+│   │   └── modules/
+│   │       ├── networking/     # VPC, subnets, security groups
+│   │       ├── database/       # RDS + RDS Proxy
+│   │       ├── lambda/         # Lambda functions + API Gateway
+│   │       ├── cdn/            # S3 + CloudFront
+│   │       ├── secrets/        # Secrets Manager
+│   │       └── monitoring/     # CloudWatch
+│   ├── backend/
+│   │   ├── cmd/
+│   │   │   ├── lambda/         # Lambda entrypoint
+│   │   │   │   └── main.go
+│   │   │   └── local/          # Local dev server (Gin directo)
+│   │   │       └── main.go
+│   │   ├── internal/
+│   │   │   ├── identity/       # Clerk JWKS verification
+│   │   │   ├── clerkwebhook/   # Clerk webhook handler
+│   │   │   ├── billing/        # Stripe billing
+│   │   │   ├── notifications/  # Email notifications (SES/SMTP/Noop)
+│   │   │   ├── admin/          # Admin console, tenant settings
+│   │   │   ├── users/          # User management, API keys
+│   │   │   ├── org/            # Organization CRUD
+│   │   │   ├── audit/          # Audit log
+│   │   │   ├── shared/
+│   │   │   │   ├── handlers/   # Auth middleware, CORS middleware
+│   │   │   │   ├── authz/      # Permissions, scopes
+│   │   │   │   ├── config/     # Config from env vars
+│   │   │   │   ├── store/      # GORM DB connection
+│   │   │   │   └── app/        # App struct (Router)
+│   │   │   └── verticals/      # Plugin point for verticals (empty for now)
+│   │   ├── pkg/
+│   │   │   ├── http/errors/    # Structured HTTP errors
+│   │   │   ├── utils/          # SHA256, canonical JSON, API key generation
+│   │   │   └── types/          # Context keys
+│   │   ├── migrations/
+│   │   │   ├── runner.go       # golang-migrate runner (embed.FS)
+│   │   │   ├── 0001_base_schema.up.sql / .down.sql
+│   │   │   ├── 0002_billing.up.sql / .down.sql
+│   │   │   ├── 0003_notifications.up.sql / .down.sql
+│   │   │   └── 0004_local_seed.up.sql / .down.sql
+│   │   ├── wire/               # DI manual (bootstrap.go)
+│   │   ├── go.mod
+│   │   └── go.sum
+│   └── frontend/
+│       ├── src/
+│       │   ├── app/App.tsx
+│       │   ├── api/client.ts   # HTTP client with Clerk JWT
+│       │   ├── lib/
+│       │   │   ├── api.ts      # API functions
+│       │   │   ├── types.ts    # TypeScript types
+│       │   │   └── auth.ts     # clerkEnabled flag
+│       │   ├── components/
+│       │   │   ├── Shell.tsx
+│       │   │   ├── ProtectedRoute.tsx
+│       │   │   └── AuthTokenBridge.tsx
+│       │   └── pages/
+│       │       ├── LoginPage.tsx
+│       │       ├── SignupPage.tsx
+│       │       ├── DashboardPage.tsx
+│       │       ├── SettingsPage.tsx
+│       │       ├── BillingPage.tsx
+│       │       ├── AdminPage.tsx
+│       │       ├── NotificationPreferencesPage.tsx
+│       │       └── APIKeysPage.tsx
+│       ├── package.json
+│       ├── vite.config.ts
+│       ├── tsconfig.json
+│       └── index.html
+├── prompts/                    # Prompts de diseño del proyecto
 └── README.md
 ```
 
@@ -813,7 +819,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -825,9 +833,53 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  backend:
+    build:
+      context: ./control-plane/backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8100:8080"
+    volumes:
+      - ./control-plane/backend:/app
+      - backend_go_mod:/go/pkg/mod
+      - backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      SMTP_HOST: mailhog
+      FRONTEND_URL: http://localhost:5180
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./control-plane/frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5180:5173"
+    volumes:
+      - ./control-plane/frontend/src:/app/src
+      - ./control-plane/frontend/public:/app/public
+      - ./control-plane/frontend/index.html:/app/index.html
+      - ./control-plane/frontend/vite.config.ts:/app/vite.config.ts
+      - ./control-plane/frontend/tsconfig.json:/app/tsconfig.json
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: http://localhost:8100
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  backend_go_mod:
+  backend_go_build:
 ```
 
-No se necesita Redis (no hay rate-limiting complejo en base). Si un vertical lo necesita, se agrega después.
+Hot reload: backend usa Air (recompila Go en cambios), frontend usa Vite HMR. No se necesita Redis (no hay rate-limiting complejo en base). Si un vertical lo necesita, se agrega después.
 
 ---
 
@@ -835,7 +887,9 @@ No se necesita Redis (no hay rate-limiting complejo en base). Si un vertical lo 
 
 ```env
 # ── Database ──
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable
+# Dentro de Docker (compose override): postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+# Fuera de Docker (go run local):      postgres://postgres:postgres@localhost:5434/pymes?sslmode=disable
+DATABASE_URL=postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
 
 # ── Server ──
 PORT=8080
@@ -861,15 +915,19 @@ STRIPE_PRICE_ENTERPRISE=price_zzz
 NOTIFICATION_BACKEND=noop
 AWS_REGION=us-east-1
 AWS_SES_FROM_EMAIL=noreply@example.com
-SMTP_HOST=localhost
+SMTP_HOST=mailhog
 SMTP_PORT=1025
 
-# ── CORS / Frontend URLs ──
-FRONTEND_URL=http://localhost:5173
+# ── CORS / Frontend URLs (puertos Docker: backend=8100, frontend=5180) ──
+FRONTEND_URL=http://localhost:5180
 
 # ── Frontend (Vite) ──
 VITE_CLERK_PUBLISHABLE_KEY=
-VITE_API_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8100
+VITE_API_KEY=psk_local_admin
+VITE_API_ACTOR=local-admin
+VITE_API_ROLE=admin
+VITE_API_SCOPES=admin:console:read,admin:console:write
 ```
 
 ---
@@ -894,7 +952,7 @@ El frontend sigue el mismo patrón: cada vertical agrega sus pages y rutas.
 1. **Go**: 1.24, módulos, `zerolog` para logging, GORM para DB
 2. **Gin**: mismo engine para Lambda y local, solo cambia entrypoint
 3. **Hexagonal**: handler → usecases → repository, interfaces definidas por el consumidor
-4. **Wire**: para DI, un Set por módulo
+4. **DI**: manual en `wire/bootstrap.go` (constructores explícitos, sin code generation)
 5. **Secrets**: nunca en código ni en .tfvars. Secrets Manager en prod, .env en dev
 6. **Notificaciones**: sincrónicas antes de responder (en Lambda, goroutines fire-and-forget no son confiables). Errores se logean, nunca fallan el request. Si port es nil, no envían.
 7. **Stripe client**: usar `client.API` (per-instance), NO `stripe.Key` (global)
@@ -913,7 +971,7 @@ El frontend sigue el mismo patrón: cada vertical agrega sus pages y rutas.
 - [ ] `go test ./...` todos los tests pasan
 - [ ] `npm run build` (frontend) exitoso
 - [ ] Lambda entrypoint compila y expone Gin via `aws-lambda-go-api-proxy`
-- [ ] Local entrypoint corre Gin en :8080
+- [ ] Local entrypoint corre Gin en :8080 (mapeado a :8100 en Docker)
 - [ ] POST /v1/webhooks/clerk verifica Svix y sincroniza usuarios
 - [ ] POST /v1/webhooks/stripe verifica firma y procesa checkout/cancellation/payment
 - [ ] GET/PUT /v1/notifications/preferences funciona
@@ -922,7 +980,7 @@ El frontend sigue el mismo patrón: cada vertical agrega sus pages y rutas.
 - [ ] GET /v1/audit retorna entries con hash chain
 - [ ] Auth middleware soporta JWT y API key dual
 - [ ] Frontend: login → dashboard → billing → admin → settings funcional
-- [ ] docker-compose up levanta postgres + mailhog
+- [ ] docker-compose up levanta postgres + mailhog + backend (Air hot reload) + frontend (Vite HMR)
 - [ ] Estructura de archivos limpia, sin código de dominio específico
 
 ---
@@ -942,7 +1000,7 @@ El frontend sigue el mismo patrón: cada vertical agrega sus pages y rutas.
 11. `internal/clerkwebhook/` — Clerk webhooks
 12. `internal/billing/` — Stripe billing
 13. `internal/notifications/` — email (SES/SMTP/Noop) + preferences
-14. `wire/` — providers y bootstrap routes
+14. `wire/bootstrap.go` — DI manual y registro de rutas
 15. `cmd/lambda/main.go` + `cmd/local/main.go`
 16. Frontend: pages base
 17. docker-compose.yml + .env.example + Makefile

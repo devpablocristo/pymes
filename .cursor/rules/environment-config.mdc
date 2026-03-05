@@ -1,0 +1,16 @@
+---
+description: Reglas de entorno y configuracion (Lambda + RDS PostgreSQL)
+globs:
+alwaysApply: true
+---
+
+# Principios obligatorios para este repo
+
+- El codigo de aplicacion es uno solo para todos los ambientes (local, dev, staging, prod).
+- No se permiten forks de logica por ambiente dentro del codigo fuente.
+- Las diferencias por ambiente se definen por configuracion externa (variables de entorno Lambda, Secrets Manager, Terraform variables, .env local).
+- `DATABASE_URL`, claves de Stripe/Clerk, webhook secrets, y cualquier credencial se reciben por variable de entorno, nunca hardcodeados.
+- Nombres de buckets S3, dominios de CloudFront, region AWS, y cualquier recurso se reciben por variable de entorno.
+- En produccion: Secrets Manager para credenciales, variables de entorno Lambda para config no sensible.
+- En local: `.env` con `docker-compose.yml` (postgres + mailhog). El backend corre con `go run ./cmd/local/` directo contra la DB local.
+- Si una configuracion local cambia, debe actualizarse de forma centralizada en `.env.example` y documentarse, nunca manualmente modulo por modulo.

@@ -1,0 +1,72 @@
+package audit
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
+)
+
+type RepositoryPort interface {
+	Add(orgID uuid.UUID, actor, action, resourceType, resourceID string, payload map[string]any) domain.Entry
+	List(orgID uuid.UUID, limit int) []domain.Entry
+	ExportCSV(orgID uuid.UUID) (string, error)
+}
+
+type Usecases struct {
+	repo RepositoryPort
+}
+
+func NewUsecases(repo RepositoryPort) *Usecases {
+	return &Usecases{repo: repo}
+}
+
+func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+	_ = ctx
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return
+	}
+	u.repo.Add(id, actor, action, resourceType, resourceID, payload)
+}
+
+func (u *Usecases) List(ctx context.Context, orgID string, limit int) ([]domain.Entry, error) {
+	_ = ctx
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid org_id")
+	}
+	return u.repo.List(id, limit), nil
+}
+
+func (u *Usecases) Export(ctx context.Context, orgID, format string) (string, string, error) {
+	_ = ctx
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid org_id")
+	}
+	switch strings.ToLower(format) {
+	case "", "csv":
+		content, err := u.repo.ExportCSV(id)
+		if err != nil {
+			return "", "", err
+		}
+		return "csv", content, nil
+	case "jsonl":
+		entries := u.repo.List(id, 0)
+		lines := make([]string, 0, len(entries))
+		for _, e := range entries {
+			b, err := json.Marshal(e)
+			if err != nil {
+				return "", "", err
+			}
+			lines = append(lines, string(b))
+		}
+		return "jsonl", strings.Join(lines, "\n"), nil
+	default:
+		return "", "", fmt.Errorf("unsupported format: %s", format)
+	}
+}

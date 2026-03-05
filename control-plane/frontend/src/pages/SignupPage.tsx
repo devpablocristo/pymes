@@ -1,0 +1,20 @@
+import { Link } from 'react-router-dom';
+import { SignUp } from '@clerk/clerk-react';
+import { clerkEnabled } from '../lib/auth';
+
+export function SignupPage() {
+  if (clerkEnabled) {
+    return (
+      <div className="container">
+        <SignUp routing="path" path="/signup" signInUrl="/login" />
+      </div>
+    );
+  }
+  return (
+    <div className="container card">
+      <h1>Registro local</h1>
+      <p>Clerk deshabilitado en este ambiente.</p>
+      <Link to="/">Ir al dashboard</Link>
+    </div>
+  );
+}

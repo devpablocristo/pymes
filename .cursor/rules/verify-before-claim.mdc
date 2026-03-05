@@ -1,0 +1,28 @@
+---
+description: Probar e iterar antes de devolver cualquier resultado
+globs:
+alwaysApply: true
+---
+
+# Regla obligatoria: probar → corregir → repetir hasta éxito
+
+Antes de devolver **cualquier** resultado al usuario:
+
+1. **Ejecutar la prueba correspondiente** al cambio realizado:
+   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde `control-plane/backend/`
+   - Lambda entrypoint: `go build -o /dev/null ./cmd/lambda/` para verificar que compila
+   - Local entrypoint: `go build -o /dev/null ./cmd/local/` para verificar que compila
+   - Frontend (React/Vite): `npm run build` desde `control-plane/frontend/`
+   - Endpoint nuevo: levantar con `go run ./cmd/local/` y `curl` para verificar HTTP + body
+   - Infraestructura Terraform: `terraform validate` desde `control-plane/infra/`
+   - Migraciones SQL: verificar sintaxis y que up/down son reversibles
+   - Script nuevo: ejecutarlo y verificar que termina sin error
+   - Wire: `go generate ./wire/...` si se modificaron providers
+
+2. **Si falla: corregir y volver al paso 1.** No devolver el resultado hasta que pase.
+
+3. **Solo cuando la prueba pasa**, decirle al usuario que está listo.
+
+4. **Si el entorno no permite probar** (sin red, sin Docker, sin DB, etc.), decirlo explícitamente — nunca asumir que funciona.
+
+Nunca afirmar "listo", "funciona" o "debería andar" sin evidencia de una ejecución exitosa en este turno.

@@ -1,0 +1,4 @@
+project_name         = "pymes-control-plane"
+aws_region           = "us-east-1"
+lambda_image_uri     = "123456789012.dkr.ecr.us-east-1.amazonaws.com/pymes-control-plane-backend:latest"
+frontend_bucket_name = "pymes-control-plane-frontend"

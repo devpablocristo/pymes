@@ -1,0 +1,11 @@
+.env
+**/node_modules
+**/dist
+**/bin
+.DS_Store
+*.exe
+go.work.sum
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl

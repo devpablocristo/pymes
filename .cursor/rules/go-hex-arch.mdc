@@ -1,0 +1,138 @@
+---
+description: Arquitectura hexagonal Go - Lambda monolito Gin + PostgreSQL + Wire
+globs: "**/*.go"
+alwaysApply: true
+---
+
+# Go Hexagonal Architecture (Lambda monolito Gin + PostgreSQL)
+
+## Stack
+
+- **Runtime**: 1 Lambda monolito con `aws-lambda-go-api-proxy/gin`. Mismo código Gin para Lambda y local.
+- **DB**: RDS PostgreSQL 16 via RDS Proxy. ORM: GORM.
+- **DI**: Google Wire (`wire/` con un Set por módulo).
+- **Entrypoints**: `backend/cmd/lambda/main.go` (prod) y `backend/cmd/local/main.go` (dev).
+
+## Naming
+
+- El nombre del struct principal de un archivo debe coincidir con el nombre del archivo.
+  - `usecases.go` → `type Usecases struct`
+  - `handler.go` → `type Handler struct`
+  - `repository.go` → `type Repository struct`
+- El constructor sigue el mismo patron: `NewUsecases(...)`, `NewHandler(...)`, `NewRepository(...)`.
+
+## Accept interfaces, return structs
+
+- Los constructores devuelven `*Struct` (puntero a struct concreto), nunca una interfaz.
+- Las interfaces se definen en el **consumidor** (quien las necesita), no en el proveedor.
+
+## Ports en el consumidor
+
+- Cada adapter (handler, repository, gateway) define su propio port (interfaz) con **solo los metodos que necesita**.
+
+```go
+// handler.go — define su propio port
+type billingUsecase interface {
+    GetStatus(ctx context.Context, orgID uuid.UUID) (StatusResponse, error)
+    CreateCheckout(ctx context.Context, orgID uuid.UUID, req CheckoutRequest) (string, error)
+}
+
+type Handler struct {
+    uc billingUsecase
+}
+```
+
+## Handler (Gin)
+
+- `handler.go` es un adapter HTTP Gin. Recibe `*gin.Context`, extrae datos del request, llama al usecase, responde JSON.
+- Los handlers NO conocen Lambda. Lambda llega via `aws-lambda-go-api-proxy/gin` que traduce `APIGatewayV2HTTPRequest` → `*gin.Context` de forma transparente.
+- Las rutas se registran en `wire/bootstrap_routes.go`.
+
+```go
+// handler.go — adapter Gin
+func (h *Handler) GetStatus(c *gin.Context) {
+    orgID := c.GetString("org_id")
+    result, err := h.uc.GetStatus(c.Request.Context(), uuid.MustParse(orgID))
+    if err != nil {
+        httperrors.Respond(c, err)
+        return
+    }
+    c.JSON(http.StatusOK, handler_dto.FromDomain(result))
+}
+```
+
+## Repository (GORM + PostgreSQL)
+
+- `repository.go` usa GORM con PostgreSQL. Recibe `*gorm.DB` en el constructor.
+- Los modelos GORM viven en `repository/models/models.go`.
+- Las migraciones SQL viven en `backend/migrations/` (numeradas, up/down, idempotentes con `IF NOT EXISTS`).
+- `DATABASE_URL` se recibe por variable de entorno, nunca hardcodeado.
+
+## Inyeccion de dependencias (Wire)
+
+- Un Wire Set por módulo en `wire/<modulo>_providers.go`.
+- Los adapters entre módulos se implementan como funciones provider que castean un tipo concreto a la interface del consumidor.
+- `wire/bootstrap_routes.go` registra todas las rutas de todos los módulos en el `*gin.Engine`.
+
+```go
+// wire/billing_providers.go
+var BillingSet = wire.NewSet(
+    billing.NewRepository,
+    ProvideStripeClient,
+    ProvideTenantSettingsPort,
+    billing.NewUsecases,
+    billing.NewHandler,
+)
+```
+
+## Entrypoints
+
+```go
+// backend/cmd/lambda/main.go — prod (Lambda monolito)
+func init() {
+    app := wire.InitializeApp()
+    ginLambda = ginadapter.NewGinLambdaV2(app.Router)
+}
+func handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+    return ginLambda.ProxyWithContext(ctx, req)
+}
+func main() { lambda.Start(handler) }
+```
+
+```go
+// backend/cmd/local/main.go — dev (Gin directo)
+func main() {
+    app := wire.InitializeApp()
+    app.Router.Run(":8080")
+}
+```
+
+## Estructura por modulo
+
+```
+internal/<modulo>/
+  usecases.go              — logica de negocio (struct Usecases, define ports)
+  handler.go               — Gin HTTP adapter (struct Handler, define su port)
+  repository.go            — GORM/PostgreSQL adapter (struct Repository)
+  handler/dto/dto.go       — DTOs de entrada/salida HTTP
+  usecases/domain/         — entidades de dominio
+  repository/models/       — modelos GORM
+```
+
+## Patrón de Adapters
+
+Un **adapter** es cualquier componente que adapta una API externa al dominio (handler HTTP, executor externo, gateway adapter, etc.).
+
+### Regla obligatoria
+
+1. **Archivo principal en la raíz del dominio**: `adapter.go` (ej. `handler.go`, `executor.go`) queda en la raíz del módulo.
+2. **Directorio con el nombre del adapter**: Todo lo relacionado con ese adapter va en `adapter/`:
+   - `adapter/dto/` — DTOs de entrada/salida
+   - `adapter/` — cualquier archivo auxiliar del adapter
+3. **Dependencia explícita**: El adapter recibe y usa Usecases (o el port que corresponda).
+
+### Aplicar a
+
+- `handler` → `handler.go` + `handler/dto/` (Gin HTTP, rutas en wire/bootstrap_routes.go)
+- `executor` → `executor.go` + `executor/` (implementaciones de ports externos: JWKS, Stripe, SES)
+- `gateway_adapter` → `gateway_adapter.go` + `gateway_adapter/dto/` (llamadas entre módulos)

@@ -1,0 +1,36 @@
+---
+description: Escanear el repo completo antes de actualizar documentación
+globs:
+  - docs/**
+  - README.md
+alwaysApply: false
+---
+
+# Regla obligatoria: escanear antes de documentar
+
+Cuando el usuario pida actualizar, corregir o crear documentación:
+
+1. **ESCANEAR el proyecto completo** antes de escribir una sola línea:
+   - Estructura de directorios (`control-plane/backend/`, `control-plane/frontend/`, `control-plane/infra/`)
+   - Entry points reales (`control-plane/backend/cmd/lambda/main.go`, `control-plane/backend/cmd/local/main.go`)
+   - `control-plane/backend/go.mod`, `control-plane/frontend/package.json`
+   - Endpoints reales (`control-plane/backend/wire/bootstrap_routes.go`, handlers de cada módulo)
+   - Migraciones existentes (`control-plane/backend/migrations/`)
+   - Módulos en `control-plane/backend/internal/` (identity, billing, users, audit, admin, org, clerkwebhook, notifications, shared)
+   - Wire providers (`control-plane/backend/wire/`)
+   - Terraform (`control-plane/infra/modules/`)
+   - Variables de entorno (`.env.example`)
+   - Docker Compose (`docker-compose.yml`)
+   - CI/CD (`.github/workflows/`)
+
+2. **VERIFICAR** que cada afirmación en la documentación corresponde a código real:
+   - Si un módulo se menciona, verificar que el directorio existe en `control-plane/backend/internal/`
+   - Si un endpoint se documenta, verificar que la ruta existe en `control-plane/backend/wire/bootstrap_routes.go` o el handler
+   - Si una variable de entorno se lista, verificar que se lee en el código
+   - Si un recurso AWS se menciona (Lambda, RDS, S3, etc.), verificar en `control-plane/infra/`
+
+3. **NO INVENTAR**: no agregar features, endpoints, variables o flujos que no existan en el código actual.
+
+4. **ELIMINAR** referencias a componentes que ya no existen (módulos borrados, scripts renombrados, etc.)
+
+5. **DETECTAR** inconsistencias entre docs y código (nombres de rutas, variables, módulos) y corregir hacia lo que dice el código.

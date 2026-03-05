@@ -1,0 +1,110 @@
+package audit
+
+import (
+	"encoding/csv"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/repository/models"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
+	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+)
+
+type Repository struct {
+	db *gorm.DB
+}
+
+func NewRepository(db *gorm.DB) *Repository {
+	return &Repository{db: db}
+}
+
+func (r *Repository) Add(orgID uuid.UUID, actor, action, resourceType, resourceID string, payload map[string]any) domain.Entry {
+	var lastEntry models.AuditLogModel
+	prevHash := ""
+	if err := r.db.Where("org_id = ?", orgID).Order("created_at DESC").First(&lastEntry).Error; err == nil {
+		prevHash = lastEntry.Hash
+	}
+
+	canonicalPayload, _ := utils.CanonicalJSON(payload)
+	hash := utils.SHA256Hex(prevHash + string(canonicalPayload))
+
+	payloadJSON, _ := json.Marshal(payload)
+
+	m := models.AuditLogModel{
+		ID:           uuid.New(),
+		OrgID:        orgID,
+		Actor:        actor,
+		Action:       action,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Payload:      payloadJSON,
+		PrevHash:     prevHash,
+		Hash:         hash,
+		CreatedAt:    time.Now().UTC(),
+	}
+	r.db.Create(&m)
+
+	return auditToDomain(m)
+}
+
+func (r *Repository) List(orgID uuid.UUID, limit int) []domain.Entry {
+	if limit <= 0 {
+		limit = 200
+	}
+	var rows []models.AuditLogModel
+	r.db.Where("org_id = ?", orgID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&rows)
+
+	result := make([]domain.Entry, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, auditToDomain(row))
+	}
+	return result
+}
+
+func (r *Repository) ExportCSV(orgID uuid.UUID) (string, error) {
+	entries := r.List(orgID, 0)
+
+	var b strings.Builder
+	w := csv.NewWriter(&b)
+	if err := w.Write([]string{"id", "org_id", "actor", "action", "resource_type", "resource_id", "prev_hash", "hash", "created_at", "payload"}); err != nil {
+		return "", err
+	}
+	for _, e := range entries {
+		payload, _ := json.Marshal(e.Payload)
+		if err := w.Write([]string{
+			e.ID.String(), e.OrgID.String(), e.Actor, e.Action,
+			e.ResourceType, e.ResourceID, e.PrevHash, e.Hash,
+			e.CreatedAt.Format(time.RFC3339), string(payload),
+		}); err != nil {
+			return "", err
+		}
+	}
+	w.Flush()
+	return b.String(), w.Error()
+}
+
+func auditToDomain(m models.AuditLogModel) domain.Entry {
+	var payload map[string]any
+	if len(m.Payload) > 0 {
+		_ = json.Unmarshal(m.Payload, &payload)
+	}
+	return domain.Entry{
+		ID:           m.ID,
+		OrgID:        m.OrgID,
+		Actor:        m.Actor,
+		Action:       m.Action,
+		ResourceType: m.ResourceType,
+		ResourceID:   m.ResourceID,
+		Payload:      payload,
+		PrevHash:     m.PrevHash,
+		Hash:         m.Hash,
+		CreatedAt:    m.CreatedAt,
+	}
+}

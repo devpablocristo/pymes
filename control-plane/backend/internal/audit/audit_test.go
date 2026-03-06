@@ -14,22 +14,25 @@ type mockAuditRepo struct {
 	entries []domain.Entry
 }
 
-func (m *mockAuditRepo) Add(orgID uuid.UUID, actor, action, resourceType, resourceID string, payload map[string]any) domain.Entry {
+func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 	prevHash := ""
 	if len(m.entries) > 0 {
 		prevHash = m.entries[len(m.entries)-1].Hash
 	}
-	canonical, _ := utils.CanonicalJSON(payload)
+	canonical, _ := utils.CanonicalJSON(in.Payload)
 	hash := utils.SHA256Hex(prevHash + string(canonical))
 
 	entry := domain.Entry{
 		ID:           uuid.New(),
-		OrgID:        orgID,
-		Actor:        actor,
-		Action:       action,
-		ResourceType: resourceType,
-		ResourceID:   resourceID,
-		Payload:      payload,
+		OrgID:        in.OrgID,
+		Actor:        in.Actor.Legacy,
+		ActorType:    in.Actor.Type,
+		ActorID:      in.Actor.ID,
+		ActorLabel:   in.Actor.Label,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Payload:      in.Payload,
 		PrevHash:     prevHash,
 		Hash:         hash,
 	}
@@ -178,5 +181,40 @@ func TestAuditHashChain(t *testing.T) {
 		if repo.entries[i].PrevHash != repo.entries[i-1].Hash {
 			t.Errorf("entry %d PrevHash doesn't match entry %d Hash", i, i-1)
 		}
+	}
+}
+
+func TestAuditLogWithActor_Service(t *testing.T) {
+	repo := &mockAuditRepo{}
+	uc := NewUsecases(repo)
+	orgID := uuid.New()
+	serviceID := uuid.New()
+
+	uc.LogWithActor(context.Background(), domain.LogInput{
+		OrgID: orgID,
+		Actor: domain.ActorRef{
+			Legacy: "mercadopago_webhook",
+			Type:   "service",
+			ID:     &serviceID,
+			Label:  "Mercado Pago webhook",
+		},
+		Action:       "payment_gateway.payment.approved",
+		ResourceType: "sale",
+		ResourceID:   "sale-1",
+		Payload:      map[string]any{"provider": "mercadopago"},
+	})
+
+	if len(repo.entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(repo.entries))
+	}
+	entry := repo.entries[0]
+	if entry.ActorType != "service" {
+		t.Fatalf("ActorType = %q, want service", entry.ActorType)
+	}
+	if entry.ActorID == nil || *entry.ActorID != serviceID {
+		t.Fatalf("ActorID = %v, want %s", entry.ActorID, serviceID)
+	}
+	if entry.ActorLabel != "Mercado Pago webhook" {
+		t.Fatalf("ActorLabel = %q, want %q", entry.ActorLabel, "Mercado Pago webhook")
 	}
 }

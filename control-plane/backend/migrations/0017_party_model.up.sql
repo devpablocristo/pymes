@@ -243,7 +243,7 @@ SELECT DISTINCT
     s.org_id,
     'supplier',
     true,
-    NULL,
+    NULL::uuid,
     CASE WHEN COALESCE(NULLIF(TRIM(s.contact_name), ''), '') = '' THEN '{}'::jsonb ELSE jsonb_build_object('contact_name', s.contact_name) END,
     s.created_at
 FROM suppliers s
@@ -301,10 +301,13 @@ WITH members AS (
     SELECT
         om.id AS org_member_id,
         om.org_id,
-        u.id AS user_id,
-        gen_random_uuid() AS generated_party_id
+        p.id AS generated_party_id
     FROM org_members om
     JOIN users u ON u.id = om.user_id
+    JOIN parties p
+      ON p.org_id = om.org_id
+     AND p.metadata->>'system_key' = 'org_member'
+     AND p.metadata->>'user_external_id' = u.external_id
     WHERE om.party_id IS NULL
 ), updated AS (
     UPDATE org_members om
@@ -314,12 +317,12 @@ WITH members AS (
     RETURNING om.org_id, om.party_id
 )
 INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT party_id, org_id, 'employee', true, NULL, '{}'::jsonb, now()
+SELECT party_id, org_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
 FROM updated
 ON CONFLICT (party_id, org_id, role) DO NOTHING;
 
 INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT om.party_id, om.org_id, 'employee', true, NULL, '{}'::jsonb, now()
+SELECT om.party_id, om.org_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
 FROM org_members om
 WHERE om.party_id IS NOT NULL
 ON CONFLICT (party_id, org_id, role) DO NOTHING;
@@ -352,7 +355,7 @@ WHERE p.party_type = 'automated_agent'
 ON CONFLICT (party_id) DO NOTHING;
 
 INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT p.id, p.org_id, 'assistant', true, NULL, '{}'::jsonb, p.created_at
+SELECT p.id, p.org_id, 'assistant', true, NULL::uuid, '{}'::jsonb, p.created_at
 FROM parties p
 WHERE p.party_type = 'automated_agent'
   AND p.metadata->>'system_key' = 'assistant_ai'
@@ -596,7 +599,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_preferences_party ON payment_preferences(
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS suppliers;
 
-CREATE OR REPLACE VIEW customers AS
+CREATE VIEW customers AS
 SELECT
     p.id,
     p.org_id,
@@ -609,10 +612,10 @@ SELECT
     p.notes,
     p.tags,
     p.metadata,
-    pr.price_list_id,
     p.created_at,
     p.updated_at,
-    p.deleted_at
+    p.deleted_at,
+    pr.price_list_id
 FROM parties p
 JOIN party_roles r
     ON r.party_id = p.id
@@ -624,7 +627,7 @@ LEFT JOIN party_roles pr
    AND pr.org_id = p.org_id
    AND pr.role = 'customer';
 
-CREATE OR REPLACE VIEW suppliers AS
+CREATE VIEW suppliers AS
 SELECT
     p.id,
     p.org_id,

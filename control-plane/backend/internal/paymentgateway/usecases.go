@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/skip2/go-qrcode"
 
+	auditdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
 	gatewaydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/usecases/domain"
 )
@@ -29,6 +30,7 @@ const (
 	mpPreferenceTTL         = 72 * time.Hour
 	mpOAuthStateTTL         = 45 * time.Minute
 	growthMonthlyLinksLimit = 50
+	mpWebhookServiceName    = "mercadopago_webhook"
 )
 
 var (
@@ -51,6 +53,7 @@ type repositoryPort interface {
 
 	GetConnection(ctx context.Context, orgID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error)
 	GetConnectionByExternalUserID(ctx context.Context, externalUserID string) (gatewaydomain.PaymentGatewayConnection, error)
+	GetServiceIDByName(ctx context.Context, name string) (uuid.UUID, error)
 	ListActiveConnections(ctx context.Context) ([]gatewaydomain.PaymentGatewayConnection, error)
 	SaveConnection(ctx context.Context, in gatewaydomain.PaymentGatewayConnection) error
 	Disconnect(ctx context.Context, orgID uuid.UUID) error
@@ -77,9 +80,14 @@ type mercadoPagoPort interface {
 	GetPaymentDetail(ctx context.Context, accessToken, paymentID string) (gateway.PaymentDetail, error)
 }
 
+type auditPort interface {
+	LogWithActor(ctx context.Context, in auditdomain.LogInput)
+}
+
 type Usecases struct {
 	repo            repositoryPort
 	mp              mercadoPagoPort
+	audit           auditPort
 	crypto          *Crypto
 	mpAppID         string
 	mpClientSecret  string
@@ -92,6 +100,7 @@ type Usecases struct {
 func NewUsecases(
 	repo repositoryPort,
 	mp mercadoPagoPort,
+	audit auditPort,
 	crypto *Crypto,
 	mpAppID string,
 	mpClientSecret string,
@@ -102,6 +111,7 @@ func NewUsecases(
 	return &Usecases{
 		repo:            repo,
 		mp:              mp,
+		audit:           audit,
 		crypto:          crypto,
 		mpAppID:         strings.TrimSpace(mpAppID),
 		mpClientSecret:  strings.TrimSpace(mpClientSecret),
@@ -492,7 +502,7 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 
 	switch refType {
 	case "sale":
-		return u.repo.ProcessApprovedSalePayment(ctx, ProcessSalePaymentInput{
+		err := u.repo.ProcessApprovedSalePayment(ctx, ProcessSalePaymentInput{
 			OrgID:         orgID,
 			SaleID:        refID,
 			Amount:        detail.TransactionAmount,
@@ -500,8 +510,13 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 			ExternalPayer: detail.PayerEmail,
 			PaidAt:        u.now(),
 		})
+		if err != nil {
+			return err
+		}
+		u.logWebhookApproval(ctx, orgID, "sale", refID, evt.ExternalEventID, detail)
+		return nil
 	case "quote":
-		return u.repo.MarkPreferenceApproved(
+		err := u.repo.MarkPreferenceApproved(
 			ctx,
 			orgID,
 			refType,
@@ -509,9 +524,54 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 			detail.PayerEmail,
 			u.now(),
 		)
+		if err != nil {
+			return err
+		}
+		u.logWebhookApproval(ctx, orgID, "quote", refID, evt.ExternalEventID, detail)
+		return nil
 	default:
 		return nil
 	}
+}
+
+func (u *Usecases) logWebhookApproval(
+	ctx context.Context,
+	orgID uuid.UUID,
+	refType string,
+	refID uuid.UUID,
+	eventID string,
+	detail gateway.PaymentDetail,
+) {
+	if u.audit == nil {
+		return
+	}
+
+	actor := auditdomain.ActorRef{
+		Legacy: mpWebhookServiceName,
+		Type:   "service",
+		Label:  "Mercado Pago webhook",
+	}
+	if serviceID, err := u.repo.GetServiceIDByName(ctx, mpWebhookServiceName); err == nil && serviceID != uuid.Nil {
+		actor.ID = &serviceID
+	}
+
+	u.audit.LogWithActor(ctx, auditdomain.LogInput{
+		OrgID:  orgID,
+		Actor:  actor,
+		Action: "payment_gateway.payment.approved",
+		ResourceType: refType,
+		ResourceID:   refID.String(),
+		Payload: map[string]any{
+			"provider":           providerMercadoPago,
+			"reference_type":     refType,
+			"payment_id":         strings.TrimSpace(detail.ID),
+			"event_id":           strings.TrimSpace(eventID),
+			"external_reference": strings.TrimSpace(detail.ExternalReference),
+			"amount":             detail.TransactionAmount,
+			"payer":              strings.TrimSpace(detail.PayerEmail),
+			"status":             strings.TrimSpace(detail.Status),
+		},
+	})
 }
 
 func (u *Usecases) ensureConnectionAccessToken(

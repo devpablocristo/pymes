@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	auditdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
 	gatewaydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/usecases/domain"
 )
@@ -24,6 +25,9 @@ type fakeRepo struct {
 
 	connection    gatewaydomain.PaymentGatewayConnection
 	connectionErr error
+
+	serviceIDByName uuid.UUID
+	serviceIDErr    error
 
 	listConnections []gatewaydomain.PaymentGatewayConnection
 	listErr         error
@@ -97,6 +101,13 @@ func (f *fakeRepo) GetConnection(ctx context.Context, orgID uuid.UUID) (gatewayd
 
 func (f *fakeRepo) GetConnectionByExternalUserID(ctx context.Context, externalUserID string) (gatewaydomain.PaymentGatewayConnection, error) {
 	return f.connection, nil
+}
+
+func (f *fakeRepo) GetServiceIDByName(ctx context.Context, name string) (uuid.UUID, error) {
+	if f.serviceIDErr != nil {
+		return uuid.Nil, f.serviceIDErr
+	}
+	return f.serviceIDByName, nil
 }
 
 func (f *fakeRepo) ListActiveConnections(ctx context.Context) ([]gatewaydomain.PaymentGatewayConnection, error) {
@@ -245,6 +256,15 @@ func (f *fakeMP) GetPaymentDetail(ctx context.Context, accessToken, paymentID st
 	return f.detailOut, nil
 }
 
+type fakeAudit struct {
+	inputs []auditdomain.LogInput
+}
+
+func (f *fakeAudit) LogWithActor(ctx context.Context, in auditdomain.LogInput) {
+	_ = ctx
+	f.inputs = append(f.inputs, in)
+}
+
 func newTestUsecases(t *testing.T, repo *fakeRepo, mp *fakeMP) *Usecases {
 	t.Helper()
 	crypto, err := NewCrypto(testEncryptionKey)
@@ -254,6 +274,7 @@ func newTestUsecases(t *testing.T, repo *fakeRepo, mp *fakeMP) *Usecases {
 	uc := NewUsecases(
 		repo,
 		mp,
+		nil,
 		crypto,
 		"app-id",
 		"client-secret",
@@ -322,6 +343,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 	uc := NewUsecases(
 		repo,
 		mp,
+		nil,
 		crypto,
 		"app-id",
 		"client-secret",
@@ -383,6 +405,7 @@ func TestProcessWebhookStoresPaymentEvent(t *testing.T) {
 func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	orgID := uuid.New()
 	saleID := uuid.New()
+	serviceID := uuid.New()
 	crypto, err := NewCrypto(testEncryptionKey)
 	if err != nil {
 		t.Fatalf("NewCrypto() error = %v", err)
@@ -391,6 +414,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	encRefresh, _ := crypto.Encrypt("refresh-token")
 
 	repo := &fakeRepo{
+		serviceIDByName: serviceID,
 		getByExternalErr: ErrNotFound,
 		listConnections: []gatewaydomain.PaymentGatewayConnection{
 			{
@@ -420,7 +444,21 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 			PayerEmail:        "payer@example.com",
 		},
 	}
-	uc := newTestUsecases(t, repo, mp)
+	audit := &fakeAudit{}
+	uc := NewUsecases(
+		repo,
+		mp,
+		audit,
+		crypto,
+		"app-id",
+		"client-secret",
+		"webhook-secret",
+		"http://localhost:8100/v1/payment-gateway/callback",
+		"http://localhost:5180",
+	)
+	uc.now = func() time.Time {
+		return time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC)
+	}
 
 	processed, err := uc.ProcessPendingWebhookEvents(context.Background(), 10)
 	if err != nil {
@@ -437,6 +475,19 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	}
 	if len(repo.markProcessedIDs) != 1 {
 		t.Fatalf("expected 1 processed event, got %d", len(repo.markProcessedIDs))
+	}
+	if len(audit.inputs) != 1 {
+		t.Fatalf("expected 1 audit input, got %d", len(audit.inputs))
+	}
+	logged := audit.inputs[0]
+	if logged.Actor.Type != "service" {
+		t.Fatalf("actor type = %q, want service", logged.Actor.Type)
+	}
+	if logged.Actor.ID == nil || *logged.Actor.ID != serviceID {
+		t.Fatalf("actor id = %v, want %s", logged.Actor.ID, serviceID)
+	}
+	if logged.Action != "payment_gateway.payment.approved" {
+		t.Fatalf("action = %q", logged.Action)
 	}
 }
 

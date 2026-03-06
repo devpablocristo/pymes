@@ -1,7 +1,10 @@
+// Package wire wires the application dependencies and routes.
 package wire
 
 import (
+	"context"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -151,6 +154,7 @@ func InitializeApp() *app.App {
 	paymentGatewayUC := paymentgateway.NewUsecases(
 		paymentGatewayRepo,
 		paymentgatewayclient.NewMercadoPagoGateway(),
+		auditUC,
 		paymentGatewayCrypto,
 		cfg.MPAppID,
 		cfg.MPClientSecret,
@@ -218,6 +222,15 @@ func InitializeApp() *app.App {
 	router.Use(handlers.NewCORSMiddleware(cfg.FrontendURL))
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
+	})
+	router.GET("/readyz", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := store.Ping(ctx, db); err != nil {
+			c.JSON(503, gin.H{"status": "not_ready", "error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ready"})
 	})
 
 	v1 := router.Group("/v1")

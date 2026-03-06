@@ -22,25 +22,33 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) Add(orgID uuid.UUID, actor, action, resourceType, resourceID string, payload map[string]any) domain.Entry {
+func (r *Repository) Add(in domain.LogInput) domain.Entry {
 	var lastEntry models.AuditLogModel
 	prevHash := ""
-	if err := r.db.Where("org_id = ?", orgID).Order("created_at DESC").First(&lastEntry).Error; err == nil {
+	if err := r.db.Where("org_id = ?", in.OrgID).Order("created_at DESC").First(&lastEntry).Error; err == nil {
 		prevHash = lastEntry.Hash
 	}
 
-	canonicalPayload, _ := utils.CanonicalJSON(payload)
+	canonicalPayload, _ := utils.CanonicalJSON(in.Payload)
 	hash := utils.SHA256Hex(prevHash + string(canonicalPayload))
 
-	payloadJSON, _ := json.Marshal(payload)
+	payloadJSON, _ := json.Marshal(in.Payload)
+	actorType := normalizeActorType(in.Actor.Type)
+	actorLabel := strings.TrimSpace(in.Actor.Label)
+	if actorLabel == "" {
+		actorLabel = strings.TrimSpace(in.Actor.Legacy)
+	}
 
 	m := models.AuditLogModel{
 		ID:           uuid.New(),
-		OrgID:        orgID,
-		Actor:        actor,
-		Action:       action,
-		ResourceType: resourceType,
-		ResourceID:   resourceID,
+		OrgID:        in.OrgID,
+		Actor:        strings.TrimSpace(in.Actor.Legacy),
+		ActorType:    actorType,
+		ActorID:      in.Actor.ID,
+		ActorLabel:   actorLabel,
+		Action:       strings.TrimSpace(in.Action),
+		ResourceType: strings.TrimSpace(in.ResourceType),
+		ResourceID:   strings.TrimSpace(in.ResourceID),
 		Payload:      payloadJSON,
 		PrevHash:     prevHash,
 		Hash:         hash,
@@ -73,13 +81,17 @@ func (r *Repository) ExportCSV(orgID uuid.UUID) (string, error) {
 
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	if err := w.Write([]string{"id", "org_id", "actor", "action", "resource_type", "resource_id", "prev_hash", "hash", "created_at", "payload"}); err != nil {
+	if err := w.Write([]string{"id", "org_id", "actor", "actor_type", "actor_id", "actor_label", "action", "resource_type", "resource_id", "prev_hash", "hash", "created_at", "payload"}); err != nil {
 		return "", err
 	}
 	for _, e := range entries {
 		payload, _ := json.Marshal(e.Payload)
+		actorID := ""
+		if e.ActorID != nil {
+			actorID = e.ActorID.String()
+		}
 		if err := w.Write([]string{
-			e.ID.String(), e.OrgID.String(), e.Actor, e.Action,
+			e.ID.String(), e.OrgID.String(), e.Actor, e.ActorType, actorID, e.ActorLabel, e.Action,
 			e.ResourceType, e.ResourceID, e.PrevHash, e.Hash,
 			e.CreatedAt.Format(time.RFC3339), string(payload),
 		}); err != nil {
@@ -99,6 +111,9 @@ func auditToDomain(m models.AuditLogModel) domain.Entry {
 		ID:           m.ID,
 		OrgID:        m.OrgID,
 		Actor:        m.Actor,
+		ActorType:    m.ActorType,
+		ActorID:      m.ActorID,
+		ActorLabel:   m.ActorLabel,
 		Action:       m.Action,
 		ResourceType: m.ResourceType,
 		ResourceID:   m.ResourceID,
@@ -106,5 +121,14 @@ func auditToDomain(m models.AuditLogModel) domain.Entry {
 		PrevHash:     m.PrevHash,
 		Hash:         m.Hash,
 		CreatedAt:    m.CreatedAt,
+	}
+}
+
+func normalizeActorType(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "party", "service", "system":
+		return strings.ToLower(strings.TrimSpace(raw))
+	default:
+		return "user"
 	}
 }

@@ -147,6 +147,24 @@ func (r *Repository) GetConnectionByExternalUserID(ctx context.Context, external
 	return toConnectionDomain(row), nil
 }
 
+func (r *Repository) GetServiceIDByName(ctx context.Context, name string) (uuid.UUID, error) {
+	var row struct {
+		ID uuid.UUID
+	}
+	err := r.db.WithContext(ctx).
+		Table("services").
+		Select("id").
+		Where("name = ? AND is_active = true", strings.TrimSpace(name)).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, ErrNotFound
+		}
+		return uuid.Nil, err
+	}
+	return row.ID, nil
+}
+
 func (r *Repository) ListActiveConnections(ctx context.Context) ([]gatewaydomain.PaymentGatewayConnection, error) {
 	var rows []models.PaymentGatewayConnectionModel
 	if err := r.db.WithContext(ctx).Where("is_active = true").Find(&rows).Error; err != nil {

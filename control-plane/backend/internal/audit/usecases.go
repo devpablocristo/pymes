@@ -13,7 +13,7 @@ import (
 )
 
 type RepositoryPort interface {
-	Add(orgID uuid.UUID, actor, action, resourceType, resourceID string, payload map[string]any) domain.Entry
+	Add(in domain.LogInput) domain.Entry
 	List(orgID uuid.UUID, limit int) []domain.Entry
 	ExportCSV(orgID uuid.UUID) (string, error)
 }
@@ -32,7 +32,26 @@ func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourc
 	if err != nil {
 		return
 	}
-	u.repo.Add(id, actor, action, resourceType, resourceID, payload)
+	u.repo.Add(domain.LogInput{
+		OrgID: id,
+		Actor: domain.ActorRef{
+			Legacy: actor,
+			Type:   "user",
+			Label:  actor,
+		},
+		Action:       action,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Payload:      payload,
+	})
+}
+
+func (u *Usecases) LogWithActor(ctx context.Context, in domain.LogInput) {
+	_ = ctx
+	if in.OrgID == uuid.Nil {
+		return
+	}
+	u.repo.Add(in)
 }
 
 func (u *Usecases) List(ctx context.Context, orgID string, limit int) ([]domain.Entry, error) {

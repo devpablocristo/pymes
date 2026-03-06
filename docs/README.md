@@ -19,7 +19,7 @@ Para evitar duplicación:
 - `README.md` es la puerta de entrada corta del repo
 - `docs/README.md` es este documento canónico y más detallado
 - `prompts/` define el alcance funcional y arquitectónico fuente
-- `docs/prompt-05-commercial-agents.md` resume el estado implementado del Prompt 05
+- no deben existir resúmenes paralelos en `docs/` si su contenido puede vivir acá
 
 ## Estructura
 
@@ -209,7 +209,63 @@ Rutas nuevas:
 - `POST /v1/chat/commercial/sales`
 - `POST /v1/chat/commercial/procurement`
 
-Detalle implementado: [`docs/prompt-05-commercial-agents.md`](./prompt-05-commercial-agents.md)
+Arquitectura elegida:
+- vive dentro de `control-plane/ai`
+- reutiliza autenticación, cuotas, observabilidad y persistencia existentes
+- mantiene al backend Go como única fuente de verdad
+- evita duplicar catálogo, pagos, turnos, permisos y auditoría
+
+Modos implementados:
+- `external_sales`: agente comercial externo para web pública y WhatsApp
+- `internal_sales`: agente comercial interno para roles comerciales
+- `internal_procurement`: base del agente de compras interno
+
+Guardrails y policy layer:
+- `control-plane/ai/src/agents/policy.py`
+- allowlist de tools por modo
+- allowlist de tools por rol
+- filtro por módulos activos del tenant
+- confirmación explícita para escrituras sensibles
+- límites por cantidad de tool calls, timeout por tool y timeout total
+- separación fuerte entre canales externos e internos
+- sanitización básica de input conversacional
+- schema estricto para contratos agente-a-agente
+
+Contrato estructurado:
+- vive en `control-plane/ai/src/agents/contracts.py`
+- intents cubiertos: `request_quote`, `quote_response`, `counter_offer`, `offer_acceptance`, `offer_rejection`, `availability_request`, `availability_response`, `payment_request`, `reservation_request`
+- validaciones: campos requeridos, `request_id` estricto, `timestamp` con ventana válida, `extra=forbid`, chequeo de `org_id`, idempotencia por `request_id`
+
+Auditoría comercial:
+- tabla `ai_agent_events`
+- migración backend `0020_ai_agent_events`
+- registra `org_id`, `conversation_id`, `agent_mode`, `channel`, `actor_id`, `actor_type`, `action`, `tool_name`, `result`, `confirmed`, `metadata`, `external_request_id`
+
+Reutilización de backend:
+- `public info`
+- `public services`
+- `availability`
+- `book appointment`
+- `public quote payment link`
+- `customers`
+- `products`
+- `quotes`
+- `sales`
+- `accounts`
+- `suppliers`
+- `purchases`
+- `inventory`
+
+Estado del MVP:
+- externo: chat comercial dedicado, tools públicas acotadas, presupuesto preliminar controlado, disponibilidad, turnos con confirmación, contrato estructurado para agentes externos
+- interno ventas: búsqueda de clientes y productos, stock, presupuestos, ventas, links de pago, estado de cobro, confirmación previa para writes sensibles
+- base compras: herramientas de consulta, detección de stock bajo, borrador de compra no comprometible y puntos de extensión para proveedor y orden final
+
+Validaciones ejecutadas:
+- `cd control-plane/ai && .venv/bin/pytest -q tests`
+- `cd control-plane/backend && go test ./...`
+- `cd control-plane/backend && go vet ./...`
+- `cd control-plane/frontend && npm run build`
 
 ## Módulos principales del backend
 
@@ -403,7 +459,6 @@ curl http://localhost:8200/readyz
 ## Documentación relacionada
 
 - [`../README.md`](../README.md)
-- [`./prompt-05-commercial-agents.md`](./prompt-05-commercial-agents.md)
 
 ## Fuente de diseño
 

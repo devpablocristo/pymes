@@ -48,7 +48,6 @@ La documentación canónica del repo vive en `docs/README.md`.
 
 Lecturas recomendadas:
 - `docs/README.md`: guía operativa y arquitectónica consolidada
-- `docs/prompt-05-commercial-agents.md`: resumen de implementación del Prompt 05
 - `prompts/00-base-transversal.md` a `prompts/05-agentes-comerciales.md`: alcance y diseño funcional
 
 ## Estado actual

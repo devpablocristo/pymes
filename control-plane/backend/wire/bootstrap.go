@@ -24,6 +24,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
@@ -216,6 +217,7 @@ func InitializeApp() *app.App {
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -240,6 +242,10 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
 	whatsappHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
+
+	internalGroup := v1.Group("/internal/v1")
+	internalGroup.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
+	internalAPIHandler.RegisterRoutes(internalGroup)
 
 	public := v1.Group("/public/:org_id")
 	public.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))

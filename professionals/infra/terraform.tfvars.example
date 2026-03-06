@@ -1,0 +1,32 @@
+# =============================================================================
+# terraform.tfvars.example – Professionals Vertical
+# Copy to terraform.tfvars and fill in real values before applying.
+# =============================================================================
+
+project_name = "pymes-professionals"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# -- Lambda images (required) -------------------------------------------------
+# Build and push to ECR, then paste the URI here.
+backend_lambda_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/pymes-professionals-backend:latest"
+ai_lambda_image_uri      = "123456789012.dkr.ecr.us-east-1.amazonaws.com/pymes-professionals-ai:latest"
+
+# -- Lambda sizing (optional – defaults shown) ---------------------------------
+# backend_lambda_memory  = 512
+# backend_lambda_timeout = 30
+# ai_lambda_memory       = 1024
+# ai_lambda_timeout      = 60
+
+# -- Frontend bucket (optional – auto-generated if empty) ---------------------
+# frontend_bucket_name = "pymes-professionals-dev-frontend"
+
+# -- Custom domain (optional – leave empty to skip) ---------------------------
+# domain_name         = "api.professionals.example.com"
+# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# route53_zone_id     = "Z0123456789ABCDEFGHIJ"
+
+# -- Monitoring (optional) ----------------------------------------------------
+# alarm_sns_topic_arn     = "arn:aws:sns:us-east-1:123456789012:pymes-alerts"
+# backend_error_threshold = 5
+# ai_error_threshold      = 5

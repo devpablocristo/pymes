@@ -1,0 +1,21 @@
+FROM golang:1.24-alpine
+
+RUN apk add --no-cache git curl && \
+    curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b /usr/local/bin
+
+WORKDIR /workspace
+
+COPY go.work ./
+COPY professionals/backend/go.mod professionals/backend/go.sum ./professionals/backend/
+COPY pkgs/go-pkg/go.mod ./pkgs/go-pkg/
+
+WORKDIR /workspace/professionals/backend
+
+RUN go mod download
+
+COPY professionals/backend /workspace/professionals/backend
+COPY pkgs/go-pkg /workspace/pkgs/go-pkg
+
+EXPOSE 8081
+
+CMD ["air", "-c", ".air.toml"]

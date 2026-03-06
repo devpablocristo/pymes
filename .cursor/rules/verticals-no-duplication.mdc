@@ -1,0 +1,15 @@
+---
+description: Verticales autonomas sin duplicar la base transversal
+alwaysApply: true
+---
+
+# Verticales sobre `control-plane`
+
+- `control-plane` es la base transversal obligatoria del producto.
+- Ninguna vertical puede reimplementar capacidades ya existentes en `control-plane`.
+- Si una capacidad ya existe en `control-plane`, la vertical la consume por HTTP mediante contratos internos estables.
+- No se permite duplicar en una vertical: auth, API keys, tenant/org bootstrap, party model, customers, products, appointments, quotes, sales, payments, WhatsApp, billing, admin, ni la base comun de AI, salvo extraccion explicita y justificada del core.
+- Todo prompt o diseño de vertical debe empezar declarando dos listas: `reutiliza desde control-plane` y `crea nuevo en la vertical`.
+- Lo nuevo de la vertical debe ser solo el delta de dominio que `control-plane` no modela.
+- Si un backend nuevo se crea en este repo, se diseña desde el inicio como una Lambda independiente, no como proceso long-running asumido ni como modulo embebido en otro backend.
+- La separacion por servicio/Lambda no habilita duplicacion de dominio: separar despliegue no significa repetir ownership funcional.

@@ -1,0 +1,24 @@
+package controlplane
+
+import (
+	"context"
+	"fmt"
+)
+
+// GetBootstrap fetches the organization bootstrap payload from control-plane.
+func (c *Client) GetBootstrap(ctx context.Context, orgID string) (map[string]any, error) {
+	result, err := c.get(ctx, fmt.Sprintf("/v1/internal/v1/orgs/%s/bootstrap", orgID), orgID)
+	if err != nil {
+		return nil, fmt.Errorf("get bootstrap: %w", err)
+	}
+	return result, nil
+}
+
+// GetSettings fetches the tenant settings from control-plane.
+func (c *Client) GetSettings(ctx context.Context, orgID string) (map[string]any, error) {
+	result, err := c.get(ctx, fmt.Sprintf("/v1/internal/v1/orgs/%s/settings", orgID), orgID)
+	if err != nil {
+		return nil, fmt.Errorf("get settings: %w", err)
+	}
+	return result, nil
+}

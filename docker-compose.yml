@@ -81,7 +81,73 @@ services:
     depends_on:
       - backend
 
+  # ── Professionals Vertical ──
+
+  prof-backend:
+    build:
+      context: .
+      dockerfile: ./professionals/backend/Dockerfile.dev
+    ports:
+      - "8181:8081"
+    volumes:
+      - ./go.work:/workspace/go.work
+      - ./professionals/backend:/workspace/professionals/backend
+      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - prof_backend_go_mod:/go/pkg/mod
+      - prof_backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      CONTROL_PLANE_URL: http://backend:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  prof-frontend:
+    build:
+      context: .
+      dockerfile: ./professionals/frontend/Dockerfile.dev
+    ports:
+      - "5181:5174"
+    volumes:
+      - ./professionals/frontend/src:/workspace/professionals/frontend/src
+      - ./professionals/frontend/public:/workspace/professionals/frontend/public
+      - ./professionals/frontend/index.html:/workspace/professionals/frontend/index.html
+      - ./professionals/frontend/vite.config.ts:/workspace/professionals/frontend/vite.config.ts
+      - ./professionals/frontend/tsconfig.json:/workspace/professionals/frontend/tsconfig.json
+      - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
+    env_file:
+      - .env
+    environment:
+      VITE_PROFESSIONALS_API_URL: http://localhost:8181
+      VITE_API_URL: http://localhost:8100
+    depends_on:
+      - prof-backend
+
+  prof-ai:
+    build:
+      context: .
+      dockerfile: ./professionals/ai/Dockerfile.dev
+    ports:
+      - "8201:8001"
+    volumes:
+      - ./professionals/ai/src:/workspace/professionals/ai/src
+      - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
+    env_file:
+      - .env
+    environment:
+      BACKEND_URL: http://prof-backend:8081
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      - prof-backend
+
 volumes:
   pgdata:
   backend_go_mod:
   backend_go_build:
+  prof_backend_go_mod:
+  prof_backend_go_build:

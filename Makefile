@@ -42,10 +42,39 @@ ai-test: ## Run AI service tests
 ai-lint: ## Basic AI static check (compile)
 	cd control-plane/ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src)
 
+# ── Professionals Vertical ──
+
+prof-build: ## Build professionals backend
+	cd professionals/backend && go build ./...
+
+prof-test: ## Run professionals backend tests
+	cd professionals/backend && go test ./...
+
+prof-vet: ## Run go vet on professionals backend
+	cd professionals/backend && go vet ./...
+
+prof-run: ## Run professionals backend locally
+	cd professionals/backend && go run ./cmd/local
+
+prof-frontend-dev: ## Run professionals frontend dev server
+	cd professionals/frontend && npm run dev
+
+prof-frontend-build: ## Build professionals frontend
+	cd professionals/frontend && npm run build
+
+prof-ai-dev: ## Run professionals AI service locally
+	cd professionals/ai && (test -x .venv/bin/uvicorn && .venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload || uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload)
+
+prof-ai-test: ## Run professionals AI tests
+	cd professionals/ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
+
+prof-ai-lint: ## Basic professionals AI static check
+	cd professionals/ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src)
+
 # ── All services ──
 
-build: cp-build ai-lint ## Build all services
+build: cp-build prof-build ai-lint prof-ai-lint ## Build all services
 
-test: cp-test ai-test ## Test all services
+test: cp-test prof-test ai-test prof-ai-test ## Test all services
 
-lint: cp-vet ai-lint ## Lint all services
+lint: cp-vet prof-vet ai-lint prof-ai-lint ## Lint all services

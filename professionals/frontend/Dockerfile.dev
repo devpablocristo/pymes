@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+WORKDIR /workspace/professionals/frontend
+
+COPY professionals/frontend/package.json professionals/frontend/package-lock.json* ./
+RUN npm install
+
+COPY professionals/frontend/ ./
+COPY pkgs/ts-pkg /workspace/pkgs/ts-pkg
+
+EXPOSE 5174
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

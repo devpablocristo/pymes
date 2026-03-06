@@ -1,18 +1,17 @@
----
-description: Arquitectura hexagonal Go - Lambda monolito Gin + PostgreSQL
+description: Arquitectura hexagonal Go - servicios Lambda Gin + PostgreSQL
 globs: "**/*.go"
 alwaysApply: true
 ---
 
-# Go Hexagonal Architecture (Lambda monolito Gin + PostgreSQL)
+# Go Hexagonal Architecture (servicios Lambda Gin + PostgreSQL)
 
 ## Stack
 
-- **Runtime**: 1 Lambda monolito con `aws-lambda-go-api-proxy/gin`. Mismo código Gin para Lambda y local.
+- **Runtime**: cada backend Go del repo se diseña como una Lambda independiente con `aws-lambda-go-api-proxy/gin`. Mismo código Gin para Lambda y local.
 - **DB**: RDS PostgreSQL 16 via RDS Proxy. ORM: GORM.
 - **DI**: Manual en `wire/bootstrap.go` (constructores explícitos, sin code generation).
 - **Migraciones**: `golang-migrate` con `embed.FS` en `migrations/runner.go`, ejecutadas al arrancar.
-- **Entrypoints**: `control-plane/backend/cmd/lambda/main.go` (prod) y `control-plane/backend/cmd/local/main.go` (dev).
+- **Entrypoints**: cada servicio backend expone `cmd/lambda/main.go` (prod) y opcionalmente `cmd/local/main.go` (dev).
 
 ## Naming
 
@@ -47,7 +46,7 @@ type Handler struct {
 
 - `handler.go` es un adapter HTTP Gin. Recibe `*gin.Context`, extrae datos del request, llama al usecase, responde JSON.
 - Los handlers NO conocen Lambda. Lambda llega via `aws-lambda-go-api-proxy/gin` que traduce `APIGatewayV2HTTPRequest` → `*gin.Context` de forma transparente.
-- Las rutas se registran en `wire/bootstrap.go` (cada handler tiene un método `RegisterRoutes`).
+- Las rutas se registran en `wire/bootstrap.go` del servicio correspondiente (cada handler tiene un método `RegisterRoutes`).
 
 ```go
 // handler.go — adapter Gin
@@ -66,7 +65,7 @@ func (h *Handler) GetStatus(c *gin.Context) {
 
 - `repository.go` usa GORM con PostgreSQL. Recibe `*gorm.DB` en el constructor.
 - Los modelos GORM viven en `repository/models/models.go`.
-- Las migraciones SQL viven en `control-plane/backend/migrations/` (numeradas, up/down, idempotentes con `IF NOT EXISTS`).
+- Las migraciones SQL viven en el `migrations/` del servicio correspondiente (numeradas, up/down, idempotentes con `IF NOT EXISTS`).
 - `DATABASE_URL` se recibe por variable de entorno, nunca hardcodeado.
 
 ## Inyección de dependencias (manual)
@@ -97,7 +96,7 @@ func InitializeApp() *app.App {
 ## Entrypoints
 
 ```go
-// cmd/lambda/main.go — prod (Lambda monolito)
+// cmd/lambda/main.go — prod (Lambda del servicio)
 func init() {
     app := wire.InitializeApp()
     ginLambda = ginadapter.NewGinLambdaV2(app.Router)

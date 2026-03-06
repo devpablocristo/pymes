@@ -5,7 +5,7 @@ RUN apk add --no-cache git curl && \
 
 WORKDIR /workspace
 
-COPY go.work ./
+COPY professionals/backend/go.work.build ./go.work
 COPY professionals/backend/go.mod professionals/backend/go.sum ./professionals/backend/
 COPY pkgs/go-pkg/go.mod ./pkgs/go-pkg/
 

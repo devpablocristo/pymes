@@ -12,7 +12,6 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers/handler/dto"
 	customerdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/customers/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/authz"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
@@ -34,23 +33,19 @@ type Handler struct {
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
-func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
-	auth.GET("/customers", h.List)
-	auth.POST("/customers", h.Create)
-	auth.GET("/customers/export", h.ExportCSV)
-	auth.POST("/customers/import", h.ImportCSV)
-	auth.GET("/customers/:id", h.Get)
-	auth.PUT("/customers/:id", h.Update)
-	auth.DELETE("/customers/:id", h.Delete)
-	auth.GET("/customers/:id/sales", h.SalesHistory)
+func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
+	auth.GET("/customers", rbac.RequirePermission("customers", "read"), h.List)
+	auth.POST("/customers", rbac.RequirePermission("customers", "create"), h.Create)
+	auth.GET("/customers/export", rbac.RequirePermission("customers", "export"), h.ExportCSV)
+	auth.POST("/customers/import", rbac.RequirePermission("customers", "import"), h.ImportCSV)
+	auth.GET("/customers/:id", rbac.RequirePermission("customers", "read"), h.Get)
+	auth.PUT("/customers/:id", rbac.RequirePermission("customers", "update"), h.Update)
+	auth.DELETE("/customers/:id", rbac.RequirePermission("customers", "delete"), h.Delete)
+	auth.GET("/customers/:id/sales", rbac.RequirePermission("customers", "read"), h.SalesHistory)
 }
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -92,10 +87,6 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -132,10 +123,6 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -156,10 +143,6 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -200,10 +183,6 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -223,10 +202,6 @@ func (h *Handler) Delete(c *gin.Context) {
 
 func (h *Handler) SalesHistory(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -259,10 +234,6 @@ func (h *Handler) SalesHistory(c *gin.Context) {
 
 func (h *Handler) ExportCSV(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -279,10 +250,6 @@ func (h *Handler) ExportCSV(c *gin.Context) {
 
 func (h *Handler) ImportCSV(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})

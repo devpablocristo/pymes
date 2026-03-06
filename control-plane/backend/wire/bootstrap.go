@@ -21,6 +21,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/rbac"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/app"
@@ -61,6 +62,7 @@ func InitializeApp() *app.App {
 	salesRepo := sales.NewRepository(db)
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
+	rbacRepo := rbac.NewRepository(db)
 
 	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
@@ -76,6 +78,8 @@ func InitializeApp() *app.App {
 	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC)
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	reportsUC := reports.NewUsecases(reportsRepo)
+	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
+	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 
 	emailSender, err := notifications.NewEmailSender(cfg.NotificationBackend, logger)
 	if err != nil {
@@ -104,6 +108,7 @@ func InitializeApp() *app.App {
 	salesHandler := sales.NewHandler(salesUC)
 	quotesHandler := quotes.NewHandler(quotesUC)
 	reportsHandler := reports.NewHandler(reportsUC)
+	rbacHandler := rbac.NewHandler(rbacUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	billingHandler := billing.NewHandler(billingUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
@@ -124,17 +129,18 @@ func InitializeApp() *app.App {
 	authGroup.Use(authMiddleware.RequireAuth())
 	usersHandler.RegisterRoutes(authGroup)
 	adminHandler.RegisterRoutes(authGroup)
+	rbacHandler.RegisterRoutes(authGroup)
 	auditHandler.RegisterRoutes(authGroup)
 	notificationHandler.RegisterRoutes(authGroup)
 	billingHandler.RegisterAuthRoutes(authGroup)
-	customersHandler.RegisterRoutes(authGroup)
-	suppliersHandler.RegisterRoutes(authGroup)
-	productsHandler.RegisterRoutes(authGroup)
-	inventoryHandler.RegisterRoutes(authGroup)
-	cashflowHandler.RegisterRoutes(authGroup)
-	salesHandler.RegisterRoutes(authGroup)
-	quotesHandler.RegisterRoutes(authGroup)
-	reportsHandler.RegisterRoutes(authGroup)
+	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	suppliersHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	productsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	inventoryHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	cashflowHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 
 	return &app.App{Router: router}
 }

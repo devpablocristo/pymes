@@ -12,7 +12,6 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory/handler/dto"
 	inventorydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/inventory/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/authz"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
@@ -31,20 +30,16 @@ type Handler struct {
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
-func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
-	auth.GET("/inventory", h.List)
-	auth.GET("/inventory/low-stock", h.LowStock)
-	auth.GET("/inventory/movements", h.ListMovements)
-	auth.GET("/inventory/:product_id", h.Get)
-	auth.POST("/inventory/:product_id/adjust", h.Adjust)
+func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
+	auth.GET("/inventory", rbac.RequirePermission("inventory", "read"), h.List)
+	auth.GET("/inventory/low-stock", rbac.RequirePermission("inventory", "read"), h.LowStock)
+	auth.GET("/inventory/movements", rbac.RequirePermission("inventory", "read"), h.ListMovements)
+	auth.GET("/inventory/:product_id", rbac.RequirePermission("inventory", "read"), h.Get)
+	auth.POST("/inventory/:product_id/adjust", rbac.RequirePermission("inventory", "update"), h.Adjust)
 }
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -77,10 +72,6 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -101,10 +92,6 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Adjust(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -130,10 +117,6 @@ func (h *Handler) Adjust(c *gin.Context) {
 
 func (h *Handler) ListMovements(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
@@ -175,10 +158,6 @@ func (h *Handler) ListMovements(c *gin.Context) {
 
 func (h *Handler) LowStock(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})

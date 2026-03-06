@@ -11,7 +11,6 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports/handler/dto"
 	reportdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/reports/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/authz"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
@@ -33,15 +32,15 @@ type Handler struct {
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
-func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
-	auth.GET("/reports/sales-summary", h.SalesSummary)
-	auth.GET("/reports/sales-by-product", h.SalesByProduct)
-	auth.GET("/reports/sales-by-customer", h.SalesByCustomer)
-	auth.GET("/reports/sales-by-payment", h.SalesByPayment)
-	auth.GET("/reports/inventory-valuation", h.InventoryValuation)
-	auth.GET("/reports/low-stock", h.LowStock)
-	auth.GET("/reports/cashflow-summary", h.CashflowSummary)
-	auth.GET("/reports/profit-margin", h.ProfitMargin)
+func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
+	auth.GET("/reports/sales-summary", rbac.RequirePermission("reports", "read"), h.SalesSummary)
+	auth.GET("/reports/sales-by-product", rbac.RequirePermission("reports", "read"), h.SalesByProduct)
+	auth.GET("/reports/sales-by-customer", rbac.RequirePermission("reports", "read"), h.SalesByCustomer)
+	auth.GET("/reports/sales-by-payment", rbac.RequirePermission("reports", "read"), h.SalesByPayment)
+	auth.GET("/reports/inventory-valuation", rbac.RequirePermission("reports", "read"), h.InventoryValuation)
+	auth.GET("/reports/low-stock", rbac.RequirePermission("reports", "read"), h.LowStock)
+	auth.GET("/reports/cashflow-summary", rbac.RequirePermission("reports", "read"), h.CashflowSummary)
+	auth.GET("/reports/profit-margin", rbac.RequirePermission("reports", "read"), h.ProfitMargin)
 }
 
 func (h *Handler) SalesSummary(c *gin.Context) {
@@ -177,10 +176,6 @@ func (h *Handler) ProfitMargin(c *gin.Context) {
 
 func (h *Handler) readAuth(c *gin.Context) (uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
-	if !authz.IsAdmin(a.Role, a.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
-		return uuid.Nil, false
-	}
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})

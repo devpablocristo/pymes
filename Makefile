@@ -1,14 +1,14 @@
-.PHONY: help dev-up dev-down build test lint ai-dev ai-test ai-lint
+.PHONY: help up down build test lint ai-dev ai-test ai-lint
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ── Dev environment ──
 
-dev-up: ## Start local dev services (postgres, mailhog)
+up: ## Start local dev services (all Docker services)
 	docker compose up -d
 
-dev-down: ## Stop local dev services
+down: ## Stop local dev services
 	docker compose down
 
 # ── Control Plane ──

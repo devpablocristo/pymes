@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	recurringdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/recurring/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {
@@ -31,7 +31,9 @@ type Usecases struct {
 	audit AuditPort
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases { return &Usecases{repo: repo, audit: audit} }
+func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
+	return &Usecases{repo: repo, audit: audit}
+}
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
 	return u.repo.List(ctx, orgID, activeOnly, limit)
@@ -140,16 +142,36 @@ func prepareRecurring(in recurringdomain.RecurringExpense, creating bool, defaul
 }
 
 func mergeRecurring(dst *recurringdomain.RecurringExpense, patch recurringdomain.RecurringExpense) {
-	if strings.TrimSpace(patch.Description) != "" { dst.Description = strings.TrimSpace(patch.Description) }
-	if patch.Amount > 0 { dst.Amount = patch.Amount }
-	if patch.Currency != "" { dst.Currency = strings.TrimSpace(patch.Currency) }
-	if patch.Category != "" { dst.Category = strings.TrimSpace(patch.Category) }
-	if patch.PaymentMethod != "" { dst.PaymentMethod = strings.TrimSpace(patch.PaymentMethod) }
-	if patch.Frequency != "" { dst.Frequency = strings.TrimSpace(patch.Frequency) }
-	if patch.DayOfMonth > 0 { dst.DayOfMonth = patch.DayOfMonth }
-	if patch.SupplierID != nil { dst.SupplierID = patch.SupplierID }
-	if !patch.NextDueDate.IsZero() { dst.NextDueDate = patch.NextDueDate }
-	if patch.Notes != "" { dst.Notes = strings.TrimSpace(patch.Notes) }
+	if strings.TrimSpace(patch.Description) != "" {
+		dst.Description = strings.TrimSpace(patch.Description)
+	}
+	if patch.Amount > 0 {
+		dst.Amount = patch.Amount
+	}
+	if patch.Currency != "" {
+		dst.Currency = strings.TrimSpace(patch.Currency)
+	}
+	if patch.Category != "" {
+		dst.Category = strings.TrimSpace(patch.Category)
+	}
+	if patch.PaymentMethod != "" {
+		dst.PaymentMethod = strings.TrimSpace(patch.PaymentMethod)
+	}
+	if patch.Frequency != "" {
+		dst.Frequency = strings.TrimSpace(patch.Frequency)
+	}
+	if patch.DayOfMonth > 0 {
+		dst.DayOfMonth = patch.DayOfMonth
+	}
+	if patch.SupplierID != nil {
+		dst.SupplierID = patch.SupplierID
+	}
+	if !patch.NextDueDate.IsZero() {
+		dst.NextDueDate = patch.NextDueDate
+	}
+	if patch.Notes != "" {
+		dst.Notes = strings.TrimSpace(patch.Notes)
+	}
 	dst.IsActive = patch.IsActive || dst.IsActive
 }
 

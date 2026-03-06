@@ -21,7 +21,7 @@ import (
 
 	webhookmodels "github.com/devpablocristo/pymes/control-plane/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/outwebhooks/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

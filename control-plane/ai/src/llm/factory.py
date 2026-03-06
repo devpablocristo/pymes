@@ -1,7 +1,7 @@
 from src.config import Settings
-from src.core.circuit_breaker import CircuitBreaker
 from src.llm.base import EchoProvider, LLMProvider
 from src.llm.gemini import GeminiProvider
+from pymes_py_pkg.resilience import CircuitBreaker
 
 
 def create_provider(config: Settings) -> LLMProvider:

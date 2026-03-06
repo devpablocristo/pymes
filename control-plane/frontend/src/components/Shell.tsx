@@ -1,9 +1,14 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { UserButton } from '@clerk/clerk-react';
-import { clerkEnabled } from '../lib/auth';
+import { clerkEnabled } from '@pymes/ts-pkg/auth';
+import { moduleGroups, moduleList } from '../lib/moduleCatalog';
 
 type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
+
+function Glyph({ label }: { label: string }) {
+  return <span className="sidebar-token">{label}</span>;
+}
 
 const mainNav: NavItem[] = [
   {
@@ -83,9 +88,7 @@ function NavSection({ label, items }: { label: string; items: NavItem[] }) {
           key={item.to}
           to={item.to}
           end={item.end}
-          className={({ isActive }) =>
-            `sidebar-link${isActive ? ' active' : ''}`
-          }
+          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
         >
           {item.icon}
           <span>{item.label}</span>
@@ -95,26 +98,37 @@ function NavSection({ label, items }: { label: string; items: NavItem[] }) {
   );
 }
 
+const moduleNav = moduleGroups.map((group) => ({
+  label: group.label,
+  items: moduleList
+    .filter((module) => module.group === group.id)
+    .sort((left, right) => left.navLabel.localeCompare(right.navLabel))
+    .map<NavItem>((module) => ({
+      to: `/modules/${module.id}`,
+      label: module.navLabel,
+      icon: <Glyph label={module.icon} />,
+    })),
+}));
+
 export function Shell({ children }: PropsWithChildren) {
   return (
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
           <h1>Pymes SaaS</h1>
-          <small>Panel de control</small>
+          <small>Control plane</small>
         </div>
 
         <nav className="sidebar-nav">
-          <NavSection label="Principal" items={mainNav} />
+          <NavSection label="Base" items={mainNav} />
+          {moduleNav.map((section) => (
+            <NavSection key={section.label} label={section.label} items={section.items} />
+          ))}
           <NavSection label="Configuracion" items={settingsNav} />
         </nav>
 
         <div className="sidebar-footer">
-          {clerkEnabled ? (
-            <UserButton />
-          ) : (
-            <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>
-          )}
+          {clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>}
         </div>
       </aside>
 

@@ -11,7 +11,7 @@ import (
 
 	webhookdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/outwebhooks/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {

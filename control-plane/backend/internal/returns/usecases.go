@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	returndomain "github.com/devpablocristo/pymes/control-plane/backend/internal/returns/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

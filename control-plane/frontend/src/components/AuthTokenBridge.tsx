@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { registerTokenProvider } from '../api/client';
-import { clerkEnabled } from '../lib/auth';
+import { clerkEnabled } from '@pymes/ts-pkg/auth';
+import { registerTokenProvider } from '@pymes/ts-pkg/http';
 
 export function AuthTokenBridge() {
   if (!clerkEnabled) {

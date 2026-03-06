@@ -10,7 +10,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/repository/models"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type ResolvedAPIKey struct {

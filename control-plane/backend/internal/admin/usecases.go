@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

@@ -8,7 +8,7 @@ from uuid import uuid4
 from sqlalchemy import and_, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db.models import AIConversation, AIDossier, AIUsageDaily
+from src.db.models import AIAgentEvent, AIConversation, AIDossier, AIUsageDaily
 
 
 DEFAULT_DOSSIER: dict[str, Any] = {
@@ -248,3 +248,54 @@ class AIRepository:
         if not plan:
             return "starter"
         return str(plan).strip().lower() or "starter"
+
+    async def has_agent_request(self, org_id: str, request_id: str) -> bool:
+        normalized = str(request_id).strip()
+        if not normalized:
+            return False
+        query = select(AIAgentEvent.id).where(
+            AIAgentEvent.org_id == org_id,
+            AIAgentEvent.external_request_id == normalized,
+        ).limit(1)
+        row = await self.db.execute(query)
+        return row.scalar_one_or_none() is not None
+
+    async def record_agent_event(
+        self,
+        *,
+        org_id: str,
+        conversation_id: str | None,
+        agent_mode: str,
+        channel: str,
+        actor_id: str,
+        actor_type: str,
+        action: str,
+        result: str,
+        confirmed: bool,
+        tool_name: str = "",
+        entity_type: str = "",
+        entity_id: str = "",
+        external_request_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        now = datetime.now(UTC)
+        row = AIAgentEvent(
+            id=str(uuid4()),
+            org_id=org_id,
+            conversation_id=conversation_id,
+            external_request_id=(external_request_id or "").strip() or None,
+            agent_mode=agent_mode,
+            channel=channel,
+            actor_id=actor_id,
+            actor_type=actor_type,
+            action=action,
+            tool_name=tool_name,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            result=result,
+            confirmed=confirmed,
+            event_metadata=metadata or {},
+            created_at=now,
+        )
+        self.db.add(row)
+        await self.db.commit()

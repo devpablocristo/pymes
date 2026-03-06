@@ -1,4 +1,4 @@
-import { request } from '../api/client';
+import { request, requestResponse, type RequestOptions } from '@pymes/ts-pkg/http';
 import type { APIKeyItem, BillingStatus, NotificationPreference, TenantSettings } from './types';
 
 export async function getAdminBootstrap(): Promise<{ settings: TenantSettings }> {
@@ -69,4 +69,25 @@ export async function getAuditEntries(): Promise<{ items: unknown[] }> {
 
 export async function getMe(): Promise<Record<string, unknown>> {
   return request('/v1/users/me');
+}
+
+export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+  return request<T>(path, options);
+}
+
+export async function downloadAPIFile(path: string, options: RequestOptions = {}): Promise<string> {
+  const response = await requestResponse(path, options);
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+  const filename = match?.[1] ?? `download-${Date.now()}`;
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+  return filename;
 }

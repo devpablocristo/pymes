@@ -1,4 +1,4 @@
-package errors
+package httperrors
 
 import (
 	"errors"
@@ -6,15 +6,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 var (
-	ErrNotFound    = errors.New("not found")
-	ErrConflict    = errors.New("conflict")
-	ErrForbidden   = errors.New("forbidden")
-	ErrBadInput    = errors.New("bad input")
-	ErrNotDraft    = errors.New("resource is not in draft status")
+	ErrNotFound  = errors.New("not found")
+	ErrConflict  = errors.New("conflict")
+	ErrForbidden = errors.New("forbidden")
+	ErrBadInput  = errors.New("bad input")
+	ErrNotDraft  = errors.New("resource is not in draft status")
 )
 
 type ErrorResponse struct {

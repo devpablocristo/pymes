@@ -7,6 +7,7 @@ import { APIKeysPage } from '../pages/APIKeysPage';
 import { BillingPage } from '../pages/BillingPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { LoginPage } from '../pages/LoginPage';
+import { ModulePage } from '../pages/ModulePage';
 import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
@@ -27,6 +28,7 @@ export function App() {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="/billing" element={<BillingPage />} />
+                  <Route path="/modules/:moduleId" element={<ModulePage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/settings/keys" element={<APIKeysPage />} />
                   <Route

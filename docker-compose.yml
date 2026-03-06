@@ -23,12 +23,14 @@ services:
 
   backend:
     build:
-      context: ./control-plane/backend
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: ./control-plane/backend/Dockerfile.dev
     ports:
       - "8100:8080"
     volumes:
-      - ./control-plane/backend:/app
+      - ./go.work:/workspace/go.work
+      - ./control-plane/backend:/workspace/control-plane/backend
+      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - backend_go_mod:/go/pkg/mod
       - backend_go_build:/root/.cache/go-build
     env_file:
@@ -43,16 +45,17 @@ services:
 
   frontend:
     build:
-      context: ./control-plane/frontend
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: ./control-plane/frontend/Dockerfile.dev
     ports:
       - "5180:5173"
     volumes:
-      - ./control-plane/frontend/src:/app/src
-      - ./control-plane/frontend/public:/app/public
-      - ./control-plane/frontend/index.html:/app/index.html
-      - ./control-plane/frontend/vite.config.ts:/app/vite.config.ts
-      - ./control-plane/frontend/tsconfig.json:/app/tsconfig.json
+      - ./control-plane/frontend/src:/workspace/control-plane/frontend/src
+      - ./control-plane/frontend/public:/workspace/control-plane/frontend/public
+      - ./control-plane/frontend/index.html:/workspace/control-plane/frontend/index.html
+      - ./control-plane/frontend/vite.config.ts:/workspace/control-plane/frontend/vite.config.ts
+      - ./control-plane/frontend/tsconfig.json:/workspace/control-plane/frontend/tsconfig.json
+      - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
     env_file:
       - .env
     environment:
@@ -62,12 +65,13 @@ services:
 
   ai:
     build:
-      context: ./control-plane/ai
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: ./control-plane/ai/Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
-      - ./control-plane/ai/src:/app/src
+      - ./control-plane/ai/src:/workspace/control-plane/ai/src
+      - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
     env_file:
       - .env
     environment:

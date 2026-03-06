@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	schedulerdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/scheduler/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/resilience"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/resilience"
 )
 
 type RepositoryPort interface {

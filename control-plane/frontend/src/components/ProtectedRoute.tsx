@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { clerkEnabled } from '../lib/auth';
+import { clerkEnabled } from '@pymes/ts-pkg/auth';
 
 export function ProtectedRoute({ children }: PropsWithChildren) {
   if (!clerkEnabled) {

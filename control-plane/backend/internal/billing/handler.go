@@ -8,10 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v81"
 
-	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing/handler/dto"
+	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {

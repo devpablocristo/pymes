@@ -6,8 +6,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
+from src.agents.service import run_commercial_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository, get_settings_dep
-from src.api.external_chat_support import clean_phone, run_external_chat
+from src.api.external_chat_support import clean_phone
 from src.api.router import check_quota
 from src.backend_client.client import BackendClient
 from src.config import Settings
@@ -58,15 +59,17 @@ async def whatsapp_message(
     await check_quota(repo, org_id, mode="external")
     update_request_context(org_id=org_id, user_id=external_contact or "whatsapp")
 
-    result = await run_external_chat(
+    result = await run_commercial_chat(
         repo=repo,
         llm=llm,
         backend_client=backend_client,
         org_id=org_id,
         message=req.message,
+        agent_mode="external_sales",
+        channel="whatsapp",
         external_contact=external_contact,
         conversation_id=req.conversation_id,
-        reuse_latest=True,
+        confirmed_actions=[],
         user_metadata={
             "channel": "whatsapp",
             "message_id": (req.message_id or "").strip(),

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	supplierdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {

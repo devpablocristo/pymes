@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 	supplierdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type RepositoryPort interface {

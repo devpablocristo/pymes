@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	paymentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/payments/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {
@@ -32,7 +32,9 @@ func (u *Usecases) CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUI
 	if in.Amount <= 0 {
 		return paymentsdomain.Payment{}, apperror.NewBadInput("amount must be > 0")
 	}
-	if in.ReceivedAt.IsZero() { in.ReceivedAt = time.Now().UTC() }
+	if in.ReceivedAt.IsZero() {
+		in.ReceivedAt = time.Now().UTC()
+	}
 	in.Method = method
 	return u.repo.CreateSalePayment(ctx, orgID, saleID, in)
 }

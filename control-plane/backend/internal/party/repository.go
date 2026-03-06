@@ -13,7 +13,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/party/repository/models"
 	partydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/party/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {

@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	appointmentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

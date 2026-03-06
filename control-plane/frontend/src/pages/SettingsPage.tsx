@@ -1,5 +1,5 @@
 import { UserProfile } from '@clerk/clerk-react';
-import { clerkEnabled } from '../lib/auth';
+import { clerkEnabled } from '@pymes/ts-pkg/auth';
 
 export function SettingsPage() {
   return (

@@ -32,8 +32,8 @@ async def book_appointment(
     duration: int = 60,
 ) -> dict:
     payload = {
-        "customer_name": customer_name,
-        "customer_phone": customer_phone,
+        "party_name": customer_name,
+        "party_phone": customer_phone,
         "title": title,
         "start_at": start_at,
         "duration": duration,

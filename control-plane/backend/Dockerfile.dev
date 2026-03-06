@@ -3,12 +3,18 @@ FROM golang:1.24-alpine
 RUN apk add --no-cache git curl && \
     curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b /usr/local/bin
 
-WORKDIR /app
+WORKDIR /workspace
 
-COPY go.mod go.sum ./
+COPY go.work ./
+COPY control-plane/backend/go.mod control-plane/backend/go.sum ./control-plane/backend/
+COPY pkgs/go-pkg/go.mod ./pkgs/go-pkg/
+
+WORKDIR /workspace/control-plane/backend
+
 RUN go mod download
 
-COPY . .
+COPY control-plane/backend /workspace/control-plane/backend
+COPY pkgs/go-pkg /workspace/pkgs/go-pkg
 
 EXPOSE 8080
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/purchases/repository/models"
 	purchasesdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/purchases/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }

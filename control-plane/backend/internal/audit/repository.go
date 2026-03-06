@@ -11,7 +11,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/repository/models"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {

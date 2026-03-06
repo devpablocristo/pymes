@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/types"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/types"
 )
 
 type APIKeyResolver interface {
@@ -22,8 +22,8 @@ type ResolvedKey struct {
 }
 
 type AuthMiddleware struct {
-	identity     *identity.Usecases
-	keyResolver  APIKeyResolver
+	identity      *identity.Usecases
+	keyResolver   APIKeyResolver
 	authEnableJWT bool
 	authAllowKey  bool
 }
@@ -61,14 +61,14 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			if rawKey != "" {
 				key, ok := m.keyResolver.ResolveAPIKey(rawKey)
 				if ok {
-				actor := sanitizeHeader(c.GetHeader("X-Actor"), 128)
-				if actor == "" {
-					actor = "api_key:" + key.ID.String()
-				}
-				role := sanitizeHeader(c.GetHeader("X-Role"), 32)
-				if role == "" {
-					role = "service"
-				}
+					actor := sanitizeHeader(c.GetHeader("X-Actor"), 128)
+					if actor == "" {
+						actor = "api_key:" + key.ID.String()
+					}
+					role := sanitizeHeader(c.GetHeader("X-Role"), 32)
+					if role == "" {
+						role = "service"
+					}
 					reqScopes := splitCSV(c.GetHeader("X-Scopes"))
 					scopes := key.Scopes
 					if len(reqScopes) > 0 {

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	productdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/products/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type RepositoryPort interface {

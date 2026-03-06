@@ -3,12 +3,12 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 
+from pymes_py_pkg.errors import error_payload
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.config import Settings
-from src.core.errors import error_payload
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

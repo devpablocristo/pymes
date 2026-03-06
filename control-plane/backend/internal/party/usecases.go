@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	partydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/party/usecases/domain"
-	apperror "github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

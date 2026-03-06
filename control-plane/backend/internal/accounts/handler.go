@@ -12,7 +12,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/accounts/handler/dto"
 	accountsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/accounts/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {
@@ -35,58 +35,95 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	orgID, ok := parseOrg(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	onlyNonZero := strings.ToLower(c.DefaultQuery("non_zero", "false")) == "true"
 	items, err := h.uc.List(c.Request.Context(), orgID, c.Query("type"), c.Query("entity_type"), onlyNonZero, limit)
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 func (h *Handler) Debtors(c *gin.Context) {
 	orgID, ok := parseOrg(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	items, err := h.uc.Debtors(c.Request.Context(), orgID, limit)
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 func (h *Handler) Movements(c *gin.Context) {
 	orgID, id, ok := parseOrgID(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	items, err := h.uc.Movements(c.Request.Context(), orgID, id, limit)
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"}); return }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
 	var req dto.CreateAccountRequest
-	if err := c.ShouldBindJSON(&req); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity_id"}); return }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity_id"})
+		return
+	}
 	creditLimit := 0.0
-	if req.CreditLimit != nil { creditLimit = *req.CreditLimit }
+	if req.CreditLimit != nil {
+		creditLimit = *req.CreditLimit
+	}
 	out, err := h.uc.CreateOrAdjust(c.Request.Context(), accountsdomain.Account{OrgID: orgID, Type: strings.TrimSpace(req.Type), EntityType: strings.TrimSpace(req.EntityType), EntityID: entityID, EntityName: strings.TrimSpace(req.EntityName), Currency: strings.TrimSpace(req.Currency), CreditLimit: creditLimit}, req.Amount, req.Description, authCtx.Actor)
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusCreated, out)
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"}); return uuid.Nil, false }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return uuid.Nil, false
+	}
 	return orgID, true
 }
 
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	orgID, ok := parseOrg(c)
-	if !ok { return uuid.Nil, uuid.Nil, false }
+	if !ok {
+		return uuid.Nil, uuid.Nil, false
+	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"}); return uuid.Nil, uuid.Nil, false }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return uuid.Nil, uuid.Nil, false
+	}
 	return orgID, id, true
 }

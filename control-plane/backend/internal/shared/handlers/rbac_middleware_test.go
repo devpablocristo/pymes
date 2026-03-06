@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/types"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/types"
 )
 
 type fakeChecker struct {

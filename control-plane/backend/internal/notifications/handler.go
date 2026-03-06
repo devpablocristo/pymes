@@ -9,7 +9,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/handler/dto"
 	notifdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {

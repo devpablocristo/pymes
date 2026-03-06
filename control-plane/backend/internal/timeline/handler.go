@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
+	apperror "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 	timelinedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/timeline/usecases/domain"
-	apperror "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type usecasesPort interface {

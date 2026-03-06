@@ -11,7 +11,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/repository/models"
 	appointmentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct {

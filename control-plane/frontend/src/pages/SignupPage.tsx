@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { SignUp } from '@clerk/clerk-react';
-import { clerkEnabled } from '../lib/auth';
+import { clerkEnabled } from '@pymes/ts-pkg/auth';
 
 export function SignupPage() {
   if (clerkEnabled) {

@@ -11,7 +11,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@pymes/ts-pkg": ["../../pkgs/ts-pkg/src"],
+      "@pymes/ts-pkg/*": ["../../pkgs/ts-pkg/src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../../pkgs/ts-pkg/src"]
 }

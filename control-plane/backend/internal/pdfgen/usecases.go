@@ -13,7 +13,7 @@ import (
 	admindomain "github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/control-plane/backend/internal/sales/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type QuotePort interface {

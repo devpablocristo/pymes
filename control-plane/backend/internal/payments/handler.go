@@ -12,7 +12,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/payments/handler/dto"
 	paymentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/payments/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {
@@ -32,33 +32,55 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 func (h *Handler) ListSalePayments(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, saleID, ok := parseOrgSale(c, authCtx.OrgID)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	items, err := h.uc.ListSalePayments(c.Request.Context(), orgID, saleID)
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 func (h *Handler) CreateSalePayment(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, saleID, ok := parseOrgSale(c, authCtx.OrgID)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	var req dto.CreatePaymentRequest
-	if err := c.ShouldBindJSON(&req); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	receivedAt := time.Now().UTC()
 	if strings.TrimSpace(req.ReceivedAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(req.ReceivedAt))
-		if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid received_at"}); return }
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid received_at"})
+			return
+		}
 		receivedAt = parsed.UTC()
 	}
 	out, err := h.uc.CreateSalePayment(c.Request.Context(), orgID, saleID, paymentsdomain.Payment{Method: req.Method, Amount: req.Amount, Notes: strings.TrimSpace(req.Notes), ReceivedAt: receivedAt, CreatedBy: authCtx.Actor})
-	if err != nil { httperrors.Respond(c, err); return }
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
 	c.JSON(http.StatusCreated, out)
 }
 
 func parseOrgSale(c *gin.Context, rawOrgID string) (uuid.UUID, uuid.UUID, bool) {
 	orgID, err := uuid.Parse(rawOrgID)
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"}); return uuid.Nil, uuid.Nil, false }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return uuid.Nil, uuid.Nil, false
+	}
 	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"}); return uuid.Nil, uuid.Nil, false }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		return uuid.Nil, uuid.Nil, false
+	}
 	return orgID, saleID, true
 }

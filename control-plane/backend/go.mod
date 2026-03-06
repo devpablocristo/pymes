@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.11
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.59.3
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
+	github.com/devpablocristo/pymes/pkgs/go-pkg v0.0.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-pdf/fpdf v0.9.0
@@ -80,3 +81,5 @@ require (
 	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/devpablocristo/pymes/pkgs/go-pkg => ../../pkgs/go-pkg

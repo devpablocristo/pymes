@@ -8,7 +8,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org/handler/dto"
 	orgdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/org/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 )
 
 type usecasesPort interface {

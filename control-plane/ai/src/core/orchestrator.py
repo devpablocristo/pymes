@@ -3,15 +3,19 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
 from src.llm.base import ChatChunk, LLMProvider, Message, ToolDeclaration
 
-MAX_TOOL_CALLS = 10
-TOOL_TIMEOUT_SECONDS = 10
-TOTAL_TIMEOUT_SECONDS = 60
-
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
+
+
+@dataclass(frozen=True)
+class OrchestratorLimits:
+    max_tool_calls: int = 10
+    tool_timeout_seconds: int = 10
+    total_timeout_seconds: int = 60
 
 
 async def orchestrate(
@@ -20,12 +24,14 @@ async def orchestrate(
     tools: list[ToolDeclaration],
     tool_handlers: dict[str, ToolHandler],
     org_id: str,
+    limits: OrchestratorLimits | None = None,
 ) -> AsyncIterator[ChatChunk]:
+    effective_limits = limits or OrchestratorLimits()
     tool_calls_count = 0
     started_at = asyncio.get_running_loop().time()
 
-    while tool_calls_count < MAX_TOOL_CALLS:
-        if asyncio.get_running_loop().time() - started_at > TOTAL_TIMEOUT_SECONDS:
+    while tool_calls_count < effective_limits.max_tool_calls:
+        if asyncio.get_running_loop().time() - started_at > effective_limits.total_timeout_seconds:
             yield ChatChunk(type="text", text="Lo siento, la consulta esta tardando demasiado.")
             break
 
@@ -60,7 +66,10 @@ async def orchestrate(
             else:
                 arguments = tool_call.get("arguments") or {}
                 try:
-                    result = await asyncio.wait_for(handler(org_id=org_id, **arguments), timeout=TOOL_TIMEOUT_SECONDS)
+                    result = await asyncio.wait_for(
+                        handler(org_id=org_id, **arguments),
+                        timeout=effective_limits.tool_timeout_seconds,
+                    )
                 except asyncio.TimeoutError:
                     result = {"error": f"timeout ejecutando tool {tool_name}"}
                 except Exception as exc:  # noqa: BLE001

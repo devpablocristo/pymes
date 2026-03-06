@@ -9,7 +9,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/recurring/repository/models"
 	recurringdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/recurring/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }

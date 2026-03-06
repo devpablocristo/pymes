@@ -7,8 +7,8 @@ from typing import Any
 
 from google import genai
 from google.genai import types
+from pymes_py_pkg.resilience import CircuitBreaker, CircuitBreakerOpenError
 
-from src.core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from src.llm.base import ChatChunk, Message, ToolDeclaration
 from src.observability.logging import get_logger
 

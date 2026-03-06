@@ -7,9 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/handler/dto"
 	userdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/users/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
 )
 
 type usecasesPort interface {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/timeline/repository/models"
 	timelinedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/timeline/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }

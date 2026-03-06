@@ -13,7 +13,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products/repository/models"
 	productdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/products/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {
@@ -193,4 +193,3 @@ func toDomain(row models.ProductModel) productdomain.Product {
 		DeletedAt:   row.DeletedAt,
 	}
 }
-

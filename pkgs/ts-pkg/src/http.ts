@@ -4,11 +4,13 @@ export function registerTokenProvider(provider: () => Promise<string | null>): v
   tokenProvider = provider;
 }
 
-type RequestOptions = {
+export type RequestOptions = {
   method?: string;
   body?: unknown;
+  rawBody?: BodyInit | null;
   headers?: Record<string, string>;
   orgId?: string;
+  skipJSONContentType?: boolean;
 };
 
 class HttpError extends Error {
@@ -52,11 +54,17 @@ function resolveLocalAPIKeyFallback(): string | null {
   return 'psk_local_admin';
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function buildHeaders(options: RequestOptions): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers ?? {}),
   };
+  if (
+    !options.skipJSONContentType &&
+    !('Content-Type' in headers) &&
+    !(typeof FormData !== 'undefined' && options.rawBody instanceof FormData)
+  ) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   const token = tokenProvider ? await tokenProvider() : null;
   if (token) {
@@ -75,26 +83,27 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (options.orgId) {
     headers['X-Org-ID'] = options.orgId;
   }
+  return headers;
+}
 
+export async function requestResponse(path: string, options: RequestOptions = {}): Promise<Response> {
+  const headers = await buildHeaders(options);
   let lastError: unknown = null;
   for (const baseURL of resolveBaseURLs()) {
     try {
       const response = await fetch(`${baseURL}${path}`, {
         method: options.method ?? 'GET',
         headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        body:
+          options.rawBody ??
+          (options.body !== undefined ? JSON.stringify(options.body) : undefined),
       });
 
       if (!response.ok) {
         const text = await response.text();
         throw new HttpError(text || `HTTP ${response.status}`);
       }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (contentType.includes('application/json')) {
-        return (await response.json()) as T;
-      }
-      return (await response.text()) as T;
+      return response;
     } catch (error) {
       lastError = error;
       if (error instanceof Error && error.name === 'HttpError') {
@@ -108,4 +117,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   throw new Error('No se pudo conectar con el backend');
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await requestResponse(path, options);
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+  return (await response.text()) as T;
 }

@@ -11,8 +11,8 @@ import (
 
 	returnmodels "github.com/devpablocristo/pymes/control-plane/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/control-plane/backend/internal/returns/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }

@@ -7,13 +7,13 @@ from typing import Any
 
 import httpx
 from jose import jwt
+from pymes_py_pkg.errors import error_payload
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.backend_client.auth import AuthContext
 from src.config import Settings
-from src.core.errors import error_payload
 from src.observability.logging import update_request_context
 
 

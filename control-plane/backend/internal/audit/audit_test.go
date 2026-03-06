@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/utils"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
+	"github.com/google/uuid"
 )
 
 type mockAuditRepo struct {

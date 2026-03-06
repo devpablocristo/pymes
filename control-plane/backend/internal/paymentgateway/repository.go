@@ -13,7 +13,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/repository/models"
 	gatewaydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/usecases/domain"
-	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 var (

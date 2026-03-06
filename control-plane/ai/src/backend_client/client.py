@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -41,13 +42,23 @@ class BackendClient:
         include_internal: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        response = await self._client.request(
-            method,
-            path,
-            headers=self._headers(auth, include_internal=include_internal),
-            **kwargs,
-        )
-        response.raise_for_status()
-        if response.headers.get("content-type", "").startswith("application/json"):
-            return response.json()
-        return {"raw": response.text}
+        headers = self._headers(auth, include_internal=include_internal)
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = await self._client.request(method, path, headers=headers, **kwargs)
+                if response.status_code >= 500 and attempt < 2:
+                    await asyncio.sleep(0.2 * (attempt + 1))
+                    continue
+                response.raise_for_status()
+                if response.headers.get("content-type", "").startswith("application/json"):
+                    return response.json()
+                return {"raw": response.text}
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError) as exc:
+                last_error = exc
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(0.2 * (attempt + 1))
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("backend request failed without error")

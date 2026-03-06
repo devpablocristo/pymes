@@ -8,9 +8,57 @@ Este prompt extiende el **control-plane** (Prompt 00) y el **core de negocio** (
 
 **Regla fundamental**: estos modulos viven dentro de `control-plane/backend/internal/` porque comparten la misma DB, el mismo auth, el mismo Lambda, y el mismo tenant (`org_id`). NO son servicios separados.
 
-**Tipos numericos**: los modulos existentes (Prompt 01) usan `float64` en Go para montos, con `numeric(15,2)` en PostgreSQL para precision en la DB. Los modulos nuevos de este prompt mantienen `float64` por **consistencia** con el codigo existente. Esto evita conversiones en las interacciones entre modulos (sales → accounts, payments → cashflow, etc.). La precision financiera se garantiza en la capa de persistencia (PostgreSQL numeric).
+**Tipos numericos**: los modulos existentes (Prompt 01) usan `float64` en Go para montos, con `numeric(15,2)` en PostgreSQL para precision en la DB. Los modulos nuevos de este prompt mantienen `float64` por **consistencia** con el codigo existente. La precision financiera se garantiza en la capa de persistencia (PostgreSQL numeric).
 
 **Migraciones**: el proyecto ya tiene migraciones 0001-0009. Las migraciones de este prompt empiezan en **0010**.
+
+**Estándares de Ingeniería**: todos los módulos de este prompt aplican los patrones de Prompt 00 (E1-E15):
+- **Domain Errors**: cada módulo define sus errores con `apperror.Error`. Los handlers usan `c.Error(err)`.
+- **Validation**: DTOs con binding tags. Validaciones de negocio en usecases.
+- **Transactions**: toda operación multi-tabla usa `db.Transaction(ctx, fn)`. Side-effects fuera.
+- **Testing**: unit tests table-driven para usecases complejos. Integration tests con testcontainers-go.
+- **Functional Options**: dependencias opcionales (timeline, webhooks, currency) via `Option`.
+
+## Alcance obligatorio
+
+Todo lo documentado en este prompt forma parte del alcance requerido del producto. Ningún módulo transversal, integración, automatización, scheduler, webhook o criterio de calidad debe considerarse opcional salvo indicación explícita en el propio texto.
+
+La secuencia de implementación puede agruparse por dependencias técnicas, pero eso no implica recortar alcance. El objetivo es implementar **completo** este prompt sobre la base de Prompts 00 y 01.
+
+---
+
+## Domain Errors comunes (extensiones)
+
+```go
+var (
+    ErrAccountNotFound    = func(id string) *apperror.Error { return apperror.NewNotFound("account", id) }
+    ErrPurchaseNotFound   = func(id string) *apperror.Error { return apperror.NewNotFound("purchase", id) }
+    ErrCreditNoteNotFound = func(id string) *apperror.Error { return apperror.NewNotFound("credit_note", id) }
+    ErrAppointmentNotFound = func(id string) *apperror.Error { return apperror.NewNotFound("appointment", id) }
+    ErrReturnNotFound     = func(id string) *apperror.Error { return apperror.NewNotFound("return", id) }
+
+    ErrCreditLimitExceeded = func(balance, limit float64) *apperror.Error {
+        return apperror.NewBusinessRule(fmt.Sprintf("Límite de fiado excedido: saldo $%.2f + venta supera límite de $%.2f", balance, limit))
+    }
+    ErrPaymentExceedsPending = func(amount, pending float64) *apperror.Error {
+        return apperror.NewBusinessRule(fmt.Sprintf("Pago de $%.2f excede saldo pendiente de $%.2f", amount, pending))
+    }
+    ErrReturnExceedsQuantity = func(product string, returned, available float64) *apperror.Error {
+        return apperror.NewBusinessRule(fmt.Sprintf("Devolución de %.0f unidades de '%s' excede las %.0f disponibles", returned, product, available))
+    }
+    ErrSlotUnavailable = apperror.NewConflict("El horario seleccionado ya no está disponible")
+    ErrOutsideBusinessHours = apperror.NewBusinessRule("El turno está fuera del horario de atención configurado")
+    ErrCreditNoteExpired  = apperror.NewBusinessRule("La nota de crédito está vencida")
+    ErrCreditNoteInsufficient = func(balance, amount float64) *apperror.Error {
+        return apperror.NewBusinessRule(fmt.Sprintf("Saldo de nota de crédito ($%.2f) insuficiente para $%.2f", balance, amount))
+    }
+    ErrRoleSystemProtected = apperror.NewBusinessRule("Los roles del sistema no se pueden modificar ni eliminar")
+    ErrRoleAdminRequired   = apperror.NewForbidden("Solo administradores pueden gestionar roles")
+    ErrPurchaseNotDraft    = apperror.NewBusinessRule("Solo se pueden editar compras en estado 'draft'")
+    ErrGatewayNotConnected = apperror.NewPrecondition("La pasarela de pago no está conectada")
+    ErrWebhookURLPrivateIP = apperror.NewValidation("La URL del webhook no puede apuntar a una IP privada", nil)
+)
+```
 
 ---
 
@@ -101,12 +149,16 @@ CREATE TABLE IF NOT EXISTS user_roles (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     role_id uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    party_id uuid REFERENCES parties(id),
     assigned_by text,
     assigned_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, org_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_roles_org ON user_roles(org_id);
+
+-- NOTA: party_id vincula al usuario con su representación en el Party Model.
+-- Cuando un usuario tiene rol RBAC, su party_id permite trazar acciones en el audit log.
 ```
 
 ### API
@@ -213,8 +265,8 @@ type Purchase struct {
     ID            uuid.UUID
     OrgID         uuid.UUID
     Number        string         // "CPA-00001"
-    SupplierID    *uuid.UUID
-    SupplierName  string
+    PartyID       *uuid.UUID     // party con rol 'supplier'
+    PartyName     string         // denormalizado
     Status        string         // "draft" | "received" | "partial" | "voided"
     PaymentStatus string         // "pending" | "partial" | "paid"
     Items         []PurchaseItem
@@ -249,8 +301,8 @@ CREATE TABLE IF NOT EXISTS purchases (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     number text NOT NULL,
-    supplier_id uuid REFERENCES suppliers(id),
-    supplier_name text NOT NULL DEFAULT '',
+    party_id uuid REFERENCES parties(id),
+    party_name text NOT NULL DEFAULT '',
     status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'received', 'partial', 'voided')),
     payment_status text NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'partial', 'paid')),
     subtotal numeric(15,2) NOT NULL DEFAULT 0,
@@ -278,7 +330,7 @@ CREATE TABLE IF NOT EXISTS purchase_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_purchases_org ON purchases(org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_purchases_supplier ON purchases(supplier_id) WHERE supplier_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_purchases_party ON purchases(party_id) WHERE party_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_purchases_org_status ON purchases(org_id, status);
 ```
 
@@ -346,9 +398,8 @@ type Account struct {
     ID          uuid.UUID
     OrgID       uuid.UUID
     Type        string         // "receivable" | "payable"
-    EntityType  string         // "customer" | "supplier"
-    EntityID    uuid.UUID
-    EntityName  string         // denormalized para queries rapidos
+    PartyID     uuid.UUID      // FK directa a parties(id) — el party puede tener rol customer, supplier o ambos
+    PartyName   string         // denormalized para queries rapidos
     Balance     float64 // positivo = le deben a la org (receivable), negativo = la org debe (payable)
     Currency    string
     CreditLimit float64 // limite de fiado (0 = sin limite)
@@ -377,20 +428,20 @@ CREATE TABLE IF NOT EXISTS accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     type text NOT NULL CHECK (type IN ('receivable', 'payable')),
-    entity_type text NOT NULL CHECK (entity_type IN ('customer', 'supplier')),
-    entity_id uuid NOT NULL, -- polimórfico: apunta a customers(id) o suppliers(id) según entity_type. Sin FK porque referencia múltiples tablas.
-    entity_name text NOT NULL DEFAULT '',
+    party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
+    party_name text NOT NULL DEFAULT '',
     balance numeric(15,2) NOT NULL DEFAULT 0,
     currency text NOT NULL DEFAULT 'ARS',
     credit_limit numeric(15,2) NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, entity_type, entity_id)
+    UNIQUE(org_id, type, party_id)
 );
 
--- NOTA: entity_id es polimórfico (sin FK). La integridad se garantiza a nivel de aplicación:
--- el usecase valida que entity_id exista en customers/suppliers según entity_type antes de crear la cuenta.
+-- NOTA: Con Party Model ya no hay entity polimórfico sin FK. La FK a parties(id) es directa.
+-- Un party con rol 'customer' tiene cuenta 'receivable', uno con rol 'supplier' tiene 'payable'.
+-- Un party con AMBOS roles puede tener AMBOS tipos de cuenta.
 CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(org_id, type);
-CREATE INDEX IF NOT EXISTS idx_accounts_entity ON accounts(org_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_party ON accounts(org_id, party_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(org_id) WHERE balance != 0;
 
 CREATE TABLE IF NOT EXISTS account_movements (
@@ -417,7 +468,7 @@ CREATE INDEX IF NOT EXISTS idx_account_movements_org ON account_movements(org_id
 GET    /v1/accounts                          — Listar cuentas (filtro por tipo, con saldo != 0)
 GET    /v1/accounts/receivable               — Solo cuentas a cobrar (clientes que deben)
 GET    /v1/accounts/payable                  — Solo cuentas a pagar (deudas con proveedores)
-GET    /v1/accounts/:entity_type/:entity_id  — Cuenta de un cliente/proveedor especifico
+GET    /v1/accounts/party/:party_id           — Cuentas de un party (puede tener receivable y/o payable)
 GET    /v1/accounts/:id/movements            — Historial de movimientos de una cuenta
 POST   /v1/accounts/:id/payment              — Registrar pago (reduce saldo)
 POST   /v1/accounts/:id/charge               — Registrar cargo manual (aumenta saldo)
@@ -442,14 +493,47 @@ GET    /v1/accounts/summary                  — Resumen: total a cobrar, total 
 3. Se registra un `charge` por el total de la compra
 4. Cuando se paga al proveedor: `POST /v1/accounts/:id/payment` → genera movimiento de caja
 
+### Transacción de cargo en cuenta corriente
+
+```go
+func (uc *Usecases) ChargeToAccount(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, partyID *uuid.UUID, amount float64, refType string, refID uuid.UUID) error {
+    if partyID == nil { return apperror.NewValidation("party_id requerido para venta fiada", nil) }
+
+    return uc.db.TransactionWithTx(ctx, tx, func(innerTx *gorm.DB) error {
+        // 1. Get or create account (lazy creation)
+        account, err := uc.repo.GetOrCreateAccount(ctx, innerTx, orgID, *partyID, "receivable")
+        if err != nil { return fmt.Errorf("get/create account: %w", err) }
+
+        // 2. Validar credit limit
+        if account.CreditLimit > 0 && account.Balance+amount > account.CreditLimit {
+            return ErrCreditLimitExceeded(account.Balance, account.CreditLimit)
+        }
+
+        // 3. Registrar movimiento con running balance
+        newBalance := account.Balance + amount
+        movement := &domain.AccountMovement{
+            AccountID: account.ID, OrgID: orgID,
+            Type: "charge", Amount: amount, Balance: newBalance,
+            Description: fmt.Sprintf("Cargo por %s", refType),
+            ReferenceType: refType, ReferenceID: &refID,
+        }
+        if err := uc.repo.CreateMovement(ctx, innerTx, movement); err != nil { return err }
+
+        // 4. Actualizar balance de la cuenta (atómico)
+        return uc.repo.UpdateBalance(ctx, innerTx, account.ID, newBalance)
+    })
+}
+```
+
 ### Reglas de negocio
 
-- Las cuentas se crean automaticamente al primer cargo (lazy creation).
-- El `balance` se actualiza atomicamente con cada movimiento (running balance en la tabla `account_movements`).
-- Los movimientos son **inmutables** — nunca se editan ni borran.
-- `credit_limit`: si > 0, la venta fiada se rechaza si `balance + venta.total > credit_limit`. Si = 0, sin limite (fiado libre).
+- Las cuentas se crean automaticamente al primer cargo (lazy creation) **dentro de la misma transacción**.
+- El `balance` se actualiza atomicamente con cada movimiento (running balance en la tabla `account_movements`). Se usa `SELECT ... FOR UPDATE` en la cuenta para evitar race conditions.
+- Los movimientos son **inmutables** — nunca se editan ni borran. Intentar modificar retorna `apperror.NewBusinessRule`.
+- `credit_limit`: si > 0, la venta fiada se rechaza con `ErrCreditLimitExceeded` si `balance + venta.total > credit_limit`. Si = 0, sin limite (fiado libre).
+- Al registrar pago: se genera `cash_movement(type=income)` si es receivable, `cash_movement(type=expense)` si es payable. **Todo dentro de una transacción.**
+- Cada operación de pago valida que `amount <= saldo pendiente`. Si excede, retorna `ErrPaymentExceedsPending`.
 - El resumen (`/summary`) muestra: total a cobrar de todos los clientes, total a pagar a todos los proveedores, neto.
-- Al registrar pago: se genera `cash_movement(type=income)` si es receivable, `cash_movement(type=expense)` si es payable.
 - La cuenta muestra el estado de cuenta completo: fecha, concepto, debe, haber, saldo. Como el cuadernito pero digital.
 
 ---
@@ -603,7 +687,7 @@ type CreditNote struct {
     ID          uuid.UUID
     OrgID       uuid.UUID
     Number      string         // "NC-00001"
-    CustomerID  uuid.UUID
+    PartyID     uuid.UUID      // party con rol customer
     ReturnID    uuid.UUID
     Amount      float64
     UsedAmount  float64 // cuanto se ha aplicado a ventas futuras
@@ -650,7 +734,7 @@ CREATE TABLE IF NOT EXISTS credit_notes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     number text NOT NULL,
-    customer_id uuid NOT NULL REFERENCES customers(id),
+    party_id uuid NOT NULL REFERENCES parties(id),
     return_id uuid NOT NULL REFERENCES returns(id),
     amount numeric(15,2) NOT NULL,
     used_amount numeric(15,2) NOT NULL DEFAULT 0,
@@ -663,7 +747,7 @@ CREATE TABLE IF NOT EXISTS credit_notes (
 
 CREATE INDEX IF NOT EXISTS idx_returns_org ON returns(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_returns_sale ON returns(sale_id);
-CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(org_id, customer_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_credit_notes_party ON credit_notes(org_id, party_id) WHERE status = 'active';
 ```
 
 ### API
@@ -676,7 +760,7 @@ POST   /v1/returns/:id/void          — Anular devolucion
 
 GET    /v1/credit-notes              — Listar notas de credito
 GET    /v1/credit-notes/:id          — Detalle
-GET    /v1/customers/:id/credit-notes — Notas de credito de un cliente
+GET    /v1/parties/:id/credit-notes   — Notas de credito de un party (cliente)
 POST   /v1/sales/:id/apply-credit    — Aplicar nota de credito a una venta
 ```
 
@@ -858,13 +942,24 @@ PUT    /v1/price-lists/:id/items                — Actualizar precios de produc
 GET    /v1/products/:id/prices                  — Precio del producto en todas las listas
 ```
 
-### Asignacion de lista a clientes
+### Asignacion de lista a clientes (via Party Model)
 
-Agregar a `customers`:
+La `price_list_id` se almacena en `party_roles.metadata` del rol `customer`:
+
+```json
+{
+    "price_list_id": "uuid-de-la-lista"
+}
+```
+
+Alternativa: agregar columna `price_list_id` en `party_roles` directamente si se prefiere tipado fuerte:
+
 ```sql
-ALTER TABLE customers
+ALTER TABLE party_roles
     ADD COLUMN IF NOT EXISTS price_list_id uuid REFERENCES price_lists(id);
 ```
+
+Esta columna solo aplica cuando `role = 'customer'`, para los demás roles es null.
 
 ### Resolucion de precio
 
@@ -876,8 +971,8 @@ Cuando se crea una venta o presupuesto, el precio se resuelve asi:
 4. Si el cliente no tiene lista → usar `products.price` (lista default)
 
 ```go
-func (uc *Usecases) ResolvePrice(ctx context.Context, orgID, productID, customerID uuid.UUID) (float64, error) {
-    // 1. Buscar lista del cliente
+func (uc *Usecases) ResolvePrice(ctx context.Context, orgID, productID, partyID uuid.UUID) (float64, error) {
+    // 1. Buscar price_list_id del party_role(customer) del party
     // 2. Buscar override en price_list_items
     // 3. Si no hay override, aplicar markup
     // 4. Fallback: product.price
@@ -913,7 +1008,7 @@ type RecurringExpense struct {
     PaymentMethod string         // "cash" | "card" | "transfer" | "debit" | "check" | "other"
     Frequency     string         // "monthly" | "biweekly" | "weekly" | "quarterly" | "yearly"
     DayOfMonth    int            // dia del mes en que se paga (1-28)
-    SupplierID    *uuid.UUID     // proveedor asociado (opcional)
+    PartyID       *uuid.UUID     // party con rol 'supplier' asociado (opcional)
     IsActive      bool
     NextDueDate   time.Time
     LastPaidDate  *time.Time
@@ -939,7 +1034,7 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     frequency text NOT NULL DEFAULT 'monthly'
         CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
     day_of_month int NOT NULL DEFAULT 1 CHECK (day_of_month BETWEEN 1 AND 28),
-    supplier_id uuid REFERENCES suppliers(id),
+    party_id uuid REFERENCES parties(id),
     is_active boolean NOT NULL DEFAULT true,
     next_due_date date NOT NULL,
     last_paid_date date,
@@ -970,7 +1065,7 @@ GET    /v1/recurring-expenses/upcoming      — Proximos vencimientos (proximos 
 
 1. `POST /v1/recurring-expenses/:id/pay`
 2. Genera `cash_movement(type=expense, category=<category>, reference_type=recurring)`
-3. Si tiene `supplier_id`: genera `account_movement` en la cuenta del proveedor (si paga a credito)
+3. Si tiene `party_id` (proveedor): genera `account_movement` en la cuenta del party/supplier (si paga a credito)
 4. Actualiza `last_paid_date = today`
 5. Calcula `next_due_date` segun `frequency`
 6. Genera audit log
@@ -1014,9 +1109,9 @@ El taller agenda turnos para recibir autos, el profe agenda clases, el profesion
 type Appointment struct {
     ID          uuid.UUID
     OrgID       uuid.UUID
-    CustomerID  *uuid.UUID
-    CustomerName string       // si no hay customer registrado
-    CustomerPhone string      // para confirmar/recordar
+    PartyID     *uuid.UUID    // party con rol 'customer' (opcional)
+    PartyName   string        // si no hay party registrado
+    PartyPhone  string        // para confirmar/recordar
     Title       string        // "Revision auto", "Clase de piano", "Consulta"
     Description string
     Status      string        // "scheduled" | "confirmed" | "in_progress" | "completed" | "cancelled" | "no_show"
@@ -1048,9 +1143,9 @@ type AppointmentSlot struct {
 CREATE TABLE IF NOT EXISTS appointments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    customer_id uuid REFERENCES customers(id),
-    customer_name text NOT NULL DEFAULT '',
-    customer_phone text NOT NULL DEFAULT '',
+    party_id uuid REFERENCES parties(id),
+    party_name text NOT NULL DEFAULT '',
+    party_phone text NOT NULL DEFAULT '',
     title text NOT NULL DEFAULT '',
     description text NOT NULL DEFAULT '',
     status text NOT NULL DEFAULT 'scheduled'
@@ -1071,7 +1166,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 
 CREATE INDEX IF NOT EXISTS idx_appointments_org_date ON appointments(org_id, start_at);
 CREATE INDEX IF NOT EXISTS idx_appointments_org_status ON appointments(org_id, status, start_at);
-CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_appointments_party ON appointments(party_id) WHERE party_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_appointments_assigned ON appointments(org_id, assigned_to, start_at) WHERE assigned_to != '';
 
 CREATE TABLE IF NOT EXISTS appointment_slots (
@@ -1099,7 +1194,7 @@ POST   /v1/appointments/:id/complete        — Marcar como completado
 POST   /v1/appointments/:id/no-show         — Marcar como no-show
 GET    /v1/appointments/calendar             — Vista calendario (por semana/mes)
 GET    /v1/appointments/available-slots      — Horarios disponibles para una fecha
-GET    /v1/customers/:id/appointments       — Turnos de un cliente
+GET    /v1/parties/:id/appointments          — Turnos de un party (cliente)
 
 # Configuracion de horarios
 GET    /v1/appointment-slots                — Horarios de atencion
@@ -1571,8 +1666,8 @@ type TimelineEntry struct {
 CREATE TABLE IF NOT EXISTS timeline_entries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    entity_type text NOT NULL, -- 'sale', 'quote', 'customer', 'supplier', 'product', 'purchase', etc.
-    entity_id uuid NOT NULL,  -- polimórfico: apunta a la tabla correspondiente a entity_type (sin FK)
+    entity_type text NOT NULL, -- 'sale', 'quote', 'party', 'product', 'purchase', etc.
+    entity_id uuid NOT NULL,  -- polimórfico: apunta a parties(id), products(id), sales(id), etc. según entity_type (sin FK)
     event_type text NOT NULL,
     title text NOT NULL,
     description text NOT NULL DEFAULT '',
@@ -1598,10 +1693,10 @@ Los usecases existentes generan timeline entries automaticamente:
 
 | Evento | Title | Entity |
 |--------|-------|--------|
-| Crear cliente | "Cliente creado" | customer |
-| Actualizar cliente | "Datos actualizados" | customer |
-| Venta a cliente | "Venta VTA-00042 por $847" | customer |
-| Presupuesto a cliente | "Presupuesto PRE-00015 por $500" | customer |
+| Crear party (cliente) | "Cliente creado" | party |
+| Actualizar party | "Datos actualizados" | party |
+| Venta a party | "Venta VTA-00042 por $847" | party |
+| Presupuesto a party | "Presupuesto PRE-00015 por $500" | party |
 | Crear producto | "Producto creado" | product |
 | Ajuste de stock | "Stock ajustado: +20 unidades" | product |
 | Venta de producto | "Vendido: 3 unidades en VTA-00042" | product |
@@ -1614,7 +1709,7 @@ type TimelinePort interface {
 }
 ```
 
-Se inyecta en los usecases de customers, products, sales, quotes. Es nil-safe: si nil, no registra.
+Se inyecta en los usecases de parties, products, sales, quotes. Es nil-safe: si nil, no registra.
 
 ### Reglas de negocio
 
@@ -1658,6 +1753,18 @@ type WebhookDelivery struct {
     DeliveredAt *time.Time
     CreatedAt   time.Time
 }
+
+type WebhookOutbox struct {
+    ID          uuid.UUID
+    OrgID       uuid.UUID
+    EventType   string
+    AggregateType string
+    AggregateID string
+    Payload     map[string]any
+    LockedAt    *time.Time
+    ProcessedAt *time.Time
+    CreatedAt   time.Time
+}
 ```
 
 ### Tablas SQL
@@ -1692,6 +1799,22 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_endpoint ON webhook_deliveries(endpoint_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_retry ON webhook_deliveries(next_retry) WHERE delivered_at IS NULL AND attempts < 5;
+
+CREATE TABLE IF NOT EXISTS webhook_outbox (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    event_type text NOT NULL,
+    aggregate_type text NOT NULL,
+    aggregate_id text NOT NULL,
+    payload jsonb NOT NULL,
+    locked_at timestamptz,
+    processed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_outbox_pending
+    ON webhook_outbox(created_at)
+    WHERE processed_at IS NULL;
 ```
 
 ### API
@@ -1704,13 +1827,13 @@ PUT    /v1/webhook-endpoints/:id               — Actualizar (URL, events, acti
 DELETE /v1/webhook-endpoints/:id               — Eliminar endpoint
 GET    /v1/webhook-endpoints/:id/deliveries    — Historial de envios
 POST   /v1/webhook-endpoints/:id/test          — Enviar evento de prueba
+POST   /v1/webhook-deliveries/:id/replay       — Reencolar delivery fallido
 ```
 
 ### Eventos disponibles
 
 ```
-customer.created, customer.updated, customer.deleted
-supplier.created, supplier.updated, supplier.deleted
+party.created, party.updated, party.deleted, party.role_added, party.role_removed
 product.created, product.updated, product.deleted
 sale.created, sale.voided
 quote.created, quote.accepted, quote.rejected
@@ -1739,22 +1862,51 @@ Mensaje firmado: `{webhook_id}.{timestamp}.{body}`
 
 ```go
 type WebhookDispatcher interface {
-    Dispatch(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+    Enqueue(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, eventType string, aggregateType string, aggregateID string, payload map[string]any) error
+    FlushPending(ctx context.Context, limit int) error
 }
 ```
 
-**En Lambda**: el dispatch es sincronico pero con timeout corto (5 segundos por endpoint). Si falla, se registra el delivery con `next_retry` y se reintenta en el proximo request que toque el scheduler (ver modulo 9).
+**Patrón recomendado**: transactional outbox. El módulo que genera el evento inserta un registro en `webhook_outbox` dentro de la misma transacción de negocio. Un worker/scheduler independiente lee el outbox y genera `webhook_deliveries`. Esto evita dual-write inconsistente (ej: venta confirmada en DB pero webhook perdido).
 
-**Reintentos**: hasta 5 intentos con backoff exponencial (1min, 5min, 30min, 2hr, 12hr). Despues de 5 fallos, se marca como failed y se desactiva el endpoint si acumula 10 fallos consecutivos.
+**En Lambda**: el request del usuario solo encola en outbox. El scheduler `retry_webhooks` hace `FlushPending()` y ejecuta deliveries con timeout corto (5 segundos por endpoint).
+
+**Reintentos**: hasta 5 intentos con backoff exponencial (1min, 5min, 30min, 2hr, 12hr). Después de 5 fallos, el delivery queda en estado `dead_letter` y puede reintentarse manualmente con el endpoint de replay. Si un endpoint acumula 10 fallos consecutivos, se desactiva automáticamente.
+
+### Validación de URL (prevención SSRF)
+
+```go
+func validateWebhookURL(rawURL string) error {
+    u, err := url.Parse(rawURL)
+    if err != nil { return apperror.NewValidation("URL inválida", nil) }
+    if u.Scheme != "https" { return apperror.NewValidation("Solo se permiten URLs HTTPS", nil) }
+
+    host := u.Hostname()
+    ips, err := net.LookupIP(host)
+    if err != nil { return apperror.NewValidation("No se pudo resolver el host", nil) }
+
+    for _, ip := range ips {
+        if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+            return ErrWebhookURLPrivateIP
+        }
+    }
+    return nil
+}
+```
 
 ### Reglas de negocio
 
-- Maximo 5 endpoints por org en plan starter, 20 en growth, ilimitado en enterprise.
-- El `secret` se genera automaticamente al crear el endpoint (32 bytes hex).
-- El `secret` se muestra una sola vez al crear (como las API keys).
-- Los deliveries se retienen 30 dias.
+- Maximo 5 endpoints por org en plan starter, 20 en growth, ilimitado en enterprise. Exceder el límite retorna `ErrQuotaExceeded`.
+- **Validación SSRF**: la URL del webhook se valida contra IPs privadas (10.x, 172.16.x, 192.168.x, 127.x, ::1). Solo HTTPS permitido.
+- El `secret` se genera automaticamente al crear el endpoint (32 bytes hex). Se muestra una sola vez al crear (como las API keys).
+- Los deliveries se retienen 30 dias. El scheduler los limpia.
 - El payload incluye siempre: `event`, `org_id`, `timestamp`, `data` (la entidad completa).
 - Solo `admin` puede gestionar webhooks.
+- Los eventos de webhook se escriben a `webhook_outbox` dentro de la misma transacción de negocio. Nunca hacer dual-write `UPDATE negocio + POST webhook`.
+- El dispatcher usa **retry con backoff exponencial** (ver Prompt 00, E8): 5 intentos con delays 1min, 5min, 30min, 2hr, 12hr.
+- Timeout de 5 segundos por delivery. Si falla, se registra y se reintenta.
+- Los deliveries agotados pasan a DLQ lógica (`dead_letter`) y quedan visibles para replay manual desde API/admin.
+- Cada delivery incluye `X-Webhook-ID` y `X-Webhook-Timestamp` para deduplicación y replay protection del receptor.
 
 ---
 
@@ -2047,7 +2199,7 @@ PUT    /v1/dashboard/config           — Actualizar configuracion
 | `low_stock_products` | Productos con stock bajo | `stock_levels WHERE quantity <= min_quantity` |
 | `top_products_month` | Top 5 productos mas vendidos | `sale_items GROUP BY product_id ORDER BY SUM(quantity) DESC LIMIT 5` |
 | `recent_sales` | Ultimas 10 ventas | `sales ORDER BY created_at DESC LIMIT 10` |
-| `customers_month` | Clientes nuevos del mes | `customers WHERE created_at >= first_of_month` |
+| `customers_month` | Clientes nuevos del mes | `party_roles WHERE role='customer' AND created_at >= first_of_month` |
 | `accounts_receivable` | Total fiado pendiente de cobro | `accounts WHERE type = 'receivable' AND balance > 0` |
 | `upcoming_expenses` | Gastos recurrentes proximos a vencer | `recurring_expenses WHERE next_due_date <= today + 7` |
 | `today_appointments` | Turnos del dia | `appointments WHERE start_at::date = today` |
@@ -2235,7 +2387,7 @@ Y los ALTERs a tablas existentes:
 - `sales`: agregar `amount_paid`, `payment_status`, actualizar CHECK de `payment_method` para incluir `'credit'`, `'mixed'`
 - `sales` + `quotes`: agregar `discount_type`, `discount_value`, `discount_total`
 - `sale_items` + `quote_items`: agregar `discount_type`, `discount_value`
-- `customers`: agregar `price_list_id`
+- `party_roles`: agregar `price_list_id` (para rol customer)
 - `products`: agregar `price_currency`
 - `sales`: agregar `exchange_rate`, `exchange_rate_type`
 
@@ -2336,14 +2488,14 @@ Sale (crear, pago inmediato)
 
 Sale (crear, fiada/credito)
   ├── Inventory: stock_movement(out)
-  ├── Accounts: charge en cuenta corriente del cliente
+  ├── Accounts: charge en cuenta corriente del party (rol customer)
   ├── NO cashflow (la plata no entro)
   ├── Audit + Timeline + Webhooks
   └── payment_status = 'pending'
 
 Sale (pago parcial posterior)
   ├── Payments: registrar Payment
-  ├── Accounts: payment en cuenta corriente del cliente
+  ├── Accounts: payment en cuenta corriente del party
   ├── Cashflow: cash_movement(income)
   └── Actualizar amount_paid y payment_status
 
@@ -2357,7 +2509,7 @@ Purchase (recibir, pago inmediato)
 
 Purchase (recibir, a credito)
   ├── Inventory: stock_movement(in, reason=purchase)
-  ├── Accounts: charge en cuenta corriente del proveedor
+  ├── Accounts: charge en cuenta corriente del party (rol supplier)
   ├── NO cashflow
   └── payment_status = 'pending'
 
@@ -2371,7 +2523,7 @@ Return (devolucion)
 
 Recurring Expense (pagar)
   ├── Cashflow: cash_movement(expense)
-  ├── Accounts: movement en cuenta del proveedor (si aplica)
+  ├── Accounts: movement en cuenta del party/supplier (si aplica)
   └── Actualizar next_due_date
 
 Appointment (completar)
@@ -2424,20 +2576,39 @@ rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 accountsUC := accounts.NewUsecases(accountsRepo, cashflowUC, auditUC)
 paymentsUC := payments.NewUsecases(paymentsRepo, accountsUC, cashflowUC, auditUC)
 pricelistsUC := pricelists.NewUsecases(pricelistsRepo, auditUC)
-returnsUC := returns.NewUsecases(returnsRepo, inventoryUC, cashflowUC, accountsUC, auditUC)
 recurringUC := recurring.NewUsecases(recurringRepo, cashflowUC, accountsUC, auditUC)
-appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC)
-
-// sales y purchases NO cambian su constructor original.
-// Las nuevas dependencias (accounts, payments, pricelists) se inyectan via setter injection,
-// igual que timeline y webhooks. Esto evita romper el constructor existente.
-salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC) // constructor original sin cambios
-purchasesUC := purchases.NewUsecases(purchasesRepo, inventoryUC, cashflowUC, auditUC)
-
-attachmentUC := attachments.NewUsecases(attachmentRepo, storage, auditUC)
 timelineUC := timeline.NewUsecases(timelineRepo)
 outwebhookUC := outwebhooks.NewUsecases(outwebhookRepo)
 currencyUC := currency.NewUsecases(currencyRepo, cfg.ExchangeRateProvider)
+appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC, appointments.WithTimeline(timelineUC))
+returnsUC := returns.NewUsecases(returnsRepo, inventoryUC, cashflowUC, accountsUC, auditUC, returns.WithWebhooks(outwebhookUC))
+
+// sales y purchases migran a Functional Options (Prompt 00, E14)
+salesUC := sales.NewUsecases(
+    salesRepo,
+    inventoryUC,
+    cashflowUC,
+    auditUC,
+    sales.WithAccounts(accountsUC),
+    sales.WithPayments(paymentsUC),
+    sales.WithPriceLists(pricelistsUC),
+    sales.WithCurrency(currencyUC),
+    sales.WithTimeline(timelineUC),
+    sales.WithWebhooks(outwebhookUC),
+)
+purchasesUC := purchases.NewUsecases(
+    purchasesRepo,
+    inventoryUC,
+    cashflowUC,
+    auditUC,
+    purchases.WithAccounts(accountsUC),
+    purchases.WithPayments(paymentsUC),
+    purchases.WithCurrency(currencyUC),
+    purchases.WithTimeline(timelineUC),
+    purchases.WithWebhooks(outwebhookUC),
+)
+
+attachmentUC := attachments.NewUsecases(attachmentRepo, storage, auditUC)
 dashboardUC := dashboard.NewUsecases(salesUC, cashflowUC, inventoryUC, quotesUC, customersUC, accountsUC, appointmentsUC, recurringUC)
 dataioUC := dataio.NewUsecases(customersRepo, productsRepo, suppliersRepo, salesRepo, cashflowRepo, auditUC)
 pdfgenUC := pdfgen.NewUsecases(quotesRepo, salesRepo, adminRepo)
@@ -2446,26 +2617,8 @@ waUC := whatsapp.NewUsecases(customersRepo, quotesRepo, salesRepo, adminRepo)
 // RBAC middleware
 rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 
-// Inyectar nuevas dependencias en usecases existentes (setter injection, nil-safe)
-// Accounts, payments, pricelists:
-salesUC.SetAccounts(accountsUC)
-salesUC.SetPayments(paymentsUC)
-salesUC.SetPriceLists(pricelistsUC)
-purchasesUC.SetAccounts(accountsUC)
-purchasesUC.SetPayments(paymentsUC)
-// Currency:
-salesUC.SetCurrency(currencyUC)
-purchasesUC.SetCurrency(currencyUC)
-// Timeline y webhooks:
-salesUC.SetTimeline(timelineUC)
-salesUC.SetWebhookDispatcher(outwebhookUC)
-purchasesUC.SetTimeline(timelineUC)
-purchasesUC.SetWebhookDispatcher(outwebhookUC)
-customersUC.SetTimeline(timelineUC)
-customersUC.SetWebhookDispatcher(outwebhookUC)
-productsUC.SetTimeline(timelineUC)
-appointmentsUC.SetTimeline(timelineUC)
-returnsUC.SetWebhookDispatcher(outwebhookUC)
+partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhookUC))
+productsUC := products.NewUsecases(productsRepo, auditUC, products.WithTimeline(timelineUC))
 
 // ── Nuevos handlers ──
 rbacHandler := rbac.NewHandler(rbacUC)
@@ -2489,8 +2642,9 @@ schedulerHandler := scheduler.NewHandler(cfg.SchedulerSecret, quotesUC, outwebho
 // ── Registrar rutas ──
 // Handlers existentes (Prompt 01) conservan su firma RegisterRoutes(rg *gin.RouterGroup).
 // RBAC se aplica como middleware de grupo para las rutas existentes:
-customersHandler.RegisterRoutes(authGroup) // ya registrado, RBAC se agrega via grupo
-suppliersHandler.RegisterRoutes(authGroup)
+partyHandler.RegisterRoutes(authGroup)       // Party CRUD base (Prompt 00)
+customersHandler.RegisterRoutes(authGroup)   // Alias sobre parties con rol 'customer'
+suppliersHandler.RegisterRoutes(authGroup)   // Alias sobre parties con rol 'supplier'
 productsHandler.RegisterRoutes(authGroup)
 // ... (los handlers de Prompt 01 ya estan registrados arriba, no duplicar)
 
@@ -2543,9 +2697,87 @@ schedulerHandler.RegisterRoutes(v1)
 17. `whatsapp` — links de WhatsApp
 18. `dashboard` — KPIs (depende de todos los demas para mostrar datos)
 19. `scheduler` — tareas programadas (depende de quotes, webhooks, recurring, appointments, currency)
-20. Integrar RBAC + payments + discounts + pricelists en handlers existentes de Prompt 01 (via setter injection, sin cambiar firmas)
+20. Integrar RBAC + payments + discounts + pricelists en módulos existentes usando Functional Options, sin setter injection
 21. Tests unitarios + E2E
 22. Actualizar Terraform (EventBridge, S3 bucket)
+
+---
+
+## Testing — Módulos extensiones
+
+### Tests obligatorios por módulo
+
+| Módulo | Unit tests (usecases) | Integration tests (repo) | Prioridad |
+|--------|----------------------|-------------------------|-----------|
+| `rbac` | HasPermission con cache, roles system protegidos | Asignar/revocar roles | Alta |
+| `accounts` | ChargeToAccount, RegisterPayment, credit limit | Running balance, lazy creation | Alta |
+| `payments` | Pago parcial, pago excede pendiente, múltiples medios | Suma de payments por reference | Alta |
+| `returns` | Cantidad devuelta vs vendida, nota de crédito, reembolso | Credit note balance | Alta |
+| `purchases` | Recibir compra → stock + caja, anular compra | CRUD básico | Media |
+| `appointments` | Slot availability, doble booking, no-show | Calendar query | Media |
+| `discounts` | Cálculo con descuento item + global + impuesto | N/A (campos en sales) | Alta |
+| `pricelists` | ResolvePrice: override > markup > default | CRUD básico | Media |
+| `outwebhooks` | URL validation SSRF, firma HMAC, retry logic | Delivery persistence | Media |
+| `currency` | Conversión con buy/sell rate, fallback a last known | Rate history | Baja |
+
+### Ejemplo: test de pago parcial
+
+```go
+func TestPayments_RegisterPayment(t *testing.T) {
+    tests := []struct {
+        name      string
+        saleTotal float64
+        amountPaid float64
+        newPayment float64
+        wantStatus string
+        wantErr    apperror.Code
+    }{
+        {name: "pago parcial", saleTotal: 1000, amountPaid: 0, newPayment: 500, wantStatus: "partial"},
+        {name: "pago completo", saleTotal: 1000, amountPaid: 500, newPayment: 500, wantStatus: "paid"},
+        {name: "pago excede pendiente", saleTotal: 1000, amountPaid: 800, newPayment: 500, wantErr: apperror.CodeBusinessRule},
+        {name: "pago de $0", saleTotal: 1000, amountPaid: 0, newPayment: 0, wantErr: apperror.CodeValidation},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()
+            // ... setup mocks, execute, assert
+        })
+    }
+}
+```
+
+### Ejemplo: test de devolución parcial
+
+```go
+func TestReturns_CreateReturn(t *testing.T) {
+    tests := []struct {
+        name         string
+        saleItems    []SaleItem
+        returnItems  []ReturnItemReq
+        refundMethod string
+        wantErr      apperror.Code
+    }{
+        {
+            name: "devolución parcial con nota de crédito",
+            saleItems: []SaleItem{{Qty: 5, UnitPrice: 100}},
+            returnItems: []ReturnItemReq{{Qty: 2}},
+            refundMethod: "credit_note",
+        },
+        {
+            name: "devolución excede cantidad vendida",
+            saleItems: []SaleItem{{Qty: 3, UnitPrice: 100}},
+            returnItems: []ReturnItemReq{{Qty: 5}},
+            wantErr: apperror.CodeBusinessRule,
+        },
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()
+            // ... setup mocks, execute, assert
+        })
+    }
+}
+```
 
 ---
 
@@ -2555,13 +2787,14 @@ schedulerHandler.RegisterRoutes(v1)
 - [ ] `go test ./...` todos los tests pasan
 - [ ] RBAC: admin puede todo, vendedor solo puede crear ventas, cajero no puede ver reportes
 - [ ] Purchases: crear compra → recibir → stock ingresa → deuda con proveedor generada
-- [ ] Accounts: venta fiada → saldo en cuenta del cliente → pago parcial → saldo actualizado
-- [ ] Accounts: compra a credito → saldo con proveedor → pago → saldo en 0
+- [ ] Accounts: venta fiada → saldo en cuenta del party (customer) → pago parcial → saldo actualizado
+- [ ] Accounts: compra a credito → saldo con party (supplier) → pago → saldo en 0
+- [ ] Accounts: party con rol dual (customer+supplier) tiene cuenta receivable Y payable
 - [ ] Payments: venta con 2 medios de pago → 2 payments → 2 cash_movements
 - [ ] Returns: devolucion parcial → stock devuelto → nota de credito generada
 - [ ] Returns: aplicar nota de credito a venta nueva → saldo descontado
 - [ ] Discounts: venta con descuento por item + descuento global → total correcto
-- [ ] Price Lists: cliente con lista mayorista → precio resuelto automaticamente al crear venta
+- [ ] Price Lists: party/customer con lista mayorista → precio resuelto automaticamente al crear venta
 - [ ] Recurring: crear gasto mensual → pagar → cash_movement generado → next_due_date actualizado
 - [ ] Appointments: crear turno → confirmar → completar → timeline del cliente actualizado
 - [ ] Appointments: verificar slots disponibles → no permitir doble booking
@@ -2569,12 +2802,28 @@ schedulerHandler.RegisterRoutes(v1)
 - [ ] Export: descargar XLSX de ventas del mes con filtro de fecha
 - [ ] Attachments: subir foto a un producto via presigned URL, descargar via presigned URL
 - [ ] PDF: generar PDF de presupuesto con datos de la org y items
-- [ ] Timeline: ver historial de un cliente (creacion, ventas, pagos, notas)
+- [ ] Timeline: ver historial de un party (creacion, ventas, compras, pagos, notas)
 - [ ] Webhooks: crear endpoint → crear venta → delivery registrado
+- [ ] Webhooks: evento de negocio se escribe en `webhook_outbox` y luego scheduler lo entrega
 - [ ] WhatsApp: generar link wa.me con presupuesto para un cliente con telefono
 - [ ] Dashboard: ver KPIs (ventas hoy, caja, deudas, stock bajo, presupuestos pendientes, turnos del dia)
 - [ ] Currency: consultar cotizacion dolar blue y oficial del dia
 - [ ] Currency: venta en USD → exchange_rate snapshot guardado → total_ars calculado
 - [ ] Currency: scheduler actualiza cotizaciones automaticamente cada hora
 - [ ] Scheduler: expirar presupuestos, recordar gastos, recordar turnos, actualizar cotizaciones automaticamente
-- [ ] Tests E2E cubren: compras, fiado, pagos parciales, devoluciones, descuentos, listas de precio, turnos, cotizaciones
+- [ ] Tests E2E cubren: compras, fiado (con party), pagos parciales, devoluciones, descuentos, listas de precio, turnos, cotizaciones
+- [ ] Party Model: todas las FKs apuntan a parties(id), no existen tablas customers/suppliers
+
+### Engineering Standards
+- [ ] Todos los domain errors usan `apperror.Error` con código y HTTP status
+- [ ] Validación: DTOs de purchases, appointments, returns, price_lists con binding tags
+- [ ] Transacciones: ChargeToAccount, RegisterPayment, CreateReturn, ReceivePurchase usan `db.Transaction`
+- [ ] Race conditions: running balance de accounts usa `SELECT ... FOR UPDATE`
+- [ ] Webhook URLs validadas contra SSRF (no IPs privadas, solo HTTPS)
+- [ ] Webhook deliveries con retry + backoff exponencial
+- [ ] Transactional outbox evita dual-write entre transacción de negocio y dispatch webhook
+- [ ] Deliveries agotados pasan a `dead_letter` y pueden reintentarse con replay manual
+- [ ] Wiring usa Functional Options para dependencias opcionales; no setter injection
+- [ ] Unit tests: ≥ 70% coverage en accounts, payments, returns usecases
+- [ ] Integration tests: accounts running balance, credit notes balance, slot availability con testcontainers
+- [ ] Cache RBAC: permisos cacheados en memoria con TTL 5min, invalidación al asignar/revocar

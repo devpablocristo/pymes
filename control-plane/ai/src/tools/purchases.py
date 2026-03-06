@@ -5,4 +5,4 @@ from src.backend_client.client import BackendClient
 
 
 async def get_purchases_summary(client: BackendClient, auth: AuthContext) -> dict:
-    return {"error": "purchases module not available yet"}
+    return await client.request("GET", "/v1/purchases", auth=auth, params={"limit": 20})

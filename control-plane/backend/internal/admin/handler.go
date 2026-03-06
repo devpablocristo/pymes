@@ -16,7 +16,7 @@ import (
 type usecasesPort interface {
 	GetBootstrap(ctx context.Context, orgID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
 	GetTenantSettings(ctx context.Context, orgID string) (admindomain.TenantSettings, error)
-	UpdateTenantSettings(ctx context.Context, orgID, plan string, hardLimits map[string]any, actor *string) (admindomain.TenantSettings, error)
+	UpdateTenantSettings(ctx context.Context, orgID string, patch admindomain.TenantSettingsPatch, actor *string) (admindomain.TenantSettings, error)
 	ListActivity(ctx context.Context, orgID string, limit int) ([]admindomain.ActivityEvent, error)
 }
 
@@ -32,6 +32,9 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 	auth.GET("/admin/bootstrap", h.GetBootstrap)
 	auth.GET("/admin/tenant-settings", h.GetTenantSettings)
 	auth.PUT("/admin/tenant-settings", h.UpdateTenantSettings)
+	auth.PATCH("/admin/tenant-settings", h.UpdateTenantSettings)
+	auth.GET("/tenant-settings", h.GetTenantSettings)
+	auth.PATCH("/tenant-settings", h.UpdateTenantSettings)
 	auth.GET("/admin/activity", h.ListActivity)
 }
 
@@ -74,7 +77,40 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, req.PlanCode, req.HardLimits, &authCtx.Actor)
+	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{
+		PlanCode:                 req.PlanCode,
+		HardLimits:               req.HardLimits,
+		Currency:                 req.Currency,
+		TaxRate:                  req.TaxRate,
+		QuotePrefix:              req.QuotePrefix,
+		SalePrefix:               req.SalePrefix,
+		AllowNegativeStock:       req.AllowNegativeStock,
+		PurchasePrefix:           req.PurchasePrefix,
+		ReturnPrefix:             req.ReturnPrefix,
+		CreditNotePrefix:         req.CreditNotePrefix,
+		BusinessName:             req.BusinessName,
+		BusinessTaxID:            req.BusinessTaxID,
+		BusinessAddress:          req.BusinessAddress,
+		BusinessPhone:            req.BusinessPhone,
+		BusinessEmail:            req.BusinessEmail,
+		WAQuoteTemplate:          req.WAQuoteTemplate,
+		WAReceiptTemplate:        req.WAReceiptTemplate,
+		WADefaultCountryCode:     req.WADefaultCountryCode,
+		AppointmentsEnabled:      req.AppointmentsEnabled,
+		AppointmentLabel:         req.AppointmentLabel,
+		AppointmentReminderHours: req.AppointmentReminderHours,
+		SecondaryCurrency:        req.SecondaryCurrency,
+		DefaultRateType:          req.DefaultRateType,
+		AutoFetchRates:           req.AutoFetchRates,
+		ShowDualPrices:           req.ShowDualPrices,
+		BankHolder:               req.BankHolder,
+		BankCBU:                  req.BankCBU,
+		BankAlias:                req.BankAlias,
+		BankName:                 req.BankName,
+		ShowQRInPDF:              req.ShowQRInPDF,
+		WAPaymentTemplate:        req.WAPaymentTemplate,
+		WAPaymentLinkTemplate:    req.WAPaymentLinkTemplate,
+	}, &authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

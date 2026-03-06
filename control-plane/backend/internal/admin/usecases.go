@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/pkg/http/errors"
+	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
 )
 
 type RepositoryPort interface {
 	GetTenantSettings(orgID uuid.UUID) domain.TenantSettings
-	UpdateTenantSettings(orgID uuid.UUID, plan string, hardLimits map[string]any, actor *string) domain.TenantSettings
+	UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings
 	ListActivity(orgID uuid.UUID, limit int) []domain.ActivityEvent
 }
 
@@ -46,25 +46,31 @@ func (u *Usecases) GetTenantSettings(ctx context.Context, orgID string) (domain.
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return domain.TenantSettings{}, apperror.NewBadInput("invalid org_id")
 	}
 	return u.repo.GetTenantSettings(id), nil
 }
 
-func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID, plan string, hardLimits map[string]any, actor *string) (domain.TenantSettings, error) {
+func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch domain.TenantSettingsPatch, actor *string) (domain.TenantSettings, error) {
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return domain.TenantSettings{}, apperror.NewBadInput("invalid org_id")
 	}
-	return u.repo.UpdateTenantSettings(id, plan, hardLimits, actor), nil
+	if patch.AppointmentReminderHours != nil && *patch.AppointmentReminderHours < 0 {
+		return domain.TenantSettings{}, apperror.NewBadInput("appointment_reminder_hours must be >= 0")
+	}
+	if patch.TaxRate != nil && *patch.TaxRate < 0 {
+		return domain.TenantSettings{}, apperror.NewBadInput("tax_rate must be >= 0")
+	}
+	return u.repo.UpdateTenantSettings(id, patch, actor), nil
 }
 
 func (u *Usecases) ListActivity(ctx context.Context, orgID string, limit int) ([]domain.ActivityEvent, error) {
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("invalid org_id: %w", apperror.NewBadInput("invalid org_id"))
 	}
 	return u.repo.ListActivity(id, limit), nil
 }

@@ -5,4 +5,9 @@ from src.backend_client.client import BackendClient
 
 
 async def get_recurring_expenses(client: BackendClient, auth: AuthContext) -> dict:
-    return {"error": "recurring module not available yet"}
+    return await client.request(
+        "GET",
+        "/v1/recurring-expenses",
+        auth=auth,
+        params={"active": "true", "limit": 20},
+    )

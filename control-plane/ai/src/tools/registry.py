@@ -5,6 +5,8 @@ from typing import Any
 
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
+from src.core.dossier import add_learned_context, set_modules, set_preference, update_business_field
+from src.core.onboarding import BUSINESS_PROFILES, apply_profile, complete_step, skip_step
 from src.llm.base import ToolDeclaration
 from src.tools import (
     accounts,
@@ -20,6 +22,7 @@ from src.tools import (
     quotes,
     recurring,
     sales,
+    settings,
 )
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
@@ -99,6 +102,12 @@ TOOL_MODULES: dict[str, set[str]] = {
     "generate_payment_link": {"sales"},
     "get_payment_status": {"sales"},
     "send_payment_info": {"sales"},
+    "complete_onboarding_step": set(),
+    "skip_onboarding_step": set(),
+    "apply_business_profile": set(),
+    "update_business_info": set(),
+    "get_tenant_settings": set(),
+    "remember_fact": set(),
     "search_help": set(),
 }
 
@@ -281,10 +290,179 @@ def build_internal_tools(
             description=description,
         )
 
+    async def _complete_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
+        _ = org_id
+        complete_step(dossier, step)
+        current = dossier.get("onboarding", {}).get("current_step", "")
+        return {"ok": True, "current_step": current, "completed": dossier.get("onboarding", {}).get("steps_completed", [])}
+
+    async def _skip_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
+        _ = org_id
+        skip_step(dossier, step)
+        current = dossier.get("onboarding", {}).get("current_step", "")
+        return {"ok": True, "current_step": current, "skipped": dossier.get("onboarding", {}).get("steps_skipped", [])}
+
+    async def _apply_business_profile(org_id: str, profile: str) -> dict[str, Any]:
+        _ = org_id
+        if profile not in BUSINESS_PROFILES:
+            available = list(BUSINESS_PROFILES.keys())
+            return {"error": f"Perfil desconocido. Opciones: {available}"}
+        apply_profile(dossier, profile)
+        return {"ok": True, "profile": profile, "modules_active": dossier.get("modules_active", [])}
+
+    async def _update_business_info(
+        org_id: str,
+        business_name: str | None = None,
+        business_tax_id: str | None = None,
+        business_address: str | None = None,
+        business_phone: str | None = None,
+        default_currency: str | None = None,
+        default_tax_rate: float | None = None,
+        appointments_enabled: bool | None = None,
+    ) -> dict[str, Any]:
+        _ = org_id
+        field_map = {
+            "name": business_name, "tax_id": business_tax_id,
+            "address": business_address, "phone": business_phone,
+            "currency": default_currency, "tax_rate": default_tax_rate,
+        }
+        for key, val in field_map.items():
+            if val is not None:
+                update_business_field(dossier, key, val)
+        if appointments_enabled is not None:
+            set_preference(dossier, "appointments_enabled", appointments_enabled)
+        result = await settings.update_business_info(
+            client, auth,
+            business_name=business_name, business_tax_id=business_tax_id,
+            business_address=business_address, business_phone=business_phone,
+            default_currency=default_currency, default_tax_rate=default_tax_rate,
+            appointments_enabled=appointments_enabled,
+        )
+        return result
+
+    async def _get_tenant_settings(org_id: str) -> dict[str, Any]:
+        _ = org_id
+        return await settings.get_tenant_settings(client, auth)
+
+    async def _remember_fact(org_id: str, fact: str) -> dict[str, Any]:
+        _ = org_id
+        add_learned_context(dossier, fact)
+        return {"ok": True, "total_facts": len(dossier.get("learned_context", []))}
+
     async def _search_help(org_id: str, query: str) -> dict[str, Any]:
         _ = org_id
         return await help.search_help_docs(query)
 
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "complete_onboarding_step",
+            "Marcar un paso del onboarding como completado",
+            {
+                "type": "object",
+                "properties": {
+                    "step": {
+                        "type": "string",
+                        "description": "welcome, business_type, business_info, currency_setup, tax_setup, modules_setup, first_record, feature_tips",
+                    }
+                },
+                "required": ["step"],
+            },
+        ),
+        _complete_onboarding_step,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "skip_onboarding_step",
+            "Saltar un paso del onboarding",
+            {
+                "type": "object",
+                "properties": {
+                    "step": {
+                        "type": "string",
+                        "description": "welcome, business_type, business_info, currency_setup, tax_setup, modules_setup, first_record, feature_tips",
+                    }
+                },
+                "required": ["step"],
+            },
+        ),
+        _skip_onboarding_step,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "apply_business_profile",
+            "Aplicar perfil de negocio predefinido que configura modulos y preferencias",
+            {
+                "type": "object",
+                "properties": {
+                    "profile": {
+                        "type": "string",
+                        "description": "comercio_minorista, servicio_profesional, gastronomia, distribuidora, freelancer, otro",
+                    }
+                },
+                "required": ["profile"],
+            },
+        ),
+        _apply_business_profile,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "update_business_info",
+            "Actualizar datos del negocio (nombre, CUIT, direccion, telefono, moneda, impuesto, turnos)",
+            {
+                "type": "object",
+                "properties": {
+                    "business_name": {"type": "string"},
+                    "business_tax_id": {"type": "string"},
+                    "business_address": {"type": "string"},
+                    "business_phone": {"type": "string"},
+                    "default_currency": {"type": "string", "description": "ARS, USD, etc"},
+                    "default_tax_rate": {"type": "number", "description": "21.0 para IVA standard"},
+                    "appointments_enabled": {"type": "boolean"},
+                },
+            },
+        ),
+        _update_business_info,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool("get_tenant_settings", "Obtener configuracion actual del negocio", {"type": "object", "properties": {}}),
+        _get_tenant_settings,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "remember_fact",
+            "Guardar un dato aprendido sobre el negocio para recordarlo en futuras conversaciones",
+            {
+                "type": "object",
+                "properties": {"fact": {"type": "string", "description": "Dato a recordar"}},
+                "required": ["fact"],
+            },
+        ),
+        _remember_fact,
+    )
     _maybe_add(
         declarations,
         handlers,

@@ -22,4 +22,3 @@ async def get_public_quote_payment_link(client: BackendClient, org_id: str, quot
         f"/v1/public/{org_id}/quote/{quote_id}/payment-link",
         include_internal=True,
     )
-

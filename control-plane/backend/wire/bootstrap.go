@@ -8,12 +8,16 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/accounts"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
 	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/clerkwebhook"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/currency"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
@@ -23,10 +27,15 @@ import (
 	paymentgatewayclient "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/publicapi"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/payments"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/pricelists"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/purchases"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/rbac"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/scheduler"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/app"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
@@ -66,7 +75,16 @@ func InitializeApp() *app.App {
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
 	rbacRepo := rbac.NewRepository(db)
+	accountsRepo := accounts.NewRepository(db)
+	appointmentsRepo := appointments.NewRepository(db)
+	currencyRepo := currency.NewRepository(db)
+	dashboardRepo := dashboard.NewRepository(db)
 	paymentGatewayRepo := paymentgateway.NewRepository(db)
+	paymentsRepo := payments.NewRepository(db)
+	priceListsRepo := pricelists.NewRepository(db)
+	purchasesRepo := purchases.NewRepository(db)
+	recurringRepo := recurring.NewRepository(db)
+	schedulerRepo := scheduler.NewRepository(db)
 
 	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
@@ -80,10 +98,19 @@ func InitializeApp() *app.App {
 	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
 	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
 	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC)
+	accountsUC := accounts.NewUsecases(accountsRepo)
+	appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC)
+	currencyUC := currency.NewUsecases(currencyRepo)
+	dashboardUC := dashboard.NewUsecases(dashboardRepo)
+	paymentsUC := payments.NewUsecases(paymentsRepo)
+	priceListsUC := pricelists.NewUsecases(priceListsRepo)
+	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC)
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	reportsUC := reports.NewUsecases(reportsRepo)
+	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
+	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider)
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
@@ -126,9 +153,18 @@ func InitializeApp() *app.App {
 	inventoryHandler := inventory.NewHandler(inventoryUC)
 	cashflowHandler := cashflow.NewHandler(cashflowUC)
 	salesHandler := sales.NewHandler(salesUC)
+	accountsHandler := accounts.NewHandler(accountsUC)
+	appointmentsHandler := appointments.NewHandler(appointmentsUC)
+	currencyHandler := currency.NewHandler(currencyUC)
+	dashboardHandler := dashboard.NewHandler(dashboardUC)
+	paymentsHandler := payments.NewHandler(paymentsUC)
+	priceListsHandler := pricelists.NewHandler(priceListsUC)
+	purchasesHandler := purchases.NewHandler(purchasesUC)
 	quotesHandler := quotes.NewHandler(quotesUC)
 	reportsHandler := reports.NewHandler(reportsUC)
+	recurringHandler := recurring.NewHandler(recurringUC)
 	rbacHandler := rbac.NewHandler(rbacUC)
+	schedulerHandler := scheduler.NewHandler(schedulerUC, cfg.SchedulerSecret)
 	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	billingHandler := billing.NewHandler(billingUC)
@@ -147,6 +183,7 @@ func InitializeApp() *app.App {
 	clerkWebhookHandler.RegisterRoutes(v1)
 	billingHandler.RegisterPublicRoutes(v1)
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
+	schedulerHandler.RegisterRoutes(v1)
 
 	public := v1.Group("/public/:org_id")
 	public.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
@@ -162,11 +199,19 @@ func InitializeApp() *app.App {
 	auditHandler.RegisterRoutes(authGroup)
 	notificationHandler.RegisterRoutes(authGroup)
 	billingHandler.RegisterAuthRoutes(authGroup)
+	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	currencyHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	dashboardHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	paymentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	priceListsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	suppliersHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	productsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	inventoryHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	cashflowHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	recurringHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)

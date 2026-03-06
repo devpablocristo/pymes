@@ -8,6 +8,12 @@ Este prompt extiende el **control-plane** (Prompt 00) con los módulos de negoci
 
 **Regla fundamental**: estos módulos viven dentro de `control-plane/backend/internal/` porque comparten la misma DB, el mismo auth, el mismo Lambda, y el mismo tenant (`org_id`). NO son un servicio separado.
 
+## Alcance obligatorio
+
+Todos los módulos, reglas de negocio, validaciones, transacciones, errores y tests definidos en este prompt son parte del alcance requerido. No deben reinterpretarse como backlog opcional ni como mejoras para "más adelante".
+
+Si una parte parece más simple o más compleja, eso no altera su obligatoriedad. La implementación puede hacerse por dependencia técnica, pero el objetivo final sigue siendo completar **todo** este prompt.
+
 ---
 
 ## Módulos a implementar
@@ -40,6 +46,33 @@ En Go se usa `float64` para montos. En PostgreSQL se usa `numeric(15,2)` para ga
 5. **Moneda**: todos los montos son `numeric(15,2)`. El campo `currency` (ISO 4217: ARS, USD, BRL, CLP, MXN, COP, PEN) se define a nivel de `tenant_settings`. No hay conversión de monedas; cada org opera en una sola moneda.
 6. **Impuestos**: el sistema registra monto neto, impuesto y total. La lógica de cálculo de impuestos varía por país y se inyecta como configuración, NO como código hardcodeado. Para la base: solo un porcentaje de IVA configurable por org.
 7. **Numeración de comprobantes**: secuencial por org, configurable (prefijo + número). No es factura electrónica — eso es del vertical o integración futura.
+8. **Domain Errors**: cada módulo define sus errores específicos usando `apperror.Error` (ver Prompt 00, E1). Los handlers nunca formatean errores — usan `c.Error(err)`.
+9. **Transacciones explícitas**: toda operación que impacta múltiples tablas (venta → stock → caja) usa `db.Transaction(ctx, fn)` (ver Prompt 00, E4).
+10. **Validación en 2 capas**: binding tags en DTOs para formato + validaciones de negocio en usecases (ver Prompt 00, E3).
+
+---
+
+## Domain Errors (aplicados a todos los módulos)
+
+```go
+// Errores comunes de negocio reutilizables en todos los módulos del core
+var (
+    ErrPartyNotFound       = func(id string) *apperror.Error { return apperror.NewNotFound("party", id) }
+    ErrProductNotFound     = func(id string) *apperror.Error { return apperror.NewNotFound("product", id) }
+    ErrQuoteNotFound       = func(id string) *apperror.Error { return apperror.NewNotFound("quote", id) }
+    ErrSaleNotFound        = func(id string) *apperror.Error { return apperror.NewNotFound("sale", id) }
+
+    ErrQuoteNotDraft       = apperror.NewBusinessRule("Solo se pueden editar presupuestos en estado 'draft'")
+    ErrSaleImmutable       = apperror.NewBusinessRule("Las ventas no se pueden editar, solo anular")
+    ErrSaleAlreadyVoided   = apperror.NewBusinessRule("La venta ya está anulada")
+    ErrStockInsufficient   = func(product string, available, requested float64) *apperror.Error {
+        return apperror.NewBusinessRule(fmt.Sprintf("Stock insuficiente para '%s': disponible %.2f, solicitado %.2f", product, available, requested))
+    }
+    ErrTaxIDDuplicate      = func(taxID string) *apperror.Error { return apperror.NewConflict(fmt.Sprintf("Ya existe una entidad con CUIT/RUT '%s' en esta organización", taxID)) }
+    ErrSKUDuplicate        = func(sku string) *apperror.Error { return apperror.NewConflict(fmt.Sprintf("Ya existe un producto con SKU '%s'", sku)) }
+    ErrInvalidTotalCalc    = apperror.NewBusinessRule("Los totales no coinciden con el cálculo server-side")
+)
+```
 
 ---
 
@@ -61,23 +94,33 @@ Los handlers registran rutas en `wire/bootstrap.go` via `RegisterRoutes(authGrou
 
 ---
 
-## 1. Customers (Clientes)
+## 1. Customers (Clientes) — via Party Model
 
-### Entidad de dominio
+### Concepto
+
+**No existe tabla `customers`.** Un "cliente" es un `party` (persona u organización) con `party_role.role = 'customer'`. La API `/v1/customers` es un **alias de conveniencia** que internamente filtra parties por rol. Esto permite que un mismo registro sea cliente Y proveedor simultáneamente sin duplicación.
+
+### Entidad de dominio (vista de negocio)
 
 ```go
+// Customer es una vista de Party + PartyRole(customer)
 type Customer struct {
-    ID          uuid.UUID
+    ID          uuid.UUID      // = party.id
     OrgID       uuid.UUID
-    Type        string    // "person" | "company"
-    Name        string    // nombre completo o razón social
-    TaxID       string    // CUIT/RUT/RFC/NIT según país (opcional)
+    PartyType   string         // "person" | "organization"
+    Name        string         // = party.display_name
+    TaxID       string
     Email       string
     Phone       string
     Address     Address
     Notes       string
     Tags        []string
-    Metadata    map[string]any // extensión por vertical
+    Metadata    map[string]any
+    // Extension según party_type
+    Person       *PartyPerson
+    Organization *PartyOrganization
+    // Role-specific
+    RoleMetadata map[string]any // price_list_id, credit_limit, etc.
     CreatedAt   time.Time
     UpdatedAt   time.Time
     DeletedAt   *time.Time
@@ -95,70 +138,72 @@ type Address struct {
 ### API
 
 ```
-GET    /v1/customers              — Listar (paginado, filtro por name/email/tag/type, search)
-POST   /v1/customers              — Crear
-GET    /v1/customers/:id          — Detalle
-PUT    /v1/customers/:id          — Actualizar
-DELETE /v1/customers/:id          — Soft delete
+GET    /v1/customers              — Listar parties con rol 'customer' (paginado, filtro por name/email/tag/party_type, search)
+POST   /v1/customers              — Crear party + asignar rol 'customer'
+GET    /v1/customers/:id          — Detalle (party + extensión + roles)
+PUT    /v1/customers/:id          — Actualizar party
+DELETE /v1/customers/:id          — Soft delete del party
 GET    /v1/customers/:id/sales    — Historial de ventas del cliente
 # Futuro: GET /v1/customers/export (CSV), POST /v1/customers/import (CSV bulk)
 ```
 
-### Tabla SQL
+### Implementación SQL
+
+No hay tabla `customers`. La query es:
 
 ```sql
-CREATE TABLE IF NOT EXISTS customers (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    type text NOT NULL DEFAULT 'person' CHECK (type IN ('person', 'company')),
-    name text NOT NULL,
-    tax_id text,
-    email text,
-    phone text,
-    address jsonb NOT NULL DEFAULT '{}',
-    notes text NOT NULL DEFAULT '',
-    tags text[] NOT NULL DEFAULT '{}',
-    metadata jsonb NOT NULL DEFAULT '{}',
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    deleted_at timestamptz
-);
-
-CREATE INDEX IF NOT EXISTS idx_customers_org ON customers(org_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_customers_org_name ON customers(org_id, name) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_customers_org_email ON customers(org_id, email) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_customers_org_tax ON customers(org_id, tax_id) WHERE deleted_at IS NULL AND tax_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_customers_tags ON customers USING GIN(tags) WHERE deleted_at IS NULL;
+SELECT p.*, pr.metadata AS role_metadata
+FROM parties p
+JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id
+WHERE pr.role = 'customer'
+  AND pr.is_active = true
+  AND p.org_id = $1
+  AND p.deleted_at IS NULL
+ORDER BY p.display_name;
 ```
 
 ### Reglas de negocio
 
-- `name` es obligatorio, mínimo 2 caracteres.
+- `display_name` es obligatorio, mínimo 2 caracteres.
 - `tax_id` es único por org (si se provee). Validar formato según país es futuro.
 - `email` no es obligatorio (muchas pymes LATAM no tienen email de sus clientes).
 - Soft delete: `DELETE` setea `deleted_at`. Los queries filtran `WHERE deleted_at IS NULL`.
-- La búsqueda (`?search=`) busca en `name`, `email`, `phone`, `tax_id` con `ILIKE`.
+- La búsqueda (`?search=`) busca en `display_name`, `email`, `phone`, `tax_id` con `ILIKE`.
 - Paginación con cursor (`?after=<uuid>&limit=20`).
+- Al crear un customer, el handler: (1) crea el party con el `party_type` indicado, (2) crea la extensión (person/organization), (3) crea `party_role(role='customer')`.
+- Si el party ya existe (por `tax_id` o `email`), se agrega el rol `customer` sin duplicar el party.
+- **Backward compatibility**: el DTO de request/response de `/v1/customers` usa campos como `name` (mapeado a `display_name`), `type` (`person`/`company` → `party_type` `person`/`organization`) para que el frontend no necesite saber del Party Model.
 
 ---
 
-## 2. Suppliers (Proveedores)
+## 2. Suppliers (Proveedores) — via Party Model
 
-### Entidad de dominio
+### Concepto
+
+Igual que clientes, **no existe tabla `suppliers`**. Un proveedor es un `party` con `party_role.role = 'supplier'`. La API `/v1/suppliers` es un alias de conveniencia.
+
+**Caso clave**: una empresa que es cliente Y proveedor simultáneamente (ej: el taller le compra repuestos al mismo negocio que le trae autos para reparar) tiene UN solo party con 2 roles. Su historial completo (compras + ventas) está centralizado.
+
+### Entidad de dominio (vista de negocio)
 
 ```go
+// Supplier es una vista de Party + PartyRole(supplier)
 type Supplier struct {
-    ID          uuid.UUID
+    ID          uuid.UUID      // = party.id
     OrgID       uuid.UUID
-    Name        string
+    PartyType   string         // "person" | "organization"
+    Name        string         // = party.display_name
     TaxID       string
     Email       string
     Phone       string
-    Address     Address   // mismo tipo que customers
-    ContactName string    // persona de contacto
+    Address     Address
     Notes       string
     Tags        []string
     Metadata    map[string]any
+    // Role-specific
+    RoleMetadata map[string]any // payment_terms, contact_name, etc.
+    // Contactos vinculados (via party_relationships)
+    Contacts    []PartyRelationship
     CreatedAt   time.Time
     UpdatedAt   time.Time
     DeletedAt   *time.Time
@@ -168,37 +213,39 @@ type Supplier struct {
 ### API
 
 ```
-GET    /v1/suppliers              — Listar (paginado, filtro, search)
-POST   /v1/suppliers              — Crear
-GET    /v1/suppliers/:id          — Detalle
-PUT    /v1/suppliers/:id          — Actualizar
+GET    /v1/suppliers              — Listar parties con rol 'supplier' (paginado, filtro, search)
+POST   /v1/suppliers              — Crear party + asignar rol 'supplier'
+GET    /v1/suppliers/:id          — Detalle (party + extensión + contactos)
+PUT    /v1/suppliers/:id          — Actualizar party
 DELETE /v1/suppliers/:id          — Soft delete
 ```
 
-### Tabla SQL
+### Implementación SQL
 
 ```sql
-CREATE TABLE IF NOT EXISTS suppliers (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    tax_id text,
-    email text,
-    phone text,
-    address jsonb NOT NULL DEFAULT '{}',
-    contact_name text NOT NULL DEFAULT '',
-    notes text NOT NULL DEFAULT '',
-    tags text[] NOT NULL DEFAULT '{}',
-    metadata jsonb NOT NULL DEFAULT '{}',
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    deleted_at timestamptz
-);
-
-CREATE INDEX IF NOT EXISTS idx_suppliers_org ON suppliers(org_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_suppliers_org_name ON suppliers(org_id, name) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_suppliers_org_tax ON suppliers(org_id, tax_id) WHERE deleted_at IS NULL AND tax_id IS NOT NULL;
+SELECT p.*, pr.metadata AS role_metadata
+FROM parties p
+JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id
+WHERE pr.role = 'supplier'
+  AND pr.is_active = true
+  AND p.org_id = $1
+  AND p.deleted_at IS NULL;
 ```
+
+### Persona de contacto
+
+El viejo campo `contact_name` se modela con **relaciones entre parties**:
+
+1. El proveedor (organización) es un party con rol `supplier`
+2. Su contacto es otro party (persona) con rol `contact`
+3. Se vinculan con `party_relationships(type='contact_of', from=contacto, to=proveedor)`
+
+Alternativamente, para pymes que solo necesitan un nombre de contacto, se guarda en `party_roles.metadata.contact_name` (más simple, sin crear otro party).
+
+### Reglas de negocio
+
+- Mismas reglas base que customers (display_name obligatorio, tax_id único por org, soft delete, búsqueda ILIKE).
+- Si al crear un supplier el `tax_id` o `email` coincide con un party existente que ya es `customer`, se agrega el rol `supplier` al mismo party — **sin duplicar**.
 
 ---
 
@@ -359,8 +406,8 @@ type Quote struct {
     ID          uuid.UUID
     OrgID       uuid.UUID
     Number      string        // secuencial: "PRE-00001"
-    CustomerID  *uuid.UUID    // puede ser presupuesto sin cliente registrado
-    CustomerName string       // nombre manual si no hay customer_id
+    PartyID     *uuid.UUID    // party con rol customer (puede ser nil para presupuesto sin cliente registrado)
+    PartyName   string        // nombre manual si no hay party_id (denormalizado)
     Status      string        // "draft" | "sent" | "accepted" | "rejected" | "expired"
     Items       []QuoteItem
     Subtotal    float64
@@ -409,8 +456,8 @@ CREATE TABLE IF NOT EXISTS quotes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     number text NOT NULL,
-    customer_id uuid REFERENCES customers(id),
-    customer_name text NOT NULL DEFAULT '',
+    party_id uuid REFERENCES parties(id),
+    party_name text NOT NULL DEFAULT '',
     status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent', 'accepted', 'rejected', 'expired')),
     subtotal numeric(15,2) NOT NULL DEFAULT 0,
     tax_total numeric(15,2) NOT NULL DEFAULT 0,
@@ -438,7 +485,7 @@ CREATE TABLE IF NOT EXISTS quote_items (
 
 CREATE INDEX IF NOT EXISTS idx_quotes_org ON quotes(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quotes_org_status ON quotes(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_quotes_customer ON quotes(customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_quotes_party ON quotes(party_id) WHERE party_id IS NOT NULL;
 ```
 
 ### Reglas de negocio
@@ -447,7 +494,7 @@ CREATE INDEX IF NOT EXISTS idx_quotes_customer ON quotes(customer_id) WHERE cust
 - `number` se genera automáticamente: `PRE-{secuencial 5 dígitos}`. Configurable por org via `tenant_settings.quote_prefix`. La numeración usa `SELECT next_quote_number FROM tenant_settings WHERE org_id = ? FOR UPDATE` dentro de una transacción para evitar race conditions, y luego `UPDATE ... SET next_quote_number = next_quote_number + 1`.
 - `to-sale` copia los items a una nueva venta y marca el presupuesto como `accepted`.
 - Totales se recalculan server-side: `subtotal = Σ(quantity × unit_price)`, `tax_total = Σ(subtotal_item × tax_rate / 100)`, `total = subtotal + tax_total`.
-- `customer_id` es opcional. Para presupuestos rápidos basta con `customer_name`.
+- `party_id` es opcional. Para presupuestos rápidos basta con `party_name`.
 
 ---
 
@@ -460,8 +507,8 @@ type Sale struct {
     ID          uuid.UUID
     OrgID       uuid.UUID
     Number      string         // "VTA-00001"
-    CustomerID  *uuid.UUID
-    CustomerName string
+    PartyID     *uuid.UUID     // party con rol customer
+    PartyName   string         // denormalizado
     QuoteID     *uuid.UUID     // si se originó de un presupuesto
     Status      string         // "completed" | "voided"
     PaymentMethod string       // "cash" | "card" | "transfer" | "other"
@@ -506,8 +553,8 @@ CREATE TABLE IF NOT EXISTS sales (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     number text NOT NULL,
-    customer_id uuid REFERENCES customers(id),
-    customer_name text NOT NULL DEFAULT '',
+    party_id uuid REFERENCES parties(id),
+    party_name text NOT NULL DEFAULT '',
     quote_id uuid REFERENCES quotes(id),
     status text NOT NULL DEFAULT 'completed' CHECK (status IN ('completed', 'voided')),
     payment_method text NOT NULL DEFAULT 'cash' CHECK (payment_method IN ('cash', 'card', 'transfer', 'other')),
@@ -537,18 +584,94 @@ CREATE TABLE IF NOT EXISTS sale_items (
 
 CREATE INDEX IF NOT EXISTS idx_sales_org ON sales(org_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sales_org_date ON sales(org_id, created_at) WHERE status = 'completed';
-CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_party ON sales(party_id) WHERE party_id IS NOT NULL;
+```
+
+### DTOs con validación (binding tags)
+
+```go
+// handler/dto/dto.go
+type CreateSaleRequest struct {
+    PartyID       *uuid.UUID     `json:"party_id" binding:"omitempty"`
+    PartyName     string         `json:"party_name" binding:"required_without=PartyID,max=200"`
+    PaymentMethod string         `json:"payment_method" binding:"required,oneof=cash card transfer check other credit"`
+    Items         []SaleItemReq  `json:"items" binding:"required,min=1,dive"`
+    Notes         string         `json:"notes" binding:"max=2000"`
+}
+
+type SaleItemReq struct {
+    ProductID   *uuid.UUID `json:"product_id" binding:"omitempty"`
+    Description string     `json:"description" binding:"required,min=1,max=500"`
+    Quantity    float64    `json:"quantity" binding:"required,gt=0"`
+    UnitPrice   float64    `json:"unit_price" binding:"required,gte=0"`
+    TaxRate     float64    `json:"tax_rate" binding:"gte=0,lte=100"`
+}
+```
+
+### Transacción de creación de venta (patrón completo)
+
+```go
+func (uc *Usecases) CreateSale(ctx context.Context, orgID uuid.UUID, req CreateSaleRequest) (*domain.Sale, error) {
+    // Validaciones de negocio pre-transacción
+    if err := uc.validateSaleItems(ctx, orgID, req.Items); err != nil {
+        return nil, err // retorna *apperror.Error
+    }
+
+    var sale *domain.Sale
+    err := uc.db.Transaction(ctx, func(tx *gorm.DB) error {
+        // 1. Número secuencial (atómico con FOR UPDATE)
+        number, err := uc.repo.NextNumber(ctx, tx, orgID, "sale")
+        if err != nil { return fmt.Errorf("next sale number: %w", err) }
+
+        // 2. Calcular totales server-side
+        calculated := uc.calculateTotals(req.Items)
+
+        // 3. Crear venta
+        sale, err = uc.repo.Create(ctx, tx, orgID, number, req, calculated)
+        if err != nil { return fmt.Errorf("create sale: %w", err) }
+
+        // 4. Stock (atómico)
+        for _, item := range sale.Items {
+            if item.ProductID != nil && item.TrackStock {
+                if err := uc.inventoryPort.DeductStock(ctx, tx, orgID, *item.ProductID, item.Quantity, sale.ID); err != nil {
+                    return err
+                }
+            }
+        }
+
+        // 5. Pago + caja (atómico)
+        if req.PaymentMethod != "credit" {
+            if err := uc.paymentsPort.RegisterAutoPayment(ctx, tx, orgID, sale.ID, sale.Total, req.PaymentMethod); err != nil {
+                return err
+            }
+        } else if uc.accountsPort != nil {
+            if err := uc.accountsPort.ChargeToAccount(ctx, tx, orgID, sale.PartyID, sale.Total, "sale", sale.ID); err != nil {
+                return err
+            }
+        }
+
+        return nil
+    })
+    if err != nil { return nil, err }
+
+    // Side-effects best-effort (fuera de transacción, nil-safe)
+    uc.auditPort.Log(ctx, orgID, "sale.created", "sale", sale.ID.String(), nil)
+    uc.timelinePort.Record(ctx, domain.TimelineEntry{OrgID: orgID, EntityType: "party", EntityID: sale.PartyID, EventType: "sale_completed", Title: fmt.Sprintf("Venta %s por $%.2f", sale.Number, sale.Total)})
+    uc.webhookPort.Dispatch(ctx, orgID, "sale.created", sale)
+
+    return sale, nil
+}
 ```
 
 ### Reglas de negocio
 
-- Las ventas son **inmutables** una vez creadas. Solo se pueden anular (`void`), no editar.
-- Al crear una venta con productos que tienen `track_stock = true`, se generan automáticamente movimientos de stock (`type = 'out'`).
-- Al anular una venta, se generan movimientos de stock reversos (`type = 'in'`, `reason = 'void'`).
-- Al crear una venta, se genera automáticamente un movimiento de caja (`type = 'income'`).
+- Las ventas son **inmutables** una vez creadas. Solo se pueden anular (`void`), no editar. Intentar editar retorna `ErrSaleImmutable`.
+- Al crear una venta con productos que tienen `track_stock = true`, se generan automáticamente movimientos de stock (`type = 'out'`) **dentro de la misma transacción**.
+- Al anular una venta, se generan movimientos de stock reversos (`type = 'in'`, `reason = 'void'`) **dentro de una transacción**.
+- Al crear una venta no fiada, se genera automáticamente un movimiento de caja (`type = 'income'`) **dentro de la misma transacción**.
 - `cost_price` es un snapshot: se copia de `products.cost_price` al momento de la venta.
-- `number` secuencial: `VTA-{5 dígitos}`. Configurable via `tenant_settings.sale_prefix`.
-- Al anular, setear `voided_at = now()` además de `status = 'voided'`.
+- `number` secuencial: `VTA-{5 dígitos}`. Configurable via `tenant_settings.sale_prefix`. Se obtiene con `SELECT ... FOR UPDATE` dentro de la transacción.
+- Al anular, setear `voided_at = now()` además de `status = 'voided'`. Si la venta ya está anulada, retornar `ErrSaleAlreadyVoided`.
 
 ---
 
@@ -632,7 +755,7 @@ CREATE INDEX IF NOT EXISTS idx_cash_movements_org_date ON cash_movements(org_id,
 ```
 GET /v1/reports/sales-summary          — Ventas por período (total, cantidad, ticket promedio)
 GET /v1/reports/sales-by-product       — Ranking de productos más vendidos
-GET /v1/reports/sales-by-customer      — Ranking de clientes por monto
+GET /v1/reports/sales-by-party         — Ranking de clientes (parties con rol customer) por monto
 GET /v1/reports/sales-by-payment       — Ventas por método de pago
 GET /v1/reports/inventory-valuation    — Valor del inventario (stock × costo)
 GET /v1/reports/low-stock              — Productos con stock bajo
@@ -653,14 +776,14 @@ GET /v1/reports/profit-margin          — Margen de ganancia (venta - costo)
 
 Una sola migración `0005_core_business.up.sql` que crea todas las tablas:
 
-- `customers`
-- `suppliers`
 - `products`
 - `stock_levels`
 - `stock_movements`
 - `quotes` + `quote_items`
 - `sales` + `sale_items`
 - `cash_movements`
+
+**NOTA**: NO crea tablas `customers` ni `suppliers` — estas son vistas lógicas sobre `parties` + `party_roles` (definidas en Prompt 00). Los FKs de `quotes.party_id`, `sales.party_id` apuntan a `parties(id)`.
 
 Y `0005_core_business.down.sql` que las dropea en orden inverso (por foreign keys).
 
@@ -688,13 +811,15 @@ ALTER TABLE tenant_settings
 Agregar datos de ejemplo al org de desarrollo local:
 
 ```sql
--- 3 clientes de ejemplo
--- 2 proveedores
+-- 3 parties con rol 'customer' (2 personas + 1 organización)
+-- 2 parties con rol 'supplier' (1 persona + 1 organización)
+-- 1 party que es TANTO customer como supplier (misma entidad, 2 roles)
 -- 5 productos (3 productos físicos + 2 servicios)
 -- Stock inicial para los 3 productos físicos
 -- 1 presupuesto (aceptado) con 2 items
 -- 2 ventas con items
 -- Movimientos de stock y caja correspondientes
+-- El party dual (customer+supplier) tiene ventas Y compras en su historial
 ```
 
 ---
@@ -753,21 +878,119 @@ Estas interacciones se orquestan en el **usecase** de ventas, NO en el handler n
 
 1. Seguir la misma arquitectura hexagonal que los módulos existentes del control-plane.
 2. Cada módulo define sus propios ports (interfaces) para las dependencias que necesita.
-3. Los totales de quotes y sales se calculan server-side, nunca confiar en el frontend.
-4. `numeric(15,2)` en PostgreSQL, `float64` en Go. La precisión financiera se garantiza en la DB. No usar `shopspring/decimal` (complejidad innecesaria para los montos de una pyme).
+3. Los totales de quotes y sales se calculan server-side, nunca confiar en el frontend. Si el frontend envía totales, se ignoran y se recalculan.
+4. `numeric(15,2)` en PostgreSQL, `float64` en Go. La precisión financiera se garantiza en la DB. No usar `shopspring/decimal`.
 5. Todos los endpoints requieren auth (van en `authGroup`).
 6. El `org_id` se extrae del auth context, NUNCA del path ni del body.
-7. Registrar todas las rutas nuevas en `wire/bootstrap.go`.
-8. Agregar tests unitarios para los usecases de `sales` (por las interacciones complejas con inventory y cashflow).
-9. Agregar tests E2E al script `scripts/e2e-test.sh` para los nuevos endpoints.
+7. Registrar todas las rutas nuevas en `wire/bootstrap.go` usando Functional Options para dependencias opcionales.
+8. **Domain Errors**: todo error de negocio usa `apperror.Error`. Los repositorios convierten `gorm.ErrRecordNotFound` → `apperror.NewNotFound`. Los handlers usan `c.Error(err)`.
+9. **Transacciones**: crear venta y anular venta usan `db.Transaction`. Numeración secuencial con `FOR UPDATE`. Side-effects (audit, timeline, webhooks) fuera de la transacción.
+10. **Validation**: todos los DTOs de request usan binding tags. Validaciones de negocio (stock suficiente, presupuesto en draft, tax_id único) en el usecase.
+11. **Tests obligatorios**: unit tests table-driven para usecases de `sales` y `quotes` (interacciones complejas). Integration tests para repositorios con testcontainers-go.
+12. Agregar tests E2E al script `scripts/e2e-test.sh` para los nuevos endpoints.
+
+---
+
+## Testing — Ejemplo para Sales
+
+### Unit test del usecase (table-driven)
+
+```go
+func TestSalesUsecases_CreateSale(t *testing.T) {
+    prodID := uuid.New()
+    tests := []struct {
+        name    string
+        req     dto.CreateSaleRequest
+        setup   func(m *mocks)
+        wantErr apperror.Code
+    }{
+        {
+            name: "venta cash con stock OK",
+            req:  dto.CreateSaleRequest{PaymentMethod: "cash", Items: []dto.SaleItemReq{{ProductID: &prodID, Description: "Tornillo", Quantity: 5, UnitPrice: 100}}},
+            setup: func(m *mocks) {
+                m.repo.EXPECT().NextNumber(gomock.Any(), gomock.Any(), orgID, "sale").Return("VTA-00001", nil)
+                m.repo.EXPECT().Create(gomock.Any(), gomock.Any(), orgID, "VTA-00001", gomock.Any(), gomock.Any()).Return(testSale, nil)
+                m.inventory.EXPECT().DeductStock(gomock.Any(), gomock.Any(), orgID, prodID, float64(5), testSale.ID).Return(nil)
+                m.payments.EXPECT().RegisterAutoPayment(gomock.Any(), gomock.Any(), orgID, testSale.ID, float64(500), "cash").Return(nil)
+            },
+        },
+        {
+            name: "venta fiada sin módulo accounts → error",
+            req:  dto.CreateSaleRequest{PaymentMethod: "credit", PartyID: &partyID, Items: []dto.SaleItemReq{{Description: "Servicio", Quantity: 1, UnitPrice: 1000}}},
+            setup: func(m *mocks) {
+                m.repo.EXPECT().NextNumber(gomock.Any(), gomock.Any(), orgID, "sale").Return("VTA-00002", nil)
+                m.repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(testSaleFiada, nil)
+                // accountsPort es nil → no puede fiar
+            },
+            wantErr: apperror.CodeBusinessRule,
+        },
+        {
+            name: "stock insuficiente → rollback transacción",
+            req:  dto.CreateSaleRequest{PaymentMethod: "cash", Items: []dto.SaleItemReq{{ProductID: &prodID, Description: "Tornillo", Quantity: 9999, UnitPrice: 100}}},
+            setup: func(m *mocks) {
+                m.repo.EXPECT().NextNumber(gomock.Any(), gomock.Any(), orgID, "sale").Return("VTA-00003", nil)
+                m.repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(testSaleBig, nil)
+                m.inventory.EXPECT().DeductStock(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+                    Return(apperror.NewBusinessRule("stock insuficiente"))
+            },
+            wantErr: apperror.CodeBusinessRule,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()
+            ctrl := gomock.NewController(t)
+            m := newMocks(ctrl)
+            tt.setup(m)
+            uc := sales.NewUsecases(m.repo, m.db, logger,
+                sales.WithInventory(m.inventory),
+                sales.WithPayments(m.payments),
+            )
+            _, err := uc.CreateSale(context.Background(), orgID, tt.req)
+            if tt.wantErr == "" {
+                require.NoError(t, err)
+            } else {
+                var appErr *apperror.Error
+                require.ErrorAs(t, err, &appErr)
+                assert.Equal(t, tt.wantErr, appErr.Code)
+            }
+        })
+    }
+}
+```
+
+### Integration test del repository
+
+```go
+func TestSalesRepository_Integration(t *testing.T) {
+    if testing.Short() { t.Skip("skipping integration test") }
+
+    ctx := context.Background()
+    db := testutil.SetupPostgresWithMigrations(ctx, t)
+    repo := sales.NewRepository(db)
+
+    t.Run("create and list sales", func(t *testing.T) {
+        // Crear org y party de test
+        // Crear venta
+        // Verificar que se lista correctamente
+        // Verificar paginación con cursor
+    })
+
+    t.Run("void sale", func(t *testing.T) {
+        // Crear venta → anular → verificar status y voided_at
+        // Intentar anular de nuevo → verificar ErrSaleAlreadyVoided
+    })
+}
+```
 
 ---
 
 ## Orden de implementación recomendado
 
 1. Migración SQL (`0005`, `0006`, `0007`)
-2. `customers` — CRUD simple, valida el patrón
-3. `suppliers` — casi idéntico a customers
+2. `customers` — alias sobre Party Model, valida el patrón (usa party module de Prompt 00)
+3. `suppliers` — alias sobre Party Model, valida party con rol dual
 4. `products` — agrega tipo y stock tracking
 5. `inventory` — movimientos de stock
 6. `quotes` — presupuestos con items y estados
@@ -782,7 +1005,10 @@ Estas interacciones se orquestan en el **usecase** de ventas, NO en el handler n
 
 - [ ] `go build ./...` compila sin errores
 - [ ] `go test ./...` todos los tests pasan
-- [ ] CRUD completo de clientes, proveedores, productos
+- [ ] CRUD de clientes via Party Model (crear party + rol customer)
+- [ ] CRUD de proveedores via Party Model (crear party + rol supplier)
+- [ ] Party dual: crear party que sea customer Y supplier simultáneamente
+- [ ] CRUD de productos
 - [ ] Crear venta → descuenta stock → genera movimiento de caja → genera audit entry
 - [ ] Anular venta → revierte stock → genera movimiento reverso
 - [ ] Crear presupuesto → aceptar → convertir a venta (flujo completo)
@@ -791,5 +1017,5 @@ Estas interacciones se orquestan en el **usecase** de ventas, NO en el handler n
 - [ ] Resumen de caja: income/expense/balance por rango de fechas
 - [ ] Paginación con cursor funciona en todos los listados
 - [ ] Búsqueda (`?search=`) funciona en customers, suppliers, products
-- [ ] Tests E2E pasan (flujo: crear producto → crear cliente → crear venta → verificar stock → verificar caja)
-- [ ] Seed data cargado y funcional para dev local
+- [ ] Tests E2E pasan (flujo: crear party/customer → crear producto → crear venta → verificar stock → verificar caja)
+- [ ] Seed data cargado y funcional para dev local (incluye party dual customer+supplier)

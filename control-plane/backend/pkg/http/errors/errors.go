@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/devpablocristo/pymes/control-plane/backend/pkg/apperror"
 )
 
 var (
@@ -18,6 +20,7 @@ var (
 type ErrorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Meta    any    `json:"meta,omitempty"`
 }
 
 func Write(c *gin.Context, status int, code, message string) {
@@ -25,16 +28,25 @@ func Write(c *gin.Context, status int, code, message string) {
 }
 
 func Respond(c *gin.Context, err error) {
+	var appErr *apperror.Error
+	if errors.As(err, &appErr) {
+		c.JSON(appErr.HTTPStatus, ErrorResponse{
+			Code:    appErr.Code,
+			Message: appErr.Message,
+			Meta:    appErr.Meta,
+		})
+		return
+	}
 	switch {
 	case errors.Is(err, ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, ErrorResponse{Code: "not_found", Message: err.Error()})
 	case errors.Is(err, ErrConflict):
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, ErrorResponse{Code: "conflict", Message: err.Error()})
 	case errors.Is(err, ErrForbidden):
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusForbidden, ErrorResponse{Code: "forbidden", Message: err.Error()})
 	case errors.Is(err, ErrNotDraft):
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, ErrorResponse{Code: "not_draft", Message: err.Error()})
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Code: "bad_input", Message: err.Error()})
 	}
 }

@@ -5,4 +5,4 @@ from src.backend_client.client import BackendClient
 
 
 async def get_exchange_rates(client: BackendClient, auth: AuthContext) -> dict:
-    return {"error": "exchange rates endpoint not available yet"}
+    return await client.request("GET", "/v1/exchange-rates", auth=auth, params={"limit": 10})

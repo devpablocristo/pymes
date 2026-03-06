@@ -8,6 +8,23 @@ Este prompt agrega un **asistente conversacional con IA** al control-plane. Es u
 
 **Regla fundamental**: el servicio AI NO contiene logica de negocio. Toda lectura y escritura de datos pasa por los endpoints del backend Go, que ya manejan auth, org_id, RBAC, audit y validaciones. El servicio AI solo orquesta la interaccion entre el usuario y el LLM.
 
+**Party Model**: el asistente IA se registra como un `party` con `party_type = 'automated_agent'` y extension `party_agents(agent_kind='ai')`. Esto permite que las acciones ejecutadas por el asistente sean trazables en el `audit_log` con `actor_type='party'`. Las tools que interactúan con clientes, proveedores y turnos operan sobre `parties` con sus respectivos roles.
+
+**Estándares de Ingeniería (Python)**: el servicio AI aplica los equivalentes Python de los patrones del backend Go:
+- **Structured Errors**: excepciones tipadas que mapean a HTTP status codes.
+- **Validation**: pydantic models para request/response validation.
+- **Resilience**: retry con backoff para llamadas al backend Go y al LLM.
+- **Structured Logging**: structlog/loguru con request_id, org_id en cada log.
+- **Metrics + Tracing**: OpenTelemetry para FastAPI, httpx y llamadas al LLM/backend.
+- **Testing**: pytest con mocks, fixtures, y tests parametrizados (equivalente a table-driven).
+- **Circuit Breaker**: para llamadas al LLM que podrían fallar o estar lentas.
+
+## Alcance obligatorio
+
+Todo lo definido en este prompt para el servicio AI es parte del alcance requerido: arquitectura, seguridad, herramientas, flujos internos/externos, observabilidad, resiliencia y testing. No debe interpretarse como un módulo experimental ni como una fase opcional.
+
+El hecho de que algunas partes dependan de endpoints del backend Go o de integraciones externas no reduce su importancia. La implementación puede secuenciarse por dependencias, pero el alcance final sigue siendo **todo** este prompt.
+
 ---
 
 ## Vision del producto
@@ -309,11 +326,124 @@ async def orchestrate(
     yield ChatChunk(type="done")
 ```
 
-### Limites de seguridad
+### Limites de seguridad y resiliencia
 
 - **MAX_TOOL_CALLS = 10**: evita loops infinitos. Si el LLM llama mas de 10 tools en un turno, se corta y responde con lo que tiene.
 - **Timeout por tool call**: 10 segundos. Si el backend no responde, se retorna error al LLM.
 - **Timeout total**: 60 segundos por conversacion. Si se excede, se responde con "Lo siento, la consulta esta tardando demasiado".
+
+### Error handling estructurado
+
+```python
+# src/core/errors.py
+from fastapi import HTTPException
+
+class AppError(Exception):
+    def __init__(self, code: str, message: str, status_code: int = 400, details: dict | None = None):
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        self.details = details or {}
+
+class QuotaExceededError(AppError):
+    def __init__(self, message: str):
+        super().__init__("QUOTA_EXCEEDED", message, 429)
+
+class LLMError(AppError):
+    def __init__(self, provider: str, message: str):
+        super().__init__("LLM_ERROR", f"{provider}: {message}", 502)
+
+class BackendError(AppError):
+    def __init__(self, status_code: int, message: str):
+        super().__init__("BACKEND_ERROR", message, 502)
+
+class ConversationNotFoundError(AppError):
+    def __init__(self, conversation_id: str):
+        super().__init__("NOT_FOUND", f"Conversation {conversation_id} not found", 404)
+```
+
+**Error handler global de FastAPI:**
+
+```python
+# src/main.py
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+                "request_id": request.state.request_id,
+            }
+        },
+    )
+```
+
+### Resilience para Backend Client
+
+```python
+# src/backend_client/client.py
+import tenacity
+
+class BackendClient:
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(3),
+        wait=tenacity.wait_exponential(multiplier=0.5, min=0.5, max=5),
+        retry=tenacity.retry_if_exception_type(httpx.TransportError),
+        before_sleep=tenacity.before_sleep_log(logger, logging.WARNING),
+    )
+    async def request(self, method: str, path: str, org_id: UUID, **kwargs) -> dict:
+        response = await self.client.request(method, path, headers=headers, **kwargs)
+        if response.status_code >= 500:
+            raise BackendError(response.status_code, f"Backend returned {response.status_code}")
+        response.raise_for_status()
+        return response.json()
+```
+
+### Circuit breaker para LLM
+
+```python
+# Si el LLM falla 5 veces consecutivas, abrir circuito por 30 segundos
+from src.core.circuit_breaker import CircuitBreaker
+
+llm_breaker = CircuitBreaker(
+    failure_threshold=5,
+    recovery_timeout=30,
+    expected_exception=LLMError,
+)
+
+async def chat_with_breaker(llm, messages, tools, **kwargs):
+    if llm_breaker.is_open():
+        raise LLMError("gemini", "Service temporarily unavailable (circuit open)")
+    try:
+        async for chunk in llm.chat(messages, tools=tools, **kwargs):
+            yield chunk
+        llm_breaker.record_success()
+    except Exception as e:
+        llm_breaker.record_failure()
+        raise LLMError("gemini", str(e))
+```
+
+### Structured Logging
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+# Middleware que inyecta request_id
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", f"req_{uuid4().hex[:8]}")
+    request.state.request_id = request_id
+    structlog.contextvars.bind_contextvars(request_id=request_id)
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+```
 
 ---
 
@@ -411,14 +541,14 @@ Tiene acceso a: {modules_active}.
 |------|-------------|-----------------|------|
 | `get_sales_summary` | Ventas por periodo con totales | `GET /v1/reports/sales-summary` | read |
 | `get_recent_sales` | Ultimas N ventas | `GET /v1/sales?limit=N` | read |
-| `get_top_customers` | Top N clientes por facturacion | `GET /v1/reports/sales-by-customer` | read |
-| `search_customers` | Buscar cliente por nombre/email | `GET /v1/customers?q=X` | read |
+| `get_top_customers` | Top N clientes (parties con rol customer) por facturacion | `GET /v1/reports/sales-by-party` | read |
+| `search_customers` | Buscar party con rol customer por nombre/email | `GET /v1/customers?q=X` | read |
 | `search_products` | Buscar producto por nombre/SKU | `GET /v1/products?q=X` | read |
 | `get_low_stock` | Productos con stock bajo | `GET /v1/reports/low-stock` | read |
 | `get_stock_level` | Stock de un producto | `GET /v1/inventory/:product_id` | read |
 | `get_cashflow_summary` | Balance de caja por periodo | `GET /v1/reports/cashflow-summary` | read |
 | `get_account_balances` | Cuentas corrientes con saldo | `GET /v1/accounts/summary` | read |
-| `get_debtors` | Clientes que deben plata | `GET /v1/accounts/receivable` | read |
+| `get_debtors` | Parties (clientes) que deben plata | `GET /v1/accounts/receivable` | read |
 | `get_appointments` | Turnos por fecha/estado | `GET /v1/appointments` | read |
 | `check_availability` | Slots libres para un dia | `GET /v1/appointments/availability` | read |
 | `get_quotes` | Presupuestos por estado | `GET /v1/quotes` | read |
@@ -429,6 +559,7 @@ Tiene acceso a: {modules_active}.
 | `create_sale` | Registrar venta | `POST /v1/sales` | write |
 | `book_appointment` | Agendar turno | `POST /v1/appointments` | write |
 | `create_cash_movement` | Registrar movimiento de caja | `POST /v1/cashflow` | write |
+| `search_parties` | Buscar party por nombre/email (cualquier rol) | `GET /v1/parties?q=X` | read |
 | `search_help` | Buscar en documentacion de la plataforma | (local, sin backend) | read |
 
 **Filtrado por RBAC**: si el usuario tiene rol `cajero`, no ve tools de reportes ni inventario. El AI service consulta el rol del usuario y filtra los tools antes de enviarlos al LLM.
@@ -918,6 +1049,12 @@ class BackendClient:
     async def search_customers(self, org_id: UUID, token: str, query: str) -> dict:
         return await self.request("GET", "/v1/customers", org_id, token, params={"q": query})
 
+    async def search_parties(self, org_id: UUID, token: str, query: str, role: str | None = None) -> dict:
+        params = {"q": query}
+        if role:
+            params["role"] = role
+        return await self.request("GET", "/v1/parties", org_id, token, params=params)
+
     async def create_appointment(self, org_id: UUID, token: str, data: dict) -> dict:
         return await self.request("POST", "/v1/appointments", org_id, token, json=data)
 ```
@@ -1086,12 +1223,30 @@ CREATE TABLE IF NOT EXISTS ai_usage_daily (
 );
 ```
 
+**Party del AI Assistant** — al ejecutar el seed o al inicializar, crear un party representando al asistente IA:
+
+```sql
+-- Crear party del asistente IA (uno por org, se crea al activar AI)
+-- En el seed de desarrollo:
+INSERT INTO parties (org_id, party_type, display_name, metadata) VALUES
+    (:org_id, 'automated_agent', 'Asistente IA', '{"system": true}');
+
+INSERT INTO party_agents (party_id, agent_kind, provider, config, is_active) VALUES
+    (:party_id, 'ai', 'gemini', '{"model": "gemini-2.0-flash"}', true);
+```
+
+El `party_id` del asistente se usa para:
+- `audit_log.actor_id` cuando el AI ejecuta acciones (crear venta, agendar turno)
+- `ai_conversations.agent_party_id` para saber qué agente atendió la conversación
+- Trazabilidad completa de acciones automáticas vs manuales
+
 ### `0014_ai_tables.down.sql`
 
 ```sql
 DROP TABLE IF EXISTS ai_usage_daily;
 DROP TABLE IF EXISTS ai_conversations;
 DROP TABLE IF EXISTS ai_dossiers;
+-- Los party agents se eliminan via CASCADE al borrar parties
 ```
 
 ### `0015_whatsapp_connections.up.sql` (futuro, cuando se implemente WhatsApp Business API)
@@ -1169,31 +1324,77 @@ Los handlers existentes (`appointments`, `products`, `org`) agregan un metodo `R
 
 | Tipo | Que testea | Como |
 |------|-----------|------|
-| **Unit: orchestrator** | Loop ReAct con mock LLM | LLM mock que devuelve tool calls predefinidos |
+| **Unit: orchestrator** | Loop ReAct, max tool calls, timeout | LLM mock con respuestas predefinidas |
 | **Unit: tools** | Cada tool llama al endpoint correcto | Mock de BackendClient |
-| **Unit: onboarding** | Transiciones de estado | Dossier mock |
-| **Integration: API** | Endpoints de chat | TestClient de FastAPI + mock LLM + DB de test |
-| **E2E** | Flujo completo con Docker | curl contra AI service real (Gemini mockeado) |
+| **Unit: onboarding** | Transiciones de estado, skip steps | Dossier mock |
+| **Unit: errors** | Errores tipados, circuit breaker, retry | Mocks que fallan |
+| **Unit: quota** | Límites por plan, rechazo quota | Mock de usage tracker |
+| **Integration: API** | Endpoints de chat con SSE | TestClient FastAPI + mock LLM + DB test |
+| **E2E** | Flujo completo con Docker | curl contra AI service (Gemini mockeado) |
 
-### Ejemplo de test del orquestador
+### Ejemplo: test parametrizado del orquestador (equivalente a table-driven)
 
 ```python
-async def test_orchestrate_sales_query():
-    mock_llm = MockLLM(responses=[
-        [ChatChunk(type="tool_call", tool_call={"name": "get_sales_summary", "arguments": {"period": "today"}})],
-        [ChatChunk(type="text", text="Hoy vendiste $45.200")],
-    ])
-
-    mock_handlers = {
-        "get_sales_summary": AsyncMock(return_value={"total": 45200, "count": 6}),
-    }
+@pytest.mark.parametrize("scenario,mock_responses,expected_tools,expected_text", [
+    (
+        "consulta de ventas",
+        [[ChatChunk(type="tool_call", tool_call={"name": "get_sales_summary", "arguments": {"period": "today"}})],
+         [ChatChunk(type="text", text="Hoy vendiste $45.200")]],
+        ["get_sales_summary"],
+        "45.200",
+    ),
+    (
+        "respuesta directa sin tools",
+        [[ChatChunk(type="text", text="Hola, ¿en qué puedo ayudarte?")]],
+        [],
+        "ayudarte",
+    ),
+    (
+        "max tool calls — se corta en 10",
+        [[ChatChunk(type="tool_call", tool_call={"name": "search_customers", "arguments": {"q": "x"}})] for _ in range(12)],
+        ["search_customers"] * 10,
+        None,
+    ),
+])
+async def test_orchestrate(scenario, mock_responses, expected_tools, expected_text):
+    mock_llm = MockLLM(responses=mock_responses)
+    mock_handlers = {name: AsyncMock(return_value={"items": []}) for name in set(expected_tools)}
 
     chunks = []
     async for chunk in orchestrate(mock_llm, messages, tools, mock_handlers, org_id):
         chunks.append(chunk)
 
-    assert any(c.text and "45.200" in c.text for c in chunks)
-    mock_handlers["get_sales_summary"].assert_called_once_with(org_id=org_id, period="today")
+    tool_calls = [c.tool_call["name"] for c in chunks if c.type == "tool_call"]
+    assert len(tool_calls) <= 10
+    if expected_text:
+        assert any(c.text and expected_text in c.text for c in chunks if c.text)
+```
+
+### Ejemplo: test de resiliencia
+
+```python
+async def test_backend_client_retries_on_transport_error():
+    """Verifica retry automático en errores de transporte."""
+    client = BackendClient(base_url="http://backend:8080", internal_token="test")
+    with respx.mock:
+        route = respx.get("http://backend:8080/v1/sales").mock(
+            side_effect=[httpx.ConnectError("refused"), httpx.Response(200, json={"data": []})]
+        )
+        result = await client.request("GET", "/v1/sales", org_id=uuid4())
+        assert route.call_count == 2
+
+async def test_quota_exceeded_returns_429():
+    """Verifica que exceder quota retorna 429 con QUOTA_EXCEEDED."""
+    # Simular 51 queries para plan starter → último request falla
+```
+
+### Dependencias de testing adicionales
+
+```
+# requirements-dev.txt (separado de producción)
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+respx>=0.21.0
 ```
 
 ---
@@ -1211,10 +1412,13 @@ async def test_orchestrate_sales_query():
 | `.gitignore` | Agregar `__pycache__/`, `*.pyc`, `.venv/` |
 | `README.md` | Agregar seccion AI service con endpoints y arquitectura |
 | `Makefile` | Agregar targets `ai-dev`, `ai-test`, `ai-lint` |
+| `requirements.txt` | Agregar dependencias OpenTelemetry (`opentelemetry-sdk`, instrumentors FastAPI/httpx`) |
 
 ---
 
 ## Orden de ejecucion recomendado
+
+**Aclaración importante**: este orden es solo una secuencia técnica para construir sin retrabajo. No convierte ningún bloque en opcional ni en "fase 2".
 
 1. Crear `control-plane/ai/` con estructura de directorios
 2. `requirements.txt` + `Dockerfile.dev`
@@ -1231,13 +1435,14 @@ async def test_orchestrate_sales_query():
 13. `src/api/router.py` — endpoints de chat con SSE
 14. `src/middleware/auth.py` — validacion JWT/API key
 15. `src/middleware/rate_limit.py`
-16. `src/core/onboarding.py` — state machine
-17. Implementar tools de escritura: `quotes.py` (create), `appointments.py` (book), `settings.py` (onboarding)
-18. `src/api/public_router.py` — endpoints modo external
-19. Backend Go: endpoints publicos + middleware de servicio interno
-20. Actualizar `.env.example`, `.env`, `config.go`, `docker-compose.yml`, `.gitignore`, `README.md`, `Makefile`
-21. Tests
-22. Verificar todo: `docker compose up -d`, probar chat interno y externo
+16. `src/observability/otel.py` — tracer provider, OTLP exporter, métricas HTTP/LLM/backend
+17. `src/core/onboarding.py` — state machine
+18. Implementar tools de escritura: `quotes.py` (create), `appointments.py` (book), `settings.py` (onboarding)
+19. `src/api/public_router.py` — endpoints modo external
+20. Backend Go: endpoints publicos + middleware de servicio interno
+21. Actualizar `.env.example`, `.env`, `config.go`, `docker-compose.yml`, `.gitignore`, `README.md`, `Makefile`
+22. Tests
+23. Verificar todo: `docker compose up -d`, probar chat interno y externo
 
 ---
 
@@ -1256,4 +1461,20 @@ async def test_orchestrate_sales_query():
 - [ ] Conversaciones se guardan y se pueden listar/ver/borrar
 - [ ] Usage tracking: `ai_usage_daily` se incrementa por query
 - [ ] `pytest` pasa todos los tests
+- [ ] Party Model: AI assistant tiene party(automated_agent) por org
+- [ ] Party Model: acciones del AI registran actor_type='party' en audit_log
+- [ ] Party Model: tools de customers/suppliers operan sobre parties con roles
 - [ ] `.env.example` contiene todas las variables nuevas
+
+### Engineering Standards
+- [ ] Errores tipados: `AppError`, `QuotaExceededError`, `LLMError`, `BackendError` con códigos
+- [ ] Error responses siguen formato `{"error": {"code", "message", "details", "request_id"}}`
+- [ ] Request ID propagado en todo request (`X-Request-ID` header)
+- [ ] Structured logging con `structlog`: request_id, org_id, user_id en cada log
+- [ ] Backend client con retry automático (3 intentos, backoff exponencial) via tenacity
+- [ ] Circuit breaker para LLM: abre después de 5 fallos, recupera en 30s
+- [ ] FastAPI instrumentado con OpenTelemetry (HTTP server + `httpx` client)
+- [ ] Métricas mínimas: latencia de chat, errores por tool, tokens consumidos, retries, circuit-breaker open events
+- [ ] Tests parametrizados para orchestrator, quota, y resiliencia
+- [ ] Validación pydantic en todos los request models
+- [ ] Health check en `/healthz`

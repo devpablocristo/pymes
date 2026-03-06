@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from datetime import UTC, datetime
 from typing import Any
@@ -127,6 +128,7 @@ async def chat_internal(
         )
 
     dossier = await repo.get_or_create_dossier(auth.org_id)
+    dossier_snapshot = copy.deepcopy(dossier)
     declarations, handlers = build_internal_tools(backend_client, auth, dossier)
 
     conversation_messages = list(conversation.messages)
@@ -189,6 +191,9 @@ async def chat_internal(
             tokens_output=tokens_out,
         )
         await repo.track_usage(auth.org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+
+        if dossier != dossier_snapshot:
+            await repo.update_dossier(auth.org_id, dossier)
 
         yield to_sse_event(
             "done",

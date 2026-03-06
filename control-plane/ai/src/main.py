@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.public_router import router as public_router
+from src.api.internal_router import router as internal_router
 from src.api.router import router as chat_router
 from src.backend_client.client import BackendClient
 from src.config import get_settings
@@ -70,6 +71,7 @@ async def request_context_middleware(request: Request, call_next):
 
 app.include_router(chat_router)
 app.include_router(public_router)
+app.include_router(internal_router)
 
 
 @app.exception_handler(AppError)

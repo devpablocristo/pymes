@@ -128,6 +128,20 @@ class AIRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_latest_external_conversation(self, org_id: str, external_contact: str) -> AIConversation | None:
+        query = (
+            select(AIConversation)
+            .where(
+                AIConversation.org_id == org_id,
+                AIConversation.mode == "external",
+                AIConversation.external_contact == external_contact,
+            )
+            .order_by(AIConversation.updated_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def list_conversations(self, org_id: str, mode: str, user_id: str | None, limit: int = 50) -> list[AIConversation]:
         query = select(AIConversation).where(AIConversation.org_id == org_id, AIConversation.mode == mode)
         if mode == "internal" and user_id:

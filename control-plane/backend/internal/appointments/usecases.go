@@ -26,13 +26,32 @@ type AuditPort interface {
 	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
-type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+type TimelinePort interface {
+	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+type WebhookPort interface {
+	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+}
+
+type Usecases struct {
+	repo     RepositoryPort
+	audit    AuditPort
+	timeline TimelinePort
+	webhooks WebhookPort
+}
+
+type Option func(*Usecases)
+
+func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
+func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
+	uc := &Usecases{repo: repo, audit: audit}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
 }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error) {
@@ -53,6 +72,12 @@ func (u *Usecases) Create(ctx context.Context, in appointmentsdomain.Appointment
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, prepared.OrgID.String(), prepared.CreatedBy, "appointment.created", "appointment", out.ID.String(), map[string]any{"title": out.Title, "status": out.Status})
+	}
+	if u.timeline != nil && out.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, prepared.OrgID, "parties", *out.CustomerID, "appointment.created", "Turno registrado", out.Title, prepared.CreatedBy, map[string]any{"appointment_id": out.ID.String(), "status": out.Status})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, prepared.OrgID, "appointment.created", map[string]any{"appointment_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "status": out.Status, "start_at": out.StartAt})
 	}
 	return out, nil
 }
@@ -88,6 +113,12 @@ func (u *Usecases) Update(ctx context.Context, in appointmentsdomain.Appointment
 	if u.audit != nil {
 		u.audit.Log(ctx, in.OrgID.String(), actor, "appointment.updated", "appointment", out.ID.String(), map[string]any{"status": out.Status})
 	}
+	if u.timeline != nil && out.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.CustomerID, "appointment.updated", "Turno actualizado", out.Title, actor, map[string]any{"appointment_id": out.ID.String(), "status": out.Status})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "appointment.updated", map[string]any{"appointment_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "status": out.Status, "start_at": out.StartAt})
+	}
 	return out, nil
 }
 
@@ -100,6 +131,9 @@ func (u *Usecases) Cancel(ctx context.Context, orgID, id uuid.UUID, actor string
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "appointment.cancelled", "appointment", id.String(), nil)
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, orgID, "appointment.cancelled", map[string]any{"appointment_id": id.String()})
 	}
 	return nil
 }
@@ -217,4 +251,11 @@ func normalizeStatus(v string) string {
 
 func describeParseErr(field string, err error) error {
 	return fmt.Errorf("invalid %s: %w", field, err)
+}
+
+func nullableUUID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }

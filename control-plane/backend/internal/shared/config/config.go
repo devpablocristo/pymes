@@ -33,6 +33,10 @@ type Config struct {
 	SchedulerSecret             string
 	ExchangeRateProvider        string
 	InternalServiceToken        string
+	AIServiceURL                string
+	WhatsAppWebhookVerifyToken  string
+	WhatsAppAppSecret           string
+	WhatsAppGraphAPIBaseURL     string
 	MPAppID                     string
 	MPClientSecret              string
 	MPWebhookSecret             string
@@ -69,6 +73,10 @@ func LoadFromEnv() Config {
 		SchedulerSecret:             os.Getenv("SCHEDULER_SECRET"),
 		ExchangeRateProvider:        getEnv("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:        os.Getenv("INTERNAL_SERVICE_TOKEN"),
+		AIServiceURL:                getEnv("AI_SERVICE_URL", "http://ai:8000"),
+		WhatsAppWebhookVerifyToken:  os.Getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN"),
+		WhatsAppAppSecret:           os.Getenv("WHATSAPP_APP_SECRET"),
+		WhatsAppGraphAPIBaseURL:     getEnv("WHATSAPP_GRAPH_API_BASE_URL", "https://graph.facebook.com/v23.0"),
 		MPAppID:                     os.Getenv("MP_APP_ID"),
 		MPClientSecret:              os.Getenv("MP_CLIENT_SECRET"),
 		MPWebhookSecret:             os.Getenv("MP_WEBHOOK_SECRET"),

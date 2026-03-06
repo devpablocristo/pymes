@@ -37,15 +37,34 @@ type AuditPort interface {
 	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
+type TimelinePort interface {
+	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
+}
+
+type WebhookPort interface {
+	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+}
+
 type Usecases struct {
 	repo      RepositoryPort
 	inventory InventoryPort
 	cashflow  CashflowPort
 	audit     AuditPort
+	timeline  TimelinePort
+	webhooks  WebhookPort
 }
 
-func NewUsecases(repo RepositoryPort, inventory InventoryPort, cashflow CashflowPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, inventory: inventory, cashflow: cashflow, audit: audit}
+type Option func(*Usecases)
+
+func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
+func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+
+func NewUsecases(repo RepositoryPort, inventory InventoryPort, cashflow CashflowPort, audit AuditPort, opts ...Option) *Usecases {
+	uc := &Usecases{repo: repo, inventory: inventory, cashflow: cashflow, audit: audit}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
 }
 
 type CreateSaleItemInput struct {
@@ -193,6 +212,12 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 			"total":  out.Total,
 		})
 	}
+	if u.timeline != nil && out.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.CustomerID, "sale.created", "Venta registrada", out.Number, in.CreatedBy, map[string]any{"sale_id": out.ID.String(), "total": out.Total})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "sale.created", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "total": out.Total, "payment_method": out.PaymentMethod})
+	}
 	return out, nil
 }
 
@@ -251,6 +276,12 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 			"total":  current.Total,
 		})
 	}
+	if u.timeline != nil && current.CustomerID != nil {
+		_ = u.timeline.RecordEvent(ctx, orgID, "parties", *current.CustomerID, "sale.voided", "Venta anulada", current.Number, actor, map[string]any{"sale_id": saleID.String(), "total": current.Total})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, orgID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
+	}
 	return out, nil
 }
 
@@ -261,4 +292,11 @@ func isValidPaymentMethod(v string) bool {
 	default:
 		return false
 	}
+}
+
+func nullableUUID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }

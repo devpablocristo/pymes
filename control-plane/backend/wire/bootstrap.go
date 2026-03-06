@@ -10,6 +10,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
 	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
@@ -18,11 +19,13 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/currency"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/outwebhooks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/party"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"
 	paymentgatewayclient "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
@@ -36,6 +39,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/rbac"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/returns"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/scheduler"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/app"
@@ -43,7 +47,9 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/store"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
 )
 
@@ -66,8 +72,10 @@ func InitializeApp() *app.App {
 	orgRepo := org.NewRepository(db)
 	usersRepo := users.NewRepository(db)
 	adminRepo := admin.NewRepository(db)
+	attachmentsRepo := attachments.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
 	billingRepo := billing.NewRepository(db)
+	outwebhooksRepo := outwebhooks.NewRepository(db)
 	partyRepo := party.NewRepository(db)
 	customersRepo := customers.NewRepository(db)
 	suppliersRepo := suppliers.NewRepository(db)
@@ -77,17 +85,21 @@ func InitializeApp() *app.App {
 	salesRepo := sales.NewRepository(db)
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
+	returnsRepo := returns.NewRepository(db)
 	rbacRepo := rbac.NewRepository(db)
 	accountsRepo := accounts.NewRepository(db)
 	appointmentsRepo := appointments.NewRepository(db)
 	currencyRepo := currency.NewRepository(db)
 	dashboardRepo := dashboard.NewRepository(db)
+	dataioRepo := dataio.NewRepository(db)
 	paymentGatewayRepo := paymentgateway.NewRepository(db)
 	paymentsRepo := payments.NewRepository(db)
 	priceListsRepo := pricelists.NewRepository(db)
 	purchasesRepo := purchases.NewRepository(db)
 	recurringRepo := recurring.NewRepository(db)
 	schedulerRepo := scheduler.NewRepository(db)
+	timelineRepo := timeline.NewRepository(db)
+	whatsappRepo := whatsapp.NewRepository(db)
 
 	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
@@ -95,31 +107,48 @@ func InitializeApp() *app.App {
 	orgUC := org.NewUsecases(orgRepo, auditUC)
 	usersUC := users.NewUsecases(usersRepo)
 	adminUC := admin.NewUsecases(adminRepo)
+	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
 	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC)
 	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC)
+	timelineUC := timeline.NewUsecases(timelineRepo)
+	outwebhooksUC := outwebhooks.NewUsecases(outwebhooksRepo)
 	customersUC := customers.NewUsecases(customersRepo, auditUC)
 	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
 	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
-	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC)
+	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC, sales.WithTimeline(timelineUC), sales.WithWebhooks(outwebhooksUC))
 	accountsUC := accounts.NewUsecases(accountsRepo)
-	appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC)
+	appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC, appointments.WithTimeline(timelineUC), appointments.WithWebhooks(outwebhooksUC))
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
+	dataioUC := dataio.NewUsecases(dataioRepo, auditUC)
 	paymentsUC := payments.NewUsecases(paymentsRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
-	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC)
+	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
-	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider)
+	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
+	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC)
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
 	if err != nil {
 		logger.Warn().Err(err).Msg("invalid PAYMENT_GATEWAY_ENCRYPTION_KEY; mercado pago integration disabled")
 	}
+	whatsappAIClient := whatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
+	whatsappMetaClient := whatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
+	whatsappUC := whatsapp.NewUsecases(
+		whatsappRepo,
+		timelineUC,
+		cfg.FrontendURL,
+		whatsappAIClient,
+		whatsappMetaClient,
+		paymentGatewayCrypto,
+		cfg.WhatsAppWebhookVerifyToken,
+		cfg.WhatsAppAppSecret,
+	)
 	paymentGatewayUC := paymentgateway.NewUsecases(
 		paymentGatewayRepo,
 		paymentgatewayclient.NewMercadoPagoGateway(),
@@ -145,13 +174,14 @@ func InitializeApp() *app.App {
 	}
 	stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
 	billingUC := billing.NewUsecases(billingRepo, stripeClient, notificationUC, cfg.FrontendURL, priceIDs, cfg.StripeWebhookSecret, logger)
-	partyUC := party.NewUsecases(partyRepo, auditUC)
+	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
 
 	auditHandler := audit.NewHandler(auditUC)
 	orgHandler := org.NewHandler(orgUC)
 	usersHandler := users.NewHandler(usersUC)
 	adminHandler := admin.NewHandler(adminUC)
+	attachmentsHandler := attachments.NewHandler(attachmentsUC)
 	customersHandler := customers.NewHandler(customersUC)
 	suppliersHandler := suppliers.NewHandler(suppliersUC)
 	productsHandler := products.NewHandler(productsUC)
@@ -162,6 +192,7 @@ func InitializeApp() *app.App {
 	appointmentsHandler := appointments.NewHandler(appointmentsUC)
 	currencyHandler := currency.NewHandler(currencyUC)
 	dashboardHandler := dashboard.NewHandler(dashboardUC)
+	dataioHandler := dataio.NewHandler(dataioUC)
 	paymentsHandler := payments.NewHandler(paymentsUC)
 	priceListsHandler := pricelists.NewHandler(priceListsUC)
 	purchasesHandler := purchases.NewHandler(purchasesUC)
@@ -172,9 +203,13 @@ func InitializeApp() *app.App {
 	schedulerHandler := scheduler.NewHandler(schedulerUC, cfg.SchedulerSecret)
 	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
+	outwebhooksHandler := outwebhooks.NewHandler(outwebhooksUC)
 	billingHandler := billing.NewHandler(billingUC)
 	partyHandler := party.NewHandler(partyUC)
 	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
+	returnsHandler := returns.NewHandler(returnsUC)
+	timelineHandler := timeline.NewHandler(timelineUC)
+	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
 
@@ -190,6 +225,7 @@ func InitializeApp() *app.App {
 	clerkWebhookHandler.RegisterRoutes(v1)
 	billingHandler.RegisterPublicRoutes(v1)
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
+	whatsappHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
 
 	public := v1.Group("/public/:org_id")
@@ -202,17 +238,22 @@ func InitializeApp() *app.App {
 	authGroup.Use(authMiddleware.RequireAuth())
 	usersHandler.RegisterRoutes(authGroup)
 	adminHandler.RegisterRoutes(authGroup)
+	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
 	auditHandler.RegisterRoutes(authGroup)
 	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	whatsappHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
+	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	billingHandler.RegisterAuthRoutes(authGroup)
 	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	currencyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	dashboardHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	dataioHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	paymentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	priceListsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	suppliersHandler.RegisterRoutes(authGroup, rbacMiddleware)
@@ -221,6 +262,7 @@ func InitializeApp() *app.App {
 	purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	cashflowHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	recurringHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	returnsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)

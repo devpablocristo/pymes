@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.config import Settings
+from src.config import Settings, get_settings
 from src.db.engine import get_db_session
 from src.db.repository import AIRepository
 from src.llm.base import LLMProvider
@@ -14,7 +14,7 @@ from src.llm.base import LLMProvider
 def get_settings_dep(request: Request) -> Settings:
     settings = getattr(request.app.state, "settings", None)
     if settings is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="settings not initialized")
+        settings = get_settings()
     return settings
 
 

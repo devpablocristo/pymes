@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel, Field
 
 from src.api.deps import get_backend_client, get_llm_provider, get_repository
-from src.api.router import check_quota, estimate_tokens, to_sse_event, _history_to_messages
+from src.api.external_chat_support import clean_phone, get_external_conversation, history_to_messages, resolve_org_id
+from src.api.router import check_quota, estimate_tokens, to_sse_event
 from src.api.sse import EventSourceResponse
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
@@ -34,24 +33,6 @@ class IdentifyRequest(BaseModel):
     phone: str = Field(min_length=6, max_length=32)
 
 
-def _clean_phone(raw: str) -> str:
-    return "".join(ch for ch in raw if ch.isdigit() or ch == "+")
-
-
-async def resolve_org_id(backend_client: BackendClient, org_slug: str) -> str:
-    try:
-        payload = await backend_client.request("GET", f"/v1/public/{org_slug}/info", include_internal=True)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == status.HTTP_404_NOT_FOUND:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found") from exc
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="backend unavailable") from exc
-
-    org_id = str(payload.get("org_id", "")).strip()
-    if not org_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found")
-    return org_id
-
-
 @router.post("/{org_slug}/chat")
 async def chat_external(
     req: PublicChatRequest,
@@ -64,20 +45,16 @@ async def chat_external(
     await check_quota(repo, org_id, mode="external")
 
     conversation = None
-    external_contact = _clean_phone(req.phone or "")
+    external_contact = clean_phone(req.phone or "")
     update_request_context(org_id=org_id, user_id=external_contact or "external")
     logger.info("chat_external_started", org_id=org_id, external_contact=external_contact, conversation_id=req.conversation_id or "")
-    if req.conversation_id:
-        conversation = await repo.get_conversation(org_id, req.conversation_id)
-        if conversation is None or conversation.mode != "external":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
-    else:
-        conversation = await repo.create_conversation(
-            org_id=org_id,
-            mode="external",
-            external_contact=external_contact,
-            title=req.message.strip()[:60],
-        )
+    conversation = await get_external_conversation(
+        repo=repo,
+        org_id=org_id,
+        external_contact=external_contact,
+        message=req.message,
+        conversation_id=req.conversation_id,
+    )
 
     dossier = await repo.get_or_create_dossier(org_id)
     declarations, handlers = build_external_tools(backend_client)
@@ -86,7 +63,7 @@ async def chat_external(
     llm_messages: list[Message] = [
         Message(role="system", content=build_system_prompt("external", None, dossier)),
         Message(role="system", content=f"Dossier: {summarize_dossier_for_context(dossier)}"),
-        *_history_to_messages(history_messages),
+        *history_to_messages(history_messages),
         Message(role="user", content=req.message.strip()),
     ]
 
@@ -169,6 +146,6 @@ async def identify_external(req: IdentifyRequest, org_slug: str = Path(..., min_
     _ = org_slug
     return {
         "name": req.name.strip(),
-        "phone": _clean_phone(req.phone),
+        "phone": clean_phone(req.phone),
         "status": "identified",
     }

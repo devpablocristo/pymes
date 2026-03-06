@@ -30,13 +30,32 @@ type AuditPort interface {
 	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
-type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+type TimelinePort interface {
+	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+type WebhookPort interface {
+	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+}
+
+type Usecases struct {
+	repo     RepositoryPort
+	audit    AuditPort
+	timeline TimelinePort
+	webhooks WebhookPort
+}
+
+type Option func(*Usecases)
+
+func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
+func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
+	uc := &Usecases{repo: repo, audit: audit}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]partydomain.Party, int64, bool, *uuid.UUID, error) {
@@ -53,6 +72,12 @@ func (u *Usecases) Create(ctx context.Context, in partydomain.Party, actor strin
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "party.created", "party", out.ID.String(), map[string]any{"party_type": out.PartyType, "display_name": out.DisplayName})
+	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, out.OrgID, "parties", out.ID, "party.created", "Party creada", out.DisplayName, actor, map[string]any{"party_type": out.PartyType})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, out.OrgID, "party.created", map[string]any{"party_id": out.ID.String(), "party_type": out.PartyType, "display_name": out.DisplayName})
 	}
 	return out, nil
 }
@@ -78,6 +103,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in partydoma
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "party.updated", "party", id.String(), map[string]any{"party_type": out.PartyType, "display_name": out.DisplayName})
 	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, orgID, "parties", id, "party.updated", "Party actualizada", out.DisplayName, actor, map[string]any{"party_type": out.PartyType})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, orgID, "party.updated", map[string]any{"party_id": id.String(), "party_type": out.PartyType, "display_name": out.DisplayName})
+	}
 	return out, nil
 }
 
@@ -87,6 +118,12 @@ func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "party.deleted", "party", id.String(), map[string]any{})
+	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, orgID, "parties", id, "party.deleted", "Party eliminada", id.String(), actor, map[string]any{})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, orgID, "party.deleted", map[string]any{"party_id": id.String()})
 	}
 	return nil
 }
@@ -103,6 +140,9 @@ func (u *Usecases) AddRole(ctx context.Context, orgID, partyID uuid.UUID, role s
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "party.role_added", "party", partyID.String(), map[string]any{"role": role})
 	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, orgID, "parties", partyID, "party.role_added", "Rol agregado", role, actor, map[string]any{"role": role})
+	}
 	return out, nil
 }
 
@@ -112,6 +152,9 @@ func (u *Usecases) RemoveRole(ctx context.Context, orgID, partyID uuid.UUID, rol
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "party.role_removed", "party", partyID.String(), map[string]any{"role": role})
+	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, orgID, "parties", partyID, "party.role_removed", "Rol removido", role, actor, map[string]any{"role": role})
 	}
 	return nil
 }
@@ -140,6 +183,9 @@ func (u *Usecases) CreateRelationship(ctx context.Context, in partydomain.PartyR
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, in.OrgID.String(), actor, "party.relationship_created", "party_relationship", out.ID.String(), map[string]any{"relationship_type": out.RelationshipType})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "party.relationship_created", map[string]any{"relationship_id": out.ID.String(), "from_party_id": out.FromPartyID.String(), "to_party_id": out.ToPartyID.String(), "relationship_type": out.RelationshipType})
 	}
 	return out, nil
 }

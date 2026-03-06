@@ -13,9 +13,9 @@ export function LoginPage() {
   return (
     <div className="auth-layout">
       <div className="auth-card">
-        <h1>Login local</h1>
-        <p>Clerk deshabilitado. Usa API key para consumir la API desde el frontend.</p>
-        <Link to="/">Ir al dashboard</Link>
+        <h1>Ingreso local</h1>
+        <p>Clerk deshabilitado. Usa una clave API para consumir la API desde el frontend.</p>
+        <Link to="/">Ir al panel</Link>
       </div>
     </div>
   );

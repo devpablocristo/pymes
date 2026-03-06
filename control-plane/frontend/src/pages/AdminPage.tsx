@@ -2,6 +2,12 @@ import { FormEvent, useEffect, useState } from 'react';
 import { getAuditEntries, getTenantSettings, updateTenantSettings } from '../lib/api';
 import type { TenantSettings } from '../lib/types';
 
+const planLabels: Record<string, string> = {
+  starter: 'Inicial',
+  growth: 'Crecimiento',
+  enterprise: 'Empresas',
+};
+
 export function AdminPage() {
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [planCode, setPlanCode] = useState('starter');
@@ -38,23 +44,23 @@ export function AdminPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Admin</h1>
-        <p>Configuracion del tenant y registro de actividad</p>
+        <h1>Administracion</h1>
+        <p>Configuracion del espacio y registro de actividad</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
         <div className="card-header">
-          <h2>Tenant Settings</h2>
+          <h2>Configuracion del espacio</h2>
         </div>
         <form onSubmit={onSubmit} className="form-row">
           <div className="form-group">
             <label>Plan</label>
             <select value={planCode} onChange={(e) => setPlanCode(e.target.value)}>
-              <option value="starter">Starter</option>
-              <option value="growth">Growth</option>
-              <option value="enterprise">Enterprise</option>
+              <option value="starter">{planLabels.starter}</option>
+              <option value="growth">{planLabels.growth}</option>
+              <option value="enterprise">{planLabels.enterprise}</option>
             </select>
           </div>
           <button type="submit" className="btn-primary">Actualizar</button>
@@ -66,7 +72,7 @@ export function AdminPage() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Audit Log</h2>
+          <h2>Registro de auditoria</h2>
           <span className="badge badge-neutral">{activity.length} eventos</span>
         </div>
         {activity.length === 0 ? (

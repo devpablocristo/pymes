@@ -21,7 +21,7 @@ export function DashboardPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Dashboard</h1>
+        <h1>Panel</h1>
         <p>Vista general de tu cuenta y organizacion</p>
       </div>
 
@@ -39,7 +39,7 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Status</div>
+          <div className="stat-label">Estado</div>
           <div className="stat-value">
             {me ? <span className="badge badge-success">Activo</span> : <span className="badge badge-neutral">---</span>}
           </div>

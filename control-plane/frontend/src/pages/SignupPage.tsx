@@ -15,7 +15,7 @@ export function SignupPage() {
       <div className="auth-card">
         <h1>Registro local</h1>
         <p>Clerk deshabilitado en este ambiente.</p>
-        <Link to="/">Ir al dashboard</Link>
+        <Link to="/">Ir al panel</Link>
       </div>
     </div>
   );

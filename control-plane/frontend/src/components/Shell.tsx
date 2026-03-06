@@ -8,7 +8,7 @@ type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
 const mainNav: NavItem[] = [
   {
     to: '/',
-    label: 'Dashboard',
+    label: 'Panel',
     end: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -21,7 +21,7 @@ const mainNav: NavItem[] = [
   },
   {
     to: '/admin',
-    label: 'Admin',
+    label: 'Administracion',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
@@ -31,7 +31,7 @@ const mainNav: NavItem[] = [
   },
   {
     to: '/billing',
-    label: 'Billing',
+    label: 'Facturacion',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="1" y="4" width="22" height="16" rx="2" />
@@ -44,7 +44,7 @@ const mainNav: NavItem[] = [
 const settingsNav: NavItem[] = [
   {
     to: '/settings/keys',
-    label: 'API Keys',
+    label: 'Claves API',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
@@ -53,7 +53,7 @@ const settingsNav: NavItem[] = [
   },
   {
     to: '/settings/notifications',
-    label: 'Notifications',
+    label: 'Notificaciones',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -63,7 +63,7 @@ const settingsNav: NavItem[] = [
   },
   {
     to: '/settings',
-    label: 'Profile',
+    label: 'Perfil',
     end: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -101,19 +101,19 @@ export function Shell({ children }: PropsWithChildren) {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <h1>Pymes SaaS</h1>
-          <small>Control Plane</small>
+          <small>Panel de control</small>
         </div>
 
         <nav className="sidebar-nav">
-          <NavSection label="General" items={mainNav} />
-          <NavSection label="Settings" items={settingsNav} />
+          <NavSection label="Principal" items={mainNav} />
+          <NavSection label="Configuracion" items={settingsNav} />
         </nav>
 
         <div className="sidebar-footer">
           {clerkEnabled ? (
             <UserButton />
           ) : (
-            <span style={{ fontSize: '0.78rem' }}>Local dev</span>
+            <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>
           )}
         </div>
       </aside>

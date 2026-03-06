@@ -8,6 +8,10 @@ export function ProtectedRoute({ children }: PropsWithChildren) {
     return <>{children}</>;
   }
 
+  return <ClerkProtectedRoute>{children}</ClerkProtectedRoute>;
+}
+
+function ClerkProtectedRoute({ children }: PropsWithChildren) {
   const { isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
   if (!isLoaded) {

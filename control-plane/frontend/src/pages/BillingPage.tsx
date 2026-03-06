@@ -3,10 +3,18 @@ import { createCheckout, createPortal, getBillingStatus } from '../lib/api';
 import type { BillingStatus } from '../lib/types';
 
 const plans = [
-  { code: 'starter', name: 'Starter', description: 'Para equipos pequenos' },
-  { code: 'growth', name: 'Growth', description: 'Para empresas en crecimiento' },
-  { code: 'enterprise', name: 'Enterprise', description: 'Para grandes organizaciones' },
+  { code: 'starter', name: 'Inicial', description: 'Para equipos pequenos' },
+  { code: 'growth', name: 'Crecimiento', description: 'Para empresas en crecimiento' },
+  { code: 'enterprise', name: 'Empresas', description: 'Para grandes organizaciones' },
 ];
+
+const billingStatusLabels: Record<string, string> = {
+  active: 'Activo',
+  trialing: 'Prueba',
+  past_due: 'Pago vencido',
+  canceled: 'Cancelado',
+  unpaid: 'Impago',
+};
 
 export function BillingPage() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
@@ -51,8 +59,8 @@ export function BillingPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Billing</h1>
-        <p>Gestiona tu plan y metodo de pago</p>
+        <h1>Facturacion</h1>
+        <p>Gestiona tu plan y medio de pago</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -61,13 +69,13 @@ export function BillingPage() {
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-label">Plan actual</div>
-            <div className="stat-value text-capitalize">{status.plan_code}</div>
+            <div className="stat-value text-capitalize">{plans.find((plan) => plan.code === status.plan_code)?.name ?? status.plan_code}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Estado</div>
             <div className="stat-value">
               <span className={`badge ${status.status === 'active' ? 'badge-success' : 'badge-warning'}`}>
-                {status.status}
+                {billingStatusLabels[status.status] ?? status.status}
               </span>
             </div>
           </div>
@@ -105,7 +113,7 @@ export function BillingPage() {
                     className="btn-primary btn-sm"
                     onClick={() => void upgrade(plan.code)}
                   >
-                    Upgrade
+                    Mejorar plan
                   </button>
                 )}
               </div>

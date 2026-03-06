@@ -70,7 +70,7 @@ export function APIKeysPage() {
   return (
     <>
       <div className="page-header">
-        <h1>API Keys</h1>
+        <h1>Claves API</h1>
         <p>Crea y administra las claves de acceso a la API</p>
       </div>
 
@@ -85,8 +85,8 @@ export function APIKeysPage() {
 
       <div className="card">
         <div className="card-header">
-          <h2>Nueva API Key</h2>
-          {orgID && <span className="badge badge-neutral">Org: {orgID}</span>}
+          <h2>Nueva clave API</h2>
+          {orgID && <span className="badge badge-neutral">Organizacion: {orgID}</span>}
         </div>
         <form onSubmit={onCreate} className="form-row">
           <div className="form-group grow">
@@ -94,7 +94,7 @@ export function APIKeysPage() {
             <input placeholder="Mi clave de produccion" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-group grow">
-            <label>Scopes</label>
+            <label>Permisos</label>
             <input value={scopes} onChange={(e) => setScopes(e.target.value)} />
           </div>
           <button type="submit" className="btn-primary">Crear</button>
@@ -108,7 +108,7 @@ export function APIKeysPage() {
         </div>
         {keys.length === 0 ? (
           <div className="empty-state">
-            <p>No hay API keys creadas</p>
+            <p>No hay claves API creadas</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -117,7 +117,7 @@ export function APIKeysPage() {
                 <tr>
                   <th>Nombre</th>
                   <th>Prefijo</th>
-                  <th>Scopes</th>
+                  <th>Permisos</th>
                   <th>Creada</th>
                   <th>Acciones</th>
                 </tr>

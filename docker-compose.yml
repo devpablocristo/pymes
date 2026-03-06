@@ -90,7 +90,7 @@ services:
     ports:
       - "8181:8081"
     volumes:
-      - ./go.work:/workspace/go.work
+      - ./professionals/backend/go.work.build:/workspace/go.work
       - ./professionals/backend:/workspace/professionals/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - prof_backend_go_mod:/go/pkg/mod

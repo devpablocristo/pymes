@@ -25,7 +25,9 @@ func Run(db *gorm.DB, logger zerolog.Logger) error {
 		return fmt.Errorf("iofs source: %w", err)
 	}
 
-	driver, err := pg.WithInstance(sqlDB, &pg.Config{})
+	driver, err := pg.WithInstance(sqlDB, &pg.Config{
+		MigrationsTable: "schema_migrations_professionals",
+	})
 	if err != nil {
 		return fmt.Errorf("postgres driver: %w", err)
 	}

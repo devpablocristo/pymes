@@ -87,6 +87,11 @@
       // Makefile settings
       "makefile.configureOnOpen": true,
 
+      // Even Better TOML: desactivar validación de esquema para .air.toml (formato Air)
+      "evenBetterToml.schema.associations": {
+          ".air.toml": null
+      },
+
       // Tabnine settings
       // "tabnine.experimentalAutoImports": true,
 

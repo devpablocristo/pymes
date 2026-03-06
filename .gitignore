@@ -10,3 +10,8 @@ go.work.sum
 *.tfstate.backup
 .terraform.lock.hcl
 **/tmp/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/

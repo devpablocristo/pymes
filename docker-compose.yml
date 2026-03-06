@@ -60,6 +60,23 @@ services:
     depends_on:
       - backend
 
+  ai:
+    build:
+      context: ./control-plane/ai
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8200:8000"
+    volumes:
+      - ./control-plane/ai/src:/app/src
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
+      BACKEND_URL: http://backend:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
   backend_go_mod:

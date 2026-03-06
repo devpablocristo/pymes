@@ -19,7 +19,10 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"
+	paymentgatewayclient "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/publicapi"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/rbac"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/reports"
@@ -63,6 +66,7 @@ func InitializeApp() *app.App {
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
 	rbacRepo := rbac.NewRepository(db)
+	paymentGatewayRepo := paymentgateway.NewRepository(db)
 
 	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
@@ -80,6 +84,22 @@ func InitializeApp() *app.App {
 	reportsUC := reports.NewUsecases(reportsRepo)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
+
+	var paymentGatewayCrypto *paymentgateway.Crypto
+	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
+	if err != nil {
+		logger.Warn().Err(err).Msg("invalid PAYMENT_GATEWAY_ENCRYPTION_KEY; mercado pago integration disabled")
+	}
+	paymentGatewayUC := paymentgateway.NewUsecases(
+		paymentGatewayRepo,
+		paymentgatewayclient.NewMercadoPagoGateway(),
+		paymentGatewayCrypto,
+		cfg.MPAppID,
+		cfg.MPClientSecret,
+		cfg.MPWebhookSecret,
+		cfg.MPRedirectURI,
+		cfg.FrontendURL,
+	)
 
 	emailSender, err := notifications.NewEmailSender(cfg.NotificationBackend, logger)
 	if err != nil {
@@ -109,9 +129,11 @@ func InitializeApp() *app.App {
 	quotesHandler := quotes.NewHandler(quotesUC)
 	reportsHandler := reports.NewHandler(reportsUC)
 	rbacHandler := rbac.NewHandler(rbacUC)
+	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	billingHandler := billing.NewHandler(billingUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
+	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -124,6 +146,13 @@ func InitializeApp() *app.App {
 	orgHandler.RegisterRoutes(v1)
 	clerkWebhookHandler.RegisterRoutes(v1)
 	billingHandler.RegisterPublicRoutes(v1)
+	paymentGatewayHandler.RegisterPublicRoutes(v1)
+
+	public := v1.Group("/public/:org_id")
+	public.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
+	public.Use(handlers.NewPublicRateLimit(30))
+	publicAPIHandler.RegisterRoutes(public)
+	paymentGatewayHandler.RegisterExternalRoutes(public)
 
 	authGroup := v1.Group("")
 	authGroup.Use(authMiddleware.RequireAuth())
@@ -141,6 +170,7 @@ func InitializeApp() *app.App {
 	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	return &app.App{Router: router}
 }

@@ -9,6 +9,7 @@ pymes/
 ├── control-plane/           # Gestión de plataforma + core de negocio
 │   ├── backend/             # Go 1.24 + Gin + GORM + Lambda
 │   ├── frontend/            # React 18 + TypeScript + Vite
+│   ├── ai/                  # FastAPI + Gemini + SSE (asistente conversacional)
 │   └── infra/               # Terraform (Lambda, API Gateway, RDS, S3, CloudFront)
 ├── pkgs/
 │   └── go-pkg/              # Librería Go compartida entre servicios
@@ -24,7 +25,7 @@ pymes/
 
 ```bash
 cp .env.example .env
-docker compose up -d          # Levanta todo: postgres, mailhog, backend (:8100), frontend (:5180)
+docker compose up -d          # Levanta todo: postgres, mailhog, backend (:8100), frontend (:5180), ai (:8200)
 ```
 
 O sin Docker para el backend:
@@ -45,6 +46,26 @@ Customers, suppliers, products, inventory, quotes, sales, cashflow, reports.
 
 ### Prompt 02 — Extensiones transversales (SQL listo, Go en progreso)
 RBAC, purchases, accounts (fiado), payments, returns, discounts, price lists, recurring expenses, appointments, data I/O, attachments (S3), PDF generation, timeline, outgoing webhooks, WhatsApp, currency (dólar blue/oficial/MEP), dashboard, scheduler.
+
+### Prompt 03 — Asistente IA (FastAPI)
+Servicio separado en `control-plane/ai`:
+- `GET /healthz`
+- `POST /v1/chat` (SSE, modo internal con JWT/API key)
+- `POST /v1/public/:org_slug/chat` (SSE, modo external)
+- `POST /v1/public/:org_slug/chat/identify`
+
+Integración backend:
+- Endpoints públicos: `/v1/public/:org_id/{info,services,availability,book,my-appointments}`
+- Protección interna: header `X-Internal-Service-Token`
+
+### Prompt 04 — Pasarelas de Cobro (Mercado Pago + QR + transferencia)
+Backend `internal/paymentgateway`:
+- OAuth MP: `GET /v1/payment-gateway/connect`, `GET /v1/payment-gateway/callback`, `GET /v1/payment-gateway/status`, `DELETE /v1/payment-gateway/disconnect`
+- QR estático: `GET /v1/payment-methods/qr-static`, `GET /v1/payment-methods/qr-static/download`
+- Links de pago: `POST/GET /v1/sales/:id/payment-link`, `POST/GET /v1/quotes/:id/payment-link`
+- WhatsApp: `GET /v1/whatsapp/sale/:id/payment-info`, `GET /v1/whatsapp/sale/:id/payment-link`
+- Webhook: `POST /v1/webhooks/mercadopago`
+- Público interno AI: `GET /v1/public/:org_id/quote/:id/payment-link`
 
 ## API Endpoints
 
@@ -109,6 +130,9 @@ RBAC, purchases, accounts (fiado), payments, returns, discounts, price lists, re
 | 0011 | transversal_infra | roles, attachments, timeline, webhooks, exchange_rates, dashboard, scheduler |
 | 0012 | tenant_settings_ext | ALTER tenant_settings (purchases, returns, WhatsApp, appointments, currency) |
 | 0013 | rbac_seed | Roles del sistema (admin, vendedor, cajero, etc.) |
+| 0014 | ai_tables | ai_dossiers, ai_conversations, ai_usage_daily |
+| 0015 | whatsapp_connections | Conexiones WhatsApp Business (futuro) |
+| 0016 | payment_gateway | Mercado Pago OAuth/webhook, payment_preferences, columnas bancarias/WhatsApp |
 
 ## Testing
 
@@ -116,5 +140,6 @@ RBAC, purchases, accounts (fiado), payments, returns, discounts, price lists, re
 make cp-build           # Compilar
 make cp-test            # Tests unitarios
 make cp-vet             # go vet
+make ai-test            # Tests del servicio AI
 ./scripts/e2e-test.sh   # Tests E2E (requiere docker compose up)
 ```

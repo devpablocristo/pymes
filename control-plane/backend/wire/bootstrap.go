@@ -7,28 +7,30 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/accounts"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/admin"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
 	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/clerkwebhook"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/currency"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/party"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"
 	paymentgatewayclient "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/gateway"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/payments"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/pdfgen"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/pricelists"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/publicapi"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/payments"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/pricelists"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/purchases"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/rbac"
@@ -66,6 +68,7 @@ func InitializeApp() *app.App {
 	adminRepo := admin.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
 	billingRepo := billing.NewRepository(db)
+	partyRepo := party.NewRepository(db)
 	customersRepo := customers.NewRepository(db)
 	suppliersRepo := suppliers.NewRepository(db)
 	productsRepo := products.NewRepository(db)
@@ -142,6 +145,8 @@ func InitializeApp() *app.App {
 	}
 	stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
 	billingUC := billing.NewUsecases(billingRepo, stripeClient, notificationUC, cfg.FrontendURL, priceIDs, cfg.StripeWebhookSecret, logger)
+	partyUC := party.NewUsecases(partyRepo, auditUC)
+	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
 
 	auditHandler := audit.NewHandler(auditUC)
 	orgHandler := org.NewHandler(orgUC)
@@ -168,6 +173,8 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	billingHandler := billing.NewHandler(billingUC)
+	partyHandler := party.NewHandler(partyUC)
+	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
 
@@ -197,6 +204,8 @@ func InitializeApp() *app.App {
 	adminHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
 	auditHandler.RegisterRoutes(authGroup)
+	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
 	billingHandler.RegisterAuthRoutes(authGroup)
 	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)

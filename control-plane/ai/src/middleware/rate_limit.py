@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.config import Settings
+from src.core.errors import error_payload
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -20,6 +21,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if not (path.startswith("/v1/chat") or path.startswith("/v1/public/")):
             return await call_next(request)
+        request_id = getattr(request.state, "request_id", "")
 
         now = time.time()
         if path.startswith("/v1/public/"):
@@ -35,7 +37,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         while q and now - q[0] > 60:
             q.popleft()
         if len(q) >= max(limit, 1):
-            return JSONResponse(status_code=429, content={"error": "rate limit exceeded"})
+            return JSONResponse(
+                status_code=429,
+                content=error_payload("rate_limit_exceeded", "rate limit exceeded", request_id),
+            )
 
         q.append(now)
         return await call_next(request)

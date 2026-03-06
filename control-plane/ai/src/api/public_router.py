@@ -16,9 +16,11 @@ from src.core.orchestrator import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
 from src.llm.base import Message
+from src.observability.logging import get_logger, update_request_context
 from src.tools.registry import build_external_tools
 
 router = APIRouter(prefix="/v1/public", tags=["public-chat"])
+logger = get_logger(__name__)
 
 
 class PublicChatRequest(BaseModel):
@@ -63,6 +65,8 @@ async def chat_external(
 
     conversation = None
     external_contact = _clean_phone(req.phone or "")
+    update_request_context(org_id=org_id, user_id=external_contact or "external")
+    logger.info("chat_external_started", org_id=org_id, external_contact=external_contact, conversation_id=req.conversation_id or "")
     if req.conversation_id:
         conversation = await repo.get_conversation(org_id, req.conversation_id)
         if conversation is None or conversation.mode != "external":
@@ -113,6 +117,7 @@ async def chat_external(
                     tool_name = str(chunk.tool_call.get("name", ""))
                     yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
         except Exception as exc:  # noqa: BLE001
+            logger.exception("chat_external_failed", org_id=org_id, external_contact=external_contact, error=str(exc))
             yield to_sse_event("error", {"message": str(exc)})
 
         assistant_text = "".join(assistant_parts).strip()
@@ -138,6 +143,15 @@ async def chat_external(
             tokens_output=tokens_out,
         )
         await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+        logger.info(
+            "chat_external_completed",
+            org_id=org_id,
+            external_contact=external_contact,
+            conversation_id=conversation.id,
+            tool_calls=len(tool_calls),
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+        )
 
         yield to_sse_event(
             "done",

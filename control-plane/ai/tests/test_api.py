@@ -10,12 +10,16 @@ def test_healthz() -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert response.headers["X-Request-ID"].startswith("req_")
 
 
 def test_chat_requires_auth() -> None:
     client = TestClient(app)
     response = client.post("/v1/chat", json={"message": "hola"})
     assert response.status_code == 401
+    payload = response.json()
+    assert payload["error"]["code"] == "unauthorized"
+    assert payload["error"]["request_id"]
 
 
 def test_public_identify() -> None:

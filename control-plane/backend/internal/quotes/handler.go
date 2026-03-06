@@ -46,7 +46,6 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/quotes/:id/accept", rbac.RequirePermission("quotes", "update"), h.Accept)
 	auth.POST("/quotes/:id/reject", rbac.RequirePermission("quotes", "update"), h.Reject)
 	auth.POST("/quotes/:id/to-sale", rbac.RequirePermission("quotes", "update"), h.ToSale)
-	auth.GET("/quotes/:id/pdf", rbac.RequirePermission("quotes", "read"), h.PDF)
 }
 
 func (h *Handler) List(c *gin.Context) {

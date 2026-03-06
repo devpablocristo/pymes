@@ -16,7 +16,7 @@ type RecurringExpenseModel struct {
 	PaymentMethod string
 	Frequency     string
 	DayOfMonth    int
-	SupplierID    *uuid.UUID
+	SupplierID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
 	IsActive      bool
 	NextDueDate   time.Time
 	LastPaidDate  *time.Time

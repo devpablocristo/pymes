@@ -116,8 +116,8 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 }
 
 type bookRequest struct {
-	CustomerName  string `json:"customer_name"`
-	CustomerPhone string `json:"customer_phone"`
+	CustomerName  string `json:"party_name"`
+	CustomerPhone string `json:"party_phone"`
 	Title         string `json:"title"`
 	StartAt       string `json:"start_at"`
 	Duration      int    `json:"duration"`
@@ -163,14 +163,14 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":             appointment.ID.String(),
-		"customer_name":  appointment.CustomerName,
-		"customer_phone": appointment.CustomerPhone,
-		"title":          appointment.Title,
-		"status":         appointment.Status,
-		"start_at":       appointment.StartAt.UTC().Format(time.RFC3339),
-		"end_at":         appointment.EndAt.UTC().Format(time.RFC3339),
-		"duration":       appointment.Duration,
+		"id":          appointment.ID.String(),
+		"party_name":  appointment.CustomerName,
+		"party_phone": appointment.CustomerPhone,
+		"title":       appointment.Title,
+		"status":      appointment.Status,
+		"start_at":    appointment.StartAt.UTC().Format(time.RFC3339),
+		"end_at":      appointment.EndAt.UTC().Format(time.RFC3339),
+		"duration":    appointment.Duration,
 	})
 }
 
@@ -199,14 +199,14 @@ func (h *Handler) GetMyAppointments(c *gin.Context) {
 	out := make([]gin.H, 0, len(items))
 	for _, item := range items {
 		out = append(out, gin.H{
-			"id":             item.ID.String(),
-			"customer_name":  item.CustomerName,
-			"customer_phone": item.CustomerPhone,
-			"title":          item.Title,
-			"status":         item.Status,
-			"start_at":       item.StartAt.UTC().Format(time.RFC3339),
-			"end_at":         item.EndAt.UTC().Format(time.RFC3339),
-			"duration":       item.Duration,
+			"id":          item.ID.String(),
+			"party_name":  item.CustomerName,
+			"party_phone": item.CustomerPhone,
+			"title":       item.Title,
+			"status":      item.Status,
+			"start_at":    item.StartAt.UTC().Format(time.RFC3339),
+			"end_at":      item.EndAt.UTC().Format(time.RFC3339),
+			"duration":    item.Duration,
 		})
 	}
 

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 import httpx
 
 from src.backend_client.auth import AuthContext
+from src.observability.logging import get_logger, get_request_id
+
+logger = get_logger(__name__)
 
 
 class BackendClient:
@@ -19,6 +23,9 @@ class BackendClient:
 
     def _headers(self, auth: AuthContext | None, include_internal: bool = False) -> dict[str, str]:
         headers: dict[str, str] = {}
+        request_id = get_request_id()
+        if request_id:
+            headers["X-Request-ID"] = request_id
         if include_internal and self.internal_token:
             headers["X-Internal-Service-Token"] = self.internal_token
 
@@ -45,17 +52,49 @@ class BackendClient:
         headers = self._headers(auth, include_internal=include_internal)
         last_error: Exception | None = None
         for attempt in range(3):
+            started_at = time.perf_counter()
             try:
                 response = await self._client.request(method, path, headers=headers, **kwargs)
                 if response.status_code >= 500 and attempt < 2:
+                    logger.warning(
+                        "backend_retryable_status",
+                        method=method,
+                        path=path,
+                        status_code=response.status_code,
+                        attempt=attempt + 1,
+                    )
                     await asyncio.sleep(0.2 * (attempt + 1))
                     continue
+                logger.info(
+                    "backend_request",
+                    method=method,
+                    path=path,
+                    status_code=response.status_code,
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                )
                 response.raise_for_status()
                 if response.headers.get("content-type", "").startswith("application/json"):
                     return response.json()
                 return {"raw": response.text}
+            except httpx.HTTPStatusError:
+                logger.warning(
+                    "backend_http_error",
+                    method=method,
+                    path=path,
+                    attempt=attempt + 1,
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                )
+                raise
             except (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError) as exc:
                 last_error = exc
+                logger.warning(
+                    "backend_transport_error",
+                    method=method,
+                    path=path,
+                    error=str(exc),
+                    attempt=attempt + 1,
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                )
                 if attempt == 2:
                     raise
                 await asyncio.sleep(0.2 * (attempt + 1))

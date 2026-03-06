@@ -113,7 +113,7 @@ func (r *Repository) GetWhatsAppLinkTemplate(ctx context.Context, orgID uuid.UUI
 		Where("org_id = ?", orgID).
 		Take(&tpl).Error
 	if err != nil || strings.TrimSpace(tpl) == "" {
-		return "Hola {customer_name}, podes pagar {total} de tu compra {number} con este link: {payment_url}"
+		return "Hola {party_name}, podes pagar {total} de tu compra {number} con este link: {payment_url}"
 	}
 	return tpl
 }
@@ -271,12 +271,12 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUI
 		Select(`
 			s.id,
 			s.number,
-			s.customer_name,
+			COALESCE(s.party_name, '') AS customer_name,
 			COALESCE(c.phone, '') AS customer_phone,
 			s.total,
 			s.currency
 		`).
-		Joins("LEFT JOIN customers c ON c.id = s.customer_id").
+		Joins("LEFT JOIN parties c ON c.id = s.party_id").
 		Where("s.org_id = ? AND s.id = ?", orgID, saleID).
 		Take(&row).Error
 	if err != nil {
@@ -298,7 +298,7 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 	}
 	err := r.db.WithContext(ctx).
 		Table("quotes").
-		Select("id, number, customer_name, total, currency").
+		Select("id, number, COALESCE(party_name, '') AS customer_name, total, currency").
 		Where("org_id = ? AND id = ?", orgID, quoteID).
 		Take(&row).Error
 	if err != nil {

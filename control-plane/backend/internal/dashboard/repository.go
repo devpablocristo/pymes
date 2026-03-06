@@ -10,7 +10,7 @@ import (
 	dashboarddomain "github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard/usecases/domain"
 )
 
-type Repository struct { db *gorm.DB }
+type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
@@ -33,7 +33,7 @@ func (r *Repository) Get(ctx context.Context, orgID uuid.UUID) (dashboarddomain.
 		LIMIT 5
 	`, orgID, monthStart).Scan(&out.TopProducts).Error
 	_ = r.db.WithContext(ctx).Raw(`
-		SELECT id::text as id, number, customer_name, total, currency, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at
+		SELECT id::text as id, number, COALESCE(party_name, '') AS customer_name, total, currency, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at
 		FROM sales
 		WHERE org_id = ?
 		ORDER BY created_at DESC

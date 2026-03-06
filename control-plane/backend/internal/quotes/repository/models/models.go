@@ -10,12 +10,12 @@ type QuoteModel struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID        uuid.UUID  `gorm:"type:uuid;index;not null"`
 	Number       string     `gorm:"not null"`
-	CustomerID   *uuid.UUID `gorm:"type:uuid"`
-	CustomerName string
-	Status       string  `gorm:"not null"`
-	Subtotal     float64 `gorm:"type:numeric(15,2)"`
-	TaxTotal     float64 `gorm:"type:numeric(15,2)"`
-	Total        float64 `gorm:"type:numeric(15,2)"`
+	CustomerID   *uuid.UUID `gorm:"column:party_id;type:uuid"`
+	CustomerName string     `gorm:"column:party_name"`
+	Status       string     `gorm:"not null"`
+	Subtotal     float64    `gorm:"type:numeric(15,2)"`
+	TaxTotal     float64    `gorm:"type:numeric(15,2)"`
+	Total        float64    `gorm:"type:numeric(15,2)"`
 	Currency     string
 	Notes        string
 	ValidUntil   *time.Time

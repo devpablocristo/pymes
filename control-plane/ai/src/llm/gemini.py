@@ -1,18 +1,29 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
 from google import genai
 from google.genai import types
 
+from src.core.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
 from src.llm.base import ChatChunk, Message, ToolDeclaration
+from src.observability.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GeminiProvider:
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gemini-2.0-flash",
+        circuit_breaker: CircuitBreaker | None = None,
+    ) -> None:
         self.client = genai.Client(api_key=api_key)
         self.model = model
+        self.circuit_breaker = circuit_breaker or CircuitBreaker()
 
     async def chat(
         self,
@@ -21,6 +32,41 @@ class GeminiProvider:
         temperature: float = 0.3,
         max_tokens: int = 2048,
     ) -> AsyncIterator[ChatChunk]:
+        try:
+            chunks = await self.circuit_breaker.call(
+                self._collect_chunks,
+                messages,
+                tools,
+                temperature,
+                max_tokens,
+            )
+        except CircuitBreakerOpenError:
+            logger.warning("llm_circuit_open", model=self.model, state=self.circuit_breaker.state.value)
+            raise RuntimeError("llm temporarily unavailable")
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("llm_chat_failed", model=self.model, error=str(exc))
+            raise
+
+        logger.info("llm_chat_completed", model=self.model, chunks=len(chunks))
+        for chunk in chunks:
+            yield chunk
+
+    async def _collect_chunks(
+        self,
+        messages: list[Message],
+        tools: list[ToolDeclaration] | None,
+        temperature: float,
+        max_tokens: int,
+    ) -> list[ChatChunk]:
+        return await asyncio.to_thread(self._collect_chunks_sync, messages, tools, temperature, max_tokens)
+
+    def _collect_chunks_sync(
+        self,
+        messages: list[Message],
+        tools: list[ToolDeclaration] | None,
+        temperature: float,
+        max_tokens: int,
+    ) -> list[ChatChunk]:
         system_parts = [m.content for m in messages if m.role == "system"]
         system_instruction = "\n\n".join(system_parts) if system_parts else None
 
@@ -33,13 +79,13 @@ class GeminiProvider:
             config.tools = [types.Tool(function_declarations=[self._to_gemini_tool(t) for t in tools])]
 
         non_system = [m for m in messages if m.role != "system"]
-
         response = self.client.models.generate_content_stream(
             model=self.model,
             contents=self._to_gemini_messages(non_system),
             config=config,
         )
 
+        chunks: list[ChatChunk] = []
         for chunk in response:
             if not chunk.candidates:
                 continue
@@ -49,17 +95,20 @@ class GeminiProvider:
             for part in candidate.content.parts:
                 if getattr(part, "function_call", None):
                     function_call = part.function_call
-                    yield ChatChunk(
-                        type="tool_call",
-                        tool_call={
-                            "name": function_call.name,
-                            "arguments": dict(function_call.args or {}),
-                        },
+                    chunks.append(
+                        ChatChunk(
+                            type="tool_call",
+                            tool_call={
+                                "name": function_call.name,
+                                "arguments": dict(function_call.args or {}),
+                            },
+                        )
                     )
                 elif getattr(part, "text", None):
-                    yield ChatChunk(type="text", text=part.text)
+                    chunks.append(ChatChunk(type="text", text=part.text))
 
-        yield ChatChunk(type="done")
+        chunks.append(ChatChunk(type="done"))
+        return chunks
 
     def _to_gemini_messages(self, messages: list[Message]) -> list[types.Content]:
         converted: list[types.Content] = []
@@ -70,25 +119,33 @@ class GeminiProvider:
                     parts.append(types.Part.from_text(text=msg.content))
                 if msg.tool_calls:
                     for tc in msg.tool_calls:
-                        parts.append(types.Part.from_function_call(
-                            name=tc.get("name", ""),
-                            args=tc.get("arguments", {}),
-                        ))
+                        parts.append(
+                            types.Part.from_function_call(
+                                name=tc.get("name", ""),
+                                args=tc.get("arguments", {}),
+                            )
+                        )
                 if parts:
                     converted.append(types.Content(role="model", parts=parts))
             elif msg.role == "tool":
-                converted.append(types.Content(
-                    role="user",
-                    parts=[types.Part.from_function_response(
-                        name=msg.tool_call_id or "unknown",
-                        response={"result": msg.content},
-                    )],
-                ))
+                converted.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part.from_function_response(
+                                name=msg.tool_call_id or "unknown",
+                                response={"result": msg.content},
+                            )
+                        ],
+                    )
+                )
             else:
-                converted.append(types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=msg.content or "")],
-                ))
+                converted.append(
+                    types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=msg.content or "")],
+                    )
+                )
         return converted
 
     def _to_gemini_tool(self, tool: ToolDeclaration) -> types.FunctionDeclaration:

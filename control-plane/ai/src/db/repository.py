@@ -81,10 +81,12 @@ class AIRepository:
         title: str = "",
     ) -> AIConversation:
         now = datetime.now(UTC)
+        agent_party_id = await self.get_agent_party_id(org_id)
         row = AIConversation(
             id=str(uuid4()),
             org_id=org_id,
             user_id=user_id,
+            agent_party_id=agent_party_id,
             mode=mode,
             external_contact=external_contact,
             title=title,
@@ -99,6 +101,25 @@ class AIRepository:
         await self.db.commit()
         await self.db.refresh(row)
         return row
+
+    async def get_agent_party_id(self, org_id: str) -> str | None:
+        query = text(
+            """
+            SELECT p.id
+            FROM parties p
+            JOIN party_agents pa ON pa.party_id = p.id
+            WHERE p.org_id = :org_id
+              AND p.party_type = 'automated_agent'
+              AND pa.agent_kind = 'ai'
+            ORDER BY p.created_at ASC
+            LIMIT 1
+            """
+        )
+        row = await self.db.execute(query, {"org_id": org_id})
+        party_id = row.scalar_one_or_none()
+        if party_id is None:
+            return None
+        return str(party_id)
 
     async def get_conversation(self, org_id: str, conversation_id: str) -> AIConversation | None:
         query = select(AIConversation).where(

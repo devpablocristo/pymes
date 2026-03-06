@@ -28,6 +28,7 @@ class AIConversation(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     org_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=True, index=True)
+    agent_party_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), ForeignKey("parties.id"), nullable=True, index=True)
     mode: Mapped[str] = mapped_column(String(20), default="internal", nullable=False)
     external_contact: Mapped[str] = mapped_column(Text, default="", nullable=False)
     title: Mapped[str] = mapped_column(Text, default="", nullable=False)

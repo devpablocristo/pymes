@@ -82,21 +82,21 @@ func (r *Repository) SalesByProduct(ctx context.Context, orgID uuid.UUID, from, 
 
 func (r *Repository) SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error) {
 	type row struct {
-		CustomerID   *uuid.UUID `gorm:"column:customer_id"`
-		CustomerName string     `gorm:"column:customer_name"`
+		CustomerID   *uuid.UUID `gorm:"column:party_id"`
+		CustomerName string     `gorm:"column:party_name"`
 		Total        float64    `gorm:"column:total"`
 		Count        int64      `gorm:"column:count"`
 	}
 	var rows []row
 	if err := r.db.WithContext(ctx).Table("sales").
 		Select(`
-			customer_id,
-			COALESCE(NULLIF(customer_name, ''), 'Unknown') AS customer_name,
+			party_id,
+			COALESCE(NULLIF(party_name, ''), 'Unknown') AS party_name,
 			COALESCE(SUM(total), 0) AS total,
 			COUNT(*) AS count
 		`).
 		Where("org_id = ? AND status = 'completed' AND created_at >= ? AND created_at <= ?", orgID, from, to).
-		Group("customer_id, COALESCE(NULLIF(customer_name, ''), 'Unknown')").
+		Group("party_id, COALESCE(NULLIF(party_name, ''), 'Unknown')").
 		Order("total DESC").
 		Limit(100).
 		Scan(&rows).Error; err != nil {

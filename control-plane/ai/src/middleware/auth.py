@@ -13,6 +13,8 @@ from starlette.responses import JSONResponse
 
 from src.backend_client.auth import AuthContext
 from src.config import Settings
+from src.core.errors import error_payload
+from src.observability.logging import update_request_context
 
 
 @dataclass
@@ -29,6 +31,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         path = request.url.path
+        request_id = getattr(request.state, "request_id", "")
         if path.startswith("/healthz") or path.startswith("/v1/public/"):
             return await call_next(request)
 
@@ -42,7 +45,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             token = authz[7:].strip()
             payload = await self._decode_jwt(token)
             if payload is None:
-                return JSONResponse(status_code=401, content={"error": "invalid jwt"})
+                return JSONResponse(status_code=401, content=error_payload("unauthorized", "invalid jwt", request_id))
 
             org_id = str(payload.get("org_id", "")).strip()
             actor = str(payload.get("sub", "")).strip()
@@ -50,7 +53,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             scopes = self._parse_scopes(payload)
 
             if not org_id or not actor:
-                return JSONResponse(status_code=401, content={"error": "missing org_id/sub"})
+                return JSONResponse(
+                    status_code=401,
+                    content=error_payload("unauthorized", "missing org_id/sub", request_id),
+                )
 
             request.state.auth = AuthContext(
                 org_id=org_id,
@@ -60,6 +66,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 mode="internal",
                 authorization=authz,
             )
+            update_request_context(org_id=org_id, user_id=actor)
             return await call_next(request)
 
         if api_key and self.settings.auth_allow_api_key:
@@ -69,7 +76,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             scopes_raw = request.headers.get("X-Scopes", "")
             scopes = [s.strip() for s in scopes_raw.split(",") if s.strip()]
             if not org_id:
-                return JSONResponse(status_code=401, content={"error": "X-Org-ID required for API key mode"})
+                return JSONResponse(
+                    status_code=401,
+                    content=error_payload("unauthorized", "X-Org-ID required for API key mode", request_id),
+                )
             request.state.auth = AuthContext(
                 org_id=org_id,
                 actor=actor,
@@ -81,9 +91,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 api_role=role,
                 api_scopes=scopes_raw,
             )
+            update_request_context(org_id=org_id, user_id=actor)
             return await call_next(request)
 
-        return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        return JSONResponse(status_code=401, content=error_payload("unauthorized", "unauthorized", request_id))
 
     async def _decode_jwt(self, token: str) -> dict[str, Any] | None:
         if not token:

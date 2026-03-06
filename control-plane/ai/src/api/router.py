@@ -17,9 +17,11 @@ from src.core.system_prompt import build_system_prompt
 from src.core.dossier import summarize_dossier_for_context
 from src.db.repository import AIRepository
 from src.llm.base import Message
+from src.observability.logging import get_logger
 from src.tools.registry import build_internal_tools
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
+logger = get_logger(__name__)
 
 PLAN_LIMITS: dict[str, dict[str, int | bool]] = {
     "starter": {"queries": 50, "external": False, "external_limit": 0},
@@ -109,6 +111,7 @@ async def chat_internal(
     backend_client: BackendClient = Depends(get_backend_client),
 ):
     await check_quota(repo, auth.org_id, mode="internal")
+    logger.info("chat_internal_started", org_id=auth.org_id, user_id=auth.actor, conversation_id=req.conversation_id or "")
 
     conversation = None
     if req.conversation_id:
@@ -166,6 +169,7 @@ async def chat_internal(
                     tool_name = str(chunk.tool_call.get("name", ""))
                     yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
         except Exception as exc:  # noqa: BLE001
+            logger.exception("chat_internal_failed", org_id=auth.org_id, user_id=auth.actor, error=str(exc))
             yield to_sse_event("error", {"message": str(exc)})
 
         assistant_text = "".join(assistant_parts).strip()
@@ -194,6 +198,16 @@ async def chat_internal(
 
         if dossier != dossier_snapshot:
             await repo.update_dossier(auth.org_id, dossier)
+
+        logger.info(
+            "chat_internal_completed",
+            org_id=auth.org_id,
+            user_id=auth.actor,
+            conversation_id=conversation.id,
+            tool_calls=len(tool_calls),
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+        )
 
         yield to_sse_event(
             "done",

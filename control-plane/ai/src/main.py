@@ -14,6 +14,7 @@ from src.api.router import router as chat_router
 from src.backend_client.client import BackendClient
 from src.config import get_settings
 from src.core.errors import AppError, error_payload
+from src.db.engine import ping_database
 from src.llm.factory import create_provider
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
@@ -114,3 +115,9 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz() -> dict[str, str]:
+    await ping_database()
+    return {"status": "ready"}

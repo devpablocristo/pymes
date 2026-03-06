@@ -39,3 +39,17 @@ type PaymentPreferenceModel struct {
 }
 
 func (PaymentPreferenceModel) TableName() string { return "payment_preferences" }
+
+type PaymentGatewayEventModel struct {
+	ID              uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Provider        string    `gorm:"not null"`
+	ExternalEventID string    `gorm:"not null"`
+	EventType       string    `gorm:"not null"`
+	RawPayload      []byte    `gorm:"type:jsonb;not null"`
+	Signature       string    `gorm:"not null;default:''"`
+	ProcessedAt     *time.Time
+	ErrorMessage    string    `gorm:"not null;default:''"`
+	CreatedAt       time.Time `gorm:"not null"`
+}
+
+func (PaymentGatewayEventModel) TableName() string { return "payment_gateway_events" }

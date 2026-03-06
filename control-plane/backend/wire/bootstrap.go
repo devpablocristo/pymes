@@ -130,7 +130,6 @@ func InitializeApp() *app.App {
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
-	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC)
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
@@ -159,6 +158,7 @@ func InitializeApp() *app.App {
 		cfg.MPRedirectURI,
 		cfg.FrontendURL,
 	)
+	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC)
 
 	emailSender, err := notifications.NewEmailSender(cfg.NotificationBackend, logger)
 	if err != nil {
@@ -231,6 +231,7 @@ func InitializeApp() *app.App {
 	public := v1.Group("/public/:org_id")
 	public.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
 	public.Use(handlers.NewPublicRateLimit(30))
+	public.Use(handlers.NewBodySizeLimit(64 << 10))
 	publicAPIHandler.RegisterRoutes(public)
 	paymentGatewayHandler.RegisterExternalRoutes(public)
 

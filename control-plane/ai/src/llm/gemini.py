@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -12,6 +13,9 @@ from src.llm.base import ChatChunk, Message, ToolDeclaration
 from src.observability.logging import get_logger
 
 logger = get_logger(__name__)
+
+LLM_MAX_RETRIES = 3
+LLM_RETRY_BASE_DELAY_SECONDS = 0.2
 
 
 class GeminiProvider:
@@ -34,7 +38,7 @@ class GeminiProvider:
     ) -> AsyncIterator[ChatChunk]:
         try:
             chunks = await self.circuit_breaker.call(
-                self._collect_chunks,
+                self._collect_chunks_with_retry,
                 messages,
                 tools,
                 temperature,
@@ -50,6 +54,34 @@ class GeminiProvider:
         logger.info("llm_chat_completed", model=self.model, chunks=len(chunks))
         for chunk in chunks:
             yield chunk
+
+    async def _collect_chunks_with_retry(
+        self,
+        messages: list[Message],
+        tools: list[ToolDeclaration] | None,
+        temperature: float,
+        max_tokens: int,
+    ) -> list[ChatChunk]:
+        last_error: Exception | None = None
+        for attempt in range(1, LLM_MAX_RETRIES + 1):
+            try:
+                return await self._collect_chunks(messages, tools, temperature, max_tokens)
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                if attempt >= LLM_MAX_RETRIES:
+                    raise
+                delay = self._retry_delay_seconds(attempt)
+                logger.warning(
+                    "llm_retrying",
+                    model=self.model,
+                    attempt=attempt,
+                    delay_seconds=round(delay, 3),
+                    error=str(exc),
+                )
+                await asyncio.sleep(delay)
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("llm request failed without error")
 
     async def _collect_chunks(
         self,
@@ -109,6 +141,10 @@ class GeminiProvider:
 
         chunks.append(ChatChunk(type="done"))
         return chunks
+
+    def _retry_delay_seconds(self, attempt: int) -> float:
+        base = LLM_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+        return base + random.uniform(0, base/2)
 
     def _to_gemini_messages(self, messages: list[Message]) -> list[types.Content]:
         converted: list[types.Content] = []

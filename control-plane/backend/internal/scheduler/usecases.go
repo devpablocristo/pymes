@@ -28,11 +28,16 @@ type WebhookTaskPort interface {
 	CleanupOldDeliveries(ctx context.Context, days int) (int64, error)
 }
 
+type PaymentGatewayTaskPort interface {
+	ProcessPendingWebhookEvents(ctx context.Context, limit int) (int, error)
+}
+
 type Usecases struct {
-	repo     RepositoryPort
-	provider string
-	client   *http.Client
-	webhooks WebhookTaskPort
+	repo            RepositoryPort
+	provider        string
+	client          *http.Client
+	webhooks        WebhookTaskPort
+	paymentGateways PaymentGatewayTaskPort
 }
 
 type RecurringDue struct {
@@ -48,8 +53,14 @@ type RecurringDue struct {
 	NextDueDate   time.Time
 }
 
-func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort) *Usecases {
-	return &Usecases{repo: repo, provider: strings.ToLower(strings.TrimSpace(provider)), client: &http.Client{Timeout: 10 * time.Second}, webhooks: webhooks}
+func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort) *Usecases {
+	return &Usecases{
+		repo:            repo,
+		provider:        strings.ToLower(strings.TrimSpace(provider)),
+		client:          &http.Client{Timeout: 10 * time.Second},
+		webhooks:        webhooks,
+		paymentGateways: paymentGateways,
+	}
 }
 
 func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunResult, error) {
@@ -57,7 +68,7 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 	if task == "" {
 		task = "all"
 	}
-	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" {
+	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" {
 		return schedulerdomain.RunResult{}, apperror.NewBadInput("invalid task")
 	}
 	result := schedulerdomain.RunResult{Task: task, Metadata: map[string]any{}}
@@ -96,6 +107,15 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["webhooks_deleted"] = removed
 		_ = u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "ok", "", time.Now().UTC().Add(24*time.Hour))
+	}
+	if u.paymentGateways != nil && (task == "all" || task == "payment_gateway_webhooks") {
+		processed, err := u.paymentGateways.ProcessPendingWebhookEvents(ctx, 100)
+		if err != nil {
+			_ = u.repo.RecordRun(ctx, "payment_gateway_webhooks", "error", err.Error(), time.Now().UTC().Add(5*time.Minute))
+			return schedulerdomain.RunResult{}, err
+		}
+		result.Metadata["payment_gateway_events_processed"] = processed
+		_ = u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute))
 	}
 	return result, nil
 }

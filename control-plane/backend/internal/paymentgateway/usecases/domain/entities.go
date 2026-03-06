@@ -67,3 +67,15 @@ type QuoteSnapshot struct {
 	Total        float64
 	Currency     string
 }
+
+type WebhookEvent struct {
+	ID              uuid.UUID
+	Provider        string
+	ExternalEventID string
+	EventType       string
+	RawPayload      []byte
+	Signature       string
+	ProcessedAt     *time.Time
+	ErrorMessage    string
+	CreatedAt       time.Time
+}

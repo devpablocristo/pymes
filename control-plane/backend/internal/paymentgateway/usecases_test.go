@@ -51,6 +51,18 @@ type fakeRepo struct {
 	markApprovedRefType string
 	markApprovedRefID   uuid.UUID
 	markApprovedErr     error
+
+	storedWebhookEvent gatewaydomain.WebhookEvent
+	storeWebhookErr    error
+	pendingEvents      []gatewaydomain.WebhookEvent
+	lockPendingErr     error
+	markProcessedIDs   []uuid.UUID
+	markProcessedErr   error
+	markErrorCalls     []struct {
+		ID    uuid.UUID
+		Error string
+	}
+	markEventErr error
 }
 
 func (f *fakeRepo) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
@@ -161,6 +173,40 @@ func (f *fakeRepo) MarkPreferenceApproved(ctx context.Context, orgID uuid.UUID, 
 	f.markApprovedOrgID = orgID
 	f.markApprovedRefType = refType
 	f.markApprovedRefID = refID
+	return nil
+}
+
+func (f *fakeRepo) StoreWebhookEvent(ctx context.Context, in gatewaydomain.WebhookEvent) error {
+	if f.storeWebhookErr != nil {
+		return f.storeWebhookErr
+	}
+	f.storedWebhookEvent = in
+	return nil
+}
+
+func (f *fakeRepo) LockPendingWebhookEvents(ctx context.Context, limit int) ([]gatewaydomain.WebhookEvent, error) {
+	if f.lockPendingErr != nil {
+		return nil, f.lockPendingErr
+	}
+	return f.pendingEvents, nil
+}
+
+func (f *fakeRepo) MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error {
+	if f.markProcessedErr != nil {
+		return f.markProcessedErr
+	}
+	f.markProcessedIDs = append(f.markProcessedIDs, id)
+	return nil
+}
+
+func (f *fakeRepo) MarkWebhookEventError(ctx context.Context, id uuid.UUID, errorMessage string) error {
+	if f.markEventErr != nil {
+		return f.markEventErr
+	}
+	f.markErrorCalls = append(f.markErrorCalls, struct {
+		ID    uuid.UUID
+		Error string
+	}{ID: id, Error: errorMessage})
 	return nil
 }
 
@@ -305,7 +351,36 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 	}
 }
 
-func TestProcessWebhookApprovedSale(t *testing.T) {
+func TestProcessWebhookStoresPaymentEvent(t *testing.T) {
+	orgID := uuid.New()
+	repo := &fakeRepo{}
+	mp := &fakeMP{}
+	uc := newTestUsecases(t, repo, mp)
+
+	body := []byte(`{"type":"payment","data":{"id":"pay-789"}}`)
+	signature := signPayload("webhook-secret", body)
+	headers := http.Header{}
+	headers.Set("X-Signature", "v1="+signature)
+
+	err := uc.ProcessWebhook(context.Background(), "mercadopago", headers, body)
+	if err != nil {
+		t.Fatalf("ProcessWebhook() error = %v", err)
+	}
+	if repo.storedWebhookEvent.Provider != providerMercadoPago {
+		t.Fatalf("stored provider = %q", repo.storedWebhookEvent.Provider)
+	}
+	if repo.storedWebhookEvent.ExternalEventID != "pay-789" {
+		t.Fatalf("stored external id = %q", repo.storedWebhookEvent.ExternalEventID)
+	}
+	if repo.storedWebhookEvent.EventType != "payment" {
+		t.Fatalf("stored event type = %q", repo.storedWebhookEvent.EventType)
+	}
+	if repo.processSaleIn != nil || repo.markApprovedRefID != uuid.Nil || orgID == uuid.Nil {
+		t.Fatalf("webhook should only store event, not process inline")
+	}
+}
+
+func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	orgID := uuid.New()
 	saleID := uuid.New()
 	crypto, err := NewCrypto(testEncryptionKey)
@@ -328,6 +403,13 @@ func TestProcessWebhookApprovedSale(t *testing.T) {
 				IsActive:       true,
 			},
 		},
+		pendingEvents: []gatewaydomain.WebhookEvent{{
+			ID:              uuid.New(),
+			Provider:        providerMercadoPago,
+			ExternalEventID: "pay-789",
+			EventType:       "payment",
+			RawPayload:      []byte(`{"type":"payment","data":{"id":"pay-789"}}`),
+		}},
 	}
 	mp := &fakeMP{
 		detailOut: gateway.PaymentDetail{
@@ -340,20 +422,21 @@ func TestProcessWebhookApprovedSale(t *testing.T) {
 	}
 	uc := newTestUsecases(t, repo, mp)
 
-	body := []byte(`{"type":"payment","data":{"id":"pay-789"}}`)
-	signature := signPayload("webhook-secret", body)
-	headers := http.Header{}
-	headers.Set("X-Signature", "v1="+signature)
-
-	err = uc.ProcessWebhook(context.Background(), "mercadopago", headers, body)
+	processed, err := uc.ProcessPendingWebhookEvents(context.Background(), 10)
 	if err != nil {
-		t.Fatalf("ProcessWebhook() error = %v", err)
+		t.Fatalf("ProcessPendingWebhookEvents() error = %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("processed = %d, want 1", processed)
 	}
 	if repo.processSaleIn == nil {
 		t.Fatalf("expected ProcessApprovedSalePayment call")
 	}
 	if repo.processSaleIn.OrgID != orgID || repo.processSaleIn.SaleID != saleID {
 		t.Fatalf("unexpected sale input: %+v", *repo.processSaleIn)
+	}
+	if len(repo.markProcessedIDs) != 1 {
+		t.Fatalf("expected 1 processed event, got %d", len(repo.markProcessedIDs))
 	}
 }
 

@@ -80,12 +80,31 @@ async def get_external_conversation(
         if conversation is not None:
             return conversation
 
+    await enforce_external_conversation_limit(repo, org_id)
     return await repo.create_conversation(
         org_id=org_id,
         mode="external",
         external_contact=external_contact,
         title=message.strip()[:60],
     )
+
+
+async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -> None:
+    from src.api.router import PLAN_LIMITS  # local import to avoid router cycle at import time
+
+    now = datetime.now(UTC)
+    plan = await repo.get_plan_code(org_id)
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
+    external_limit = int(limits["external_limit"])
+    if external_limit == -1:
+        return
+
+    used = await repo.count_external_conversations_in_month(org_id, now.year, now.month)
+    if used >= external_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Limite mensual de conversaciones externas alcanzado ({external_limit})",
+        )
 
 
 async def run_external_chat(

@@ -220,6 +220,25 @@ class AIRepository:
             "tokens_output": sum(r.tokens_output for r in rows),
         }
 
+    async def count_external_conversations_in_month(self, org_id: str, year: int, month: int) -> int:
+        start = datetime(year, month, 1, tzinfo=UTC)
+        if month == 12:
+            end = datetime(year + 1, 1, 1, tzinfo=UTC)
+        else:
+            end = datetime(year, month + 1, 1, tzinfo=UTC)
+        query = text(
+            """
+            SELECT COUNT(*)
+            FROM ai_conversations
+            WHERE org_id = :org_id
+              AND mode = 'external'
+              AND created_at >= :start
+              AND created_at < :end
+            """
+        )
+        row = await self.db.execute(query, {"org_id": org_id, "start": start, "end": end})
+        return int(row.scalar_one() or 0)
+
     async def get_plan_code(self, org_id: str) -> str:
         row = await self.db.execute(
             text("SELECT plan_code FROM tenant_settings WHERE org_id = :org_id LIMIT 1"),

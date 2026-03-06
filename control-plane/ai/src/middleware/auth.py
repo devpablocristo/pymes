@@ -32,7 +32,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         path = request.url.path
         request_id = getattr(request.state, "request_id", "")
-        if path.startswith("/healthz") or path.startswith("/v1/public/"):
+        if path.startswith("/healthz") or path.startswith("/readyz") or path.startswith("/v1/public/"):
             return await call_next(request)
 
         if not path.startswith("/v1/chat"):

@@ -64,6 +64,10 @@ type repositoryPort interface {
 	GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error)
 	ProcessApprovedSalePayment(ctx context.Context, in ProcessSalePaymentInput) error
 	MarkPreferenceApproved(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID, payerID string, paidAt time.Time) error
+	StoreWebhookEvent(ctx context.Context, in gatewaydomain.WebhookEvent) error
+	LockPendingWebhookEvents(ctx context.Context, limit int) ([]gatewaydomain.WebhookEvent, error)
+	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
+	MarkWebhookEventError(ctx context.Context, id uuid.UUID, errorMessage string) error
 }
 
 type mercadoPagoPort interface {
@@ -442,7 +446,38 @@ func (u *Usecases) ProcessWebhook(ctx context.Context, provider string, headers 
 		return nil
 	}
 
-	detail, err := u.fetchPaymentDetailAcrossConnections(ctx, paymentID)
+	return u.repo.StoreWebhookEvent(ctx, gatewaydomain.WebhookEvent{
+		Provider:        providerMercadoPago,
+		ExternalEventID: paymentID,
+		EventType:       typ,
+		RawPayload:      body,
+		Signature:       strings.TrimSpace(headers.Get("X-Signature")),
+	})
+}
+
+func (u *Usecases) ProcessPendingWebhookEvents(ctx context.Context, limit int) (int, error) {
+	events, err := u.repo.LockPendingWebhookEvents(ctx, limit)
+	if err != nil {
+		return 0, err
+	}
+	processed := 0
+	for _, evt := range events {
+		if err := u.processStoredWebhookEvent(ctx, evt); err != nil {
+			if markErr := u.repo.MarkWebhookEventError(ctx, evt.ID, err.Error()); markErr != nil {
+				return processed, markErr
+			}
+			continue
+		}
+		if err := u.repo.MarkWebhookEventProcessed(ctx, evt.ID); err != nil {
+			return processed, err
+		}
+		processed++
+	}
+	return processed, nil
+}
+
+func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydomain.WebhookEvent) error {
+	detail, err := u.fetchPaymentDetailAcrossConnections(ctx, evt.ExternalEventID)
 	if err != nil {
 		return err
 	}

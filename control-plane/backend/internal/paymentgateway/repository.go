@@ -13,6 +13,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/repository/models"
 	gatewaydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/usecases/domain"
+	"github.com/devpablocristo/pymes/control-plane/backend/pkg/pagination"
 )
 
 var (
@@ -471,6 +472,70 @@ func (r *Repository) MarkPreferenceApproved(
 	})
 }
 
+func (r *Repository) StoreWebhookEvent(ctx context.Context, in gatewaydomain.WebhookEvent) error {
+	row := models.PaymentGatewayEventModel{
+		ID:              coalesceUUID(in.ID),
+		Provider:        strings.TrimSpace(in.Provider),
+		ExternalEventID: strings.TrimSpace(in.ExternalEventID),
+		EventType:       strings.TrimSpace(in.EventType),
+		RawPayload:      append([]byte(nil), in.RawPayload...),
+		Signature:       strings.TrimSpace(in.Signature),
+		CreatedAt:       time.Now().UTC(),
+	}
+	return r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "provider"}, {Name: "external_event_id"}},
+			DoNothing: true,
+		}).
+		Create(&row).Error
+}
+
+func (r *Repository) LockPendingWebhookEvents(ctx context.Context, limit int) ([]gatewaydomain.WebhookEvent, error) {
+	limit = pagination.NormalizeLimit(limit, 50, 200)
+	var rows []models.PaymentGatewayEventModel
+	err := r.db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("processed_at IS NULL").
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]gatewaydomain.WebhookEvent, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, gatewaydomain.WebhookEvent{
+			ID:              row.ID,
+			Provider:        row.Provider,
+			ExternalEventID: row.ExternalEventID,
+			EventType:       row.EventType,
+			RawPayload:      append([]byte(nil), row.RawPayload...),
+			Signature:       row.Signature,
+			ProcessedAt:     row.ProcessedAt,
+			ErrorMessage:    row.ErrorMessage,
+			CreatedAt:       row.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&models.PaymentGatewayEventModel{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"processed_at":  time.Now().UTC(),
+			"error_message": "",
+		}).Error
+}
+
+func (r *Repository) MarkWebhookEventError(ctx context.Context, id uuid.UUID, errorMessage string) error {
+	return r.db.WithContext(ctx).
+		Model(&models.PaymentGatewayEventModel{}).
+		Where("id = ?", id).
+		Update("error_message", strings.TrimSpace(errorMessage)).Error
+}
+
 func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.PaymentGatewayConnection {
 	return gatewaydomain.PaymentGatewayConnection{
 		OrgID:          in.OrgID,
@@ -510,4 +575,11 @@ func coalesce(v, def string) string {
 		return def
 	}
 	return strings.TrimSpace(v)
+}
+
+func coalesceUUID(id uuid.UUID) uuid.UUID {
+	if id == uuid.Nil {
+		return uuid.New()
+	}
+	return id
 }

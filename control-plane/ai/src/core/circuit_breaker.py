@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Awaitable, Callable, TypeVar
 
@@ -22,6 +22,10 @@ class CircuitBreakerOpenError(RuntimeError):
 class CircuitBreaker:
     failure_threshold: int = 3
     recovery_timeout_seconds: float = 30.0
+    _state: CircuitBreakerState = field(init=False)
+    _failure_count: int = field(init=False)
+    _opened_at: float = field(init=False)
+    _lock: asyncio.Lock = field(init=False)
 
     def __post_init__(self) -> None:
         self._state = CircuitBreakerState.CLOSED

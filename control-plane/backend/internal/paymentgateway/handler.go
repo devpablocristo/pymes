@@ -60,7 +60,12 @@ func (h *Handler) RegisterAuthRoutes(auth *gin.RouterGroup, rbac *handlers.RBACM
 
 func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
 	v1.GET("/payment-gateway/callback", h.Callback)
-	v1.POST("/webhooks/mercadopago", h.MercadoPagoWebhook)
+	v1.POST(
+		"/webhooks/mercadopago",
+		handlers.NewPublicRateLimit(240),
+		handlers.NewBodySizeLimit(256<<10),
+		h.MercadoPagoWebhook,
+	)
 }
 
 func (h *Handler) RegisterExternalRoutes(public *gin.RouterGroup) {
@@ -302,6 +307,10 @@ func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
+		if handlers.IsBodyTooLarge(err) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}

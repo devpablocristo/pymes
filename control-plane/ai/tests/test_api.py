@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -15,6 +16,24 @@ def test_healthz() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
     assert response.headers["X-Request-ID"].startswith("req_")
+
+
+def test_readyz() -> None:
+    client = TestClient(app)
+    with patch("src.main.ping_database", new=AsyncMock()) as ping_mock:
+        response = client.get("/readyz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready"}
+    ping_mock.assert_awaited_once()
+
+
+def test_readyz_returns_500_on_database_error() -> None:
+    client = TestClient(app, raise_server_exceptions=False)
+    with patch("src.main.ping_database", new=AsyncMock(side_effect=RuntimeError("db unavailable"))):
+        response = client.get("/readyz")
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["error"]["code"] == "internal_error"
 
 
 def test_chat_requires_auth() -> None:
@@ -43,9 +62,10 @@ class _FakeConversation:
 
 
 class _FakeRepo:
-    def __init__(self) -> None:
+    def __init__(self, external_conversations: int = 0) -> None:
         self.conversation = _FakeConversation()
         self.appended: list[dict[str, Any]] = []
+        self.external_conversations = external_conversations
 
     async def get_plan_code(self, org_id: str) -> str:
         _ = org_id
@@ -54,6 +74,10 @@ class _FakeRepo:
     async def get_month_usage(self, org_id: str, year: int, month: int) -> dict[str, int]:
         _ = (org_id, year, month)
         return {"queries": 0, "tokens_input": 0, "tokens_output": 0}
+
+    async def count_external_conversations_in_month(self, org_id: str, year: int, month: int) -> int:
+        _ = (org_id, year, month)
+        return self.external_conversations
 
     async def get_latest_external_conversation(self, org_id: str, external_contact: str):
         _ = (org_id, external_contact)
@@ -137,3 +161,29 @@ def test_internal_whatsapp_message() -> None:
     assert "hola" in payload["reply"].lower()
     assert repo.appended[0]["channel"] == "whatsapp"
     assert repo.appended[0]["message_id"] == "wamid-1"
+
+
+def test_internal_whatsapp_message_respects_external_conversation_limit() -> None:
+    repo = _FakeRepo(external_conversations=200)
+    app.dependency_overrides[deps.get_repository] = lambda: repo
+    app.dependency_overrides[deps.get_backend_client] = lambda: _FakeBackendClient()
+    app.dependency_overrides[deps.get_llm_provider] = lambda: EchoProvider()
+
+    client = TestClient(app)
+    response = client.post(
+        "/v1/internal/whatsapp/message",
+        headers={"X-Internal-Service-Token": "local-internal-token"},
+        json={
+            "org_id": "00000000-0000-0000-0000-000000000001",
+            "phone_number_id": "123456",
+            "from_phone": "+54 9 11 1234-5678",
+            "message": "hola",
+        },
+    )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 429
+    payload = response.json()
+    assert payload["error"]["code"] == "http_error"
+    assert "conversaciones externas" in payload["error"]["message"].lower()

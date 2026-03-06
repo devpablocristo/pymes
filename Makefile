@@ -40,7 +40,7 @@ ai-test: ## Run AI service tests
 	cd control-plane/ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
 ai-lint: ## Basic AI static check (compile)
-	cd control-plane/ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src)
+	cd control-plane/ai && env PYTHONPYCACHEPREFIX=/tmp/ai-lint-cp sh -c 'test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src'
 
 # ── Professionals Vertical ──
 
@@ -69,7 +69,7 @@ prof-ai-test: ## Run professionals AI tests
 	cd professionals/ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
 prof-ai-lint: ## Basic professionals AI static check
-	cd professionals/ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src)
+	cd professionals/ai && env PYTHONPYCACHEPREFIX=/tmp/ai-lint-prof sh -c 'test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python -m compileall -q src'
 
 # ── All services ──
 

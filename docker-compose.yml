@@ -28,7 +28,7 @@ services:
     ports:
       - "8100:8080"
     volumes:
-      - ./go.work:/workspace/go.work
+      - ./control-plane/backend/go.work.build:/workspace/go.work
       - ./control-plane/backend:/workspace/control-plane/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - backend_go_mod:/go/pkg/mod
@@ -100,6 +100,7 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       CONTROL_PLANE_URL: http://backend:8080
+      FRONTEND_URL: http://localhost:5181
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
       postgres:

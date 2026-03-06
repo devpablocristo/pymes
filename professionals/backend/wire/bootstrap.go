@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	syncPkg "sync"
 	"time"
@@ -163,9 +164,17 @@ func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.
 
 // CORS middleware (same pattern as control-plane).
 func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
-	origins := []string{"http://localhost:5173"}
-	if frontendURL != "" && frontendURL != "http://localhost:5173" {
-		origins = append(origins, strings.TrimSuffix(frontendURL, "/"))
+	origins := []string{
+		"http://localhost:5173", // Vite default
+		"http://localhost:5174", // prof-frontend dev
+		"http://localhost:5180", // control-plane frontend (Docker)
+		"http://localhost:5181", // prof-frontend (Docker)
+	}
+	if frontendURL != "" {
+		trimmed := strings.TrimSuffix(frontendURL, "/")
+		if !slices.Contains(origins, trimmed) {
+			origins = append(origins, trimmed)
+		}
 	}
 
 	return func(c *gin.Context) {

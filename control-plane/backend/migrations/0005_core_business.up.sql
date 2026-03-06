@@ -46,6 +46,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_org_tax_unique
     WHERE deleted_at IS NULL AND tax_id IS NOT NULL AND tax_id != '';
 CREATE INDEX IF NOT EXISTS idx_suppliers_org ON suppliers(org_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_suppliers_org_name ON suppliers(org_id, name) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_suppliers_org_tax ON suppliers(org_id, tax_id) WHERE deleted_at IS NULL AND tax_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS products (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

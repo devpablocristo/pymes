@@ -19,4 +19,9 @@ ALTER TABLE tenant_settings
 
     ADD COLUMN IF NOT EXISTS appointments_enabled boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS appointment_label text NOT NULL DEFAULT 'Turno',
-    ADD COLUMN IF NOT EXISTS appointment_reminder_hours int NOT NULL DEFAULT 24;
+    ADD COLUMN IF NOT EXISTS appointment_reminder_hours int NOT NULL DEFAULT 24,
+
+    ADD COLUMN IF NOT EXISTS secondary_currency text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS default_rate_type text NOT NULL DEFAULT 'blue',
+    ADD COLUMN IF NOT EXISTS auto_fetch_rates boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS show_dual_prices boolean NOT NULL DEFAULT false;

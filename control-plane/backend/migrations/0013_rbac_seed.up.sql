@@ -38,12 +38,25 @@ BEGIN
         (gen_random_uuid(), r_vendedor, 'quotes', 'create'),
         (gen_random_uuid(), r_vendedor, 'quotes', 'update'),
         (gen_random_uuid(), r_vendedor, 'inventory', 'read'),
+        (gen_random_uuid(), r_vendedor, 'appointments', 'read'),
+        (gen_random_uuid(), r_vendedor, 'appointments', 'create'),
+        (gen_random_uuid(), r_vendedor, 'appointments', 'update'),
+        (gen_random_uuid(), r_vendedor, 'returns', 'read'),
+        (gen_random_uuid(), r_vendedor, 'returns', 'create'),
+        (gen_random_uuid(), r_vendedor, 'accounts', 'read'),
+        (gen_random_uuid(), r_vendedor, 'price_lists', 'read'),
 
         (gen_random_uuid(), r_cajero, 'sales', 'read'),
         (gen_random_uuid(), r_cajero, 'sales', 'create'),
         (gen_random_uuid(), r_cajero, 'cashflow', 'read'),
         (gen_random_uuid(), r_cajero, 'cashflow', 'create'),
         (gen_random_uuid(), r_cajero, 'customers', 'read'),
+        (gen_random_uuid(), r_cajero, 'payments', 'read'),
+        (gen_random_uuid(), r_cajero, 'payments', 'create'),
+        (gen_random_uuid(), r_cajero, 'returns', 'read'),
+        (gen_random_uuid(), r_cajero, 'returns', 'create'),
+        (gen_random_uuid(), r_cajero, 'accounts', 'read'),
+        (gen_random_uuid(), r_cajero, 'appointments', 'read'),
 
         (gen_random_uuid(), r_contador, 'reports', 'read'),
         (gen_random_uuid(), r_contador, 'cashflow', 'read'),
@@ -51,11 +64,19 @@ BEGIN
         (gen_random_uuid(), r_contador, 'billing', 'read'),
         (gen_random_uuid(), r_contador, 'audit', 'read'),
         (gen_random_uuid(), r_contador, 'audit', 'export'),
+        (gen_random_uuid(), r_contador, 'purchases', 'read'),
+        (gen_random_uuid(), r_contador, 'accounts', 'read'),
+        (gen_random_uuid(), r_contador, 'payments', 'read'),
+        (gen_random_uuid(), r_contador, 'returns', 'read'),
+        (gen_random_uuid(), r_contador, 'recurring', 'read'),
+        (gen_random_uuid(), r_contador, 'price_lists', 'read'),
 
         (gen_random_uuid(), r_almacenero, 'inventory', 'read'),
         (gen_random_uuid(), r_almacenero, 'inventory', 'create'),
         (gen_random_uuid(), r_almacenero, 'inventory', 'update'),
-        (gen_random_uuid(), r_almacenero, 'products', 'read')
+        (gen_random_uuid(), r_almacenero, 'products', 'read'),
+        (gen_random_uuid(), r_almacenero, 'purchases', 'read'),
+        (gen_random_uuid(), r_almacenero, 'returns', 'read')
     ON CONFLICT (role_id, resource, action) DO NOTHING;
 
     IF EXISTS (

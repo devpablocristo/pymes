@@ -1,4 +1,9 @@
 ALTER TABLE tenant_settings
+    DROP COLUMN IF EXISTS show_dual_prices,
+    DROP COLUMN IF EXISTS auto_fetch_rates,
+    DROP COLUMN IF EXISTS default_rate_type,
+    DROP COLUMN IF EXISTS secondary_currency,
+
     DROP COLUMN IF EXISTS appointment_reminder_hours,
     DROP COLUMN IF EXISTS appointment_label,
     DROP COLUMN IF EXISTS appointments_enabled,

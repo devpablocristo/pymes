@@ -25,13 +25,9 @@ Este prompt extiende el **control-plane** (Prompt 00) con los módulos de negoci
 
 ---
 
-## Dependencia nueva
+## Tipos numéricos
 
-```bash
-go get github.com/shopspring/decimal
-```
-
-En los tipos de dominio, `decimal` = `github.com/shopspring/decimal.Decimal`. En los modelos GORM, usar `decimal.Decimal` que mapea a `numeric` de PostgreSQL sin pérdida de precisión.
+En Go se usa `float64` para montos. En PostgreSQL se usa `numeric(15,2)` para garantizar precisión en la capa de persistencia. GORM convierte automáticamente entre ambos. Esta decisión prioriza la simplicidad y consistencia del código Go sobre la precisión absoluta en memoria — los errores de redondeo de float64 son despreciables para los montos de una pyme (hasta ~15 dígitos de precisión), y la DB es la fuente de verdad con `numeric`.
 
 ---
 
@@ -219,9 +215,9 @@ type Product struct {
     Name        string
     Description string
     Unit        string         // "unit", "kg", "hr", "m", "lt", etc.
-    Price       decimal        // precio de venta (sin impuestos)
-    CostPrice   decimal        // precio de costo (para margen)
-    TaxRate     decimal        // % IVA para este producto (override del default org)
+    Price       float64        // precio de venta (sin impuestos)
+    CostPrice   float64        // precio de costo (para margen)
+    TaxRate     float64        // % IVA para este producto (override del default org)
     TrackStock  bool           // true para productos físicos, false para servicios
     Tags        []string
     Metadata    map[string]any
@@ -285,8 +281,8 @@ CREATE INDEX IF NOT EXISTS idx_products_org_name ON products(org_id, name) WHERE
 type StockLevel struct {
     ProductID   uuid.UUID
     OrgID       uuid.UUID
-    Quantity    decimal
-    MinQuantity decimal   // alerta de stock bajo
+    Quantity    float64
+    MinQuantity float64   // alerta de stock bajo
     UpdatedAt   time.Time
 }
 
@@ -295,7 +291,7 @@ type StockMovement struct {
     OrgID       uuid.UUID
     ProductID   uuid.UUID
     Type        string    // "in" | "out" | "adjustment"
-    Quantity    decimal   // positivo para in, negativo para out
+    Quantity    float64   // positivo para in, negativo para out
     Reason      string    // "sale", "purchase", "return", "adjustment", "initial"
     ReferenceID *uuid.UUID // sale_id o purchase_id que originó el movimiento
     Notes       string
@@ -367,9 +363,9 @@ type Quote struct {
     CustomerName string       // nombre manual si no hay customer_id
     Status      string        // "draft" | "sent" | "accepted" | "rejected" | "expired"
     Items       []QuoteItem
-    Subtotal    decimal
-    TaxTotal    decimal
-    Total       decimal
+    Subtotal    float64
+    TaxTotal    float64
+    Total       float64
     Currency    string
     Notes       string
     ValidUntil  *time.Time
@@ -383,10 +379,10 @@ type QuoteItem struct {
     QuoteID     uuid.UUID
     ProductID   *uuid.UUID    // puede ser item ad-hoc sin producto
     Description string
-    Quantity    decimal
-    UnitPrice   decimal
-    TaxRate     decimal
-    Subtotal    decimal
+    Quantity    float64
+    UnitPrice   float64
+    TaxRate     float64
+    Subtotal    float64
     SortOrder   int
 }
 ```
@@ -470,9 +466,9 @@ type Sale struct {
     Status      string         // "completed" | "voided"
     PaymentMethod string       // "cash" | "card" | "transfer" | "other"
     Items       []SaleItem
-    Subtotal    decimal
-    TaxTotal    decimal
-    Total       decimal
+    Subtotal    float64
+    TaxTotal    float64
+    Total       float64
     Currency    string
     Notes       string
     CreatedBy   string
@@ -484,11 +480,11 @@ type SaleItem struct {
     SaleID      uuid.UUID
     ProductID   *uuid.UUID
     Description string
-    Quantity    decimal
-    UnitPrice   decimal
-    CostPrice   decimal    // snapshot del costo al momento de la venta (para margen)
-    TaxRate     decimal
-    Subtotal    decimal
+    Quantity    float64
+    UnitPrice   float64
+    CostPrice   float64    // snapshot del costo al momento de la venta (para margen)
+    TaxRate     float64
+    Subtotal    float64
     SortOrder   int
 }
 ```
@@ -565,7 +561,7 @@ type CashMovement struct {
     ID            uuid.UUID
     OrgID         uuid.UUID
     Type          string     // "income" | "expense"
-    Amount        decimal
+    Amount        float64
     Currency      string
     Category      string     // "sale", "purchase", "salary", "rent", "tax", "other"
     Description   string
@@ -580,9 +576,9 @@ type CashSummary struct {
     OrgID         uuid.UUID
     PeriodStart   time.Time
     PeriodEnd     time.Time
-    TotalIncome   decimal
-    TotalExpense  decimal
-    Balance       decimal
+    TotalIncome   float64
+    TotalExpense  float64
+    Balance       float64
     Currency      string
 }
 ```
@@ -758,7 +754,7 @@ Estas interacciones se orquestan en el **usecase** de ventas, NO en el handler n
 1. Seguir la misma arquitectura hexagonal que los módulos existentes del control-plane.
 2. Cada módulo define sus propios ports (interfaces) para las dependencias que necesita.
 3. Los totales de quotes y sales se calculan server-side, nunca confiar en el frontend.
-4. `numeric(15,2)` en Go se mapea con `github.com/shopspring/decimal`. NUNCA usar `float64` para dinero (errores de redondeo). Agregar la dependencia: `go get github.com/shopspring/decimal`.
+4. `numeric(15,2)` en PostgreSQL, `float64` en Go. La precisión financiera se garantiza en la DB. No usar `shopspring/decimal` (complejidad innecesaria para los montos de una pyme).
 5. Todos los endpoints requieren auth (van en `authGroup`).
 6. El `org_id` se extrae del auth context, NUNCA del path ni del body.
 7. Registrar todas las rutas nuevas en `wire/bootstrap.go`.

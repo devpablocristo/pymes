@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     amount numeric(15,2) NOT NULL,
     currency text NOT NULL DEFAULT 'ARS',
     category text NOT NULL DEFAULT 'other',
-    payment_method text NOT NULL DEFAULT 'transfer',
+    payment_method text NOT NULL DEFAULT 'transfer'
+        CHECK (payment_method IN ('cash', 'card', 'transfer', 'debit', 'check', 'other')),
     frequency text NOT NULL DEFAULT 'monthly'
         CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
     day_of_month int NOT NULL DEFAULT 1 CHECK (day_of_month BETWEEN 1 AND 28),
@@ -191,6 +192,7 @@ CREATE TABLE IF NOT EXISTS appointments (
         CHECK (status IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show')),
     start_at timestamptz NOT NULL,
     end_at timestamptz NOT NULL,
+    CHECK (end_at > start_at),
     duration int NOT NULL DEFAULT 60,
     location text NOT NULL DEFAULT '',
     assigned_to text NOT NULL DEFAULT '',
@@ -247,3 +249,14 @@ ALTER TABLE quotes
 
 ALTER TABLE customers
     ADD COLUMN IF NOT EXISTS price_list_id uuid REFERENCES price_lists(id);
+
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
+ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check
+    CHECK (payment_method IN ('cash', 'card', 'transfer', 'check', 'other', 'credit', 'mixed'));
+
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS price_currency text NOT NULL DEFAULT 'ARS';
+
+ALTER TABLE sales
+    ADD COLUMN IF NOT EXISTS exchange_rate numeric(15,4),
+    ADD COLUMN IF NOT EXISTS exchange_rate_type text;

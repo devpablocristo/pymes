@@ -1,3 +1,14 @@
+ALTER TABLE sales
+    DROP COLUMN IF EXISTS exchange_rate_type,
+    DROP COLUMN IF EXISTS exchange_rate;
+
+ALTER TABLE products
+    DROP COLUMN IF EXISTS price_currency;
+
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
+ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check
+    CHECK (payment_method IN ('cash', 'card', 'transfer', 'other'));
+
 ALTER TABLE customers
     DROP COLUMN IF EXISTS price_list_id;
 

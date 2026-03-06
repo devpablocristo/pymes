@@ -27,6 +27,11 @@ type Config struct {
 	StripePriceStarter    string
 	StripePriceGrowth     string
 	StripePriceEnterprise string
+	StorageBackend        string
+	S3Bucket              string
+	S3Region              string
+	SchedulerSecret       string
+	ExchangeRateProvider  string
 }
 
 // LoadFromEnv carga valores con defaults seguros para desarrollo local.
@@ -52,6 +57,11 @@ func LoadFromEnv() Config {
 		StripePriceStarter:    os.Getenv("STRIPE_PRICE_STARTER"),
 		StripePriceGrowth:     os.Getenv("STRIPE_PRICE_GROWTH"),
 		StripePriceEnterprise: os.Getenv("STRIPE_PRICE_ENTERPRISE"),
+		StorageBackend:        getEnv("STORAGE_BACKEND", "local"),
+		S3Bucket:              os.Getenv("S3_BUCKET"),
+		S3Region:              getEnv("S3_REGION", "us-east-1"),
+		SchedulerSecret:       os.Getenv("SCHEDULER_SECRET"),
+		ExchangeRateProvider:  getEnv("EXCHANGE_RATE_PROVIDER", "manual"),
 	}
 }
 

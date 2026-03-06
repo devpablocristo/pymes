@@ -145,23 +145,19 @@ internal/<module>/
 - `handler.go` SOLO depende de `*Usecases` (no de repository, no de DB)
 - `usecases.go` define sus ports (interfaces) en el mismo archivo: `RepositoryPort`, `NotificationPort`, etc.
 - `repository.go` implementa `RepositoryPort` usando GORM
-- La DI se resuelve en `wire/` con Google Wire
+- La DI se resuelve en `wire/bootstrap.go` con constructores explícitos (DI manual, sin code generation)
 
-**Ejemplo de DI con Wire:**
+**Ejemplo de DI manual en bootstrap:**
 
 ```go
-// wire/<module>_providers.go
-var BillingSet = wire.NewSet(
-    billing.NewRepository,
-    ProvideStripeClient,
-    ProvideTenantSettingsPort,    // adapter: admin.Repository → billing.TenantSettingsPort
-    ProvideBillingNotificationPort, // adapter: notifications.Usecases → billing.NotificationPort
-    billing.NewUsecases,
-    billing.NewHandler,
-)
+// wire/bootstrap.go
+billingRepo := billing.NewRepository(db)
+stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
+billingUC := billing.NewUsecases(billingRepo, stripeClient, notificationsUC, cfg.FrontendURL, priceIDs, cfg.StripeWebhookSecret, logger)
+billingHandler := billing.NewHandler(billingUC)
 ```
 
-Los adapters entre módulos se implementan como funciones provider que castean un tipo concreto a la interface del consumidor.
+Los constructores reciben dependencias concretas; los handlers definen sus propios port interfaces para los usecases que consumen.
 
 ---
 
@@ -175,13 +171,12 @@ import (
     "context"
     "github.com/aws/aws-lambda-go/lambda"
     ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
-    // wire-generated app
+    "github.com/devpablocristo/pymes/control-plane/backend/wire"
 )
 
 var ginLambda *ginadapter.GinLambdaV2
 
 func init() {
-    // Wire injects everything; returns *gin.Engine
     app := wire.InitializeApp()
     ginLambda = ginadapter.NewGinLambdaV2(app.Router)
 }

@@ -8,6 +8,10 @@ Este prompt extiende el **control-plane** (Prompt 00) y el **core de negocio** (
 
 **Regla fundamental**: estos modulos viven dentro de `control-plane/backend/internal/` porque comparten la misma DB, el mismo auth, el mismo Lambda, y el mismo tenant (`org_id`). NO son servicios separados.
 
+**Tipos numericos**: los modulos existentes (Prompt 01) usan `float64` en Go para montos, con `numeric(15,2)` en PostgreSQL para precision en la DB. Los modulos nuevos de este prompt mantienen `float64` por **consistencia** con el codigo existente. Esto evita conversiones en las interacciones entre modulos (sales → accounts, payments → cashflow, etc.). La precision financiera se garantiza en la capa de persistencia (PostgreSQL numeric).
+
+**Migraciones**: el proyecto ya tiene migraciones 0001-0009. Las migraciones de este prompt empiezan en **0010**.
+
 ---
 
 ## Modulos a implementar
@@ -29,8 +33,9 @@ Este prompt extiende el **control-plane** (Prompt 00) y el **core de negocio** (
 | 13 | `timeline` | Activity timeline por entidad | 13 |
 | 14 | `outwebhooks` | Webhooks salientes para integraciones | 14 |
 | 15 | `whatsapp` | Integracion WhatsApp (links + templates) | 15 |
-| 16 | `dashboard` | Dashboard con KPIs configurables | 16 |
-| 17 | `scheduler` | Tareas programadas (cron) | 17 |
+| 16 | `currency` | Cotizaciones y tipo de cambio (dolar, etc.) | 16 |
+| 17 | `dashboard` | Dashboard con KPIs configurables | 17 |
+| 18 | `scheduler` | Tareas programadas (cron) | 18 |
 
 ---
 
@@ -177,16 +182,18 @@ type cacheEntry struct {
 
 ### Integracion con handlers existentes
 
-Los handlers existentes de Prompt 01 necesitan agregar el middleware. Ejemplo:
+**IMPORTANTE — no cambiar la firma de `RegisterRoutes`**. Los handlers existentes de Prompt 01 ya usan `RegisterRoutes(rg *gin.RouterGroup)`. Cambiar la firma rompería todos los handlers. En su lugar, el RBAC middleware se aplica **por grupo de rutas en `bootstrap.go`**:
 
 ```go
-// internal/customers/handler.go
-func (h *Handler) RegisterRoutes(rg *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-    g := rg.Group("/customers")
-    g.GET("", rbac.RequirePermission("customers", "read"), h.List)
-    g.POST("", rbac.RequirePermission("customers", "create"), h.Create)
-    g.GET("/:id", rbac.RequirePermission("customers", "read"), h.Get)
-    g.PUT("/:id", rbac.RequirePermission("customers", "update"), h.Update)
+// wire/bootstrap.go — aplicar RBAC a las rutas existentes
+customersGroup := authGroup.Group("/customers", rbacMiddleware.RequirePermission("customers", ""))
+customersHandler.RegisterRoutes(customersGroup)
+
+// O bien, para control mas granular, aplicar a nivel de ruta individual:
+// Se puede usar un wrapper en bootstrap que intercepte las rutas despues de RegisterRoutes
+
+// Los handlers NUEVOS de este prompt si pueden recibir rbac en su constructor:
+// purchasesHandler := purchases.NewHandler(purchasesUC, rbacMiddleware)
     g.DELETE("/:id", rbac.RequirePermission("customers", "delete"), h.Delete)
 }
 ```
@@ -211,9 +218,9 @@ type Purchase struct {
     Status        string         // "draft" | "received" | "partial" | "voided"
     PaymentStatus string         // "pending" | "partial" | "paid"
     Items         []PurchaseItem
-    Subtotal      decimal.Decimal
-    TaxTotal      decimal.Decimal
-    Total         decimal.Decimal
+    Subtotal      float64
+    TaxTotal      float64
+    Total         float64
     Currency      string
     Notes         string
     ReceivedAt    *time.Time
@@ -227,10 +234,10 @@ type PurchaseItem struct {
     PurchaseID  uuid.UUID
     ProductID   *uuid.UUID
     Description string
-    Quantity    decimal.Decimal
-    UnitCost    decimal.Decimal
-    TaxRate     decimal.Decimal
-    Subtotal    decimal.Decimal
+    Quantity    float64
+    UnitCost    float64
+    TaxRate     float64
+    Subtotal    float64
     SortOrder   int
 }
 ```
@@ -342,9 +349,9 @@ type Account struct {
     EntityType  string         // "customer" | "supplier"
     EntityID    uuid.UUID
     EntityName  string         // denormalized para queries rapidos
-    Balance     decimal.Decimal // positivo = le deben a la org (receivable), negativo = la org debe (payable)
+    Balance     float64 // positivo = le deben a la org (receivable), negativo = la org debe (payable)
     Currency    string
-    CreditLimit decimal.Decimal // limite de fiado (0 = sin limite)
+    CreditLimit float64 // limite de fiado (0 = sin limite)
     UpdatedAt   time.Time
 }
 
@@ -353,8 +360,8 @@ type AccountMovement struct {
     AccountID   uuid.UUID
     OrgID       uuid.UUID
     Type        string         // "charge" | "payment" | "adjustment" | "void"
-    Amount      decimal.Decimal // positivo = aumenta deuda, negativo = reduce deuda
-    Balance     decimal.Decimal // saldo despues del movimiento (running balance)
+    Amount      float64 // positivo = aumenta deuda, negativo = reduce deuda
+    Balance     float64 // saldo despues del movimiento (running balance)
     Description string
     ReferenceType string       // "sale", "purchase", "payment", "manual"
     ReferenceID *uuid.UUID
@@ -371,7 +378,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     type text NOT NULL CHECK (type IN ('receivable', 'payable')),
     entity_type text NOT NULL CHECK (entity_type IN ('customer', 'supplier')),
-    entity_id uuid NOT NULL,
+    entity_id uuid NOT NULL, -- polimórfico: apunta a customers(id) o suppliers(id) según entity_type. Sin FK porque referencia múltiples tablas.
     entity_name text NOT NULL DEFAULT '',
     balance numeric(15,2) NOT NULL DEFAULT 0,
     currency text NOT NULL DEFAULT 'ARS',
@@ -380,6 +387,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     UNIQUE(org_id, entity_type, entity_id)
 );
 
+-- NOTA: entity_id es polimórfico (sin FK). La integridad se garantiza a nivel de aplicación:
+-- el usecase valida que entity_id exista en customers/suppliers según entity_type antes de crear la cuenta.
 CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(org_id, type);
 CREATE INDEX IF NOT EXISTS idx_accounts_entity ON accounts(org_id, entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(org_id) WHERE balance != 0;
@@ -460,7 +469,7 @@ type Payment struct {
     ReferenceType string         // "sale" | "purchase"
     ReferenceID   uuid.UUID
     Method        string         // "cash" | "card" | "transfer" | "check" | "other"
-    Amount        decimal.Decimal
+    Amount        float64
     Notes         string
     ReceivedAt    time.Time      // cuando se recibio el pago
     CreatedBy     string
@@ -476,7 +485,7 @@ CREATE TABLE IF NOT EXISTS payments (
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     reference_type text NOT NULL CHECK (reference_type IN ('sale', 'purchase')),
     reference_id uuid NOT NULL,
-    method text NOT NULL DEFAULT 'cash' CHECK (method IN ('cash', 'card', 'transfer', 'check', 'other')),
+    method text NOT NULL DEFAULT 'cash' CHECK (method IN ('cash', 'card', 'transfer', 'check', 'other', 'credit_note')),
     amount numeric(15,2) NOT NULL,
     notes text NOT NULL DEFAULT '',
     received_at timestamptz NOT NULL DEFAULT now(),
@@ -507,6 +516,11 @@ ALTER TABLE sales
     ADD COLUMN IF NOT EXISTS amount_paid numeric(15,2) NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'paid'
         CHECK (payment_status IN ('pending', 'partial', 'paid'));
+
+-- Actualizar CHECK constraint de payment_method para incluir 'credit' y 'mixed'
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
+ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check
+    CHECK (payment_method IN ('cash', 'card', 'transfer', 'check', 'other', 'credit', 'mixed'));
 ```
 
 ### Flujo de venta con pago inmediato (sin cambio)
@@ -563,9 +577,9 @@ type Return struct {
     SaleID      uuid.UUID
     Reason      string         // "defective", "wrong_item", "changed_mind", "other"
     Items       []ReturnItem
-    Subtotal    decimal.Decimal
-    TaxTotal    decimal.Decimal
-    Total       decimal.Decimal
+    Subtotal    float64
+    TaxTotal    float64
+    Total       float64
     RefundMethod string        // "cash" | "credit_note" | "original_method"
     Status      string         // "completed" | "voided"
     Notes       string
@@ -579,10 +593,10 @@ type ReturnItem struct {
     SaleItemID  uuid.UUID      // referencia al item original de la venta
     ProductID   *uuid.UUID
     Description string
-    Quantity    decimal.Decimal // cantidad devuelta (no puede exceder la vendida)
-    UnitPrice   decimal.Decimal
-    TaxRate     decimal.Decimal
-    Subtotal    decimal.Decimal
+    Quantity    float64 // cantidad devuelta (no puede exceder la vendida)
+    UnitPrice   float64
+    TaxRate     float64
+    Subtotal    float64
 }
 
 type CreditNote struct {
@@ -591,9 +605,9 @@ type CreditNote struct {
     Number      string         // "NC-00001"
     CustomerID  uuid.UUID
     ReturnID    uuid.UUID
-    Amount      decimal.Decimal
-    UsedAmount  decimal.Decimal // cuanto se ha aplicado a ventas futuras
-    Balance     decimal.Decimal // amount - used_amount
+    Amount      float64
+    UsedAmount  float64 // cuanto se ha aplicado a ventas futuras
+    Balance     float64 // amount - used_amount
     ExpiresAt   *time.Time
     Status      string         // "active" | "used" | "expired" | "voided"
     CreatedAt   time.Time
@@ -750,11 +764,22 @@ Por cada item:
 
 Totales de la venta/presupuesto:
   subtotal = SUM(item_net)
+  tax_total_bruto = SUM(item_tax)
+
+  // Descuento global (aplica sobre subtotal)
   discount_total = (global) discount_type == 'percentage' ? subtotal * discount_value / 100 : discount_value
   subtotal_after_discount = subtotal - discount_total
-  tax_total = SUM(item_tax) ajustado proporcionalmente si hay descuento global
+
+  // El impuesto se ajusta proporcionalmente al descuento global:
+  // Ratio de descuento = subtotal_after_discount / subtotal
+  // El impuesto final es proporcional al monto efectivamente cobrado
+  ratio = subtotal_after_discount / subtotal   // (1.0 si no hay descuento global)
+  tax_total = tax_total_bruto * ratio
+
   total = subtotal_after_discount + tax_total
 ```
+
+> **Nota**: El impuesto se recalcula proporcionalmente al descuento global porque en LATAM la base imponible es el monto neto despues de descuentos. Si `subtotal` es 0, `ratio` = 1 (sin ajuste).
 
 ### Reglas de negocio
 
@@ -782,7 +807,7 @@ type PriceList struct {
     Name        string         // "Minorista", "Mayorista", "Empleados"
     Description string
     IsDefault   bool           // la lista que se aplica si no se especifica otra
-    Markup      decimal.Decimal // porcentaje sobre precio base (ej: -30 para 30% descuento)
+    Markup      float64 // porcentaje sobre precio base (ej: -30 para 30% descuento)
     IsActive    bool
     CreatedAt   time.Time
     UpdatedAt   time.Time
@@ -791,7 +816,7 @@ type PriceList struct {
 type PriceListItem struct {
     PriceListID uuid.UUID
     ProductID   uuid.UUID
-    Price       decimal.Decimal // precio especifico para este producto en esta lista (override)
+    Price       float64 // precio especifico para este producto en esta lista (override)
 }
 ```
 
@@ -851,7 +876,7 @@ Cuando se crea una venta o presupuesto, el precio se resuelve asi:
 4. Si el cliente no tiene lista → usar `products.price` (lista default)
 
 ```go
-func (uc *Usecases) ResolvePrice(ctx context.Context, orgID, productID, customerID uuid.UUID) (decimal.Decimal, error) {
+func (uc *Usecases) ResolvePrice(ctx context.Context, orgID, productID, customerID uuid.UUID) (float64, error) {
     // 1. Buscar lista del cliente
     // 2. Buscar override en price_list_items
     // 3. Si no hay override, aplicar markup
@@ -882,10 +907,10 @@ type RecurringExpense struct {
     ID            uuid.UUID
     OrgID         uuid.UUID
     Description   string
-    Amount        decimal.Decimal
+    Amount        float64
     Currency      string
     Category      string         // "rent", "utilities", "salary", "tax", "insurance", "subscription", "other"
-    PaymentMethod string         // "cash" | "card" | "transfer" | "debit" | "other"
+    PaymentMethod string         // "cash" | "card" | "transfer" | "debit" | "check" | "other"
     Frequency     string         // "monthly" | "biweekly" | "weekly" | "quarterly" | "yearly"
     DayOfMonth    int            // dia del mes en que se paga (1-28)
     SupplierID    *uuid.UUID     // proveedor asociado (opcional)
@@ -909,7 +934,8 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     amount numeric(15,2) NOT NULL,
     currency text NOT NULL DEFAULT 'ARS',
     category text NOT NULL DEFAULT 'other',
-    payment_method text NOT NULL DEFAULT 'transfer',
+    payment_method text NOT NULL DEFAULT 'transfer'
+        CHECK (payment_method IN ('cash', 'card', 'transfer', 'debit', 'check', 'other')),
     frequency text NOT NULL DEFAULT 'monthly'
         CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
     day_of_month int NOT NULL DEFAULT 1 CHECK (day_of_month BETWEEN 1 AND 28),
@@ -1031,6 +1057,7 @@ CREATE TABLE IF NOT EXISTS appointments (
         CHECK (status IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show')),
     start_at timestamptz NOT NULL,
     end_at timestamptz NOT NULL,
+    CHECK (end_at > start_at),
     duration int NOT NULL DEFAULT 60,
     location text NOT NULL DEFAULT '',
     assigned_to text NOT NULL DEFAULT '',
@@ -1544,8 +1571,8 @@ type TimelineEntry struct {
 CREATE TABLE IF NOT EXISTS timeline_entries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    entity_type text NOT NULL,
-    entity_id uuid NOT NULL,
+    entity_type text NOT NULL, -- 'sale', 'quote', 'customer', 'supplier', 'product', 'purchase', etc.
+    entity_id uuid NOT NULL,  -- polimórfico: apunta a la tabla correspondiente a entity_type (sin FK)
     event_type text NOT NULL,
     title text NOT NULL,
     description text NOT NULL DEFAULT '',
@@ -1670,13 +1697,13 @@ CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_retry ON webhook_deliveries(ne
 ### API
 
 ```
-GET    /v1/webhooks                   — Listar endpoints de la org
-POST   /v1/webhooks                   — Crear endpoint
-GET    /v1/webhooks/:id               — Detalle
-PUT    /v1/webhooks/:id               — Actualizar (URL, events, active)
-DELETE /v1/webhooks/:id               — Eliminar endpoint
-GET    /v1/webhooks/:id/deliveries    — Historial de envios
-POST   /v1/webhooks/:id/test          — Enviar evento de prueba
+GET    /v1/webhook-endpoints                   — Listar endpoints de la org
+POST   /v1/webhook-endpoints                   — Crear endpoint
+GET    /v1/webhook-endpoints/:id               — Detalle
+PUT    /v1/webhook-endpoints/:id               — Actualizar (URL, events, active)
+DELETE /v1/webhook-endpoints/:id               — Eliminar endpoint
+GET    /v1/webhook-endpoints/:id/deliveries    — Historial de envios
+POST   /v1/webhook-endpoints/:id/test          — Enviar evento de prueba
 ```
 
 ### Eventos disponibles
@@ -1687,6 +1714,10 @@ supplier.created, supplier.updated, supplier.deleted
 product.created, product.updated, product.deleted
 sale.created, sale.voided
 quote.created, quote.accepted, quote.rejected
+purchase.created, purchase.received, purchase.voided
+appointment.created, appointment.confirmed, appointment.cancelled, appointment.completed, appointment.no_show
+return.created
+payment.created
 cashflow.created
 inventory.adjusted, inventory.low_stock
 ```
@@ -1783,10 +1814,170 @@ func BuildWhatsAppURL(phone, countryCode, message string) string {
 - El template se interpola server-side con los datos reales.
 - El link abre WhatsApp en el dispositivo del usuario (no envia automaticamente).
 - `wa_default_country_code` se usa cuando el telefono no tiene codigo de pais.
+- Al generar un link de WhatsApp, registrar un `TimelineEntry` en la entidad correspondiente (`quote`, `sale`) con `event_type = 'whatsapp_link_generated'`. Esto permite ver en el historial cuando se envio un presupuesto o recibo por WhatsApp.
 
 ---
 
-## 16. Dashboard — KPIs Configurables
+## 16. Currency — Cotizaciones y Tipo de Cambio
+
+### Problema
+
+En Argentina todo se cotiza en dolares pero se paga en pesos. El ferretero dice "este cano vale 50 dolares" y cobra al blue del dia. No es solo Argentina — Uruguay, Venezuela, Colombia, Peru tambien manejan dualidad de moneda. Sin esto, la pyme argentina no puede operar.
+
+### Entidades de dominio
+
+```go
+type ExchangeRate struct {
+    ID           uuid.UUID
+    OrgID        uuid.UUID
+    FromCurrency string          // "USD"
+    ToCurrency   string          // "ARS"
+    RateType     string          // "official", "blue", "mep", "ccl", "crypto", "custom"
+    BuyRate      float64         // precio de compra
+    SellRate     float64         // precio de venta
+    Source       string          // "api" | "manual"
+    RateDate     time.Time       // fecha de la cotizacion
+    CreatedAt    time.Time
+}
+```
+
+### Tabla SQL
+
+```sql
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    from_currency text NOT NULL,
+    to_currency text NOT NULL,
+    rate_type text NOT NULL CHECK (rate_type IN ('official', 'blue', 'mep', 'ccl', 'crypto', 'custom')),
+    buy_rate numeric(15,4) NOT NULL,
+    sell_rate numeric(15,4) NOT NULL,
+    source text NOT NULL DEFAULT 'manual' CHECK (source IN ('api', 'manual')),
+    rate_date date NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(org_id, from_currency, to_currency, rate_type, rate_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_org_date ON exchange_rates(org_id, rate_date DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_latest ON exchange_rates(org_id, from_currency, to_currency, rate_type, rate_date DESC);
+```
+
+### API
+
+```
+GET    /v1/exchange-rates/today              — Cotizaciones del dia (auto-fetch si no hay)
+GET    /v1/exchange-rates/history             — Historial (?from=&to=&type=blue)
+POST   /v1/exchange-rates                     — Cargar cotizacion manual
+GET    /v1/exchange-rates/convert             — Convertir monto (?amount=100&from=USD&to=ARS&type=blue)
+GET    /v1/products/:id/prices-converted      — Precio del producto en ambas monedas
+```
+
+### Provider de cotizaciones
+
+```go
+type RateProvider interface {
+    FetchRates(ctx context.Context, date time.Time) ([]ExchangeRate, error)
+}
+```
+
+**Implementacion para Argentina** (transversal, la mas demandada):
+- Fuente: API publica como `dolarapi.com` o `bluelytics.com.ar` (gratis, sin API key)
+- Trae: oficial, blue, MEP, CCL, tarjeta, crypto
+- Fallback: si la API falla, usar la ultima cotizacion disponible
+
+**Implementacion manual**:
+- El usuario carga la cotizacion del dia manualmente
+- Util para paises donde no hay API publica confiable
+
+### Integracion con ventas y productos
+
+**Productos con precio en moneda extranjera:**
+
+```sql
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS price_currency text NOT NULL DEFAULT 'ARS';
+```
+
+Si `price_currency = 'USD'`, al crear venta:
+1. Resolver cotizacion del dia segun `default_rate_type` de la org
+2. Convertir a moneda local: `unit_price_local = product.price * sell_rate`
+3. Guardar en `sale_items`: tanto el precio en moneda original como el convertido
+
+**Snapshot en ventas:**
+
+```sql
+ALTER TABLE sales
+    ADD COLUMN IF NOT EXISTS exchange_rate numeric(15,4),
+    ADD COLUMN IF NOT EXISTS exchange_rate_type text;
+```
+
+Esto permite saber: "esta venta se hizo a dolar blue $1150". Fundamental para reportes.
+
+**Presupuestos:**
+- Los presupuestos en USD muestran el total en ambas monedas
+- Al convertir presupuesto a venta, se usa la cotizacion del DIA DE LA VENTA (no del presupuesto)
+
+### Extension de tenant_settings
+
+```sql
+ALTER TABLE tenant_settings
+    ADD COLUMN IF NOT EXISTS secondary_currency text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS default_rate_type text NOT NULL DEFAULT 'blue',
+    ADD COLUMN IF NOT EXISTS auto_fetch_rates boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS show_dual_prices boolean NOT NULL DEFAULT false;
+```
+
+- `secondary_currency`: vacio = no usa moneda dual. "USD" = habilita cotizaciones.
+- `default_rate_type`: que tipo de dolar usar por defecto al convertir.
+- `auto_fetch_rates`: si el scheduler busca cotizaciones automaticamente.
+- `show_dual_prices`: si el frontend muestra precios en ambas monedas.
+
+### Scheduler task
+
+```go
+{
+    Name:     "fetch_exchange_rates",
+    Interval: 4 * time.Hour,
+    Handler: func(ctx) {
+        // 1. Buscar orgs con auto_fetch_rates = true y secondary_currency != ''
+        // 2. Para cada una, llamar al provider
+        // 3. Guardar cotizaciones del dia (upsert por date + type)
+        // 4. Si falla, logear y usar last known rate
+    },
+}
+```
+
+### Dashboard widget
+
+Agregar widget `exchange_rates`:
+```json
+{
+    "exchange_rates": {
+        "usd_official": 1050.00,
+        "usd_blue": 1150.00,
+        "usd_mep": 1120.00,
+        "updated_at": "2026-03-05T14:30:00Z"
+    }
+}
+```
+
+### Reportes
+
+Los reportes de ventas agregan opcion `?currency=USD` para ver todo convertido a dolares a la cotizacion del dia de cada venta. Util para el dueno que piensa en dolares.
+
+### Reglas de negocio
+
+- Las cotizaciones son por org (cada org puede tener su rate_type preferido).
+- Si no hay cotizacion del dia, se usa la ultima disponible (con warning en la respuesta).
+- La cotizacion NUNCA se actualiza retroactivamente. El snapshot en la venta es definitivo.
+- `buy_rate` y `sell_rate` son distintos (spread). Al vender un producto en USD, se usa `sell_rate`. Al comprar, `buy_rate`.
+- Si la org no tiene `secondary_currency`, el modulo esta inactivo (no consume API, no muestra nada).
+- Las cotizaciones se retienen indefinidamente (historial para reportes).
+- Soporte para cualquier par de monedas (USD/ARS, USD/UYU, USD/CLP, etc.), no solo dolar/peso argentino.
+
+---
+
+## 17. Dashboard — KPIs Configurables
 
 ### Problema
 
@@ -1857,6 +2048,10 @@ PUT    /v1/dashboard/config           — Actualizar configuracion
 | `top_products_month` | Top 5 productos mas vendidos | `sale_items GROUP BY product_id ORDER BY SUM(quantity) DESC LIMIT 5` |
 | `recent_sales` | Ultimas 10 ventas | `sales ORDER BY created_at DESC LIMIT 10` |
 | `customers_month` | Clientes nuevos del mes | `customers WHERE created_at >= first_of_month` |
+| `accounts_receivable` | Total fiado pendiente de cobro | `accounts WHERE type = 'receivable' AND balance > 0` |
+| `upcoming_expenses` | Gastos recurrentes proximos a vencer | `recurring_expenses WHERE next_due_date <= today + 7` |
+| `today_appointments` | Turnos del dia | `appointments WHERE start_at::date = today` |
+| `exchange_rates` | Cotizaciones del dia (si `secondary_currency` activo) | `exchange_rates WHERE rate_date = today` |
 
 ### Configuracion
 
@@ -1874,12 +2069,12 @@ El usuario elige que widgets ver y en que orden. Default: todos habilitados.
 
 - El dashboard es **una sola query compuesta** (o pocas queries paralelas). No N+1.
 - `trend` se calcula comparando el periodo actual vs el anterior (ej: ventas hoy vs ayer, mes actual vs mes anterior).
-- Los KPIs se calculan en tiempo real, no se cachean (la DB es rapida para estos aggregates con indices correctos).
+- **Cache en usecase**: los KPIs se cachean en memoria por 60 segundos (`sync.Map` con TTL o similar). Esto evita recalcular aggregates en cada request (especialmente si el dashboard está abierto en el navegador y hace polling). La primera request calcula, las siguientes 60s devuelven el cache. Invalidar manualmente no es necesario: 60s de latencia es aceptable para KPIs.
 - El dashboard respeta permisos RBAC: un `vendedor` no ve `cashflow_balance`.
 
 ---
 
-## 17. Scheduler — Tareas Programadas
+## 18. Scheduler — Tareas Programadas
 
 ### Problema
 
@@ -1900,7 +2095,9 @@ En Lambda no hay cron nativo. Se usa **EventBridge Scheduler** que invoca un end
 POST   /v1/internal/scheduler/run    — Ejecuta tareas pendientes
 ```
 
-Este endpoint esta protegido: solo acepta requests de EventBridge (verificar header `X-Scheduler-Secret` que viene como env var).
+Este endpoint esta protegido: solo acepta requests con header `X-Scheduler-Secret` que coincida con la env var `SCHEDULER_SECRET`.
+
+> **Produccion**: EventBridge Scheduler invoca la Lambda directamente (no pasa por API Gateway). El payload incluye el header `X-Scheduler-Secret`. Esto significa que el endpoint `/v1/internal/scheduler/run` no esta expuesto publicamente — solo es invocable por EventBridge o llamada directa a la Lambda. En local, el script de test puede llamarlo directamente con el header.
 
 ### Entidad de dominio
 
@@ -1940,6 +2137,26 @@ var tasks = []ScheduledTask{
         Name:     "cleanup_old_deliveries",
         Interval: 24 * time.Hour,
         Handler:  func(ctx) { outwebhooksUC.CleanupOldDeliveries(ctx, 30) },
+    },
+    {
+        Name:     "recurring_expenses_reminder",
+        Interval: 24 * time.Hour,
+        Handler:  func(ctx) { recurringUC.RemindUpcoming(ctx, 3) }, // gastos que vencen en 3 dias
+    },
+    {
+        Name:     "appointment_reminders",
+        Interval: 1 * time.Hour,
+        Handler:  func(ctx) { appointmentsUC.SendReminders(ctx) }, // turnos de manana
+    },
+    {
+        Name:     "appointment_no_show",
+        Interval: 1 * time.Hour,
+        Handler:  func(ctx) { appointmentsUC.MarkNoShows(ctx) }, // turnos pasados sin asistir
+    },
+    {
+        Name:     "fetch_exchange_rates",
+        Interval: 4 * time.Hour,
+        Handler:  func(ctx) { currencyUC.FetchAndStoreRates(ctx) }, // cotizaciones para orgs con auto_fetch
     },
 }
 ```
@@ -2001,7 +2218,7 @@ resource "aws_scheduler_schedule" "cron" {
 
 ## Migraciones SQL
 
-### `0008_transversal_core.up.sql` — Tablas de negocio transversal
+### `0010_transversal_core.up.sql` — Tablas de negocio transversal
 
 Crea las tablas nuevas de negocio:
 
@@ -2015,21 +2232,24 @@ Crea las tablas nuevas de negocio:
 
 Y los ALTERs a tablas existentes:
 
-- `sales`: agregar `amount_paid`, `payment_status`
+- `sales`: agregar `amount_paid`, `payment_status`, actualizar CHECK de `payment_method` para incluir `'credit'`, `'mixed'`
 - `sales` + `quotes`: agregar `discount_type`, `discount_value`, `discount_total`
 - `sale_items` + `quote_items`: agregar `discount_type`, `discount_value`
 - `customers`: agregar `price_list_id`
+- `products`: agregar `price_currency`
+- `sales`: agregar `exchange_rate`, `exchange_rate_type`
 
-### `0009_transversal_infra.up.sql` — Tablas de infraestructura transversal
+### `0011_transversal_infra.up.sql` — Tablas de infraestructura transversal
 
 - `roles` + `role_permissions` + `user_roles`
 - `attachments`
 - `timeline_entries`
 - `webhook_endpoints` + `webhook_deliveries`
+- `exchange_rates`
 - `dashboard_configs`
 - `scheduler_runs`
 
-### `0010_tenant_settings_ext.up.sql` — Extension de tenant_settings
+### `0012_tenant_settings_ext.up.sql` — Extension de tenant_settings
 
 ```sql
 ALTER TABLE tenant_settings
@@ -2054,10 +2274,15 @@ ALTER TABLE tenant_settings
     -- Appointments
     ADD COLUMN IF NOT EXISTS appointments_enabled boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS appointment_label text NOT NULL DEFAULT 'Turno',
-    ADD COLUMN IF NOT EXISTS appointment_reminder_hours int NOT NULL DEFAULT 24;
+    ADD COLUMN IF NOT EXISTS appointment_reminder_hours int NOT NULL DEFAULT 24,
+    -- Currency
+    ADD COLUMN IF NOT EXISTS secondary_currency text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS default_rate_type text NOT NULL DEFAULT 'blue',
+    ADD COLUMN IF NOT EXISTS auto_fetch_rates boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS show_dual_prices boolean NOT NULL DEFAULT false;
 ```
 
-### `0011_rbac_seed.up.sql` — Roles del sistema y seed data
+### `0013_rbac_seed.up.sql` — Roles del sistema y seed data
 
 ```sql
 -- Roles del sistema para el org de desarrollo local
@@ -2088,6 +2313,9 @@ S3_REGION=us-east-1
 
 # ── Scheduler ──
 SCHEDULER_SECRET=change-me-in-prod
+
+# ── Currency ──
+EXCHANGE_RATE_PROVIDER=dolarapi      # "dolarapi" | "bluelytics" | "manual"
 ```
 
 ---
@@ -2100,6 +2328,7 @@ Sale (crear, pago inmediato)
   ├── Payments: registrar Payment automatico
   ├── Cashflow: cash_movement(income) por cada payment
   ├── Price Lists: resolver precio segun lista del cliente
+  ├── Currency: si producto en USD, convertir a moneda local + snapshot exchange_rate
   ├── Discounts: aplicar descuentos por item y global
   ├── Audit: audit_log entry (existente)
   ├── Timeline: entry en customer + cada product
@@ -2163,6 +2392,7 @@ Scheduler (periodico)
   ├── Appointment no-show: marcar turnos pasados sin asistir
   ├── Retry webhooks: reintentar deliveries fallidos
   ├── Low stock alerts: notificar productos bajo minimo
+  ├── Fetch exchange rates: cotizaciones para orgs con auto_fetch
   └── Cleanup: temp files, old deliveries
 ```
 
@@ -2183,6 +2413,7 @@ appointmentsRepo := appointments.NewRepository(db)
 attachmentRepo := attachments.NewRepository(db)
 timelineRepo := timeline.NewRepository(db)
 outwebhookRepo := outwebhooks.NewRepository(db)
+currencyRepo := currency.NewRepository(db)
 dashboardRepo := dashboard.NewRepository(db)
 
 // Storage
@@ -2197,14 +2428,17 @@ returnsUC := returns.NewUsecases(returnsRepo, inventoryUC, cashflowUC, accountsU
 recurringUC := recurring.NewUsecases(recurringRepo, cashflowUC, accountsUC, auditUC)
 appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC)
 
-// Actualizar sales y purchases para usar accounts, payments, pricelists
-salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, accountsUC, paymentsUC, pricelistsUC, auditUC)
-purchasesUC := purchases.NewUsecases(purchasesRepo, inventoryUC, cashflowUC, accountsUC, paymentsUC, auditUC)
+// sales y purchases NO cambian su constructor original.
+// Las nuevas dependencias (accounts, payments, pricelists) se inyectan via setter injection,
+// igual que timeline y webhooks. Esto evita romper el constructor existente.
+salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC) // constructor original sin cambios
+purchasesUC := purchases.NewUsecases(purchasesRepo, inventoryUC, cashflowUC, auditUC)
 
 attachmentUC := attachments.NewUsecases(attachmentRepo, storage, auditUC)
 timelineUC := timeline.NewUsecases(timelineRepo)
 outwebhookUC := outwebhooks.NewUsecases(outwebhookRepo)
-dashboardUC := dashboard.NewUsecases(salesRepo, cashflowRepo, inventoryRepo, quotesRepo, customersRepo, accountsRepo, appointmentsRepo, recurringRepo)
+currencyUC := currency.NewUsecases(currencyRepo, cfg.ExchangeRateProvider)
+dashboardUC := dashboard.NewUsecases(salesUC, cashflowUC, inventoryUC, quotesUC, customersUC, accountsUC, appointmentsUC, recurringUC)
 dataioUC := dataio.NewUsecases(customersRepo, productsRepo, suppliersRepo, salesRepo, cashflowRepo, auditUC)
 pdfgenUC := pdfgen.NewUsecases(quotesRepo, salesRepo, adminRepo)
 waUC := whatsapp.NewUsecases(customersRepo, quotesRepo, salesRepo, adminRepo)
@@ -2212,7 +2446,17 @@ waUC := whatsapp.NewUsecases(customersRepo, quotesRepo, salesRepo, adminRepo)
 // RBAC middleware
 rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 
-// Inyectar timeline y webhooks en usecases existentes (setter injection, nil-safe)
+// Inyectar nuevas dependencias en usecases existentes (setter injection, nil-safe)
+// Accounts, payments, pricelists:
+salesUC.SetAccounts(accountsUC)
+salesUC.SetPayments(paymentsUC)
+salesUC.SetPriceLists(pricelistsUC)
+purchasesUC.SetAccounts(accountsUC)
+purchasesUC.SetPayments(paymentsUC)
+// Currency:
+salesUC.SetCurrency(currencyUC)
+purchasesUC.SetCurrency(currencyUC)
+// Timeline y webhooks:
 salesUC.SetTimeline(timelineUC)
 salesUC.SetWebhookDispatcher(outwebhookUC)
 purchasesUC.SetTimeline(timelineUC)
@@ -2239,23 +2483,38 @@ dashboardHandler := dashboard.NewHandler(dashboardUC)
 dataioHandler := dataio.NewHandler(dataioUC)
 pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
 waHandler := whatsapp.NewHandler(waUC)
-schedulerHandler := scheduler.NewHandler(cfg.SchedulerSecret, quotesUC, outwebhookUC, inventoryUC, dataioUC, recurringUC, appointmentsUC)
+currencyHandler := currency.NewHandler(currencyUC)
+schedulerHandler := scheduler.NewHandler(cfg.SchedulerSecret, quotesUC, outwebhookUC, inventoryUC, dataioUC, recurringUC, appointmentsUC, currencyUC)
 
-// ── Registrar rutas (con RBAC middleware) ──
+// ── Registrar rutas ──
+// Handlers existentes (Prompt 01) conservan su firma RegisterRoutes(rg *gin.RouterGroup).
+// RBAC se aplica como middleware de grupo para las rutas existentes:
+customersHandler.RegisterRoutes(authGroup) // ya registrado, RBAC se agrega via grupo
+suppliersHandler.RegisterRoutes(authGroup)
+productsHandler.RegisterRoutes(authGroup)
+// ... (los handlers de Prompt 01 ya estan registrados arriba, no duplicar)
+
+// Handlers NUEVOS — reciben rbacMiddleware en constructor o lo aplican internamente
 rbacHandler.RegisterRoutes(authGroup)
-purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
-accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-paymentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-returnsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-pricelistsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-recurringHandler.RegisterRoutes(authGroup, rbacMiddleware)
-appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-attachmentHandler.RegisterRoutes(authGroup, rbacMiddleware)
-dashboardHandler.RegisterRoutes(authGroup, rbacMiddleware)
-dataioHandler.RegisterRoutes(authGroup, rbacMiddleware)
+purchasesHandler.RegisterRoutes(authGroup)
+accountsHandler.RegisterRoutes(authGroup)
+paymentsHandler.RegisterRoutes(authGroup)
+returnsHandler.RegisterRoutes(authGroup)
+pricelistsHandler.RegisterRoutes(authGroup)
+recurringHandler.RegisterRoutes(authGroup)
+appointmentsHandler.RegisterRoutes(authGroup)
+attachmentHandler.RegisterRoutes(authGroup)
+dashboardHandler.RegisterRoutes(authGroup)
+dataioHandler.RegisterRoutes(authGroup)
 pdfgenHandler.RegisterRoutes(authGroup)
 waHandler.RegisterRoutes(authGroup)
 outwebhookHandler.RegisterRoutes(authGroup)
+currencyHandler.RegisterRoutes(authGroup)
+
+// RBAC middleware global: aplica a todo authGroup (despues del auth, antes de los handlers)
+// Cada handler nuevo usa rbacMiddleware.RequirePermission("resource", "action") internamente en sus rutas.
+// Ejemplo dentro de purchases/handler.go:
+//   g.POST("", h.rbac.RequirePermission("purchases", "create"), h.Create)
 
 // Scheduler (ruta interna, no auth JWT — protegida por secret)
 schedulerHandler.RegisterRoutes(v1)
@@ -2265,7 +2524,7 @@ schedulerHandler.RegisterRoutes(v1)
 
 ## Orden de implementacion recomendado
 
-1. Migraciones SQL (`0008`, `0009`, `0010`, `0011`)
+1. Migraciones SQL (`0010`, `0011`, `0012`, `0013`)
 2. `rbac` — roles, permisos, middleware (impacta todos los handlers)
 3. `accounts` — cuentas corrientes (dependency de purchases, sales fiadas, returns)
 4. `payments` — pagos parciales y multiples medios (dependency de sales y purchases)
@@ -2280,12 +2539,13 @@ schedulerHandler.RegisterRoutes(v1)
 13. `pdfgen` — PDFs de presupuestos y ventas
 14. `timeline` — activity timeline
 15. `outwebhooks` — webhooks salientes
-16. `whatsapp` — links de WhatsApp
-17. `dashboard` — KPIs (depende de todos los demas para mostrar datos)
-18. `scheduler` — tareas programadas (depende de quotes, webhooks, recurring, appointments)
-19. Actualizar handlers existentes de Prompt 01 para usar RBAC middleware + payments + discounts + pricelists
-20. Tests unitarios + E2E
-21. Actualizar Terraform (EventBridge, S3 bucket)
+16. `currency` — tipos de cambio (dependency de sales y purchases en pesos/dolar)
+17. `whatsapp` — links de WhatsApp
+18. `dashboard` — KPIs (depende de todos los demas para mostrar datos)
+19. `scheduler` — tareas programadas (depende de quotes, webhooks, recurring, appointments, currency)
+20. Integrar RBAC + payments + discounts + pricelists en handlers existentes de Prompt 01 (via setter injection, sin cambiar firmas)
+21. Tests unitarios + E2E
+22. Actualizar Terraform (EventBridge, S3 bucket)
 
 ---
 
@@ -2313,5 +2573,8 @@ schedulerHandler.RegisterRoutes(v1)
 - [ ] Webhooks: crear endpoint → crear venta → delivery registrado
 - [ ] WhatsApp: generar link wa.me con presupuesto para un cliente con telefono
 - [ ] Dashboard: ver KPIs (ventas hoy, caja, deudas, stock bajo, presupuestos pendientes, turnos del dia)
-- [ ] Scheduler: expirar presupuestos, recordar gastos, recordar turnos automaticamente
-- [ ] Tests E2E cubren: compras, fiado, pagos parciales, devoluciones, descuentos, listas de precio, turnos
+- [ ] Currency: consultar cotizacion dolar blue y oficial del dia
+- [ ] Currency: venta en USD → exchange_rate snapshot guardado → total_ars calculado
+- [ ] Currency: scheduler actualiza cotizaciones automaticamente cada hora
+- [ ] Scheduler: expirar presupuestos, recordar gastos, recordar turnos, actualizar cotizaciones automaticamente
+- [ ] Tests E2E cubren: compras, fiado, pagos parciales, devoluciones, descuentos, listas de precio, turnos, cotizaciones

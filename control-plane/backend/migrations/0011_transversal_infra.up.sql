@@ -92,6 +92,23 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_endpoint ON webhook_deliveries(endpoint_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_retry ON webhook_deliveries(next_retry) WHERE delivered_at IS NULL AND attempts < 5;
 
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    from_currency text NOT NULL,
+    to_currency text NOT NULL,
+    rate_type text NOT NULL CHECK (rate_type IN ('official', 'blue', 'mep', 'ccl', 'crypto', 'custom')),
+    buy_rate numeric(15,4) NOT NULL,
+    sell_rate numeric(15,4) NOT NULL,
+    source text NOT NULL DEFAULT 'manual' CHECK (source IN ('api', 'manual')),
+    rate_date date NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(org_id, from_currency, to_currency, rate_type, rate_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_org_date ON exchange_rates(org_id, rate_date DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_latest ON exchange_rates(org_id, from_currency, to_currency, rate_type, rate_date DESC);
+
 CREATE TABLE IF NOT EXISTS dashboard_configs (
     org_id uuid PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
     widgets jsonb NOT NULL DEFAULT '["sales_today","sales_month","cashflow_balance","pending_quotes","low_stock_products","top_products_month","recent_sales"]'::jsonb,

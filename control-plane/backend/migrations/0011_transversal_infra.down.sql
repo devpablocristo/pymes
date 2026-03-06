@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS scheduler_runs;
 DROP TABLE IF EXISTS dashboard_configs;
+DROP TABLE IF EXISTS exchange_rates;
 DROP TABLE IF EXISTS webhook_deliveries;
 DROP TABLE IF EXISTS webhook_endpoints;
 DROP TABLE IF EXISTS timeline_entries;

@@ -50,20 +50,20 @@ export function PublicPreviewPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Vista publica</h1>
-        <p>Preview de como se veria la pagina publica de profesionales</p>
+        <h1>Vista pública</h1>
+        <p>Vista previa de cómo se vería la página pública de profesionales</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-header">
-          <h2>Configuracion</h2>
+          <h2>Configuración</h2>
         </div>
         <div className="form-row">
           <div className="form-group grow">
-            <label>Slug de organizacion</label>
-            <input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="slug-org" />
+            <label>Slug de organización</label>
+            <input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="slug-organizacion" />
           </div>
           <button className="btn-primary" onClick={handleLoad}>Cargar</button>
         </div>

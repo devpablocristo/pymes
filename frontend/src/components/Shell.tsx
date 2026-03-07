@@ -89,7 +89,7 @@ const professionalsNav = [
   },
   {
     to: '/public',
-    label: 'Vista publica',
+    label: 'Vista pública',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -149,12 +149,12 @@ const sections: AppShellNavSection[] = [
   { label: 'Base', items: mainNav },
   { label: 'Profesionales', items: professionalsNav },
   ...moduleNav,
-  { label: 'Configuracion', items: settingsNav },
+  { label: 'Configuración', items: settingsNav },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
-    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Panel de gestion" sections={sections}>
+    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Panel de gestión" sections={sections}>
       {children}
     </AppShell>
   );

@@ -84,7 +84,7 @@ export function SessionsPage() {
     <>
       <div className="page-header">
         <h1>Sesiones</h1>
-        <p>Gestion de sesiones profesionales</p>
+        <p>Gestión de sesiones profesionales</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -102,7 +102,7 @@ export function SessionsPage() {
           </div>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group grow">
-              <label>Profile ID</label>
+              <label>ID del profesional</label>
               <input value={profileId} onChange={(e) => setProfileId(e.target.value)} placeholder="ID del profesional" />
             </div>
             <div className="form-group grow">

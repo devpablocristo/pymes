@@ -36,7 +36,7 @@ export function DashboardBoard({
     return (
       <div className="dashboard-empty card">
         <h2>No hay widgets visibles</h2>
-        <p>Activa widgets desde el catalogo o resetea este contexto para volver al layout base.</p>
+        <p>Activa widgets desde el catálogo o resetea este contexto para volver al layout base.</p>
       </div>
     );
   }

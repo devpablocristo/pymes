@@ -164,7 +164,7 @@ export function DashboardPage() {
               <strong>{visible.length}</strong>
             </div>
             <div>
-              <small>Catalogo</small>
+              <small>Catálogo</small>
               <strong>{availableWidgets.length}</strong>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function DashboardPage() {
             {editing ? (
               <>
                 <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
-                  Catalogo
+                  Catálogo
                 </button>
                 <button
                   type="button"
@@ -272,7 +272,7 @@ export function DashboardPage() {
             <div className="dashboard-meta-card">
               <small>Widgets ocultos</small>
               <strong>{hidden.length}</strong>
-              <p>{hidden.length > 0 ? 'Listos para reactivar desde el catalogo.' : 'Sin widgets ocultos.'}</p>
+              <p>{hidden.length > 0 ? 'Listos para reactivar desde el catálogo.' : 'Sin widgets ocultos.'}</p>
             </div>
           </div>
         </>

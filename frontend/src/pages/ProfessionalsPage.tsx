@@ -92,7 +92,7 @@ export function ProfessionalsPage() {
     <>
       <div className="page-header">
         <h1>Profesionales</h1>
-        <p>Gestion de perfiles profesionales</p>
+        <p>Gestión de perfiles profesionales</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -110,17 +110,17 @@ export function ProfessionalsPage() {
           </div>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group grow">
-              <label>Party ID</label>
-              <input value={partyId} onChange={(e) => setPartyId(e.target.value)} placeholder="ID del partido/persona" />
+              <label>ID de entidad</label>
+              <input value={partyId} onChange={(e) => setPartyId(e.target.value)} placeholder="ID de partido o persona" />
             </div>
             <div className="form-group grow">
-              <label>Headline</label>
-              <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Titulo profesional" />
+              <label>Título profesional</label>
+              <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Título profesional" />
             </div>
           </div>
           <div className="form-row" style={{ marginBottom: '0.75rem' }}>
             <div className="form-group grow">
-              <label>Slug publico</label>
+              <label>Slug público</label>
               <input value={publicSlug} onChange={(e) => setPublicSlug(e.target.value)} placeholder="slug-unico" />
             </div>
           </div>
@@ -154,7 +154,7 @@ export function ProfessionalsPage() {
                   <th>Nombre / Headline</th>
                   <th>Slug</th>
                   <th>Especialidades</th>
-                  <th>Publico</th>
+                  <th>Público</th>
                   <th>Reservable</th>
                   <th>Acciones</th>
                 </tr>
@@ -207,11 +207,11 @@ export function ProfessionalsPage() {
             </div>
             <div className="form-row" style={{ marginBottom: '0.75rem' }}>
               <div className="form-group grow">
-                <label>Headline</label>
+                <label>Título profesional</label>
                 <input value={editHeadline} onChange={(e) => setEditHeadline(e.target.value)} />
               </div>
               <div className="form-group grow">
-                <label>Slug publico</label>
+                <label>Slug público</label>
                 <input value={editSlug} onChange={(e) => setEditSlug(e.target.value)} />
               </div>
             </div>

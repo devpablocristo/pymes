@@ -177,7 +177,7 @@ type EndpointCardProps = {
 function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
   const fields = definition.fields ?? [];
   const runtimeKey = `${runtime.orgId}:${runtime.today}:${runtime.monthStart}`;
-  const defId = 'id' in definition ? (definition as ModuleDataset | ModuleAction).id : definition.path;
+  const defId = definition.id ?? definition.path;
   const [values, setValues] = useState<Record<string, string>>(() => buildInitialValues(fields, runtime));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -215,7 +215,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
           body: hasBody ? body : action.sendEmptyBody ? {} : undefined,
         });
         setResult(payload);
-        setSuccess(isAction && action.method !== 'GET' ? 'Operacion completada.' : 'Datos actualizados.');
+        setSuccess(isAction && action.method !== 'GET' ? 'Operación completada.' : 'Datos actualizados.');
       }
     } catch (err) {
       setError(String(err));
@@ -315,12 +315,12 @@ function NotFoundState() {
   return (
     <>
       <div className="page-header">
-        <h1>Modulo no encontrado</h1>
-        <p>La ruta solicitada no coincide con ningun modulo registrado en el frontend.</p>
+        <h1>Módulo no encontrado</h1>
+        <p>La ruta solicitada no coincide con ningún módulo registrado en el frontend.</p>
       </div>
       <div className="card">
         <div className="card-header">
-          <h2>Modulos disponibles</h2>
+          <h2>Módulos disponibles</h2>
         </div>
         <div className="module-link-grid">
           {moduleList.map((module) => (

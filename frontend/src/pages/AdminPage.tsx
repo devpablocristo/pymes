@@ -45,14 +45,14 @@ export function AdminPage() {
     <>
       <div className="page-header">
         <h1>Administracion</h1>
-        <p>Configuracion del espacio y registro de actividad</p>
+        <p>Configuración del espacio y registro de actividad</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
         <div className="card-header">
-          <h2>Configuracion del espacio</h2>
+          <h2>Configuración del espacio</h2>
         </div>
         <form onSubmit={onSubmit} className="form-row">
           <div className="form-group">

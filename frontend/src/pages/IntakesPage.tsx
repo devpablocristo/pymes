@@ -85,7 +85,7 @@ export function IntakesPage() {
     <>
       <div className="page-header">
         <h1>Ingresos</h1>
-        <p>Gestion de procesos de ingreso</p>
+        <p>Gestión de procesos de ingreso</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

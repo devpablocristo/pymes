@@ -18,7 +18,7 @@ export function WidgetCatalog({ open, widgets, layoutItems, onAdd, onClose }: Wi
       <aside className="dashboard-catalog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="card-header">
           <div>
-            <h2>Catalogo de widgets</h2>
+            <h2>Catálogo de widgets</h2>
             <p className="text-secondary">Solo aparecen widgets habilitados para tu rol y este contexto.</p>
           </div>
           <button type="button" className="btn-secondary btn-sm" onClick={onClose}>

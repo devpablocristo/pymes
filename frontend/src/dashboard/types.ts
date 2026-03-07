@@ -76,20 +76,20 @@ export type DashboardContextDefinition = {
 export const dashboardContexts: DashboardContextDefinition[] = [
   {
     id: 'home',
-    label: 'Home',
+    label: 'Panel',
     kicker: 'Base estable',
     description: 'La vista inicial transversal para cada usuario autenticado.',
   },
   {
     id: 'commercial',
     label: 'Comercial',
-    kicker: 'Pipeline',
+    kicker: 'Embudo',
     description: 'Prioriza ventas, presupuestos y actividad del frente comercial.',
   },
   {
     id: 'operations',
     label: 'Operaciones',
-    kicker: 'Ejecucion',
+    kicker: 'Ejecución',
     description: 'Expone alertas operativas, stock y ritmo diario del tenant.',
   },
   {

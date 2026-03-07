@@ -56,7 +56,7 @@ export function SpecialtiesPage() {
     <>
       <div className="page-header">
         <h1>Especialidades</h1>
-        <p>Catalogo de especialidades profesionales</p>
+        <p>Catálogo de especialidades profesionales</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -75,8 +75,8 @@ export function SpecialtiesPage() {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la especialidad" />
           </div>
           <div className="form-group grow">
-            <label>Descripcion</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripcion breve" />
+            <label>Descripción</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción breve" />
           </div>
           <button className="btn-primary" onClick={handleCreate}>Crear</button>
         </div>
@@ -100,7 +100,7 @@ export function SpecialtiesPage() {
                 <tr>
                   <th>Codigo</th>
                   <th>Nombre</th>
-                  <th>Descripcion</th>
+                  <th>Descripción</th>
                   <th>Estado</th>
                 </tr>
               </thead>

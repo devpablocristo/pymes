@@ -51,7 +51,7 @@ export function QuotesPipelineWidget(props: DashboardWidgetRendererProps) {
       {(data) => (
         <div className="widget-metric-grid widget-metric-grid-4">
           <MetricTile label="Pendientes" value={data.pending_total.toLocaleString('es-AR')} />
-          <MetricTile label="Draft" value={data.draft.toLocaleString('es-AR')} subtle />
+          <MetricTile label="Borrador" value={data.draft.toLocaleString('es-AR')} subtle />
           <MetricTile label="Enviados" value={data.sent.toLocaleString('es-AR')} subtle />
           <MetricTile label="Aceptados" value={data.accepted.toLocaleString('es-AR')} tone="success" />
           <MetricTile label="Rechazados" value={data.rejected.toLocaleString('es-AR')} tone="danger" />
@@ -211,7 +211,7 @@ export function UnknownWidget(props: DashboardWidgetRendererProps) {
     <div className="widget-state widget-state-warning">
       <strong>Widget sin renderer local</strong>
       <p>
-        `{props.widget.widget_key}` existe en el catalogo, pero este frontend no tiene un componente registrado todavia.
+        `{props.widget.widget_key}` existe en el catálogo, pero este frontend no tiene un componente registrado todavía.
       </p>
       <small>{props.widget.data_endpoint}</small>
     </div>

@@ -13,7 +13,7 @@ export function SettingsPage() {
           <UserProfile routing="path" path="/settings" />
         ) : (
           <div className="empty-state">
-            <p>Clerk deshabilitado. Este entorno usa autenticacion por clave API.</p>
+            <p>Clerk deshabilitado. Este entorno usa autenticación por clave API.</p>
           </div>
         )}
       </div>

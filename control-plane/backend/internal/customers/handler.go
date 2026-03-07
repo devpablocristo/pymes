@@ -18,10 +18,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error)
 	Create(ctx context.Context, in customerdomain.Customer, actor string) (customerdomain.Customer, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (customerdomain.Customer, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error)
 	ExportCSV(ctx context.Context, orgID uuid.UUID) ([]byte, error)
 	ImportCSV(ctx context.Context, orgID uuid.UUID, csvData []byte, actor string) (int, error)
@@ -35,12 +38,15 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/customers", rbac.RequirePermission("customers", "read"), h.List)
+	auth.GET("/customers/archived", rbac.RequirePermission("customers", "read"), h.ListArchived)
 	auth.POST("/customers", rbac.RequirePermission("customers", "create"), h.Create)
 	auth.GET("/customers/export", rbac.RequirePermission("customers", "export"), h.ExportCSV)
 	auth.POST("/customers/import", rbac.RequirePermission("customers", "import"), h.ImportCSV)
 	auth.GET("/customers/:id", rbac.RequirePermission("customers", "read"), h.Get)
 	auth.PUT("/customers/:id", rbac.RequirePermission("customers", "update"), h.Update)
 	auth.DELETE("/customers/:id", rbac.RequirePermission("customers", "delete"), h.Delete)
+	auth.POST("/customers/:id/restore", rbac.RequirePermission("customers", "delete"), h.Restore)
+	auth.DELETE("/customers/:id/hard", rbac.RequirePermission("customers", "delete"), h.HardDelete)
 	auth.GET("/customers/:id/sales", rbac.RequirePermission("customers", "read"), h.SalesHistory)
 }
 
@@ -194,6 +200,63 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	resp := dto.ListCustomersResponse{Items: make([]dto.CustomerItem, 0, len(items)), Total: int64(len(items))}
+	for _, it := range items {
+		resp.Items = append(resp.Items, toCustomerItem(it))
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

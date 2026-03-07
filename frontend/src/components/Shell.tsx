@@ -1,6 +1,9 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavSection } from '../shared/frontendShell';
 import { moduleGroups, moduleList } from '../lib/moduleCatalog';
+import { getVisibleModuleIds } from '../lib/profileFilters';
+import { vocab } from '../lib/vocabulary';
+import { getTheme, toggleTheme } from '../lib/theme';
 
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
@@ -9,7 +12,7 @@ function Glyph({ label }: { label: string }) {
 const mainNav = [
   {
     to: '/',
-    label: 'Panel',
+    label: 'Dashboard',
     end: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -133,28 +136,57 @@ const settingsNav = [
   },
 ];
 
-const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
-  label: group.label,
-  items: moduleList
-    .filter((module) => module.group === group.id)
-    .sort((left, right) => left.navLabel.localeCompare(right.navLabel))
-    .map((module) => ({
-      to: `/modules/${module.id}`,
-      label: module.navLabel,
-      icon: <Glyph label={module.icon} />,
-    })),
-}));
-
-const sections: AppShellNavSection[] = [
-  { label: 'Base', items: mainNav },
-  { label: 'Profesionales', items: professionalsNav },
-  ...moduleNav,
-  { label: 'Configuración', items: settingsNav },
-];
-
 export function Shell({ children }: { children: ReactNode }) {
+  const sections = useMemo(() => {
+    const visibleIds = getVisibleModuleIds();
+
+    const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
+      label: group.label,
+      items: moduleList
+        .filter((module) => module.group === group.id && visibleIds.has(module.id))
+        .sort((left, right) => left.navLabel.localeCompare(right.navLabel))
+        .map((module) => ({
+          to: `/modules/${module.id}`,
+          label: vocab(module.navLabel),
+          icon: <Glyph label={module.icon} />,
+        })),
+    })).filter((section) => section.items.length > 0);
+
+    return [
+      { label: 'Base', items: mainNav },
+      { label: 'Profesionales', items: professionalsNav },
+      ...moduleNav,
+      { label: 'Configuración', items: settingsNav },
+    ] as AppShellNavSection[];
+  }, []);
+
+  const [theme, setThemeState] = useState(getTheme);
+
+  function handleToggleTheme() {
+    const next = toggleTheme();
+    setThemeState(next);
+  }
+
+  const themeToggle = (
+    <button type="button" className="theme-toggle" onClick={handleToggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+      {theme === 'dark' ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  );
+
   return (
-    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Panel de gestión" sections={sections}>
+    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Panel de gestión" sections={sections} footerContent={themeToggle}>
       {children}
     </AppShell>
   );

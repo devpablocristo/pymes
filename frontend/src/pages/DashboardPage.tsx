@@ -8,14 +8,15 @@ import {
 } from '../lib/api';
 import { DashboardBoard } from '../dashboard/components/DashboardBoard';
 import { WidgetCatalog } from '../dashboard/components/WidgetCatalog';
+import { getVisibleWidgetKeys } from '../lib/profileFilters';
+import { getTenantProfile } from '../lib/tenantProfile';
+import { WeeklyCalendar } from '../components/WeeklyCalendar';
 import {
-  dashboardContexts,
   type DashboardContext,
   type DashboardLayoutItem,
   type DashboardWidgetDefinition,
 } from '../dashboard/types';
 import {
-  hiddenItems,
   moveLayoutItem,
   packLayoutItems,
   resizeLayoutItem,
@@ -23,12 +24,11 @@ import {
   toDashboardSavePayload,
   toggleLayoutItemVisibility,
   upsertWidgetInstance,
-  visibleItems,
 } from '../dashboard/utils/layout';
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
-  const [selectedContext, setSelectedContext] = useState<DashboardContext>('home');
+  const selectedContext: DashboardContext = 'home';
   const [editing, setEditing] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [draftItems, setDraftItems] = useState<DashboardLayoutItem[]>([]);
@@ -45,11 +45,6 @@ export function DashboardPage() {
   });
 
   useEffect(() => {
-    setEditing(false);
-    setCatalogOpen(false);
-  }, [selectedContext]);
-
-  useEffect(() => {
     if (dashboardQuery.data && !editing) {
       setDraftItems(
         packLayoutItems(
@@ -60,13 +55,15 @@ export function DashboardPage() {
     }
   }, [dashboardQuery.data, editing]);
 
-  const availableWidgets = dashboardQuery.data?.available_widgets ?? [];
+  const profileWidgetKeys = useMemo(() => getVisibleWidgetKeys(), []);
+  const availableWidgets = useMemo(
+    () => (dashboardQuery.data?.available_widgets ?? []).filter((w) => profileWidgetKeys.has(w.widget_key)),
+    [dashboardQuery.data?.available_widgets, profileWidgetKeys],
+  );
   const normalizedDraft = useMemo(
     () => packLayoutItems(draftItems, availableWidgets),
     [draftItems, availableWidgets],
   );
-  const hidden = hiddenItems(normalizedDraft);
-  const visible = visibleItems(normalizedDraft);
   const dirty = dashboardQuery.data
     ? serializeLayout(normalizedDraft, availableWidgets) !==
       serializeLayout(dashboardQuery.data.layout.items, availableWidgets)
@@ -94,9 +91,6 @@ export function DashboardPage() {
       setCatalogOpen(false);
     },
   });
-
-  const contextMeta =
-    dashboardContexts.find((context) => context.id === selectedContext) ?? dashboardContexts[0];
 
   const primaryError =
     (dashboardQuery.error as Error | null)?.message || (meQuery.error as Error | null)?.message || '';
@@ -137,145 +131,88 @@ export function DashboardPage() {
     setCatalogOpen(false);
   }
 
+  const profile = getTenantProfile();
+  const userName = String(
+    meQuery.data?.name ?? meQuery.data?.email ?? meQuery.data?.id ?? '',
+  );
+
   return (
     <>
       <div className="dashboard-shell-header">
-        <div className="dashboard-hero card">
-          <div className="dashboard-hero-copy">
-            <span className="dashboard-hero-kicker">{contextMeta.kicker}</span>
-            <h1>{contextMeta.label}</h1>
-            <p>{contextMeta.description}</p>
-          </div>
-          <div className="dashboard-hero-meta">
-            <div>
-              <small>Usuario</small>
-              <strong>
-                {String(
-                  meQuery.data?.name ?? meQuery.data?.email ?? meQuery.data?.id ?? 'Sin identificar',
-                )}
-              </strong>
-            </div>
-            <div>
-              <small>Layout</small>
-              <strong>{dashboardQuery.data?.layout.source ?? 'cargando'}</strong>
-            </div>
-            <div>
-              <small>Widgets visibles</small>
-              <strong>{visible.length}</strong>
-            </div>
-            <div>
-              <small>Catálogo</small>
-              <strong>{availableWidgets.length}</strong>
-            </div>
-          </div>
+        <div className="dashboard-welcome">
+          <h1>{userName ? `Hola, ${userName}` : 'Dashboard'}</h1>
+          {profile?.businessName && (
+            <p className="text-secondary">{profile.businessName}</p>
+          )}
         </div>
 
-        <div className="dashboard-toolbar-row">
-          <div className="dashboard-context-tabs">
-            {dashboardContexts.map((context) => (
-              <button
-                key={context.id}
-                type="button"
-                className={`dashboard-context-tab${selectedContext === context.id ? ' active' : ''}`}
-                onClick={() => setSelectedContext(context.id)}
-              >
-                <span>{context.label}</span>
-                <small>{context.kicker}</small>
+        <div className="actions-row dashboard-actions">
+          {editing ? (
+            <>
+              <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
+                Catálogo
               </button>
-            ))}
-          </div>
-
-          <div className="actions-row dashboard-actions">
-            {editing ? (
-              <>
-                <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
-                  Catálogo
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={handleCancelEditing}
-                  disabled={saving}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={() => resetMutation.mutate()}
-                  disabled={saving}
-                >
-                  Resetear
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => saveMutation.mutate()}
-                  disabled={saving || !dirty}
-                >
-                  {saving ? 'Guardando...' : 'Guardar layout'}
-                </button>
-              </>
-            ) : (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleCancelEditing}
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => resetMutation.mutate()}
+                disabled={saving}
+              >
+                Resetear
+              </button>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => setEditing(true)}
-                disabled={busy}
+                onClick={() => saveMutation.mutate()}
+                disabled={saving || !dirty}
               >
-                Personalizar dashboard
+                {saving ? 'Guardando...' : 'Guardar'}
               </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setEditing(true)}
+              disabled={busy}
+            >
+              Personalizar
+            </button>
+          )}
         </div>
       </div>
 
       {primaryError ? <div className="alert alert-error">{primaryError}</div> : null}
-      {dashboardQuery.data?.layout.source === 'default' && !editing ? (
-        <div className="alert alert-warning">
-          Estas viendo el layout base del sistema. Entra en modo edicion para guardar tu propia version.
-        </div>
-      ) : null}
       {editing && dirty ? (
         <div className="alert alert-success">
-          Tienes cambios locales sin persistir en este contexto.
+          Tenés cambios sin guardar.
         </div>
       ) : null}
+
+      {profile?.usesScheduling && <WeeklyCalendar />}
 
       {busy ? (
         <div className="spinner" />
-      ) : dashboardQuery.data ? (
-        <>
-          <DashboardBoard
-            context={selectedContext}
-            items={normalizedDraft}
-            widgets={availableWidgets}
-            editing={editing}
-            onMoveBackward={(instanceId) => handleMove(instanceId, -1)}
-            onMoveForward={(instanceId) => handleMove(instanceId, 1)}
-            onGrow={(instanceId) => handleResize(instanceId, 1, 1)}
-            onShrink={(instanceId) => handleResize(instanceId, -1, -1)}
-            onToggleVisibility={handleToggleVisibility}
-          />
-
-          <div className="dashboard-meta-grid compact-grid">
-            <div className="dashboard-meta-card">
-              <small>Contexto activo</small>
-              <strong>{selectedContext}</strong>
-              <p>{contextMeta.description}</p>
-            </div>
-            <div className="dashboard-meta-card">
-              <small>Fuente del layout</small>
-              <strong>{dashboardQuery.data.layout.source}</strong>
-              <p>Version {dashboardQuery.data.layout.version}</p>
-            </div>
-            <div className="dashboard-meta-card">
-              <small>Widgets ocultos</small>
-              <strong>{hidden.length}</strong>
-              <p>{hidden.length > 0 ? 'Listos para reactivar desde el catálogo.' : 'Sin widgets ocultos.'}</p>
-            </div>
-          </div>
-        </>
+      ) : dashboardQuery.data && (!profile?.usesScheduling || editing) ? (
+        <DashboardBoard
+          context={selectedContext}
+          items={normalizedDraft}
+          widgets={availableWidgets}
+          editing={editing}
+          onMoveBackward={(instanceId) => handleMove(instanceId, -1)}
+          onMoveForward={(instanceId) => handleMove(instanceId, 1)}
+          onGrow={(instanceId) => handleResize(instanceId, 1, 1)}
+          onShrink={(instanceId) => handleResize(instanceId, -1, -1)}
+          onToggleVisibility={handleToggleVisibility}
+        />
       ) : null}
 
       <WidgetCatalog

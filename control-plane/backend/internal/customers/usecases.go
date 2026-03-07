@@ -16,10 +16,13 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error)
 	Create(ctx context.Context, in customerdomain.Customer) (customerdomain.Customer, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error)
 	Update(ctx context.Context, in customerdomain.Customer) (customerdomain.Customer, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error)
 }
 
@@ -149,6 +152,36 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "customer.deleted", "customer", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error) {
+	return u.repo.ListArchived(ctx, orgID)
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "customer.restored", "customer", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "customer.hard_deleted", "customer", id.String(), map[string]any{})
 	}
 	return nil
 }

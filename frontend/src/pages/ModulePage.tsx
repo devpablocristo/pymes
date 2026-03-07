@@ -12,6 +12,7 @@ import {
   type ModuleField,
   type ModuleRuntimeContext,
 } from '../lib/moduleCatalog';
+import { vocab } from '../lib/vocabulary';
 
 function currentRuntimeContext(): ModuleRuntimeContext {
   const now = new Date();
@@ -242,8 +243,8 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
     <section className="card module-card">
       <div className="card-header">
         <div>
-          <h2>{definition.title}</h2>
-          <p className="text-secondary">{definition.description}</p>
+          <h2>{vocab(definition.title)}</h2>
+          <p className="text-secondary">{vocab(definition.description)}</p>
         </div>
         <span className="badge badge-neutral mono">{definition.path}</span>
       </div>
@@ -349,8 +350,8 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
             <span className="sidebar-token">{module.icon}</span>
             <span className="badge badge-neutral">{module.badge ?? groupLabel}</span>
           </div>
-          <h1>{module.title}</h1>
-          <p>{module.summary}</p>
+          <h1>{vocab(module.title)}</h1>
+          <p>{vocab(module.summary)}</p>
         </div>
         <div className="module-runtime-card">
           <span>Org activa</span>

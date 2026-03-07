@@ -228,6 +228,96 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error) {
+	var rows []customerPartyRow
+	err := r.db.WithContext(ctx).
+		Table("parties p").
+		Select(`p.id, p.org_id, p.party_type, p.display_name, p.email, p.phone, p.address, p.tax_id, p.notes, p.tags, p.metadata, p.created_at, p.updated_at, p.deleted_at`).
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer'").
+		Where("p.org_id = ? AND p.deleted_at IS NOT NULL", orgID).
+		Order("p.updated_at DESC").
+		Limit(200).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]customerdomain.Customer, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, customerFromPartyRow(row))
+	}
+	return out, nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Table("parties").
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+			Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		exists, err := legacyCustomerTableExists(ctx, tx)
+		if err != nil || !exists {
+			return err
+		}
+		return tx.Table("customers").
+			Where("org_id = ? AND id = ?", orgID, id).
+			Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")}).Error
+	})
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verify it's archived before hard-deleting.
+		var count int64
+		if err := tx.Table("parties").
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		// Nullify FK references in dependent tables.
+		for _, table := range []string{"quotes", "sales", "returns", "credit_notes", "appointments"} {
+			if has, _ := r.tableHasColumn(ctx, table, "customer_id"); has {
+				tx.Exec("UPDATE "+table+" SET customer_id = NULL WHERE customer_id = ? AND org_id = ?", id, orgID)
+			}
+			if has, _ := r.tableHasColumn(ctx, table, "party_id"); has {
+				tx.Exec("UPDATE "+table+" SET party_id = NULL WHERE party_id = ? AND org_id = ?", id, orgID)
+			}
+		}
+
+		// Nullify account references.
+		if has, _ := r.tableHasColumn(ctx, "accounts", "party_id"); has {
+			tx.Exec("UPDATE accounts SET party_id = NULL WHERE party_id = ? AND org_id = ?", id, orgID)
+		}
+
+		// Delete legacy customer row first (has FK from other tables too).
+		exists, err := legacyCustomerTableExists(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if exists {
+			tx.Table("customers").Where("org_id = ? AND id = ?", orgID, id).Delete(nil)
+		}
+
+		// Delete party extensions and roles.
+		tx.Exec("DELETE FROM party_roles WHERE party_id = ? AND org_id = ?", id, orgID)
+		tx.Exec("DELETE FROM party_persons WHERE party_id = ?", id)
+		tx.Exec("DELETE FROM party_organizations WHERE party_id = ?", id)
+
+		// Delete the party itself.
+		return tx.Table("parties").
+			Where("org_id = ? AND id = ?", orgID, id).
+			Delete(nil).Error
+	})
+}
+
 func (r *Repository) ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error) {
 	type row struct {
 		ID            uuid.UUID

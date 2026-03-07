@@ -134,6 +134,30 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
       { id: 'suppliers-list', title: 'Proveedores', description: 'Listado principal de proveedores.', path: '/v1/suppliers', autoLoad: true },
     ],
   },
+  employees: {
+    id: 'employees',
+    title: 'Empleados',
+    navLabel: 'Empleados',
+    summary: 'Gestión de empleados y miembros de la organización.',
+    group: 'commercial',
+    icon: 'EM',
+    datasets: [
+      {
+        id: 'employees-parties',
+        title: 'Empleados (entidades)',
+        description: 'Entidades con rol empleado en el modelo de parties.',
+        path: '/v1/parties?role=employee',
+        autoLoad: true,
+      },
+      {
+        id: 'employees-members',
+        title: 'Miembros de la org',
+        description: 'Usuarios registrados como miembros de la organización activa.',
+        path: '/v1/orgs/{{orgId}}/members',
+        autoLoad: true,
+      },
+    ],
+  },
   products: {
     id: 'products',
     title: 'Productos',

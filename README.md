@@ -48,13 +48,14 @@ La documentación canónica del repo vive en `docs/README.md`.
 
 Lecturas recomendadas:
 - `docs/README.md`: guía operativa y arquitectónica consolidada
-- `prompts/00-base-transversal.md` a `prompts/05-agentes-comerciales.md`: alcance y diseño funcional
+- `docs/prompt-07-dashboard-personalizable.md`: contratos y alcance del dashboard configurable
+- `prompts/00-base-transversal.md` a `prompts/07-dashboard-personalizable.md`: alcance y diseño funcional
 
 ## Estado actual
 
 El repo ya incluye:
 - backend modular en Go para plataforma, core de negocio, extensiones y pagos
-- frontend React/TypeScript alineado con la superficie principal del backend
+- frontend React/TypeScript alineado con la superficie principal del backend y home personalizable por usuario
 - servicio AI en FastAPI con chat interno/externo, WhatsApp y agentes comerciales
 - paquetes compartidos en `pkgs/` para Go, TypeScript y Python
 
@@ -64,5 +65,6 @@ El repo ya incluye:
 make cp-test
 make cp-vet
 make ai-test
+cd control-plane/frontend && npm test
 cd control-plane/frontend && npm run build
 ```

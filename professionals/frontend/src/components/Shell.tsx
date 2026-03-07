@@ -1,11 +1,7 @@
-import type { PropsWithChildren, ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
-import { UserButton } from '@clerk/clerk-react';
-import { clerkEnabled } from '@pymes/ts-pkg/auth';
+import type { ReactNode } from 'react';
+import { AppShell, type AppShellNavSection } from '@pymes/frontend-shared/frontendShell';
 
-type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
-
-const mainNav: NavItem[] = [
+const mainNav = [
   {
     to: '/',
     label: 'Panel',
@@ -42,7 +38,7 @@ const mainNav: NavItem[] = [
   },
 ];
 
-const operationsNav: NavItem[] = [
+const operationsNav = [
   {
     to: '/intakes',
     label: 'Intakes',
@@ -68,7 +64,7 @@ const operationsNav: NavItem[] = [
   },
 ];
 
-const publicNav: NavItem[] = [
+const publicNav = [
   {
     to: '/public',
     label: 'Vista publica',
@@ -82,7 +78,7 @@ const publicNav: NavItem[] = [
   },
 ];
 
-const settingsNav: NavItem[] = [
+const settingsNav = [
   {
     to: '/settings',
     label: 'Perfil',
@@ -96,47 +92,21 @@ const settingsNav: NavItem[] = [
   },
 ];
 
-function NavSection({ label, items }: { label: string; items: NavItem[] }) {
+const sections: AppShellNavSection[] = [
+  { label: 'Principal', items: mainNav },
+  { label: 'Operaciones', items: operationsNav },
+  { label: 'Publico', items: publicNav },
+  { label: 'Configuracion', items: settingsNav },
+];
+
+export function Shell({ children }: { children: ReactNode }) {
   return (
-    <>
-      <div className="sidebar-section-label">{label}</div>
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
-    </>
-  );
-}
-
-export function Shell({ children }: PropsWithChildren) {
-  return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h1>Pymes Profesionales</h1>
-          <small>Gestion profesional</small>
-        </div>
-
-        <nav className="sidebar-nav">
-          <NavSection label="Principal" items={mainNav} />
-          <NavSection label="Operaciones" items={operationsNav} />
-          <NavSection label="Publico" items={publicNav} />
-          <NavSection label="Configuracion" items={settingsNav} />
-        </nav>
-
-        <div className="sidebar-footer">
-          {clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>}
-        </div>
-      </aside>
-
-      <main className="main-content">{children}</main>
-    </div>
+    <AppShell
+      brandTitle="Pymes Profesionales"
+      brandSubtitle="Gestion profesional"
+      sections={sections}
+    >
+      {children}
+    </AppShell>
   );
 }

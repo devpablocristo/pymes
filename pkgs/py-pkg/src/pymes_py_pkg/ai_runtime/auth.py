@@ -2,31 +2,16 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from jose import jwt
+from pymes_py_pkg.ai_runtime.contexts import AuthContext
+from pymes_py_pkg.ai_runtime.logging import update_request_context as default_update_request_context
 from pymes_py_pkg.errors import error_payload
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-
-from src.config import Settings
-from src.observability.logging import update_request_context
-
-
-@dataclass
-class AuthContext:
-    org_id: str
-    actor: str
-    role: str
-    scopes: list[str]
-    mode: str
-    authorization: str | None = None
-    api_key: str | None = None
-    api_actor: str | None = None
-    api_role: str | None = None
-    api_scopes: str | None = None
 
 
 @dataclass
@@ -36,18 +21,30 @@ class JWKSCache:
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    def __init__(
+        self,
+        app,
+        settings: Any,
+        update_request_context: Callable[..., None] | None = None,
+        public_prefixes: tuple[str, ...] = ("/v1/public/",),
+        protected_prefixes: tuple[str, ...] = ("/v1/chat",),
+        health_prefixes: tuple[str, ...] = ("/healthz", "/readyz"),
+    ) -> None:  # type: ignore[no-untyped-def]
         super().__init__(app)
         self.settings = settings
+        self.update_request_context = update_request_context or default_update_request_context
+        self.public_prefixes = public_prefixes
+        self.protected_prefixes = protected_prefixes
+        self.health_prefixes = health_prefixes
         self._jwks_cache = JWKSCache(keys={}, expires_at=0)
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         path = request.url.path
         request_id = getattr(request.state, "request_id", "")
-        if path.startswith("/healthz") or path.startswith("/readyz") or path.startswith("/v1/public/"):
+        if any(path.startswith(prefix) for prefix in self.health_prefixes + self.public_prefixes):
             return await call_next(request)
 
-        if not path.startswith("/v1/chat"):
+        if not any(path.startswith(prefix) for prefix in self.protected_prefixes):
             return await call_next(request)
 
         authz = request.headers.get("Authorization", "")
@@ -78,7 +75,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 mode="internal",
                 authorization=authz,
             )
-            update_request_context(org_id=org_id, user_id=actor)
+            self.update_request_context(org_id=org_id, user_id=actor)
             return await call_next(request)
 
         if api_key and self.settings.auth_allow_api_key:
@@ -103,7 +100,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 api_role=role,
                 api_scopes=scopes_raw,
             )
-            update_request_context(org_id=org_id, user_id=actor)
+            self.update_request_context(org_id=org_id, user_id=actor)
             return await call_next(request)
 
         return JSONResponse(status_code=401, content=error_payload("unauthorized", "unauthorized", request_id))

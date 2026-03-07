@@ -1,16 +1,12 @@
-import type { PropsWithChildren, ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
-import { UserButton } from '@clerk/clerk-react';
-import { clerkEnabled } from '@pymes/ts-pkg/auth';
+import type { ReactNode } from 'react';
+import { AppShell, type AppShellNavSection } from '../shared/frontendShell';
 import { moduleGroups, moduleList } from '../lib/moduleCatalog';
-
-type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
 
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
 }
 
-const mainNav: NavItem[] = [
+const mainNav = [
   {
     to: '/',
     label: 'Panel',
@@ -46,7 +42,7 @@ const mainNav: NavItem[] = [
   },
 ];
 
-const settingsNav: NavItem[] = [
+const settingsNav = [
   {
     to: '/settings/keys',
     label: 'Claves API',
@@ -79,60 +75,28 @@ const settingsNav: NavItem[] = [
   },
 ];
 
-function NavSection({ label, items }: { label: string; items: NavItem[] }) {
-  return (
-    <>
-      <div className="sidebar-section-label">{label}</div>
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
-    </>
-  );
-}
-
-const moduleNav = moduleGroups.map((group) => ({
+const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
   label: group.label,
   items: moduleList
     .filter((module) => module.group === group.id)
     .sort((left, right) => left.navLabel.localeCompare(right.navLabel))
-    .map<NavItem>((module) => ({
+    .map((module) => ({
       to: `/modules/${module.id}`,
       label: module.navLabel,
       icon: <Glyph label={module.icon} />,
     })),
 }));
 
-export function Shell({ children }: PropsWithChildren) {
+const sections: AppShellNavSection[] = [
+  { label: 'Base', items: mainNav },
+  ...moduleNav,
+  { label: 'Configuracion', items: settingsNav },
+];
+
+export function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h1>Pymes SaaS</h1>
-          <small>Control plane</small>
-        </div>
-
-        <nav className="sidebar-nav">
-          <NavSection label="Base" items={mainNav} />
-          {moduleNav.map((section) => (
-            <NavSection key={section.label} label={section.label} items={section.items} />
-          ))}
-          <NavSection label="Configuracion" items={settingsNav} />
-        </nav>
-
-        <div className="sidebar-footer">
-          {clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>}
-        </div>
-      </aside>
-
-      <main className="main-content">{children}</main>
-    </div>
+    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Control plane" sections={sections}>
+      {children}
+    </AppShell>
   );
 }

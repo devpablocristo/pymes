@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@pymes/ts-pkg': path.resolve(__dirname, '../../pkgs/ts-pkg/src'),
+      '@pymes/frontend-shared': path.resolve(__dirname, '../../control-plane/frontend/src/shared'),
     },
   },
   server: {

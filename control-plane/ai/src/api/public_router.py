@@ -12,11 +12,11 @@ from src.api.router import check_quota, estimate_tokens, to_sse_event
 from src.api.sse import EventSourceResponse
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
-from src.core.orchestrator import orchestrate
+from pymes_py_pkg.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
-from src.llm.base import Message
-from src.observability.logging import get_logger, update_request_context
+from pymes_py_pkg.ai_runtime import Message
+from pymes_py_pkg.ai_runtime import get_logger, update_request_context
 from src.tools.registry import build_external_tools
 
 router = APIRouter(prefix="/v1/public", tags=["public-chat"])

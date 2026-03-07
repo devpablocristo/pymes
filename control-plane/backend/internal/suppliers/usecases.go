@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 	supplierdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers/usecases/domain"
 )
 

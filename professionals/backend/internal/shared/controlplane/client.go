@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -94,4 +95,31 @@ func (c *Client) decode(resp *http.Response) (map[string]any, error) {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return result, nil
+}
+
+func (c *Client) GetBusinessInfo(ctx context.Context, orgRef string) (map[string]any, error) {
+	return c.get(ctx, fmt.Sprintf("/v1/public/%s/info", url.PathEscape(orgRef)), "")
+}
+
+func (c *Client) GetAvailability(ctx context.Context, orgRef string, date string, duration int) (map[string]any, error) {
+	path := fmt.Sprintf("/v1/public/%s/availability", url.PathEscape(orgRef))
+	query := url.Values{}
+	if date != "" {
+		query.Set("date", date)
+	}
+	if duration > 0 {
+		query.Set("duration", fmt.Sprintf("%d", duration))
+	}
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	return c.get(ctx, path, "")
+}
+
+func (c *Client) BookAppointment(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error) {
+	return c.post(ctx, fmt.Sprintf("/v1/public/%s/book", url.PathEscape(orgRef)), "", payload)
+}
+
+func (c *Client) CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error) {
+	return c.post(ctx, fmt.Sprintf("/v1/internal/v1/sales/%s/payment-link", url.PathEscape(saleID)), orgID, nil)
 }

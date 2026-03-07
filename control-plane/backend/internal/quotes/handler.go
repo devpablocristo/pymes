@@ -15,7 +15,7 @@ import (
 	quotedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/quotes/usecases/domain"
 	salesdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/sales/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type usecasesPort interface {

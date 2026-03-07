@@ -183,7 +183,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]saledomain.Sale,
 
 	q := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ?", p.OrgID)
 	if p.CustomerID != nil && *p.CustomerID != uuid.Nil {
-		q = q.Where("party_id = ?", *p.CustomerID)
+		q = q.Where("customer_id = ?", *p.CustomerID)
 	}
 	if pm := strings.TrimSpace(p.PaymentMethod); pm != "" {
 		q = q.Where("payment_method = ?", pm)

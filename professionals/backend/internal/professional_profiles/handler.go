@@ -12,7 +12,7 @@ import (
 
 	"github.com/devpablocristo/pymes/professionals/backend/internal/professional_profiles/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/professional_profiles/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/professionals/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 	"github.com/devpablocristo/pymes/pkgs/go-pkg/auth"
 )
 

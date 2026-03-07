@@ -10,7 +10,7 @@ import (
 	admindomain "github.com/devpablocristo/pymes/control-plane/backend/internal/admin/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/authz"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type usecasesPort interface {

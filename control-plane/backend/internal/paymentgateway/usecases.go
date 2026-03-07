@@ -1,3 +1,4 @@
+// Package paymentgateway contains payment gateway business logic and provider orchestration.
 package paymentgateway
 
 import (
@@ -89,6 +90,7 @@ type Usecases struct {
 	mp              mercadoPagoPort
 	audit           auditPort
 	crypto          *Crypto
+	mode            string
 	mpAppID         string
 	mpClientSecret  string
 	mpWebhookSecret string
@@ -102,6 +104,7 @@ func NewUsecases(
 	mp mercadoPagoPort,
 	audit auditPort,
 	crypto *Crypto,
+	mode string,
 	mpAppID string,
 	mpClientSecret string,
 	mpWebhookSecret string,
@@ -113,6 +116,7 @@ func NewUsecases(
 		mp:              mp,
 		audit:           audit,
 		crypto:          crypto,
+		mode:            normalizeGatewayMode(mode),
 		mpAppID:         strings.TrimSpace(mpAppID),
 		mpClientSecret:  strings.TrimSpace(mpClientSecret),
 		mpWebhookSecret: strings.TrimSpace(mpWebhookSecret),
@@ -254,13 +258,17 @@ func (u *Usecases) CreatePreference(
 	orgID uuid.UUID,
 	req CreatePreferenceRequest,
 ) (gatewaydomain.PaymentPreference, error) {
-	if err := u.validateMPConfig(); err != nil {
-		return gatewaydomain.PaymentPreference{}, err
-	}
-
 	refType := normalizeReferenceType(req.ReferenceType)
 	if refType == "" || req.ReferenceID == uuid.Nil {
 		return gatewaydomain.PaymentPreference{}, ErrInvalidReference
+	}
+
+	if u.mode == "demo" {
+		return u.createDemoPreference(ctx, orgID, refType, req.ReferenceID)
+	}
+
+	if err := u.validateMPConfig(); err != nil {
+		return gatewaydomain.PaymentPreference{}, err
 	}
 
 	if err := u.checkPlanForNewLink(ctx, orgID); err != nil {
@@ -313,6 +321,41 @@ func (u *Usecases) CreatePreference(
 	}
 
 	return pref, nil
+}
+
+func (u *Usecases) createDemoPreference(
+	ctx context.Context,
+	orgID uuid.UUID,
+	refType string,
+	refID uuid.UUID,
+) (gatewaydomain.PaymentPreference, error) {
+	amount, currency, description, err := u.resolveReference(ctx, orgID, refType, refID)
+	if err != nil {
+		return gatewaydomain.PaymentPreference{}, err
+	}
+	expiresAt := u.now().Add(mpPreferenceTTL).UTC()
+	ref := fmt.Sprintf("%s:%s:%s", orgID.String(), refType, refID.String())
+	query := url.Values{}
+	query.Set("reference", ref)
+	query.Set("amount", strconv.FormatFloat(amount, 'f', -1, 64))
+	query.Set("currency", coalesce(currency, "ARS"))
+	paymentURL := u.buildFrontendURL("/payment/demo?" + query.Encode())
+	if strings.TrimSpace(paymentURL) == "" {
+		paymentURL = "https://example.invalid/payment/demo?" + query.Encode()
+	}
+	return u.repo.SavePreference(ctx, gatewaydomain.PaymentPreference{
+		OrgID:         orgID,
+		Provider:      providerMercadoPago,
+		ExternalID:    "demo:" + ref,
+		ReferenceType: refType,
+		ReferenceID:   refID,
+		Amount:        amount,
+		Description:   description,
+		PaymentURL:    paymentURL,
+		QRData:        "demo:" + ref,
+		Status:        "pending",
+		ExpiresAt:     expiresAt,
+	})
 }
 
 func (u *Usecases) GetPreference(
@@ -556,9 +599,9 @@ func (u *Usecases) logWebhookApproval(
 	}
 
 	u.audit.LogWithActor(ctx, auditdomain.LogInput{
-		OrgID:  orgID,
-		Actor:  actor,
-		Action: "payment_gateway.payment.approved",
+		OrgID:        orgID,
+		Actor:        actor,
+		Action:       "payment_gateway.payment.approved",
 		ResourceType: refType,
 		ResourceID:   refID.String(),
 		Payload: map[string]any{
@@ -808,11 +851,11 @@ func (u *Usecases) verifyOAuthState(state string) (uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
-	unixTs, err := strconv.ParseInt(parts[1], 10, 64)
+	unixTS, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
-	if u.now().Sub(time.Unix(unixTs, 0)) > mpOAuthStateTTL {
+	if u.now().Sub(time.Unix(unixTS, 0)) > mpOAuthStateTTL {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
 
@@ -858,6 +901,17 @@ func (u *Usecases) validateMPConfig() error {
 		return ErrGatewayConfigMissing
 	}
 	return nil
+}
+
+func normalizeGatewayMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "mercadopago":
+		return "mercadopago"
+	case "demo":
+		return "demo"
+	default:
+		return "mercadopago"
+	}
 }
 
 func parseExternalReference(in string) (uuid.UUID, string, uuid.UUID, error) {

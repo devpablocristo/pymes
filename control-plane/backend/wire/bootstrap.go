@@ -24,8 +24,8 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
@@ -46,10 +46,10 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/returns"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/scheduler"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/app"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/app"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/store"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/store"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
@@ -157,6 +157,7 @@ func InitializeApp() *app.App {
 		paymentgatewayclient.NewMercadoPagoGateway(),
 		auditUC,
 		paymentGatewayCrypto,
+		cfg.PaymentGatewayMode,
 		cfg.MPAppID,
 		cfg.MPClientSecret,
 		cfg.MPWebhookSecret,
@@ -217,7 +218,7 @@ func InitializeApp() *app.App {
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -248,7 +249,6 @@ func InitializeApp() *app.App {
 	internalAPIHandler.RegisterRoutes(internalGroup)
 
 	public := v1.Group("/public/:org_id")
-	public.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
 	public.Use(handlers.NewPublicRateLimit(30))
 	public.Use(handlers.NewBodySizeLimit(64 << 10))
 	publicAPIHandler.RegisterRoutes(public)

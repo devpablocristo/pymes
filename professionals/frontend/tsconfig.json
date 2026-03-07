@@ -15,8 +15,9 @@
     "baseUrl": ".",
     "paths": {
       "@pymes/ts-pkg": ["../../pkgs/ts-pkg/src"],
-      "@pymes/ts-pkg/*": ["../../pkgs/ts-pkg/src/*"]
+      "@pymes/ts-pkg/*": ["../../pkgs/ts-pkg/src/*"],
+      "@pymes/frontend-shared/*": ["../../control-plane/frontend/src/shared/*"]
     }
   },
-  "include": ["src", "../../pkgs/ts-pkg/src"]
+  "include": ["src", "../../pkgs/ts-pkg/src", "../../control-plane/frontend/src/shared"]
 }

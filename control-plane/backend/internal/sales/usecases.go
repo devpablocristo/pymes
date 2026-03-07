@@ -11,7 +11,7 @@ import (
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	saledomain "github.com/devpablocristo/pymes/control-plane/backend/internal/sales/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type RepositoryPort interface {

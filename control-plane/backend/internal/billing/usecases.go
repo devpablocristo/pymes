@@ -12,7 +12,7 @@ import (
 	"github.com/stripe/stripe-go/v81"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type RepositoryPort interface {

@@ -13,7 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/currency/handler/dto"
 	currencydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/currency/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type usecasesPort interface {

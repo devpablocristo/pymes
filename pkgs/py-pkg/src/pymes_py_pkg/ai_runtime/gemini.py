@@ -7,10 +7,9 @@ from typing import Any
 
 from google import genai
 from google.genai import types
+from pymes_py_pkg.ai_runtime.logging import get_logger
+from pymes_py_pkg.ai_runtime.types import ChatChunk, Message, ToolDeclaration
 from pymes_py_pkg.resilience import CircuitBreaker, CircuitBreakerOpenError
-
-from src.llm.base import ChatChunk, Message, ToolDeclaration
-from src.observability.logging import get_logger
 
 logger = get_logger(__name__)
 

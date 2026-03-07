@@ -17,7 +17,8 @@ Las piezas activas del producto son:
 
 Para evitar duplicación:
 - `README.md` es la puerta de entrada corta del repo
-- `docs/README.md` es este documento canónico y más detallado
+- `docs/README.md` es el índice canónico
+- `docs/CONTROL_PLANE.md` consolida la arquitectura y operación del monorepo
 - `prompts/` define el alcance funcional y arquitectónico fuente
 - no deben existir resúmenes paralelos en `docs/` si su contenido puede vivir acá
 
@@ -114,7 +115,7 @@ make lint
 Implementa base transversal, core de negocio, extensiones operativas, pagos, party model y soporte para agentes comerciales.
 
 ### Frontend
-Refleja la superficie principal del backend con navegación y vistas operativas para módulos de negocio y plataforma.
+Refleja la superficie principal del backend con navegación, vistas operativas modulares y dashboard personalizable por usuario/contexto.
 
 ### IA
 Incluye:
@@ -414,6 +415,7 @@ Bloques importantes:
 - party model
 - eventos de pasarela de pago
 - auditoría comercial de agentes
+- dashboard personalizable
 
 ## Estado actual
 
@@ -421,9 +423,11 @@ El proyecto tiene implementados y validados en esta etapa:
 - backend de negocio completo para prompts 00-04
 - servicio AI con chat interno/externo y canal WhatsApp
 - agentes comerciales de prompt 05
+- vertical base de prompt 06
+- dashboard personalizable de prompt 07
 - pasarela de pago con webhook inbox
 - endurecimiento de rutas públicas y webhooks
-- frontend alineado a la superficie modular principal
+- frontend alineado a la superficie modular principal y al motor de dashboard configurable
 
 ## Cómo validar rápido
 
@@ -443,6 +447,7 @@ make ai-test
 ### Frontend
 
 ```bash
+cd control-plane/frontend && npm test
 cd control-plane/frontend && npm run build
 ```
 
@@ -471,3 +476,5 @@ Lectura recomendada:
 4. `prompts/03-ai-assistant.md`
 5. `prompts/04-pasarelas-cobro.md`
 6. `prompts/05-agentes-comerciales.md`
+7. `prompts/06-professionals.md`
+8. `prompts/07-dashboard-personalizable.md`

@@ -9,11 +9,11 @@ from pydantic import BaseModel, Field
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider
 from src.api.sse import EventSourceResponse
 from src.backend_client import BackendClient
-from src.core.orchestrator import orchestrate
+from pymes_py_pkg.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
-from src.llm.base import Message
-from src.middleware.auth import AuthContext
-from src.observability.logging import get_logger
+from pymes_py_pkg.ai_runtime import Message
+from pymes_py_pkg.ai_runtime import AuthContext
+from pymes_py_pkg.ai_runtime import get_logger
 from src.tools.registry import build_internal_tools
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])

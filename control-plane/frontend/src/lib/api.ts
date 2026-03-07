@@ -1,4 +1,9 @@
 import { request, requestResponse, type RequestOptions } from '@pymes/ts-pkg/http';
+import type {
+  DashboardResponse,
+  DashboardSavePayload,
+  DashboardWidgetCatalogResponse,
+} from '../dashboard/types';
 import type { APIKeyItem, BillingStatus, NotificationPreference, TenantSettings } from './types';
 
 export async function getAdminBootstrap(): Promise<{ settings: TenantSettings }> {
@@ -69,6 +74,25 @@ export async function getAuditEntries(): Promise<{ items: unknown[] }> {
 
 export async function getMe(): Promise<Record<string, unknown>> {
   return request('/v1/users/me');
+}
+
+export async function getDashboard(context = 'home'): Promise<DashboardResponse> {
+  return request(`/v1/dashboard?context=${encodeURIComponent(context)}`);
+}
+
+export async function saveDashboard(payload: DashboardSavePayload): Promise<DashboardResponse> {
+  return request('/v1/dashboard', { method: 'PUT', body: payload });
+}
+
+export async function resetDashboard(context = 'home'): Promise<DashboardResponse> {
+  return request(`/v1/dashboard/reset?context=${encodeURIComponent(context)}`, {
+    method: 'POST',
+    body: {},
+  });
+}
+
+export async function getDashboardWidgets(context = 'home'): Promise<DashboardWidgetCatalogResponse> {
+  return request(`/v1/dashboard/widgets?context=${encodeURIComponent(context)}`);
 }
 
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {

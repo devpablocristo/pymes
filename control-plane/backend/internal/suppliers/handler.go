@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers/handler/dto"
 	supplierdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers/usecases/domain"
 )

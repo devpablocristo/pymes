@@ -1,3 +1,4 @@
+// Package internalapi exposes internal service-to-service routes for the control-plane.
 package internalapi
 
 import (
@@ -14,12 +15,14 @@ import (
 	appointmentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/usecases/domain"
 	customerdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/customers/usecases/domain"
 	partydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/party/usecases/domain"
+	gatewaydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway/usecases/domain"
 	productdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/products/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/control-plane/backend/internal/sales/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
@@ -57,6 +60,10 @@ type salePort interface {
 	Create(ctx context.Context, in sales.CreateSaleInput) (saledomain.Sale, error)
 }
 
+type paymentGatewayPort interface {
+	GetOrCreatePreference(ctx context.Context, orgID uuid.UUID, req paymentgateway.CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
+}
+
 type Handler struct {
 	admin     adminPort
 	parties   partyPort
@@ -65,6 +72,7 @@ type Handler struct {
 	appts     appointmentPort
 	quotes    quotePort
 	sales     salePort
+	gateway   paymentGatewayPort
 }
 
 func NewHandler(
@@ -75,6 +83,7 @@ func NewHandler(
 	appts appointmentPort,
 	quotes quotePort,
 	sales salePort,
+	gateway paymentGatewayPort,
 ) *Handler {
 	return &Handler{
 		admin:     admin,
@@ -84,6 +93,7 @@ func NewHandler(
 		appts:     appts,
 		quotes:    quotes,
 		sales:     sales,
+		gateway:   gateway,
 	}
 }
 
@@ -97,6 +107,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/appointments/:id", h.GetAppointment)
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
+	internal.POST("/sales/:id/payment-link", h.CreateSalePaymentLink)
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {
@@ -462,4 +473,37 @@ func (h *Handler) CreateSale(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, out)
+}
+
+func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
+	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
+		return
+	}
+	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	pref, err := h.gateway.GetOrCreatePreference(c.Request.Context(), orgID, paymentgateway.CreatePreferenceRequest{
+		ReferenceType: "sale",
+		ReferenceID:   saleID,
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":             pref.ID.String(),
+		"provider":       pref.Provider,
+		"reference_type": pref.ReferenceType,
+		"reference_id":   pref.ReferenceID.String(),
+		"status":         pref.Status,
+		"amount":         pref.Amount,
+		"payment_url":    pref.PaymentURL,
+		"qr_data":        pref.QRData,
+		"expires_at":     pref.ExpiresAt.UTC().Format(time.RFC3339),
+		"created_at":     pref.CreatedAt.UTC().Format(time.RFC3339),
+	})
 }

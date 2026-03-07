@@ -17,14 +17,15 @@ import (
 
 	"github.com/devpablocristo/pymes/pkgs/go-pkg/auth"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/intakes"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/orchestration"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/professional_profiles"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/public"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/service_links"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/sessions"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/app"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/app"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/controlplane"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/store"
+	"github.com/devpablocristo/pymes/pkgs/go-pkg/store"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
 )
@@ -47,7 +48,7 @@ func InitializeApp() *app.App {
 
 	// Auth middleware using pkgs/go-pkg/auth
 	identityResolver := buildIdentityResolver(cfg, logger)
-	authMiddleware := auth.NewAuthMiddleware(identityResolver, nil, cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	authMiddleware := auth.NewAuthMiddleware(identityResolver, newAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 
 	// Audit logger (lightweight, log-only implementation)
 	auditLog := &logAudit{logger: logger}
@@ -65,6 +66,7 @@ func InitializeApp() *app.App {
 	serviceLinksUC := service_links.NewUsecases(serviceLinksRepo, auditLog)
 	intakesUC := intakes.NewUsecases(intakesRepo, auditLog)
 	sessionsUC := sessions.NewUsecases(sessionsRepo, auditLog)
+	orchestrationUC := orchestration.NewUsecases(cpClient)
 
 	// Handlers
 	profilesHandler := professional_profiles.NewHandler(profilesUC)
@@ -72,7 +74,8 @@ func InitializeApp() *app.App {
 	serviceLinksHandler := service_links.NewHandler(serviceLinksUC)
 	intakesHandler := intakes.NewHandler(intakesUC)
 	sessionsHandler := sessions.NewHandler(sessionsUC)
-	publicHandler := public.NewHandler(profilesUC, serviceLinksUC, &cpOrgResolver{client: cpClient})
+	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
+	publicHandler := public.NewHandler(profilesUC, serviceLinksUC, cpClient, &cpOrgResolver{client: cpClient})
 
 	// Router
 	router := gin.New()
@@ -106,6 +109,7 @@ func InitializeApp() *app.App {
 	serviceLinksHandler.RegisterRoutes(authGroup)
 	intakesHandler.RegisterRoutes(authGroup)
 	sessionsHandler.RegisterRoutes(authGroup)
+	orchestrationHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }
@@ -151,13 +155,13 @@ type cpOrgResolver struct {
 }
 
 func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBootstrap(ctx, orgSlug)
+	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	orgIDStr, ok := result["org_id"].(string)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in bootstrap response")
+		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
 	}
 	return uuid.Parse(orgIDStr)
 }

@@ -13,8 +13,8 @@ from src.api.router import check_quota
 from src.backend_client.client import BackendClient
 from src.config import Settings
 from src.db.repository import AIRepository
-from src.llm.base import LLMProvider
-from src.observability.logging import get_logger, update_request_context
+from pymes_py_pkg.ai_runtime import LLMProvider
+from pymes_py_pkg.ai_runtime import get_logger, update_request_context
 
 router = APIRouter(prefix="/v1/internal", tags=["internal"])
 logger = get_logger(__name__)

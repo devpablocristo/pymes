@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/usecases/domain"
 	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )

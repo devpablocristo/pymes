@@ -1,3 +1,4 @@
+// Package config loads backend configuration from external environment variables.
 package config
 
 import (
@@ -41,6 +42,7 @@ type Config struct {
 	MPClientSecret              string
 	MPWebhookSecret             string
 	MPRedirectURI               string
+	PaymentGatewayMode          string
 	PaymentGatewayEncryptionKey string
 }
 
@@ -81,6 +83,7 @@ func LoadFromEnv() Config {
 		MPClientSecret:              os.Getenv("MP_CLIENT_SECRET"),
 		MPWebhookSecret:             os.Getenv("MP_WEBHOOK_SECRET"),
 		MPRedirectURI:               os.Getenv("MP_REDIRECT_URI"),
+		PaymentGatewayMode:          getEnv("PAYMENT_GATEWAY_MODE", "mercadopago"),
 		PaymentGatewayEncryptionKey: os.Getenv("PAYMENT_GATEWAY_ENCRYPTION_KEY"),
 	}
 }

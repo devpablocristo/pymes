@@ -12,7 +12,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/purchases/handler/dto"
 	purchasesdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/purchases/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/control-plane/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 )
 
 type usecasesPort interface {

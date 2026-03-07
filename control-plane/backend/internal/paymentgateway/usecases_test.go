@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,6 +277,7 @@ func newTestUsecases(t *testing.T, repo *fakeRepo, mp *fakeMP) *Usecases {
 		mp,
 		nil,
 		crypto,
+		"",
 		"app-id",
 		"client-secret",
 		"webhook-secret",
@@ -345,6 +347,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 		mp,
 		nil,
 		crypto,
+		"",
 		"app-id",
 		"client-secret",
 		"webhook-secret",
@@ -370,6 +373,54 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 	}
 	if repo.savedPreferenceIn.ReferenceType != "sale" {
 		t.Fatalf("saved reference type = %q, want sale", repo.savedPreferenceIn.ReferenceType)
+	}
+}
+
+func TestCreatePreference_DemoMode(t *testing.T) {
+	orgID := uuid.New()
+	saleID := uuid.New()
+	repo := &fakeRepo{
+		planCode: "starter",
+		saleSnapshot: gatewaydomain.SaleSnapshot{
+			ID:           saleID,
+			Number:       "VTA-LOCAL-1",
+			CustomerName: "Cliente Local",
+			Total:        12100,
+			Currency:     "ARS",
+		},
+	}
+
+	uc := NewUsecases(
+		repo,
+		nil,
+		nil,
+		nil,
+		"demo",
+		"",
+		"",
+		"",
+		"http://localhost:8100/v1/payment-gateway/callback",
+		"http://localhost:5180",
+	)
+	uc.now = func() time.Time {
+		return time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC)
+	}
+
+	pref, err := uc.CreatePreference(context.Background(), orgID, CreatePreferenceRequest{
+		ReferenceType: "sale",
+		ReferenceID:   saleID,
+	})
+	if err != nil {
+		t.Fatalf("CreatePreference() error = %v", err)
+	}
+	if pref.ExternalID == "" || !strings.HasPrefix(pref.ExternalID, "demo:") {
+		t.Fatalf("ExternalID = %q, want demo:*", pref.ExternalID)
+	}
+	if !strings.Contains(pref.PaymentURL, "/payment/demo?") {
+		t.Fatalf("PaymentURL = %q, want local demo url", pref.PaymentURL)
+	}
+	if repo.savedPreferenceIn.Amount != 12100 {
+		t.Fatalf("saved amount = %v, want 12100", repo.savedPreferenceIn.Amount)
 	}
 }
 
@@ -414,7 +465,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	encRefresh, _ := crypto.Encrypt("refresh-token")
 
 	repo := &fakeRepo{
-		serviceIDByName: serviceID,
+		serviceIDByName:  serviceID,
 		getByExternalErr: ErrNotFound,
 		listConnections: []gatewaydomain.PaymentGatewayConnection{
 			{
@@ -450,6 +501,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 		mp,
 		audit,
 		crypto,
+		"",
 		"app-id",
 		"client-secret",
 		"webhook-secret",

@@ -10,7 +10,7 @@ import (
 
 	"github.com/devpablocristo/pymes/professionals/backend/internal/service_links/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/service_links/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/professionals/backend/internal/shared/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
 	"github.com/devpablocristo/pymes/pkgs/go-pkg/auth"
 )
 

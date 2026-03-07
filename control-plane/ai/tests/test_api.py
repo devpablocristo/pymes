@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.api import deps
-from src.llm.base import EchoProvider
+from pymes_py_pkg.ai_runtime import EchoProvider
 
 
 def test_healthz() -> None:

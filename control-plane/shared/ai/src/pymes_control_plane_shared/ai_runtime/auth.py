@@ -6,8 +6,8 @@ from typing import Any, Callable
 
 import httpx
 from jose import jwt
-from pymes_py_pkg.ai_runtime.contexts import AuthContext
-from pymes_py_pkg.ai_runtime.logging import update_request_context as default_update_request_context
+from pymes_control_plane_shared.ai_runtime.contexts import AuthContext
+from pymes_control_plane_shared.ai_runtime.logging import update_request_context as default_update_request_context
 from pymes_py_pkg.errors import error_payload
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request

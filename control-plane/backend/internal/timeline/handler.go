@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	apperror "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 	timelinedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/timeline/usecases/domain"
 )
 

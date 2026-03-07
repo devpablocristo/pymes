@@ -8,7 +8,7 @@ from src.backend_client.client import BackendClient
 from src.config import Settings, get_settings
 from src.db.engine import get_db_session
 from src.db.repository import AIRepository
-from pymes_py_pkg.ai_runtime import LLMProvider
+from pymes_control_plane_shared.ai_runtime import LLMProvider
 
 
 def get_settings_dep(request: Request) -> Settings:

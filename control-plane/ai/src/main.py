@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from pymes_py_pkg.ai_runtime import (
+from pymes_control_plane_shared.ai_runtime import (
     apply_permissive_cors,
     install_request_context_middleware,
     register_common_exception_handlers,
@@ -18,10 +18,10 @@ from src.api.router import router as chat_router
 from src.backend_client.client import BackendClient
 from src.config import get_settings
 from src.db.engine import ping_database
-from pymes_py_pkg.ai_runtime import create_provider
-from pymes_py_pkg.ai_runtime import AuthMiddleware
-from pymes_py_pkg.ai_runtime import RateLimitMiddleware
-from pymes_py_pkg.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
+from pymes_control_plane_shared.ai_runtime import create_provider
+from pymes_control_plane_shared.ai_runtime import AuthMiddleware
+from pymes_control_plane_shared.ai_runtime import RateLimitMiddleware
+from pymes_control_plane_shared.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
 from src.observability.otel import configure_opentelemetry
 
 settings = get_settings()

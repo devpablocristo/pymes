@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pymes_py_pkg.ai_runtime.gemini import GeminiProvider
-from pymes_py_pkg.ai_runtime.types import EchoProvider, LLMProvider
+from pymes_control_plane_shared.ai_runtime.gemini import GeminiProvider
+from pymes_control_plane_shared.ai_runtime.types import EchoProvider, LLMProvider
 from pymes_py_pkg.resilience import CircuitBreaker
 
 

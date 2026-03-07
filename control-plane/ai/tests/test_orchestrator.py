@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
-from pymes_py_pkg.ai_runtime import OrchestratorLimits, orchestrate
-from pymes_py_pkg.ai_runtime import ChatChunk, Message, ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import OrchestratorLimits, orchestrate
+from pymes_control_plane_shared.ai_runtime import ChatChunk, Message, ToolDeclaration
 
 
 class MockLLM:

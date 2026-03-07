@@ -1,7 +1,0 @@
-go 1.25.0
-
-use (
-	./control-plane/backend
-	./pkgs/go-pkg
-	./professionals/backend
-)

@@ -4,8 +4,8 @@ from fastapi import HTTPException, Request, status
 
 from src.backend_client import BackendClient
 from src.config import Settings, get_settings
-from pymes_py_pkg.ai_runtime import LLMProvider
-from pymes_py_pkg.ai_runtime import AuthContext
+from pymes_control_plane_shared.ai_runtime import LLMProvider
+from pymes_control_plane_shared.ai_runtime import AuthContext
 
 
 def get_settings_dep(request: Request) -> Settings:

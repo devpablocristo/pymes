@@ -13,7 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/handler/dto"
 	appointmentsdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/appointments/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type usecasesPort interface {

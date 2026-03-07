@@ -65,28 +65,32 @@ export function LowStockWidget(props: DashboardWidgetRendererProps) {
   const query = useDashboardWidgetData<LowStockData>(props.widget, props.context);
   return (
     <WidgetQueryState query={query}>
-      {(data) => (
-        <>
-          <div className="widget-stack-header">
-            <strong>{data.total.toLocaleString('es-AR')} alertas activas</strong>
-            <small>Se muestran las mas urgentes para operacion diaria.</small>
-          </div>
-          <div className="widget-list">
-            {data.items.map((item) => (
-              <div key={`${item.product_id}-${item.sku ?? ''}`} className="widget-list-row">
-                <div>
-                  <strong>{item.product_name || 'Producto sin nombre'}</strong>
-                  <small>{item.sku || item.product_id}</small>
+      {(data) => {
+        const items = Array.isArray(data.items) ? data.items : [];
+        const total = typeof data.total === 'number' ? data.total : items.length;
+        return (
+          <>
+            <div className="widget-stack-header">
+              <strong>{total.toLocaleString('es-AR')} alertas activas</strong>
+              <small>Se muestran las mas urgentes para operacion diaria.</small>
+            </div>
+            <div className="widget-list">
+              {items.map((item) => (
+                <div key={`${item.product_id}-${item.sku ?? ''}`} className="widget-list-row">
+                  <div>
+                    <strong>{item.product_name || 'Producto sin nombre'}</strong>
+                    <small>{item.sku || item.product_id}</small>
+                  </div>
+                  <div className="widget-row-metrics">
+                    <span>{item.quantity.toLocaleString('es-AR')}</span>
+                    <small>min {item.min_quantity.toLocaleString('es-AR')}</small>
+                  </div>
                 </div>
-                <div className="widget-row-metrics">
-                  <span>{item.quantity.toLocaleString('es-AR')}</span>
-                  <small>min {item.min_quantity.toLocaleString('es-AR')}</small>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+              ))}
+            </div>
+          </>
+        );
+      }}
     </WidgetQueryState>
   );
 }
@@ -95,24 +99,27 @@ export function RecentSalesWidget(props: DashboardWidgetRendererProps) {
   const query = useDashboardWidgetData<RecentSalesData>(props.widget, props.context);
   return (
     <WidgetQueryState query={query}>
-      {(data) => (
-        <div className="widget-list">
-          {data.items.map((item) => (
-            <div key={item.id} className="widget-list-row">
-              <div>
-                <strong>{item.number}</strong>
-                <small>{item.customer_name || 'Consumidor final'}</small>
+      {(data) => {
+        const items = Array.isArray(data.items) ? data.items : [];
+        return (
+          <div className="widget-list">
+            {items.map((item) => (
+              <div key={item.id} className="widget-list-row">
+                <div>
+                  <strong>{item.number}</strong>
+                  <small>{item.customer_name || 'Consumidor final'}</small>
+                </div>
+                <div className="widget-row-metrics">
+                  <span>
+                    {item.currency} {item.total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
+                  </span>
+                  <small>{new Date(item.created_at).toLocaleString('es-AR')}</small>
+                </div>
               </div>
-              <div className="widget-row-metrics">
-                <span>
-                  {item.currency} {item.total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}
-                </span>
-                <small>{new Date(item.created_at).toLocaleString('es-AR')}</small>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      }}
     </WidgetQueryState>
   );
 }
@@ -122,10 +129,11 @@ export function TopProductsWidget(props: DashboardWidgetRendererProps) {
   return (
     <WidgetQueryState query={query}>
       {(data) => {
-        const peak = Math.max(...data.items.map((item) => item.total), 1);
+        const items = Array.isArray(data.items) ? data.items : [];
+        const peak = Math.max(...items.map((item) => item.total), 1);
         return (
           <div className="widget-bars">
-            {data.items.map((item) => (
+            {items.map((item) => (
               <div key={`${item.product_id}-${item.name}`} className="widget-bar-row">
                 <div className="widget-bar-labels">
                   <strong>{item.name}</strong>
@@ -174,23 +182,26 @@ export function AuditActivityWidget(props: DashboardWidgetRendererProps) {
   const query = useDashboardWidgetData<AuditActivityData>(props.widget, props.context);
   return (
     <WidgetQueryState query={query}>
-      {(data) => (
-        <div className="widget-timeline">
-          {data.items.map((item) => (
-            <div key={item.id} className="widget-timeline-row">
-              <span className="widget-timeline-dot" />
-              <div>
-                <strong>{item.action}</strong>
-                <small>
-                  {item.actor || 'system'} · {item.resource_type}
-                  {item.resource_id ? ` · ${item.resource_id}` : ''}
-                </small>
+      {(data) => {
+        const items = Array.isArray(data.items) ? data.items : [];
+        return (
+          <div className="widget-timeline">
+            {items.map((item) => (
+              <div key={item.id} className="widget-timeline-row">
+                <span className="widget-timeline-dot" />
+                <div>
+                  <strong>{item.action}</strong>
+                  <small>
+                    {item.actor || 'system'} · {item.resource_type}
+                    {item.resource_id ? ` · ${item.resource_id}` : ''}
+                  </small>
+                </div>
+                <time>{new Date(item.created_at).toLocaleString('es-AR')}</time>
               </div>
-              <time>{new Date(item.created_at).toLocaleString('es-AR')}</time>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      }}
     </WidgetQueryState>
   );
 }

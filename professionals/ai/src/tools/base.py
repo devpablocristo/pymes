@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from pymes_py_pkg.ai_runtime import ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import ToolDeclaration
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 

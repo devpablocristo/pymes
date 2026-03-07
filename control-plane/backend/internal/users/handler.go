@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users/handler/dto"
 	userdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/users/usecases/domain"
 )

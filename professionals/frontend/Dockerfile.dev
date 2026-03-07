@@ -7,6 +7,7 @@ RUN npm install
 
 COPY professionals/frontend/ ./
 COPY pkgs/ts-pkg /workspace/pkgs/ts-pkg
+COPY control-plane/frontend/src/shared /workspace/control-plane/frontend/src/shared
 
 EXPOSE 5174
 

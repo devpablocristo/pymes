@@ -19,7 +19,7 @@ import (
 	productdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/products/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/control-plane/backend/internal/sales/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"

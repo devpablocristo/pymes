@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/service_links/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {

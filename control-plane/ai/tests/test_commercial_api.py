@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from httpx import HTTPStatusError, Request, Response
 
 from src.api import deps
-from pymes_py_pkg.ai_runtime import ChatChunk, Message, ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import ChatChunk, Message, ToolDeclaration
 from src.main import app
 
 

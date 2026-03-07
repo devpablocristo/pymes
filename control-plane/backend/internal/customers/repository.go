@@ -1,3 +1,4 @@
+// Package customers implements persistence for customer operations.
 package customers
 
 import (
@@ -136,6 +137,21 @@ func (r *Repository) Create(ctx context.Context, in customerdomain.Customer) (cu
 		if err := upsertCustomerExtension(ctx, tx, partyID, partyType, strings.TrimSpace(in.Name), defaultMetadata(in.Metadata)); err != nil {
 			return err
 		}
+		if err := upsertLegacyCustomer(ctx, tx, customerdomain.Customer{
+			ID:       partyID,
+			OrgID:    in.OrgID,
+			Type:     in.Type,
+			Name:     in.Name,
+			TaxID:    in.TaxID,
+			Email:    in.Email,
+			Phone:    in.Phone,
+			Address:  in.Address,
+			Notes:    in.Notes,
+			Tags:     in.Tags,
+			Metadata: in.Metadata,
+		}); err != nil {
+			return err
+		}
 		return tx.Exec(`
 			INSERT INTO party_roles (id, party_id, org_id, role, is_active, metadata, created_at)
 			VALUES (?, ?, ?, 'customer', true, '{}'::jsonb, now())
@@ -184,7 +200,10 @@ func (r *Repository) Update(ctx context.Context, in customerdomain.Customer) (cu
 		if res.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
 		}
-		return upsertCustomerExtension(ctx, tx, in.ID, partyType, strings.TrimSpace(in.Name), defaultMetadata(in.Metadata))
+		if err := upsertCustomerExtension(ctx, tx, in.ID, partyType, strings.TrimSpace(in.Name), defaultMetadata(in.Metadata)); err != nil {
+			return err
+		}
+		return upsertLegacyCustomer(ctx, tx, in)
 	}); err != nil {
 		return customerdomain.Customer{}, err
 	}
@@ -192,14 +211,19 @@ func (r *Repository) Update(ctx context.Context, in customerdomain.Customer) (cu
 }
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Table("parties").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Table("parties").
+			Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+			Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return softDeleteLegacyCustomer(ctx, tx, orgID, id)
+	}); err != nil {
+		return err
 	}
 	return nil
 }
@@ -330,4 +354,55 @@ func stringValue(m map[string]any, key string) string {
 		return strings.TrimSpace(v)
 	}
 	return ""
+}
+
+func upsertLegacyCustomer(ctx context.Context, tx *gorm.DB, in customerdomain.Customer) error {
+	exists, err := legacyCustomerTableExists(ctx, tx)
+	if err != nil || !exists {
+		return err
+	}
+	addr, _ := json.Marshal(in.Address)
+	meta, _ := json.Marshal(defaultMetadata(in.Metadata))
+	return tx.Exec(`
+		INSERT INTO customers (
+			id, org_id, type, name, tax_id, email, phone, address, notes, tags, metadata, created_at, updated_at, deleted_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?::jsonb, now(), now(), NULL)
+		ON CONFLICT (id) DO UPDATE SET
+			type = EXCLUDED.type,
+			name = EXCLUDED.name,
+			tax_id = EXCLUDED.tax_id,
+			email = EXCLUDED.email,
+			phone = EXCLUDED.phone,
+			address = EXCLUDED.address,
+			notes = EXCLUDED.notes,
+			tags = EXCLUDED.tags,
+			metadata = EXCLUDED.metadata,
+			updated_at = now(),
+			deleted_at = NULL
+	`, in.ID, in.OrgID, strings.TrimSpace(in.Type), strings.TrimSpace(in.Name), strings.TrimSpace(in.TaxID), strings.TrimSpace(in.Email), strings.TrimSpace(in.Phone), string(addr), strings.TrimSpace(in.Notes), pq.StringArray(utils.NormalizeTags(in.Tags)), string(meta)).Error
+}
+
+func softDeleteLegacyCustomer(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID) error {
+	exists, err := legacyCustomerTableExists(ctx, tx)
+	if err != nil || !exists {
+		return err
+	}
+	return tx.Table("customers").
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")}).Error
+}
+
+func legacyCustomerTableExists(ctx context.Context, tx *gorm.DB) (bool, error) {
+	var exists bool
+	err := tx.WithContext(ctx).Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = current_schema()
+			  AND c.relname = 'customers'
+			  AND c.relkind = 'r'
+		)
+	`).Scan(&exists).Error
+	return exists, err
 }

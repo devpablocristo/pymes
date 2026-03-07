@@ -6,8 +6,8 @@ from typing import Any
 
 import httpx
 
-from pymes_py_pkg.ai_runtime import AuthContext
-from pymes_py_pkg.ai_runtime import get_logger, get_request_id
+from pymes_control_plane_shared.ai_runtime import AuthContext
+from pymes_control_plane_shared.ai_runtime import get_logger, get_request_id
 
 logger = get_logger(__name__)
 

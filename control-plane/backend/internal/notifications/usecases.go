@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type EmailSender interface {

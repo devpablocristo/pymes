@@ -1,10 +1,12 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /workspace/control-plane/ai
 
-COPY requirements.txt ./
+COPY control-plane/ai/requirements.txt ./
+COPY control-plane/shared/ai /workspace/control-plane/shared/ai
+COPY pkgs/py-pkg /workspace/pkgs/py-pkg
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
+COPY control-plane/ai/src/ ./src/
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

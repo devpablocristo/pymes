@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from pymes_py_pkg.ai_runtime import (
+from pymes_control_plane_shared.ai_runtime import (
     apply_permissive_cors,
     install_request_context_middleware,
     register_common_exception_handlers,
@@ -14,10 +14,10 @@ from src.api.public_router import router as public_router
 from src.api.router import router as chat_router
 from src.backend_client import BackendClient
 from src.config import get_settings
-from pymes_py_pkg.ai_runtime import create_provider
-from pymes_py_pkg.ai_runtime import AuthMiddleware
-from pymes_py_pkg.ai_runtime import RateLimitMiddleware
-from pymes_py_pkg.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
+from pymes_control_plane_shared.ai_runtime import create_provider
+from pymes_control_plane_shared.ai_runtime import AuthMiddleware
+from pymes_control_plane_shared.ai_runtime import RateLimitMiddleware
+from pymes_control_plane_shared.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
 
 settings = get_settings()
 configure_logging(settings.ai_log_level, json_logs=settings.ai_log_json)

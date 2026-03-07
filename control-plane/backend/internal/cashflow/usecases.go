@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	cashdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/cashflow/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {

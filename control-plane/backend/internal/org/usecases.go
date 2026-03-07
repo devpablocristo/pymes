@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/org/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {

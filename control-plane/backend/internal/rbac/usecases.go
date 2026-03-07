@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	rbacdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/rbac/usecases/domain"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 const permissionCacheTTL = 5 * time.Minute

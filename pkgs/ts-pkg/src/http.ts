@@ -28,22 +28,19 @@ function isLocalhost(): boolean {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
 }
 
-function resolveBaseURLs(): string[] {
-  const candidates: string[] = [];
+function resolveBaseURL(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) {
-    candidates.push(configured);
+    return configured;
   }
 
   if (typeof window === 'undefined') {
-    candidates.push('http://localhost:8100', 'http://localhost:8080');
-  } else {
-    const protocol = window.location.protocol || 'http:';
-    const hostname = window.location.hostname || 'localhost';
-    candidates.push(`${protocol}//${hostname}:8100`, `${protocol}//${hostname}:8080`);
+    return 'http://localhost:8100';
   }
 
-  return [...new Set(candidates)];
+  const protocol = window.location.protocol || 'http:';
+  const hostname = window.location.hostname || 'localhost';
+  return `${protocol}//${hostname}:8100`;
 }
 
 function resolveLocalAPIKeyFallback(): string | null {
@@ -88,35 +85,20 @@ async function buildHeaders(options: RequestOptions): Promise<Record<string, str
 
 export async function requestResponse(path: string, options: RequestOptions = {}): Promise<Response> {
   const headers = await buildHeaders(options);
-  let lastError: unknown = null;
-  for (const baseURL of resolveBaseURLs()) {
-    try {
-      const response = await fetch(`${baseURL}${path}`, {
-        method: options.method ?? 'GET',
-        headers,
-        body:
-          options.rawBody ??
-          (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-      });
+  const baseURL = resolveBaseURL();
+  const response = await fetch(`${baseURL}${path}`, {
+    method: options.method ?? 'GET',
+    headers,
+    body:
+      options.rawBody ??
+      (options.body !== undefined ? JSON.stringify(options.body) : undefined),
+  });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new HttpError(text || `HTTP ${response.status}`);
-      }
-      return response;
-    } catch (error) {
-      lastError = error;
-      if (error instanceof Error && error.name === 'HttpError') {
-        throw error;
-      }
-    }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new HttpError(text || `HTTP ${response.status}`);
   }
-
-  if (lastError instanceof Error) {
-    throw lastError;
-  }
-
-  throw new Error('No se pudo conectar con el backend');
+  return response;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

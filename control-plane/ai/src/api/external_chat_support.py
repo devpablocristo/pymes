@@ -8,11 +8,11 @@ from fastapi import HTTPException, status
 
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
-from pymes_py_pkg.ai_runtime import orchestrate
+from pymes_control_plane_shared.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
-from pymes_py_pkg.ai_runtime import LLMProvider, Message
-from pymes_py_pkg.ai_runtime import get_logger
+from pymes_control_plane_shared.ai_runtime import LLMProvider, Message
+from pymes_control_plane_shared.ai_runtime import get_logger
 from src.tools.registry import build_external_tools
 
 logger = get_logger(__name__)

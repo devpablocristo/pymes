@@ -15,10 +15,10 @@ from src.api.external_chat_support import get_external_conversation, history_to_
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
-from pymes_py_pkg.ai_runtime import OrchestratorLimits, orchestrate
+from pymes_control_plane_shared.ai_runtime import OrchestratorLimits, orchestrate
 from src.db.repository import AIRepository
-from pymes_py_pkg.ai_runtime import LLMProvider, Message, ToolDeclaration
-from pymes_py_pkg.ai_runtime import get_logger
+from pymes_control_plane_shared.ai_runtime import LLMProvider, Message, ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import get_logger
 from src.tools import accounts, appointments, customers, inventory, payments, products, purchases, quotes, sales, suppliers
 
 logger = get_logger(__name__)

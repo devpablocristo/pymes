@@ -4,8 +4,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from src.backend_client import BackendClient
-from pymes_py_pkg.ai_runtime import ToolDeclaration
-from pymes_py_pkg.ai_runtime import AuthContext
+from pymes_control_plane_shared.ai_runtime import ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import AuthContext
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 

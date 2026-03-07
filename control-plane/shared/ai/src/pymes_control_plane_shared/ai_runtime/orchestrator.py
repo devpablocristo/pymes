@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from pymes_py_pkg.ai_runtime.types import ChatChunk, LLMProvider, Message, ToolDeclaration
+from pymes_control_plane_shared.ai_runtime.types import ChatChunk, LLMProvider, Message, ToolDeclaration
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 

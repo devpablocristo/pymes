@@ -1,0 +1,25 @@
+---
+description: codigo transversal del producto vive en control-plane/shared
+alwaysApply: true
+---
+
+# control-plane/shared = transversal del producto
+
+Usar `control-plane/shared/` para codigo que:
+
+- aplica a mas de un vertical;
+- pertenece a este producto;
+- no es lo bastante agnostico como para vivir en `pkgs/`.
+
+## Regla de ubicacion
+
+- `vertical/` = solo delta exclusivo de esa vertical.
+- `control-plane/shared/` = compartido del producto.
+- `pkgs/` = compartido portable entre proyectos.
+
+## Ejemplos de `control-plane/shared/`
+
+- adapters y runtime compartidos entre verticales con convenciones de este repo;
+- copy tecnica o mensajes comunes del producto;
+- contratos internos o helpers transversales acoplados a pymes;
+- integraciones tecnicas compartidas que usan conceptos del producto.

@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pymes_py_pkg.ai_runtime import ChatChunk, Message
-from pymes_py_pkg.ai_runtime import GeminiProvider
+from pymes_control_plane_shared.ai_runtime import ChatChunk, Message
+from pymes_control_plane_shared.ai_runtime import GeminiProvider
 
 
 def build_provider() -> GeminiProvider:
-    with patch("pymes_py_pkg.ai_runtime.gemini.genai.Client", return_value=object()):
+    with patch("pymes_control_plane_shared.ai_runtime.gemini.genai.Client", return_value=object()):
         return GeminiProvider(api_key="test-key")
 
 
@@ -27,7 +27,7 @@ def test_gemini_provider_retries_transient_failures() -> None:
     async def run() -> list[ChatChunk]:
         return [chunk async for chunk in provider.chat([Message(role="user", content="hola")])]
 
-    with patch("pymes_py_pkg.ai_runtime.gemini.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+    with patch("pymes_control_plane_shared.ai_runtime.gemini.asyncio.sleep", new=AsyncMock()) as sleep_mock:
         chunks = asyncio.run(run())
 
     assert provider._collect_chunks.await_count == 3  # type: ignore[attr-defined]
@@ -43,7 +43,7 @@ def test_gemini_provider_raises_after_retry_exhaustion() -> None:
         async for _ in provider.chat([Message(role="user", content="hola")]):
             pass
 
-    with patch("pymes_py_pkg.ai_runtime.gemini.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+    with patch("pymes_control_plane_shared.ai_runtime.gemini.asyncio.sleep", new=AsyncMock()) as sleep_mock:
         with pytest.raises(RuntimeError, match="still failing"):
             asyncio.run(run())
 

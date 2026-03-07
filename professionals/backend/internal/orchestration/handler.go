@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/auth"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type usecasesPort interface {

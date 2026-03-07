@@ -1,22 +1,21 @@
-module github.com/devpablocristo/pymes/control-plane/backend
+module github.com/devpablocristo/pymes
 
 go 1.25.0
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/aws/aws-lambda-go v1.47.0
+	github.com/aws/aws-lambda-go v1.53.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.11
-	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.59.3
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.0
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
-	github.com/devpablocristo/pymes/pkgs/go-pkg v0.0.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
-	github.com/lib/pq v1.10.9
-	github.com/rs/zerolog v1.33.0
+	github.com/lib/pq v1.11.2
+	github.com/rs/zerolog v1.34.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stripe/stripe-go/v81 v81.4.0
 	github.com/xuri/excelize/v2 v2.10.1
@@ -33,7 +32,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.19 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.19 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.5 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.19 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.20 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.7 // indirect
@@ -84,5 +83,3 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
-
-replace github.com/devpablocristo/pymes/pkgs/go-pkg => ../../pkgs/go-pkg

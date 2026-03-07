@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     ai_environment: str = "development"
 
     backend_url: str = "http://localhost:8081"
-    control_plane_url: str = "http://localhost:8080"
     internal_service_token: str = "local-internal-token"
 
     llm_provider: str = "gemini"

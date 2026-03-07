@@ -7,7 +7,7 @@ from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.dossier import add_learned_context, set_modules, set_preference, update_business_field
 from src.core.onboarding import BUSINESS_PROFILES, apply_profile, complete_step, skip_step
-from pymes_py_pkg.ai_runtime import ToolDeclaration
+from pymes_control_plane_shared.ai_runtime import ToolDeclaration
 from src.tools import (
     accounts,
     appointments,

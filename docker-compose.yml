@@ -28,8 +28,8 @@ services:
     ports:
       - "8100:8080"
     volumes:
-      - ./control-plane/backend/go.work.build:/workspace/go.work
       - ./control-plane/backend:/workspace/control-plane/backend
+      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - backend_go_mod:/go/pkg/mod
       - backend_go_build:/root/.cache/go-build
@@ -72,6 +72,7 @@ services:
       - "8200:8000"
     volumes:
       - ./control-plane/ai/src:/workspace/control-plane/ai/src
+      - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
       - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
     env_file:
       - .env
@@ -91,8 +92,8 @@ services:
     ports:
       - "8181:8081"
     volumes:
-      - ./professionals/backend/go.work.build:/workspace/go.work
       - ./professionals/backend:/workspace/professionals/backend
+      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
@@ -122,6 +123,7 @@ services:
       - ./professionals/frontend/index.html:/workspace/professionals/frontend/index.html
       - ./professionals/frontend/vite.config.ts:/workspace/professionals/frontend/vite.config.ts
       - ./professionals/frontend/tsconfig.json:/workspace/professionals/frontend/tsconfig.json
+      - ./control-plane/frontend/src/shared:/workspace/control-plane/frontend/src/shared
       - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
     env_file:
       - .env
@@ -139,6 +141,7 @@ services:
       - "8201:8001"
     volumes:
       - ./professionals/ai/src:/workspace/professionals/ai/src
+      - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
       - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
     env_file:
       - .env

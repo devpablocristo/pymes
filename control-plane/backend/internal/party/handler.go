@@ -13,7 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/party/handler/dto"
 	partydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/party/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/pkgs/go-pkg/httperrors"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 

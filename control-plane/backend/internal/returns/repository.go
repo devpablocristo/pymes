@@ -1,8 +1,10 @@
+// Package returns provides persistence for returns and credit notes.
 package returns
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,13 +46,21 @@ type ApplyCreditInput struct {
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	limit = pagination.NormalizeLimit(limit, 20, 100)
+	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
+	if err != nil {
+		return nil, err
+	}
+	salePartyNameExpr, err := r.salesPartyNameSelectExpr(ctx, "s")
+	if err != nil {
+		return nil, err
+	}
 	var rows []struct {
 		returnmodels.ReturnModel
 		PartyID   *uuid.UUID `gorm:"column:party_id"`
 		PartyName string     `gorm:"column:party_name"`
 	}
-	err := r.db.WithContext(ctx).Table("returns r").
-		Select("r.*, s.party_id, COALESCE(s.party_name, '') as party_name").
+	err = r.db.WithContext(ctx).Table("returns r").
+		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
 		Where("r.org_id = ?", orgID).
 		Order("r.created_at DESC").
@@ -67,13 +77,21 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 }
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error) {
+	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
+	if err != nil {
+		return returndomain.Return{}, err
+	}
+	salePartyNameExpr, err := r.salesPartyNameSelectExpr(ctx, "s")
+	if err != nil {
+		return returndomain.Return{}, err
+	}
 	var row struct {
 		returnmodels.ReturnModel
 		PartyID   *uuid.UUID `gorm:"column:party_id"`
 		PartyName string     `gorm:"column:party_name"`
 	}
-	err := r.db.WithContext(ctx).Table("returns r").
-		Select("r.*, s.party_id, COALESCE(s.party_name, '') as party_name").
+	err = r.db.WithContext(ctx).Table("returns r").
+		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
 		Where("r.org_id = ? AND r.id = ?", orgID, id).
 		Take(&row).Error
@@ -91,6 +109,14 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 	var out returndomain.Return
 	var credit *returndomain.CreditNote
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "")
+		if err != nil {
+			return err
+		}
+		salePartyNameExpr, err := r.salesPartyNameSelectExpr(ctx, "")
+		if err != nil {
+			return err
+		}
 		var sale struct {
 			Number        string
 			PartyID       *uuid.UUID `gorm:"column:party_id"`
@@ -100,7 +126,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			Currency      string
 			PaymentMethod string `gorm:"column:payment_method"`
 		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("number, party_id, COALESCE(party_name,'') as party_name, amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if len(in.Items) == 0 {
@@ -312,6 +338,10 @@ func (r *Repository) GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (re
 func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error) {
 	var out returndomain.CreditNote
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "")
+		if err != nil {
+			return err
+		}
 		var note returnmodels.CreditNoteModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.CreditNoteID).Take(&note).Error; err != nil {
 			return err
@@ -324,7 +354,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 			AmountPaid float64    `gorm:"column:amount_paid"`
 			PartyID    *uuid.UUID `gorm:"column:party_id"`
 		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("total, amount_paid, party_id").Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("total, amount_paid, %s", salePartyIDExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if sale.PartyID == nil || *sale.PartyID != note.PartyID {
@@ -391,6 +421,68 @@ func defaultString(v, def string) string {
 		return def
 	}
 	return v
+}
+
+func (r *Repository) salesPartyIDSelectExpr(ctx context.Context, qualifier string) (string, error) {
+	column, err := r.salesColumnName(ctx, "party_id", "customer_id")
+	if err != nil {
+		return "", err
+	}
+	if column == "" {
+		return "NULL::uuid AS party_id", nil
+	}
+	return qualifyColumn(qualifier, column) + " AS party_id", nil
+}
+
+func (r *Repository) salesPartyNameSelectExpr(ctx context.Context, qualifier string) (string, error) {
+	column, err := r.salesColumnName(ctx, "party_name", "customer_name")
+	if err != nil {
+		return "", err
+	}
+	if column == "" {
+		return "'' AS party_name", nil
+	}
+	return fmt.Sprintf("COALESCE(%s, '') AS party_name", qualifyColumn(qualifier, column)), nil
+}
+
+func (r *Repository) salesColumnName(ctx context.Context, preferred, fallback string) (string, error) {
+	hasPreferred, err := r.tableHasColumn(ctx, "sales", preferred)
+	if err != nil {
+		return "", err
+	}
+	if hasPreferred {
+		return preferred, nil
+	}
+	hasFallback, err := r.tableHasColumn(ctx, "sales", fallback)
+	if err != nil {
+		return "", err
+	}
+	if hasFallback {
+		return fallback, nil
+	}
+	return "", nil
+}
+
+func (r *Repository) tableHasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
+	var exists bool
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = ?
+			  AND column_name = ?
+		)
+	`, tableName, columnName).Scan(&exists).Error
+	return exists, err
+}
+
+func qualifyColumn(qualifier, column string) string {
+	qualifier = strings.TrimSpace(qualifier)
+	if qualifier == "" {
+		return column
+	}
+	return qualifier + "." + column
 }
 func maxInt(v, def int) int {
 	if v <= 0 {

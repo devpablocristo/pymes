@@ -80,14 +80,16 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 	}
 
 	if parsed, err := uuid.Parse(trimmed); err == nil {
-		var found uuid.UUID
+		var row struct {
+			ID uuid.UUID `gorm:"column:id"`
+		}
 		err = r.db.WithContext(ctx).
 			Table("orgs").
 			Select("id").
 			Where("id = ?", parsed).
-			Take(&found).Error
+			Take(&row).Error
 		if err == nil {
-			return found, nil
+			return row.ID, nil
 		}
 	}
 

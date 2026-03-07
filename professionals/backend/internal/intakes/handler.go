@@ -1,3 +1,4 @@
+// Package intakes exposes HTTP handlers for professionals intake flows.
 package intakes
 
 import (
@@ -16,6 +17,7 @@ import (
 )
 
 type usecasesPort interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]domain.Intake, error)
 	Create(ctx context.Context, in domain.Intake, actor string) (domain.Intake, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error)
@@ -29,10 +31,30 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
+	authGroup.GET("/intakes", h.List)
 	authGroup.GET("/intakes/:id", h.Get)
 	authGroup.POST("/intakes", h.Create)
 	authGroup.PUT("/intakes/:id", h.Update)
 	authGroup.POST("/intakes/:id/submit", h.Submit)
+}
+
+func (h *Handler) List(c *gin.Context) {
+	a := auth.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	items, err := h.uc.List(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	out := make([]dto.IntakeItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, toIntakeItem(item))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out})
 }
 
 func (h *Handler) Get(c *gin.Context) {

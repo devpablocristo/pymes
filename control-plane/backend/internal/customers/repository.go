@@ -239,10 +239,14 @@ func (r *Repository) ListSales(ctx context.Context, orgID, customerID uuid.UUID)
 		CreatedAt     time.Time `gorm:"column:created_at"`
 	}
 	var rows []row
+	customerIDColumn, err := r.salesCustomerIDColumn(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if err := r.db.WithContext(ctx).
 		Table("sales").
 		Select("id, number, status, payment_method, total, currency, created_at").
-		Where("org_id = ? AND party_id = ?", orgID, customerID).
+		Where("org_id = ? AND "+customerIDColumn+" = ?", orgID, customerID).
 		Order("created_at DESC").
 		Limit(200).
 		Scan(&rows).Error; err != nil {
@@ -258,7 +262,22 @@ func (r *Repository) ListSales(ctx context.Context, orgID, customerID uuid.UUID)
 func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("parties p").
-		Select("p.*").
+		Select(`
+			p.id,
+			p.org_id,
+			p.party_type,
+			p.display_name,
+			p.email,
+			p.phone,
+			p.address,
+			p.tax_id,
+			p.notes,
+			p.tags,
+			p.metadata,
+			p.created_at,
+			p.updated_at,
+			p.deleted_at
+		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer' AND pr.is_active = true").
 		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
 }
@@ -404,5 +423,30 @@ func legacyCustomerTableExists(ctx context.Context, tx *gorm.DB) (bool, error) {
 			  AND c.relkind = 'r'
 		)
 	`).Scan(&exists).Error
+	return exists, err
+}
+
+func (r *Repository) salesCustomerIDColumn(ctx context.Context) (string, error) {
+	hasPartyID, err := r.tableHasColumn(ctx, "sales", "party_id")
+	if err != nil {
+		return "", err
+	}
+	if hasPartyID {
+		return "party_id", nil
+	}
+	return "customer_id", nil
+}
+
+func (r *Repository) tableHasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
+	var exists bool
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = ?
+			  AND column_name = ?
+		)
+	`, tableName, columnName).Scan(&exists).Error
 	return exists, err
 }

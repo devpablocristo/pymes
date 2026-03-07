@@ -12,6 +12,7 @@ import (
 )
 
 type RepositoryPort interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]domain.Intake, error)
 	Create(ctx context.Context, in domain.Intake) (domain.Intake, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error)
 	Update(ctx context.Context, in domain.Intake) (domain.Intake, error)
@@ -28,6 +29,10 @@ type Usecases struct {
 
 func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 	return &Usecases{repo: repo, audit: audit}
+}
+
+func (u *Usecases) List(ctx context.Context, orgID uuid.UUID) ([]domain.Intake, error) {
+	return u.repo.List(ctx, orgID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Intake, actor string) (domain.Intake, error) {

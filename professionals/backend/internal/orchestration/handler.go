@@ -1,3 +1,4 @@
+// Package orchestration exposes HTTP bridges from professionals to control-plane workflows.
 package orchestration
 
 import (
@@ -15,6 +16,7 @@ type usecasesPort interface {
 	CreateAppointment(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 	CreateQuote(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
+	GetPublicPreviewBootstrap(ctx context.Context, orgID string) (map[string]any, error)
 }
 
 type Handler struct {
@@ -26,9 +28,19 @@ func NewHandler(uc usecasesPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
+	authGroup.GET("/public-preview/bootstrap", h.GetPublicPreviewBootstrap)
 	authGroup.POST("/appointments", h.CreateAppointment)
 	authGroup.POST("/quotes", h.CreateQuote)
 	authGroup.POST("/payments/:sale_id/link", h.CreateSalePaymentLink)
+}
+
+func (h *Handler) GetPublicPreviewBootstrap(c *gin.Context) {
+	out, err := h.uc.GetPublicPreviewBootstrap(c.Request.Context(), auth.GetAuthContext(c).OrgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) CreateAppointment(c *gin.Context) {

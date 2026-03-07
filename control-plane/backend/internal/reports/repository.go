@@ -1,7 +1,9 @@
+// Package reports provides persistence for reporting queries.
 package reports
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,22 +83,30 @@ func (r *Repository) SalesByProduct(ctx context.Context, orgID uuid.UUID, from, 
 }
 
 func (r *Repository) SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error) {
+	customerIDExpr, err := r.salesColumnExpr(ctx, "party_id", "customer_id")
+	if err != nil {
+		return nil, err
+	}
+	customerNameExpr, err := r.salesColumnExpr(ctx, "party_name", "customer_name")
+	if err != nil {
+		return nil, err
+	}
 	type row struct {
-		CustomerID   *uuid.UUID `gorm:"column:party_id"`
-		CustomerName string     `gorm:"column:party_name"`
+		CustomerID   *uuid.UUID `gorm:"column:customer_id"`
+		CustomerName string     `gorm:"column:customer_name"`
 		Total        float64    `gorm:"column:total"`
 		Count        int64      `gorm:"column:count"`
 	}
 	var rows []row
 	if err := r.db.WithContext(ctx).Table("sales").
-		Select(`
-			party_id,
-			COALESCE(NULLIF(party_name, ''), 'Unknown') AS party_name,
+		Select(fmt.Sprintf(`
+			%s AS customer_id,
+			COALESCE(NULLIF(%s, ''), 'Unknown') AS customer_name,
 			COALESCE(SUM(total), 0) AS total,
 			COUNT(*) AS count
-		`).
+		`, customerIDExpr, customerNameExpr)).
 		Where("org_id = ? AND status = 'completed' AND created_at >= ? AND created_at <= ?", orgID, from, to).
-		Group("party_id, COALESCE(NULLIF(party_name, ''), 'Unknown')").
+		Group(fmt.Sprintf("%s, COALESCE(NULLIF(%s, ''), 'Unknown')", customerIDExpr, customerNameExpr)).
 		Order("total DESC").
 		Limit(100).
 		Scan(&rows).Error; err != nil {
@@ -172,7 +182,7 @@ func (r *Repository) InventoryValuation(ctx context.Context, orgID uuid.UUID) ([
 }
 
 func (r *Repository) LowStock(ctx context.Context, orgID uuid.UUID) ([]reportdomain.LowStockItem, error) {
-	var out []reportdomain.LowStockItem
+	out := make([]reportdomain.LowStockItem, 0)
 	if err := r.db.WithContext(ctx).Table("stock_levels sl").
 		Select("sl.product_id::text AS product_id, p.name AS product_name, p.sku, sl.quantity, sl.min_quantity").
 		Joins("JOIN products p ON p.id = sl.product_id").
@@ -182,6 +192,41 @@ func (r *Repository) LowStock(ctx context.Context, orgID uuid.UUID) ([]reportdom
 		return nil, err
 	}
 	return out, nil
+}
+
+func (r *Repository) salesColumnExpr(ctx context.Context, preferred, fallback string) (string, error) {
+	hasPreferred, err := r.tableHasColumn(ctx, "sales", preferred)
+	if err != nil {
+		return "", err
+	}
+	if hasPreferred {
+		return preferred, nil
+	}
+	hasFallback, err := r.tableHasColumn(ctx, "sales", fallback)
+	if err != nil {
+		return "", err
+	}
+	if hasFallback {
+		return fallback, nil
+	}
+	if fallback == "customer_name" {
+		return "''", nil
+	}
+	return "NULL::uuid", nil
+}
+
+func (r *Repository) tableHasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
+	var exists bool
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = ?
+			  AND column_name = ?
+		)
+	`, tableName, columnName).Scan(&exists).Error
+	return exists, err
 }
 
 func (r *Repository) CashflowSummary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.CashflowSummary, error) {

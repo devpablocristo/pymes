@@ -21,7 +21,7 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  backend:
+  cp-backend:
     build:
       context: .
       dockerfile: ./control-plane/backend/Dockerfile.dev
@@ -31,8 +31,8 @@ services:
       - ./control-plane/backend:/workspace/control-plane/backend
       - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
-      - backend_go_mod:/go/pkg/mod
-      - backend_go_build:/root/.cache/go-build
+      - cp_backend_go_mod:/go/pkg/mod
+      - cp_backend_go_build:/root/.cache/go-build
     env_file:
       - .env
     environment:
@@ -47,41 +47,43 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: ./control-plane/frontend/Dockerfile.dev
+      dockerfile: ./frontend/Dockerfile.dev
     ports:
       - "5180:5173"
     volumes:
-      - ./control-plane/frontend/src:/workspace/control-plane/frontend/src
-      - ./control-plane/frontend/public:/workspace/control-plane/frontend/public
-      - ./control-plane/frontend/index.html:/workspace/control-plane/frontend/index.html
-      - ./control-plane/frontend/vite.config.ts:/workspace/control-plane/frontend/vite.config.ts
-      - ./control-plane/frontend/tsconfig.json:/workspace/control-plane/frontend/tsconfig.json
+      - ./frontend/src:/workspace/frontend/src
+      - ./frontend/public:/workspace/frontend/public
+      - ./frontend/index.html:/workspace/frontend/index.html
+      - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
+      - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
       - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
     env_file:
       - .env
     environment:
       VITE_API_URL: http://localhost:8100
+      VITE_PROFESSIONALS_API_URL: http://localhost:8181
     depends_on:
-      - backend
+      - cp-backend
 
   ai:
     build:
       context: .
-      dockerfile: ./control-plane/ai/Dockerfile.dev
+      dockerfile: ./ai/Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
-      - ./control-plane/ai/src:/workspace/control-plane/ai/src
+      - ./ai/src:/workspace/ai/src
       - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
       - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
-      BACKEND_URL: http://backend:8080
+      BACKEND_URL: http://cp-backend:8080
+      PROFESSIONALS_BACKEND_URL: http://prof-backend:8081
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
-      - backend
+      - cp-backend
 
   # ── Professionals Vertical ──
 
@@ -102,58 +104,18 @@ services:
     environment:
       PORT: 8081
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
-      CONTROL_PLANE_URL: http://backend:8080
-      FRONTEND_URL: http://localhost:5181
+      CONTROL_PLANE_URL: http://cp-backend:8080
+      FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
       postgres:
         condition: service_healthy
-      backend:
+      cp-backend:
         condition: service_started
-
-  prof-frontend:
-    build:
-      context: .
-      dockerfile: ./professionals/frontend/Dockerfile.dev
-    ports:
-      - "5181:5174"
-    volumes:
-      - ./professionals/frontend/src:/workspace/professionals/frontend/src
-      - ./professionals/frontend/public:/workspace/professionals/frontend/public
-      - ./professionals/frontend/index.html:/workspace/professionals/frontend/index.html
-      - ./professionals/frontend/vite.config.ts:/workspace/professionals/frontend/vite.config.ts
-      - ./professionals/frontend/tsconfig.json:/workspace/professionals/frontend/tsconfig.json
-      - ./control-plane/frontend/src/shared:/workspace/control-plane/frontend/src/shared
-      - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
-    env_file:
-      - .env
-    environment:
-      VITE_PROFESSIONALS_API_URL: http://localhost:8181
-      VITE_API_URL: http://localhost:8100
-    depends_on:
-      - prof-backend
-
-  prof-ai:
-    build:
-      context: .
-      dockerfile: ./professionals/ai/Dockerfile.dev
-    ports:
-      - "8201:8001"
-    volumes:
-      - ./professionals/ai/src:/workspace/professionals/ai/src
-      - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
-      - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
-    env_file:
-      - .env
-    environment:
-      BACKEND_URL: http://prof-backend:8081
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
-    depends_on:
-      - prof-backend
 
 volumes:
   pgdata:
-  backend_go_mod:
-  backend_go_build:
+  cp_backend_go_mod:
+  cp_backend_go_build:
   prof_backend_go_mod:
   prof_backend_go_build:

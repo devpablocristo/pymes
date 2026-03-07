@@ -12,6 +12,7 @@ type controlPlanePort interface {
 	CreateAppointment(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateQuote(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
+	GetBusinessInfo(ctx context.Context, orgRef string) (map[string]any, error)
 }
 
 type Usecases struct {
@@ -41,6 +42,13 @@ func (u *Usecases) CreateSalePaymentLink(ctx context.Context, orgID, saleID stri
 		return nil, fmt.Errorf("org_id and sale_id are required: %w", httperrors.ErrBadInput)
 	}
 	return u.cp.CreateSalePaymentLink(ctx, orgID, saleID)
+}
+
+func (u *Usecases) GetPublicPreviewBootstrap(ctx context.Context, orgID string) (map[string]any, error) {
+	if strings.TrimSpace(orgID) == "" {
+		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
+	}
+	return u.cp.GetBusinessInfo(ctx, orgID)
 }
 
 func withOrgID(orgID string, payload map[string]any) map[string]any {

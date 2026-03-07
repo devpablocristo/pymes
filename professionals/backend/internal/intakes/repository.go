@@ -19,6 +19,21 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID) ([]domain.Intake, error) {
+	var rows []models.IntakeModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ?", orgID).
+		Order("created_at DESC").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.Intake, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomain(row))
+	}
+	return out, nil
+}
+
 func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intake, error) {
 	payload, _ := json.Marshal(in.Payload)
 	row := models.IntakeModel{

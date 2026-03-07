@@ -1666,6 +1666,7 @@ code {
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
   text-align: left;
   transition: all var(--transition);
@@ -1709,6 +1710,7 @@ code {
   border: 1.5px solid var(--color-border);
   border-radius: 100px;
   background: var(--color-surface);
+  color: var(--color-text);
   font-size: 0.82rem;
   font-family: var(--font-body);
   cursor: pointer;
@@ -1807,6 +1809,47 @@ code {
 
 .onboarding-btn-finish:hover {
   background: #059669;
+}
+
+/* ── Onboarding dark mode ── */
+[data-theme="dark"] .onboarding-layout {
+  background: var(--color-bg);
+}
+
+[data-theme="dark"] .onboarding-container {
+  background: var(--color-sidebar);
+  border: 1px solid var(--color-border);
+}
+
+[data-theme="dark"] .onboarding-option {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .onboarding-option:hover {
+  background: var(--color-primary-subtle);
+}
+
+[data-theme="dark"] .onboarding-option.selected {
+  background: var(--color-primary-subtle);
+}
+
+[data-theme="dark"] .onboarding-chip {
+  background: var(--color-bg);
+}
+
+[data-theme="dark"] .onboarding-field input,
+[data-theme="dark"] .onboarding-field select {
+  background: var(--color-bg);
+}
+
+[data-theme="dark"] .onboarding-btn-back {
+  background: var(--color-bg);
+}
+
+[data-theme="dark"] .onboarding-summary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 @media (max-width: 600px) {

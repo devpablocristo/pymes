@@ -46,15 +46,15 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/returns"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/scheduler"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
+	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
+	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
 )
 
 func InitializeApp() *app.App {
@@ -218,7 +218,7 @@ func InitializeApp() *app.App {
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, usersRepo)
 
 	router := gin.New()
 	router.Use(gin.Recovery())

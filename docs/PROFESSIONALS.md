@@ -1,93 +1,60 @@
 # Professionals
 
-Documentacion operativa y arquitectonica de `professionals`, la vertical especializada del repo.
+`professionals` es una vertical delgada con schema y backend propios.
 
-## Rol en el repo
+## Dominio
 
-`professionals` implementa el delta de dominio especifico de atencion profesional y sesiones.
+- professional profiles
+- specialties
+- intakes
+- sessions
+- service links
+- flujos publicos de agenda y atencion
 
-No duplica capacidades transversales que ya pertenecen a `control-plane`. Cuando necesita esas capacidades, las consume por HTTP mediante contratos internos.
+## Piezas vigentes
 
-En esta documentacion:
+- backend: `professionals/backend`
+- infra: `professionals/infra`
 
-- `professionals` es una vertical
-- `backend`, `frontend` y `AI` son piezas desplegables de la vertical
-- `modulo` se usa solo para agrupaciones internas dentro de esos backends
+La consola web y el AI especializado viven dentro de los deployables unificados:
 
-## Componentes
-
-- `professionals/backend`: backend Go de la vertical
-- `professionals/frontend`: frontend React de la vertical
-- `professionals/ai`: servicio AI especializado de la vertical
-- `professionals/infra`: infraestructura Terraform de la vertical
-
-## Superficie local
-
-En Docker:
-
-- backend: `http://localhost:8181`
-- frontend: `http://localhost:5181`
-- AI: `http://localhost:8201`
-
-Fuera de Docker:
-
-- backend: `make prof-run`
-- frontend: `make prof-frontend-dev`
-- AI: `make prof-ai-dev`
-
-## Dominio propio
-
-La vertical hoy modela principalmente:
-
-- perfiles profesionales
-- especialidades
-- intake inicial
-- sesiones
-- servicios asociados al perfil
-- flujos publicos de agenda y atencion sobre ese dominio
+- `frontend`
+- `ai`
 
 ## Integracion con control-plane
 
-La vertical usa `control-plane` como owner de capacidades transversales.
+`professionals` consume capacidades transversales via HTTP:
 
-Ejemplos de consumo por HTTP:
-
-- bootstrap organizacional
-- configuracion de organizacion
-- clientes
-- productos
-- presupuestos
-- ventas
-- pagos y links de pago
-- turnos y disponibilidad publica
+- bootstrap y settings de organizacion
+- customers y parties
+- products
+- appointments
+- quotes, sales y payment links
 
 Regla de borde:
 
-- `professionals` no importa dominio interno de `control-plane`
-- la integracion entre verticales se hace por clientes HTTP
-- `control-plane/shared/` y `pkgs/` no reemplazan contratos de ownership funcional
+- no importa dominio interno de `control-plane`
+- integra por clientes HTTP y contratos internos
+- reutiliza solo runtime tecnico compartido desde `control-plane/shared/` y `pkgs/`
+
+## Superficie local
+
+- backend: `http://localhost:8181`
+- frontend unificado: `http://localhost:5180`
+- AI unificado: `http://localhost:8200`
+
+Comandos:
+
+```bash
+make prof-run
+make frontend-dev
+make ai-dev
+```
 
 ## Validacion
 
 ```bash
-make prof-test
-make prof-vet
-make prof-ai-test
-cd professionals/frontend && npm run build
+go test ./professionals/backend/...
+make ai-test
+make frontend-test
 ```
-
-Chequeos rapidos:
-
-```bash
-curl http://localhost:8181/healthz
-curl http://localhost:8181/readyz
-curl http://localhost:8201/healthz
-curl http://localhost:8201/readyz
-```
-
-## Documentacion relacionada
-
-- [`README.md`](../README.md)
-- [`README de docs`](./README.md)
-- [`CONTROL_PLANE.md`](./CONTROL_PLANE.md)
-- `prompts/06-professionals.md`

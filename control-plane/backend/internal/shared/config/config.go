@@ -74,7 +74,7 @@ func LoadFromEnv() Config {
 		S3Region:                    getEnv("S3_REGION", "us-east-1"),
 		SchedulerSecret:             os.Getenv("SCHEDULER_SECRET"),
 		ExchangeRateProvider:        getEnv("EXCHANGE_RATE_PROVIDER", "manual"),
-		InternalServiceToken:        os.Getenv("INTERNAL_SERVICE_TOKEN"),
+		InternalServiceToken:        getEnv("INTERNAL_SERVICE_TOKEN", "local-internal-token"),
 		AIServiceURL:                getEnv("AI_SERVICE_URL", "http://ai:8000"),
 		WhatsAppWebhookVerifyToken:  os.Getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN"),
 		WhatsAppAppSecret:           os.Getenv("WHATSAPP_APP_SECRET"),

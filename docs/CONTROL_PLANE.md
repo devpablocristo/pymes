@@ -1,143 +1,51 @@
 # Control Plane
 
-Documentacion operativa y arquitectonica de `control-plane`, la base transversal del producto `pymes`.
+`control-plane` es el owner del dominio transversal del producto.
 
-## Rol en el repo
+## Alcance
 
-`control-plane` es el owner de las capacidades base del producto:
-
-- organizacion, usuarios y autenticacion
+- organizaciones, usuarios y memberships
 - API keys y seguridad interna
-- facturacion, notificaciones y auditoria
-- core comercial y operativo transversal
-- frontend principal de consola
-- servicio AI general del producto
+- billing, auditoria, notificaciones y admin
+- customers, suppliers, products, inventory, sales, quotes, cashflow y reports
+- appointments, recurring, price lists, payments, returns, webhooks y WhatsApp
+- runtime compartido reutilizado por otras verticales
 
-`professionals` no importa su dominio interno; consume capacidades de `control-plane` por HTTP cuando corresponde.
+## Piezas vigentes
 
-## Componentes
+- backend: `control-plane/backend`
+- shared backend: `control-plane/shared/backend`
+- shared AI runtime: `control-plane/shared/ai`
+- infra: `control-plane/infra`
 
-- `control-plane/backend`: backend Go principal
-- `control-plane/frontend`: consola web React
-- `control-plane/ai`: servicio AI en FastAPI
-- `control-plane/infra`: infraestructura Terraform
-- `control-plane/shared/backend`: base compartida de backend entre verticales
-- `control-plane/shared/ai`: runtime AI compartido del producto
-
-En esta documentacion:
-
-- `control-plane` es una base transversal, no una vertical
-- `backend`, `frontend` y `AI` son piezas desplegables
-- `modulo` se usa solo para agrupaciones internas del backend Go
+El frontend y el AI no viven ya dentro de `control-plane/`; hoy son deployables unificados en `frontend/` y `ai/`.
 
 ## Superficie local
 
-En Docker:
-
 - backend: `http://localhost:8100`
-- frontend: `http://localhost:5180`
-- AI: `http://localhost:8200`
+- AI unificado: `http://localhost:8200`
+- frontend unificado: `http://localhost:5180`
 
-Fuera de Docker:
+Comandos:
 
-- backend: `make cp-run`
-- frontend: `make cp-frontend-dev`
-- AI: `make ai-dev`
+```bash
+make cp-run
+make ai-dev
+make frontend-dev
+```
 
-## Dominio y alcance
+## Seguridad interna
 
-### Base transversal
-
-- organizaciones
-- usuarios
-- claves API
-- facturacion
-- notificaciones
-- administracion
-- auditoria
-
-### Core de negocio transversal
-
-- clientes
-- proveedores
-- productos
-- inventario
-- presupuestos
-- ventas
-- caja
-- reportes
-
-### Extensiones operativas
-
-- RBAC
-- compras
-- cuentas corrientes
-- pagos
-- devoluciones
-- listas de precios
-- gastos recurrentes
-- turnos
-- adjuntos
-- PDFs
-- historial
-- webhooks salientes
-- WhatsApp
-- dashboard
-- scheduler
-- party model
-
-## AI del control-plane
-
-`control-plane/ai` no define verdad de negocio propia. Toda accion sensible pasa por el backend Go.
-
-Endpoints base:
-
-- `GET /healthz`
-- `GET /readyz`
-- `POST /v1/chat`
-- `POST /v1/public/{org_slug}/chat`
-- `POST /v1/public/{org_slug}/chat/identify`
-- `POST /v1/internal/whatsapp/message`
-
-Endpoints comerciales:
-
-- `POST /v1/chat/commercial/sales`
-- `POST /v1/chat/commercial/procurement`
-- `POST /v1/public/{org_slug}/sales-agent/chat`
-- `POST /v1/public/{org_slug}/sales-agent/contracts`
+- las rutas internas usan `X-Internal-Service-Token`
+- si `INTERNAL_SERVICE_TOKEN` no esta configurado, el backend ahora falla cerrado
+- el modo API key deriva `actor` y `role` del backend, no de headers cliente
+- el AI resuelve y valida API keys contra `control-plane/backend` antes de aceptar requests
 
 ## Validacion
 
 ```bash
-make cp-test
-make cp-vet
+go test ./control-plane/backend/...
+go test ./control-plane/shared/backend/...
 make ai-test
-cd control-plane/frontend && npm run build
+make frontend-test
 ```
-
-Chequeos rapidos:
-
-```bash
-curl http://localhost:8100/healthz
-curl http://localhost:8100/readyz
-curl http://localhost:8200/healthz
-curl http://localhost:8200/readyz
-```
-
-## Relacion con otras partes del repo
-
-- `control-plane/shared/` contiene codigo transversal del producto reusable entre verticales
-- `pkgs/` contiene librerias agnosticas y portables fuera del repo
-- `professionals/` es una vertical separada que consume contratos internos de `control-plane`
-
-## Documentacion relacionada
-
-- [`README.md`](../README.md)
-- [`README de docs`](./README.md)
-- [`PROFESSIONALS.md`](./PROFESSIONALS.md)
-- `prompts/00-base-transversal.md`
-- `prompts/01-core-negocio.md`
-- `prompts/02-extensiones-transversales.md`
-- `prompts/03-ai-assistant.md`
-- `prompts/04-pasarelas-cobro.md`
-- `prompts/05-agentes-comerciales.md`

@@ -172,6 +172,9 @@ export async function createProfessional(data: {
   bio: string;
   headline: string;
   public_slug: string;
+  is_public?: boolean;
+  is_bookable?: boolean;
+  accepts_new_clients?: boolean;
 }): Promise<ProfessionalProfile> {
   return professionalRequest('/v1/professionals', { method: 'POST', body: data });
 }
@@ -182,7 +185,14 @@ export async function getProfessional(id: string): Promise<ProfessionalProfile> 
 
 export async function updateProfessional(
   id: string,
-  data: Partial<{ bio: string; headline: string; public_slug: string; is_public: boolean; is_bookable: boolean }>,
+  data: Partial<{
+    bio: string;
+    headline: string;
+    public_slug: string;
+    is_public: boolean;
+    is_bookable: boolean;
+    accepts_new_clients: boolean;
+  }>,
 ): Promise<ProfessionalProfile> {
   return professionalRequest(`/v1/professionals/${id}`, { method: 'PUT', body: data });
 }
@@ -197,13 +207,14 @@ export async function createSpecialty(data: {
   code: string;
   name: string;
   description: string;
+  is_active?: boolean;
 }): Promise<Specialty> {
   return professionalRequest('/v1/specialties', { method: 'POST', body: data });
 }
 
 export async function updateSpecialty(
   id: string,
-  data: Partial<{ name: string; description: string; is_active: boolean }>,
+  data: Partial<{ code: string; name: string; description: string; is_active: boolean }>,
 ): Promise<Specialty> {
   return professionalRequest(`/v1/specialties/${id}`, { method: 'PUT', body: data });
 }
@@ -303,7 +314,10 @@ export async function getSessions(filters?: { status?: string; profile_id?: stri
 }
 
 export async function createSession(data: {
+  appointment_id: string;
   profile_id: string;
+  customer_party_id?: string;
+  product_id?: string;
   started_at: string;
   summary?: string;
 }): Promise<Session> {
@@ -318,7 +332,10 @@ export async function completeSession(id: string): Promise<Session> {
   return professionalRequest(`/v1/sessions/${id}/complete`, { method: 'POST', body: {} });
 }
 
-export async function addSessionNote(id: string, data: { content: string; author: string }): Promise<SessionNote> {
+export async function addSessionNote(
+  id: string,
+  data: { body: string; title?: string; note_type?: string },
+): Promise<SessionNote> {
   return professionalRequest(`/v1/sessions/${id}/notes`, { method: 'POST', body: data });
 }
 

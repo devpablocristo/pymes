@@ -69,14 +69,8 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			if rawKey != "" && m.keyResolver != nil {
 				key, ok := m.keyResolver.ResolveAPIKey(rawKey)
 				if ok {
-					actor := sanitizeHeader(c.GetHeader("X-Actor"), 128)
-					if actor == "" {
-						actor = "api_key:" + key.ID.String()
-					}
-					role := sanitizeHeader(c.GetHeader("X-Role"), 32)
-					if role == "" {
-						role = "service"
-					}
+					actor := "api_key:" + key.ID.String()
+					role := "service"
 					reqScopes := splitCSV(c.GetHeader("X-Scopes"))
 					scopes := key.Scopes
 					if len(reqScopes) > 0 {
@@ -118,7 +112,7 @@ func GetAuthContext(c *gin.Context) AuthContext {
 func NewInternalServiceAuth(token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.TrimSpace(token) == "" {
-			c.Next()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "internal service auth is not configured"})
 			return
 		}
 		provided := strings.TrimSpace(c.GetHeader("X-Internal-Service-Token"))

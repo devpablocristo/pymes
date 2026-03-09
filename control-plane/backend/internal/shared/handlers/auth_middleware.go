@@ -58,17 +58,11 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 
 		if m.authAllowKey {
 			rawKey := strings.TrimSpace(c.GetHeader("X-API-KEY"))
-			if rawKey != "" {
+			if rawKey != "" && m.keyResolver != nil {
 				key, ok := m.keyResolver.ResolveAPIKey(rawKey)
 				if ok {
-					actor := sanitizeHeader(c.GetHeader("X-Actor"), 128)
-					if actor == "" {
-						actor = "api_key:" + key.ID.String()
-					}
-					role := sanitizeHeader(c.GetHeader("X-Role"), 32)
-					if role == "" {
-						role = "service"
-					}
+					actor := "api_key:" + key.ID.String()
+					role := "service"
 					reqScopes := splitCSV(c.GetHeader("X-Scopes"))
 					scopes := key.Scopes
 					if len(reqScopes) > 0 {

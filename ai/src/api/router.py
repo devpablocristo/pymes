@@ -15,6 +15,7 @@ from src.backend_client.client import BackendClient
 from pymes_control_plane_shared.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.core.dossier import summarize_dossier_for_context
+from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from src.db.repository import AIRepository
 from pymes_control_plane_shared.ai_runtime import Message
 from pymes_control_plane_shared.ai_runtime import get_logger
@@ -112,6 +113,7 @@ async def chat_internal(
 ):
     await check_quota(repo, auth.org_id, mode="internal")
     logger.info("chat_internal_started", org_id=auth.org_id, user_id=auth.actor, conversation_id=req.conversation_id or "")
+    conversation_user_id = get_internal_conversation_user_id(auth)
 
     conversation = None
     if req.conversation_id:
@@ -120,13 +122,13 @@ async def chat_internal(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
         if conversation.mode != "internal":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid conversation mode")
-        if conversation.user_id and conversation.user_id != auth.actor:
+        if not can_access_internal_conversation(auth, conversation.user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
     else:
         conversation = await repo.create_conversation(
             org_id=auth.org_id,
             mode="internal",
-            user_id=auth.actor,
+            user_id=conversation_user_id,
             title=req.message.strip()[:60],
         )
 
@@ -225,7 +227,12 @@ async def list_conversations(
     repo: AIRepository = Depends(get_repository),
     auth: AuthContext = Depends(get_auth_context),
 ):
-    rows = await repo.list_conversations(org_id=auth.org_id, mode="internal", user_id=auth.actor, limit=50)
+    rows = await repo.list_conversations(
+        org_id=auth.org_id,
+        mode="internal",
+        user_id=get_internal_conversation_user_id(auth),
+        limit=50,
+    )
     out: list[ConversationItem] = []
     for row in rows:
         out.append(
@@ -249,7 +256,7 @@ async def get_conversation(
     row = await repo.get_conversation(auth.org_id, conversation_id)
     if row is None or row.mode != "internal":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
-    if row.user_id and row.user_id != auth.actor:
+    if not can_access_internal_conversation(auth, row.user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
 
     return ConversationDetail(
@@ -273,7 +280,7 @@ async def delete_conversation(
     row = await repo.get_conversation(auth.org_id, conversation_id)
     if row is None or row.mode != "internal":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
-    if row.user_id and row.user_id != auth.actor:
+    if not can_access_internal_conversation(auth, row.user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
 
     ok = await repo.delete_conversation(auth.org_id, conversation_id)

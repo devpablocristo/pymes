@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiRequest, downloadAPIFile, getAdminBootstrap } from '../lib/api';
+import { ConfiguredCrudPage, hasCrudResource } from '../crud/resourceConfigs';
 import {
   moduleCatalog,
   moduleGroups,
@@ -391,8 +392,7 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
   );
 }
 
-export function ModulePage() {
-  const { moduleId = '' } = useParams();
+function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   const module = useMemo(() => moduleCatalog[moduleId], [moduleId]);
   const [runtime, setRuntime] = useState<ModuleRuntimeContext>(() => currentRuntimeContext());
   const [bootstrapError, setBootstrapError] = useState('');
@@ -455,4 +455,12 @@ export function ModulePage() {
       )}
     </>
   );
+}
+
+export function ModulePage() {
+  const { moduleId = '' } = useParams();
+  if (hasCrudResource(moduleId)) {
+    return <ConfiguredCrudPage resourceId={moduleId} />;
+  }
+  return <ModuleExplorerPage moduleId={moduleId} />;
 }

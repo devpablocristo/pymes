@@ -1,88 +1,95 @@
-# Pymes — SaaS multi-vertical para Pymes LATAM
+# Pymes
 
-Monorepo con `control-plane` como base transversal del producto y `professionals` como vertical especializada. Reúne backends, frontends, servicios AI, infraestructura y paquetes compartidos dentro de un solo repo.
+Monorepo SaaS multi-vertical para PyMEs LATAM.
 
-## Inicio rápido
+La topologia activa hoy es:
+
+- `control-plane/backend`: backend Go transversal
+- `professionals/backend`: backend Go de la vertical `professionals`
+- `frontend`: consola React unificada para core y verticales
+- `ai`: servicio FastAPI unificado para chat interno, publico y `professionals`
+- `control-plane/shared/` y `pkgs/`: runtime y librerias compartidas
+
+## Inicio rapido
 
 ```bash
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 ```
 
-Servicios principales:
-- control-plane backend en `http://localhost:8100`
-- control-plane frontend en `http://localhost:5180`
-- control-plane AI en `http://localhost:8200`
-- professionals backend en `http://localhost:8181`
-- professionals frontend en `http://localhost:5181`
-- professionals AI en `http://localhost:8201`
-- PostgreSQL en `localhost:5434`
-- MailHog en `http://localhost:8025`
+Servicios locales:
 
-Modo mixto:
+- control-plane backend: `http://localhost:8100`
+- professionals backend: `http://localhost:8181`
+- frontend unificado: `http://localhost:5180`
+- AI unificado: `http://localhost:8200`
+- PostgreSQL: `localhost:5434`
+- MailHog: `http://localhost:8025`
+
+API key local de desarrollo:
+
+- `psk_local_admin`
+
+## Desarrollo mixto
 
 ```bash
 docker compose up -d postgres mailhog
 make cp-run
-make cp-frontend-dev
-make ai-dev
 make prof-run
-make prof-frontend-dev
-make prof-ai-dev
+make frontend-dev
+make ai-dev
 ```
 
 ## Estructura
 
 ```text
 pymes/
+├── ai/
 ├── control-plane/
 │   ├── backend/
-│   ├── frontend/
-│   ├── ai/
 │   ├── infra/
 │   └── shared/
+├── docs/
+├── frontend/
+├── pkgs/
 ├── professionals/
 │   ├── backend/
-│   ├── frontend/
-│   ├── ai/
 │   └── infra/
-├── docs/
-├── prompts/
-├── pkgs/
 ├── docker-compose.yml
 ├── go.mod
 └── Makefile
 ```
 
-## Documentación
+## CRUDs unificados
 
-La documentación canónica del repo vive en `docs/README.md`.
+El frontend usa un blueprint unico de CRUD en:
 
-Lecturas recomendadas:
-- `docs/README.md`: índice operativo y arquitectónico
-- `docs/ARCHITECTURE.md`: regla madre de arquitectura
-- `docs/CONTROL_PLANE.md`: guía de `control-plane`
-- `docs/PROFESSIONALS.md`: guía de `professionals`
-- `prompts/00-base-transversal.md` a `prompts/07-dashboard-personalizable.md`: alcance y diseño funcional
+- `frontend/src/components/CrudPage.tsx`
+- `frontend/src/crud/resourceConfigs.tsx`
 
-## Estado actual
+`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles` y los CRUDs de `professionals`, con acciones custom cuando el flujo no es CRUD puro.
 
-El repo ya incluye:
-- `control-plane` con backend Go, frontend React y servicio AI general
-- `professionals` con backend, frontend y servicio AI propios
-- integracion entre verticales via HTTP con ownership funcional separado
-- `control-plane/shared/` para codigo transversal del producto
-- paquetes compartidos en `pkgs/` para Go, TypeScript y Python
-
-## Validación rápida
+## Validacion
 
 ```bash
-make cp-test
-make cp-vet
-make ai-test
-make prof-test
-make prof-vet
-make prof-ai-test
-cd control-plane/frontend && npm run build
-cd professionals/frontend && npm run build
+make test
+make lint
+make frontend-build
 ```
+
+Chequeos rapidos:
+
+```bash
+curl http://localhost:8100/healthz
+curl http://localhost:8181/healthz
+curl http://localhost:8200/healthz
+```
+
+## Documentacion
+
+La documentacion canónica vive en `docs/`.
+
+- `docs/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CONTROL_PLANE.md`
+- `docs/PROFESSIONALS.md`

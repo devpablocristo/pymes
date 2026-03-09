@@ -36,9 +36,9 @@ class BackendClient:
             headers["Authorization"] = auth.authorization
         if auth.api_key:
             headers["X-API-KEY"] = auth.api_key
-            headers["X-Actor"] = auth.api_actor or auth.actor
-            headers["X-Role"] = auth.api_role or auth.role
-            headers["X-Scopes"] = auth.api_scopes or ",".join(auth.scopes)
+            scopes = auth.api_scopes or ",".join(auth.scopes)
+            if scopes:
+                headers["X-Scopes"] = scopes
         return headers
 
     async def request(

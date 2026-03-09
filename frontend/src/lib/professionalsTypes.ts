@@ -6,6 +6,7 @@ export type ProfessionalProfile = {
   public_slug: string;
   is_public: boolean;
   is_bookable: boolean;
+  accepts_new_clients: boolean;
   specialties: Array<string | { id: string; code: string; name: string }>;
   created_at: string;
   updated_at: string;
@@ -46,12 +47,15 @@ export type Intake = {
 
 export type Session = {
   id: string;
+  appointment_id: string;
   profile_id: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  started_at: string;
-  ended_at: string;
+  customer_party_id?: string;
+  product_id?: string;
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  started_at?: string;
+  ended_at?: string;
   summary: string;
-  notes: SessionNote[];
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
@@ -59,7 +63,9 @@ export type Session = {
 export type SessionNote = {
   id: string;
   session_id: string;
-  content: string;
-  author: string;
+  note_type: string;
+  title: string;
+  body: string;
+  created_by: string;
   created_at: string;
 };

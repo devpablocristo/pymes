@@ -15,6 +15,7 @@ from src.api.external_chat_support import get_external_conversation, history_to_
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
+from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from pymes_control_plane_shared.ai_runtime import OrchestratorLimits, orchestrate
 from src.db.repository import AIRepository
 from pymes_control_plane_shared.ai_runtime import LLMProvider, Message, ToolDeclaration
@@ -718,10 +719,15 @@ async def _load_internal_conversation(repo: AIRepository, auth: AuthContext, con
         conversation = await repo.get_conversation(auth.org_id, conversation_id)
         if conversation is None or conversation.mode != "internal":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
-        if conversation.user_id and conversation.user_id != auth.actor:
+        if not can_access_internal_conversation(auth, conversation.user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
         return conversation
-    return await repo.create_conversation(org_id=auth.org_id, mode="internal", user_id=auth.actor, title=message[:60])
+    return await repo.create_conversation(
+        org_id=auth.org_id,
+        mode="internal",
+        user_id=get_internal_conversation_user_id(auth),
+        title=message[:60],
+    )
 
 
 async def run_commercial_chat(

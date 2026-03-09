@@ -27,7 +27,7 @@ func LoadFromEnv() Config {
 		JWTIssuer:            os.Getenv("JWT_ISSUER"),
 		AuthEnableJWT:        getEnvBool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:      getEnvBool("AUTH_ALLOW_API_KEY", true),
-		InternalServiceToken: os.Getenv("INTERNAL_SERVICE_TOKEN"),
+		InternalServiceToken: getEnv("INTERNAL_SERVICE_TOKEN", "local-internal-token"),
 		ControlPlaneURL:      getEnv("CONTROL_PLANE_URL", "http://localhost:8080"),
 		FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:5173"),
 	}

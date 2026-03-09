@@ -1,9 +1,8 @@
 import { FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { apiRequest } from '../lib/api';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export type CrudFieldValue = string | boolean;
+export type CrudFormValues = Record<string, CrudFieldValue>;
 
 export type CrudColumn<T> = {
   key: keyof T & string;
@@ -15,41 +14,104 @@ export type CrudColumn<T> = {
 export type CrudFormField = {
   key: string;
   label: string;
-  type?: 'text' | 'email' | 'tel' | 'number' | 'date' | 'textarea';
+  type?: 'text' | 'email' | 'tel' | 'number' | 'date' | 'datetime-local' | 'textarea' | 'select' | 'checkbox';
   placeholder?: string;
   required?: boolean;
   fullWidth?: boolean;
+  createOnly?: boolean;
+  editOnly?: boolean;
+  options?: Array<{ label: string; value: string }>;
+};
+
+export type CrudDataSource<T extends { id: string }> = {
+  list?: (params: { archived: boolean }) => Promise<T[]>;
+  create?: (values: CrudFormValues) => Promise<unknown>;
+  update?: (row: T, values: CrudFormValues) => Promise<unknown>;
+  deleteItem?: (row: T) => Promise<unknown>;
+  restore?: (row: T) => Promise<unknown>;
+  hardDelete?: (row: T) => Promise<unknown>;
+};
+
+type CrudHelpers<T extends { id: string }> = {
+  items: T[];
+  reload: () => Promise<void>;
+  setError: (message: string) => void;
+};
+
+export type CrudToolbarAction<T extends { id: string }> = {
+  id: string;
+  label: string;
+  kind?: 'primary' | 'secondary' | 'danger' | 'success';
+  isVisible?: (ctx: { archived: boolean; items: T[] }) => boolean;
+  onClick: (helpers: CrudHelpers<T>) => Promise<void> | void;
+};
+
+export type CrudRowAction<T extends { id: string }> = {
+  id: string;
+  label: string;
+  kind?: 'primary' | 'secondary' | 'danger' | 'success';
+  isVisible?: (row: T, ctx: { archived: boolean }) => boolean;
+  onClick: (row: T, helpers: CrudHelpers<T>) => Promise<void> | void;
 };
 
 export type CrudPageConfig<T extends { id: string }> = {
-  /** API base path, e.g. "/v1/customers" */
-  basePath: string;
-  /** Singular label, e.g. "alumno" */
+  basePath?: string;
+  dataSource?: CrudDataSource<T>;
+  supportsArchived?: boolean;
+  allowCreate?: boolean;
+  allowEdit?: boolean;
+  allowDelete?: boolean;
+  allowRestore?: boolean;
+  allowHardDelete?: boolean;
   label: string;
-  /** Plural label, e.g. "alumnos" */
   labelPlural: string;
-  /** Capitalized plural, e.g. "Alumnos" */
   labelPluralCap: string;
-  /** Table columns to render */
   columns: CrudColumn<T>[];
-  /** Form field definitions */
   formFields: CrudFormField[];
-  /** Extract search text from a row for filtering */
   searchText: (row: T) => string;
-  /** Convert a row into form values for editing */
-  toFormValues: (row: T) => Record<string, string>;
-  /** Convert form values into API body for create/update */
-  toBody: (values: Record<string, string>) => Record<string, unknown>;
-  /** Validate form — return true if valid */
-  isValid: (values: Record<string, string>) => boolean;
+  toFormValues: (row: T) => CrudFormValues;
+  toBody?: (values: CrudFormValues) => Record<string, unknown>;
+  isValid: (values: CrudFormValues) => boolean;
+  searchPlaceholder?: string;
+  emptyState?: string;
+  archivedEmptyState?: string;
+  createLabel?: string;
+  toolbarActions?: CrudToolbarAction<T>[];
+  rowActions?: CrudRowAction<T>[];
 };
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function parseListResponse<T>(data: { items?: T[] } | T[]): T[] {
+  return Array.isArray(data) ? data : (data.items ?? []);
+}
+
+function buttonClass(kind: 'primary' | 'secondary' | 'danger' | 'success' = 'secondary', small = true): string {
+  const size = small ? 'btn-sm ' : '';
+  switch (kind) {
+    case 'primary':
+      return `${size}btn-primary`;
+    case 'danger':
+      return `${size}btn-danger`;
+    case 'success':
+      return `${size}btn-success`;
+    default:
+      return `${size}btn-secondary`;
+  }
+}
+
+function normalizeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export function CrudPage<T extends { id: string }>({
   basePath,
+  dataSource,
+  supportsArchived = false,
+  allowCreate,
+  allowEdit,
+  allowDelete,
+  allowRestore,
+  allowHardDelete,
   label,
   labelPlural,
   labelPluralCap,
@@ -59,6 +121,12 @@ export function CrudPage<T extends { id: string }>({
   toFormValues,
   toBody,
   isValid,
+  searchPlaceholder,
+  emptyState,
+  archivedEmptyState,
+  createLabel,
+  toolbarActions = [],
+  rowActions = [],
 }: CrudPageConfig<T>) {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,165 +134,202 @@ export function CrudPage<T extends { id: string }>({
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
-  // Form state
   const [editing, setEditing] = useState<T | null>(null);
   const [creating, setCreating] = useState(false);
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [formValues, setFormValues] = useState<CrudFormValues>({});
   const [saving, setSaving] = useState(false);
 
-  // Action state
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteText, setConfirmDeleteText] = useState('');
 
-  // ---- Data loading ----
-
-  async function loadActive() {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await apiRequest<{ items?: T[] } | T[]>(basePath);
-      const list = Array.isArray(data) ? data : (data.items ?? []);
-      setItems(list);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadArchived() {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await apiRequest<{ items?: T[] } | T[]>(`${basePath}/archived`);
-      const list = Array.isArray(data) ? data : (data.items ?? []);
-      setItems(list);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function reload() {
-    if (showArchived) {
-      void loadArchived();
-    } else {
-      void loadActive();
-    }
-  }
-
-  useEffect(() => { reload(); }, [showArchived]);
-
-  // ---- Filtering ----
-
-  const filtered = items.filter((row) => {
-    if (!search) return true;
-    return searchText(row).toLowerCase().includes(search.toLowerCase());
+  const emptyValues = Object.fromEntries(
+    formFields.map((field) => [field.key, field.type === 'checkbox' ? false : '']),
+  ) as CrudFormValues;
+  const activeFormFields = formFields.filter((field) => {
+    if (editing && field.createOnly) return false;
+    if (!editing && field.editOnly) return false;
+    return true;
   });
 
-  // ---- Form ----
+  const canCreate = allowCreate ?? (formFields.length > 0 && Boolean(dataSource?.create || basePath));
+  const canEdit = allowEdit ?? (formFields.length > 0 && Boolean(dataSource?.update || basePath));
+  const canDelete = allowDelete ?? Boolean(dataSource?.deleteItem || basePath);
+  const canRestore = allowRestore ?? (supportsArchived && Boolean(dataSource?.restore || basePath));
+  const canHardDelete = allowHardDelete ?? (supportsArchived && Boolean(dataSource?.hardDelete || basePath));
+  const showForm = (creating || editing !== null) && formFields.length > 0;
 
-  const emptyValues = Object.fromEntries(formFields.map((f) => [f.key, '']));
-
-  function openCreate() {
-    setEditing(null);
-    setFormValues({ ...emptyValues });
-    setCreating(true);
+  async function loadItems(): Promise<void> {
+    setLoading(true);
+    setError('');
+    try {
+      if (dataSource?.list) {
+        setItems(await dataSource.list({ archived: showArchived }));
+        return;
+      }
+      if (!basePath) {
+        setItems([]);
+        return;
+      }
+      const path = showArchived && supportsArchived ? `${basePath}/archived` : basePath;
+      const data = await apiRequest<{ items?: T[] } | T[]>(path);
+      setItems(parseListResponse(data));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function openEdit(row: T) {
-    setCreating(false);
-    setEditing(row);
-    setFormValues(toFormValues(row));
-  }
+  useEffect(() => {
+    void loadItems();
+  }, [showArchived]);
 
-  function closeForm() {
+  function closeForm(): void {
     setCreating(false);
     setEditing(null);
     setFormValues({});
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  function openCreate(): void {
+    setEditing(null);
+    setCreating(true);
+    setFormValues({ ...emptyValues });
+  }
+
+  function openEdit(row: T): void {
+    setCreating(false);
+    setEditing(row);
+    setFormValues(toFormValues(row));
+  }
+
+  function cancelHardDelete(): void {
+    setConfirmDeleteId(null);
+    setConfirmDeleteText('');
+  }
+
+  function setField(key: string, value: CrudFieldValue): void {
+    setFormValues((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submitForm(event: FormEvent): Promise<void> {
+    event.preventDefault();
     if (!isValid(formValues)) return;
+
     setSaving(true);
     setError('');
     try {
       if (editing) {
-        await apiRequest(`${basePath}/${editing.id}`, { method: 'PUT', body: toBody(formValues) });
-      } else {
-        await apiRequest(basePath, { method: 'POST', body: toBody(formValues) });
+        if (dataSource?.update) {
+          await dataSource.update(editing, formValues);
+        } else if (basePath) {
+          await apiRequest(`${basePath}/${editing.id}`, { method: 'PUT', body: toBody ? toBody(formValues) : {} });
+        }
+      } else if (dataSource?.create) {
+        await dataSource.create(formValues);
+      } else if (basePath) {
+        await apiRequest(basePath, { method: 'POST', body: toBody ? toBody(formValues) : {} });
       }
       closeForm();
-      reload();
+      await loadItems();
     } catch (err) {
-      setError(String(err));
+      setError(normalizeError(err));
     } finally {
       setSaving(false);
     }
   }
 
-  function setField(key: string, value: string) {
-    setFormValues((prev) => ({ ...prev, [key]: value }));
-  }
-
-  // ---- Archive / Restore / Hard Delete ----
-
-  async function handleArchive(id: string) {
-    setBusy(id);
+  async function deleteRow(row: T): Promise<void> {
+    const nextBusyKey = `${row.id}:delete`;
+    setBusyKey(nextBusyKey);
     setError('');
     try {
-      await apiRequest(`${basePath}/${id}`, { method: 'DELETE' });
-      reload();
+      if (dataSource?.deleteItem) {
+        await dataSource.deleteItem(row);
+      } else if (basePath) {
+        await apiRequest(`${basePath}/${row.id}`, { method: 'DELETE' });
+      }
+      await loadItems();
     } catch (err) {
-      setError(String(err));
+      setError(normalizeError(err));
     } finally {
-      setBusy(null);
+      setBusyKey(null);
     }
   }
 
-  async function handleRestore(id: string) {
-    setBusy(id);
+  async function restoreRow(row: T): Promise<void> {
+    const nextBusyKey = `${row.id}:restore`;
+    setBusyKey(nextBusyKey);
     setError('');
     try {
-      await apiRequest(`${basePath}/${id}/restore`, { method: 'POST', body: {} });
-      reload();
+      if (dataSource?.restore) {
+        await dataSource.restore(row);
+      } else if (basePath) {
+        await apiRequest(`${basePath}/${row.id}/restore`, { method: 'POST', body: {} });
+      }
+      await loadItems();
     } catch (err) {
-      setError(String(err));
+      setError(normalizeError(err));
     } finally {
-      setBusy(null);
+      setBusyKey(null);
     }
   }
 
-  function startHardDelete(id: string) {
-    setConfirmDeleteId(id);
-    setConfirmDeleteText('');
-  }
-
-  function cancelHardDelete() {
-    setConfirmDeleteId(null);
-    setConfirmDeleteText('');
-  }
-
-  async function executeHardDelete(id: string) {
-    setBusy(id);
+  async function hardDeleteRow(row: T): Promise<void> {
+    const nextBusyKey = `${row.id}:hard-delete`;
+    setBusyKey(nextBusyKey);
     setError('');
     try {
-      await apiRequest(`${basePath}/${id}/hard`, { method: 'DELETE' });
+      if (dataSource?.hardDelete) {
+        await dataSource.hardDelete(row);
+      } else if (basePath) {
+        await apiRequest(`${basePath}/${row.id}/hard`, { method: 'DELETE' });
+      }
       cancelHardDelete();
-      reload();
+      await loadItems();
     } catch (err) {
-      setError(String(err));
+      setError(normalizeError(err));
     } finally {
-      setBusy(null);
+      setBusyKey(null);
     }
   }
 
-  // ---- Render ----
+  async function runToolbarAction(action: CrudToolbarAction<T>): Promise<void> {
+    setError('');
+    try {
+      await action.onClick({
+        items,
+        reload: loadItems,
+        setError,
+      });
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  }
 
-  const showForm = creating || editing !== null;
+  async function runRowAction(action: CrudRowAction<T>, row: T): Promise<void> {
+    const nextBusyKey = `${row.id}:${action.id}`;
+    setBusyKey(nextBusyKey);
+    setError('');
+    try {
+      await action.onClick(row, {
+        items,
+        reload: loadItems,
+        setError,
+      });
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  const filtered = items.filter((row) => {
+    if (!search.trim()) return true;
+    return searchText(row).toLowerCase().includes(search.trim().toLowerCase());
+  });
+
+  const visibleToolbarActions = toolbarActions.filter((action) => action.isVisible?.({ archived: showArchived, items }) ?? true);
 
   return (
     <>
@@ -236,9 +341,19 @@ export function CrudPage<T extends { id: string }>({
           </p>
         </div>
         <div className="actions-row">
-          {!showArchived && (
+          {visibleToolbarActions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              className={buttonClass(action.kind, false)}
+              onClick={() => { void runToolbarAction(action); }}
+            >
+              {action.label}
+            </button>
+          ))}
+          {!showArchived && canCreate && (
             <button type="button" className="btn-primary" onClick={openCreate}>
-              + Nuevo {label}
+              {createLabel ?? `+ Nuevo ${label}`}
             </button>
           )}
         </div>
@@ -251,25 +366,52 @@ export function CrudPage<T extends { id: string }>({
           <div className="card-header">
             <h2>{editing ? `Editar ${label}` : `Nuevo ${label}`}</h2>
           </div>
-          <form onSubmit={handleSubmit} className="crud-form">
+          <form onSubmit={(event) => { void submitForm(event); }} className="crud-form">
             <div className="crud-form-grid">
-              {formFields.map((field) => (
+              {activeFormFields.map((field) => (
                 <div key={field.key} className={`form-group${field.fullWidth ? ' full-width' : ''}`}>
-                  <label>{field.label}{field.required ? ' *' : ''}</label>
+                  <label htmlFor={`crud-field-${field.key}`}>{field.label}{field.required ? ' *' : ''}</label>
                   {field.type === 'textarea' ? (
                     <textarea
-                      rows={2}
-                      value={formValues[field.key] ?? ''}
-                      onChange={(e) => setField(field.key, e.target.value)}
+                      id={`crud-field-${field.key}`}
+                      rows={3}
+                      value={String(formValues[field.key] ?? '')}
+                      onChange={(event) => setField(field.key, event.target.value)}
                       placeholder={field.placeholder}
                     />
+                  ) : field.type === 'select' ? (
+                    <select
+                      id={`crud-field-${field.key}`}
+                      value={String(formValues[field.key] ?? '')}
+                      onChange={(event) => setField(field.key, event.target.value)}
+                    >
+                      <option value="">{field.placeholder ?? 'Seleccionar...'}</option>
+                      {(field.options ?? []).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === 'checkbox' ? (
+                    <label className="toggle">
+                      <input
+                        id={`crud-field-${field.key}`}
+                        aria-label={field.label}
+                        type="checkbox"
+                        checked={Boolean(formValues[field.key])}
+                        onChange={(event) => setField(field.key, event.target.checked)}
+                      />
+                      <span className="toggle-track" />
+                      <span className="toggle-thumb" />
+                    </label>
                   ) : (
                     <input
+                      id={`crud-field-${field.key}`}
                       type={field.type ?? 'text'}
-                      value={formValues[field.key] ?? ''}
-                      onChange={(e) => setField(field.key, e.target.value)}
+                      value={String(formValues[field.key] ?? '')}
+                      onChange={(event) => setField(field.key, event.target.value)}
                       placeholder={field.placeholder}
-                      autoFocus={field === formFields[0]}
+                      autoFocus={field === activeFormFields[0]}
                     />
                   )}
                 </div>
@@ -291,17 +433,23 @@ export function CrudPage<T extends { id: string }>({
         <input
           type="text"
           className="crud-search"
-          placeholder={`Buscar ${labelPlural}...`}
+          placeholder={searchPlaceholder ?? `Buscar ${labelPlural}...`}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
         />
-        <button
-          type="button"
-          className={`btn-sm ${showArchived ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => { closeForm(); cancelHardDelete(); setShowArchived((v) => !v); }}
-        >
-          {showArchived ? 'Ver activos' : 'Ver archivados'}
-        </button>
+        {supportsArchived && (
+          <button
+            type="button"
+            className={`btn-sm ${showArchived ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              closeForm();
+              cancelHardDelete();
+              setShowArchived((current) => !current);
+            }}
+          >
+            {showArchived ? 'Ver activos' : 'Ver archivados'}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -309,15 +457,15 @@ export function CrudPage<T extends { id: string }>({
       ) : filtered.length === 0 ? (
         <div className="empty-state">
           <p>
-            {search
-              ? `No se encontraron ${labelPlural} con "${search}"`
+            {search.trim()
+              ? `No se encontraron ${labelPlural} con "${search.trim()}"`
               : showArchived
-                ? `No hay ${labelPlural} archivados.`
-                : `No hay ${labelPlural} registrados.`}
+                ? (archivedEmptyState ?? `No hay ${labelPlural} archivados.`)
+                : (emptyState ?? `No hay ${labelPlural} registrados.`)}
           </p>
-          {!search && !showArchived && (
+          {!search.trim() && !showArchived && canCreate && (
             <button type="button" className="btn-primary" onClick={openCreate}>
-              + Crear primer {label}
+              {createLabel ?? `+ Crear primer ${label}`}
             </button>
           )}
         </div>
@@ -326,87 +474,108 @@ export function CrudPage<T extends { id: string }>({
           <table className="crud-table">
             <thead>
               <tr>
-                {columns.map((col) => (
-                  <th key={col.key} className={col.className}>{col.header}</th>
+                {columns.map((column) => (
+                  <th key={column.key} className={column.className}>{column.header}</th>
                 ))}
                 <th className="col-actions">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id}>
-                  {columns.map((col) => (
-                    <td key={col.key} className={col.className}>
-                      {col.render
-                        ? col.render(row[col.key], row)
-                        : (String(row[col.key] ?? '') || '---')}
-                    </td>
-                  ))}
-                  <td className="col-actions">
-                    {showArchived ? (
-                      <>
-                        {confirmDeleteId === row.id ? (
-                          <div className="confirm-delete-inline">
-                            <span className="confirm-delete-hint">Escribi <strong>eliminar</strong> para confirmar</span>
-                            <input
-                              type="text"
-                              className="confirm-delete-input"
-                              value={confirmDeleteText}
-                              onChange={(e) => setConfirmDeleteText(e.target.value)}
-                              placeholder="eliminar"
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              className="btn-sm btn-danger"
-                              disabled={confirmDeleteText.toLowerCase() !== 'eliminar' || busy === row.id}
-                              onClick={() => executeHardDelete(row.id)}
-                            >
-                              {busy === row.id ? '...' : 'Confirmar'}
-                            </button>
-                            <button type="button" className="btn-sm btn-secondary" onClick={cancelHardDelete}>
-                              Cancelar
-                            </button>
-                          </div>
-                        ) : (
-                          <>
+              {filtered.map((row) => {
+                const visibleRowActions = rowActions.filter((action) => action.isVisible?.(row, { archived: showArchived }) ?? true);
+                return (
+                  <tr key={row.id}>
+                    {columns.map((column) => (
+                      <td key={column.key} className={column.className}>
+                        {column.render ? column.render(row[column.key], row) : (String(row[column.key] ?? '') || '---')}
+                      </td>
+                    ))}
+                    <td className="col-actions">
+                      {showArchived ? (
+                        <>
+                          {canRestore && (
                             <button
                               type="button"
                               className="btn-sm btn-primary"
-                              disabled={busy === row.id}
-                              onClick={() => handleRestore(row.id)}
+                              disabled={busyKey === `${row.id}:restore`}
+                              onClick={() => { void restoreRow(row); }}
                             >
-                              {busy === row.id ? '...' : 'Restaurar'}
+                              {busyKey === `${row.id}:restore` ? '...' : 'Restaurar'}
                             </button>
+                          )}
+                          {canHardDelete && (
+                            confirmDeleteId === row.id ? (
+                              <div className="confirm-delete-inline">
+                                <span className="confirm-delete-hint">Escribi <strong>eliminar</strong> para confirmar</span>
+                                <input
+                                  type="text"
+                                  className="confirm-delete-input"
+                                  value={confirmDeleteText}
+                                  onChange={(event) => setConfirmDeleteText(event.target.value)}
+                                  placeholder="eliminar"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-sm btn-danger"
+                                  disabled={confirmDeleteText.toLowerCase() !== 'eliminar' || busyKey === `${row.id}:hard-delete`}
+                                  onClick={() => { void hardDeleteRow(row); }}
+                                >
+                                  {busyKey === `${row.id}:hard-delete` ? '...' : 'Confirmar'}
+                                </button>
+                                <button type="button" className="btn-sm btn-secondary" onClick={cancelHardDelete}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-sm btn-danger"
+                                disabled={busyKey === `${row.id}:hard-delete`}
+                                onClick={() => {
+                                  setConfirmDeleteId(row.id);
+                                  setConfirmDeleteText('');
+                                }}
+                              >
+                                Eliminar
+                              </button>
+                            )
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {canEdit && (
+                            <button type="button" className="btn-sm btn-secondary" onClick={() => openEdit(row)}>
+                              Editar
+                            </button>
+                          )}
+                          {visibleRowActions.map((action) => (
+                            <button
+                              key={action.id}
+                              type="button"
+                              className={buttonClass(action.kind)}
+                              disabled={busyKey === `${row.id}:${action.id}`}
+                              onClick={() => { void runRowAction(action, row); }}
+                            >
+                              {busyKey === `${row.id}:${action.id}` ? '...' : action.label}
+                            </button>
+                          ))}
+                          {canDelete && (
                             <button
                               type="button"
                               className="btn-sm btn-danger"
-                              disabled={busy === row.id}
-                              onClick={() => startHardDelete(row.id)}
+                              disabled={busyKey === `${row.id}:delete`}
+                              onClick={() => { void deleteRow(row); }}
                             >
-                              Eliminar
+                              {busyKey === `${row.id}:delete` ? '...' : supportsArchived ? 'Archivar' : 'Eliminar'}
                             </button>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="btn-sm btn-secondary" onClick={() => openEdit(row)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-sm btn-danger"
-                          disabled={busy === row.id}
-                          onClick={() => handleArchive(row.id)}
-                        >
-                          {busy === row.id ? '...' : 'Archivar'}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                          )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

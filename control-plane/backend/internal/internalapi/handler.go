@@ -26,6 +26,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/products"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/sales"
+	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
 )
 
 type adminPort interface {
@@ -64,6 +65,10 @@ type paymentGatewayPort interface {
 	GetOrCreatePreference(ctx context.Context, orgID uuid.UUID, req paymentgateway.CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
 }
 
+type apiKeyResolverPort interface {
+	ResolveAPIKey(raw string) (users.ResolvedAPIKey, bool)
+}
+
 type Handler struct {
 	admin     adminPort
 	parties   partyPort
@@ -73,6 +78,7 @@ type Handler struct {
 	quotes    quotePort
 	sales     salePort
 	gateway   paymentGatewayPort
+	apiKeys   apiKeyResolverPort
 }
 
 func NewHandler(
@@ -84,6 +90,7 @@ func NewHandler(
 	quotes quotePort,
 	sales salePort,
 	gateway paymentGatewayPort,
+	apiKeys apiKeyResolverPort,
 ) *Handler {
 	return &Handler{
 		admin:     admin,
@@ -94,12 +101,14 @@ func NewHandler(
 		quotes:    quotes,
 		sales:     sales,
 		gateway:   gateway,
+		apiKeys:   apiKeys,
 	}
 }
 
 func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/orgs/:org_id/bootstrap", h.GetBootstrap)
 	internal.GET("/orgs/:org_id/settings", h.GetSettings)
+	internal.POST("/api-keys/resolve", h.ResolveAPIKey)
 	internal.GET("/parties/:party_id", h.GetParty)
 	internal.POST("/customers/resolve", h.ResolveCustomer)
 	internal.GET("/products", h.ListProducts)
@@ -136,6 +145,30 @@ func (h *Handler) GetSettings(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) ResolveAPIKey(c *gin.Context) {
+	if h.apiKeys == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "api key resolver unavailable"})
+		return
+	}
+	var req struct {
+		APIKey string `json:"api_key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	key, ok := h.apiKeys.ResolveAPIKey(strings.TrimSpace(req.APIKey))
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "api key not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":     key.ID.String(),
+		"org_id": key.OrgID.String(),
+		"scopes": key.Scopes,
+	})
 }
 
 func (h *Handler) GetParty(c *gin.Context) {

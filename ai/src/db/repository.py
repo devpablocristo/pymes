@@ -144,8 +144,11 @@ class AIRepository:
 
     async def list_conversations(self, org_id: str, mode: str, user_id: str | None, limit: int = 50) -> list[AIConversation]:
         query = select(AIConversation).where(AIConversation.org_id == org_id, AIConversation.mode == mode)
-        if mode == "internal" and user_id:
-            query = query.where(AIConversation.user_id == user_id)
+        if mode == "internal":
+            if user_id is None:
+                query = query.where(AIConversation.user_id.is_(None))
+            else:
+                query = query.where(AIConversation.user_id == user_id)
         query = query.order_by(AIConversation.updated_at.desc()).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())

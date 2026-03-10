@@ -2,7 +2,6 @@ package customers
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"strings"
@@ -188,70 +187,4 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 
 func (u *Usecases) ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error) {
 	return u.repo.ListSales(ctx, orgID, customerID)
-}
-
-func (u *Usecases) ExportCSV(ctx context.Context, orgID uuid.UUID) ([]byte, error) {
-	items, _, _, _, err := u.repo.List(ctx, ListParams{OrgID: orgID, Limit: 10000, Order: "asc"})
-	if err != nil {
-		return nil, err
-	}
-	var b strings.Builder
-	w := csv.NewWriter(&b)
-	_ = w.Write([]string{"id", "type", "name", "tax_id", "email", "phone", "city", "country", "notes", "tags"})
-	for _, it := range items {
-		_ = w.Write([]string{
-			it.ID.String(), it.Type, it.Name, it.TaxID, it.Email, it.Phone,
-			it.Address.City, it.Address.Country, it.Notes, strings.Join(it.Tags, "|"),
-		})
-	}
-	w.Flush()
-	return []byte(b.String()), w.Error()
-}
-
-func (u *Usecases) ImportCSV(ctx context.Context, orgID uuid.UUID, csvData []byte, actor string) (int, error) {
-	r := csv.NewReader(strings.NewReader(string(csvData)))
-	rows, err := r.ReadAll()
-	if err != nil {
-		return 0, fmt.Errorf("invalid csv: %w", httperrors.ErrBadInput)
-	}
-	count := 0
-	for i, row := range rows {
-		if i == 0 || len(row) < 3 {
-			continue
-		}
-		name := strings.TrimSpace(row[2])
-		if len(name) < 2 {
-			continue
-		}
-		in := customerdomain.Customer{OrgID: orgID, Type: strings.TrimSpace(row[1]), Name: name}
-		if in.Type == "" {
-			in.Type = "person"
-		}
-		if len(row) > 3 {
-			in.TaxID = strings.TrimSpace(row[3])
-		}
-		if len(row) > 4 {
-			in.Email = strings.TrimSpace(row[4])
-		}
-		if len(row) > 5 {
-			in.Phone = strings.TrimSpace(row[5])
-		}
-		if len(row) > 6 {
-			in.Address.City = strings.TrimSpace(row[6])
-		}
-		if len(row) > 7 {
-			in.Address.Country = strings.TrimSpace(row[7])
-		}
-		if len(row) > 8 {
-			in.Notes = strings.TrimSpace(row[8])
-		}
-		if len(row) > 9 && strings.TrimSpace(row[9]) != "" {
-			in.Tags = strings.Split(strings.TrimSpace(row[9]), "|")
-		}
-		if _, err := u.Create(ctx, in, actor); err != nil {
-			continue
-		}
-		count++
-	}
-	return count, nil
 }

@@ -42,10 +42,11 @@ func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
 }
 
 func (h *Handler) Quote(c *gin.Context) {
-	orgID, id, auth, ok := parseAuth(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
+	auth := handlers.GetAuthContext(c)
 	out, err := h.uc.QuoteLink(c.Request.Context(), orgID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -55,10 +56,11 @@ func (h *Handler) Quote(c *gin.Context) {
 }
 
 func (h *Handler) SaleReceipt(c *gin.Context) {
-	orgID, id, auth, ok := parseAuth(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
+	auth := handlers.GetAuthContext(c)
 	out, err := h.uc.SaleReceiptLink(c.Request.Context(), orgID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -68,7 +70,7 @@ func (h *Handler) SaleReceipt(c *gin.Context) {
 }
 
 func (h *Handler) CustomerMessage(c *gin.Context) {
-	orgID, id, _, ok := parseAuth(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -113,19 +115,4 @@ func (h *Handler) HandleWebhook(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "processed": result.Processed, "replied": result.Replied})
-}
-
-func parseAuth(c *gin.Context) (uuid.UUID, uuid.UUID, handlers.AuthContext, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, uuid.Nil, handlers.AuthContext{}, false
-	}
-	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return uuid.Nil, uuid.Nil, handlers.AuthContext{}, false
-	}
-	return orgID, id, auth, true
 }

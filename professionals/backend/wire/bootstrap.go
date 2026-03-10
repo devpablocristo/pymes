@@ -15,17 +15,17 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
+	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/intakes"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/orchestration"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/professional_profiles"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/public"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/service_links"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/sessions"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/controlplane"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
 )
@@ -193,7 +193,7 @@ func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
 		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-KEY, X-Actor, X-Role, X-Scopes")
+			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-KEY, X-Org-ID")
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Max-Age", "86400")
 		}

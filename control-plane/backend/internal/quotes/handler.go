@@ -333,30 +333,6 @@ func (h *Handler) ToSale(c *gin.Context) {
 	})
 }
 
-func (h *Handler) PDF(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	quoteID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	q, err := h.uc.GetByID(c.Request.Context(), orgID, quoteID)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "pdf generation not implemented yet",
-		"quote_id":     q.ID.String(),
-		"quote_number": q.Number,
-	})
-}
-
 func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 	resp := dto.QuoteResponse{
 		ID:           in.ID.String(),

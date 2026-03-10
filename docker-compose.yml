@@ -62,6 +62,7 @@ services:
     environment:
       VITE_API_URL: http://localhost:8100
       VITE_PROFESSIONALS_API_URL: http://localhost:8181
+      VITE_WORKSHOPS_API_URL: http://localhost:8282
     depends_on:
       - cp-backend
 
@@ -113,9 +114,39 @@ services:
       cp-backend:
         condition: service_started
 
+  # ── Workshops Vertical ──
+
+  work-backend:
+    build:
+      context: .
+      dockerfile: ./workshops/backend/Dockerfile.dev
+    ports:
+      - "8282:8082"
+    volumes:
+      - ./workshops/backend:/workspace/workshops/backend
+      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
+      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - work_backend_go_mod:/go/pkg/mod
+      - work_backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      PORT: 8082
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      CONTROL_PLANE_URL: http://cp-backend:8080
+      FRONTEND_URL: http://localhost:5180
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cp-backend:
+        condition: service_started
+
 volumes:
   pgdata:
   cp_backend_go_mod:
   cp_backend_go_build:
   prof_backend_go_mod:
   prof_backend_go_build:
+  work_backend_go_mod:
+  work_backend_go_build:

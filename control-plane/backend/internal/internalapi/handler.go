@@ -41,10 +41,12 @@ type partyPort interface {
 type customerPort interface {
 	List(ctx context.Context, p customers.ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in customerdomain.Customer, actor string) (customerdomain.Customer, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error)
 }
 
 type productPort interface {
 	List(ctx context.Context, p products.ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 }
 
 type appointmentPort interface {
@@ -110,8 +112,10 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/orgs/:org_id/settings", h.GetSettings)
 	internal.POST("/api-keys/resolve", h.ResolveAPIKey)
 	internal.GET("/parties/:party_id", h.GetParty)
+	internal.GET("/customers/:id", h.GetCustomer)
 	internal.POST("/customers/resolve", h.ResolveCustomer)
 	internal.GET("/products", h.ListProducts)
+	internal.GET("/products/:id", h.GetProduct)
 	internal.POST("/appointments", h.CreateAppointment)
 	internal.GET("/appointments/:id", h.GetAppointment)
 	internal.POST("/quotes", h.CreateQuote)
@@ -232,6 +236,45 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
+func (h *Handler) GetCustomer(c *gin.Context) {
+	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
+		return
+	}
+	customerID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	item, err := h.customers.GetByID(c.Request.Context(), orgID, customerID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":     item.ID.String(),
+		"org_id": item.OrgID.String(),
+		"type":   item.Type,
+		"name":   item.Name,
+		"tax_id": item.TaxID,
+		"email":  item.Email,
+		"phone":  item.Phone,
+		"address": gin.H{
+			"street":   item.Address.Street,
+			"city":     item.Address.City,
+			"state":    item.Address.State,
+			"zip_code": item.Address.ZipCode,
+			"country":  item.Address.Country,
+		},
+		"notes":      item.Notes,
+		"tags":       item.Tags,
+		"metadata":   item.Metadata,
+		"created_at": item.CreatedAt.UTC().Format(time.RFC3339),
+		"updated_at": item.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
 func (h *Handler) ListProducts(c *gin.Context) {
 	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
@@ -258,6 +301,41 @@ func (h *Handler) ListProducts(c *gin.Context) {
 		"total":       total,
 		"has_more":    hasMore,
 		"next_cursor": nextCursor,
+	})
+}
+
+func (h *Handler) GetProduct(c *gin.Context) {
+	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
+		return
+	}
+	productID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	item, err := h.products.GetByID(c.Request.Context(), orgID, productID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":          item.ID.String(),
+		"org_id":      item.OrgID.String(),
+		"type":        item.Type,
+		"sku":         item.SKU,
+		"name":        item.Name,
+		"description": item.Description,
+		"unit":        item.Unit,
+		"price":       item.Price,
+		"cost_price":  item.CostPrice,
+		"tax_rate":    item.TaxRate,
+		"track_stock": item.TrackStock,
+		"tags":        item.Tags,
+		"metadata":    item.Metadata,
+		"created_at":  item.CreatedAt.UTC().Format(time.RFC3339),
+		"updated_at":  item.UpdatedAt.UTC().Format(time.RFC3339),
 	})
 }
 

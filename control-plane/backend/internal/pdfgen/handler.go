@@ -26,7 +26,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) QuotePDF(c *gin.Context) {
-	orgID, id, ok := parseIDs(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -41,7 +41,7 @@ func (h *Handler) QuotePDF(c *gin.Context) {
 }
 
 func (h *Handler) SaleReceipt(c *gin.Context) {
-	orgID, id, ok := parseIDs(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -53,19 +53,4 @@ func (h *Handler) SaleReceipt(c *gin.Context) {
 	c.Header("Content-Type", "application/pdf")
 	c.Header("Content-Disposition", `inline; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
-}
-
-func parseIDs(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, uuid.Nil, false
-	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return uuid.Nil, uuid.Nil, false
-	}
-	return orgID, id, true
 }

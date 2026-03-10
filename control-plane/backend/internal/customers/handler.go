@@ -26,8 +26,6 @@ type usecasesPort interface {
 	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error)
-	ExportCSV(ctx context.Context, orgID uuid.UUID) ([]byte, error)
-	ImportCSV(ctx context.Context, orgID uuid.UUID, csvData []byte, actor string) (int, error)
 }
 
 type Handler struct {
@@ -40,8 +38,6 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/customers", rbac.RequirePermission("customers", "read"), h.List)
 	auth.GET("/customers/archived", rbac.RequirePermission("customers", "read"), h.ListArchived)
 	auth.POST("/customers", rbac.RequirePermission("customers", "create"), h.Create)
-	auth.GET("/customers/export", rbac.RequirePermission("customers", "export"), h.ExportCSV)
-	auth.POST("/customers/import", rbac.RequirePermission("customers", "import"), h.ImportCSV)
 	auth.GET("/customers/:id", rbac.RequirePermission("customers", "read"), h.Get)
 	auth.PUT("/customers/:id", rbac.RequirePermission("customers", "update"), h.Update)
 	auth.DELETE("/customers/:id", rbac.RequirePermission("customers", "delete"), h.Delete)
@@ -293,42 +289,6 @@ func (h *Handler) SalesHistory(c *gin.Context) {
 		})
 	}
 	c.JSON(http.StatusOK, resp)
-}
-
-func (h *Handler) ExportCSV(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	out, err := h.uc.ExportCSV(c.Request.Context(), orgID)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.Header("Content-Disposition", `attachment; filename="customers.csv"`)
-	c.Data(http.StatusOK, "text/csv; charset=utf-8", out)
-}
-
-func (h *Handler) ImportCSV(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	body, err := c.GetRawData()
-	if err != nil || len(body) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "csv body required"})
-		return
-	}
-	n, err := h.uc.ImportCSV(c.Request.Context(), orgID, body, a.Actor)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, dto.ImportCustomersResponse{Imported: n})
 }
 
 func toCustomerItem(in customerdomain.Customer) dto.CustomerItem {

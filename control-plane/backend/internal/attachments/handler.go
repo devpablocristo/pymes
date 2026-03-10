@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 }
 
 func (h *Handler) RequestUpload(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := handlers.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -83,7 +83,7 @@ func (h *Handler) UploadContent(c *gin.Context) {
 }
 
 func (h *Handler) ConfirmUpload(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := handlers.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -114,7 +114,7 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 }
 
 func (h *Handler) GetURL(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) GetURL(c *gin.Context) {
 }
 
 func (h *Handler) Download(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -142,7 +142,7 @@ func (h *Handler) Download(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -154,13 +154,12 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) ListByEntity(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := handlers.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	entityID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	entityID, ok := handlers.ParseUUIDParam(c, "id", "id")
+	if !ok {
 		return
 	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -170,27 +169,4 @@ func (h *Handler) ListByEntity(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
-}
-
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, false
-	}
-	return orgID, true
-}
-
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := parseOrg(c)
-	if !ok {
-		return uuid.Nil, uuid.Nil, false
-	}
-	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return uuid.Nil, uuid.Nil, false
-	}
-	return orgID, id, true
 }

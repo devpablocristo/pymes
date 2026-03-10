@@ -185,26 +185,11 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, false
-	}
-	return orgID, true
+	return handlers.ParseAuthOrgID(c)
 }
 
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := parseOrg(c)
-	if !ok {
-		return uuid.Nil, uuid.Nil, false
-	}
-	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return uuid.Nil, uuid.Nil, false
-	}
-	return orgID, id, true
+	return handlers.ParseAuthOrgAndParamID(c, "id", "id")
 }
 
 func parseOrgSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {

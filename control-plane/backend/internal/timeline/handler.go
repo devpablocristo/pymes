@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
-	apperror "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 	timelinedomain "github.com/devpablocristo/pymes/control-plane/backend/internal/timeline/usecases/domain"
+	apperror "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 )
 
 type usecasesPort interface {
@@ -29,7 +29,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, entityID, entity, ok := parseEntity(c)
+	orgID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
 	if !ok {
 		return
 	}
@@ -43,7 +43,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) AddNote(c *gin.Context) {
-	orgID, entityID, entity, ok := parseEntity(c)
+	orgID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
 	if !ok {
 		return
 	}
@@ -75,24 +75,4 @@ func (h *Handler) AddNote(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, entry)
-}
-
-func parseEntity(c *gin.Context) (uuid.UUID, uuid.UUID, string, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, uuid.Nil, "", false
-	}
-	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return uuid.Nil, uuid.Nil, "", false
-	}
-	entity := strings.TrimSpace(strings.ToLower(c.Param("entity")))
-	if entity == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity"})
-		return uuid.Nil, uuid.Nil, "", false
-	}
-	return orgID, id, entity, true
 }

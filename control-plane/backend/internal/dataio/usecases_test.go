@@ -112,7 +112,7 @@ func TestTemplateAndExportXLSX(t *testing.T) {
 	repo := &fakeRepo{}
 	uc := NewUsecases(repo, nil)
 
-	tpl, contentType, filename, err := uc.Template("customers")
+	tpl, contentType, filename, err := uc.Template("customers", "xlsx")
 	if err != nil {
 		t.Fatalf("Template() error = %v", err)
 	}

@@ -11,6 +11,7 @@ export type RequestOptions = {
   headers?: Record<string, string>;
   orgId?: string;
   skipJSONContentType?: boolean;
+  baseURLs?: string[];
 };
 
 class HttpError extends Error {
@@ -28,7 +29,7 @@ function isLocalhost(): boolean {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
 }
 
-function resolveBaseURL(): string {
+function resolveDefaultBaseURL(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) {
     return configured;
@@ -41,6 +42,14 @@ function resolveBaseURL(): string {
   const protocol = window.location.protocol || 'http:';
   const hostname = window.location.hostname || 'localhost';
   return `${protocol}//${hostname}:8100`;
+}
+
+function resolveBaseURLs(options: RequestOptions): string[] {
+  const explicit = (options.baseURLs ?? []).map((value) => value.trim()).filter(Boolean);
+  if (explicit.length > 0) {
+    return [...new Set(explicit)];
+  }
+  return [resolveDefaultBaseURL()];
 }
 
 function resolveLocalAPIKeyFallback(): string | null {
@@ -70,10 +79,6 @@ async function buildHeaders(options: RequestOptions): Promise<Record<string, str
     const apiKey = import.meta.env.VITE_API_KEY?.trim() || resolveLocalAPIKeyFallback();
     if (apiKey) {
       headers['X-API-KEY'] = apiKey;
-      headers['X-Actor'] = import.meta.env.VITE_API_ACTOR?.trim() || 'local-admin';
-      headers['X-Role'] = import.meta.env.VITE_API_ROLE?.trim() || 'admin';
-      headers['X-Scopes'] =
-        import.meta.env.VITE_API_SCOPES?.trim() || 'admin:console:read,admin:console:write';
     }
   }
 
@@ -85,20 +90,36 @@ async function buildHeaders(options: RequestOptions): Promise<Record<string, str
 
 export async function requestResponse(path: string, options: RequestOptions = {}): Promise<Response> {
   const headers = await buildHeaders(options);
-  const baseURL = resolveBaseURL();
-  const response = await fetch(`${baseURL}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body:
-      options.rawBody ??
-      (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-  });
+  const requestBody =
+    options.rawBody ??
+    (options.body !== undefined ? JSON.stringify(options.body) : undefined);
+  let lastError: unknown = null;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new HttpError(text || `HTTP ${response.status}`);
+  for (const baseURL of resolveBaseURLs(options)) {
+    try {
+      const response = await fetch(`${baseURL}${path}`, {
+        method: options.method ?? 'GET',
+        headers,
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new HttpError(text || `HTTP ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof HttpError) {
+        throw error;
+      }
+    }
   }
-  return response;
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+  throw new Error('No se pudo completar la solicitud');
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

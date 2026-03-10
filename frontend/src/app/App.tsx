@@ -18,6 +18,9 @@ import { SessionsPage } from '../pages/SessionsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { SpecialtiesPage } from '../pages/SpecialtiesPage';
+import { WorkOrdersPage } from '../pages/WorkOrdersPage';
+import { WorkshopServicesPage } from '../pages/WorkshopServicesPage';
+import { WorkshopVehiclesPage } from '../pages/WorkshopVehiclesPage';
 import { hasCompletedOnboarding } from '../lib/tenantProfile';
 
 function RequireOnboarding({ children }: { children: React.ReactNode }) {
@@ -58,6 +61,9 @@ export function App() {
                     <Route path="/intakes" element={<IntakesPage />} />
                     <Route path="/sessions" element={<SessionsPage />} />
                     <Route path="/public" element={<PublicPreviewPage />} />
+                    <Route path="/workshops/vehicles" element={<WorkshopVehiclesPage />} />
+                    <Route path="/workshops/services" element={<WorkshopServicesPage />} />
+                    <Route path="/workshops/orders" element={<WorkOrdersPage />} />
                   </Routes>
                 </Shell>
               </RequireOnboarding>

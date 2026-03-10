@@ -215,30 +215,6 @@ func (h *Handler) Void(c *gin.Context) {
 	c.JSON(http.StatusOK, toSaleResponse(out))
 }
 
-func (h *Handler) Receipt(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	sale, err := h.uc.GetByID(c.Request.Context(), orgID, id)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "receipt generation not implemented yet",
-		"sale_id": sale.ID.String(),
-		"number":  sale.Number,
-	})
-}
-
 func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 	resp := dto.SaleResponse{
 		ID:            in.ID.String(),

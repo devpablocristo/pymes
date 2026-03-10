@@ -1,3 +1,4 @@
+import { registerTokenProvider } from '@pymes/ts-pkg/http';
 import type {
   Intake,
   OrgPreviewBootstrap,
@@ -7,71 +8,10 @@ import type {
   ServiceLink,
   Specialty,
 } from './professionalsTypes';
-
-// ── Base URL resolution ──
-
-function isLocalhost(): boolean {
-  if (typeof window === 'undefined') return true;
-  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
-}
-
-function resolveBaseURLs(): string[] {
-  const candidates: string[] = [];
-  const configured = import.meta.env.VITE_PROFESSIONALS_API_URL?.trim();
-  if (configured) {
-    candidates.push(configured);
-  }
-
-  if (typeof window === 'undefined') {
-    candidates.push('http://localhost:8181', 'http://localhost:8081');
-  } else {
-    const protocol = window.location.protocol || 'http:';
-    const hostname = window.location.hostname || 'localhost';
-    candidates.push(`${protocol}//${hostname}:8181`, `${protocol}//${hostname}:8081`);
-  }
-
-  return [...new Set(candidates)];
-}
-
-function resolveLocalAPIKeyFallback(): string | null {
-  if (!isLocalhost()) return null;
-  return 'psk_local_admin';
-}
-
-// ── Token provider (set by AuthTokenBridge) ──
-
-let tokenProvider: (() => Promise<string | null>) | null = null;
+import { createVerticalRequest } from './verticalApi';
 
 export function registerProfessionalsTokenProvider(provider: () => Promise<string | null>): void {
-  tokenProvider = provider;
-}
-
-// ── HTTP helpers ──
-
-type RequestOptions = {
-  method?: string;
-  body?: unknown;
-  headers?: Record<string, string>;
-};
-
-class HttpError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'HttpError';
-  }
-}
-
-function normalizeErrorMessage(raw: string): string {
-  const trimmed = raw.trim();
-  const withoutPrefix = trimmed.replace(/^HttpError:\s*/i, '');
-
-  try {
-    const parsed = JSON.parse(withoutPrefix) as { error?: string; message?: string };
-    const value = parsed.error ?? parsed.message ?? withoutPrefix;
-    return translateError(value);
-  } catch {
-    return translateError(withoutPrefix);
-  }
+  registerTokenProvider(provider);
 }
 
 function translateError(message: string): string {
@@ -104,62 +44,11 @@ function mapIntake(item: {
   };
 }
 
-async function buildHeaders(options: RequestOptions): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers ?? {}),
-  };
-
-  const token = tokenProvider ? await tokenProvider() : null;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  } else {
-    const apiKey = import.meta.env.VITE_API_KEY?.trim() || resolveLocalAPIKeyFallback();
-    if (apiKey) {
-      headers['X-API-KEY'] = apiKey;
-      headers['X-Actor'] = import.meta.env.VITE_API_ACTOR?.trim() || 'local-admin';
-      headers['X-Role'] = import.meta.env.VITE_API_ROLE?.trim() || 'admin';
-      headers['X-Scopes'] =
-        import.meta.env.VITE_API_SCOPES?.trim() || 'admin:console:read,admin:console:write';
-    }
-  }
-
-  return headers;
-}
-
-async function professionalRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers = await buildHeaders(options);
-  let lastError: unknown = null;
-
-  for (const baseURL of resolveBaseURLs()) {
-    try {
-      const response = await fetch(`${baseURL}${path}`, {
-        method: options.method ?? 'GET',
-        headers,
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new HttpError(normalizeErrorMessage(text || `HTTP ${response.status}`));
-      }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (contentType.includes('application/json')) {
-        return (await response.json()) as T;
-      }
-      return (await response.text()) as T;
-    } catch (error) {
-      lastError = error;
-      if (error instanceof Error && error.name === 'HttpError') {
-        throw error;
-      }
-    }
-  }
-
-  if (lastError instanceof Error) throw lastError;
-  throw new Error('No se pudo conectar con el backend de profesionales');
-}
+const professionalRequest = createVerticalRequest({
+  envVar: 'VITE_PROFESSIONALS_API_URL',
+  fallbackPorts: [8181, 8081],
+  translateError,
+});
 
 // ── Professionals ──
 

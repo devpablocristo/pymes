@@ -171,11 +171,22 @@ func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.
 	return result, nil
 }
 
-func (u *Usecases) Template(entity string) ([]byte, string, string, error) {
+func (u *Usecases) Template(entity, format string) ([]byte, string, string, error) {
 	entity = normalizeEntity(entity)
 	headers, example, err := templateDefinition(entity)
 	if err != nil {
 		return nil, "", "", err
+	}
+	format = normalizeFormat(format)
+	if format == "" {
+		format = "csv"
+	}
+	if format == "csv" {
+		content, err := buildCSV(headers, [][]string{example})
+		if err != nil {
+			return nil, "", "", err
+		}
+		return content, csvContentType, entity + "_template.csv", nil
 	}
 	content, err := buildXLSX(headers, [][]string{example})
 	if err != nil {
@@ -188,7 +199,7 @@ func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, f
 	entity = normalizeEntity(entity)
 	format = normalizeFormat(format)
 	if format == "" {
-		format = "xlsx"
+		format = "csv"
 	}
 	if (entity == "sales" || entity == "cashflow") && (from == nil || to == nil) {
 		return nil, "", "", apperror.NewBadInput("from and to are required for this export")
@@ -221,7 +232,7 @@ func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, f
 		if err != nil {
 			return nil, "", "", err
 		}
-		return content, "text/csv; charset=utf-8", entity + "_" + dateSuffix + ".csv", nil
+		return content, csvContentType, entity + "_" + dateSuffix + ".csv", nil
 	}
 	content, err := buildXLSX(headers, rows)
 	if err != nil {
@@ -439,7 +450,10 @@ func buildCSV(headers []string, rows [][]string) ([]byte, error) {
 	return buf.Bytes(), writer.Error()
 }
 
-const xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+const (
+	csvContentType  = "text/csv; charset=utf-8"
+	xlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
 func buildXLSX(headers []string, rows [][]string) ([]byte, error) {
 	f := excelize.NewFile()

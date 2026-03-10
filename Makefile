@@ -1,4 +1,4 @@
-.PHONY: help up down build test lint frontend-dev frontend-build frontend-test ai-dev ai-test ai-lint cp-build cp-test cp-vet cp-run prof-build prof-test prof-vet prof-run
+.PHONY: help up down build test lint frontend-dev frontend-build frontend-test ai-dev ai-test ai-lint cp-build cp-test cp-vet cp-run prof-build prof-test prof-vet prof-run work-build work-test work-vet work-run
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -61,10 +61,24 @@ prof-vet: ## Run go vet on professionals backend
 prof-run: ## Run professionals backend locally
 	cd professionals/backend && go run ./cmd/local
 
+# ── Workshops Vertical ──
+
+work-build: ## Build workshops backend
+	cd workshops/backend && go build ./...
+
+work-test: ## Run workshops backend tests
+	cd workshops/backend && go test ./...
+
+work-vet: ## Run go vet on workshops backend
+	cd workshops/backend && go vet ./...
+
+work-run: ## Run workshops backend locally
+	cd workshops/backend && go run ./cmd/local
+
 # ── All services ──
 
-build: cp-build prof-build frontend-build ai-lint ## Build all services
+build: cp-build prof-build work-build frontend-build ai-lint ## Build all services
 
-test: cp-test prof-test frontend-test ai-test ## Test all services
+test: cp-test prof-test work-test frontend-test ai-test ## Test all services
 
-lint: cp-vet prof-vet ai-lint ## Lint all services
+lint: cp-vet prof-vet work-vet ai-lint ## Lint all services

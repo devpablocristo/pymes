@@ -103,6 +103,44 @@ const professionalsNav = [
   },
 ];
 
+const workshopsNav = [
+  {
+    to: '/workshops/vehicles',
+    label: 'Vehiculos',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 17h14" />
+        <path d="M6 17l-1 3" />
+        <path d="M18 17l1 3" />
+        <path d="M5 17V9l2-4h10l2 4v8" />
+        <circle cx="7.5" cy="17.5" r="1.5" />
+        <circle cx="16.5" cy="17.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    to: '/workshops/services',
+    label: 'Servicios',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.7 6.3a4 4 0 1 0-5.4 5.9L3 18.5V21h2.5l6.3-6.3a4 4 0 0 0 5.9-5.4L21 6l-3-3-3.3 3.3z" />
+      </svg>
+    ),
+  },
+  {
+    to: '/workshops/orders',
+    label: 'Ordenes de trabajo',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="8" y1="13" x2="16" y2="13" />
+        <line x1="8" y1="17" x2="14" y2="17" />
+      </svg>
+    ),
+  },
+];
+
 const settingsNav = [
   {
     to: '/settings/keys',
@@ -155,6 +193,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return [
       { label: 'Base', items: mainNav },
       { label: 'Profesionales', items: professionalsNav },
+      { label: 'Talleres', items: workshopsNav },
       ...moduleNav,
       { label: 'Configuración', items: settingsNav },
     ] as AppShellNavSection[];

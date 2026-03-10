@@ -21,7 +21,7 @@ const maxImportFileSize = 5 << 20
 type usecasesPort interface {
 	Preview(ctx context.Context, entity, filename string, fileData []byte) (Preview, error)
 	ConfirmImport(ctx context.Context, entity string, orgID uuid.UUID, previewID, mode, actor string) (ImportResult, error)
-	Template(entity string) ([]byte, string, string, error)
+	Template(entity, format string) ([]byte, string, string, error)
 	Export(ctx context.Context, entity string, orgID uuid.UUID, format string, from, to *time.Time) ([]byte, string, string, error)
 }
 
@@ -56,7 +56,7 @@ type confirmRequest struct {
 }
 
 func (h *Handler) Confirm(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := handlers.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -75,7 +75,7 @@ func (h *Handler) Confirm(c *gin.Context) {
 }
 
 func (h *Handler) Template(c *gin.Context) {
-	content, contentType, filename, err := h.uc.Template(c.Param("entity"))
+	content, contentType, filename, err := h.uc.Template(c.Param("entity"), c.Query("format"))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -85,7 +85,7 @@ func (h *Handler) Template(c *gin.Context) {
 }
 
 func (h *Handler) Export(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	orgID, ok := handlers.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -106,16 +106,6 @@ func (h *Handler) Export(c *gin.Context) {
 	}
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, contentType, content)
-}
-
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(strings.TrimSpace(auth.OrgID))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, false
-	}
-	return orgID, true
 }
 
 func parseDate(raw string) (*time.Time, error) {

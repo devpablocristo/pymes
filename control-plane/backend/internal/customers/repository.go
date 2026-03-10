@@ -4,7 +4,6 @@ package customers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
@@ -43,7 +42,7 @@ type customerPartyRow struct {
 	Address     []byte `gorm:"column:address"`
 	TaxID       string `gorm:"column:tax_id"`
 	Notes       string
-	Tags        pq.StringArray `gorm:"column:tags"`
+	Tags        pq.StringArray `gorm:"type:text[];column:tags"`
 	Metadata    []byte         `gorm:"column:metadata"`
 	CreatedAt   time.Time      `gorm:"column:created_at"`
 	UpdatedAt   time.Time      `gorm:"column:updated_at"`
@@ -165,12 +164,12 @@ func (r *Repository) Create(ctx context.Context, in customerdomain.Customer) (cu
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error) {
 	var row customerPartyRow
-	err := r.baseQuery(ctx, orgID).Where("p.id = ?", id).Take(&row).Error
+	err := r.baseQuery(ctx, orgID).Where("p.id = ?", id).Limit(1).Scan(&row).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return customerdomain.Customer{}, gorm.ErrRecordNotFound
-		}
 		return customerdomain.Customer{}, err
+	}
+	if row.ID == uuid.Nil {
+		return customerdomain.Customer{}, gorm.ErrRecordNotFound
 	}
 	return customerFromPartyRow(row), nil
 }

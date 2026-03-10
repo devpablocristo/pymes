@@ -322,13 +322,7 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 }
 
 func parseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	auth := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, false
-	}
-	return orgID, true
+	return handlers.ParseAuthOrgID(c)
 }
 
 func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkResponse {

@@ -1,3 +1,5 @@
+import { crudModuleCatalog } from '../crud/resourceConfigs';
+
 export type ModuleRuntimeContext = {
   orgId: string;
   today: string;
@@ -74,7 +76,7 @@ const toField: ModuleField = {
   defaultValue: (ctx) => ctx.today,
 };
 
-export const moduleCatalog: Record<string, ModuleDefinition> = {
+const staticModuleCatalog: Record<string, ModuleDefinition> = {
   parties: {
     id: 'parties',
     title: 'Modelo de entidades',
@@ -771,7 +773,7 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
       {
         id: 'dataio-template',
         title: 'Descargar template',
-        description: 'Obtiene template de importación por entidad.',
+        description: 'Obtiene template de importación por entidad en CSV o XLSX.',
         path: '/v1/import/templates/:entity',
         method: 'GET',
         response: 'download',
@@ -786,6 +788,18 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
               { value: 'customers', label: 'Clientes' },
               { value: 'products', label: 'Productos' },
               { value: 'suppliers', label: 'Proveedores' },
+            ],
+          },
+          {
+            name: 'format',
+            label: 'Formato',
+            location: 'query',
+            required: true,
+            type: 'select',
+            defaultValue: 'csv',
+            options: [
+              { value: 'csv', label: 'csv' },
+              { value: 'xlsx', label: 'xlsx' },
             ],
           },
         ],
@@ -818,10 +832,10 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
             location: 'query',
             required: true,
             type: 'select',
-            defaultValue: 'xlsx',
+            defaultValue: 'csv',
             options: [
-              { value: 'xlsx', label: 'xlsx' },
               { value: 'csv', label: 'csv' },
+              { value: 'xlsx', label: 'xlsx' },
             ],
           },
           { ...fromField, required: false },
@@ -830,7 +844,7 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
       },
     ],
     notes: [
-      'El flujo de preview/confirm de importación sigue expuesto por API, pero en esta pasada del FE se priorizó la operación segura de templates y exportaciones.',
+      'Los CRUDs usan CSV como formato canónico; esta consola mantiene CSV y XLSX para operación avanzada y compatibilidad.',
     ],
   },
   scheduler: {
@@ -846,6 +860,13 @@ export const moduleCatalog: Record<string, ModuleDefinition> = {
     ],
   },
 };
+
+export const moduleCatalog: Record<string, ModuleDefinition> = Object.fromEntries(
+  [
+    ...Object.entries(staticModuleCatalog).filter(([moduleId]) => !(moduleId in crudModuleCatalog)),
+    ...Object.entries(crudModuleCatalog),
+  ],
+) as Record<string, ModuleDefinition>;
 
 export const moduleList = Object.values(moduleCatalog);
 

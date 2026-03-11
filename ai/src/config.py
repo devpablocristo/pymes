@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     backend_url: str = "http://cp-backend:8080"
     professionals_backend_url: str = "http://prof-backend:8081"
+    workshops_backend_url: str = "http://work-backend:8082"
     internal_service_token: str = "local-internal-token"
 
     llm_provider: str = "gemini"

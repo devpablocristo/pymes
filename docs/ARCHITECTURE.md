@@ -32,6 +32,7 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 
 - los modulos de vertical siguen la misma forma interna: `handler.go`, `repository.go`, `usecases.go`
 - los subpaquetes opcionales son siempre los mismos: `handler/dto`, `repository/models`, `usecases/domain`
+- los adapters expuestos a nivel de subdominio siguen nombres estables: `orchestration` para flujos cross-aggregate y `public` para superficie publica cuando aplica
 - `shared/handlers` y `shared/values` absorben parseo repetido, helpers de fechas/UUID y conversiones triviales
 - `teachers` y `workshops/auto_repair` ya quedaron alineados con esa estructura y son la referencia para nuevos modulos
 
@@ -55,3 +56,4 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 - el codigo compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `control-plane/shared/ai`
 - la logica especifica de verticales vive en `ai/src/domains/<vertical>/<modulo_o_subdominio>`
 - hoy `professionals/teachers` ya esta consolidado en `ai/src/domains/professionals/teachers`
+- hoy `workshops/auto_repair` ya esta consolidado en `ai/src/domains/workshops/auto_repair`

@@ -28,6 +28,20 @@ def create_app() -> FastAPI:
             "scopes": auth.scopes,
         }
 
+    @app.get("/v1/workshops/auto-repair/chat")
+    async def auto_repair_chat(request: Request) -> dict[str, object]:
+        auth = request.state.auth
+        return {
+            "org_id": auth.org_id,
+            "actor": auth.actor,
+            "role": auth.role,
+            "scopes": auth.scopes,
+        }
+
+    @app.get("/v1/workshops/auto-repair/public/demo/chat")
+    async def auto_repair_public_chat() -> dict[str, str]:
+        return {"status": "ok"}
+
     return app
 
 
@@ -74,3 +88,41 @@ def test_professionals_chat_rejects_unknown_api_key(monkeypatch) -> None:
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
     assert response.json()["error"]["message"] == "invalid api key"
+
+
+def test_workshops_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
+    async def fake_resolve(_self: AuthMiddleware, _api_key: str, _request_id: str) -> dict[str, object]:
+        return {
+            "id": "key-456",
+            "org_id": "org-456",
+            "scopes": ["work_orders:read", "work_orders:write"],
+        }
+
+    monkeypatch.setattr(AuthMiddleware, "_resolve_api_key", fake_resolve)
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/v1/workshops/auto-repair/chat",
+        headers={
+            "X-API-KEY": "psk_test",
+            "X-Org-ID": "spoofed-org",
+            "X-Scopes": "work_orders:read,unknown:scope",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "org_id": "org-456",
+        "actor": "api_key:key-456",
+        "role": "service",
+        "scopes": ["work_orders:read"],
+    }
+
+
+def test_workshops_public_chat_is_not_authenticated() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/v1/workshops/auto-repair/public/demo/chat")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

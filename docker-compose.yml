@@ -82,9 +82,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
       BACKEND_URL: http://cp-backend:8080
       PROFESSIONALS_BACKEND_URL: http://prof-backend:8081
+      WORKSHOPS_BACKEND_URL: http://work-backend:8082
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
       - cp-backend
+      - work-backend
 
   # ── Professionals Vertical ──
 

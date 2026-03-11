@@ -2,12 +2,15 @@ package wire
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
+	syncPkg "sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
@@ -53,6 +57,7 @@ func InitializeApp() *app.App {
 	servicesHandler := workshopservices.NewHandler(servicesUC)
 	workOrdersHandler := workorders.NewHandler(workOrdersUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
+	publicHandler := public.NewHandler(servicesUC, cpClient, &cpOrgResolver{client: cpClient})
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -71,6 +76,10 @@ func InitializeApp() *app.App {
 	})
 
 	v1 := router.Group("/v1")
+	publicGroup := v1.Group("")
+	publicGroup.Use(newPublicRateLimit(30))
+	publicHandler.RegisterRoutes(publicGroup)
+
 	authGroup := v1.Group("")
 	authGroup.Use(authMiddleware.RequireAuth())
 
@@ -87,6 +96,22 @@ func InitializeApp() *app.App {
 	orchestrationHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
+}
+
+type cpOrgResolver struct {
+	client *controlplane.Client
+}
+
+func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
+	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	orgIDStr, ok := result["org_id"].(string)
+	if !ok {
+		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
+	}
+	return uuid.Parse(orgIDStr)
 }
 
 func buildIdentityResolver(cfg config.Config, logger zerolog.Logger) *auth.IdentityResolver {
@@ -155,6 +180,42 @@ func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
 			c.AbortWithStatus(204)
 			return
 		}
+		c.Next()
+	}
+}
+
+func newPublicRateLimit(limit int) gin.HandlerFunc {
+	if limit <= 0 {
+		limit = 30
+	}
+	type state struct {
+		mu   syncPkg.Mutex
+		hits map[string][]time.Time
+	}
+	s := &state{hits: make(map[string][]time.Time)}
+
+	return func(c *gin.Context) {
+		key := c.ClientIP()
+		now := time.Now().UTC()
+		windowStart := now.Add(-1 * time.Minute)
+
+		s.mu.Lock()
+		history := s.hits[key]
+		filtered := make([]time.Time, 0, len(history)+1)
+		for _, ts := range history {
+			if ts.After(windowStart) {
+				filtered = append(filtered, ts)
+			}
+		}
+		if len(filtered) >= limit {
+			s.hits[key] = filtered
+			s.mu.Unlock()
+			c.AbortWithStatusJSON(429, gin.H{"error": "rate limit exceeded"})
+			return
+		}
+		filtered = append(filtered, now)
+		s.hits[key] = filtered
+		s.mu.Unlock()
 		c.Next()
 	}
 }

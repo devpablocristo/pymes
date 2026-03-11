@@ -30,6 +30,11 @@ Orquestacion:
 - `POST /v1/auto-repair/work-orders/:id/sale`
 - `POST /v1/auto-repair/work-orders/:id/payment-link`
 
+Superficie publica:
+
+- `GET /v1/public/:org_slug/auto-repair/services`
+- `POST /v1/public/:org_slug/auto-repair/appointments`
+
 Compatibilidad:
 
 - las rutas legacy `/v1/vehicles`, `/v1/workshop-services`, `/v1/work-orders` y afines siguen vivas como alias
@@ -103,6 +108,22 @@ Capacidades contextuales en OT:
 - `Presupuesto`
 - `Venta`
 - `Cobrar`
+
+## AI
+
+Modulo canonico:
+
+- `ai/src/domains/workshops/auto_repair`
+
+Rutas:
+
+- `POST /v1/workshops/auto-repair/chat`
+- `POST /v1/workshops/auto-repair/public/:org_slug/chat`
+
+Compatibilidad:
+
+- `POST /v1/workshops/chat`
+- `POST /v1/workshops/public/:org_slug/chat`
 
 Import / export:
 

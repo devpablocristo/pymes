@@ -21,6 +21,9 @@ from src.db.engine import ping_database
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient
 from src.domains.professionals.teachers.internal_router import router as teachers_chat_router
 from src.domains.professionals.teachers.public_router import router as teachers_public_router
+from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
+from src.domains.workshops.auto_repair.internal_router import router as auto_repair_chat_router
+from src.domains.workshops.auto_repair.public_router import router as auto_repair_public_router
 from pymes_control_plane_shared.ai_runtime import create_provider
 from pymes_control_plane_shared.ai_runtime import AuthMiddleware
 from pymes_control_plane_shared.ai_runtime import RateLimitMiddleware
@@ -44,6 +47,10 @@ async def lifespan(app: FastAPI):
         base_url=settings.professionals_backend_url,
         internal_token=settings.internal_service_token,
     )
+    app.state.auto_repair_backend_client = AutoRepairBackendClient(
+        base_url=settings.workshops_backend_url,
+        internal_token=settings.internal_service_token,
+    )
     app.state.llm_provider = create_provider(settings)
     if not getattr(app.state, "otel_configured", False):
         configure_opentelemetry(app, settings, app.state.backend_client)
@@ -53,11 +60,13 @@ async def lifespan(app: FastAPI):
         environment=settings.ai_environment,
         backend_url=settings.backend_url,
         professionals_backend_url=settings.professionals_backend_url,
+        workshops_backend_url=settings.workshops_backend_url,
     )
     yield
     logger.info("ai_service_stopping")
     await app.state.backend_client.close()
     await app.state.teachers_backend_client.close()
+    await app.state.auto_repair_backend_client.close()
 
 
 app = FastAPI(title="pymes-ai", version="0.1.0", lifespan=lifespan)
@@ -75,6 +84,8 @@ app.include_router(public_sales_router)
 app.include_router(internal_router)
 app.include_router(teachers_chat_router)
 app.include_router(teachers_public_router)
+app.include_router(auto_repair_chat_router)
+app.include_router(auto_repair_public_router)
 register_common_exception_handlers(app, logger)
 
 

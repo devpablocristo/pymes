@@ -18,15 +18,15 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/intakes"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/orchestration"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/professional_profiles"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/public"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/service_links"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/sessions"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/controlplane"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/specialties"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/orchestration"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/public"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
 )
 
@@ -104,6 +104,16 @@ func InitializeApp() *app.App {
 	// Auth-protected routes
 	authGroup := v1.Group("")
 	authGroup.Use(authMiddleware.RequireAuth())
+
+	teachersGroup := authGroup.Group("/teachers")
+	profilesHandler.RegisterRoutes(teachersGroup)
+	specialtiesHandler.RegisterRoutes(teachersGroup)
+	serviceLinksHandler.RegisterRoutes(teachersGroup)
+	intakesHandler.RegisterRoutes(teachersGroup)
+	sessionsHandler.RegisterRoutes(teachersGroup)
+	orchestrationHandler.RegisterRoutes(teachersGroup)
+
+	// Legacy aliases from the initial professionals release.
 	profilesHandler.RegisterRoutes(authGroup)
 	specialtiesHandler.RegisterRoutes(authGroup)
 	serviceLinksHandler.RegisterRoutes(authGroup)

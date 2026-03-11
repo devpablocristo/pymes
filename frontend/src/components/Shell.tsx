@@ -47,8 +47,8 @@ const mainNav = [
 
 const professionalsNav = [
   {
-    to: '/professionals',
-    label: 'Profesionales',
+    to: '/professionals/teachers',
+    label: 'Teachers',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -59,8 +59,8 @@ const professionalsNav = [
     ),
   },
   {
-    to: '/specialties',
-    label: 'Especialidades',
+    to: '/professionals/teachers/specialties',
+    label: 'Teachers · Especialidades',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
@@ -68,8 +68,8 @@ const professionalsNav = [
     ),
   },
   {
-    to: '/intakes',
-    label: 'Ingresos',
+    to: '/professionals/teachers/intakes',
+    label: 'Teachers · Ingresos',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -81,8 +81,8 @@ const professionalsNav = [
     ),
   },
   {
-    to: '/sessions',
-    label: 'Sesiones',
+    to: '/professionals/teachers/sessions',
+    label: 'Teachers · Sesiones',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -91,8 +91,8 @@ const professionalsNav = [
     ),
   },
   {
-    to: '/public',
-    label: 'Vista pública',
+    to: '/professionals/teachers/public',
+    label: 'Teachers · Vista pública',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -105,8 +105,8 @@ const professionalsNav = [
 
 const workshopsNav = [
   {
-    to: '/workshops/vehicles',
-    label: 'Vehiculos',
+    to: '/workshops/auto-repair/vehicles',
+    label: 'Auto repair · Vehiculos',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 17h14" />
@@ -119,8 +119,8 @@ const workshopsNav = [
     ),
   },
   {
-    to: '/workshops/services',
-    label: 'Servicios',
+    to: '/workshops/auto-repair/services',
+    label: 'Auto repair · Servicios',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14.7 6.3a4 4 0 1 0-5.4 5.9L3 18.5V21h2.5l6.3-6.3a4 4 0 0 0 5.9-5.4L21 6l-3-3-3.3 3.3z" />
@@ -128,8 +128,8 @@ const workshopsNav = [
     ),
   },
   {
-    to: '/workshops/orders',
-    label: 'Ordenes de trabajo',
+    to: '/workshops/auto-repair/orders',
+    label: 'Auto repair · Ordenes',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

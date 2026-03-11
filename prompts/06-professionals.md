@@ -163,16 +163,14 @@ La vertical agrega contexto y flujo. No reemplaza las capacidades base del siste
 
 ```text
 pymes/
+├── ai/
 ├── control-plane/
 │   ├── backend/
-│   ├── frontend/
 │   ├── infra/
-│   └── ai/
+│   └── shared/
 ├── professionals/
 │   ├── backend/
-│   ├── frontend/
-│   ├── infra/
-│   └── ai/
+│   └── infra/
 ├── pkgs/
 └── go.work
 ```
@@ -180,9 +178,9 @@ pymes/
 ### Responsabilidad por componente
 
 - `professionals/backend`: API vertical, composición de datos verticales y consumo del core
-- `professionals/frontend`: experiencia web específica de la vertical
+- `frontend`: experiencia web unificada con módulos específicos de la vertical
 - `professionals/infra`: despliegue de Lambdas, frontend, variables, secretos, monitoreo
-- `professionals/ai`: capa conversacional específica de la vertical
+- `ai`: runtime conversacional unificado con módulo específico para `professionals`
 
 ### Frontera con `control-plane`
 
@@ -212,7 +210,7 @@ pymes/
 - `sessions`
 - `session_notes`
 - presentaciones, listados y flujos UX de la vertical
-- AI y policy específica de la vertical
+- prompts, tools y policy específica de la vertical dentro del `ai/` unificado
 
 ---
 
@@ -638,15 +636,15 @@ Si una pantalla es transversal, no se duplica en la vertical. Se linkea, se embe
 
 ---
 
-## AI — `professionals/ai`
+## AI — módulo `professionals` dentro de `ai/`
 
 ### Objetivo
 
-Tener una AI específica de la vertical sin volver a crear la base común de AI.
+Tener una AI específica de la vertical sin volver a crear otra app de AI separada.
 
 ### Regla fundamental
 
-`professionals/ai` puede ser un servicio separado, pero no debe reimplementar desde cero:
+El módulo de `professionals` dentro de `ai/` no debe reimplementar desde cero:
 
 - auth
 - rate limiting base
@@ -655,12 +653,12 @@ Tener una AI específica de la vertical sin volver a crear la base común de AI.
 - capas comunes de policy/guardrails
 - primitives comunes del runtime AI
 
-Si alguna de esas piezas hoy vive solo en `control-plane/ai`, primero debe extraerse a una capa compartida antes de copiarla.
+Si alguna de esas piezas hoy vive solo en un módulo puntual del `ai/` unificado, primero debe extraerse a una capa compartida antes de copiarla.
 
 ### Flujo recomendado
 
 ```text
-professionals/frontend -> professionals/ai -> professionals/backend -> control-plane/backend
+frontend -> ai(professionals) -> professionals/backend -> control-plane/backend
 ```
 
 ### Ownership real de la AI vertical
@@ -705,7 +703,7 @@ Desplegar la vertical con independencia operativa real.
 ### Responsabilidades
 
 - Lambda de `professionals/backend`
-- Lambda o runtime backend de `professionals/ai`
+- configuración del módulo de `professionals` dentro del `ai/` unificado
 - frontend estático
 - API Gateway propio o rutas dedicadas
 - secretos y variables de entorno
@@ -817,7 +815,7 @@ Implementar en este orden:
 1. contratos HTTP faltantes en `control-plane`
 2. `professionals/backend`
 3. `professionals/frontend`
-4. `professionals/ai`
+4. módulo `professionals` dentro de `ai/`
 5. `professionals/infra`
 
 ### Justificación

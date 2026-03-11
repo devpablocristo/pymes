@@ -3,22 +3,22 @@ import { apiRequest } from '../lib/api';
 import type { ModuleDefinition } from '../lib/moduleCatalog';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
 import {
-  addSessionNote,
-  completeSession,
-  createIntake,
-  createProfessional,
-  createSession,
-  createSpecialty,
-  getIntakes,
-  getProfessionals,
-  getSessions,
-  getSpecialties,
-  submitIntake,
-  updateIntake,
-  updateProfessional,
-  updateSpecialty,
-} from '../lib/professionalsApi';
-import type { Intake, ProfessionalProfile, Session, Specialty } from '../lib/professionalsTypes';
+  addTeacherSessionNote,
+  completeTeacherSession,
+  createTeacher,
+  createTeacherIntake,
+  createTeacherSession,
+  createTeacherSpecialty,
+  getTeacherIntakes,
+  getTeachers,
+  getTeacherSessions,
+  getTeacherSpecialties,
+  submitTeacherIntake,
+  updateTeacher,
+  updateTeacherIntake,
+  updateTeacherSpecialty,
+} from '../lib/teachersApi';
+import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../lib/teachersTypes';
 import {
   createWorkOrder,
   createWorkOrderPaymentLink,
@@ -33,8 +33,8 @@ import {
   updateWorkOrder,
   updateWorkshopService,
   updateWorkshopVehicle,
-} from '../lib/workshopsApi';
-import type { WorkOrder, WorkOrderItem, WorkshopService, WorkshopVehicle } from '../lib/workshopsTypes';
+} from '../lib/autoRepairApi';
+import type { WorkOrder, WorkOrderItem, WorkshopService, WorkshopVehicle } from '../lib/autoRepairTypes';
 import { vocab } from '../lib/vocabulary';
 
 type Address = {
@@ -1415,13 +1415,13 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     isValid: (values) => asString(values.url).trim().startsWith('http'),
   },
   professionals: {
-    label: 'profesional',
-    labelPlural: 'profesionales',
-    labelPluralCap: 'Profesionales',
+    label: 'teacher',
+    labelPlural: 'teachers',
+    labelPluralCap: 'Teachers',
     dataSource: {
-      list: async () => (await getProfessionals()).items ?? [],
+      list: async () => (await getTeachers()).items ?? [],
       create: async (values) => {
-        await createProfessional({
+        await createTeacher({
           party_id: asString(values.party_id),
           bio: asString(values.bio),
           headline: asString(values.headline),
@@ -1431,8 +1431,8 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
           accepts_new_clients: asBoolean(values.accepts_new_clients),
         });
       },
-      update: async (row: ProfessionalProfile, values) => {
-        await updateProfessional(row.id, {
+      update: async (row: TeacherProfile, values) => {
+        await updateTeacher(row.id, {
           bio: asOptionalString(values.bio),
           headline: asOptionalString(values.headline),
           public_slug: asOptionalString(values.public_slug),
@@ -1445,9 +1445,9 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     columns: [
       {
         key: 'headline',
-        header: 'Profesional',
+        header: 'Teacher',
         className: 'cell-name',
-        render: (_value, row: ProfessionalProfile) => (
+        render: (_value, row: TeacherProfile) => (
           <>
             <strong>{row.headline || row.party_id}</strong>
             <div className="text-secondary">{row.public_slug || 'Sin slug'} · {row.party_id}</div>
@@ -1457,7 +1457,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'specialties',
         header: 'Especialidades',
-        render: (value) => (value as ProfessionalProfile['specialties'] ?? [])
+        render: (value) => (value as TeacherProfile['specialties'] ?? [])
           .map((item) => (typeof item === 'string' ? item : item.name))
           .join(', ') || '---',
       },
@@ -1474,11 +1474,11 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     ],
     formFields: [
       { key: 'party_id', label: 'Party ID', required: true, placeholder: 'UUID de la entidad' },
-      { key: 'headline', label: 'Titulo profesional', placeholder: 'Psicologa clinica' },
+      { key: 'headline', label: 'Headline docente', placeholder: 'Teacher de ingles para secundaria' },
       { key: 'public_slug', label: 'Slug publico', placeholder: 'ana-perez' },
       { key: 'is_public', label: 'Visible al publico', type: 'checkbox' },
       { key: 'is_bookable', label: 'Reservable', type: 'checkbox' },
-      { key: 'accepts_new_clients', label: 'Acepta nuevos clientes', type: 'checkbox' },
+      { key: 'accepts_new_clients', label: 'Acepta nuevos alumnos', type: 'checkbox' },
       { key: 'bio', label: 'Bio', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
@@ -1486,27 +1486,27 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         id: 'toggle-public',
         label: 'Publicar',
         kind: 'secondary',
-        onClick: async (row: ProfessionalProfile) => {
-          await updateProfessional(row.id, { is_public: !row.is_public });
+        onClick: async (row: TeacherProfile) => {
+          await updateTeacher(row.id, { is_public: !row.is_public });
         },
       },
       {
         id: 'toggle-bookable',
         label: 'Reservable',
         kind: 'secondary',
-        onClick: async (row: ProfessionalProfile) => {
-          await updateProfessional(row.id, { is_bookable: !row.is_bookable });
+        onClick: async (row: TeacherProfile) => {
+          await updateTeacher(row.id, { is_bookable: !row.is_bookable });
         },
       },
     ],
-    searchText: (row: ProfessionalProfile) => [
+    searchText: (row: TeacherProfile) => [
       row.party_id,
       row.headline,
       row.public_slug,
       row.bio,
       row.specialties.map((item) => (typeof item === 'string' ? item : item.name)).join(', '),
     ].filter(Boolean).join(' '),
-    toFormValues: (row: ProfessionalProfile) => ({
+    toFormValues: (row: TeacherProfile) => ({
       party_id: row.party_id ?? '',
       headline: row.headline ?? '',
       public_slug: row.public_slug ?? '',
@@ -1522,17 +1522,17 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'especialidades',
     labelPluralCap: 'Especialidades',
     dataSource: {
-      list: async () => (await getSpecialties()).items ?? [],
+      list: async () => (await getTeacherSpecialties()).items ?? [],
       create: async (values) => {
-        await createSpecialty({
+        await createTeacherSpecialty({
           code: asString(values.code),
           name: asString(values.name),
           description: asString(values.description),
           is_active: asBoolean(values.is_active),
         });
       },
-      update: async (row: Specialty, values) => {
-        await updateSpecialty(row.id, {
+      update: async (row: TeacherSpecialty, values) => {
+        await updateTeacherSpecialty(row.id, {
           code: asOptionalString(values.code),
           name: asOptionalString(values.name),
           description: asOptionalString(values.description),
@@ -1561,13 +1561,13 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         id: 'toggle-active',
         label: 'Activar / pausar',
         kind: 'secondary',
-        onClick: async (row: Specialty) => {
-          await updateSpecialty(row.id, { is_active: !row.is_active });
+        onClick: async (row: TeacherSpecialty) => {
+          await updateTeacherSpecialty(row.id, { is_active: !row.is_active });
         },
       },
     ],
-    searchText: (row: Specialty) => [row.code, row.name, row.description].filter(Boolean).join(' '),
-    toFormValues: (row: Specialty) => ({
+    searchText: (row: TeacherSpecialty) => [row.code, row.name, row.description].filter(Boolean).join(' '),
+    toFormValues: (row: TeacherSpecialty) => ({
       code: row.code ?? '',
       name: row.name ?? '',
       description: row.description ?? '',
@@ -1580,19 +1580,19 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'ingresos',
     labelPluralCap: 'Ingresos',
     dataSource: {
-      list: async () => (await getIntakes()).items ?? [],
+      list: async () => (await getTeacherIntakes()).items ?? [],
       create: async (values) => {
-        await createIntake({
+        await createTeacherIntake({
           profile_id: asString(values.profile_id),
           notes: asString(values.notes),
         });
       },
-      update: async (row: Intake, values) => {
-        await updateIntake(row.id, { notes: asString(values.notes) });
+      update: async (row: TeacherIntake, values) => {
+        await updateTeacherIntake(row.id, { notes: asString(values.notes) });
       },
     },
     columns: [
-      { key: 'profile_id', header: 'Profesional', className: 'cell-name' },
+      { key: 'profile_id', header: 'Teacher', className: 'cell-name' },
       {
         key: 'status',
         header: 'Estado',
@@ -1602,7 +1602,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
     formFields: [
-      { key: 'profile_id', label: 'Profile ID', required: true, placeholder: 'UUID del profesional' },
+      { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
@@ -1610,14 +1610,14 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         id: 'submit',
         label: 'Enviar',
         kind: 'success',
-        isVisible: (row: Intake) => row.status === 'draft',
-        onClick: async (row: Intake) => {
-          await submitIntake(row.id);
+        isVisible: (row: TeacherIntake) => row.status === 'draft',
+        onClick: async (row: TeacherIntake) => {
+          await submitTeacherIntake(row.id);
         },
       },
     ],
-    searchText: (row: Intake) => [row.profile_id, row.status, row.notes].filter(Boolean).join(' '),
-    toFormValues: (row: Intake) => ({
+    searchText: (row: TeacherIntake) => [row.profile_id, row.status, row.notes].filter(Boolean).join(' '),
+    toFormValues: (row: TeacherIntake) => ({
       profile_id: row.profile_id ?? '',
       notes: row.notes ?? '',
     }),
@@ -1628,9 +1628,9 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'sesiones',
     labelPluralCap: 'Sesiones',
     dataSource: {
-      list: async () => (await getSessions()).items ?? [],
+      list: async () => (await getTeacherSessions()).items ?? [],
       create: async (values) => {
-        await createSession({
+        await createTeacherSession({
           appointment_id: asString(values.appointment_id),
           profile_id: asString(values.profile_id),
           customer_party_id: asOptionalString(values.customer_party_id),
@@ -1645,7 +1645,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         key: 'profile_id',
         header: 'Sesion',
         className: 'cell-name',
-        render: (_value, row: Session) => (
+        render: (_value, row: TeacherSession) => (
           <>
             <strong>{row.profile_id}</strong>
             <div className="text-secondary">{row.appointment_id} · {row.summary || 'Sin resumen'}</div>
@@ -1662,7 +1662,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     ],
     formFields: [
       { key: 'appointment_id', label: 'Appointment ID', required: true, placeholder: 'UUID del turno' },
-      { key: 'profile_id', label: 'Profile ID', required: true, placeholder: 'UUID del profesional' },
+      { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
       { key: 'customer_party_id', label: 'Customer party ID' },
       { key: 'product_id', label: 'Product ID' },
       { key: 'started_at', label: 'Inicio', type: 'datetime-local', required: true },
@@ -1673,24 +1673,24 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         id: 'complete',
         label: 'Completar',
         kind: 'success',
-        isVisible: (row: Session) => row.status === 'scheduled' || row.status === 'active',
-        onClick: async (row: Session) => {
-          await completeSession(row.id);
+        isVisible: (row: TeacherSession) => row.status === 'scheduled' || row.status === 'active',
+        onClick: async (row: TeacherSession) => {
+          await completeTeacherSession(row.id);
         },
       },
       {
         id: 'note',
         label: 'Nota',
         kind: 'secondary',
-        onClick: async (row: Session) => {
+        onClick: async (row: TeacherSession) => {
           const body = window.prompt('Nota de la sesion');
           if (!body || !body.trim()) return;
           const title = window.prompt('Titulo de la nota (opcional)') ?? '';
-          await addSessionNote(row.id, { body: body.trim(), title: title.trim() || undefined });
+          await addTeacherSessionNote(row.id, { body: body.trim(), title: title.trim() || undefined });
         },
       },
     ],
-    searchText: (row: Session) => [
+    searchText: (row: TeacherSession) => [
       row.appointment_id,
       row.profile_id,
       row.status,
@@ -2097,11 +2097,15 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
 };
 
+rawResourceConfigs.teachers = rawResourceConfigs.professionals;
+
 const csvStrategies: Record<string, CSVToolbarOptions<any>> = {
   customers: { mode: 'server', entity: 'customers' },
   suppliers: { mode: 'server', entity: 'suppliers' },
   products: { mode: 'server', entity: 'products' },
 };
+
+csvStrategies.teachers = csvStrategies.professionals;
 
 type CrudModuleMeta = Pick<ModuleDefinition, 'group' | 'icon' | 'summary'> &
   Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes'>>;

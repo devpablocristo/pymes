@@ -5,11 +5,13 @@ Monorepo SaaS multi-vertical para PyMEs LATAM.
 La topologia activa hoy es:
 
 - `control-plane/backend`: backend Go transversal
-- `professionals/backend`: backend Go de la vertical `professionals`
-- `workshops/backend`: backend Go de la vertical `workshops` para talleres mecanicos LATAM
+- `professionals/backend`: backend Go de la vertical umbrella `professionals`; hoy implementa el modulo `teachers`
+- `workshops/backend`: backend Go de la vertical umbrella `workshops`; hoy implementa `auto_repair` para talleres mecanicos LATAM
 - `frontend`: consola React unificada para core y verticales
 - `ai`: servicio FastAPI unificado para chat interno, publico y `professionals`
 - `control-plane/shared/` y `pkgs/`: runtime y librerias compartidas
+
+No existen deployables `control-plane/ai` ni `professionals/ai`. El unico runtime AI vive en `ai/` y reutiliza piezas compartidas desde `control-plane/shared/ai`.
 
 ## Inicio rapido
 
@@ -73,7 +75,7 @@ El frontend usa un blueprint unico de CRUD en:
 - `frontend/src/components/CrudPage.tsx`
 - `frontend/src/crud/resourceConfigs.tsx`
 
-`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles`, los CRUDs de `professionals` y los de `workshops`, con acciones custom cuando el flujo no es CRUD puro.
+`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles`, los CRUDs del modulo `professionals/teachers` y los del subdominio `workshops/auto_repair`, con acciones custom cuando el flujo no es CRUD puro.
 
 Import / export masivo:
 

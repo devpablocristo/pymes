@@ -14,12 +14,12 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/orchestration"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/controlplane"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/vehicles"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/workorders"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
 )
 
@@ -73,6 +73,14 @@ func InitializeApp() *app.App {
 	v1 := router.Group("/v1")
 	authGroup := v1.Group("")
 	authGroup.Use(authMiddleware.RequireAuth())
+
+	autoRepairGroup := authGroup.Group("/auto-repair")
+	vehiclesHandler.RegisterRoutes(autoRepairGroup)
+	servicesHandler.RegisterRoutes(autoRepairGroup)
+	workOrdersHandler.RegisterRoutes(autoRepairGroup)
+	orchestrationHandler.RegisterRoutes(autoRepairGroup)
+
+	// Legacy aliases from the initial workshops release.
 	vehiclesHandler.RegisterRoutes(authGroup)
 	servicesHandler.RegisterRoutes(authGroup)
 	workOrdersHandler.RegisterRoutes(authGroup)

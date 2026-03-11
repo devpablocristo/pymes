@@ -6,8 +6,8 @@ Indice operativo y arquitectonico del monorepo `pymes`.
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md): reglas de ownership, shared y bordes
 - [CONTROL_PLANE.md](./CONTROL_PLANE.md): backend transversal, seguridad interna y modulos core
-- [PROFESSIONALS.md](./PROFESSIONALS.md): backend de la vertical e integracion con control-plane
-- [WORKSHOPS.md](./WORKSHOPS.md): vertical de talleres mecanicos e integracion comercial/operativa
+- [PROFESSIONALS.md](./PROFESSIONALS.md): vertical umbrella `professionals` con modulo activo `teachers`
+- [WORKSHOPS.md](./WORKSHOPS.md): vertical umbrella de talleres con subdominio inicial `auto_repair`
 
 ## Topologia vigente
 
@@ -43,7 +43,7 @@ El blueprint reusable de CRUD vive en:
 - `frontend/src/components/CrudPage.tsx`
 - `frontend/src/crud/resourceConfigs.tsx`
 
-La regla practica es: si un recurso es CRUD real, primero se modela como configuracion del blueprint antes de crear una pagina bespoke. Hoy ese registro ya cubre los CRUDs operativos principales del core, de `professionals` y de `workshops`, incluyendo variantes parciales como `sales`, `purchases`, `accounts` y `roles`.
+La regla practica es: si un recurso es CRUD real, primero se modela como configuracion del blueprint antes de crear una pagina bespoke. Hoy ese registro ya cubre los CRUDs operativos principales del core, del modulo `professionals/teachers` y del subdominio `workshops/auto_repair`, incluyendo variantes parciales como `sales`, `purchases`, `accounts` y `roles`.
 
 Import / export:
 

@@ -2,7 +2,7 @@
 
 ## Contexto
 
-Este prompt agrega un **asistente conversacional con IA** al control-plane. Es un servicio Python/FastAPI separado del backend Go, pero dentro del mismo monorepo en `control-plane/ai/`. Se comunica con el backend Go via HTTP interno para ejecutar acciones y consultar datos.
+Este prompt agrega un **asistente conversacional con IA** al producto. Es un servicio Python/FastAPI separado del backend Go, pero dentro del mismo monorepo en `ai/`. Se comunica con los backends Go via HTTP interno para ejecutar acciones y consultar datos.
 
 **Prerequisitos**: Prompts 00, 01 y 02 implementados y funcionales.
 
@@ -59,7 +59,7 @@ Cada pyme que se registra obtiene un asistente que:
 ## Estructura del proyecto
 
 ```
-control-plane/ai/
+ai/
 ├── Dockerfile.dev
 ├── Dockerfile                   # Prod (Lambda container image o ECS)
 ├── pyproject.toml               # uv/pip deps
@@ -1140,12 +1140,12 @@ CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 ```yaml
   ai:
     build:
-      context: ./control-plane/ai
+      context: ./ai
       dockerfile: Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
-      - ./control-plane/ai/src:/app/src
+      - ./ai/src:/app/src
     env_file:
       - .env
     environment:
@@ -1420,7 +1420,7 @@ respx>=0.21.0
 
 **Aclaración importante**: este orden es solo una secuencia técnica para construir sin retrabajo. No convierte ningún bloque en opcional ni en "fase 2".
 
-1. Crear `control-plane/ai/` con estructura de directorios
+1. Crear `ai/` con estructura de directorios
 2. `requirements.txt` + `Dockerfile.dev`
 3. `src/config.py` + `src/main.py` (FastAPI app con healthz)
 4. Agregar servicio `ai` al `docker-compose.yml`

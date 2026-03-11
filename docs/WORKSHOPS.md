@@ -1,10 +1,12 @@
 # Workshops
 
-Vertical `workshops` para talleres mecanicos LATAM.
+Vertical `workshops` para talleres LATAM. Hoy el primer subdominio canonico es `auto_repair`.
 
 ## Ownership
 
-- dominio propio: `vehiculos`, `servicios de taller`, `ordenes de trabajo`
+- umbrella vertical: `workshops`
+- subdominio implementado hoy: `auto_repair`
+- dominio propio del subdominio: `vehiculos`, `servicios de taller`, `ordenes de trabajo`
 - integraciones externas: siempre por HTTP hacia `control-plane`
 - no duplica ownership de `customers`, `parties`, `products`, `inventory`, `quotes`, `sales` ni `appointments`
 
@@ -17,16 +19,32 @@ Entry point:
 
 Recursos propios:
 
-- `GET/POST/PUT /v1/vehicles`
-- `GET/POST/PUT /v1/workshop-services`
-- `GET/POST/PUT /v1/work-orders`
+- `GET/POST/PUT /v1/auto-repair/vehicles`
+- `GET/POST/PUT /v1/auto-repair/workshop-services`
+- `GET/POST/PUT /v1/auto-repair/work-orders`
 
 Orquestacion:
 
-- `POST /v1/workshop-appointments`
-- `POST /v1/work-orders/:id/quote`
-- `POST /v1/work-orders/:id/sale`
-- `POST /v1/work-orders/:id/payment-link`
+- `POST /v1/auto-repair/workshop-appointments`
+- `POST /v1/auto-repair/work-orders/:id/quote`
+- `POST /v1/auto-repair/work-orders/:id/sale`
+- `POST /v1/auto-repair/work-orders/:id/payment-link`
+
+Compatibilidad:
+
+- las rutas legacy `/v1/vehicles`, `/v1/workshop-services`, `/v1/work-orders` y afines siguen vivas como alias
+
+## Estructura interna estandar
+
+El subdominio `auto_repair` ya usa la misma forma interna que `professionals/teachers`:
+
+- raiz del modulo: `handler.go`, `repository.go`, `usecases.go`
+- DTOs HTTP en `handler/dto`
+- modelos persistentes en `repository/models`
+- entidades de dominio en `usecases/domain`
+- helpers transversales en `workshops/backend/internal/shared/handlers` y `workshops/backend/internal/shared/values`
+
+Eso deja una base uniforme para sumar despues `truck_repair` o `moto_repair` sin volver a inventar layout ni helpers.
 
 ## Modelo
 
@@ -59,13 +77,23 @@ Orquestacion:
 
 La regla es que `workshops` modela contexto operativo, pero la facturacion y las entidades maestras siguen siendo del core.
 
+La regla nueva de arquitectura es: `workshops` es el umbrella, y cada oficio o segmento se modela como subdominio interno. `auto_repair` es el primero; `truck_repair` o `moto_repair` pueden sumar despues sin crear otra vertical completa.
+
 ## Frontend
 
 Rutas:
 
+- `/workshops/auto-repair/vehicles`
+- `/workshops/auto-repair/services`
+- `/workshops/auto-repair/orders`
+
+Compatibilidad:
+
 - `/workshops/vehicles`
 - `/workshops/services`
 - `/workshops/orders`
+
+redireccionan al subdominio canonico `auto-repair`.
 
 Las tres usan el blueprint comun `CrudPage`.
 

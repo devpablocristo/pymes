@@ -1,11 +1,11 @@
 import { SharedAuthTokenBridge } from '../shared/frontendShell';
 import { registerTokenProvider } from '@pymes/ts-pkg/http';
-import { registerProfessionalsTokenProvider } from '../lib/professionalsApi';
+import { registerTeachersTokenProvider } from '../lib/teachersApi';
 
 export function AuthTokenBridge() {
   return (
     <SharedAuthTokenBridge
-      registerProviders={[registerTokenProvider, registerProfessionalsTokenProvider]}
+      registerProviders={[registerTokenProvider, registerTeachersTokenProvider]}
     />
   );
 }

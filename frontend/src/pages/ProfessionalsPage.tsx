@@ -1,5 +1,5 @@
-import { ConfiguredCrudPage } from '../crud/resourceConfigs';
+import { TeachersPage } from './TeachersPage';
 
 export function ProfessionalsPage() {
-  return <ConfiguredCrudPage resourceId="professionals" />;
+  return <TeachersPage />;
 }

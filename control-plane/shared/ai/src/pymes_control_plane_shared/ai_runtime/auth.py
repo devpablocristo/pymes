@@ -33,8 +33,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         app,
         settings: Any,
         update_request_context: Callable[..., None] | None = None,
-        public_prefixes: tuple[str, ...] = ("/v1/public/",),
-        protected_prefixes: tuple[str, ...] = ("/v1/chat", "/v1/professionals/chat"),
+        public_prefixes: tuple[str, ...] = ("/v1/public/", "/v1/professionals/public/", "/v1/professionals/teachers/public/"),
+        protected_prefixes: tuple[str, ...] = ("/v1/chat", "/v1/professionals/chat", "/v1/professionals/teachers/chat"),
         health_prefixes: tuple[str, ...] = ("/healthz", "/readyz"),
     ) -> None:  # type: ignore[no-untyped-def]
         super().__init__(app)

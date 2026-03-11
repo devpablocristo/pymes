@@ -18,8 +18,8 @@ def create_app() -> FastAPI:
     app = FastAPI()
     app.add_middleware(AuthMiddleware, settings=Settings())
 
-    @app.get("/v1/professionals/chat")
-    async def professionals_chat(request: Request) -> dict[str, object]:
+    @app.get("/v1/professionals/teachers/chat")
+    async def teachers_chat(request: Request) -> dict[str, object]:
         auth = request.state.auth
         return {
             "org_id": auth.org_id,
@@ -43,7 +43,7 @@ def test_professionals_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
     client = TestClient(create_app())
 
     response = client.get(
-        "/v1/professionals/chat",
+        "/v1/professionals/teachers/chat",
         headers={
             "X-API-KEY": "psk_test",
             "X-Actor": "spoofed-user",
@@ -69,7 +69,7 @@ def test_professionals_chat_rejects_unknown_api_key(monkeypatch) -> None:
     monkeypatch.setattr(AuthMiddleware, "_resolve_api_key", fake_resolve)
     client = TestClient(create_app())
 
-    response = client.get("/v1/professionals/chat", headers={"X-API-KEY": "psk_invalid"})
+    response = client.get("/v1/professionals/teachers/chat", headers={"X-API-KEY": "psk_invalid"})
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"

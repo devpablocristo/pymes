@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getPublicPreviewBootstrap, getPublicProfessionals } from '../lib/professionalsApi';
-import type { ProfessionalProfile } from '../lib/professionalsTypes';
+import { getPublicTeachers, getTeachersPreviewBootstrap } from '../lib/teachersApi';
+import type { TeacherProfile } from '../lib/teachersTypes';
 
 export function PublicPreviewPage() {
-  const [items, setItems] = useState<ProfessionalProfile[]>([]);
+  const [items, setItems] = useState<TeacherProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
@@ -12,7 +12,7 @@ export function PublicPreviewPage() {
     try {
       setLoading(true);
       setError('');
-      const resp = await getPublicProfessionals(slug);
+      const resp = await getPublicTeachers(slug);
       setItems(resp.items ?? []);
     } catch (err) {
       setError(String(err));
@@ -25,7 +25,7 @@ export function PublicPreviewPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const bootstrap = await getPublicPreviewBootstrap();
+        const bootstrap = await getTeachersPreviewBootstrap();
         const slug = bootstrap.slug?.trim();
         if (!slug) {
           setError('No se pudo resolver el slug publico de la organizacion.');
@@ -51,7 +51,7 @@ export function PublicPreviewPage() {
     <>
       <div className="page-header">
         <h1>Vista pública</h1>
-        <p>Vista previa de cómo se vería la página pública de profesionales</p>
+        <p>Vista previa de cómo se vería la página pública del módulo teachers</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -78,7 +78,7 @@ export function PublicPreviewPage() {
       ) : items.length === 0 ? (
         <div className="card">
           <div className="empty-state">
-            <p>No hay profesionales publicos para esta organizacion</p>
+            <p>No hay teachers públicos para esta organización</p>
           </div>
         </div>
       ) : (
@@ -86,7 +86,7 @@ export function PublicPreviewPage() {
           {items.map((item) => (
             <div key={item.id} className="card">
               <div className="card-header">
-                <h2>{item.headline || item.public_slug || 'Profesional'}</h2>
+                <h2>{item.headline || item.public_slug || 'Teacher'}</h2>
                 {item.is_bookable && <span className="badge badge-success">Reservable</span>}
               </div>
               {item.bio && <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.87rem', marginBottom: '0.75rem' }}>{item.bio}</p>}

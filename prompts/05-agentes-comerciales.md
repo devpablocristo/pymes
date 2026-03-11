@@ -90,11 +90,11 @@ Separarlo como producto independiente demasiado temprano obligaría a duplicar:
 
 Elegir la mejor variante según el estado real del repo:
 
-1. **Extender `control-plane/ai`** si la orquestación actual alcanza
-2. **Crear submódulos especializados dentro de `control-plane/ai`** para `sales_agent`, `procurement_agent`, `policy_layer`, etc.
+1. **Extender `ai/`** si la orquestación actual alcanza
+2. **Crear submódulos especializados dentro de `ai/`** para `sales_agent`, `procurement_agent`, `policy_layer`, etc.
 3. **Crear un servicio adicional dentro del monorepo** solo si la separación operativa realmente lo justifica
 
-La preferencia por defecto es **reutilizar `control-plane/ai`** y extraer responsabilidades por módulo antes de crear nuevos servicios.
+La preferencia por defecto es **reutilizar `ai/`** y extraer responsabilidades por módulo antes de crear nuevos servicios.
 
 ---
 
@@ -469,7 +469,7 @@ Toda acción relevante del agente debe registrar:
 
 Antes de crear nuevas capas, auditar y reutilizar:
 
-- `control-plane/ai`
+- `ai/`
 - `control-plane/backend`
 - endpoints públicos ya existentes
 - tool registry existente
@@ -566,7 +566,7 @@ El trabajo se considera exitoso si:
 
 ## Orden sugerido de ejecución
 
-1. auditar `control-plane/ai`, `control-plane/backend` y endpoints públicos existentes
+1. auditar `ai/`, `control-plane/backend` y endpoints públicos existentes
 2. definir arquitectura final
 3. implementar MVP del agente de ventas externo
 4. implementar MVP del agente de ventas interno

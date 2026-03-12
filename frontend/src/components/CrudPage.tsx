@@ -1,5 +1,6 @@
 import { FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { apiRequest } from '../lib/api';
+import { useI18n } from '../lib/i18n';
 
 export type CrudFieldValue = string | boolean;
 export type CrudFormValues = Record<string, CrudFieldValue>;
@@ -128,6 +129,7 @@ export function CrudPage<T extends { id: string }>({
   toolbarActions = [],
   rowActions = [],
 }: CrudPageConfig<T>) {
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -158,6 +160,10 @@ export function CrudPage<T extends { id: string }>({
   const canRestore = allowRestore ?? (supportsArchived && Boolean(dataSource?.restore || basePath));
   const canHardDelete = allowHardDelete ?? (supportsArchived && Boolean(dataSource?.hardDelete || basePath));
   const showForm = (creating || editing !== null) && formFields.length > 0;
+  const localizedLabel = localizeText(label);
+  const localizedLabelPlural = localizeText(labelPlural);
+  const localizedLabelPluralCap = localizeText(labelPluralCap);
+  const hardDeleteWord = t('crud.confirm.word');
 
   async function loadItems(): Promise<void> {
     setLoading(true);
@@ -335,9 +341,9 @@ export function CrudPage<T extends { id: string }>({
     <>
       <div className="page-header">
         <div>
-          <h1>{showArchived ? `${labelPluralCap} archivados` : labelPluralCap}</h1>
+          <h1>{sentenceCase(showArchived ? t('crud.title.archived', { labelPluralCap: localizedLabelPluralCap }) : localizedLabelPluralCap)}</h1>
           <p className="text-secondary">
-            {loading ? 'Cargando...' : `${filtered.length} ${filtered.length === 1 ? label : labelPlural}`}
+            {loading ? t('common.status.loading') : `${filtered.length} ${filtered.length === 1 ? localizedLabel : localizedLabelPlural}`}
           </p>
         </div>
         <div className="actions-row">
@@ -348,12 +354,12 @@ export function CrudPage<T extends { id: string }>({
               className={buttonClass(action.kind, false)}
               onClick={() => { void runToolbarAction(action); }}
             >
-              {action.label}
+              {localizeUiText(action.label)}
             </button>
           ))}
           {!showArchived && canCreate && (
             <button type="button" className="btn-primary" onClick={openCreate}>
-              {createLabel ?? `+ Nuevo ${label}`}
+              {createLabel ? localizeUiText(createLabel) : sentenceCase(t('crud.button.new', { label: localizedLabel }))}
             </button>
           )}
         </div>
@@ -364,20 +370,20 @@ export function CrudPage<T extends { id: string }>({
       {showForm && !showArchived && (
         <div className="card crud-form-card">
           <div className="card-header">
-            <h2>{editing ? `Editar ${label}` : `Nuevo ${label}`}</h2>
+            <h2>{sentenceCase(editing ? t('crud.form.edit', { label: localizedLabel }) : t('crud.form.create', { label: localizedLabel }))}</h2>
           </div>
           <form onSubmit={(event) => { void submitForm(event); }} className="crud-form">
             <div className="crud-form-grid">
               {activeFormFields.map((field) => (
                 <div key={field.key} className={`form-group${field.fullWidth ? ' full-width' : ''}`}>
-                  <label htmlFor={`crud-field-${field.key}`}>{field.label}{field.required ? ' *' : ''}</label>
+                  <label htmlFor={`crud-field-${field.key}`}>{localizeText(field.label)}{field.required ? ' *' : ''}</label>
                   {field.type === 'textarea' ? (
                     <textarea
                       id={`crud-field-${field.key}`}
                       rows={3}
                       value={String(formValues[field.key] ?? '')}
                       onChange={(event) => setField(field.key, event.target.value)}
-                      placeholder={field.placeholder}
+                      placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     />
                   ) : field.type === 'select' ? (
                     <select
@@ -385,10 +391,10 @@ export function CrudPage<T extends { id: string }>({
                       value={String(formValues[field.key] ?? '')}
                       onChange={(event) => setField(field.key, event.target.value)}
                     >
-                      <option value="">{field.placeholder ?? 'Seleccionar...'}</option>
+                      <option value="">{field.placeholder ? localizeText(field.placeholder) : t('crud.select.placeholder')}</option>
                       {(field.options ?? []).map((option) => (
                         <option key={option.value} value={option.value}>
-                          {option.label}
+                          {localizeText(option.label)}
                         </option>
                       ))}
                     </select>
@@ -396,7 +402,7 @@ export function CrudPage<T extends { id: string }>({
                     <label className="toggle">
                       <input
                         id={`crud-field-${field.key}`}
-                        aria-label={field.label}
+                        aria-label={localizeText(field.label)}
                         type="checkbox"
                         checked={Boolean(formValues[field.key])}
                         onChange={(event) => setField(field.key, event.target.checked)}
@@ -410,7 +416,7 @@ export function CrudPage<T extends { id: string }>({
                       type={field.type ?? 'text'}
                       value={String(formValues[field.key] ?? '')}
                       onChange={(event) => setField(field.key, event.target.value)}
-                      placeholder={field.placeholder}
+                      placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                       autoFocus={field === activeFormFields[0]}
                     />
                   )}
@@ -419,10 +425,10 @@ export function CrudPage<T extends { id: string }>({
             </div>
             <div className="actions-row">
               <button type="submit" className="btn-primary" disabled={saving || !isValid(formValues)}>
-                {saving ? 'Guardando...' : 'Guardar'}
+                {saving ? t('common.status.saving') : t('common.actions.save')}
               </button>
               <button type="button" className="btn-secondary" onClick={closeForm} disabled={saving}>
-                Cancelar
+                {t('common.actions.cancel')}
               </button>
             </div>
           </form>
@@ -433,7 +439,7 @@ export function CrudPage<T extends { id: string }>({
         <input
           type="text"
           className="crud-search"
-          placeholder={searchPlaceholder ?? `Buscar ${labelPlural}...`}
+          placeholder={searchPlaceholder ? localizeText(searchPlaceholder) : t('crud.search.placeholder', { labelPlural: localizedLabelPlural })}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -447,7 +453,7 @@ export function CrudPage<T extends { id: string }>({
               setShowArchived((current) => !current);
             }}
           >
-            {showArchived ? 'Ver activos' : 'Ver archivados'}
+            {showArchived ? t('crud.toggle.showActive') : t('crud.toggle.showArchived')}
           </button>
         )}
       </div>
@@ -458,14 +464,14 @@ export function CrudPage<T extends { id: string }>({
         <div className="empty-state">
           <p>
             {search.trim()
-              ? `No se encontraron ${labelPlural} con "${search.trim()}"`
+              ? t('crud.empty.search', { labelPlural: localizedLabelPlural, search: search.trim() })
               : showArchived
-                ? (archivedEmptyState ?? `No hay ${labelPlural} archivados.`)
-                : (emptyState ?? `No hay ${labelPlural} registrados.`)}
+                ? (archivedEmptyState ? localizeText(archivedEmptyState) : t('crud.empty.archived', { labelPlural: localizedLabelPlural }))
+                : (emptyState ? localizeText(emptyState) : t('crud.empty.active', { labelPlural: localizedLabelPlural }))}
           </p>
           {!search.trim() && !showArchived && canCreate && (
             <button type="button" className="btn-primary" onClick={openCreate}>
-              {createLabel ?? `+ Crear primer ${label}`}
+              {createLabel ? localizeUiText(createLabel) : sentenceCase(t('crud.button.createFirst', { label: localizedLabel }))}
             </button>
           )}
         </div>
@@ -475,9 +481,9 @@ export function CrudPage<T extends { id: string }>({
             <thead>
               <tr>
                 {columns.map((column) => (
-                  <th key={column.key} className={column.className}>{column.header}</th>
+                  <th key={column.key} className={column.className}>{sentenceCase(localizeText(column.header))}</th>
                 ))}
-                <th className="col-actions">Acciones</th>
+                <th className="col-actions">{sentenceCase(t('crud.table.actions'))}</th>
               </tr>
             </thead>
             <tbody>
@@ -500,32 +506,32 @@ export function CrudPage<T extends { id: string }>({
                               disabled={busyKey === `${row.id}:restore`}
                               onClick={() => { void restoreRow(row); }}
                             >
-                              {busyKey === `${row.id}:restore` ? '...' : 'Restaurar'}
+                              {busyKey === `${row.id}:restore` ? '...' : t('common.actions.restore')}
                             </button>
                           )}
                           {canHardDelete && (
                             confirmDeleteId === row.id ? (
                               <div className="confirm-delete-inline">
-                                <span className="confirm-delete-hint">Escribi <strong>eliminar</strong> para confirmar</span>
+                                <span className="confirm-delete-hint">{t('crud.confirm.hint', { word: hardDeleteWord })}</span>
                                 <input
                                   type="text"
                                   className="confirm-delete-input"
                                   value={confirmDeleteText}
                                   onChange={(event) => setConfirmDeleteText(event.target.value)}
-                                  placeholder="eliminar"
+                                  placeholder={t('crud.confirm.placeholder')}
                                   autoFocus
                                 />
                                 <button
                                   type="button"
                                   className="btn-sm btn-danger"
-                                  disabled={confirmDeleteText.toLowerCase() !== 'eliminar' || busyKey === `${row.id}:hard-delete`}
+                                  disabled={confirmDeleteText.toLowerCase() !== hardDeleteWord.toLowerCase() || busyKey === `${row.id}:hard-delete`}
                                   onClick={() => { void hardDeleteRow(row); }}
                                 >
-                                  {busyKey === `${row.id}:hard-delete` ? '...' : 'Confirmar'}
+                                  {busyKey === `${row.id}:hard-delete` ? '...' : t('common.actions.confirm')}
                                 </button>
-                                <button type="button" className="btn-sm btn-secondary" onClick={cancelHardDelete}>
-                                  Cancelar
-                                </button>
+                            <button type="button" className="btn-sm btn-secondary" onClick={cancelHardDelete}>
+                              {t('common.actions.cancel')}
+                            </button>
                               </div>
                             ) : (
                               <button
@@ -537,7 +543,7 @@ export function CrudPage<T extends { id: string }>({
                                   setConfirmDeleteText('');
                                 }}
                               >
-                                Eliminar
+                                {t('common.actions.delete')}
                               </button>
                             )
                           )}
@@ -546,7 +552,7 @@ export function CrudPage<T extends { id: string }>({
                         <>
                           {canEdit && (
                             <button type="button" className="btn-sm btn-secondary" onClick={() => openEdit(row)}>
-                              Editar
+                              {t('common.actions.edit')}
                             </button>
                           )}
                           {visibleRowActions.map((action) => (
@@ -557,7 +563,7 @@ export function CrudPage<T extends { id: string }>({
                               disabled={busyKey === `${row.id}:${action.id}`}
                               onClick={() => { void runRowAction(action, row); }}
                             >
-                              {busyKey === `${row.id}:${action.id}` ? '...' : action.label}
+                              {busyKey === `${row.id}:${action.id}` ? '...' : localizeUiText(action.label)}
                             </button>
                           ))}
                           {canDelete && (
@@ -567,7 +573,7 @@ export function CrudPage<T extends { id: string }>({
                               disabled={busyKey === `${row.id}:delete`}
                               onClick={() => { void deleteRow(row); }}
                             >
-                              {busyKey === `${row.id}:delete` ? '...' : supportsArchived ? 'Archivar' : 'Eliminar'}
+                              {busyKey === `${row.id}:delete` ? '...' : supportsArchived ? t('common.actions.archive') : t('common.actions.delete')}
                             </button>
                           )}
                         </>

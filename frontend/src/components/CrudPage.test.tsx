@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CrudPage } from './CrudPage';
+import { LanguageProvider } from '../lib/i18n';
 
 type SampleItem = {
   id: string;
@@ -103,5 +104,40 @@ describe('CrudPage', () => {
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({ id: '1', name: 'Existente', active: true }, { name: 'Existente', active: true });
     });
+  });
+
+  it('translates shared scaffold text when the selected language changes', async () => {
+    const list = vi.fn().mockResolvedValue([{ id: '1', name: 'Existing', active: true }]);
+    const create = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <LanguageProvider initialLanguage="en">
+        <CrudPage<SampleItem>
+          label="item"
+          labelPlural="items"
+          labelPluralCap="Items"
+          dataSource={{
+            list: async () => list(),
+            create: async (values) => create(values),
+          }}
+          columns={[
+            { key: 'name', header: 'Nombre' },
+            { key: 'active', header: 'Activo', render: (value) => (value ? 'Yes' : 'No') },
+          ]}
+          formFields={[
+            { key: 'name', label: 'Nombre', required: true },
+            { key: 'active', label: 'Activo', type: 'checkbox' },
+          ]}
+          searchText={(row) => row.name}
+          toFormValues={(row) => ({ name: row.name, active: row.active })}
+          isValid={() => true}
+        />
+      </LanguageProvider>,
+    );
+
+    await screen.findByText('Existing');
+
+    expect(screen.getByRole('button', { name: '+ New item' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search items...')).toBeInTheDocument();
   });
 });

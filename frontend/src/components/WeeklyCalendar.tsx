@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useI18n } from '../lib/i18n';
 import { vocab } from '../lib/vocabulary';
 import { apiRequest } from '../lib/api';
 
@@ -11,7 +12,6 @@ type CalendarEvent = {
   color?: string;
 };
 
-const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const HOUR_START = 7;
 const HOUR_END = 22;
 const HOURS = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
@@ -49,7 +49,7 @@ type RawAppointment = {
   status?: string;
 };
 
-function toCalendarEvents(raw: RawAppointment[]): CalendarEvent[] {
+function toCalendarEvents(raw: RawAppointment[], untitledLabel: string): CalendarEvent[] {
   return raw
     .map((apt, i) => {
       const dateStr = apt.scheduled_at ?? apt.start_time ?? apt.started_at;
@@ -59,7 +59,7 @@ function toCalendarEvents(raw: RawAppointment[]): CalendarEvent[] {
       const hour = date.getHours() + date.getMinutes() / 60;
       return {
         id: apt.id,
-        title: apt.title ?? apt.customer_name ?? apt.display_name ?? 'Sin título',
+        title: apt.title ?? apt.customer_name ?? apt.display_name ?? untitledLabel,
         day: dayOfWeek,
         startHour: hour,
         durationHours: (apt.duration_minutes ?? 60) / 60,
@@ -101,6 +101,19 @@ function generateDemoEvents(dates: Date[]): CalendarEvent[] {
 }
 
 export function WeeklyCalendar() {
+  const { language, t, localizeText } = useI18n();
+  const dayLabels = useMemo(
+    () => [
+      t('calendar.day.mon'),
+      t('calendar.day.tue'),
+      t('calendar.day.wed'),
+      t('calendar.day.thu'),
+      t('calendar.day.fri'),
+      t('calendar.day.sat'),
+      t('calendar.day.sun'),
+    ],
+    [t],
+  );
   const [weekOffset, setWeekOffset] = useState(0);
   const dates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -119,7 +132,7 @@ export function WeeklyCalendar() {
         if (cancelled) return;
         const items = data.items ?? (Array.isArray(data) ? data : []);
         if (items.length > 0) {
-          setEvents(toCalendarEvents(items as RawAppointment[]));
+          setEvents(toCalendarEvents(items as RawAppointment[], t('calendar.event.untitled')));
           setIsDemo(false);
         } else {
           setEvents(generateDemoEvents(dates));
@@ -137,7 +150,7 @@ export function WeeklyCalendar() {
       });
 
     return () => { cancelled = true; };
-  }, [dates]);
+  }, [dates, t]);
 
   const todayDayOfWeek = (new Date().getDay() + 6) % 7;
   const todayCount = events.filter((e) => e.day === todayDayOfWeek).length;
@@ -148,20 +161,20 @@ export function WeeklyCalendar() {
       <div className="weekly-calendar-toolbar">
         <div className="weekly-calendar-nav">
           <button type="button" onClick={() => setWeekOffset((o) => o - 1)} className="weekly-cal-btn">&larr;</button>
-          <button type="button" onClick={() => setWeekOffset(0)} className="weekly-cal-btn weekly-cal-btn-today">Hoy</button>
+          <button type="button" onClick={() => setWeekOffset(0)} className="weekly-cal-btn weekly-cal-btn-today">{t('calendar.button.today')}</button>
           <button type="button" onClick={() => setWeekOffset((o) => o + 1)} className="weekly-cal-btn">&rarr;</button>
         </div>
         <div className="weekly-calendar-title">
           <h2>
-            {dates[0].toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+            {dates[0].toLocaleDateString(language === 'en' ? 'en-US' : 'es-AR', { month: 'long', year: 'numeric' })}
           </h2>
         </div>
         <div className="weekly-calendar-stats">
           <span className="weekly-cal-stat">
-            <strong>{todayCount}</strong> hoy
+            <strong>{todayCount}</strong> {t('calendar.stat.today')}
           </span>
           <span className="weekly-cal-stat">
-            <strong>{weekCount}</strong> esta semana
+            <strong>{weekCount}</strong> {t('calendar.stat.week')}
           </span>
         </div>
       </div>
@@ -173,7 +186,7 @@ export function WeeklyCalendar() {
           <div className="weekly-cal-corner" />
           {dates.map((date, i) => (
             <div key={i} className={`weekly-cal-day-header${isToday(date) ? ' today' : ''}`}>
-              <span className="weekly-cal-day-name">{DAY_LABELS[i]}</span>
+              <span className="weekly-cal-day-name">{dayLabels[i]}</span>
               <span className={`weekly-cal-day-number${isToday(date) ? ' today' : ''}`}>{date.getDate()}</span>
             </div>
           ))}
@@ -219,7 +232,7 @@ export function WeeklyCalendar() {
       {isDemo && !loading && (
         <div className="weekly-calendar-footer">
           <small>
-            Vista de ejemplo. Creá turnos en {vocab('Turnos')} para ver tu agenda real.
+            {t('calendar.demo', { appointments: localizeText(vocab('Turnos')) })}
           </small>
         </div>
       )}

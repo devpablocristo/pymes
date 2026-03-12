@@ -3,6 +3,7 @@ import { Link, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { SignIn, SignUp, UserButton, useAuth } from '@clerk/clerk-react';
 import { clerkEnabled } from '@pymes/ts-pkg/auth';
 import { registerTokenProvider } from '@pymes/ts-pkg/http';
+import { useI18n } from '../lib/i18n';
 
 export type TokenProvider = () => Promise<string | null>;
 export type TokenProviderRegistrar = (provider: TokenProvider) => void;
@@ -74,6 +75,7 @@ function ClerkProtectedRoute({ children }: PropsWithChildren) {
 }
 
 export function SharedLoginPage() {
+  const { t } = useI18n();
   if (clerkEnabled) {
     return (
       <div className="auth-layout">
@@ -84,15 +86,16 @@ export function SharedLoginPage() {
   return (
     <div className="auth-layout">
       <div className="auth-card">
-        <h1>Ingreso local</h1>
-        <p>Clerk deshabilitado. Usa una clave API para consumir la API desde el frontend.</p>
-        <Link to="/">Ir al panel</Link>
+        <h1>{t('auth.login.localTitle')}</h1>
+        <p>{t('auth.login.localDescription')}</p>
+        <Link to="/">{t('auth.goPanel')}</Link>
       </div>
     </div>
   );
 }
 
 export function SharedSignupPage() {
+  const { t } = useI18n();
   if (clerkEnabled) {
     return (
       <div className="auth-layout">
@@ -103,9 +106,9 @@ export function SharedSignupPage() {
   return (
     <div className="auth-layout">
       <div className="auth-card">
-        <h1>Registro local</h1>
-        <p>Clerk deshabilitado en este ambiente.</p>
-        <Link to="/">Ir al panel</Link>
+        <h1>{t('auth.signup.localTitle')}</h1>
+        <p>{t('auth.signup.localDescription')}</p>
+        <Link to="/">{t('auth.goPanel')}</Link>
       </div>
     </div>
   );
@@ -136,6 +139,7 @@ export function AppShell({
   footerContent?: ReactNode;
 }>) {
   const location = useLocation();
+  const { t, sentenceCase } = useI18n();
 
   useEffect(() => {
     const main = document.querySelector<HTMLElement>('.main-content');
@@ -147,7 +151,7 @@ export function AppShell({
       <aside className="sidebar">
         <div className="sidebar-brand">
           <h1>{brandTitle}</h1>
-          <small>{brandSubtitle}</small>
+          <small>{sentenceCase(brandSubtitle)}</small>
         </div>
 
         <nav className="sidebar-nav">
@@ -157,7 +161,7 @@ export function AppShell({
         </nav>
 
         <div className="sidebar-footer">
-          {footerContent ?? (clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>Desarrollo local</span>)}
+          {footerContent ?? (clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>{t('shell.footer.localDev')}</span>)}
         </div>
       </aside>
 
@@ -167,9 +171,11 @@ export function AppShell({
 }
 
 function NavSection({ label, items }: AppShellNavSection) {
+  const { sentenceCase } = useI18n();
+
   return (
     <>
-      <div className="sidebar-section-label">{label}</div>
+      <div className="sidebar-section-label">{sentenceCase(label)}</div>
       {items.map((item) => (
         <NavLink
           key={item.to}
@@ -178,7 +184,7 @@ function NavSection({ label, items }: AppShellNavSection) {
           className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
         >
           {item.icon}
-          <span>{item.label}</span>
+          <span>{sentenceCase(item.label)}</span>
         </NavLink>
       ))}
     </>

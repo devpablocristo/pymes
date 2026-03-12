@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { clerkEnabled, clerkPublishableKey } from '@pymes/ts-pkg/auth';
 import { App } from './app/App';
+import { LanguageProvider } from './lib/i18n';
 import { applyTheme } from './lib/theme';
 import './styles.css';
 
@@ -15,9 +16,11 @@ const queryClient = new QueryClient();
 const app = (
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <App />
-      </BrowserRouter>
+      <LanguageProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <App />
+        </BrowserRouter>
+      </LanguageProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

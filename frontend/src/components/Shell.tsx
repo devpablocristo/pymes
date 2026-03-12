@@ -1,205 +1,169 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { AppShell, type AppShellNavSection } from '../shared/frontendShell';
+import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
 import { moduleGroups, moduleList } from '../lib/moduleCatalog';
+import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { vocab } from '../lib/vocabulary';
 import { getTheme, toggleTheme } from '../lib/theme';
+import { LanguageSelector } from './LanguageSelector';
 
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
 }
 
-const mainNav = [
-  {
-    to: '/',
-    label: 'Dashboard',
-    end: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    to: '/admin',
-    label: 'Administracion',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/billing',
-    label: 'Facturacion',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="4" width="22" height="16" rx="2" />
-        <line x1="1" y1="10" x2="23" y2="10" />
-      </svg>
-    ),
-  },
-];
+const dashboardIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
 
-const professionalsNav = [
-  {
-    to: '/professionals/teachers',
-    label: 'Teachers',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-  {
-    to: '/professionals/teachers/specialties',
-    label: 'Teachers · Especialidades',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-      </svg>
-    ),
-  },
-  {
-    to: '/professionals/teachers/intakes',
-    label: 'Teachers · Ingresos',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
-      </svg>
-    ),
-  },
-  {
-    to: '/professionals/teachers/sessions',
-    label: 'Teachers · Sesiones',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-    ),
-  },
-  {
-    to: '/professionals/teachers/public',
-    label: 'Teachers · Vista pública',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="2" y1="12" x2="22" y2="12" />
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-      </svg>
-    ),
-  },
-];
+const adminIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+  </svg>
+);
 
-const workshopsNav = [
-  {
-    to: '/workshops/auto-repair/vehicles',
-    label: 'Auto repair · Vehiculos',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 17h14" />
-        <path d="M6 17l-1 3" />
-        <path d="M18 17l1 3" />
-        <path d="M5 17V9l2-4h10l2 4v8" />
-        <circle cx="7.5" cy="17.5" r="1.5" />
-        <circle cx="16.5" cy="17.5" r="1.5" />
-      </svg>
-    ),
-  },
-  {
-    to: '/workshops/auto-repair/services',
-    label: 'Auto repair · Servicios',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14.7 6.3a4 4 0 1 0-5.4 5.9L3 18.5V21h2.5l6.3-6.3a4 4 0 0 0 5.9-5.4L21 6l-3-3-3.3 3.3z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/workshops/auto-repair/orders',
-    label: 'Auto repair · Ordenes',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="8" y1="13" x2="16" y2="13" />
-        <line x1="8" y1="17" x2="14" y2="17" />
-      </svg>
-    ),
-  },
-];
+const billingIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="4" width="22" height="16" rx="2" />
+    <line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
 
-const settingsNav = [
-  {
-    to: '/settings/keys',
-    label: 'Claves API',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-      </svg>
-    ),
-  },
-  {
-    to: '/settings/notifications',
-    label: 'Notificaciones',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    ),
-  },
-  {
-    to: '/settings',
-    label: 'Perfil',
-    end: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    ),
-  },
-];
+const teachersIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+const specialtiesIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+  </svg>
+);
+
+const documentIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+const clockIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+const globeIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+const carIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 17h14" />
+    <path d="M6 17l-1 3" />
+    <path d="M18 17l1 3" />
+    <path d="M5 17V9l2-4h10l2 4v8" />
+    <circle cx="7.5" cy="17.5" r="1.5" />
+    <circle cx="16.5" cy="17.5" r="1.5" />
+  </svg>
+);
+
+const wrenchIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.7 6.3a4 4 0 1 0-5.4 5.9L3 18.5V21h2.5l6.3-6.3a4 4 0 0 0 5.9-5.4L21 6l-3-3-3.3 3.3z" />
+  </svg>
+);
+
+const keyIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+  </svg>
+);
+
+const bellIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+const profileIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
 
 export function Shell({ children }: { children: ReactNode }) {
+  const { t, localizeUiText, sentenceCase } = useI18n();
+  const [theme, setThemeState] = useState(getTheme);
+
+  const mainNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
+    { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
+    { to: '/billing', label: t('shell.nav.billing'), icon: billingIcon },
+  ], [t]);
+
+  const professionalsNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/professionals/teachers', label: t('shell.nav.teachers'), icon: teachersIcon },
+    { to: '/professionals/teachers/specialties', label: t('shell.nav.teachersSpecialties'), icon: specialtiesIcon },
+    { to: '/professionals/teachers/intakes', label: t('shell.nav.teachersIntakes'), icon: documentIcon },
+    { to: '/professionals/teachers/sessions', label: t('shell.nav.teachersSessions'), icon: clockIcon },
+    { to: '/professionals/teachers/public', label: t('shell.nav.teachersPublic'), icon: globeIcon },
+  ], [t]);
+
+  const workshopsNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/workshops/auto-repair/vehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
+    { to: '/workshops/auto-repair/services', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
+    { to: '/workshops/auto-repair/orders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+  ], [t]);
+
+  const settingsNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
+    { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
+    { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
+  ], [t]);
+
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
 
     const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
-      label: group.label,
+      label: localizeUiText(group.label),
       items: moduleList
         .filter((module) => module.group === group.id && visibleIds.has(module.id))
-        .sort((left, right) => left.navLabel.localeCompare(right.navLabel))
+        .sort((left, right) => localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))))
         .map((module) => ({
           to: `/modules/${module.id}`,
-          label: vocab(module.navLabel),
+          label: localizeUiText(vocab(module.navLabel)),
           icon: <Glyph label={module.icon} />,
         })),
     })).filter((section) => section.items.length > 0);
 
     return [
-      { label: 'Base', items: mainNav },
-      { label: 'Profesionales', items: professionalsNav },
-      { label: 'Talleres', items: workshopsNav },
+      { label: sentenceCase(t('shell.sections.base')), items: mainNav },
+      { label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav },
+      { label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav },
       ...moduleNav,
-      { label: 'Configuración', items: settingsNav },
+      { label: sentenceCase(t('shell.sections.settings')), items: settingsNav },
     ] as AppShellNavSection[];
-  }, []);
-
-  const [theme, setThemeState] = useState(getTheme);
+  }, [localizeUiText, mainNav, professionalsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
   function handleToggleTheme() {
     const next = toggleTheme();
@@ -207,7 +171,12 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   const themeToggle = (
-    <button type="button" className="theme-toggle" onClick={handleToggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={handleToggleTheme}
+      title={theme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
+    >
       {theme === 'dark' ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
           <circle cx="12" cy="12" r="5" />
@@ -224,8 +193,20 @@ export function Shell({ children }: { children: ReactNode }) {
     </button>
   );
 
+  const footerControls = (
+    <div className="sidebar-footer-controls">
+      <LanguageSelector />
+      {themeToggle}
+    </div>
+  );
+
   return (
-    <AppShell brandTitle="Pymes SaaS" brandSubtitle="Panel de gestión" sections={sections} footerContent={themeToggle}>
+    <AppShell
+      brandTitle="Pymes SaaS"
+      brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
+      sections={sections}
+      footerContent={footerControls}
+    >
       {children}
     </AppShell>
   );

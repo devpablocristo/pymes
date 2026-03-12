@@ -13,6 +13,7 @@ import {
   type ModuleField,
   type ModuleRuntimeContext,
 } from '../lib/moduleCatalog';
+import { useI18n } from '../lib/i18n';
 import { vocab } from '../lib/vocabulary';
 
 function currentRuntimeContext(): ModuleRuntimeContext {
@@ -177,6 +178,7 @@ type EndpointCardProps = {
 };
 
 function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const fields = definition.fields ?? [];
   const runtimeKey = `${runtime.orgId}:${runtime.today}:${runtime.monthStart}`;
   const defId = definition.id ?? definition.path;
@@ -193,7 +195,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
   async function execute(currentValues: Record<string, string>): Promise<void> {
     const missing = missingRequiredFields(fields, currentValues);
     if (missing.length > 0) {
-      setError(`Completa: ${missing.join(', ')}`);
+      setError(t('module.validation.complete', { fields: missing.map((field) => localizeText(field)).join(', ') }));
       return;
     }
 
@@ -209,7 +211,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
     try {
       if (isAction && action.response === 'download') {
         const filename = await downloadAPIFile(path, { method: action.method });
-        setSuccess(`Archivo descargado: ${filename}`);
+        setSuccess(t('module.success.download', { filename }));
         setResult({ filename, path });
       } else {
         const payload = await apiRequest(path, {
@@ -217,7 +219,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
           body: hasBody ? body : action.sendEmptyBody ? {} : undefined,
         });
         setResult(payload);
-        setSuccess(isAction && action.method !== 'GET' ? 'Operación completada.' : 'Datos actualizados.');
+        setSuccess(isAction && action.method !== 'GET' ? t('module.success.completed') : t('module.success.updated'));
       }
     } catch (err) {
       setError(String(err));
@@ -244,8 +246,8 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
     <section className="card module-card">
       <div className="card-header">
         <div>
-          <h2>{vocab(definition.title)}</h2>
-          <p className="text-secondary">{vocab(definition.description)}</p>
+          <h2>{localizeUiText(vocab(definition.title))}</h2>
+          <p className="text-secondary">{localizeText(vocab(definition.description))}</p>
         </div>
         <span className="badge badge-neutral mono">{definition.path}</span>
       </div>
@@ -255,11 +257,11 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
           <div className="module-fields-grid">
             {fields.map((field) => (
               <div key={field.name} className={`form-group ${field.type === 'textarea' ? 'full-width' : ''}`}>
-                <label>{field.label}</label>
+                <label>{localizeText(field.label)}</label>
                 {field.type === 'textarea' ? (
                   <textarea
                     rows={3}
-                    placeholder={field.placeholder}
+                    placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     value={values[field.name] ?? ''}
                     onChange={(event) =>
                       setValues((current) => ({ ...current, [field.name]: event.target.value }))
@@ -272,17 +274,17 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
                       setValues((current) => ({ ...current, [field.name]: event.target.value }))
                     }
                   >
-                    <option value="">Seleccionar...</option>
+                    <option value="">{t('module.select.placeholder')}</option>
                     {field.options?.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {localizeText(option.label)}
                       </option>
                     ))}
                   </select>
                 ) : (
                   <input
                     type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                    placeholder={field.placeholder}
+                    placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     value={values[field.name] ?? ''}
                     onChange={(event) =>
                       setValues((current) => ({ ...current, [field.name]: event.target.value }))
@@ -296,11 +298,11 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 
         <div className="actions-row module-actions-row">
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Procesando...' : kind === 'dataset' ? 'Actualizar' : ((definition as ModuleAction).submitLabel ?? 'Ejecutar')}
+            {loading ? t('common.status.processing') : kind === 'dataset' ? t('common.actions.update') : sentenceCase(localizeText((definition as ModuleAction).submitLabel ?? t('common.actions.run')))}
           </button>
           {kind === 'dataset' && (
             <button type="button" className="btn-secondary" onClick={() => void execute(values)} disabled={loading}>
-              Refrescar
+              {t('common.actions.refresh')}
             </button>
           )}
         </div>
@@ -314,23 +316,24 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 }
 
 function NotFoundState() {
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   return (
     <>
       <div className="page-header">
-        <h1>Módulo no encontrado</h1>
-        <p>La ruta solicitada no coincide con ningún módulo registrado en el frontend.</p>
+        <h1>{sentenceCase(t('module.notFound.title'))}</h1>
+        <p>{t('module.notFound.description')}</p>
       </div>
       <div className="card">
         <div className="card-header">
-          <h2>Módulos disponibles</h2>
+          <h2>{sentenceCase(t('module.notFound.available'))}</h2>
         </div>
         <div className="module-link-grid">
           {moduleList.map((module) => (
             <Link key={module.id} to={`/modules/${module.id}`} className="module-link-card">
               <span className="sidebar-token">{module.icon}</span>
               <div>
-                <strong>{module.title}</strong>
-                <p>{module.summary}</p>
+                <strong>{localizeUiText(module.title)}</strong>
+                <p>{localizeText(module.summary)}</p>
               </div>
             </Link>
           ))}
@@ -341,6 +344,7 @@ function NotFoundState() {
 }
 
 function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: ModuleRuntimeContext }) {
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const groupLabel =
     moduleGroups.find((group) => group.id === module.group)?.label ?? module.group;
   return (
@@ -349,29 +353,29 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
         <div>
           <div className="module-kicker">
             <span className="sidebar-token">{module.icon}</span>
-            <span className="badge badge-neutral">{module.badge ?? groupLabel}</span>
+            <span className="badge badge-neutral">{localizeUiText(module.badge ?? groupLabel)}</span>
           </div>
-          <h1>{vocab(module.title)}</h1>
-          <p>{vocab(module.summary)}</p>
+          <h1>{localizeUiText(vocab(module.title))}</h1>
+          <p>{localizeText(vocab(module.summary))}</p>
         </div>
         <div className="module-runtime-card">
-          <span>Org activa</span>
-          <strong>{runtime.orgId || 'resolviendo...'}</strong>
-          <small>{(module.datasets?.length ?? 0) + (module.actions?.length ?? 0)} superficies conectadas</small>
+          <span>{t('module.runtime.activeOrg')}</span>
+          <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
+          <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
         </div>
       </div>
 
       <div className="stats-grid compact-grid">
         <div className="stat-card">
-          <div className="stat-label">Datasets</div>
+          <div className="stat-label">{sentenceCase(t('module.stats.datasets'))}</div>
           <div className="stat-value">{module.datasets?.length ?? 0}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Acciones</div>
+          <div className="stat-label">{sentenceCase(t('module.stats.actions'))}</div>
           <div className="stat-value">{module.actions?.length ?? 0}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Ruta base</div>
+          <div className="stat-label">{sentenceCase(t('module.stats.basePath'))}</div>
           <div className="stat-value stat-value-sm mono">/modules/{module.id}</div>
         </div>
       </div>
@@ -379,11 +383,11 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
       {module.notes && module.notes.length > 0 && (
         <div className="card module-notes-card">
           <div className="card-header">
-            <h2>Notas operativas</h2>
+            <h2>{sentenceCase(t('module.notes.title'))}</h2>
           </div>
           <div className="notes-list">
             {module.notes.map((note) => (
-              <p key={note}>{note}</p>
+              <p key={note}>{localizeText(note)}</p>
             ))}
           </div>
         </div>
@@ -393,6 +397,7 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
 }
 
 function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
+  const { t, sentenceCase } = useI18n();
   const module = useMemo(() => moduleCatalog[moduleId], [moduleId]);
   const [runtime, setRuntime] = useState<ModuleRuntimeContext>(() => currentRuntimeContext());
   const [bootstrapError, setBootstrapError] = useState('');
@@ -424,12 +429,12 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   return (
     <>
       <ModuleHeader module={module} runtime={runtime} />
-      {bootstrapError && <div className="alert alert-warning">No se pudo resolver bootstrap: {bootstrapError}</div>}
+      {bootstrapError && <div className="alert alert-warning">{t('module.bootstrap.error', { error: bootstrapError })}</div>}
 
       {module.datasets && module.datasets.length > 0 && (
         <div className="module-section">
           <div className="section-title-row">
-            <h2>Lecturas</h2>
+            <h2>{sentenceCase(t('module.sections.reads'))}</h2>
             <span className="badge badge-neutral">{module.datasets.length}</span>
           </div>
           <div className="module-grid">
@@ -443,7 +448,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
       {module.actions && module.actions.length > 0 && (
         <div className="module-section">
           <div className="section-title-row">
-            <h2>Acciones</h2>
+            <h2>{sentenceCase(t('module.sections.actions'))}</h2>
             <span className="badge badge-neutral">{module.actions.length}</span>
           </div>
           <div className="module-grid">

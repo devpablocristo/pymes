@@ -79,7 +79,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateWorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	vehicleID, err := uuid.Parse(strings.TrimSpace(req.VehicleID))
@@ -143,7 +143,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateWorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	promisedAt, err := sharedhandlers.ParseOptionalRFC3339Ptr(req.PromisedAt)

@@ -1,6 +1,7 @@
 package workshopservices
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -82,7 +83,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Service, actor string) 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Service, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Service{}, err
@@ -93,7 +94,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Ser
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Service, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Service{}, err
@@ -136,7 +137,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Service{}, err

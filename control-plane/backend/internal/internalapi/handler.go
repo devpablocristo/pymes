@@ -160,7 +160,7 @@ func (h *Handler) ResolveAPIKey(c *gin.Context) {
 		APIKey string `json:"api_key" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	key, ok := h.apiKeys.ResolveAPIKey(strings.TrimSpace(req.APIKey))
@@ -202,7 +202,7 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 		Email string `json:"email"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	orgID, err := uuid.Parse(req.OrgID)
@@ -357,7 +357,7 @@ func (h *Handler) CreateAppointment(c *gin.Context) {
 		Metadata      map[string]any `json:"metadata,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	orgID, err := uuid.Parse(req.OrgID)
@@ -446,7 +446,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 		ValidUntil *string `json:"valid_until,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	orgID, err := uuid.Parse(req.OrgID)
@@ -524,7 +524,7 @@ func (h *Handler) CreateSale(c *gin.Context) {
 		Notes string `json:"notes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	orgID, err := uuid.Parse(req.OrgID)

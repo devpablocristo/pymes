@@ -39,7 +39,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 func (h *Handler) Preview(c *gin.Context) {
 	filename, body, err := readUpload(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Preview(c.Request.Context(), c.Param("entity"), filename, body)
@@ -62,7 +62,7 @@ func (h *Handler) Confirm(c *gin.Context) {
 	}
 	var req confirmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -91,12 +91,12 @@ func (h *Handler) Export(c *gin.Context) {
 	}
 	from, err := parseDate(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	to, err := parseDate(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	content, contentType, filename, err := h.uc.Export(c.Request.Context(), c.Param("entity"), orgID, c.Query("format"), from, to)

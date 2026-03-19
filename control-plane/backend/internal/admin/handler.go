@@ -74,7 +74,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 	}
 	var req dto.UpdateTenantSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{

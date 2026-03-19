@@ -60,7 +60,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateRecurringExpenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	payload, err := createRecurringPayload(orgID, req, authCtx.Actor)
@@ -97,7 +97,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateRecurringExpenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	payload, err := updateRecurringPayload(orgID, id, req)

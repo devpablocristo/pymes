@@ -71,7 +71,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateAppointmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	payload, err := createPayload(orgID, req, authCtx.Actor)
@@ -114,7 +114,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateAppointmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	payload, err := updatePayload(orgID, id, req)

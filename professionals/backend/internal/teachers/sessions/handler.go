@@ -112,7 +112,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	appointmentID, err := uuid.Parse(req.AppointmentID)
@@ -200,7 +200,7 @@ func (h *Handler) CreateNote(c *gin.Context) {
 	}
 	var req dto.CreateSessionNoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.CreateNote(c.Request.Context(), orgID, sessionID, req.NoteType, req.Title, req.Body, a.Actor)

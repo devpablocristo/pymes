@@ -96,7 +96,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateCustomerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), customerdomain.Customer{
@@ -157,7 +157,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateCustomerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	var addr *customerdomain.Address

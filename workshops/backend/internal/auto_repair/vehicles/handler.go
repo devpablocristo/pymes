@@ -77,7 +77,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateVehicleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Vehicle{
@@ -120,7 +120,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateVehicleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{

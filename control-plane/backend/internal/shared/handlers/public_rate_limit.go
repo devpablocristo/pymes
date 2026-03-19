@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const maxRateLimitKeys = 50_000
+
 type publicRateLimiter struct {
 	mu    sync.Mutex
 	hits  map[string][]time.Time
@@ -24,6 +26,8 @@ func NewPublicRateLimit(limit int) gin.HandlerFunc {
 		hits:  make(map[string][]time.Time),
 		limit: limit,
 	}
+	// Goroutine de limpieza periodica para evitar memory leak.
+	go limiter.evictLoop()
 
 	return func(c *gin.Context) {
 		key := clientIP(c)
@@ -50,6 +54,31 @@ func NewPublicRateLimit(limit int) gin.HandlerFunc {
 		filtered = append(filtered, now)
 		limiter.hits[key] = filtered
 		c.Next()
+	}
+}
+
+func (l *publicRateLimiter) evictLoop() {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		l.mu.Lock()
+		now := time.Now().UTC()
+		windowStart := now.Add(-1 * time.Minute)
+		for key, history := range l.hits {
+			if len(history) == 0 || history[len(history)-1].Before(windowStart) {
+				delete(l.hits, key)
+			}
+		}
+		// Hard cap para proteger contra IP rotation attacks.
+		if len(l.hits) > maxRateLimitKeys {
+			for key := range l.hits {
+				delete(l.hits, key)
+				if len(l.hits) <= maxRateLimitKeys/2 {
+					break
+				}
+			}
+		}
+		l.mu.Unlock()
 	}
 }
 

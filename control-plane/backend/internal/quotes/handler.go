@@ -2,7 +2,9 @@ package quotes
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,7 +125,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	var req dto.CreateQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	customerID, err := parseOptionalUUID(req.CustomerID)
@@ -138,7 +140,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	items, err := parseItemInputs(req.Items)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -193,7 +195,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 	var req dto.UpdateQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -219,7 +221,7 @@ func (h *Handler) Update(c *gin.Context) {
 	if req.Items != nil {
 		parsed, err := parseItemInputs(*req.Items)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 			return
 		}
 		items = &parsed
@@ -316,8 +318,8 @@ func (h *Handler) ToSale(c *gin.Context) {
 		return
 	}
 	var req dto.ToSaleRequest
-	if err := c.ShouldBindJSON(&req); err != nil && !strings.Contains(strings.ToLower(err.Error()), "eof") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	saleOut, err := h.uc.ToSale(c.Request.Context(), orgID, quoteID, req.PaymentMethod, req.Notes, a.Actor)

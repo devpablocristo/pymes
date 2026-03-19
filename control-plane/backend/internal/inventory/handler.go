@@ -104,7 +104,7 @@ func (h *Handler) Adjust(c *gin.Context) {
 	}
 	var req dto.AdjustStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.AdjustManual(c.Request.Context(), orgID, productID, req.Quantity, req.MinQuantity, req.Notes, a.Actor)

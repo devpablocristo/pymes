@@ -31,7 +31,7 @@ func (h *Handler) Run(c *gin.Context) {
 	}
 	result, err := h.uc.Run(c.Request.Context(), c.DefaultQuery("task", "all"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	c.JSON(http.StatusOK, result)

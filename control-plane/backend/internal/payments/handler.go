@@ -51,7 +51,7 @@ func (h *Handler) CreateSalePayment(c *gin.Context) {
 	}
 	var req dto.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	receivedAt := time.Now().UTC()

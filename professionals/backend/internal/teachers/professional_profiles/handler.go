@@ -80,7 +80,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	partyID, err := uuid.Parse(req.PartyID)
@@ -135,7 +135,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{

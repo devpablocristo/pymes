@@ -131,7 +131,7 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 
 	var req bookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 

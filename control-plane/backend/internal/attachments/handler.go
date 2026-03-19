@@ -53,7 +53,7 @@ func (h *Handler) RequestUpload(c *gin.Context) {
 		SizeBytes   int64  `json:"size_bytes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))
@@ -96,7 +96,7 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 		StorageKey  string `json:"storage_key" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))

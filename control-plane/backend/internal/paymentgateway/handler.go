@@ -343,24 +343,24 @@ func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkRe
 func handleGatewayError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrPlanRestricted):
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
 	case errors.Is(err, ErrPlanMonthlyLimitReached):
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 	case errors.Is(err, ErrGatewayNotConnected):
 		c.JSON(http.StatusPreconditionFailed, gin.H{"error": "mercadopago no conectado"})
 	case errors.Is(err, ErrInvalidOAuthState):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 	case errors.Is(err, ErrInvalidWebhookSignature):
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 	case errors.Is(err, ErrBankAliasMissing):
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable request"})
 	case errors.Is(err, ErrUnsupportedProvider):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 	case errors.Is(err, ErrInvalidReference):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 	case errors.Is(err, ErrNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 	}
 }

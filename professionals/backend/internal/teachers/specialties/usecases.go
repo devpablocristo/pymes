@@ -1,6 +1,7 @@
 package specialties
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -70,7 +71,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Specialty, actor string
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Specialty, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Specialty{}, err
@@ -88,7 +89,7 @@ type UpdateInput struct {
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Specialty{}, err
@@ -126,7 +127,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Specialty{}, err
@@ -139,7 +140,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 
 func (u *Usecases) AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error {
 	if _, err := u.repo.GetByID(ctx, orgID, specialtyID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
 		return err

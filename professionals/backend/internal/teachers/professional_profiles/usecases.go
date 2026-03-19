@@ -1,6 +1,7 @@
 package professional_profiles
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -75,7 +76,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.ProfessionalProfile, ac
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.ProfessionalProfile{}, err
@@ -86,7 +87,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Pro
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.ProfessionalProfile, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.ProfessionalProfile{}, err
@@ -126,7 +127,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.ProfessionalProfile{}, err
@@ -145,7 +146,7 @@ func (u *Usecases) ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.Pr
 func (u *Usecases) GetBySlug(ctx context.Context, orgID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
 	out, err := u.repo.GetBySlug(ctx, orgID, slug)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProfessionalProfile{}, fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.ProfessionalProfile{}, err

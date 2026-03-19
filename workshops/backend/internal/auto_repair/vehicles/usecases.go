@@ -1,6 +1,7 @@
 package vehicles
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -83,7 +84,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Vehicle, actor string) 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Vehicle, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Vehicle{}, fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Vehicle{}, err
@@ -94,7 +95,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Veh
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Vehicle, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Vehicle{}, fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Vehicle{}, err
@@ -137,7 +138,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Vehicle{}, fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Vehicle{}, err

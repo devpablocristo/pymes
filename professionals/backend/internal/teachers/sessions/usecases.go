@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -75,7 +76,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Session{}, err
@@ -86,7 +87,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Ses
 func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Session, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Session{}, err
@@ -116,7 +117,7 @@ func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor stri
 
 func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error) {
 	if _, err := u.repo.GetByID(ctx, orgID, sessionID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.SessionNote{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.SessionNote{}, err

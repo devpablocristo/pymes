@@ -2,6 +2,7 @@
 package dashboard
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -114,7 +115,7 @@ func (r *Repository) GetUserLayout(ctx context.Context, actor, contextKey string
 		Where("user_actor = ? AND context = ?", actor, contextKey).
 		Take(&row).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dashboarddomain.UserLayout{}, false, nil
 		}
 		return dashboarddomain.UserLayout{}, false, err
@@ -180,7 +181,7 @@ func (r *Repository) ResolveUserID(ctx context.Context, actor string) (*uuid.UUI
 	}
 	err := r.db.WithContext(ctx).Table("users").Select("id").Where("external_id = ? AND deleted_at IS NULL", actor).Take(&row).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -323,7 +324,7 @@ func (r *Repository) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (da
 		UpdatedAt  time.Time `gorm:"column:updated_at"`
 	}
 	if err := r.db.WithContext(ctx).Table("tenant_settings").Where("org_id = ?", orgID).Take(&row).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dashboarddomain.BillingStatusData{PlanCode: "starter", Status: "trialing", HardLimits: map[string]any{}}, nil
 		}
 		return dashboarddomain.BillingStatusData{}, err

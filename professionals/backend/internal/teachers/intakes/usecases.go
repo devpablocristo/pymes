@@ -1,6 +1,7 @@
 package intakes
 
 import (
+	"errors"
 	"context"
 	"fmt"
 
@@ -62,7 +63,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Intake, actor string) (
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Intake{}, err
@@ -80,7 +81,7 @@ type UpdateInput struct {
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Intake{}, err
@@ -105,7 +106,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Intake{}, err
@@ -119,7 +120,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Intake, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, fmt.Errorf("intake not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Intake{}, err

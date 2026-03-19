@@ -88,7 +88,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreatePartyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), fromCreateRequest(orgID, req), actor)
@@ -129,7 +129,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdatePartyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, fromUpdateRequest(orgID, id, req), actor)
@@ -169,7 +169,7 @@ func (h *Handler) AddRole(c *gin.Context) {
 	}
 	var req dto.PartyRoleInput
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	var priceListID *uuid.UUID
@@ -236,7 +236,7 @@ func (h *Handler) CreateRelationship(c *gin.Context) {
 	}
 	var req dto.RelationshipInput
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	toPartyID, err := uuid.Parse(req.ToPartyID)

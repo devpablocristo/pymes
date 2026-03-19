@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"sort"
@@ -75,7 +76,7 @@ func (u *Usecases) GetRole(ctx context.Context, orgID, roleID string) (rbacdomai
 	}
 	out, err := u.repo.GetRole(orgUUID, roleUUID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		return rbacdomain.Role{}, err
@@ -126,7 +127,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 
 	system, err := u.repo.IsSystemRole(orgUUID, roleUUID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		return rbacdomain.Role{}, err
@@ -137,7 +138,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 
 	current, err := u.repo.GetRole(orgUUID, roleUUID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		return rbacdomain.Role{}, err
@@ -154,7 +155,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 
 	updated, err := u.repo.UpdateRole(current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
@@ -176,7 +177,7 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 	}
 	system, err := u.repo.IsSystemRole(orgUUID, roleUUID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		return err
@@ -185,7 +186,7 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 		return fmt.Errorf("system roles cannot be deleted: %w", httperrors.ErrForbidden)
 	}
 	if err := u.repo.DeleteRole(orgUUID, roleUUID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
 		return err
@@ -206,12 +207,12 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return err
 	}
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 	}
 	if !system {
 		if _, err := u.repo.GetRole(orgUUID, roleUUID); err != nil {
-			if err == gorm.ErrRecordNotFound {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 			}
 			return err
@@ -219,7 +220,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 	}
 
 	if err := u.repo.AssignRole(orgUUID, roleUUID, userUUID, actor); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("user or role not found in org: %w", httperrors.ErrNotFound)
 		}
 		return err
@@ -237,7 +238,7 @@ func (u *Usecases) RemoveRole(ctx context.Context, orgID, roleID, userID, actor 
 		return err
 	}
 	if err := u.repo.RemoveRole(orgUUID, roleUUID, userUUID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role assignment not found: %w", httperrors.ErrNotFound)
 		}
 		return err

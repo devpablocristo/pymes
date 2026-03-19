@@ -44,7 +44,7 @@ func (h *Handler) UpdatePreference(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	var req dto.UpdatePreferenceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	pref, err := h.uc.UpdatePreferenceByActor(c.Request.Context(), authCtx.Actor, req.NotificationType, req.Channel, req.Enabled)

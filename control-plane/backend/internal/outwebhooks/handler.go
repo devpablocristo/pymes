@@ -60,7 +60,7 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 	}
 	var req endpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -92,7 +92,7 @@ func (h *Handler) UpdateEndpoint(c *gin.Context) {
 	}
 	var req endpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	current, err := h.uc.GetEndpoint(c.Request.Context(), orgID, id)

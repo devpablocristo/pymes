@@ -114,7 +114,7 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	if payload == nil {

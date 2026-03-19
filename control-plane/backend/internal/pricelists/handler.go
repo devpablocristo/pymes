@@ -57,7 +57,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreatePriceListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), requestToDomain(orgID, req))
@@ -88,7 +88,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.CreatePriceListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	payload := requestToDomain(orgID, req)

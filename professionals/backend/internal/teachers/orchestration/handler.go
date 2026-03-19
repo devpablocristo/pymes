@@ -86,7 +86,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 func bindJSONMap(c *gin.Context) (map[string]any, bool) {
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return nil, false
 	}
 	if payload == nil {

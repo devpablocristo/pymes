@@ -71,7 +71,7 @@ func (h *Handler) Save(c *gin.Context) {
 	}
 	var req saveDashboardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Save(c.Request.Context(), dashboarddomain.SaveDashboardInput{

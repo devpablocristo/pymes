@@ -1,6 +1,7 @@
 package dataio
 
 import (
+	"errors"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -239,7 +240,7 @@ func (r *Repository) findPartyByRole(ctx context.Context, tx *gorm.DB, orgID uui
 	}
 	var id uuid.UUID
 	if err := query.Take(&id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -261,7 +262,7 @@ func (r *Repository) findProduct(ctx context.Context, tx *gorm.DB, orgID uuid.UU
 	}
 	var id uuid.UUID
 	if err := q.Take(&id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

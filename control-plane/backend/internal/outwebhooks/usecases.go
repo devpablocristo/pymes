@@ -1,6 +1,7 @@
 package outwebhooks
 
 import (
+	"errors"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -105,7 +106,7 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	}
 	current, err := u.repo.GetEndpoint(ctx, in.OrgID, in.ID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return webhookdomain.Endpoint{}, apperror.NewNotFound("webhook_endpoint", in.ID.String())
 		}
 		return webhookdomain.Endpoint{}, err
@@ -124,7 +125,7 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 
 func (u *Usecases) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error {
 	if err := u.repo.DeleteEndpoint(ctx, orgID, id); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.NewNotFound("webhook_endpoint", id.String())
 		}
 		return err
@@ -157,7 +158,7 @@ func (u *Usecases) SendTest(ctx context.Context, orgID, endpointID uuid.UUID, ac
 func (u *Usecases) ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) error {
 	delivery, err := u.repo.GetDelivery(ctx, deliveryID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.NewNotFound("webhook_delivery", deliveryID.String())
 		}
 		return err

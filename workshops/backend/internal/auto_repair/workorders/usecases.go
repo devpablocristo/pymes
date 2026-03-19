@@ -1,6 +1,7 @@
 package workorders
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"strings"
@@ -101,7 +102,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.WorkOrder{}, err
@@ -112,7 +113,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Wor
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.WorkOrder{}, err
@@ -174,7 +175,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.WorkOrder{}, err
@@ -188,7 +189,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error) {
 	out, err := u.repo.SaveIntegrations(ctx, orgID, id, quoteID, saleID, status)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.WorkOrder{}, err

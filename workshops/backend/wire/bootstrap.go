@@ -69,7 +69,7 @@ func InitializeApp() *app.App {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 		defer cancel()
 		if err := store.Ping(ctx, db); err != nil {
-			c.JSON(503, gin.H{"status": "not_ready", "error": err.Error()})
+			c.JSON(503, gin.H{"status": "not_ready", "error": "database unreachable"})
 			return
 		}
 		c.JSON(200, gin.H{"status": "ready"})

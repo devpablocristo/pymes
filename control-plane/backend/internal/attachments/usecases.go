@@ -1,6 +1,7 @@
 package attachments
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"io"
@@ -87,7 +88,7 @@ func (u *Usecases) UploadContent(ctx context.Context, storageKey string, body io
 func (u *Usecases) GetDownloadLink(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, attachmentdomain.DownloadLink, error) {
 	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, apperror.NewNotFound("attachment", id.String())
 		}
 		return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, err
@@ -111,7 +112,7 @@ func (u *Usecases) OpenContent(ctx context.Context, orgID, id uuid.UUID) (attach
 func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.NewNotFound("attachment", id.String())
 		}
 		return err

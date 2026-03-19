@@ -55,7 +55,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 	}
 	var req dto.CreateExchangeRateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	rateDate := time.Now().UTC()

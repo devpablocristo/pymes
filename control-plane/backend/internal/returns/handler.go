@@ -54,7 +54,7 @@ func (h *Handler) Create(c *gin.Context) {
 		} `json:"items" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -167,7 +167,7 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 		Amount       float64 `json:"amount"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	creditNoteID, err := uuid.Parse(strings.TrimSpace(req.CreditNoteID))

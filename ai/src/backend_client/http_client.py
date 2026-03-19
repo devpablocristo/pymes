@@ -34,11 +34,11 @@ class HTTPBackendClient:
 
         if auth.authorization:
             headers["Authorization"] = auth.authorization
-        if auth.api_key:
-            headers["X-API-KEY"] = auth.api_key
-            scopes = auth.api_scopes or ",".join(auth.scopes)
-            if scopes:
-                headers["X-Scopes"] = scopes
+        elif auth.api_scopes:
+            # Auth via API key: propagar scopes al backend via internal token.
+            headers["X-Scopes"] = auth.api_scopes
+        if auth.org_id:
+            headers["X-Org-ID"] = auth.org_id
         return headers
 
     async def request(

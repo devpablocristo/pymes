@@ -11,7 +11,7 @@ import (
 func NewInternalServiceAuth(token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.TrimSpace(token) == "" {
-			c.Next()
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "internal service auth not configured"})
 			return
 		}
 

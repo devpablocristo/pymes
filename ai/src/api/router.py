@@ -172,7 +172,7 @@ async def chat_internal(
                     yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
         except Exception as exc:  # noqa: BLE001
             logger.exception("chat_internal_failed", org_id=auth.org_id, user_id=auth.actor, error=str(exc))
-            yield to_sse_event("error", {"message": str(exc)})
+            yield to_sse_event("error", {"message": "error processing request"})
 
         assistant_text = "".join(assistant_parts).strip()
         if not assistant_text:

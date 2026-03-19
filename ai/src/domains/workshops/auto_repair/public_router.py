@@ -77,7 +77,7 @@ async def chat_auto_repair_public(
                     yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
         except Exception as exc:  # noqa: BLE001
             logger.exception("auto_repair_public_chat_failed", org_slug=org_slug, error=str(exc))
-            yield to_sse_event("error", {"message": str(exc)})
+            yield to_sse_event("error", {"message": "error processing request"})
 
         assistant_text = "".join(assistant_parts).strip() or "No pude generar una respuesta en este momento."
         tokens_out = estimate_tokens(assistant_text)

@@ -96,7 +96,7 @@ async def chat_external(
                     yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
         except Exception as exc:  # noqa: BLE001
             logger.exception("chat_external_failed", org_id=org_id, external_contact=external_contact, error=str(exc))
-            yield to_sse_event("error", {"message": str(exc)})
+            yield to_sse_event("error", {"message": "error processing request"})
 
         assistant_text = "".join(assistant_parts).strip()
         if not assistant_text:

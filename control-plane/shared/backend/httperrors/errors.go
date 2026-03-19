@@ -2,6 +2,7 @@ package httperrors
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -39,14 +40,15 @@ func Respond(c *gin.Context, err error) {
 	}
 	switch {
 	case errors.Is(err, ErrNotFound):
-		c.JSON(http.StatusNotFound, ErrorResponse{Code: "not_found", Message: err.Error()})
+		c.JSON(http.StatusNotFound, ErrorResponse{Code: "not_found", Message: "resource not found"})
 	case errors.Is(err, ErrConflict):
-		c.JSON(http.StatusConflict, ErrorResponse{Code: "conflict", Message: err.Error()})
+		c.JSON(http.StatusConflict, ErrorResponse{Code: "conflict", Message: "resource conflict"})
 	case errors.Is(err, ErrForbidden):
-		c.JSON(http.StatusForbidden, ErrorResponse{Code: "forbidden", Message: err.Error()})
+		c.JSON(http.StatusForbidden, ErrorResponse{Code: "forbidden", Message: "access denied"})
 	case errors.Is(err, ErrNotDraft):
-		c.JSON(http.StatusConflict, ErrorResponse{Code: "not_draft", Message: err.Error()})
+		c.JSON(http.StatusConflict, ErrorResponse{Code: "not_draft", Message: "resource is not in draft status"})
 	default:
-		c.JSON(http.StatusBadRequest, ErrorResponse{Code: "bad_input", Message: err.Error()})
+		slog.Error("unhandled error in http response", "error", err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Code: "internal_error", Message: "unexpected error"})
 	}
 }

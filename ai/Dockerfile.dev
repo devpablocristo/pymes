@@ -4,7 +4,7 @@ WORKDIR /workspace/ai
 
 COPY ai/requirements.txt ./
 COPY control-plane/shared/ai /workspace/control-plane/shared/ai
-COPY pkgs/py-pkg /workspace/pkgs/py-pkg
+# ai-core se monta como volumen en docker-compose para desarrollo
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ai/src/ ./src/

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pushd /home/pablo/Projects/Pablo/pymes)",
+      "Bash(popd)",
+      "Bash(mkdir -p /home/pablo/Projects/Pablo/ai-core/src/ai_core)",
+      "Read(//home/pablo/Projects/Pablo/**)"
+    ],
+    "additionalDirectories": [
+      "/home/pablo/Projects/Pablo/saas-core/users",
+      "/home/pablo/Projects/Pablo/saas-core/identity"
+    ]
+  }
+}

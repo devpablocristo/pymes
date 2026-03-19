@@ -75,7 +75,7 @@ services:
     volumes:
       - ./ai/src:/workspace/ai/src
       - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
-      - ./pkgs/py-pkg:/workspace/pkgs/py-pkg
+      - ../ai-core:/workspace/ai-core
     env_file:
       - .env
     environment:

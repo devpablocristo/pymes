@@ -7,6 +7,9 @@ name = "pymes-control-plane-shared"
 version = "0.0.0"
 description = "Codigo transversal compartido del producto pymes"
 requires-python = ">=3.12"
+dependencies = [
+    "ai-core",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

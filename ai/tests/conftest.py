@@ -10,7 +10,7 @@ AI_ROOT = TESTS_DIR.parent
 for path in (
     AI_ROOT,
     AI_ROOT / "../control-plane/shared/ai/src",
-    AI_ROOT / "../pkgs/py-pkg/src",
+    AI_ROOT / "../../ai-core/src",
 ):
     resolved = path.resolve()
     if str(resolved) not in sys.path:

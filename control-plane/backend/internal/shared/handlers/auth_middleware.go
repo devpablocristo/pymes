@@ -1,15 +1,28 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
 	"github.com/devpablocristo/pymes/pkgs/go-pkg/types"
 )
+
+// JWTPrincipal is the minimal claim set resolved from a bearer token.
+type JWTPrincipal struct {
+	OrgID  string
+	Actor  string
+	Role   string
+	Scopes []string
+}
+
+// JWTResolver resolves a bearer JWT to principal claims (optional; may be nil).
+type JWTResolver interface {
+	ResolvePrincipal(ctx context.Context, token string) (JWTPrincipal, error)
+}
 
 type APIKeyResolver interface {
 	ResolveAPIKey(raw string) (ResolvedKey, bool)
@@ -22,15 +35,15 @@ type ResolvedKey struct {
 }
 
 type AuthMiddleware struct {
-	identity      *identity.Usecases
+	identity      JWTResolver
 	keyResolver   APIKeyResolver
 	authEnableJWT bool
 	authAllowKey  bool
 }
 
-func NewAuthMiddleware(identityUC *identity.Usecases, keyResolver APIKeyResolver, authEnableJWT, authAllowKey bool) *AuthMiddleware {
+func NewAuthMiddleware(identity JWTResolver, keyResolver APIKeyResolver, authEnableJWT, authAllowKey bool) *AuthMiddleware {
 	return &AuthMiddleware{
-		identity:      identityUC,
+		identity:      identity,
 		keyResolver:   keyResolver,
 		authEnableJWT: authEnableJWT,
 		authAllowKey:  authAllowKey,
@@ -39,7 +52,7 @@ func NewAuthMiddleware(identityUC *identity.Usecases, keyResolver APIKeyResolver
 
 func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if m.authEnableJWT {
+		if m.authEnableJWT && m.identity != nil {
 			header := strings.TrimSpace(c.GetHeader("Authorization"))
 			if strings.HasPrefix(strings.ToLower(header), "bearer ") {
 				token := strings.TrimSpace(header[len("Bearer "):])

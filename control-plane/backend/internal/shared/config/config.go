@@ -12,6 +12,11 @@ type Config struct {
 	DatabaseURL                 string
 	JWKSURL                     string
 	JWTIssuer                   string
+	JWTAudience                 string
+	JWTOrgClaim                 string
+	JWTRoleClaim                string
+	JWTScopesClaim              string
+	JWTActorClaim               string
 	AuthEnableJWT               bool
 	AuthAllowAPIKey             bool
 	ClerkWebhookSecret          string
@@ -53,6 +58,11 @@ func LoadFromEnv() Config {
 		DatabaseURL:                 getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
 		JWKSURL:                     os.Getenv("JWKS_URL"),
 		JWTIssuer:                   os.Getenv("JWT_ISSUER"),
+		JWTAudience:                 os.Getenv("JWT_AUDIENCE"),
+		JWTOrgClaim:                 os.Getenv("JWT_ORG_CLAIM"),
+		JWTRoleClaim:                os.Getenv("JWT_ROLE_CLAIM"),
+		JWTScopesClaim:              os.Getenv("JWT_SCOPES_CLAIM"),
+		JWTActorClaim:               os.Getenv("JWT_ACTOR_CLAIM"),
 		AuthEnableJWT:               getEnvBool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:             getEnvBool("AUTH_ALLOW_API_KEY", true),
 		ClerkWebhookSecret:          os.Getenv("CLERK_WEBHOOK_SECRET"),

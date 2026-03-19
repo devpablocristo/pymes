@@ -3,6 +3,7 @@ package wire
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"time"
 
@@ -15,20 +16,14 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/appointments"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/audit"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/billing"
-	billingdomain "github.com/devpablocristo/pymes/control-plane/backend/internal/billing/usecases/domain"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/cashflow"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/clerkwebhook"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/currency"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/customers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/dataio"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/identity/executor/jwks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/notifications"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/org"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/outwebhooks"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/party"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/paymentgateway"
@@ -50,7 +45,6 @@ import (
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/timeline"
-	"github.com/devpablocristo/pymes/control-plane/backend/internal/users"
 	"github.com/devpablocristo/pymes/control-plane/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/control-plane/backend/migrations"
 	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
@@ -70,15 +64,32 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	identityUC := buildIdentityUsecases(cfg, logger)
+	saasSvc, err := SetupSaaS(db, SaaSConfig{
+		StripeSecretKey:         cfg.StripeSecretKey,
+		StripeWebhookSecret:     cfg.StripeWebhookSecret,
+		StripePriceStarter:      cfg.StripePriceStarter,
+		StripePriceGrowth:       cfg.StripePriceGrowth,
+		StripePriceEnterprise:   cfg.StripePriceEnterprise,
+		FrontendURL:             cfg.FrontendURL,
+		ClerkWebhookSecret:      cfg.ClerkWebhookSecret,
+		JWKSURL:                 cfg.JWKSURL,
+		JWTIssuer:               cfg.JWTIssuer,
+		JWTAudience:             cfg.JWTAudience,
+		JWTOrgClaim:             cfg.JWTOrgClaim,
+		JWTRoleClaim:            cfg.JWTRoleClaim,
+		JWTScopesClaim:          cfg.JWTScopesClaim,
+		JWTActorClaim:           cfg.JWTActorClaim,
+		AuthEnableJWT:           cfg.AuthEnableJWT,
+		AuthAllowAPIKey:         cfg.AuthAllowAPIKey,
+	}, slog.Default())
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to initialize saas-core")
+	}
 
 	auditRepo := audit.NewRepository(db)
-	orgRepo := org.NewRepository(db)
-	usersRepo := users.NewRepository(db)
 	adminRepo := admin.NewRepository(db)
 	attachmentsRepo := attachments.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
-	billingRepo := billing.NewRepository(db)
 	outwebhooksRepo := outwebhooks.NewRepository(db)
 	partyRepo := party.NewRepository(db)
 	customersRepo := customers.NewRepository(db)
@@ -105,11 +116,7 @@ func InitializeApp() *app.App {
 	timelineRepo := timeline.NewRepository(db)
 	whatsappRepo := whatsapp.NewRepository(db)
 
-	authMiddleware := handlers.NewAuthMiddleware(identityUC, newAPIKeyResolver(usersRepo), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-
 	auditUC := audit.NewUsecases(auditRepo)
-	orgUC := org.NewUsecases(orgRepo, auditUC)
-	usersUC := users.NewUsecases(usersRepo)
 	adminUC := admin.NewUsecases(adminRepo)
 	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
 	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC)
@@ -173,19 +180,10 @@ func InitializeApp() *app.App {
 	}
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
-	priceIDs := map[billingdomain.PlanCode]string{
-		billingdomain.PlanStarter:    nonEmpty(cfg.StripePriceStarter, "price_starter_local"),
-		billingdomain.PlanGrowth:     nonEmpty(cfg.StripePriceGrowth, "price_growth_local"),
-		billingdomain.PlanEnterprise: nonEmpty(cfg.StripePriceEnterprise, "price_enterprise_local"),
-	}
-	stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
-	billingUC := billing.NewUsecases(billingRepo, stripeClient, notificationUC, cfg.FrontendURL, priceIDs, cfg.StripeWebhookSecret, logger)
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
 
 	auditHandler := audit.NewHandler(auditUC)
-	orgHandler := org.NewHandler(orgUC)
-	usersHandler := users.NewHandler(usersUC)
 	adminHandler := admin.NewHandler(adminUC)
 	attachmentsHandler := attachments.NewHandler(attachmentsUC)
 	customersHandler := customers.NewHandler(customersUC)
@@ -210,15 +208,13 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
 	outwebhooksHandler := outwebhooks.NewHandler(outwebhooksUC)
-	billingHandler := billing.NewHandler(billingUC)
 	partyHandler := party.NewHandler(partyUC)
 	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
 	returnsHandler := returns.NewHandler(returnsUC)
 	timelineHandler := timeline.NewHandler(timelineUC)
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
-	clerkWebhookHandler := clerkwebhook.NewHandler(usersUC, notificationUC, cfg.ClerkWebhookSecret, cfg.FrontendURL, logger)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, usersRepo)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db))
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -237,9 +233,7 @@ func InitializeApp() *app.App {
 	})
 
 	v1 := router.Group("/v1")
-	orgHandler.RegisterRoutes(v1)
-	clerkWebhookHandler.RegisterRoutes(v1)
-	billingHandler.RegisterPublicRoutes(v1)
+	// Orgs, Clerk, billing, users — served by saas-core via AttachSaaSUnmatchedRoutes (NoRoute).
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
 	whatsappHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
@@ -255,8 +249,7 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler.RegisterExternalRoutes(public)
 
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
-	usersHandler.RegisterRoutes(authGroup)
+	authGroup.Use(GinSaaSAuthMiddleware(saasSvc))
 	adminHandler.RegisterRoutes(authGroup)
 	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
@@ -267,7 +260,6 @@ func InitializeApp() *app.App {
 	whatsappHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
 	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	billingHandler.RegisterAuthRoutes(authGroup)
 	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
@@ -288,31 +280,13 @@ func InitializeApp() *app.App {
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
-	return &app.App{Router: router}
-}
+	AttachSaaSUnmatchedRoutes(router, saasSvc)
 
-func buildIdentityUsecases(cfg config.Config, logger zerolog.Logger) *identity.Usecases {
-	if cfg.JWKSURL == "" {
-		logger.Warn().Msg("JWKS_URL not set; JWT auth will fail unless AUTH_ENABLE_JWT=false")
-		return identity.NewUsecases(nil, cfg.JWTIssuer)
-	}
-	verifier, err := jwks.NewVerifier(cfg.JWKSURL)
-	if err != nil {
-		logger.Error().Err(err).Msg("invalid JWKS verifier; JWT auth will fail")
-		return identity.NewUsecases(nil, cfg.JWTIssuer)
-	}
-	return identity.NewUsecases(verifier, cfg.JWTIssuer)
+	return &app.App{Router: router}
 }
 
 func setupLogger() zerolog.Logger {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 	return logger.With().Timestamp().Logger()
-}
-
-func nonEmpty(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
 }

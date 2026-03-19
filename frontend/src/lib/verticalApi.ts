@@ -14,11 +14,9 @@ function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): strin
     candidates.push(configured);
   }
 
-  if (typeof window === 'undefined') {
-    fallbackPorts.forEach((port) => {
-      candidates.push(`http://localhost:${port}`);
-    });
-  } else {
+  // Solo usar fallbacks basados en el hostname actual del navegador.
+  // No hardcodear localhost para evitar requests a localhost en produccion.
+  if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
     fallbackPorts.forEach((port) => {

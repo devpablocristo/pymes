@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	partydomain "github.com/devpablocristo/pymes/control-plane/backend/internal/party/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
 	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
@@ -228,8 +229,8 @@ func translateRepoErr(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return apperror.NewNotFound("party", "")
 	}
-	if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
-		return apperror.NewConflict(err.Error())
+	if httperrors.IsUniqueViolation(err) {
+		return apperror.NewConflict("resource already exists")
 	}
 	return fmt.Errorf("party: %w", err)
 }

@@ -13,24 +13,30 @@ type fakeRepo struct {
 	perms map[string]map[string]bool
 }
 
-func (f *fakeRepo) ListRoles(orgID uuid.UUID) ([]rbacdomain.Role, error) { return nil, nil }
-func (f *fakeRepo) GetRole(orgID, roleID uuid.UUID) (rbacdomain.Role, error) {
+func (f *fakeRepo) ListRoles(_ context.Context, _ uuid.UUID) ([]rbacdomain.Role, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetRole(_ context.Context, _, _ uuid.UUID) (rbacdomain.Role, error) {
 	return rbacdomain.Role{}, nil
 }
-func (f *fakeRepo) CreateRole(in rbacdomain.Role) (rbacdomain.Role, error) { return in, nil }
-func (f *fakeRepo) UpdateRole(in rbacdomain.Role) (rbacdomain.Role, error) { return in, nil }
-func (f *fakeRepo) DeleteRole(orgID, roleID uuid.UUID) error               { return nil }
-func (f *fakeRepo) AssignRole(orgID, roleID, userID uuid.UUID, assignedBy string) error {
+func (f *fakeRepo) CreateRole(_ context.Context, in rbacdomain.Role) (rbacdomain.Role, error) {
+	return in, nil
+}
+func (f *fakeRepo) UpdateRole(_ context.Context, in rbacdomain.Role) (rbacdomain.Role, error) {
+	return in, nil
+}
+func (f *fakeRepo) DeleteRole(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (f *fakeRepo) AssignRole(_ context.Context, _, _, _ uuid.UUID, _ string) error {
 	return nil
 }
-func (f *fakeRepo) RemoveRole(orgID, roleID, userID uuid.UUID) error { return nil }
-func (f *fakeRepo) IsSystemRole(orgID, roleID uuid.UUID) (bool, error) {
+func (f *fakeRepo) RemoveRole(_ context.Context, _, _, _ uuid.UUID) error { return nil }
+func (f *fakeRepo) IsSystemRole(_ context.Context, _, _ uuid.UUID) (bool, error) {
 	return false, nil
 }
-func (f *fakeRepo) GetUserPermissions(orgID, userID uuid.UUID) (map[string]map[string]bool, error) {
+func (f *fakeRepo) GetUserPermissions(_ context.Context, _, _ uuid.UUID) (map[string]map[string]bool, error) {
 	return f.perms, nil
 }
-func (f *fakeRepo) GetActorPermissions(orgID uuid.UUID, actor string) (map[string]map[string]bool, error) {
+func (f *fakeRepo) GetActorPermissions(_ context.Context, _ uuid.UUID, _ string) (map[string]map[string]bool, error) {
 	return f.perms, nil
 }
 

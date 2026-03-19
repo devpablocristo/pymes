@@ -19,16 +19,16 @@ import (
 const permissionCacheTTL = 5 * time.Minute
 
 type RepositoryPort interface {
-	ListRoles(orgID uuid.UUID) ([]rbacdomain.Role, error)
-	GetRole(orgID, roleID uuid.UUID) (rbacdomain.Role, error)
-	CreateRole(in rbacdomain.Role) (rbacdomain.Role, error)
-	UpdateRole(in rbacdomain.Role) (rbacdomain.Role, error)
-	DeleteRole(orgID, roleID uuid.UUID) error
-	AssignRole(orgID, roleID, userID uuid.UUID, assignedBy string) error
-	RemoveRole(orgID, roleID, userID uuid.UUID) error
-	IsSystemRole(orgID, roleID uuid.UUID) (bool, error)
-	GetUserPermissions(orgID, userID uuid.UUID) (map[string]map[string]bool, error)
-	GetActorPermissions(orgID uuid.UUID, actor string) (map[string]map[string]bool, error)
+	ListRoles(ctx context.Context, orgID uuid.UUID) ([]rbacdomain.Role, error)
+	GetRole(ctx context.Context, orgID, roleID uuid.UUID) (rbacdomain.Role, error)
+	CreateRole(ctx context.Context, in rbacdomain.Role) (rbacdomain.Role, error)
+	UpdateRole(ctx context.Context, in rbacdomain.Role) (rbacdomain.Role, error)
+	DeleteRole(ctx context.Context, orgID, roleID uuid.UUID) error
+	AssignRole(ctx context.Context, orgID, roleID, userID uuid.UUID, assignedBy string) error
+	RemoveRole(ctx context.Context, orgID, roleID, userID uuid.UUID) error
+	IsSystemRole(ctx context.Context, orgID, roleID uuid.UUID) (bool, error)
+	GetUserPermissions(ctx context.Context, orgID, userID uuid.UUID) (map[string]map[string]bool, error)
+	GetActorPermissions(ctx context.Context, orgID uuid.UUID, actor string) (map[string]map[string]bool, error)
 }
 
 type AuditPort interface {
@@ -60,21 +60,19 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 }
 
 func (u *Usecases) ListRoles(ctx context.Context, orgID string) ([]rbacdomain.Role, error) {
-	_ = ctx
 	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
 	}
-	return u.repo.ListRoles(orgUUID)
+	return u.repo.ListRoles(ctx, orgUUID)
 }
 
 func (u *Usecases) GetRole(ctx context.Context, orgID, roleID string) (rbacdomain.Role, error) {
-	_ = ctx
 	orgUUID, roleUUID, err := parseOrgRoleIDs(orgID, roleID)
 	if err != nil {
 		return rbacdomain.Role{}, err
 	}
-	out, err := u.repo.GetRole(orgUUID, roleUUID)
+	out, err := u.repo.GetRole(ctx, orgUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -85,7 +83,6 @@ func (u *Usecases) GetRole(ctx context.Context, orgID, roleID string) (rbacdomai
 }
 
 func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, description string, perms []rbacdomain.Permission) (rbacdomain.Role, error) {
-	_ = ctx
 	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return rbacdomain.Role{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
@@ -99,7 +96,7 @@ func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, descripti
 		return rbacdomain.Role{}, fmt.Errorf("permissions are required: %w", httperrors.ErrBadInput)
 	}
 
-	out, err := u.repo.CreateRole(rbacdomain.Role{
+	out, err := u.repo.CreateRole(ctx, rbacdomain.Role{
 		OrgID:       orgUUID,
 		Name:        strings.ToLower(name),
 		Description: strings.TrimSpace(description),
@@ -107,7 +104,7 @@ func (u *Usecases) CreateRole(ctx context.Context, orgID, actor, name, descripti
 		IsSystem:    false,
 	})
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+		if httperrors.IsUniqueViolation(err) {
 			return rbacdomain.Role{}, fmt.Errorf("role already exists: %w", httperrors.ErrConflict)
 		}
 		return rbacdomain.Role{}, err
@@ -125,7 +122,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 		return rbacdomain.Role{}, err
 	}
 
-	system, err := u.repo.IsSystemRole(orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -136,7 +133,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 		return rbacdomain.Role{}, fmt.Errorf("system roles cannot be modified: %w", httperrors.ErrForbidden)
 	}
 
-	current, err := u.repo.GetRole(orgUUID, roleUUID)
+	current, err := u.repo.GetRole(ctx, orgUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -153,12 +150,12 @@ func (u *Usecases) UpdateRole(ctx context.Context, orgID, roleID, actor string, 
 		return rbacdomain.Role{}, fmt.Errorf("permissions are required: %w", httperrors.ErrBadInput)
 	}
 
-	updated, err := u.repo.UpdateRole(current)
+	updated, err := u.repo.UpdateRole(ctx, current)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return rbacdomain.Role{}, fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
-		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+		if httperrors.IsUniqueViolation(err) {
 			return rbacdomain.Role{}, fmt.Errorf("role already exists: %w", httperrors.ErrConflict)
 		}
 		return rbacdomain.Role{}, err
@@ -175,7 +172,7 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 	if err != nil {
 		return err
 	}
-	system, err := u.repo.IsSystemRole(orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
@@ -185,7 +182,7 @@ func (u *Usecases) DeleteRole(ctx context.Context, orgID, roleID, actor string) 
 	if system {
 		return fmt.Errorf("system roles cannot be deleted: %w", httperrors.ErrForbidden)
 	}
-	if err := u.repo.DeleteRole(orgUUID, roleUUID); err != nil {
+	if err := u.repo.DeleteRole(ctx, orgUUID, roleUUID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 		}
@@ -203,7 +200,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 	if err != nil {
 		return err
 	}
-	system, err := u.repo.IsSystemRole(orgUUID, roleUUID)
+	system, err := u.repo.IsSystemRole(ctx, orgUUID, roleUUID)
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return err
 	}
@@ -211,7 +208,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 		return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 	}
 	if !system {
-		if _, err := u.repo.GetRole(orgUUID, roleUUID); err != nil {
+		if _, err := u.repo.GetRole(ctx, orgUUID, roleUUID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("role not found: %w", httperrors.ErrNotFound)
 			}
@@ -219,7 +216,7 @@ func (u *Usecases) AssignRole(ctx context.Context, orgID, roleID, userID, actor 
 		}
 	}
 
-	if err := u.repo.AssignRole(orgUUID, roleUUID, userUUID, actor); err != nil {
+	if err := u.repo.AssignRole(ctx, orgUUID, roleUUID, userUUID, actor); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("user or role not found in org: %w", httperrors.ErrNotFound)
 		}
@@ -237,7 +234,7 @@ func (u *Usecases) RemoveRole(ctx context.Context, orgID, roleID, userID, actor 
 	if err != nil {
 		return err
 	}
-	if err := u.repo.RemoveRole(orgUUID, roleUUID, userUUID); err != nil {
+	if err := u.repo.RemoveRole(ctx, orgUUID, roleUUID, userUUID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("role assignment not found: %w", httperrors.ErrNotFound)
 		}
@@ -251,12 +248,11 @@ func (u *Usecases) RemoveRole(ctx context.Context, orgID, roleID, userID, actor 
 }
 
 func (u *Usecases) EffectivePermissions(ctx context.Context, orgID, userID string) (map[string][]string, error) {
-	_ = ctx
 	orgUUID, userUUID, err := parseOrgUserIDs(orgID, userID)
 	if err != nil {
 		return nil, err
 	}
-	m, err := u.repo.GetUserPermissions(orgUUID, userUUID)
+	m, err := u.repo.GetUserPermissions(ctx, orgUUID, userUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +304,7 @@ func (u *Usecases) getCachedPermissions(ctx context.Context, orgID uuid.UUID, ac
 		return entry.permissions, nil
 	}
 
-	permissions, err := u.repo.GetActorPermissions(orgID, actor)
+	permissions, err := u.repo.GetActorPermissions(ctx, orgID, actor)
 	if err != nil {
 		return nil, err
 	}

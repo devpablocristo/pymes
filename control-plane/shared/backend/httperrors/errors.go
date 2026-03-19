@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -17,6 +18,18 @@ var (
 	ErrBadInput  = errors.New("bad input")
 	ErrNotDraft  = errors.New("resource is not in draft status")
 )
+
+// IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL
+// sin depender de string matching fragil sobre err.Error().
+func IsUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "23505") ||
+		strings.Contains(msg, "unique") ||
+		strings.Contains(msg, "duplicate")
+}
 
 type ErrorResponse struct {
 	Code    string `json:"code"`

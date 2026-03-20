@@ -35,13 +35,13 @@ type SaaSConfig struct {
 
 	ClerkWebhookSecret string
 
-	JWKSURL       string
-	JWTIssuer     string
-	JWTAudience   string
-	JWTOrgClaim   string
-	JWTRoleClaim  string
+	JWKSURL        string
+	JWTIssuer      string
+	JWTAudience    string
+	JWTOrgClaim    string
+	JWTRoleClaim   string
 	JWTScopesClaim string
-	JWTActorClaim string
+	JWTActorClaim  string
 
 	AuthEnableJWT   bool
 	AuthAllowAPIKey bool
@@ -71,10 +71,11 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	}
 
 	orgRepo := saasorg.NewRepository(db)
-	orgHandler := saasorg.NewHandler(orgRepo)
+	defaultAPIKeyScopes := saasDefaultAPIKeyScopes()
+	orgHandler := saasorg.NewHandlerWithScopes(orgRepo, defaultAPIKeyScopes)
 	orgUC := saasorg.NewUsecases(orgRepo)
 
-	usersRepo := saasusers.NewRepository(db)
+	usersRepo := saasusers.NewRepositoryWithScopes(db, defaultAPIKeyScopes)
 	usersUC := saasusers.NewUsecases(usersRepo)
 	usersHandler := saasusers.NewHandler(usersUC)
 
@@ -239,4 +240,8 @@ func valueOrDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func saasDefaultAPIKeyScopes() []string {
+	return append([]string(nil), saasusers.DefaultAPIKeyScopes...)
 }

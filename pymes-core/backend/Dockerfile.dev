@@ -5,8 +5,12 @@ RUN apk add --no-cache git curl && \
 
 WORKDIR /workspace
 
+ENV GOPRIVATE=github.com/devpablocristo/* \
+    GONOSUMDB=github.com/devpablocristo/* \
+    GONOPROXY=github.com/devpablocristo/* \
+    GOPROXY=direct
+
 COPY go.mod go.sum ./
-COPY --from=saas-core . /saas-core
 
 WORKDIR /workspace/pymes-core/backend
 

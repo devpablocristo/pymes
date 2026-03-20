@@ -1,5 +1,7 @@
 .PHONY: help up down build test lint frontend-dev frontend-build frontend-test ai-dev ai-test ai-lint cp-build cp-test cp-vet cp-run prof-build prof-test prof-vet prof-run work-build work-test work-vet work-run
 
+GO_PRIVATE_ENV = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
+
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
@@ -14,16 +16,16 @@ down: ## Stop local dev services
 # ── Control Plane ──
 
 cp-build: ## Build pymes-core backend
-	cd pymes-core/backend && go build ./...
+	cd pymes-core/backend && $(GO_PRIVATE_ENV) go build ./...
 
 cp-test: ## Run pymes-core backend tests
-	cd pymes-core/backend && go test ./...
+	cd pymes-core/backend && $(GO_PRIVATE_ENV) go test ./...
 
 cp-vet: ## Run go vet on pymes-core backend
-	cd pymes-core/backend && go vet ./...
+	cd pymes-core/backend && $(GO_PRIVATE_ENV) go vet ./...
 
 cp-run: ## Run pymes-core backend locally
-	cd pymes-core/backend && go run ./cmd/local
+	cd pymes-core/backend && $(GO_PRIVATE_ENV) go run ./cmd/local
 
 # ── Frontend (unified) ──
 
@@ -50,30 +52,30 @@ ai-lint: ## Basic AI static check (compile)
 # ── Professionals Vertical ──
 
 prof-build: ## Build professionals backend
-	cd professionals/backend && go build ./...
+	cd professionals/backend && $(GO_PRIVATE_ENV) go build ./...
 
 prof-test: ## Run professionals backend tests
-	cd professionals/backend && go test ./...
+	cd professionals/backend && $(GO_PRIVATE_ENV) go test ./...
 
 prof-vet: ## Run go vet on professionals backend
-	cd professionals/backend && go vet ./...
+	cd professionals/backend && $(GO_PRIVATE_ENV) go vet ./...
 
 prof-run: ## Run professionals backend locally
-	cd professionals/backend && go run ./cmd/local
+	cd professionals/backend && $(GO_PRIVATE_ENV) go run ./cmd/local
 
 # ── Workshops Vertical ──
 
 work-build: ## Build workshops backend
-	cd workshops/backend && go build ./...
+	cd workshops/backend && $(GO_PRIVATE_ENV) go build ./...
 
 work-test: ## Run workshops backend tests
-	cd workshops/backend && go test ./...
+	cd workshops/backend && $(GO_PRIVATE_ENV) go test ./...
 
 work-vet: ## Run go vet on workshops backend
-	cd workshops/backend && go vet ./...
+	cd workshops/backend && $(GO_PRIVATE_ENV) go vet ./...
 
 work-run: ## Run workshops backend locally
-	cd workshops/backend && go run ./cmd/local
+	cd workshops/backend && $(GO_PRIVATE_ENV) go run ./cmd/local
 
 # ── All services ──
 

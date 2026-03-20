@@ -13,6 +13,8 @@ Las rutas que **no** matchean un handler Gin se enrutan con `NoRoute` a un `http
 
 Incluye: `POST /orgs`, `POST /webhooks/clerk`, usuarios/memberships/API keys, billing, webhook Stripe.
 
+En `pymes`, la key inicial creada por `POST /orgs` y las keys creadas luego desde `/orgs/{org_id}/api-keys` usan el mismo set default de scopes de `saas-core/users`, para evitar quedar atados al scope legado `admin:full`.
+
 **No** se registran las rutas HTTP de **admin** de saas-core (suspend/reactivate, protected resources, etc.) para no chocar con `/admin/bootstrap` y `/admin/tenant-settings` del ERP.
 
 ## Migración de esquema
@@ -35,10 +37,12 @@ Además de `JWKS_URL` y `JWT_ISSUER`:
 
 ## Módulo Go
 
-En el repo monolito, `go.mod` usa:
+En el repo monolito, `go.mod` fija:
 
 ```go
-replace github.com/devpablocristo/saas-core => ../saas-core
+require github.com/devpablocristo/saas-core v0.1.0
 ```
 
-Para publicar sin path local, quitá el `replace` y fijá una versión semver de saas-core.
+Si necesitás iterar localmente contra un checkout de `saas-core`, podés reintroducir temporalmente un `replace` local, pero el estado base del repo queda pinneado a `v0.1.0`.
+
+Como `saas-core` se resuelve como módulo privado/versionado, los flujos de `go` del repo usan `GOPRIVATE=github.com/devpablocristo/*` y `GOPROXY=direct`.

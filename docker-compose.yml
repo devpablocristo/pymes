@@ -25,12 +25,15 @@ services:
     build:
       context: .
       dockerfile: ./control-plane/backend/Dockerfile.dev
+      additional_contexts:
+        saas-core: ../saas-core
     ports:
       - "8100:8080"
     volumes:
       - ./control-plane/backend:/workspace/control-plane/backend
       - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ../saas-core:/saas-core
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -70,12 +73,15 @@ services:
     build:
       context: .
       dockerfile: ./ai/Dockerfile.dev
+      additional_contexts:
+        ai-core: ../ai-core
     ports:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
       - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
       - ../ai-core:/workspace/ai-core
+
     env_file:
       - .env
     environment:
@@ -94,12 +100,15 @@ services:
     build:
       context: .
       dockerfile: ./professionals/backend/Dockerfile.dev
+      additional_contexts:
+        saas-core: ../saas-core
     ports:
       - "8181:8081"
     volumes:
       - ./professionals/backend:/workspace/professionals/backend
       - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ../saas-core:/saas-core
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -122,12 +131,15 @@ services:
     build:
       context: .
       dockerfile: ./workshops/backend/Dockerfile.dev
+      additional_contexts:
+        saas-core: ../saas-core
     ports:
       - "8282:8082"
     volumes:
       - ./workshops/backend:/workspace/workshops/backend
       - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ../saas-core:/saas-core
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:

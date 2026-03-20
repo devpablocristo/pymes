@@ -1,4 +1,4 @@
--e ../../ai-core
+-e /workspace/ai-core
 -e ../control-plane/shared/ai
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0

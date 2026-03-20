@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine
+FROM golang:1.26-alpine
 
 RUN apk add --no-cache git curl && \
     curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b /usr/local/bin
@@ -6,6 +6,7 @@ RUN apk add --no-cache git curl && \
 WORKDIR /workspace
 
 COPY go.mod go.sum ./
+COPY --from=saas-core . /saas-core
 
 WORKDIR /workspace/control-plane/backend
 

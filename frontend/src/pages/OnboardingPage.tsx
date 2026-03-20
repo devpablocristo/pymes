@@ -6,7 +6,14 @@ import {
   type SellsType,
   type TeamSize,
   type TenantProfile,
+  type VerticalType,
 } from '../lib/tenantProfile';
+
+const VERTICAL_OPTIONS: { value: VerticalType; label: string; desc: string }[] = [
+  { value: 'none', label: 'Solo comercial', desc: 'Ventas, stock, facturación' },
+  { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, fichas, especialidades' },
+  { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes de trabajo, servicios' },
+];
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -56,6 +63,7 @@ export function OnboardingPage() {
   const [usesBilling, setUsesBilling] = useState<boolean | null>(null);
   const [currency, setCurrency] = useState('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [vertical, setVertical] = useState<VerticalType>('none');
 
   const canNext: Record<Step, boolean> = {
     1: businessName.trim().length >= 2 && teamSize !== '',
@@ -82,6 +90,7 @@ export function OnboardingPage() {
       usesBilling: usesBilling === true,
       currency,
       paymentMethod: paymentMethod as PaymentMethod,
+      vertical,
       completedAt: new Date().toISOString(),
     };
     saveTenantProfile(profile);
@@ -128,6 +137,23 @@ export function OnboardingPage() {
                       type="button"
                       className={`onboarding-option${teamSize === opt.value ? ' selected' : ''}`}
                       onClick={() => setTeamSize(opt.value)}
+                    >
+                      <strong>{opt.label}</strong>
+                      <small>{opt.desc}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="onboarding-field">
+                <label>¿Qué tipo de negocio es?</label>
+                <div className="onboarding-options">
+                  {VERTICAL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`onboarding-option${vertical === opt.value ? ' selected' : ''}`}
+                      onClick={() => setVertical(opt.value)}
                     >
                       <strong>{opt.label}</strong>
                       <small>{opt.desc}</small>
@@ -279,6 +305,10 @@ export function OnboardingPage() {
                 <div className="onboarding-summary-row">
                   <span>Equipo</span>
                   <strong>{TEAM_OPTIONS.find((o) => o.value === teamSize)?.label ?? teamSize}</strong>
+                </div>
+                <div className="onboarding-summary-row">
+                  <span>Tipo de negocio</span>
+                  <strong>{VERTICAL_OPTIONS.find((o) => o.value === vertical)?.label ?? vertical}</strong>
                 </div>
                 <div className="onboarding-summary-row">
                   <span>Ofrecés</span>

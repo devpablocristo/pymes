@@ -196,6 +196,13 @@ Los **mappers** viven en el adapter que los necesita:
 - No se permite duplicar en una vertical: auth, API keys, tenant/org, party model, customers, products, appointments, quotes, sales, payments, WhatsApp, billing, admin, ni la base común de AI.
 - Todo prompt o diseño de vertical debe declarar: `reutiliza desde control-plane` y `crea nuevo en la vertical`.
 
+### 6.1 Selección de vertical
+
+- Cada tenant elige **una sola vertical** (o ninguna) durante el onboarding.
+- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops'`).
+- El sidebar solo muestra la sección de la vertical elegida. Sin vertical = solo módulos comerciales/operaciones.
+- Las rutas de verticales no elegidas siguen existiendo (no se bloquean) pero no aparecen en la navegación.
+
 ---
 
 ## 7. CRUD canónico (7 operaciones)

@@ -76,6 +76,18 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('paymentGateway');
   }
 
+  // Documents & timeline: show if billing or products (operational tools)
+  if (profile.usesBilling || sellsProducts || exploring) {
+    visible.add('timeline');
+    visible.add('documents');
+    visible.add('attachments');
+  }
+
+  // Parties: show if medium+ team (advanced entity model)
+  if (profile.teamSize === 'medium' || profile.teamSize === 'large' || exploring) {
+    visible.add('parties');
+  }
+
   // Advanced/admin: only if medium+ team or exploring
   if (profile.teamSize === 'medium' || profile.teamSize === 'large' || exploring) {
     visible.add('audit');

@@ -3,6 +3,7 @@ import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shar
 import { moduleGroups, moduleList } from '../lib/moduleCatalog';
 import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
+import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
 import { getTheme, toggleTheme } from '../lib/theme';
 import { LanguageSelector } from './LanguageSelector';
@@ -143,6 +144,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
+    const profile = getTenantProfile();
+    const vertical = profile?.vertical ?? 'none';
 
     const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
       label: localizeUiText(group.label),
@@ -156,13 +159,18 @@ export function Shell({ children }: { children: ReactNode }) {
         })),
     })).filter((section) => section.items.length > 0);
 
-    return [
+    const result: AppShellNavSection[] = [
       { label: sentenceCase(t('shell.sections.base')), items: mainNav },
-      { label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav },
-      { label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav },
-      ...moduleNav,
-      { label: sentenceCase(t('shell.sections.settings')), items: settingsNav },
-    ] as AppShellNavSection[];
+    ];
+    if (vertical === 'professionals') {
+      result.push({ label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav });
+    }
+    if (vertical === 'workshops') {
+      result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
+    }
+    result.push(...moduleNav);
+    result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
+    return result;
   }, [localizeUiText, mainNav, professionalsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
   function handleToggleTheme() {

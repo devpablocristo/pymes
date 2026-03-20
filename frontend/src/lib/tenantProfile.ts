@@ -1,6 +1,7 @@
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
 export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'mixed';
+export type VerticalType = 'none' | 'professionals' | 'workshops';
 
 export type TenantProfile = {
   businessName: string;
@@ -11,6 +12,7 @@ export type TenantProfile = {
   usesBilling: boolean;
   currency: string;
   paymentMethod: PaymentMethod;
+  vertical: VerticalType;
   completedAt: string;
 };
 

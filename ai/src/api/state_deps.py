@@ -5,7 +5,7 @@ from typing import TypeVar, cast
 from fastapi import HTTPException, Request, status
 
 from src.config import Settings, get_settings
-from pymes_control_plane_shared.ai_runtime import AuthContext, LLMProvider
+from pymes_core_shared.ai_runtime import AuthContext, LLMProvider
 
 T = TypeVar("T")
 

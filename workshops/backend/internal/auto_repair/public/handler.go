@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
 	svcdomain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
 )

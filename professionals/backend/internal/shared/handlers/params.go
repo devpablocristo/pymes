@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
 func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {

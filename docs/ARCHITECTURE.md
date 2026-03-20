@@ -4,21 +4,21 @@ Reglas madre del repo `pymes`.
 
 ## Ownership
 
-- `control-plane/`: owner del dominio transversal
+- `pymes-core/`: owner del dominio transversal
 - `professionals/`: vertical umbrella especializada; hoy contiene el modulo `teachers`
 - `workshops/`: vertical umbrella especializada; hoy contiene el subdominio `auto_repair`
-- `control-plane/shared/`: runtime compartido propio del producto
+- `pymes-core/shared/`: runtime compartido propio del producto
 - `pkgs/`: librerias agnosticas reutilizables fuera del repo
 
 ## Deployables reales
 
-- `control-plane/backend`
+- `pymes-core/backend`
 - `professionals/backend`
 - `workshops/backend`
 - `frontend`
 - `ai`
 
-No hay deployables `control-plane/ai` ni `professionals/ai`: la unica app de AI corre en `ai/`.
+No hay deployables `pymes-core/ai` ni `professionals/ai`: la unica app de AI corre en `ai/`.
 
 Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen exponiendo capacidades de ambos bounded contexts, pero la verdad de negocio permanece en cada backend owner.
 
@@ -38,7 +38,7 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 
 ## Reglas de shared
 
-- `control-plane/shared/` contiene runtime, middleware, adapters y contratos internos del producto
+- `pymes-core/shared/` contiene runtime, middleware, adapters y contratos internos del producto
 - `pkgs/` no contiene logica acoplada al negocio `pymes`
 
 ## Reglas de frontend
@@ -53,7 +53,7 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 ## Reglas de AI
 
 - `ai/` es el unico deployable de inteligencia artificial
-- el codigo compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `control-plane/shared/ai`
+- el codigo compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `pymes-core/shared/ai`
 - la logica especifica de verticales vive en `ai/src/domains/<vertical>/<modulo_o_subdominio>`
 - hoy `professionals/teachers` ya esta consolidado en `ai/src/domains/professionals/teachers`
 - hoy `workshops/auto_repair` ya esta consolidado en `ai/src/domains/workshops/auto_repair`

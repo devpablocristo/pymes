@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	sharedhandlers "github.com/devpablocristo/pymes/professionals/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"

@@ -1,4 +1,4 @@
-// Package public exposes public professionals routes and bridges to control-plane where needed.
+// Package public exposes public professionals routes and bridges to pymes-core where needed.
 package public
 
 import (
@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	profdomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	sldomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 )
@@ -76,7 +76,7 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 		return orgID, true
 	}
 
-	// Then try slug resolution via control-plane
+	// Then try slug resolution via pymes-core
 	if h.orgs != nil {
 		orgID, err := h.orgs.ResolveOrgID(c.Request.Context(), orgSlug)
 		if err != nil {

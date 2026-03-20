@@ -1,11 +1,11 @@
 ---
-description: codigo transversal del producto vive en control-plane/shared
+description: codigo transversal del producto vive en pymes-core/shared
 alwaysApply: true
 ---
 
-# control-plane/shared = transversal del producto
+# pymes-core/shared = transversal del producto
 
-Usar `control-plane/shared/` para codigo que:
+Usar `pymes-core/shared/` para codigo que:
 
 - aplica a mas de un vertical;
 - pertenece a este producto;
@@ -14,10 +14,10 @@ Usar `control-plane/shared/` para codigo que:
 ## Regla de ubicacion
 
 - `vertical/` = solo delta exclusivo de esa vertical.
-- `control-plane/shared/` = compartido del producto.
+- `pymes-core/shared/` = compartido del producto.
 - `pkgs/` = compartido portable entre proyectos.
 
-## Ejemplos de `control-plane/shared/`
+## Ejemplos de `pymes-core/shared/`
 
 - adapters y runtime compartidos entre verticales con convenciones de este repo;
 - copy tecnica o mensajes comunes del producto;

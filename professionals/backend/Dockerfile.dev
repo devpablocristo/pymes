@@ -13,7 +13,7 @@ WORKDIR /workspace/professionals/backend
 RUN go mod download
 
 COPY professionals/backend /workspace/professionals/backend
-COPY control-plane/shared/backend /workspace/control-plane/shared/backend
+COPY pymes-core/shared/backend /workspace/pymes-core/shared/backend
 COPY pkgs/go-pkg /workspace/pkgs/go-pkg
 
 EXPOSE 8081

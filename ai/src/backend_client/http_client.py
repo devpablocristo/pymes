@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from src.backend_client.auth import AuthContext
-from pymes_control_plane_shared.ai_runtime import get_logger, get_request_id
+from pymes_core_shared.ai_runtime import get_logger, get_request_id
 
 logger = get_logger(__name__)
 

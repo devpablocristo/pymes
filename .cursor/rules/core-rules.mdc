@@ -24,5 +24,5 @@ alwaysApply: true
 - NUNCA sufijos en archivos si solo hay una implementación
 - NUNCA modificar migraciones existentes
 - NUNCA decir "listo" sin build + test exitosos
-- NUNCA duplicar funcionalidad de control-plane en una vertical
+- NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP

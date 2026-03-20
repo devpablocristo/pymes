@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
 )

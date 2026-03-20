@@ -13,17 +13,17 @@ down: ## Stop local dev services
 
 # ── Control Plane ──
 
-cp-build: ## Build control-plane backend
-	cd control-plane/backend && go build ./...
+cp-build: ## Build pymes-core backend
+	cd pymes-core/backend && go build ./...
 
-cp-test: ## Run control-plane backend tests
-	cd control-plane/backend && go test ./...
+cp-test: ## Run pymes-core backend tests
+	cd pymes-core/backend && go test ./...
 
-cp-vet: ## Run go vet on control-plane backend
-	cd control-plane/backend && go vet ./...
+cp-vet: ## Run go vet on pymes-core backend
+	cd pymes-core/backend && go vet ./...
 
-cp-run: ## Run control-plane backend locally
-	cd control-plane/backend && go run ./cmd/local
+cp-run: ## Run pymes-core backend locally
+	cd pymes-core/backend && go run ./cmd/local
 
 # ── Frontend (unified) ──
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 )
 
@@ -66,7 +66,7 @@ func (f *fakeCP) GetParty(ctx context.Context, orgID, partyID string) (map[strin
 	return f.party, nil
 }
 
-func TestCreateAutofillsCustomerNameFromControlPlane(t *testing.T) {
+func TestCreateAutofillsCustomerNameFromPymesCore(t *testing.T) {
 	repo := &fakeRepo{}
 	cp := &fakeCP{customer: map[string]any{"name": "Juan Perez"}}
 	uc := NewUsecases(repo, nil, cp)

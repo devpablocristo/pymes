@@ -5,7 +5,7 @@ Scaffold reservado para la infraestructura independiente de la vertical `worksho
 La prioridad en esta iteracion fue dejar operativo:
 
 - backend Go del vertical
-- integraciones HTTP con `control-plane`
+- integraciones HTTP con `pymes-core`
 - frontend unificado
 - compose/CI/smoke local
 

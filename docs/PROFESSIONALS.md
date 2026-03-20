@@ -24,7 +24,7 @@ La consola web y el AI especializado viven dentro de los deployables unificados:
 - `frontend`
 - `ai`
 
-## Integracion con control-plane
+## Integracion con pymes-core
 
 `professionals/teachers` consume capacidades transversales via HTTP:
 
@@ -36,9 +36,9 @@ La consola web y el AI especializado viven dentro de los deployables unificados:
 
 Regla de borde:
 
-- no importa dominio interno de `control-plane`
+- no importa dominio interno de `pymes-core`
 - integra por clientes HTTP y contratos internos
-- reutiliza solo runtime tecnico compartido desde `control-plane/shared/` y `pkgs/`
+- reutiliza solo runtime tecnico compartido desde `pymes-core/shared/` y `pkgs/`
 
 ## Superficie local
 

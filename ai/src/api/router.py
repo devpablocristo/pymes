@@ -12,13 +12,13 @@ from src.api.deps import get_auth_context, get_backend_client, get_llm_provider,
 from src.api.sse import EventSourceResponse
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from pymes_control_plane_shared.ai_runtime import orchestrate
+from pymes_core_shared.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.core.dossier import summarize_dossier_for_context
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from src.db.repository import AIRepository
-from pymes_control_plane_shared.ai_runtime import Message
-from pymes_control_plane_shared.ai_runtime import get_logger
+from pymes_core_shared.ai_runtime import Message
+from pymes_core_shared.ai_runtime import get_logger
 from src.tools.registry import build_internal_tools
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])

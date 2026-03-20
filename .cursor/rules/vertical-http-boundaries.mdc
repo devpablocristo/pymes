@@ -5,10 +5,10 @@ alwaysApply: true
 
 # Integracion entre verticales
 
-- Si una vertical consume capacidades de otra vertical o de `control-plane`, la integracion es por HTTP mediante contratos internos estables.
+- Si una vertical consume capacidades de otra vertical o de `pymes-core`, la integracion es por HTTP mediante contratos internos estables.
 - Una vertical no importa handlers, usecases, repositories ni dominio interno de otra vertical.
-- `control-plane/shared/` y `pkgs/` son para codigo compartido; no se usan para saltar ownership funcional entre verticales.
-- `control-plane/shared/` contiene base transversal del producto, no features de negocio que pertenezcan a una vertical especifica.
+- `pymes-core/shared/` y `pkgs/` son para codigo compartido; no se usan para saltar ownership funcional entre verticales.
+- `pymes-core/shared/` contiene base transversal del producto, no features de negocio que pertenezcan a una vertical especifica.
 - `pkgs/` contiene solo codigo portable y agnostico al producto.
 - Cada llamada HTTP entre verticales debe tener timeout, autenticacion interna y manejo explicito de errores.
 - Los DTOs de integracion viven en el borde HTTP; no se comparte dominio interno entre verticales.

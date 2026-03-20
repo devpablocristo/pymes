@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
-from pymes_control_plane_shared.ai_runtime import Message, get_logger, orchestrate, update_request_context
+from pymes_core_shared.ai_runtime import Message, get_logger, orchestrate, update_request_context
 from src.api.sse import EventSourceResponse
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 from src.domains.workshops.auto_repair.deps import get_auto_repair_backend_client, get_llm_provider

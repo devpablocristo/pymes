@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	httperrors "github.com/devpablocristo/pymes/control-plane/shared/backend/httperrors"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type controlPlanePort interface {

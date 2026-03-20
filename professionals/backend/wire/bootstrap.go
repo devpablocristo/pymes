@@ -15,11 +15,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/controlplane"
+	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/orchestration"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles"
@@ -44,7 +44,7 @@ func InitializeApp() *app.App {
 	}
 
 	// Control-plane HTTP client
-	cpClient := controlplane.NewClient(cfg.ControlPlaneURL, cfg.InternalServiceToken)
+	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 
 	// Auth middleware using pkgs/go-pkg/auth
 	identityResolver := buildIdentityResolver(cfg, logger)
@@ -159,9 +159,9 @@ func (a *logAudit) Log(_ context.Context, orgID string, actor, action, resourceT
 		Msg("audit")
 }
 
-// cpOrgResolver resolves org slugs via the control-plane client.
+// cpOrgResolver resolves org slugs via the pymes-core client.
 type cpOrgResolver struct {
-	client *controlplane.Client
+	client *pymescore.Client
 }
 
 func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
@@ -176,12 +176,12 @@ func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.
 	return uuid.Parse(orgIDStr)
 }
 
-// CORS middleware (same pattern as control-plane).
+// CORS middleware (same pattern as pymes-core).
 func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
 	origins := []string{
 		"http://localhost:5173", // Vite default
 		"http://localhost:5174", // prof-frontend dev
-		"http://localhost:5180", // control-plane frontend (Docker)
+		"http://localhost:5180", // pymes-core frontend (Docker)
 		"http://localhost:5181", // prof-frontend (Docker)
 	}
 	if frontendURL != "" {

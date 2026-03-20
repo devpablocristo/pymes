@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /workspace/ai
 
 COPY ai/requirements.txt ./
-COPY control-plane/shared/ai /workspace/control-plane/shared/ai
+COPY pymes-core/shared/ai /workspace/pymes-core/shared/ai
 COPY --from=ai-core . /workspace/ai-core
 
 RUN pip install --no-cache-dir -r requirements.txt

@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from pymes_control_plane_shared.ai_runtime import AuthContext, Message, get_logger, orchestrate
+from pymes_core_shared.ai_runtime import AuthContext, Message, get_logger, orchestrate
 from src.api.sse import EventSourceResponse
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient
 from src.domains.professionals.teachers.deps import (

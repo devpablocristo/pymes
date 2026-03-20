@@ -9,12 +9,12 @@ alwaysApply: true
 Antes de devolver **cualquier** resultado al usuario:
 
 1. **Ejecutar la prueba correspondiente** al cambio realizado:
-   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde `control-plane/backend/`
+   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde `pymes-core/backend/`
    - Lambda entrypoint: `go build -o /dev/null ./cmd/lambda/` para verificar que compila
    - Local entrypoint: `go build -o /dev/null ./cmd/local/` para verificar que compila
-   - Frontend (React/Vite): `npm run build` desde `control-plane/frontend/`
+   - Frontend (React/Vite): `npm run build` desde `pymes-core/frontend/`
    - Endpoint nuevo: levantar con `go run ./cmd/local/` y `curl` para verificar HTTP + body
-   - Infraestructura Terraform: `terraform validate` desde `control-plane/infra/`
+   - Infraestructura Terraform: `terraform validate` desde `pymes-core/infra/`
    - Migraciones SQL: verificar sintaxis y que up/down son reversibles
    - Script nuevo: ejecutarlo y verificar que termina sin error
    - Wire: `go generate ./wire/...` si se modificaron providers

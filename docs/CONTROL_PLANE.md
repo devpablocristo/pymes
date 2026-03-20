@@ -1,6 +1,6 @@
 # Control Plane
 
-`control-plane` es el owner del dominio transversal del producto.
+`pymes-core` es el owner del dominio transversal del producto.
 
 ## Alcance
 
@@ -13,12 +13,12 @@
 
 ## Piezas vigentes
 
-- backend: `control-plane/backend`
-- shared backend: `control-plane/shared/backend`
-- shared AI runtime: `control-plane/shared/ai`
-- infra: `control-plane/infra`
+- backend: `pymes-core/backend`
+- shared backend: `pymes-core/shared/backend`
+- shared AI runtime: `pymes-core/shared/ai`
+- infra: `pymes-core/infra`
 
-El frontend y el AI no viven ya dentro de `control-plane/`; hoy son deployables unificados en `frontend/` y `ai/`.
+El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables unificados en `frontend/` y `ai/`.
 
 ## Superficie local
 
@@ -39,13 +39,13 @@ make frontend-dev
 - las rutas internas usan `X-Internal-Service-Token`
 - si `INTERNAL_SERVICE_TOKEN` no esta configurado, el backend ahora falla cerrado
 - el modo API key deriva `actor` y `role` del backend, no de headers cliente
-- el AI resuelve y valida API keys contra `control-plane/backend` antes de aceptar requests
+- el AI resuelve y valida API keys contra `pymes-core/backend` antes de aceptar requests
 
 ## Validacion
 
 ```bash
-go test ./control-plane/backend/...
-go test ./control-plane/shared/backend/...
+go test ./pymes-core/backend/...
+go test ./pymes-core/shared/backend/...
 make ai-test
 make frontend-test
 ```

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pymes_control_plane_shared.ai_runtime import AuthContext
+from pymes_core_shared.ai_runtime import AuthContext
 
 
 def get_internal_conversation_user_id(auth: AuthContext) -> str | None:

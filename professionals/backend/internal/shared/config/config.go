@@ -14,7 +14,7 @@ type Config struct {
 	AuthEnableJWT        bool
 	AuthAllowAPIKey      bool
 	InternalServiceToken string
-	ControlPlaneURL      string
+	PymesCoreURL      string
 	FrontendURL          string
 }
 
@@ -28,7 +28,7 @@ func LoadFromEnv() Config {
 		AuthEnableJWT:        getEnvBool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:      getEnvBool("AUTH_ALLOW_API_KEY", true),
 		InternalServiceToken: getEnv("INTERNAL_SERVICE_TOKEN", "local-internal-token"),
-		ControlPlaneURL:      getEnv("CONTROL_PLANE_URL", "http://localhost:8080"),
+		PymesCoreURL:      getEnv("PYMES_CORE_URL", "http://localhost:8080"),
 		FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:5173"),
 	}
 }

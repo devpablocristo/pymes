@@ -3,7 +3,7 @@
 ## 1. Contexto
 
 Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
-- `control-plane/` — base transversal (backend Go + shared)
+- `pymes-core/` — base transversal (backend Go + shared)
 - `professionals/` — vertical docentes/profesionales (backend Go)
 - `workshops/` — vertical talleres mecánicos (backend Go)
 - `frontend/` — consola React unificada
@@ -60,7 +60,7 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 │   │   └── runner.go
 │   ├── Dockerfile
 │   └── go.mod
-control-plane/
+pymes-core/
 ├── backend/                        # base transversal
 ├── shared/                         # runtime y utilidades compartidas entre verticales
 │   ├── backend/                    # Go: auth, config, middleware
@@ -122,10 +122,10 @@ Los **mappers** viven en el adapter que los necesita:
 
 | Ubicación | Qué contiene | Criterio |
 |-----------|-------------|----------|
-| `control-plane/shared/` | Código transversal del producto | Específico de pymes, usado por varios verticales |
+| `pymes-core/shared/` | Código transversal del producto | Específico de pymes, usado por varios verticales |
 | `pkgs/` | Código agnóstico al proyecto | Se puede llevar a otro proyecto sin cambios |
 
-`pkgs/` no importa código de ningún servicio. `control-plane/shared/` no sale del producto.
+`pkgs/` no importa código de ningún servicio. `pymes-core/shared/` no sale del producto.
 
 ### 5.5 Persistencia
 
@@ -186,15 +186,15 @@ Los **mappers** viven en el adapter que los necesita:
 
 ---
 
-## 6. Verticales sobre control-plane
+## 6. Verticales sobre pymes-core
 
-- `control-plane` es la base transversal obligatoria del producto.
-- **Si algo aplica a más de un vertical, va en control-plane.** No duplicar.
+- `pymes-core` es la base transversal obligatoria del producto.
+- **Si algo aplica a más de un vertical, va en pymes-core.** No duplicar.
 - Las verticales solo contienen funcionalidad exclusiva de su dominio.
-- Si una vertical consume capacidades de otra o de control-plane, la integración es por HTTP.
+- Si una vertical consume capacidades de otra o de pymes-core, la integración es por HTTP.
 - Una vertical no importa handlers, usecases, repositories ni dominio interno de otra.
 - No se permite duplicar en una vertical: auth, API keys, tenant/org, party model, customers, products, appointments, quotes, sales, payments, WhatsApp, billing, admin, ni la base común de AI.
-- Todo prompt o diseño de vertical debe declarar: `reutiliza desde control-plane` y `crea nuevo en la vertical`.
+- Todo prompt o diseño de vertical debe declarar: `reutiliza desde pymes-core` y `crea nuevo en la vertical`.
 
 ### 6.1 Selección de vertical
 
@@ -268,7 +268,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 ### Nombres prohibidos
 
 - NUNCA `web/`, `frontend/`, `ui/` → el frontend ya se llama `frontend/`
-- NUNCA `api/`, `server/` → usar nombre del producto (`control-plane/`, `professionals/`, `workshops/`)
+- NUNCA `api/`, `server/` → usar nombre del producto (`pymes-core/`, `professionals/`, `workshops/`)
 - NUNCA `postgres:16` sin `-alpine`
 
 ---
@@ -281,7 +281,97 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 ---
 
-## 12. Reglas críticas
+## 12. WhatsApp Business — Módulo transversal
+
+### 12.1 Arquitectura
+
+WhatsApp es un módulo transversal en `pymes-core/backend/internal/whatsapp/`. No va en saas-core (es específico del producto pymes). Estructura hexagonal completa:
+
+```
+internal/whatsapp/
+├── usecases.go                     # lógica + ports (RepositoryPort, TimelinePort, etc.)
+├── usecases/domain/entities.go     # Connection, Message, Template, OptIn
+├── handler.go                      # HTTP adapter (Gin)
+├── handler/dto/dto.go              # DTOs request/response
+├── repository.go                   # GORM adapter + sentinels + mappers
+├── repository/models/models.go     # GORM models
+├── clients.go                      # AIClient + MetaClient (Graph API v23.0)
+├── inbound.go                      # Webhook handling (verify + HMAC + inbound messages)
+├── *_test.go                       # 10 tests
+```
+
+### 12.2 Tablas
+
+| Tabla | Propósito |
+|-------|-----------|
+| `whatsapp_connections` | 1 por org. Phone number ID, WABA ID, token encriptado, quality rating |
+| `whatsapp_messages` | Historial enviados/recibidos. Status tracking (pending→sent→delivered→read) |
+| `whatsapp_templates` | Templates de Meta. Draft→pending→approved/rejected. CRUD local |
+| `whatsapp_opt_ins` | Consentimiento por contacto. Obligatorio antes de enviar |
+
+### 12.3 API (endpoints)
+
+**Links wa.me/ (legacy):**
+- `GET /v1/whatsapp/quote/:id` — link de presupuesto
+- `GET /v1/whatsapp/sale/:id/receipt` — link de comprobante
+- `GET /v1/whatsapp/customer/:id/message` — mensaje libre
+
+**Conexión:**
+- `GET /v1/whatsapp/connection` — estado
+- `POST /v1/whatsapp/connection` — conectar (phone_number_id, waba_id, access_token)
+- `DELETE /v1/whatsapp/connection` — desconectar
+- `GET /v1/whatsapp/connection/stats` — métricas
+
+**Envío real (Graph API):**
+- `POST /v1/whatsapp/send/text` — texto directo
+- `POST /v1/whatsapp/send/template` — template aprobado
+- `POST /v1/whatsapp/send/media` — imagen, documento, audio, video
+- `POST /v1/whatsapp/send/interactive` — botones de respuesta rápida (max 3)
+
+**Historial:**
+- `GET /v1/whatsapp/messages` — listado con filtros (party_id, direction, status)
+
+**Templates:**
+- `GET /v1/whatsapp/templates` — listar
+- `POST /v1/whatsapp/templates` — crear (draft)
+- `GET /v1/whatsapp/templates/:id` — detalle
+- `DELETE /v1/whatsapp/templates/:id` — eliminar
+
+**Opt-in:**
+- `GET /v1/whatsapp/opt-ins` — listar contactos con consentimiento
+- `POST /v1/whatsapp/opt-ins` — registrar consentimiento
+- `DELETE /v1/whatsapp/opt-ins/:party_id` — registrar opt-out
+- `GET /v1/whatsapp/opt-ins/:party_id/status` — verificar estado
+
+**Webhooks (públicos, sin auth):**
+- `GET /v1/webhooks/whatsapp` — verificación Meta
+- `POST /v1/webhooks/whatsapp` — inbound + status (rate limit 240/min, max 256KB)
+
+### 12.4 Meta Graph API
+
+- Versión: v23.0
+- Client: `MetaClient` en `clients.go`
+- Métodos: `SendTextMessage`, `SendTemplateMessage`, `SendMediaMessage`, `SendInteractiveButtons`, `MarkAsRead`
+- Todos retornan `(waMessageID string, error)` para tracking
+- Tokens almacenados encriptados via `paymentgateway.Crypto`
+
+### 12.5 Multi-tenant
+
+- Cada org tiene máximo 1 conexión (`whatsapp_connections.org_id` es PK)
+- Cada conexión tiene su propio `phone_number_id` + `access_token`
+- El flujo de conexión futuro será via Embedded Signup (popup Meta OAuth)
+- Los mensajes se registran con `org_id` para aislamiento total
+
+### 12.6 Compliance LATAM
+
+- **Opt-in obligatorio**: tabla `whatsapp_opt_ins`, verificar antes de enviar
+- **Templates en español**: idioma default `es`, categorías UTILITY/MARKETING/AUTHENTICATION
+- **Status tracking**: sent→delivered→read via webhooks de Meta
+- **Rate limits**: tier 1 (250 msgs/24h) → tier 5 (ilimitado), sube automáticamente
+
+---
+
+## 13. Reglas críticas
 
 - NUNCA valores hardcodeados
 - NUNCA exponer dominio por HTTP — siempre DTOs
@@ -292,5 +382,5 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 - NUNCA repositorios in-memory como artefacto de producción
 - NUNCA sufijos en archivos si solo hay una implementación
 - NUNCA decir "listo" sin haber buildado/testeado
-- NUNCA duplicar funcionalidad de control-plane en una vertical
+- NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP

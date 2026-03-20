@@ -4,14 +4,14 @@ Monorepo SaaS multi-vertical para PyMEs LATAM.
 
 La topologia activa hoy es:
 
-- `control-plane/backend`: backend Go transversal
+- `pymes-core/backend`: backend Go transversal
 - `professionals/backend`: backend Go de la vertical umbrella `professionals`; hoy implementa el modulo `teachers`
 - `workshops/backend`: backend Go de la vertical umbrella `workshops`; hoy implementa `auto_repair` para talleres mecanicos LATAM
 - `frontend`: consola React unificada para core y verticales
 - `ai`: servicio FastAPI unificado para chat interno, publico y `professionals`
-- `control-plane/shared/` y `pkgs/`: runtime y librerias compartidas
+- `pymes-core/shared/` y `pkgs/`: runtime y librerias compartidas
 
-No existen deployables `control-plane/ai` ni `professionals/ai`. El unico runtime AI vive en `ai/` y reutiliza piezas compartidas desde `control-plane/shared/ai`.
+No existen deployables `pymes-core/ai` ni `professionals/ai`. El unico runtime AI vive en `ai/` y reutiliza piezas compartidas desde `pymes-core/shared/ai`.
 
 ## Inicio rapido
 
@@ -22,7 +22,7 @@ docker compose up -d --build
 
 Servicios locales:
 
-- control-plane backend: `http://localhost:8100`
+- pymes-core backend: `http://localhost:8100`
 - professionals backend: `http://localhost:8181`
 - workshops backend: `http://localhost:8282`
 - frontend unificado: `http://localhost:5180`
@@ -50,7 +50,7 @@ make ai-dev
 ```text
 pymes/
 ├── ai/
-├── control-plane/
+├── pymes-core/
 │   ├── backend/
 │   ├── infra/
 │   └── shared/
@@ -106,6 +106,6 @@ La documentacion canónica vive en `docs/`.
 
 - `docs/README.md`
 - `docs/ARCHITECTURE.md`
-- `docs/CONTROL_PLANE.md`
+- `docs/PYMES_CORE.md`
 - `docs/PROFESSIONALS.md`
 - `docs/WORKSHOPS.md`

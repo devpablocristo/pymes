@@ -7,7 +7,7 @@ Vertical `workshops` para talleres LATAM. Hoy el primer subdominio canonico es `
 - umbrella vertical: `workshops`
 - subdominio implementado hoy: `auto_repair`
 - dominio propio del subdominio: `vehiculos`, `servicios de taller`, `ordenes de trabajo`
-- integraciones externas: siempre por HTTP hacia `control-plane`
+- integraciones externas: siempre por HTTP hacia `pymes-core`
 - no duplica ownership de `customers`, `parties`, `products`, `inventory`, `quotes`, `sales` ni `appointments`
 
 ## Backend
@@ -72,7 +72,7 @@ Eso deja una base uniforme para sumar despues `truck_repair` o `moto_repair` sin
 - calculo propio de subtotales, impuestos y total
 - tracking de `appointment_id`, `quote_id` y `sale_id`
 
-## Integracion con control-plane
+## Integracion con pymes-core
 
 - dueños: validacion/autofill contra `parties`
 - repuestos: validacion/autofill contra `products`

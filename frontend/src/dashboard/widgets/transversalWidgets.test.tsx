@@ -29,7 +29,7 @@ const props: DashboardWidgetRendererProps = {
     widget_key: 'sales.summary',
     title: 'Ventas',
     description: 'Resumen de ventas',
-    domain: 'control-plane',
+    domain: 'pymes-core',
     kind: 'metric',
     default_size: { w: 4, h: 2 },
     min_w: 3,

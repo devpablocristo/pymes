@@ -6,18 +6,18 @@ on:
   pull_request:
 
 jobs:
-  control-plane-backend:
+  pymes-core-backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.0'
-      - name: Verify control-plane backend
+      - name: Verify pymes-core backend
         run: |
-          go vet ./control-plane/backend/...
-          go test ./control-plane/backend/...
-          go build ./control-plane/backend/...
+          go vet ./pymes-core/backend/...
+          go test ./pymes-core/backend/...
+          go build ./pymes-core/backend/...
 
   professionals-backend:
     runs-on: ubuntu-latest

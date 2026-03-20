@@ -10,8 +10,8 @@ from src.api.external_chat_support import clean_phone, resolve_org_id
 from src.api.router import check_quota
 from src.backend_client.client import BackendClient
 from src.db.repository import AIRepository
-from pymes_control_plane_shared.ai_runtime import LLMProvider
-from pymes_control_plane_shared.ai_runtime import get_logger, update_request_context
+from pymes_core_shared.ai_runtime import LLMProvider
+from pymes_core_shared.ai_runtime import get_logger, update_request_context
 
 router = APIRouter(prefix="/v1/public", tags=["commercial-public"])
 logger = get_logger(__name__)

@@ -14,16 +14,16 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/app"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/auth"
-	"github.com/devpablocristo/pymes/control-plane/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/controlplane"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
 )
 
@@ -39,7 +39,7 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	cpClient := controlplane.NewClient(cfg.ControlPlaneURL, cfg.InternalServiceToken)
+	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := buildIdentityResolver(cfg, logger)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, newAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
@@ -99,7 +99,7 @@ func InitializeApp() *app.App {
 }
 
 type cpOrgResolver struct {
-	client *controlplane.Client
+	client *pymescore.Client
 }
 
 func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {

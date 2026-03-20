@@ -24,14 +24,14 @@ services:
   cp-backend:
     build:
       context: .
-      dockerfile: ./control-plane/backend/Dockerfile.dev
+      dockerfile: ./pymes-core/backend/Dockerfile.dev
       additional_contexts:
         saas-core: ../saas-core
     ports:
       - "8100:8080"
     volumes:
-      - ./control-plane/backend:/workspace/control-plane/backend
-      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
+      - ./pymes-core/backend:/workspace/pymes-core/backend
+      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - ../saas-core:/saas-core
       - cp_backend_go_mod:/go/pkg/mod
@@ -79,7 +79,7 @@ services:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
-      - ./control-plane/shared/ai:/workspace/control-plane/shared/ai
+      - ./pymes-core/shared/ai:/workspace/pymes-core/shared/ai
       - ../ai-core:/workspace/ai-core
 
     env_file:
@@ -106,7 +106,7 @@ services:
       - "8181:8081"
     volumes:
       - ./professionals/backend:/workspace/professionals/backend
-      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
+      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - ../saas-core:/saas-core
       - prof_backend_go_mod:/go/pkg/mod
@@ -116,7 +116,7 @@ services:
     environment:
       PORT: 8081
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
-      CONTROL_PLANE_URL: http://cp-backend:8080
+      PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
@@ -137,7 +137,7 @@ services:
       - "8282:8082"
     volumes:
       - ./workshops/backend:/workspace/workshops/backend
-      - ./control-plane/shared/backend:/workspace/control-plane/shared/backend
+      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
       - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
       - ../saas-core:/saas-core
       - work_backend_go_mod:/go/pkg/mod
@@ -147,7 +147,7 @@ services:
     environment:
       PORT: 8082
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
-      CONTROL_PLANE_URL: http://cp-backend:8080
+      PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:

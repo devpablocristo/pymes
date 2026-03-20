@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pymes_control_plane_shared.ai_runtime import get_logger
+from pymes_core_shared.ai_runtime import get_logger
 
 logger = get_logger(__name__)
 

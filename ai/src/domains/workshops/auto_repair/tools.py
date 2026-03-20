@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from pymes_control_plane_shared.ai_runtime import AuthContext, ToolDeclaration
+from pymes_core_shared.ai_runtime import AuthContext, ToolDeclaration
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]

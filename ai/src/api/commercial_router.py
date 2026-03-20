@@ -9,8 +9,8 @@ from src.api.router import check_quota
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.db.repository import AIRepository
-from pymes_control_plane_shared.ai_runtime import LLMProvider
-from pymes_control_plane_shared.ai_runtime import get_logger
+from pymes_core_shared.ai_runtime import LLMProvider
+from pymes_core_shared.ai_runtime import get_logger
 
 router = APIRouter(prefix="/v1/chat/commercial", tags=["commercial-chat"])
 logger = get_logger(__name__)

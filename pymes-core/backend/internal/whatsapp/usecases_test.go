@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
@@ -15,17 +16,18 @@ import (
 // --- Fakes ---
 
 type testRepo struct {
-	conn        Connection
-	domainConn  domain.Connection
-	partyPhone  string
-	partyName   string
-	messages    []domain.Message
-	templates   []domain.Template
-	optIns      []domain.OptIn
-	savedMsg    *domain.Message
-	savedTpl    *domain.Template
-	savedOptIn  *domain.OptIn
-	savedConn   *domain.Connection
+	conn               Connection
+	getConnByPhoneErr  error
+	domainConn         domain.Connection
+	partyPhone         string
+	partyName          string
+	messages           []domain.Message
+	templates          []domain.Template
+	optIns             []domain.OptIn
+	savedMsg           *domain.Message
+	savedTpl           *domain.Template
+	savedOptIn         *domain.OptIn
+	savedConn          *domain.Connection
 }
 
 func (r *testRepo) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
@@ -45,6 +47,9 @@ func (r *testRepo) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates
 }
 
 func (r *testRepo) GetConnectionByPhoneNumberID(ctx context.Context, phoneNumberID string) (Connection, error) {
+	if r.getConnByPhoneErr != nil {
+		return Connection{}, r.getConnByPhoneErr
+	}
 	return r.conn, nil
 }
 
@@ -400,5 +405,135 @@ func TestRegisterOptIn(t *testing.T) {
 	}
 	if repo.savedOptIn == nil {
 		t.Fatal("opt-in was not saved to repository")
+	}
+}
+
+func TestVerifyWebhook_InvalidMode(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "verify-token", "")
+	_, err := uc.VerifyWebhook("unsubscribe", "verify-token", "12345")
+	if err == nil {
+		t.Fatal("VerifyWebhook() error = nil, want error for invalid mode")
+	}
+}
+
+func TestVerifyWebhook_MissingChallenge(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "verify-token", "")
+	_, err := uc.VerifyWebhook("subscribe", "verify-token", "  ")
+	if err == nil {
+		t.Fatal("VerifyWebhook() error = nil, want error for empty challenge")
+	}
+}
+
+func TestVerifyWebhook_InvalidToken(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "verify-token", "")
+	_, err := uc.VerifyWebhook("subscribe", "wrong-token", "12345")
+	if err == nil {
+		t.Fatal("VerifyWebhook() error = nil, want error for bad verify token")
+	}
+}
+
+func TestVerifyWebhook_TokenNotConfigured(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "", "")
+	_, err := uc.VerifyWebhook("subscribe", "any", "12345")
+	if err == nil {
+		t.Fatal("VerifyWebhook() error = nil, want error when verify token is empty")
+	}
+}
+
+func TestHandleInboundWebhook_InvalidJSON(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`not-json`))
+	if err == nil {
+		t.Fatal("HandleInboundWebhook() error = nil, want bad input for invalid JSON")
+	}
+}
+
+func TestHandleInboundWebhook_NoMessages(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	result, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result.Processed != 0 || result.Replied != 0 {
+		t.Fatalf("result = %+v, want zeros", result)
+	}
+}
+
+func TestHandleInboundWebhook_SkipsUnknownConnection(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{
+		getConnByPhoneErr: gorm.ErrRecordNotFound,
+	}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, &testMetaClient{}, nil, "", "")
+	payload := []byte(`{
+		"object":"whatsapp_business_account",
+		"entry":[{"changes":[{"field":"messages","value":{
+			"metadata":{"phone_number_id":"999"},
+			"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]
+		}}]}]
+	}`)
+	result, err := uc.HandleInboundWebhook(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result.Processed != 0 {
+		t.Fatalf("Processed = %d, want 0 when org is unknown", result.Processed)
+	}
+}
+
+func TestHandleInboundWebhook_RequiresAI(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
+	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
+	if err == nil {
+		t.Fatal("HandleInboundWebhook() error = nil, want error when AI is not configured")
+	}
+}
+
+func TestHandleInboundWebhook_RequiresMeta(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, nil, nil, "", "")
+	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
+	if err == nil {
+		t.Fatal("HandleInboundWebhook() error = nil, want error when Meta client is not configured")
+	}
+}
+
+func TestConnect_Validation(t *testing.T) {
+	t.Parallel()
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "", "")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
+	_, err := uc.Connect(context.Background(), orgID, "", "waba", "token", "", "")
+	if err == nil {
+		t.Fatal("Connect() error = nil, want error when phone_number_id empty")
+	}
+	_, err = uc.Connect(context.Background(), orgID, "phone", "", "token", "", "")
+	if err == nil {
+		t.Fatal("Connect() error = nil, want error when waba_id empty")
+	}
+	_, err = uc.Connect(context.Background(), orgID, "phone", "waba", "", "", "")
+	if err == nil {
+		t.Fatal("Connect() error = nil, want error when access_token empty")
+	}
+}
+
+func TestDisconnect(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	if err := uc.Disconnect(context.Background(), orgID); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
 	}
 }

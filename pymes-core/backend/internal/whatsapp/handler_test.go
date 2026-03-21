@@ -168,3 +168,53 @@ func TestHandleWebhookProcessesValidPayload(t *testing.T) {
 		t.Fatalf("signature = %q, want %q", uc.signature, "sha256=good")
 	}
 }
+
+func TestVerifyWebhookGETSuccess(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "meta-verify-secret", "")
+	handler := NewHandler(uc)
+
+	router := gin.New()
+	router.GET("/v1/webhooks/whatsapp", handler.VerifyWebhook)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=meta-verify-secret&hub.challenge=challenge-xyz",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if rec.Body.String() != "challenge-xyz" {
+		t.Fatalf("body = %q, want challenge echoed", rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want text/plain", ct)
+	}
+}
+
+func TestVerifyWebhookGETRejectsBadToken(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "meta-verify-secret", "")
+	handler := NewHandler(uc)
+
+	router := gin.New()
+	router.GET("/v1/webhooks/whatsapp", handler.VerifyWebhook)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=challenge-xyz",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusOK {
+		t.Fatalf("status = %d, want non-OK for bad token", rec.Code)
+	}
+}

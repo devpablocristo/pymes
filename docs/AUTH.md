@@ -21,16 +21,22 @@ Este documento fija **el primer bloque** del SaaS: **cómo entra un usuario a la
 
 ## Configuración: consola con Clerk
 
-1. Crear aplicación en [Clerk](https://clerk.com) y obtener la **publishable key**.
-2. En `.env` del frontend (o `docker-compose`):
+Guía paso a paso (Docker local): **[CLERK_LOCAL.md](./CLERK_LOCAL.md)**.
+
+Resumen:
+
+1. Crear aplicación en [Clerk](https://clerk.com) y obtener la **publishable key** (`pk_test_...` / `pk_live_...`).
+2. En `.env` en la raíz del monorepo (lo leen `frontend` y `cp-backend` vía `docker-compose`):
    - `VITE_CLERK_PUBLISHABLE_KEY=pk_...`
-3. En el backend (`pymes-core`, mismo `.env` que uses para `go run` / Lambda):
-   - `JWKS_URL=https://<tu-instancia-clerk>/.well-known/jwks.json`
-   - `JWT_ISSUER=https://<tu-instancia-clerk>` (valor que emite el token)
+3. En el mismo `.env` para el backend:
+   - `JWKS_URL=https://<Frontend-API-de-Clerk>/.well-known/jwks.json`
+   - `JWT_ISSUER=https://<Frontend-API-de-Clerk>` (debe coincidir con el claim `iss` del JWT)
    - `AUTH_ENABLE_JWT=true`
    - Opcional: `CLERK_WEBHOOK_SECRET` para sincronizar usuarios/orgs en `core/saas` (ver `saas/go/clerkwebhook` en `core`).
 
-Sin JWKS/issuer correctos, el backend rechazará el Bearer token aunque el frontend tenga sesión Clerk.
+Sin JWKS/issuer correctos, el Bearer puede fallar la verificación. El middleware SaaS intenta **después** la **clave API** (`X-API-KEY`) si viene en el request y `AUTH_ALLOW_API_KEY=true` (útil en dev cuando el JWT de Clerk aún no trae `org_id` alineado al tenant). En producción conviene que el JWT sea suficiente y la clave API solo para integraciones.
+
+El cliente HTTP (`core-authn`) puede enviar **Bearer y `X-API-KEY` a la vez** si `VITE_API_KEY` está definida: el backend usa JWT si valida; si no, acepta la clave.
 
 ## Configuración: desarrollo sin Clerk
 
@@ -49,14 +55,15 @@ Documentá en el equipo: *sin Clerk en local = modo consola con API key; con Cle
 - En **Perfil** (`/settings`), sin Clerk se muestra la **sesión resuelta** (`GET /v1/session`) y datos de **`GET /v1/users/me`** si hay usuario sincronizado (típicamente vacío con solo clave API); enlace a **Claves API** para rotar credenciales.
 - Uso pensado: **solo local**; no es un sustituto de producción.
 
-### Puerto del API (8100 vs 8080)
+### Puerto del API (8100 en el host)
 
-- **`make cp-run`** y **`go run ./cmd/local`** sin `PORT` en el entorno: el backend escucha en **8100** por defecto (mismo criterio que `VITE_API_URL=http://localhost:8100` y que el host Docker `8100:8080`).
-- Si cargás un `.env` con **`PORT=8080`** (pensado para el contenedor) y corrés el binario **en el host**, el API queda en **8080**: tenés que poner **`VITE_API_URL=http://localhost:8080`** o no exportar `PORT` al usar `go run`.
+- **Con Docker (flujo habitual):** `cp-backend` escucha **8080 dentro del contenedor** y Compose publica **`8100:8080`** en el host. El navegador y Vite usan **`VITE_API_URL=http://localhost:8100`** (y el `.env` del compose ya lo suele fijar).
+- **`PORT=8080` en `.env`** es el valor pensado para ese contenedor; no hace falta tocarlo para desarrollo normal.
+- **Solo si ejecutás el binario Go en el host** (caso excepcional): `cmd/local` puede usar **8100** por defecto; si forzás otro puerto, alineá **`VITE_API_URL`** al puerto donde realmente escucha el API.
 
 ### CORS (Vite en otro puerto que el API)
 
-El backend permite por defecto orígenes `http://localhost:5173`, `http://localhost:5180` y `127.0.0.1` en esos puertos, y además **`FRONTEND_URL`** (sin duplicar). Si el navegador muestra **Failed to fetch** y en consola aparece CORS, alineá **`FRONTEND_URL`** en el backend con la URL real del Vite (p. ej. `http://localhost:5180`) y reiniciá el proceso Go.
+El backend permite por defecto orígenes `http://localhost:5173`, `http://localhost:5180` y `127.0.0.1` en esos puertos, y además **`FRONTEND_URL`** (sin duplicar). Si el navegador muestra **Failed to fetch** y en consola aparece CORS, alineá **`FRONTEND_URL`** en el backend con la URL real del frontend (p. ej. `http://localhost:5180`) y reiniciá el servicio (`docker compose restart cp-backend` o el contenedor que corresponda).
 
 ## Roles de producto (`admin` | `user`)
 

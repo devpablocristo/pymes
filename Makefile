@@ -1,4 +1,5 @@
-# Pymes — comandos frecuentes (docker-compose.yml en la raíz de este directorio)
+# Pymes — comandos frecuentes. Flujo local habitual: todo en contenedores (`make up`), no apps nativas en el host.
+# docker-compose.yml en la raíz de este directorio.
 .PHONY: up down build test logs ps
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct

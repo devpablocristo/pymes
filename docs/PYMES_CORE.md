@@ -45,15 +45,15 @@ Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-co
 
 ## Cómo ejecutar y probar
 
-Desde la raíz del monorepo (ver también `Makefile`):
+Desde la raíz del monorepo:
 
 ```bash
-make cp-build    # pymes-core/backend
-make cp-test
-cd pymes-core/backend && go run ./cmd/local
+make up          # stack: Postgres, backends, frontend, AI (Docker)
+make build       # compilar backends + frontend (CI / verificación local)
+make test
 ```
 
-Variables: ver `.env.example` (no commitear secretos).
+Variables: ver `.env.example` (no commitear secretos). Para ejecutar solo el binario `go run` en el host (caso excepcional), ver [AUTH.md](./AUTH.md).
 
 ## Frontend y consola de módulos
 

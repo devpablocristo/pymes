@@ -68,6 +68,8 @@ services:
       VITE_PROFESSIONALS_API_URL: http://localhost:8181
       VITE_WORKSHOPS_API_URL: http://localhost:8282
       VITE_BEAUTY_API_URL: http://localhost:8383
+      # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
+      VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     depends_on:
       - cp-backend
 

@@ -26,12 +26,11 @@ El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables uni
 - AI unificado: `http://localhost:8200`
 - frontend unificado: `http://localhost:5180`
 
-Comandos:
+Comandos (stack en contenedores):
 
 ```bash
-make cp-run
-make ai-dev
-make frontend-dev
+make up
+make logs
 ```
 
 ## Seguridad interna
@@ -46,6 +45,5 @@ make frontend-dev
 ```bash
 go test ./pymes-core/backend/...
 go test ./pymes-core/shared/backend/...
-make ai-test
-make frontend-test
+make test
 ```

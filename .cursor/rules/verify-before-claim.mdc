@@ -6,14 +6,18 @@ alwaysApply: true
 
 # Regla obligatoria: probar → corregir → repetir hasta éxito
 
+**Nunca decir que algo “está hecho”, “listo” o “probá” sin haber ejecutado en este turno la verificación que corresponde al cambio** (build, test, o comando explícito acordado). Si no se pudo probar, decirlo claro.
+
 Antes de devolver **cualquier** resultado al usuario:
 
 1. **Ejecutar la prueba correspondiente** al cambio realizado:
-   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde `pymes-core/backend/`
+   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde el `backend/` del servicio tocado (p. ej. `pymes-core/backend/`)
    - Lambda entrypoint: `go build -o /dev/null ./cmd/lambda/` para verificar que compila
-   - Local entrypoint: `go build -o /dev/null ./cmd/local/` para verificar que compila
-   - Frontend (React/Vite): `npm run build` desde `pymes-core/frontend/`
-   - Endpoint nuevo: levantar con `go run ./cmd/local/` y `curl` para verificar HTTP + body
+   - Local entrypoint: `go build -o /dev/null ./cmd/local/` para verificar que compila (sigue existiendo; prod corre en Lambda/containers)
+   - Frontend (React/Vite): `npm run build` (y `npm test` si tocó lógica o UI) desde `frontend/`
+   - **Nueva dependencia npm en el frontend y uso con Docker:** además de `npm run build` en host, **`docker compose build frontend`** (o `make up` con rebuild) — la imagen `Dockerfile.dev` solo hace `npm install` al construir; el contenedor no ve `package.json` nuevo hasta reconstruir la imagen
+   - Monorepo completo (opcional): `make build` / `make test` desde la raíz del repo
+   - Endpoint nuevo: con stack en Docker, `make up` y `curl` al puerto publicado en el host (p. ej. control plane `http://localhost:8100`). Solo usar `go run ./cmd/local/` en el host si el entorno no usa contenedores o para depurar el binario aislado
    - Infraestructura Terraform: `terraform validate` desde `pymes-core/infra/`
    - Migraciones SQL: verificar sintaxis y que up/down son reversibles
    - Script nuevo: ejecutarlo y verificar que termina sin error

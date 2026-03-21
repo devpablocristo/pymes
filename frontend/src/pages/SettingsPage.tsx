@@ -1,11 +1,10 @@
-import { UserProfile } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMe, getSession } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
-import type { MeProfileResponse, SessionResponse } from '../lib/types';
+import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
 
 function authMethodLabel(t: (key: string) => string, method: string): string {
   const m = method.toLowerCase();
@@ -74,7 +73,30 @@ function ProfileSessionRows({
   );
 }
 
-function ApiKeyModeProfile() {
+function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
+  const initial =
+    user.name?.trim().charAt(0)?.toUpperCase() ||
+    user.email?.trim().charAt(0)?.toUpperCase() ||
+    '?';
+
+  return (
+    <div className="profile-account-block">
+      {user.avatar_url ? (
+        <img className="profile-account-avatar" src={user.avatar_url} alt="" width={64} height={64} />
+      ) : (
+        <div className="profile-account-avatar profile-account-avatar-placeholder" aria-hidden>
+          {initial}
+        </div>
+      )}
+      <div className="profile-account-text">
+        <p className="profile-account-name">{user.name?.trim() || '—'}</p>
+        <p className="profile-account-email text-muted">{user.email?.trim() || '—'}</p>
+      </div>
+    </div>
+  );
+}
+
+function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -82,6 +104,9 @@ function ApiKeyModeProfile() {
   const [error, setError] = useState('');
   const [meWarning, setMeWarning] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
+
+  const user = me?.user;
+  const accountLoadFailed = Boolean(meWarning);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,15 +137,8 @@ function ApiKeyModeProfile() {
     };
   }, [reloadToken, t]);
 
-  const user = me?.user;
-
   return (
     <>
-      <div className="page-header">
-        <h1>Perfil</h1>
-        <p>Gestiona tu cuenta y preferencias</p>
-      </div>
-
       {error && (
         <div className="alert alert-error">
           <p>{error}</p>
@@ -134,37 +152,42 @@ function ApiKeyModeProfile() {
 
       {meWarning && !error && <div className="alert alert-warning">{meWarning}</div>}
 
-      <div className="card">
-        <div className="card-header">
-          <h2>{t('profile.apiMode.title')}</h2>
-        </div>
-        <p className="profile-api-mode-lead">{t('profile.apiMode.lead')}</p>
-        <p>
-          <Link to="/settings/keys" className="btn-secondary">
-            {t('profile.apiMode.keysCta')}
-          </Link>
-        </p>
+      {clerkMode && (
+        <p className="profile-clerk-hint text-muted">{t('profile.clerk.hintSecurity')}</p>
+      )}
 
+      {!clerkMode && (
+        <div className="card">
+          <div className="card-header profile-card-header-api">
+            <h2>{t('profile.apiMode.title')}</h2>
+            <span className="badge badge-neutral profile-mode-badge">{t('profile.apiMode.badge')}</span>
+          </div>
+          <p className="profile-api-mode-lead">{t('profile.apiMode.lead')}</p>
+          <p>
+            <Link to="/settings/keys" className="btn-secondary">
+              {t('profile.apiMode.keysCta')}
+            </Link>
+          </p>
+        </div>
+      )}
+
+      <div className="card">
         {loading ? (
           <p className="text-muted">{t('common.status.loading')}</p>
         ) : (
           <>
-            <h3 className="profile-subsection-title">{t('profile.section.account')}</h3>
+            <h3 className="profile-subsection-title profile-subsection-title--first">{t('profile.section.account')}</h3>
             {user ? (
-              <table className="profile-session-table">
-                <tbody>
-                  <tr>
-                    <th scope="row">{t('profile.labels.name')}</th>
-                    <td>{user.name || '—'}</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">{t('profile.labels.email')}</th>
-                    <td>{user.email || '—'}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <ProfileAccountBlock user={user} />
+            ) : accountLoadFailed ? (
+              <p className="text-muted">{t('profile.account.unavailable')}</p>
             ) : (
-              <p className="text-muted">{t('profile.accountPlaceholder')}</p>
+              <div className="profile-account-panel" role="status">
+                <p className="profile-account-panel-title">{t('profile.account.empty.title')}</p>
+                <p className="profile-account-panel-body">
+                  {clerkMode ? t('profile.account.empty.clerk') : t('profile.account.empty.body')}
+                </p>
+              </div>
             )}
 
             {session && (
@@ -181,17 +204,14 @@ function ApiKeyModeProfile() {
 }
 
 export function SettingsPage() {
-  return clerkEnabled ? (
+  const { t } = useI18n();
+  return (
     <>
       <div className="page-header">
-        <h1>Perfil</h1>
-        <p>Gestiona tu cuenta y preferencias</p>
+        <h1>{t('profile.page.title')}</h1>
+        <p>{t('profile.page.subtitle')}</p>
       </div>
-      <div className="card">
-        <UserProfile routing="path" path="/settings" />
-      </div>
+      <SettingsProfileBody clerkMode={clerkEnabled} />
     </>
-  ) : (
-    <ApiKeyModeProfile />
   );
 }

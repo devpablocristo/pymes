@@ -22,9 +22,11 @@ make up
 # equivalente: docker compose up -d --build
 ```
 
-**Identidad en local:** por defecto se trabaja **sin Clerk** y con **clave API** (`psk_local_admin` en `.env.example`). Ver [docs/AUTH.md](docs/AUTH.md) (*desarrollo sin Clerk* y prioridad recomendada).
+**Flujo habitual:** todo el stack en **contenedores** (`make up`); no hace falta levantar backends ni el frontend como procesos nativos en el host.
 
-Servicios locales:
+**Identidad en local:** por defecto se trabaja **sin Clerk** y con **clave API** (`psk_local_admin` en `.env.example`). Ver [docs/AUTH.md](docs/AUTH.md). Para **login con Clerk** en Docker: [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md).
+
+Servicios expuestos al host (con `docker compose` levantado):
 
 - pymes-core backend: `http://localhost:8100`
 - professionals backend: `http://localhost:8181`
@@ -38,15 +40,9 @@ API key local de desarrollo:
 
 - `psk_local_admin`
 
-## Desarrollo mixto
+## Desarrollo avanzado (sin contenedor para un servicio)
 
-Solo infra en Docker y backends a mano (ajustá `DATABASE_URL` y `PORT` según [docs/AUTH.md](docs/AUTH.md)):
-
-```bash
-docker compose up -d postgres mailhog
-cd pymes-core/backend && PORT=8100 go run ./cmd/local
-# En otras terminales: professionals/backend, workshops/backend, frontend (`npm run dev`), ai (`uvicorn ...`)
-```
+Si necesitás ejecutar un solo binario en el host (p. ej. depurar `pymes-core` con Delve), alineá `DATABASE_URL`, `PORT` y `VITE_API_URL` como en [docs/AUTH.md](docs/AUTH.md) (*puerto del API*). No es el flujo por defecto del equipo.
 
 ## Estructura
 

@@ -41,7 +41,7 @@ Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/A
 1. TLDR primero
 2. Ideal primero, luego práctico si difieren
 3. Esperar aprobación antes de implementar algo no trivial
-4. Verificar antes de decir "listo": `go build` + `go vet` + `go test`
+4. Verificar antes de decir "listo": en el backend tocado, `go build` + `go vet` + `go test`; desde la raíz del monorepo opcionalmente `make build` / `make test` (stack en Docker es el flujo local habitual — ver §10).
 5. Nunca decir "listo" sin evidencia de ejecución exitosa
 
 ---
@@ -268,6 +268,12 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 - `postgres:16-alpine`, `restart: unless-stopped`, healthcheck
 - Puertos configurables via env vars
+
+### Desarrollo local (contenedores)
+
+- **Flujo habitual del equipo:** levantar todo con **`make up`** (o `docker compose up -d --build`) desde la raíz del monorepo donde está `docker-compose.yml`; no se asume correr backends, frontend ni AI como procesos nativos en el host.
+- Los **`cmd/local/main.go`** siguen existiendo (paridad con Gin, depuración, `go build` de verificación); ejecutarlos con `go run` en el host es **opcional** y está documentado en **`docs/AUTH.md`** como caso excepcional.
+- Ver también **`README.md`** y **`Makefile`** (objetivos `up`, `down`, `build`, `test`, `logs`, `ps`).
 
 ### Nombres prohibidos
 

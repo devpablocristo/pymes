@@ -1,9 +1,11 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { esMX } from '@clerk/localizations';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { clerkEnabled, clerkPublishableKey } from './lib/auth';
+import { clerkAppearance } from './lib/clerkAppearance';
 import { App } from './app/App';
 import { LanguageProvider } from './lib/i18n';
 import { applyTheme } from './lib/theme';
@@ -54,7 +56,13 @@ const app = (
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   clerkEnabled ? (
-    <ClerkProvider publishableKey={clerkPublishableKey}>{app}</ClerkProvider>
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      localization={esMX}
+      appearance={clerkAppearance}
+    >
+      {app}
+    </ClerkProvider>
   ) : (
     app
   ),

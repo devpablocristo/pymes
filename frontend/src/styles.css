@@ -670,7 +670,7 @@ code {
   color: var(--color-text);
 }
 
-.profile-subsection-title:first-of-type {
+.profile-subsection-title--first {
   margin-top: 0.5rem;
 }
 
@@ -703,6 +703,91 @@ code {
 .profile-scope-badge {
   margin-right: 0.35rem;
   margin-bottom: 0.25rem;
+}
+
+.profile-card-header-api {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.profile-card-header-api h2 {
+  margin: 0;
+}
+
+.profile-mode-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.profile-account-panel {
+  margin-top: 0.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-hover);
+}
+
+.profile-account-panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.profile-account-panel-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.profile-clerk-hint {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0 0 1rem;
+  max-width: 42rem;
+}
+
+.profile-account-block {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.profile-account-avatar {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.profile-account-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--color-accent-muted, #3b4a6b), var(--color-surface-hover));
+  color: var(--color-text);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.profile-account-name {
+  margin: 0 0 0.2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.profile-account-email {
+  margin: 0;
+  font-size: 0.9rem;
 }
 
 /* ── Empty state ── */

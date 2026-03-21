@@ -11,7 +11,7 @@ alwaysApply: true
 - **DB**: RDS PostgreSQL 16 via RDS Proxy. ORM: GORM.
 - **DI**: Manual en `wire/bootstrap.go` (constructores explícitos, sin code generation).
 - **Migraciones**: `golang-migrate` con `embed.FS` en `migrations/runner.go`, ejecutadas al arrancar.
-- **Entrypoints**: cada servicio backend expone `cmd/lambda/main.go` (prod) y opcionalmente `cmd/local/main.go` (dev).
+- **Entrypoints**: cada servicio backend expone `cmd/lambda/main.go` (prod) y `cmd/local/main.go` (Gin en proceso local; en este repo el **desarrollo habitual** es con **Docker** — `make up` — no binarios nativos en el host salvo depuración).
 
 ## Naming
 
@@ -108,7 +108,7 @@ func main() { lambda.Start(handler) }
 ```
 
 ```go
-// cmd/local/main.go — dev (Gin directo)
+// cmd/local/main.go — Gin directo (útil para depurar; en local el equipo suele usar la imagen Docker del servicio)
 func main() {
     app := wire.InitializeApp()
     app.Router.Run(":8080")

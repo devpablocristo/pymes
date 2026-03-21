@@ -11,9 +11,9 @@ alwaysApply: false
 Cuando el usuario pida actualizar, corregir o crear documentación:
 
 1. **ESCANEAR el proyecto completo** antes de escribir una sola línea:
-   - Estructura de directorios (`pymes-core/backend/`, `pymes-core/frontend/`, `pymes-core/infra/`)
-   - Entry points reales (`pymes-core/backend/cmd/lambda/main.go`, `pymes-core/backend/cmd/local/main.go`)
-   - `pymes-core/backend/go.mod`, `pymes-core/frontend/package.json`
+   - Estructura de directorios (`pymes-core/backend/`, `frontend/`, `ai/`, `pymes-core/infra/`)
+   - Entry points reales (`pymes-core/backend/cmd/lambda/main.go`, `pymes-core/backend/cmd/local/main.go`; despliegue local habitual vía Docker)
+   - `pymes-core/backend/go.mod`, `frontend/package.json`
    - Endpoints reales (`pymes-core/backend/wire/bootstrap.go`, handlers de cada módulo)
    - Migraciones existentes (`pymes-core/backend/migrations/`)
    - Módulos en `pymes-core/backend/internal/` (identity, billing, users, audit, admin, org, clerkwebhook, notifications, shared)

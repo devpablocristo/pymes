@@ -102,18 +102,16 @@ Cada modulo interno del vertical sigue esta forma:
 
 `teachers` ya usa este estandar completo y funciona como blueprint para futuros modulos dentro de `professionals`.
 
-Comandos:
+Comandos (stack en contenedores desde la raíz del monorepo):
 
 ```bash
-make prof-run
-make frontend-dev
-make ai-dev
+make up
+make logs
 ```
 
 ## Validacion
 
 ```bash
 go test ./professionals/backend/...
-make ai-test
-make frontend-test
+make test
 ```

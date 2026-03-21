@@ -11,6 +11,7 @@
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [CONTROL_PLANE.md](./CONTROL_PLANE.md) | Control plane, seguridad interna, comandos de validación |
 | [AUTH.md](./AUTH.md) | Identidad, Clerk vs local; **prioridad dev:** API key / consola técnica sin Clerk |
+| [CLERK_LOCAL.md](./CLERK_LOCAL.md) | Checklist para **encender Clerk** en local con Docker (`VITE_CLERK_*`, JWKS, issuer) |
 | [PROFESSIONALS.md](./PROFESSIONALS.md) | Vertical umbrella `professionals` (módulo `teachers`) |
 | [WORKSHOPS.md](./WORKSHOPS.md) | Vertical umbrella `workshops` (`auto_repair`) |
 | [BEAUTY.md](./BEAUTY.md) | Vertical belleza/salón (`beauty`) |
@@ -39,10 +40,10 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 ## Validación rápida
 
 ```bash
+make up
+make build
 make test
-make lint
-make frontend-build
-docker compose up -d --build
+make down
 ```
 
 ## Frontend CRUD

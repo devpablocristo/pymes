@@ -13,7 +13,8 @@ alwaysApply: true
 - Código: inglés. Comentarios: español. Respuestas: español.
 
 ## Flujo
-- TLDR primero. Ideal primero. Esperar aprobación. Verificar antes de decir "listo".
+- TLDR primero. Ideal primero. Esperar aprobación.
+- **Verificación obligatoria** (ver `verify-before-claim.mdc`): en este turno ejecutar `make build` + `make test` desde la raíz del monorepo cuando el cambio afecta entrega o varios paquetes; o el subconjunto equivalente. **Nunca** decir “listo” / “ya está” sin haber corrido comandos y visto salida OK.
 
 ## Prohibiciones
 - NUNCA valores hardcodeados
@@ -23,6 +24,6 @@ alwaysApply: true
 - NUNCA repos in-memory como artefacto de producción
 - NUNCA sufijos en archivos si solo hay una implementación
 - NUNCA modificar migraciones existentes
-- NUNCA decir "listo" sin build + test exitosos
+- NUNCA decir "listo", "ya está" o "funciona" sin haber ejecutado en **este turno** los comandos de verificación (`make build` / `make test` o equivalente según `verify-before-claim.mdc`) y haber obtenido salida exitosa
 - NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP

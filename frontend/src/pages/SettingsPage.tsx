@@ -1,3 +1,4 @@
+import { useOrganization, useUser } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMe, getSession } from '../lib/api';
@@ -6,66 +7,43 @@ import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
 
-function authMethodLabel(t: (key: string) => string, method: string): string {
-  const m = method.toLowerCase();
-  if (m === 'jwt') return t('profile.authMethod.jwt');
-  if (m === 'api_key') return t('profile.authMethod.api_key');
-  if (m === '') return '—';
-  return `${t('profile.authMethod.other')} (${method})`;
+function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
+  const clerk = clerkOrgName?.trim() || '';
+  const apiName = typeof auth.org_name === 'string' ? auth.org_name.trim() : '';
+  const id = auth.org_id?.trim() || '';
+  return clerk || apiName || id || '—';
+}
+
+function accountTypeLabel(t: (key: string) => string, productRole: SessionResponse['auth']['product_role']): string {
+  return productRole === 'admin' ? t('profile.accountTypeValue.admin') : t('profile.accountTypeValue.user');
 }
 
 function ProfileSessionRows({
   session,
+  clerkOrgName,
   t,
 }: {
   session: SessionResponse;
+  /** Nombre de la org activa en Clerk (solo modo Clerk); prioridad sobre org_name del API. */
+  clerkOrgName?: string | null;
   t: (key: string) => string;
 }) {
   const { auth } = session;
-  const productLabel = auth.product_role === 'admin' ? t('shell.role.admin') : t('shell.role.user');
+  const orgLabel = profileOrgLabel(auth, clerkOrgName);
+  const typeLabel = accountTypeLabel(t, auth.product_role);
   return (
     <table className="profile-session-table">
       <tbody>
         <tr>
           <th scope="row">{t('profile.labels.org')}</th>
           <td>
-            <code className="mono">{auth.org_id || '—'}</code>
+            <span className="profile-session-value">{orgLabel}</span>
           </td>
         </tr>
         <tr>
-          <th scope="row">{t('profile.labels.productRole')}</th>
+          <th scope="row">{t('profile.labels.accountType')}</th>
           <td>
-            <span className="badge badge-neutral">{productLabel}</span>
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">{t('profile.labels.roleRaw')}</th>
-          <td>
-            <code className="mono">{auth.role || '—'}</code>
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">{t('profile.labels.actor')}</th>
-          <td>
-            <code className="mono">{auth.actor || '—'}</code>
-          </td>
-        </tr>
-        <tr>
-          <th scope="row">{t('profile.labels.authMethod')}</th>
-          <td>{authMethodLabel(t, auth.auth_method)}</td>
-        </tr>
-        <tr>
-          <th scope="row">{t('profile.labels.scopes')}</th>
-          <td>
-            {auth.scopes.length === 0 ? (
-              <span className="text-muted">—</span>
-            ) : (
-              auth.scopes.map((s) => (
-                <span key={s} className="badge badge-neutral profile-scope-badge">
-                  {s}
-                </span>
-              ))
-            )}
+            <span className="profile-session-value">{typeLabel}</span>
           </td>
         </tr>
       </tbody>
@@ -92,6 +70,71 @@ function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
         <p className="profile-account-name">{user.name?.trim() || '—'}</p>
         <p className="profile-account-email text-muted">{user.email?.trim() || '—'}</p>
       </div>
+    </div>
+  );
+}
+
+/** Enriquece la tarjeta Cuenta: el JWT suele no traer email/nombre; Clerk en el browser sí. */
+function mergeClerkSessionWithApiUser(
+  clerkUser: NonNullable<ReturnType<typeof useUser>['user']>,
+  apiUser: MeProfileUser | null | undefined,
+): MeProfileUser {
+  const email =
+    clerkUser.primaryEmailAddress?.emailAddress?.trim() ||
+    apiUser?.email?.trim() ||
+    '';
+  const nameFromClerk =
+    (typeof clerkUser.fullName === 'string' ? clerkUser.fullName.trim() : '') ||
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() ||
+    clerkUser.username?.trim() ||
+    '';
+  const name = nameFromClerk || apiUser?.name?.trim() || '';
+  return {
+    id: apiUser?.id || clerkUser.id,
+    external_id: apiUser?.external_id || clerkUser.id,
+    email,
+    name,
+    avatar_url: clerkUser.imageUrl || apiUser?.avatar_url || null,
+  };
+}
+
+/** Solo se monta en modo Clerk para poder usar useOrganization sin romper el build sin ClerkProvider. */
+function ClerkProfileSessionRows({ session, t }: { session: SessionResponse; t: (key: string) => string }) {
+  const { organization } = useOrganization();
+  const clerkOrgName = organization?.name?.trim() || null;
+  return <ProfileSessionRows session={session} clerkOrgName={clerkOrgName} t={t} />;
+}
+
+function ClerkProfileAccountSection({
+  apiUser,
+  accountLoadFailed,
+}: {
+  apiUser: MeProfileUser | null | undefined;
+  accountLoadFailed: boolean;
+}) {
+  const { t } = useI18n();
+  const { isLoaded, user: clerkUser } = useUser();
+
+  if (!isLoaded) {
+    return <p className="text-muted">{t('common.status.loading')}</p>;
+  }
+
+  if (clerkUser) {
+    return <ProfileAccountBlock user={mergeClerkSessionWithApiUser(clerkUser, apiUser)} />;
+  }
+
+  if (apiUser) {
+    return <ProfileAccountBlock user={apiUser} />;
+  }
+
+  if (accountLoadFailed) {
+    return <p className="text-muted">{t('profile.account.unavailable')}</p>;
+  }
+
+  return (
+    <div className="profile-account-panel" role="status">
+      <p className="profile-account-panel-title">{t('profile.account.empty.title')}</p>
+      <p className="profile-account-panel-body">{t('profile.account.empty.clerk')}</p>
     </div>
   );
 }
@@ -152,10 +195,6 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
 
       {meWarning && !error && <div className="alert alert-warning">{meWarning}</div>}
 
-      {clerkMode && (
-        <p className="profile-clerk-hint text-muted">{t('profile.clerk.hintSecurity')}</p>
-      )}
-
       {!clerkMode && (
         <div className="card">
           <div className="card-header profile-card-header-api">
@@ -177,23 +216,30 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
         ) : (
           <>
             <h3 className="profile-subsection-title profile-subsection-title--first">{t('profile.section.account')}</h3>
-            {user ? (
+            {clerkMode ? (
+              <ClerkProfileAccountSection apiUser={user ?? undefined} accountLoadFailed={accountLoadFailed} />
+            ) : user ? (
               <ProfileAccountBlock user={user} />
             ) : accountLoadFailed ? (
               <p className="text-muted">{t('profile.account.unavailable')}</p>
             ) : (
               <div className="profile-account-panel" role="status">
                 <p className="profile-account-panel-title">{t('profile.account.empty.title')}</p>
-                <p className="profile-account-panel-body">
-                  {clerkMode ? t('profile.account.empty.clerk') : t('profile.account.empty.body')}
-                </p>
+                <p className="profile-account-panel-body">{t('profile.account.empty.body')}</p>
               </div>
             )}
 
             {session && (
               <>
-                <h3 className="profile-subsection-title">{t('profile.section.session')}</h3>
-                <ProfileSessionRows session={session} t={t} />
+                <hr className="profile-section-divider" aria-hidden="true" />
+                <h3 className="profile-subsection-title profile-subsection-title--after-divider">
+                  {t('profile.section.session')}
+                </h3>
+                {clerkMode ? (
+                  <ClerkProfileSessionRows session={session} t={t} />
+                ) : (
+                  <ProfileSessionRows session={session} clerkOrgName={null} t={t} />
+                )}
               </>
             )}
           </>
@@ -206,12 +252,12 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
 export function SettingsPage() {
   const { t } = useI18n();
   return (
-    <>
+    <div className="profile-page">
       <div className="page-header">
         <h1>{t('profile.page.title')}</h1>
         <p>{t('profile.page.subtitle')}</p>
       </div>
       <SettingsProfileBody clerkMode={clerkEnabled} />
-    </>
+    </div>
   );
 }

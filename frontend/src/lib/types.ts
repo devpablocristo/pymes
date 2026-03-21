@@ -10,6 +10,8 @@ export type ProductRole = 'admin' | 'user';
 
 export type BootstrapAuthPayload = {
   org_id: string;
+  /** Nombre legible desde `orgs.name` (GET /session); puede faltar si no hay fila o está vacío. */
+  org_name?: string | null;
   /** Mismo UUID que `org_id`; nombre alineado con kernel `tenant_id`. */
   tenant_id?: string;
   /** Rol crudo del JWT / API (p. ej. owner, admin, viewer, service). */

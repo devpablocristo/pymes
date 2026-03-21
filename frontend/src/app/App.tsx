@@ -37,8 +37,9 @@ export function App() {
     <>
       <AuthTokenBridge />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        {/* Clerk (path routing) usa subrutas: /login/tasks/choose-organization, etc. */}
+        <Route path="/login/*" element={<LoginPage />} />
+        <Route path="/signup/*" element={<SignupPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route
           path="*"

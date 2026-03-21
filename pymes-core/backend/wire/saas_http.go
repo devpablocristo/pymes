@@ -2,9 +2,11 @@ package wire
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	authn "github.com/devpablocristo/core/authn/go"
 	"github.com/devpablocristo/core/backend/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
@@ -16,16 +18,30 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
 
-func registerPymesSaaSRoutes(mux *http.ServeMux, store *pymesSaaSStore, authMW func(http.Handler) http.Handler, billingRuntime *saasbilling.Runtime) {
+// pymesSaaSHTTPAuth configura lectura segura del JWT en handlers (sync perezoso de perfil Clerk).
+type pymesSaaSHTTPAuth struct {
+	JWKSURL   string
+	JWTIssuer string
+}
+
+func registerPymesSaaSRoutes(
+	mux *http.ServeMux,
+	store *pymesSaaSStore,
+	authMW func(http.Handler) http.Handler,
+	billingRuntime *saasbilling.Runtime,
+	httpAuth pymesSaaSHTTPAuth,
+) {
 	registerPublic(mux, "POST /orgs", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateOrg(w, r, store)
 	})
 
-	// Sesión de producto: envuelve el Principal del kernel (core/saas/go/session) con org_id + product_role.
-	registerProtected(mux, authMW, "GET /session", handleSessionEnriched)
+	// Sesión de producto: envuelve el Principal del kernel (core/saas/go/session) con org_id + product_role (+ org_name si hay fila en orgs).
+	registerProtected(mux, authMW, "GET /session", func(w http.ResponseWriter, r *http.Request) {
+		handleSessionEnriched(w, r, store)
+	})
 
 	registerProtected(mux, authMW, "GET /users/me", func(w http.ResponseWriter, r *http.Request) {
-		handleGetMe(w, r, store)
+		handleGetMe(w, r, store, httpAuth)
 	})
 	registerProtected(mux, authMW, "GET /orgs/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
@@ -93,42 +109,77 @@ func handleCreateOrg(w http.ResponseWriter, r *http.Request, store *pymesSaaSSto
 	})
 }
 
-func handleSessionEnriched(w http.ResponseWriter, r *http.Request) {
+func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
 	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
 	}
-	httperr.WriteJSON(w, http.StatusOK, map[string]any{
-		"auth": map[string]any{
-			"org_id":       principal.TenantID,
-			"tenant_id":    principal.TenantID,
-			"role":         principal.Role,
-			"product_role": authz.ProductRole(principal.Role),
-			"scopes":       principal.Scopes,
-			"actor":        principal.Actor,
-			"auth_method":  principal.AuthMethod,
-		},
-	})
+	auth := map[string]any{
+		"org_id":       principal.TenantID,
+		"tenant_id":    principal.TenantID,
+		"role":         principal.Role,
+		"product_role": authz.ProductRole(principal.Role),
+		"scopes":       principal.Scopes,
+		"actor":        principal.Actor,
+		"auth_method":  principal.AuthMethod,
+	}
+	if store != nil {
+		name, okName, err := store.GetOrgNameByOrgUUID(r.Context(), principal.TenantID)
+		if err != nil {
+			slog.Warn("session org name lookup", "err", err, "org_id", principal.TenantID)
+		} else if okName && strings.TrimSpace(name) != "" {
+			auth["org_name"] = strings.TrimSpace(name)
+		}
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"auth": auth})
 }
 
-func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
 	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
 	}
 	usersUC := saasusers.NewUseCases(store)
-	resp, err := saasusers.NewHandler(usersUC).GetMe(r.Context(), dto.GetMeRequest{
+	handler := saasusers.NewHandler(usersUC)
+	req := dto.GetMeRequest{
 		OrgID:      principal.TenantID,
 		ExternalID: principal.Actor,
 		Role:       principal.Role,
 		Scopes:     principal.Scopes,
-	})
+	}
+	resp, err := handler.GetMe(r.Context(), req)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
+
+	// Sin webhook de Clerk: el JWT ya está verificado en el middleware; creamos usuario + membresía desde claims.
+	if principal.AuthMethod == "jwt" && resp.Profile.User == nil && strings.TrimSpace(httpAuth.JWKSURL) != "" {
+		raw, bearerOK := authn.BearerToken(r.Header.Get("Authorization"))
+		if bearerOK && strings.TrimSpace(raw) != "" {
+			if claims, vErr := verifyJWTClaimsMap(r.Context(), raw, httpAuth.JWKSURL, httpAuth.JWTIssuer); vErr == nil {
+				if sub := stringClaim(claims, "sub"); sub != "" && sub == strings.TrimSpace(principal.Actor) {
+					email := clerkEmailFromClaims(claims)
+					name := clerkDisplayNameFromClaims(claims)
+					if email == "" {
+						email = placeholderClerkEmail(principal.Actor)
+					}
+					if name == "" {
+						name = "User"
+					}
+					if _, upErr := store.UpsertUser(r.Context(), principal.Actor, email, name, nil); upErr == nil {
+						_, _ = store.SyncMembership(r.Context(), principal.TenantID, principal.Actor, email, name, nil, principal.Role)
+						if resp2, gErr := handler.GetMe(r.Context(), req); gErr == nil {
+							resp = resp2
+						}
+					}
+				}
+			}
+		}
+	}
+
 	httperr.WriteJSON(w, http.StatusOK, resp.Profile)
 }
 

@@ -99,7 +99,10 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	}, store, nil, log)
 
 	mux := http.NewServeMux()
-	registerPymesSaaSRoutes(mux, store, authMW, billingRuntime)
+	registerPymesSaaSRoutes(mux, store, authMW, billingRuntime, pymesSaaSHTTPAuth{
+		JWKSURL:   strings.TrimSpace(cfg.JWKSURL),
+		JWTIssuer: strings.TrimSpace(cfg.JWTIssuer),
+	})
 	clerkHandler.Register(mux)
 	saasbilling.NewWebhookHandler(billingRuntime).Register(mux)
 

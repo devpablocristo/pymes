@@ -121,12 +121,61 @@ type pymesUsageCounterRow struct {
 
 func (pymesUsageCounterRow) TableName() string { return "org_usage_counters" }
 
+// GetOrgNameByOrgUUID devuelve el nombre legible de `orgs` para el UUID interno (tenant_id / org_id del token).
+func (s *pymesSaaSStore) GetOrgNameByOrgUUID(ctx context.Context, orgID string) (string, bool, error) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
+		return "", false, nil
+	}
+	id, err := uuid.Parse(orgID)
+	if err != nil {
+		return "", false, nil
+	}
+	var row pymesOrgRow
+	err = s.db.WithContext(ctx).Where("id = ?", id).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	name := strings.TrimSpace(row.Name)
+	if name == "" {
+		return "", false, nil
+	}
+	return name, true, nil
+}
+
 func (s *pymesSaaSStore) FindOrgIDByExternalID(ctx context.Context, externalID string) (string, bool, error) {
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return "", false, nil
+	}
+	// Token con UUID interno (p. ej. entornos que emiten tenant como id de fila).
+	if id, err := uuid.Parse(externalID); err == nil {
+		var row pymesOrgRow
+		err := s.db.WithContext(ctx).Where("id = ?", id).Take(&row).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", false, nil
+		}
+		if err != nil {
+			return "", false, err
+		}
+		return row.ID.String(), true, nil
+	}
 	var row pymesOrgRow
 	err := s.db.WithContext(ctx).
-		Where("external_id = ?", strings.TrimSpace(externalID)).
+		Where("external_id = ?", externalID).
 		Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Clerk emite org_id tipo org_...; sin webhook aún no hay fila. Creamos org mínima (JWT ya verificado).
+		if strings.HasPrefix(externalID, "org_") {
+			orgID, upErr := s.UpsertOrg(ctx, externalID, "Organization")
+			if upErr != nil {
+				return "", false, upErr
+			}
+			return orgID, true, nil
+		}
 		return "", false, nil
 	}
 	if err != nil {

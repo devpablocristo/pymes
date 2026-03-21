@@ -656,33 +656,69 @@ code {
   color: var(--color-text-muted);
 }
 
+/* Perfil: ritmo vertical más compacto y alineado con la card */
+.profile-page .page-header {
+  margin-bottom: 1.25rem;
+}
+
+.profile-page .card {
+  padding: 1.25rem 1.35rem;
+}
+
+.profile-page .card + .card {
+  margin-top: 0.85rem;
+}
+
 .profile-api-mode-lead {
   color: var(--color-text-secondary);
   font-size: 0.95rem;
   line-height: 1.5;
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .profile-subsection-title {
   font-size: 0.95rem;
   font-weight: 600;
-  margin: 1.25rem 0 0.75rem;
+  margin: 0.85rem 0 0.45rem;
   color: var(--color-text);
 }
 
 .profile-subsection-title--first {
-  margin-top: 0.5rem;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
+/* Separador explícito entre Cuenta e Identidad y permisos */
+.profile-section-divider {
+  border: none;
+  margin: 1rem 0 0;
+  height: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-subsection-title--after-divider {
+  margin-top: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Ancho al contenido: si la tabla es 100%, la 2.ª columna se estira y los valores quedan lejos de las claves. */
 .profile-session-table {
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.profile-session-table tbody tr:hover {
+  background: transparent;
 }
 
 .profile-session-table th,
 .profile-session-table td {
-  padding: 0.45rem 0;
-  vertical-align: top;
+  padding: 0.5rem 0;
+  vertical-align: middle;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -692,17 +728,24 @@ code {
 }
 
 .profile-session-table th {
-  width: 11rem;
-  max-width: 42%;
-  padding-right: 1rem;
+  box-sizing: border-box;
+  padding-right: 0.65rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   text-align: left;
+  white-space: nowrap;
 }
 
-.profile-scope-badge {
-  margin-right: 0.35rem;
-  margin-bottom: 0.25rem;
+.profile-session-table td {
+  padding-left: 0;
+  color: var(--color-text);
+}
+
+.profile-session-value {
+  display: inline-block;
+  color: var(--color-text);
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .profile-card-header-api {
@@ -724,7 +767,7 @@ code {
 }
 
 .profile-account-panel {
-  margin-top: 0.25rem;
+  margin-top: 0;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--color-border-subtle);
@@ -745,19 +788,13 @@ code {
   color: var(--color-text-secondary);
 }
 
-.profile-clerk-hint {
-  font-size: 0.88rem;
-  line-height: 1.45;
-  margin: 0 0 1rem;
-  max-width: 42rem;
-}
-
 .profile-account-block {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 0.25rem;
+  margin-top: 0;
+  margin-bottom: 0.15rem;
 }
 
 .profile-account-avatar {
@@ -2426,6 +2463,11 @@ code {
 
 [data-theme="dark"] table th {
   background: var(--color-surface-hover);
+}
+
+/* Tablas de datos (CRUD): no aplicar celda “header” al perfil (th = etiqueta de fila). */
+[data-theme="dark"] .profile-session-table th {
+  background: transparent;
 }
 
 [data-theme="dark"] .weekly-cal-event {

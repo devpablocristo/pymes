@@ -26,7 +26,11 @@ AUTH_ENABLE_JWT=true
 AUTH_ALLOW_API_KEY=true
 ```
 
-Sustituí `TU-FRONTEND-API-HOST` por el host que muestra Clerk (sin path). Si el backend rechaza el token (`401`), compará el claim `iss` de un JWT decodificado (jwt.io) con `JWT_ISSUER` — deben coincidir.
+Sustituí `TU-FRONTEND-API-HOST` por el host que muestra Clerk (sin path). Si el backend rechaza el token (`401`), compará el claim `iss` de un JWT decodificado (jwt.io) con `JWT_ISSUER` — deben coincidir (el backend acepta `iss` con o sin barra final).
+
+Si el JWT trae una organización de Clerk (`org_id` / `o.id` tipo `org_...`) y aún no corriste el webhook, el **control plane** puede **crear automáticamente** la fila en `orgs` con ese `external_id` en el primer request autenticado (JWT ya validado con JWKS). Para nombres reales seguí usando el webhook de Clerk.
+
+En **`GET /v1/users/me`** con **JWT** (sin fila previa en `users`), el backend intenta **sync perezoso**: vuelve a verificar el Bearer con JWKS y hace `UpsertUser` + `SyncMembership` usando claims (`email`, `email_addresses`, `name`, `first_name`/`last_name`, etc.). Si tu plantilla de sesión de Clerk no incluye email, se usa un placeholder `...@users.clerk.placeholder`. En producción conviene **webhook** + claims explícitos.
 
 Opcional:
 
@@ -47,8 +51,15 @@ O `make up`. El frontend debe recibir `VITE_CLERK_PUBLISHABLE_KEY` (está refere
 ## 4. Probar
 
 1. Abrí `http://localhost:5180/login` → debería mostrarse el **Sign in** de Clerk (no la pantalla “modo local”).
+   - Clerk redirige a subrutas (p. ej. `/login/tasks/choose-organization`). En React Router la ruta debe ser **`/login/*`**, no solo `/login`; si no, la pantalla queda en blanco en esas URLs.
 2. Tras iniciar sesión, el cliente envía **Bearer** (JWT de sesión); la clave API del `.env` no se usa mientras haya token (`core-authn` prioriza Bearer).
-3. **Perfil** (`/settings`) → componente **UserProfile** de Clerk.
+3. **Perfil** (`/settings`) → datos desde la API (`/v1/session`, `/v1/users/me`); contraseña y 2FA siguen en Clerk (UserButton).
+
+## 4.1 Si el frontend dice que no puede conectar a la API
+
+- Revisá `docker compose ps`: **`cp-backend`** debe estar **Up** y el puerto **8100** mapeado. `curl -s http://localhost:8100/healthz` → `{"status":"ok"}`.
+- Tras un `docker compose up` reciente, Postgres puede estar unos segundos en “starting up”; el **control plane** espera con `pg_isready` antes de arrancar. Si igual ves el error, `docker compose restart cp-backend`.
+- Si abrís la consola desde **otra máquina** (no `localhost`), `VITE_API_URL` debe apuntar al **host alcanzable** (p. ej. IP de la PC), no a `localhost`.
 
 ## 5. Volver a modo consola (solo API key)
 

@@ -34,9 +34,11 @@ Resumen:
    - `AUTH_ENABLE_JWT=true`
    - Opcional: `CLERK_WEBHOOK_SECRET` para sincronizar usuarios/orgs en `core/saas` (ver `saas/go/clerkwebhook` en `core`).
 
-Sin JWKS/issuer correctos, el Bearer puede fallar la verificación. El middleware SaaS intenta **después** la **clave API** (`X-API-KEY`) si viene en el request y `AUTH_ALLOW_API_KEY=true` (útil en dev cuando el JWT de Clerk aún no trae `org_id` alineado al tenant). En producción conviene que el JWT sea suficiente y la clave API solo para integraciones.
+Sin JWKS/issuer correctos, el **Bearer** fallará y obtendrás **401** hasta alinear `JWKS_URL` / `JWT_ISSUER` y los claims de org en Clerk.
 
-El cliente HTTP (`core-authn`) puede enviar **Bearer y `X-API-KEY` a la vez** si `VITE_API_KEY` está definida: el backend usa JWT si valida; si no, acepta la clave.
+El cliente (`core-authn`) **no** envía `X-API-KEY` cuando hay token Bearer (sesión Clerk), para no “enmascarar” un JWT roto con la identidad de la clave de servicio. Solo sin Bearer se usa la clave (modo consola). Opcional en dev: `VITE_DEV_ALLOW_API_KEY_WITH_CLERK_BEARER=true` para mandar ambos (el middleware sigue intentando JWT primero y luego clave).
+
+El middleware SaaS puede aceptar **clave API** tras fallar el JWT **si** el request incluye `X-API-KEY` y `AUTH_ALLOW_API_KEY=true`.
 
 ## Configuración: desarrollo sin Clerk
 

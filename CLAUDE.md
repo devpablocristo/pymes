@@ -41,8 +41,8 @@ Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/A
 1. TLDR primero
 2. Ideal primero, luego práctico si difieren
 3. Esperar aprobación antes de implementar algo no trivial
-4. Verificar antes de decir "listo": en el backend tocado, `go build` + `go vet` + `go test`; desde la raíz del monorepo opcionalmente `make build` / `make test` (stack en Docker es el flujo local habitual — ver §10).
-5. Nunca decir "listo" sin evidencia de ejecución exitosa
+4. **Verificación obligatoria antes de decir “listo” / “ya está”:** desde la raíz del monorepo ejecutar **`make build`** y **`make test`** en este mismo turno cuando el cambio afecta entrega o varios paquetes; si el alcance es mínimo, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend). Si tocás **Dockerfile**, **entrypoint** o **compose**, además: **`docker compose build`** del servicio afectado, **`docker compose up -d`**, y comprobar **HTTP** (p. ej. `curl` a `/healthz` en el puerto publicado). Ver `.cursor/rules/verify-before-claim.mdc`.
+5. **Prohibido** afirmar “listo”, “ya está” o “funciona” sin evidencia de una ejecución exitosa en este turno (comandos + salida OK).
 
 ---
 

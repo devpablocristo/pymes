@@ -68,6 +68,8 @@ describe('SettingsPage (modo clave API)', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Sesión en este entorno' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Cuenta' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: 'Identidad y permisos' })).toBeInTheDocument();
+    expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
+    expect(screen.getByText('Administrador')).toBeInTheDocument();
 
     expect(screen.getByText('Sin perfil de usuario en este modo')).toBeInTheDocument();
     expect(
@@ -75,6 +77,42 @@ describe('SettingsPage (modo clave API)', () => {
     ).toBeInTheDocument();
 
     expect(screen.getByText('00000000-0000-0000-0000-000000000001')).toBeInTheDocument();
+  });
+
+  it('muestra org_name del API cuando viene en la sesión', async () => {
+    apiMocks.getSession.mockResolvedValue({
+      auth: {
+        ...sessionFixture.auth,
+        org_name: 'Fábrica Norte',
+      },
+    });
+
+    renderSettings();
+
+    await waitFor(() => {
+      expect(apiMocks.getSession).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText('Fábrica Norte')).toBeInTheDocument();
+  });
+
+  it('no revienta si /v1/session trae scopes null (JSON desde Go)', async () => {
+    apiMocks.getSession.mockResolvedValue({
+      auth: {
+        ...sessionFixture.auth,
+        scopes: null as unknown as string[],
+      },
+    });
+
+    renderSettings();
+
+    await waitFor(() => {
+      expect(apiMocks.getSession).toHaveBeenCalled();
+    });
+
+    expect(
+      screen.getAllByRole('heading', { level: 3, name: 'Identidad y permisos' }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('si falla /v1/users/me con error de red, muestra aviso y cuenta no disponible', async () => {

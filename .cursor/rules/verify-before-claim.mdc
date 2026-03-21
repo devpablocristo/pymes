@@ -1,32 +1,48 @@
 ---
-description: Probar e iterar antes de devolver cualquier resultado
+description: OBLIGATORIO — ejecutar pruebas en este turno antes de afirmar que algo funciona o está terminado
 globs:
 alwaysApply: true
 ---
 
-# Regla obligatoria: probar → corregir → repetir hasta éxito
+# Regla obligatoria (no negociable): ejecutar → pasar → recién entonces responder
 
-**Nunca decir que algo “está hecho”, “listo” o “probá” sin haber ejecutado en este turno la verificación que corresponde al cambio** (build, test, o comando explícito acordado). Si no se pudo probar, decirlo claro.
+**Prohibido** afirmar o insinuar que algo **“está listo”**, **“ya está”**, **“quedó hecho”**, **“probá”** (como cierre), **“debería andar”** o **“funciona”** si **en este mismo turno** no corriste los comandos de verificación y **no salieron OK**.
 
-Antes de devolver **cualquier** resultado al usuario:
+No vale “en teoría”, “debería compilar” ni confiar en caché mental: **hay que ejecutar en el entorno**.
 
-1. **Ejecutar la prueba correspondiente** al cambio realizado:
-   - Código Go (backend): `go build ./...`, `go vet ./...`, `go test ./...` desde el `backend/` del servicio tocado (p. ej. `pymes-core/backend/`)
-   - Lambda entrypoint: `go build -o /dev/null ./cmd/lambda/` para verificar que compila
-   - Local entrypoint: `go build -o /dev/null ./cmd/local/` para verificar que compila (sigue existiendo; prod corre en Lambda/containers)
-   - Frontend (React/Vite): `npm run build` (y `npm test` si tocó lógica o UI) desde `frontend/`
-   - **Nueva dependencia npm en el frontend y uso con Docker:** además de `npm run build` en host, **`docker compose build frontend`** (o `make up` con rebuild) — la imagen `Dockerfile.dev` solo hace `npm install` al construir; el contenedor no ve `package.json` nuevo hasta reconstruir la imagen
-   - Monorepo completo (opcional): `make build` / `make test` desde la raíz del repo
-   - Endpoint nuevo: con stack en Docker, `make up` y `curl` al puerto publicado en el host (p. ej. control plane `http://localhost:8100`). Solo usar `go run ./cmd/local/` en el host si el entorno no usa contenedores o para depurar el binario aislado
-   - Infraestructura Terraform: `terraform validate` desde `pymes-core/infra/`
-   - Migraciones SQL: verificar sintaxis y que up/down son reversibles
-   - Script nuevo: ejecutarlo y verificar que termina sin error
-   - Wire: `go generate ./wire/...` si se modificaron providers
+---
 
-2. **Si falla: corregir y volver al paso 1.** No devolver el resultado hasta que pase.
+## Qué ejecutar (mínimo según el cambio)
 
-3. **Solo cuando la prueba pasa**, decirle al usuario que está listo.
+| Tipo de cambio | Comandos que tenés que haber corrido (y pasado) en este turno |
+|----------------|----------------------------------------------------------------|
+| Cualquier entrega que quieras dar por cerrada en el monorepo | Desde la raíz del repo: **`make build`** y **`make test`**. Si el alcance es solo un paquete, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend si aplica). |
+| Backend Go tocado | `go build ./...`, `go vet ./...`, `go test ./...` desde el directorio del backend (p. ej. `pymes-core/backend/`). |
+| Frontend tocado | `cd frontend && npm run build` y, si hay lógica/UI: `npm test`. |
+| **Dockerfile**, **entrypoint**, **docker-compose**, imagen reconstruida | **`docker compose build <servicio>`** (o `make build` si incluye la imagen), **`docker compose up -d`** del servicio afectado, y **comprobación HTTP** al puerto en host (p. ej. `curl` / script a `http://localhost:8100/healthz` para `cp-backend`). **`docker compose ps`** debe mostrar el servicio **Up**. |
+| Nueva dependencia npm en frontend usada en Docker | Además de `npm run build` en host: **`docker compose build frontend`** (la imagen instala deps al build). |
 
-4. **Si el entorno no permite probar** (sin red, sin Docker, sin DB, etc.), decirlo explícitamente — nunca asumir que funciona.
+Si falla algo: **corregir y volver a ejecutar** hasta que pase. **No** devolver la respuesta final al usuario hasta tener comandos OK.
 
-Nunca afirmar "listo", "funciona" o "debería andar" sin evidencia de una ejecución exitosa en este turno.
+---
+
+## Cómo responder al usuario
+
+Cuando el trabajo esté realmente verificado, incluí **evidencia breve** en texto:
+
+- Qué corriste (p. ej. `make build` OK, `make test` OK).
+- Si aplica Docker: servicio **Up** y **health** (status + cuerpo esperado).
+
+Si **no** pudiste ejecutar (sin permisos, sin Docker, sin red): decilo **explícito** y no digas que “está listo”.
+
+---
+
+## Frases prohibidas sin evidencia de ejecución exitosa en este turno
+
+- “Listo”, “ya está”, “quedó”, “cerrado”, “funciona”, “probá y debería” (como sustituto de haber probado vos), “debería andar”.
+
+---
+
+## Resumen en una línea
+
+**No cierres el turno sin haber corrido comandos en esta sesión y haber visto salida exitosa.** Si no, solo describí el cambio y qué falta probar.

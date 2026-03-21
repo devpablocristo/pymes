@@ -28,7 +28,9 @@ func TestHandleSessionEnriched_ProductRoleUser(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
 	authMW := saasmiddleware.NewAuthMiddleware(sessionStubJWTVerifier{}, nil)
-	registerProtected(mux, authMW, "GET /session", handleSessionEnriched)
+	registerProtected(mux, authMW, "GET /session", func(w http.ResponseWriter, r *http.Request) {
+		handleSessionEnriched(w, r, nil)
+	})
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

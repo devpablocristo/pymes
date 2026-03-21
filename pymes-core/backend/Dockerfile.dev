@@ -1,6 +1,6 @@
 FROM golang:1.26-alpine
 
-RUN apk add --no-cache git curl && \
+RUN apk add --no-cache git curl postgresql-client && \
     curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b /usr/local/bin
 
 WORKDIR /workspace
@@ -17,9 +17,12 @@ WORKDIR /workspace/pymes/pymes-core/backend
 
 RUN go mod download
 
+COPY pymes/pymes-core/backend/docker-entrypoint-dev.sh /usr/local/bin/pymes-cp-backend-entrypoint.sh
+RUN chmod +x /usr/local/bin/pymes-cp-backend-entrypoint.sh
+
 COPY pymes/pymes-core/backend /workspace/pymes/pymes-core/backend
 COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
 
 EXPOSE 8080
 
-CMD ["air", "-c", ".air.toml"]
+ENTRYPOINT ["/usr/local/bin/pymes-cp-backend-entrypoint.sh"]

@@ -1,4 +1,4 @@
-import { useEffect, type PropsWithChildren, type ReactNode } from 'react';
+import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { SignIn, SignUp, UserButton, useAuth } from '@clerk/clerk-react';
 import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
@@ -57,14 +57,34 @@ export function SharedProtectedRoute({ children }: PropsWithChildren) {
   return <ClerkProtectedRoute>{children}</ClerkProtectedRoute>;
 }
 
+const clerkLoadTimeoutMs = 15_000;
+
 function ClerkProtectedRoute({ children }: PropsWithChildren) {
   const { isLoaded, isSignedIn } = useAuth();
   const location = useLocation();
+  const { t } = useI18n();
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      return;
+    }
+    const id = window.setTimeout(() => setLoadTimedOut(true), clerkLoadTimeoutMs);
+    return () => window.clearTimeout(id);
+  }, [isLoaded]);
+
   if (!isLoaded) {
     return (
       <div className="app-layout">
         <div className="main-content">
-          <div className="spinner" />
+          {loadTimedOut ? (
+            <div className="auth-card" style={{ maxWidth: '36rem', margin: '2rem auto' }}>
+              <h1 style={{ fontSize: '1.1rem' }}>{t('auth.clerk.loadTimeout.title')}</h1>
+              <p style={{ marginTop: '0.75rem', lineHeight: 1.5 }}>{t('auth.clerk.loadTimeout.hint')}</p>
+            </div>
+          ) : (
+            <div className="spinner" />
+          )}
         </div>
       </div>
     );

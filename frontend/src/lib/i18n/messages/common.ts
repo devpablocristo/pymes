@@ -18,6 +18,9 @@ export const commonMessages: TranslationsByLanguage = {
     'common.status.loading': 'Cargando...',
     'common.status.saving': 'Guardando...',
     'common.status.processing': 'Procesando...',
+    'auth.clerk.loadTimeout.title': 'Clerk no termina de cargar',
+    'auth.clerk.loadTimeout.hint':
+      'Revisá en Clerk Dashboard que exista http://localhost:5180 (y el puerto real) en dominios / orígenes permitidos. Abrí la consola del navegador (F12) por si hay bloqueo de red o extensiones. Probá también http://127.0.0.1:5180.',
   },
   en: {
     'common.language.label': 'Language',
@@ -36,5 +39,8 @@ export const commonMessages: TranslationsByLanguage = {
     'common.status.loading': 'Loading...',
     'common.status.saving': 'Saving...',
     'common.status.processing': 'Processing...',
+    'auth.clerk.loadTimeout.title': 'Clerk is taking too long to load',
+    'auth.clerk.loadTimeout.hint':
+      'In Clerk Dashboard, allow your dev URL (e.g. http://localhost:5180) under domains / authorized origins. Check the browser console (F12) for blocked requests or extensions. Try http://127.0.0.1:5180 as well.',
   },
 };

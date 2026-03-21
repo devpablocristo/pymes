@@ -1,4 +1,4 @@
--e /workspace/ai-core
+-e /workspace/core/ai/python
 -e ../pymes-core/shared/ai
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0

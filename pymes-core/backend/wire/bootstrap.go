@@ -83,7 +83,7 @@ func InitializeApp() *app.App {
 		AuthAllowAPIKey:         cfg.AuthAllowAPIKey,
 	}, slog.Default())
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to initialize saas-core")
+		logger.Fatal().Err(err).Msg("failed to initialize core/saas/go")
 	}
 
 	auditRepo := audit.NewRepository(db)
@@ -233,7 +233,7 @@ func InitializeApp() *app.App {
 	})
 
 	v1 := router.Group("/v1")
-	// Orgs, Clerk, billing, users — served by saas-core via AttachSaaSUnmatchedRoutes (NoRoute).
+	// Orgs, Clerk, billing, users — served by core/saas/go via AttachSaaSUnmatchedRoutes (NoRoute).
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
 	whatsappHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)

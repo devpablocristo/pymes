@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/saas-core/shared/ctxkeys"
+	"github.com/devpablocristo/core/saas/go/shared/ctxkeys"
 	pymestypes "github.com/devpablocristo/pymes/pkgs/go-pkg/types"
 )
 
-// GinSaaSAuthMiddleware runs saas-core net/http auth and copies principal into Gin context
+// GinSaaSAuthMiddleware runs core/saas/go net/http auth and copies principal into Gin context
 // using the same keys as the legacy handlers package (org_id, actor, role, scopes, auth_method).
 func GinSaaSAuthMiddleware(svc *SaaSServices) gin.HandlerFunc {
 	if svc == nil || svc.AuthMiddleware == nil {

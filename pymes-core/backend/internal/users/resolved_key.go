@@ -1,5 +1,5 @@
 // Package users holds minimal types shared with internal APIs after SaaS migration.
-// User/org management and API key verification are implemented in saas-core.
+// User/org management and API key verification are implemented in core/saas/go.
 package users
 
 import "github.com/google/uuid"

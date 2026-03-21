@@ -9,7 +9,7 @@ import (
 )
 
 // AttachSaaSUnmatchedRoutes forwards /v1/* requests that did not match any Gin route
-// to saas-core's http.ServeMux (paths under /v1 are rewritten, except Stripe webhook).
+// to core/saas/go's http.ServeMux (paths under /v1 are rewritten, except Stripe webhook).
 func AttachSaaSUnmatchedRoutes(engine *gin.Engine, svc *SaaSServices) {
 	if engine == nil || svc == nil || svc.Mux == nil {
 		return

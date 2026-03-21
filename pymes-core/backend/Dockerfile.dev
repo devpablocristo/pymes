@@ -10,15 +10,16 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GONOPROXY=github.com/devpablocristo/* \
     GOPROXY=direct
 
-COPY go.mod go.sum ./
+COPY pymes/go.mod pymes/go.sum /workspace/pymes/
+COPY core /workspace/core
 
-WORKDIR /workspace/pymes-core/backend
+WORKDIR /workspace/pymes/pymes-core/backend
 
 RUN go mod download
 
-COPY pymes-core/backend /workspace/pymes-core/backend
-COPY pymes-core/shared/backend /workspace/pymes-core/shared/backend
-COPY pkgs/go-pkg /workspace/pkgs/go-pkg
+COPY pymes/pymes-core/backend /workspace/pymes/pymes-core/backend
+COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
+COPY pymes/pkgs/go-pkg /workspace/pymes/pkgs/go-pkg
 
 EXPOSE 8080
 

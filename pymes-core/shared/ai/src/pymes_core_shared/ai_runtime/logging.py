@@ -1,4 +1,4 @@
-# Re-export desde ai_core
+# Re-export desde core/ai/python (paquete ai_core)
 from ai_core.logging import (
     bind_request_context,
     clear_request_context,

@@ -2,12 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /workspace/ai
 
-COPY ai/requirements.txt ./
-COPY pymes-core/shared/ai /workspace/pymes-core/shared/ai
-COPY --from=ai-core . /workspace/ai-core
+COPY pymes/ai/requirements.txt ./
+COPY pymes/pymes-core/shared/ai /workspace/pymes-core/shared/ai
+COPY core/ai/python /workspace/core/ai/python
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ai/src/ ./src/
+COPY pymes/ai/src/ ./src/
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

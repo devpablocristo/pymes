@@ -285,7 +285,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 ### 12.1 Arquitectura
 
-WhatsApp es un módulo transversal en `pymes-core/backend/internal/whatsapp/`. No va en saas-core (es específico del producto pymes). Estructura hexagonal completa:
+WhatsApp es un módulo transversal en `pymes-core/backend/internal/whatsapp/`. No va en `core/saas/go` (es específico del producto pymes). Estructura hexagonal completa:
 
 ```
 internal/whatsapp/

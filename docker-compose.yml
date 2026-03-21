@@ -23,14 +23,15 @@ services:
 
   cp-backend:
     build:
-      context: .
-      dockerfile: ./pymes-core/backend/Dockerfile.dev
+      context: ..
+      dockerfile: ./pymes/pymes-core/backend/Dockerfile.dev
     ports:
       - "8100:8080"
     volumes:
-      - ./pymes-core/backend:/workspace/pymes-core/backend
-      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
+      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
+      - ../core:/workspace/core
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -68,16 +69,14 @@ services:
 
   ai:
     build:
-      context: .
-      dockerfile: ./ai/Dockerfile.dev
-      additional_contexts:
-        ai-core: ../ai-core
+      context: ..
+      dockerfile: ./pymes/ai/Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
       - ./pymes-core/shared/ai:/workspace/pymes-core/shared/ai
-      - ../ai-core:/workspace/ai-core
+      - ../core:/workspace/core
 
     env_file:
       - .env
@@ -95,14 +94,15 @@ services:
 
   prof-backend:
     build:
-      context: .
-      dockerfile: ./professionals/backend/Dockerfile.dev
+      context: ..
+      dockerfile: ./pymes/professionals/backend/Dockerfile.dev
     ports:
       - "8181:8081"
     volumes:
-      - ./professionals/backend:/workspace/professionals/backend
-      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ./professionals/backend:/workspace/pymes/professionals/backend
+      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
+      - ../core:/workspace/core
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -123,14 +123,15 @@ services:
 
   work-backend:
     build:
-      context: .
-      dockerfile: ./workshops/backend/Dockerfile.dev
+      context: ..
+      dockerfile: ./pymes/workshops/backend/Dockerfile.dev
     ports:
       - "8282:8082"
     volumes:
-      - ./workshops/backend:/workspace/workshops/backend
-      - ./pymes-core/shared/backend:/workspace/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pkgs/go-pkg
+      - ./workshops/backend:/workspace/pymes/workshops/backend
+      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
+      - ../core:/workspace/core
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:

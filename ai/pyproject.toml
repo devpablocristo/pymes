@@ -24,4 +24,4 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "../pymes-core/shared/ai/src", "../../ai-core/src"]
+pythonpath = ["src", "../pymes-core/shared/ai/src", "../../core/ai/python/src"]

@@ -1,4 +1,4 @@
-# Re-export desde ai_core — la implementacion real vive en el paquete ai-core.
+# Re-export desde ai_core — la implementacion real vive en core/ai/python.
 # Este modulo existe para mantener backward compatibility con imports existentes.
 from ai_core.auth import AuthMiddleware
 from ai_core.contexts import AuthContext

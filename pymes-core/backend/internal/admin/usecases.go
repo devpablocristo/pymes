@@ -8,6 +8,7 @@ import (
 
 	"github.com/devpablocristo/core/backend/go/apperror"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
 
 type RepositoryPort interface {
@@ -32,11 +33,12 @@ func (u *Usecases) GetBootstrap(ctx context.Context, orgID string, role string, 
 	}
 	return map[string]any{
 		"auth": map[string]any{
-			"org_id":      orgID,
-			"role":        role,
-			"scopes":      scopes,
-			"actor":       actor,
-			"auth_method": authMethod,
+			"org_id":       orgID,
+			"role":         role,
+			"product_role": authz.ProductRole(role),
+			"scopes":       scopes,
+			"actor":        actor,
+			"auth_method":  authMethod,
 		},
 		"settings": settings,
 	}, nil

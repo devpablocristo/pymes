@@ -18,8 +18,11 @@ No existen deployables `pymes-core/ai` ni `professionals/ai`. El unico runtime A
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+make up
+# equivalente: docker compose up -d --build
 ```
+
+**Identidad en local:** por defecto se trabaja **sin Clerk** y con **clave API** (`psk_local_admin` en `.env.example`). Ver [docs/AUTH.md](docs/AUTH.md) (*desarrollo sin Clerk* y prioridad recomendada).
 
 Servicios locales:
 
@@ -37,13 +40,12 @@ API key local de desarrollo:
 
 ## Desarrollo mixto
 
+Solo infra en Docker y backends a mano (ajustá `DATABASE_URL` y `PORT` según [docs/AUTH.md](docs/AUTH.md)):
+
 ```bash
 docker compose up -d postgres mailhog
-make cp-run
-make prof-run
-make work-run
-make frontend-dev
-make ai-dev
+cd pymes-core/backend && PORT=8100 go run ./cmd/local
+# En otras terminales: professionals/backend, workshops/backend, frontend (`npm run dev`), ai (`uvicorn ...`)
 ```
 
 ## Estructura

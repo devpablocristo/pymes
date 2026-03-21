@@ -8,15 +8,28 @@ import (
 )
 
 func NewCORSMiddleware(frontendURL string) gin.HandlerFunc {
-	origins := []string{"http://localhost:5173"}
-	if frontendURL != "" && frontendURL != "http://localhost:5173" {
-		origins = append(origins, strings.TrimSuffix(frontendURL, "/"))
+	// Puertos típicos de Vite en local; FRONTEND_URL suma el origen explícito (p. ej. Docker en 5180).
+	origins := []string{
+		"http://localhost:5173",
+		"http://localhost:5180",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:5180",
+	}
+	if frontendURL != "" {
+		u := strings.TrimSuffix(frontendURL, "/")
+		seen := make(map[string]struct{}, len(origins))
+		for _, o := range origins {
+			seen[o] = struct{}{}
+		}
+		if _, ok := seen[u]; !ok {
+			origins = append(origins, u)
+		}
 	}
 
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Authorization", "Content-Type", "X-API-KEY", "X-Org-ID"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders:     []string{"Authorization", "Content-Type", "X-API-KEY", "X-Org-ID", "X-Scopes"},
 		AllowCredentials: true,
 		MaxAge:           86400,
 	})

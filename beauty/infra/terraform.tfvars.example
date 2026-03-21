@@ -1,0 +1,19 @@
+# Copiar a terraform.tfvars (no commitear secretos).
+
+aws_region = "us-east-1"
+
+environment  = "dev"
+project_name = "pymes-beauty"
+
+# Imagen ECR del backend (ARM64), mismo patrón que otros verticales.
+backend_lambda_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/pymes-beauty-backend:dev"
+
+backend_lambda_memory   = 512
+backend_lambda_timeout    = 30
+
+# Dominio API opcional
+# domain_name         = "beauty-api.example.com"
+# acm_certificate_arn = "arn:aws:acm:..."
+# route53_zone_id     = "Z..."
+
+# alarm_sns_topic_arn = "arn:aws:sns:..."

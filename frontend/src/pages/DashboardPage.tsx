@@ -133,7 +133,10 @@ export function DashboardPage() {
 
   const profile = getTenantProfile();
   const userName = String(
-    meQuery.data?.name ?? meQuery.data?.email ?? meQuery.data?.id ?? '',
+    meQuery.data?.user?.name ??
+      meQuery.data?.user?.email ??
+      meQuery.data?.external_id ??
+      '',
   );
 
   return (

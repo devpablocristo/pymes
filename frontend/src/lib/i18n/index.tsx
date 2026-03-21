@@ -8,11 +8,13 @@ import {
 } from 'react';
 import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
 import { vocab } from '../vocabulary';
+import { apiKeysMessages } from './messages/apiKeys';
 import { authMessages } from './messages/auth';
 import { calendarMessages } from './messages/calendar';
 import { commonMessages } from './messages/common';
 import { crudMessages } from './messages/crud';
 import { moduleMessages } from './messages/module';
+import { profileMessages } from './messages/profile';
 import { shellMessages } from './messages/shell';
 import { translateLegacyText } from './legacy';
 import type { FlatMessages, LanguageCode, TranslationVariables, TranslationsByLanguage } from './types';
@@ -38,8 +40,10 @@ const messages = mergeMessages(
   shellMessages,
   crudMessages,
   moduleMessages,
+  profileMessages,
   authMessages,
   calendarMessages,
+  apiKeysMessages,
 );
 
 function hasLettersOrDigits(token: string): boolean {

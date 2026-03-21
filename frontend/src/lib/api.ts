@@ -8,9 +8,21 @@ import type {
   DashboardSavePayload,
   DashboardWidgetCatalogResponse,
 } from '../dashboard/types';
-import type { APIKeyItem, BillingStatus, NotificationPreference, TenantSettings } from './types';
+import type {
+  AdminBootstrapResponse,
+  APIKeyItem,
+  BillingStatus,
+  MeProfileResponse,
+  NotificationPreference,
+  SessionResponse,
+  TenantSettings,
+} from './types';
 
-export async function getAdminBootstrap(): Promise<{ settings: TenantSettings }> {
+export async function getSession(): Promise<SessionResponse> {
+  return request('/v1/session');
+}
+
+export async function getAdminBootstrap(): Promise<AdminBootstrapResponse> {
   return request('/v1/admin/bootstrap');
 }
 
@@ -76,7 +88,7 @@ export async function getAuditEntries(): Promise<{ items: unknown[] }> {
   return request('/v1/audit');
 }
 
-export async function getMe(): Promise<Record<string, unknown>> {
+export async function getMe(): Promise<MeProfileResponse> {
   return request('/v1/users/me');
 }
 

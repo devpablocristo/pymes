@@ -24,6 +24,12 @@ Público:
 - `GET /v1/public/:org_slug/beauty/services`
 - `POST /v1/public/:org_slug/beauty/appointments`
 
+## Infraestructura (AWS)
+
+- Terraform: `beauty/infra/` (Lambda + API Gateway HTTP + SSM + IAM + alarmas).
+- Ver `beauty/infra/README.md` para `terraform init/apply` y variables.
+- El frontend unificado no se empaqueta aquí; solo se configura `VITE_BEAUTY_API_URL` contra la URL del API Gateway (o dominio custom).
+
 ## Frontend
 
 - Onboarding: vertical `beauty`

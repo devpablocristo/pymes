@@ -1,7 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
+import { getSession } from '../lib/api';
 import { moduleGroups, moduleList } from '../lib/moduleCatalog';
 import { useI18n } from '../lib/i18n';
+import type { ProductRole } from '../lib/types';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
@@ -115,6 +117,26 @@ const profileIcon = (
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
   const [theme, setThemeState] = useState(getTheme);
+  const [productRole, setProductRole] = useState<ProductRole | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const session = await getSession();
+        if (!cancelled) {
+          setProductRole(session.auth.product_role);
+        }
+      } catch {
+        if (!cancelled) {
+          setProductRole(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const mainNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
@@ -219,6 +241,11 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const footerControls = (
     <div className="sidebar-footer-controls">
+      {productRole !== null && (
+        <span className="badge badge-neutral shell-product-role" title={t('shell.role.hint')}>
+          {productRole === 'admin' ? t('shell.role.admin') : t('shell.role.user')}
+        </span>
+      )}
       <LanguageSelector />
       {themeToggle}
     </div>

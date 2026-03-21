@@ -27,6 +27,9 @@ export const shellMessages: TranslationsByLanguage = {
     'shell.theme.light': 'Modo claro',
     'shell.theme.dark': 'Modo oscuro',
     'shell.footer.localDev': 'Desarrollo local',
+    'shell.role.admin': 'Admin',
+    'shell.role.user': 'Usuario',
+    'shell.role.hint': 'Rol en la consola (derivado del token)',
   },
   en: {
     'shell.brand.subtitle': 'Management panel',
@@ -53,5 +56,8 @@ export const shellMessages: TranslationsByLanguage = {
     'shell.theme.light': 'Light mode',
     'shell.theme.dark': 'Dark mode',
     'shell.footer.localDev': 'Local development',
+    'shell.role.admin': 'Admin',
+    'shell.role.user': 'User',
+    'shell.role.hint': 'Console role (from token)',
   },
 };

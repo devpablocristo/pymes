@@ -2398,7 +2398,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
             className="badge"
             style={{
               background: String(value || '#6366f1'),
-              color: '#fff',
+              color: 'var(--color-on-primary)',
               minWidth: '2.5rem',
             }}
           >

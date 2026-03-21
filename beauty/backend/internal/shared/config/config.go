@@ -19,7 +19,7 @@ type Config struct {
 
 func LoadFromEnv() Config {
 	return Config{
-		Port:                 getEnv("PORT", "8082"),
+		Port:                 getEnv("PORT", "8083"),
 		DatabaseURL:          getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
 		JWKSURL:              os.Getenv("JWKS_URL"),
 		JWTIssuer:            os.Getenv("JWT_ISSUER"),

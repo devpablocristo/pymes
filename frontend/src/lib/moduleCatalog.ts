@@ -14,7 +14,7 @@ export type ModuleField = {
   placeholder?: string;
   required?: boolean;
   location?: 'path' | 'query' | 'body';
-  type?: 'text' | 'number' | 'textarea' | 'date' | 'select';
+  type?: 'text' | 'number' | 'textarea' | 'date' | 'select' | 'json';
   defaultValue?: ValueResolver;
   options?: Array<{ label: string; value: string }>;
 };
@@ -34,6 +34,8 @@ export type ModuleAction = {
   description: string;
   path: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  /** Agrupa tarjetas en la UI del módulo (p. ej. WhatsApp por flujo). */
+  group?: string;
   fields?: ModuleField[];
   response?: 'json' | 'download' | 'none';
   submitLabel?: string;
@@ -50,7 +52,13 @@ export type ModuleDefinition = {
   badge?: string;
   datasets?: ModuleDataset[];
   actions?: ModuleAction[];
+  /** Orden de secciones cuando las acciones tienen `group`. */
+  actionGroupOrder?: string[];
+  /** Títulos de sección para cada `group`. */
+  actionGroupLabels?: Record<string, string>;
   notes?: string[];
+  /** Texto opcional bajo el resumen: qué es esta pantalla (p. ej. módulos tipo explorador de API). */
+  helpIntro?: string;
 };
 
 export const moduleGroups = [
@@ -673,185 +681,226 @@ const staticModuleCatalog: Record<string, ModuleDefinition> = {
     id: 'whatsapp',
     title: 'WhatsApp',
     navLabel: 'WhatsApp',
-    summary: 'Mensajería, templates, conexión y cobro asistido por WhatsApp Business.',
+    summary:
+      'Integración WhatsApp Business (Meta): conexión, plantillas, historial y envíos. Cada tarjeta llama al API del control plane; primero debes tener cuenta vinculada y, para envíos, opt-in del contacto.',
+    helpIntro:
+      'Esta vista es un panel de operaciones del backend: cada bloque es una llamada al API del control plane (mismo contrato que integraciones y la app). No reemplaza el administrador de Meta Business Suite; sirve para probar conexión, envíos, historial y consentimientos desde tu organización.',
     group: 'integrations',
     icon: 'WA',
+    actionGroupOrder: ['links', 'connection', 'outbound', 'history', 'templates', 'optin'],
+    actionGroupLabels: {
+      links: 'Enlaces wa.me (abrir chat en el teléfono)',
+      connection: 'Cuenta y conexión con Meta',
+      outbound: 'Envío por API (Graph)',
+      history: 'Historial',
+      templates: 'Plantillas de mensaje',
+      optin: 'Consentimientos (opt-in)',
+    },
+    notes: [
+      'Sin conexión activa (token + Phone Number ID) no hay envío real ni estadísticas útiles.',
+      'WhatsApp exige opt-in registrado antes de mensajes promocionales; el envío por API usa el party_id del contacto en el modelo comercial.',
+      'Los enlaces wa.me solo generan URLs para abrir WhatsApp; no consumen cuota de API de la misma forma que el envío servidor a servidor.',
+    ],
     actions: [
-      // --- Links wa.me/ ---
       {
         id: 'whatsapp-quote',
+        group: 'links',
         title: 'Link de presupuesto',
-        description: 'Genera mensaje de WhatsApp para un presupuesto.',
+        description: 'Devuelve datos para armar un mensaje (enlace wa.me) asociado a un presupuesto.',
         path: '/v1/whatsapp/quote/:quoteId',
         method: 'GET',
-        fields: [{ name: 'quoteId', label: 'ID de presupuesto', location: 'path', required: true }],
+        fields: [{ name: 'quoteId', label: 'ID de presupuesto (UUID)', location: 'path', required: true }],
       },
       {
         id: 'whatsapp-sale-receipt',
+        group: 'links',
         title: 'Link de comprobante',
-        description: 'Genera mensaje de WhatsApp para un comprobante.',
+        description: 'Devuelve datos para un mensaje con comprobante de venta.',
         path: '/v1/whatsapp/sale/:saleId/receipt',
         method: 'GET',
-        fields: [{ name: 'saleId', label: 'ID de venta', location: 'path', required: true }],
+        fields: [{ name: 'saleId', label: 'ID de venta (UUID)', location: 'path', required: true }],
       },
       {
         id: 'whatsapp-customer-message',
+        group: 'links',
         title: 'Mensaje libre a cliente',
-        description: 'Genera un link de WhatsApp con mensaje personalizado.',
+        description: 'Genera enlace wa.me con texto; el cliente es el party en el CRM.',
         path: '/v1/whatsapp/customer/:customerId/message',
         method: 'GET',
         fields: [
-          { name: 'customerId', label: 'Customer ID', location: 'path', required: true },
+          { name: 'customerId', label: 'ID de cliente / party (UUID)', location: 'path', required: true },
           { name: 'message', label: 'Mensaje', location: 'query', required: true, type: 'textarea' },
         ],
       },
-      // --- Conexión ---
       {
         id: 'whatsapp-connection',
+        group: 'connection',
         title: 'Estado de conexión',
-        description: 'Ver estado de la conexión WhatsApp Business.',
+        description: 'Ver si hay línea de WhatsApp Business configurada para la organización.',
         path: '/v1/whatsapp/connection',
         method: 'GET',
         fields: [],
       },
       {
         id: 'whatsapp-connect',
+        group: 'connection',
         title: 'Conectar WhatsApp',
-        description: 'Conectar cuenta WhatsApp Business.',
+        description: 'Registra Phone Number ID, WABA y token de acceso de Meta (Graph API).',
         path: '/v1/whatsapp/connection',
         method: 'POST',
         fields: [
-          { name: 'phone_number_id', label: 'Phone Number ID', location: 'body', required: true },
-          { name: 'waba_id', label: 'WABA ID', location: 'body', required: true },
-          { name: 'access_token', label: 'Access Token', location: 'body', required: true },
-          { name: 'display_phone_number', label: 'Número visible', location: 'body', required: false },
-          { name: 'verified_name', label: 'Nombre verificado', location: 'body', required: false },
+          { name: 'phone_number_id', label: 'Phone Number ID (Meta)', location: 'body', required: true },
+          { name: 'waba_id', label: 'WhatsApp Business Account ID (WABA)', location: 'body', required: true },
+          { name: 'access_token', label: 'Access token de larga duración', location: 'body', required: true },
+          { name: 'display_phone_number', label: 'Número visible (opcional)', location: 'body', required: false },
+          { name: 'verified_name', label: 'Nombre verificado (opcional)', location: 'body', required: false },
         ],
       },
       {
         id: 'whatsapp-disconnect',
+        group: 'connection',
         title: 'Desconectar WhatsApp',
-        description: 'Desconectar cuenta WhatsApp Business.',
+        description: 'Quita la conexión almacenada para esta organización.',
         path: '/v1/whatsapp/connection',
         method: 'DELETE',
         fields: [],
       },
       {
         id: 'whatsapp-stats',
+        group: 'connection',
         title: 'Estadísticas',
-        description: 'Métricas de mensajes enviados, recibidos, leídos.',
+        description: 'Conteos de mensajes enviados, recibidos, entregados y leídos (según registros locales).',
         path: '/v1/whatsapp/connection/stats',
         method: 'GET',
         fields: [],
       },
-      // --- Envío de mensajes ---
       {
         id: 'whatsapp-send-text',
+        group: 'outbound',
         title: 'Enviar texto',
-        description: 'Enviar mensaje de texto directo por WhatsApp.',
+        description: 'Mensaje de texto saliente vía Graph API (requiere conexión y teléfono del contacto).',
         path: '/v1/whatsapp/send/text',
         method: 'POST',
         fields: [
-          { name: 'party_id', label: 'Contacto (party ID)', location: 'body', required: true },
-          { name: 'body', label: 'Mensaje', location: 'body', required: true, type: 'textarea' },
+          { name: 'party_id', label: 'Party ID del contacto (UUID)', location: 'body', required: true },
+          { name: 'body', label: 'Texto del mensaje', location: 'body', required: true, type: 'textarea' },
         ],
       },
       {
         id: 'whatsapp-send-template',
-        title: 'Enviar template',
-        description: 'Enviar template message aprobado por Meta.',
+        group: 'outbound',
+        title: 'Enviar plantilla (template)',
+        description: 'Template aprobado por Meta; parámetros en el orden que define la plantilla.',
         path: '/v1/whatsapp/send/template',
         method: 'POST',
         fields: [
-          { name: 'party_id', label: 'Contacto (party ID)', location: 'body', required: true },
-          { name: 'template_name', label: 'Nombre del template', location: 'body', required: true },
-          { name: 'language', label: 'Idioma', location: 'body', required: false },
-          { name: 'params', label: 'Parámetros', location: 'body', required: false },
+          { name: 'party_id', label: 'Party ID del contacto (UUID)', location: 'body', required: true },
+          { name: 'template_name', label: 'Nombre del template en Meta', location: 'body', required: true },
+          { name: 'language', label: 'Código de idioma (ej. es)', location: 'body', required: false },
+          {
+            name: 'params',
+            label: 'Variables del template (JSON array de strings)',
+            location: 'body',
+            required: false,
+            type: 'json',
+            placeholder: '["valor1","valor2"]',
+          },
         ],
       },
       {
         id: 'whatsapp-send-media',
-        title: 'Enviar media',
-        description: 'Enviar imagen, documento o audio por WhatsApp.',
+        group: 'outbound',
+        title: 'Enviar imagen / documento / audio',
+        description: 'Adjunta por URL pública accesible por los servidores de Meta.',
         path: '/v1/whatsapp/send/media',
         method: 'POST',
         fields: [
-          { name: 'party_id', label: 'Contacto (party ID)', location: 'body', required: true },
-          { name: 'media_type', label: 'Tipo (image/document/audio/video)', location: 'body', required: true },
-          { name: 'media_url', label: 'URL del archivo', location: 'body', required: true },
-          { name: 'caption', label: 'Descripción', location: 'body', required: false },
+          { name: 'party_id', label: 'Party ID del contacto (UUID)', location: 'body', required: true },
+          { name: 'media_type', label: 'Tipo: image | document | audio | video', location: 'body', required: true },
+          { name: 'media_url', label: 'URL HTTPS del archivo', location: 'body', required: true },
+          { name: 'caption', label: 'Leyenda (opcional)', location: 'body', required: false },
         ],
       },
       {
         id: 'whatsapp-send-interactive',
-        title: 'Enviar botones',
-        description: 'Enviar mensaje con botones de respuesta rápida.',
+        group: 'outbound',
+        title: 'Enviar botones de respuesta',
+        description: 'Hasta 3 botones; cada uno requiere id y título en JSON.',
         path: '/v1/whatsapp/send/interactive',
         method: 'POST',
         fields: [
-          { name: 'party_id', label: 'Contacto (party ID)', location: 'body', required: true },
-          { name: 'body', label: 'Mensaje', location: 'body', required: true, type: 'textarea' },
-          { name: 'buttons', label: 'Botones (max 3)', location: 'body', required: true },
+          { name: 'party_id', label: 'Party ID del contacto (UUID)', location: 'body', required: true },
+          { name: 'body', label: 'Texto del mensaje', location: 'body', required: true, type: 'textarea' },
+          {
+            name: 'buttons',
+            label: 'Botones (JSON array, máx. 3 objetos id/title)',
+            location: 'body',
+            required: true,
+            type: 'json',
+            placeholder: '[{"id":"yes","title":"Sí"},{"id":"no","title":"No"}]',
+          },
         ],
       },
-      // --- Historial ---
       {
         id: 'whatsapp-messages',
+        group: 'history',
         title: 'Historial de mensajes',
-        description: 'Ver mensajes enviados y recibidos.',
+        description: 'Lista mensajes almacenados con filtros opcionales.',
         path: '/v1/whatsapp/messages',
         method: 'GET',
         fields: [
-          { name: 'party_id', label: 'Filtrar por contacto', location: 'query', required: false },
-          { name: 'direction', label: 'Dirección (inbound/outbound)', location: 'query', required: false },
-          { name: 'status', label: 'Estado', location: 'query', required: false },
+          { name: 'party_id', label: 'Filtrar por party ID (UUID)', location: 'query', required: false },
+          { name: 'direction', label: 'Dirección: inbound | outbound', location: 'query', required: false },
+          { name: 'status', label: 'Estado (opcional)', location: 'query', required: false },
           { name: 'limit', label: 'Límite', location: 'query', required: false },
           { name: 'offset', label: 'Offset', location: 'query', required: false },
         ],
       },
-      // --- Templates ---
       {
         id: 'whatsapp-templates-list',
-        title: 'Templates',
-        description: 'Listar templates de mensaje.',
+        group: 'templates',
+        title: 'Listar plantillas',
+        description: 'Templates registrados en el sistema (sincronización con Meta según implementación).',
         path: '/v1/whatsapp/templates',
         method: 'GET',
         fields: [],
       },
       {
         id: 'whatsapp-templates-create',
-        title: 'Crear template',
-        description: 'Crear un nuevo template de mensaje.',
+        group: 'templates',
+        title: 'Crear borrador de plantilla',
+        description: 'Alta local para envío a aprobación en Meta (categoría UTILITY/MARKETING, etc.).',
         path: '/v1/whatsapp/templates',
         method: 'POST',
         fields: [
-          { name: 'name', label: 'Nombre', location: 'body', required: true },
-          { name: 'category', label: 'Categoría (UTILITY/MARKETING)', location: 'body', required: true },
+          { name: 'name', label: 'Nombre interno', location: 'body', required: true },
+          { name: 'category', label: 'Categoría: UTILITY | MARKETING | …', location: 'body', required: true },
           { name: 'body_text', label: 'Cuerpo del mensaje', location: 'body', required: true, type: 'textarea' },
-          { name: 'language', label: 'Idioma', location: 'body', required: false },
-          { name: 'header_text', label: 'Encabezado', location: 'body', required: false },
-          { name: 'footer_text', label: 'Pie', location: 'body', required: false },
+          { name: 'language', label: 'Idioma (ej. es)', location: 'body', required: false },
+          { name: 'header_text', label: 'Encabezado (opcional)', location: 'body', required: false },
+          { name: 'footer_text', label: 'Pie (opcional)', location: 'body', required: false },
         ],
       },
-      // --- Opt-in ---
       {
         id: 'whatsapp-opt-ins-list',
-        title: 'Consentimientos',
-        description: 'Ver contactos con opt-in de WhatsApp.',
+        group: 'optin',
+        title: 'Listar consentimientos',
+        description: 'Contactos con opt-in registrado para envíos.',
         path: '/v1/whatsapp/opt-ins',
         method: 'GET',
         fields: [],
       },
       {
         id: 'whatsapp-opt-in-register',
+        group: 'optin',
         title: 'Registrar opt-in',
-        description: 'Registrar consentimiento de un contacto.',
+        description: 'Registra consentimiento explícito antes de mensajes promocionales.',
         path: '/v1/whatsapp/opt-ins',
         method: 'POST',
         fields: [
-          { name: 'party_id', label: 'Contacto (party ID)', location: 'body', required: true },
-          { name: 'phone', label: 'Teléfono', location: 'body', required: true },
-          { name: 'source', label: 'Fuente (manual/form/import)', location: 'body', required: false },
+          { name: 'party_id', label: 'Party ID del contacto (UUID)', location: 'body', required: true },
+          { name: 'phone', label: 'Teléfono E.164 (ej. +54911…)', location: 'body', required: true },
+          { name: 'source', label: 'Origen: manual | form | import', location: 'body', required: false },
         ],
       },
     ],

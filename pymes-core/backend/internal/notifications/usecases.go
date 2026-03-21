@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/notifications/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -66,7 +67,7 @@ func (u *Usecases) UpdatePreferenceByActor(ctx context.Context, actor, notifType
 func (u *Usecases) Notify(ctx context.Context, orgID uuid.UUID, notifType string, data map[string]string) error {
 	members := u.repo.ListMembers(orgID)
 	for _, m := range members {
-		if m.Role != "admin" {
+		if !authz.IsPrivilegedRole(m.Role) {
 			continue
 		}
 		if err := u.sendToUser(ctx, orgID, m.UserID, m.Email, notifType, data); err != nil {

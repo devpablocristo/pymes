@@ -8,15 +8,21 @@ import (
 	"github.com/devpablocristo/core/backend/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
+	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
 	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasusers "github.com/devpablocristo/core/saas/go/users"
 	"github.com/devpablocristo/core/saas/go/users/handler/dto"
+
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
 
 func registerPymesSaaSRoutes(mux *http.ServeMux, store *pymesSaaSStore, authMW func(http.Handler) http.Handler, billingRuntime *saasbilling.Runtime) {
 	registerPublic(mux, "POST /orgs", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateOrg(w, r, store)
 	})
+
+	// Sesión de producto: envuelve el Principal del kernel (core/saas/go/session) con org_id + product_role.
+	registerProtected(mux, authMW, "GET /session", handleSessionEnriched)
 
 	registerProtected(mux, authMW, "GET /users/me", func(w http.ResponseWriter, r *http.Request) {
 		handleGetMe(w, r, store)
@@ -87,6 +93,25 @@ func handleCreateOrg(w http.ResponseWriter, r *http.Request, store *pymesSaaSSto
 	})
 }
 
+func handleSessionEnriched(w http.ResponseWriter, r *http.Request) {
+	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		httperr.Unauthorized(w, "principal not found")
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{
+		"auth": map[string]any{
+			"org_id":       principal.TenantID,
+			"tenant_id":    principal.TenantID,
+			"role":         principal.Role,
+			"product_role": authz.ProductRole(principal.Role),
+			"scopes":       principal.Scopes,
+			"actor":        principal.Actor,
+			"auth_method":  principal.AuthMethod,
+		},
+	})
+}
+
 func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
 	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
@@ -121,7 +146,7 @@ func handleListMembers(w http.ResponseWriter, r *http.Request, store *pymesSaaSS
 }
 
 func handleListAPIKeys(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgID(w, r)
+	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
@@ -149,7 +174,7 @@ func handleListAPIKeys(w http.ResponseWriter, r *http.Request, store *pymesSaaSS
 }
 
 func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgID(w, r)
+	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
@@ -179,7 +204,7 @@ func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 }
 
 func handleRotateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgID(w, r)
+	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
@@ -201,7 +226,7 @@ func handleRotateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 }
 
 func handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgID(w, r)
+	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
@@ -291,6 +316,34 @@ func authorizedOrgID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
+		return "", false
+	}
+	orgID := strings.TrimSpace(r.PathValue("org_id"))
+	if orgID == "" {
+		httperr.BadRequest(w, "org_id is required")
+		return "", false
+	}
+	if principal.TenantID != orgID {
+		httperr.Write(w, http.StatusForbidden, httperr.CodeUnauthorized, "cross-org access denied")
+		return "", false
+	}
+	return orgID, true
+}
+
+// apiKeyManagementAllowed alinea con la consola: solo privilegiados o scopes admin de consola.
+func apiKeyManagementAllowed(principal kerneldomain.Principal) bool {
+	return authz.IsAdmin(principal.Role, principal.Scopes)
+}
+
+// authorizedOrgIDForAPIKeyManagement exige además de coincidencia de tenant, permisos de admin de producto.
+func authorizedOrgIDForAPIKeyManagement(w http.ResponseWriter, r *http.Request) (string, bool) {
+	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		httperr.Unauthorized(w, "principal not found")
+		return "", false
+	}
+	if !apiKeyManagementAllowed(principal) {
+		httperr.Write(w, http.StatusForbidden, "FORBIDDEN", "api key management requires admin privileges")
 		return "", false
 	}
 	orgID := strings.TrimSpace(r.PathValue("org_id"))

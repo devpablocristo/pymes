@@ -29,6 +29,7 @@ func NewHandler(uc usecasesPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
+	// GET /session vive en wire/saas_http.go (mux SaaS) con envelope de producto; ver core/saas/go/session.
 	auth.GET("/admin/bootstrap", h.GetBootstrap)
 	auth.GET("/admin/tenant-settings", h.GetTenantSettings)
 	auth.PUT("/admin/tenant-settings", h.UpdateTenantSettings)
@@ -54,7 +55,7 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 
 func (h *Handler) GetTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	if !(authCtx.Role == "admin" || authz.HasScope(authCtx.Scopes, "admin:console:read") || authz.HasScope(authCtx.Scopes, "admin:console:write")) {
+	if !authz.CanReadConsoleSettings(authCtx.Role, authCtx.Scopes) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin read permission required"})
 		return
 	}
@@ -68,7 +69,7 @@ func (h *Handler) GetTenantSettings(c *gin.Context) {
 
 func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	if !(authCtx.Role == "admin" || authz.HasScope(authCtx.Scopes, "admin:console:write")) {
+	if !authz.CanWriteConsoleSettings(authCtx.Role, authCtx.Scopes) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin write permission required"})
 		return
 	}
@@ -120,7 +121,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 
 func (h *Handler) ListActivity(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	if !(authCtx.Role == "admin" || authz.HasScope(authCtx.Scopes, "admin:console:read") || authz.HasScope(authCtx.Scopes, "admin:console:write")) {
+	if !authz.CanReadConsoleSettings(authCtx.Role, authCtx.Scopes) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin read permission required"})
 		return
 	}

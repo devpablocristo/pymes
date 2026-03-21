@@ -1,8 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { createAPIKey, deleteAPIKey, getAdminBootstrap, getAPIKeys, rotateAPIKey } from '../lib/api';
-import type { APIKeyItem } from '../lib/types';
+import { createAPIKey, deleteAPIKey, getAPIKeys, getSession, rotateAPIKey } from '../lib/api';
+import { useI18n } from '../lib/i18n';
+import type { APIKeyItem, SessionResponse } from '../lib/types';
 
 export function APIKeysPage() {
+  const { t } = useI18n();
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [session, setSession] = useState<SessionResponse | null>(null);
   const [orgID, setOrgID] = useState('');
   const [keys, setKeys] = useState<APIKeyItem[]>([]);
   const [name, setName] = useState('');
@@ -10,16 +14,31 @@ export function APIKeysPage() {
   const [newRawKey, setNewRawKey] = useState('');
   const [error, setError] = useState('');
 
+  const canManage = session?.auth.product_role === 'admin';
+
+  async function loadKeys(resolvedOrgID: string): Promise<void> {
+    const list = await getAPIKeys(resolvedOrgID);
+    setKeys(list.items);
+    setError('');
+  }
+
   async function load(): Promise<void> {
     try {
-      const bootstrap = await getAdminBootstrap();
-      const resolvedOrgID = bootstrap.settings.org_id;
+      const next = await getSession();
+      setSession(next);
+      const resolvedOrgID = next.auth.org_id;
       setOrgID(resolvedOrgID);
-      const list = await getAPIKeys(resolvedOrgID);
-      setKeys(list.items);
-      setError('');
+      if (next.auth.product_role === 'admin') {
+        await loadKeys(resolvedOrgID);
+      } else {
+        setKeys([]);
+        setError('');
+      }
     } catch (err) {
+      setSession(null);
       setError(String(err));
+    } finally {
+      setSessionLoading(false);
     }
   }
 
@@ -29,7 +48,7 @@ export function APIKeysPage() {
 
   async function onCreate(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (!orgID) return;
+    if (!orgID || !canManage) return;
     try {
       const resp = await createAPIKey(orgID, {
         name,
@@ -40,31 +59,69 @@ export function APIKeysPage() {
       });
       setNewRawKey(resp.raw_key);
       setName('');
-      await load();
+      await loadKeys(orgID);
     } catch (err) {
       setError(String(err));
     }
   }
 
   async function onRotate(keyID: string): Promise<void> {
-    if (!orgID) return;
+    if (!orgID || !canManage) return;
     try {
       const resp = await rotateAPIKey(orgID, keyID);
       setNewRawKey(resp.raw_key);
-      await load();
+      await loadKeys(orgID);
     } catch (err) {
       setError(String(err));
     }
   }
 
   async function onDelete(keyID: string): Promise<void> {
-    if (!orgID) return;
+    if (!orgID || !canManage) return;
     try {
       await deleteAPIKey(orgID, keyID);
-      await load();
+      await loadKeys(orgID);
     } catch (err) {
       setError(String(err));
     }
+  }
+
+  if (sessionLoading) {
+    return (
+      <div className="page-header">
+        <h1>Claves API</h1>
+        <p className="text-muted">{t('apiKeys.loading')}</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        <div className="page-header">
+          <h1>Claves API</h1>
+          <p>Crea y administra las claves de acceso a la API</p>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+      </>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <>
+        <div className="page-header">
+          <h1>Claves API</h1>
+          <p>Crea y administra las claves de acceso a la API</p>
+        </div>
+        <div className="card">
+          <div className="card-header">
+            <h2>{t('apiKeys.adminOnly.title')}</h2>
+          </div>
+          <p>{t('apiKeys.adminOnly.body')}</p>
+        </div>
+      </>
+    );
   }
 
   return (
@@ -97,7 +154,9 @@ export function APIKeysPage() {
             <label>Permisos</label>
             <input value={scopes} onChange={(e) => setScopes(e.target.value)} />
           </div>
-          <button type="submit" className="btn-primary">Crear</button>
+          <button type="submit" className="btn-primary">
+            Crear
+          </button>
         </form>
       </div>
 
@@ -126,10 +185,14 @@ export function APIKeysPage() {
                 {keys.map((key) => (
                   <tr key={key.id}>
                     <td className="text-semibold">{key.name}</td>
-                    <td><code>{key.key_prefix}</code></td>
+                    <td>
+                      <code>{key.key_prefix}</code>
+                    </td>
                     <td>
                       {key.scopes.map((s) => (
-                        <span key={s} className="badge badge-neutral">{s}</span>
+                        <span key={s} className="badge badge-neutral">
+                          {s}
+                        </span>
                       ))}
                     </td>
                     <td className="mono">{new Date(key.created_at).toLocaleDateString()}</td>

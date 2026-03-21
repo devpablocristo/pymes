@@ -10,8 +10,10 @@
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [CONTROL_PLANE.md](./CONTROL_PLANE.md) | Control plane, seguridad interna, comandos de validación |
+| [AUTH.md](./AUTH.md) | Identidad, Clerk vs local; **prioridad dev:** API key / consola técnica sin Clerk |
 | [PROFESSIONALS.md](./PROFESSIONALS.md) | Vertical umbrella `professionals` (módulo `teachers`) |
 | [WORKSHOPS.md](./WORKSHOPS.md) | Vertical umbrella `workshops` (`auto_repair`) |
+| [BEAUTY.md](./BEAUTY.md) | Vertical belleza/salón (`beauty`) |
 
 Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](../pymes-core/backend/docs/SAAS_CORE.md).
 
@@ -20,6 +22,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 - `pymes-core/backend`: backend principal (control plane)
 - `professionals/backend`: backend de vertical
 - `workshops/backend`: backend de vertical
+- `beauty/backend`: backend de vertical (belleza/salón)
 - `frontend`: consola React unificada
 - `ai`: servicio FastAPI unificado
 - `pymes-core/shared/`: runtime compartido del producto (backend + AI)
@@ -31,7 +34,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 2. [ARCHITECTURE.md](./ARCHITECTURE.md)
 3. [PYMES_CORE.md](./PYMES_CORE.md)
 4. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
-5. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) según vertical
+5. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) según vertical
 
 ## Validación rápida
 

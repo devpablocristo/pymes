@@ -1,5 +1,6 @@
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: pymes
@@ -16,12 +17,14 @@ services:
       retries: 5
 
   mailhog:
+    restart: unless-stopped
     image: mailhog/mailhog:v1.0.1
     ports:
       - "1025:1025"
       - "8025:8025"
 
   cp-backend:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: ./pymes/pymes-core/backend/Dockerfile.dev
@@ -45,6 +48,7 @@ services:
         condition: service_healthy
 
   frontend:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./frontend/Dockerfile.dev
@@ -68,6 +72,7 @@ services:
       - cp-backend
 
   ai:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: ./pymes/ai/Dockerfile.dev
@@ -94,6 +99,7 @@ services:
   # ── Professionals Vertical ──
 
   prof-backend:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: ./pymes/professionals/backend/Dockerfile.dev
@@ -122,6 +128,7 @@ services:
   # ── Workshops Vertical ──
 
   work-backend:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: ./pymes/workshops/backend/Dockerfile.dev
@@ -150,6 +157,7 @@ services:
   # ── Beauty / Salón Vertical ──
 
   beauty-backend:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: ./pymes/beauty/backend/Dockerfile.dev

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { apiRequest, downloadAPIFile, getAdminBootstrap } from '../lib/api';
+import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
 import { ConfiguredCrudPage, hasCrudResource } from '../crud/resourceConfigs';
 import {
   moduleCatalog,
@@ -69,9 +69,51 @@ function buildBody(fields: ModuleField[] | undefined, values: Record<string, str
     if (raw === '') {
       continue;
     }
-    body[field.name] = field.type === 'number' ? Number(raw) : raw;
+    if (field.type === 'json') {
+      try {
+        body[field.name] = JSON.parse(raw) as unknown;
+      } catch {
+        throw new Error(`JSON inválido en «${field.label}»`);
+      }
+    } else if (field.type === 'number') {
+      body[field.name] = Number(raw);
+    } else {
+      body[field.name] = raw;
+    }
   }
   return body;
+}
+
+function groupedModuleActions(module: ModuleDefinition): Array<{ key: string; title: string; actions: ModuleAction[] }> {
+  const actions = module.actions ?? [];
+  const order = module.actionGroupOrder;
+  const labels = module.actionGroupLabels;
+  const map = new Map<string, ModuleAction[]>();
+  for (const action of actions) {
+    const key = action.group ?? '_ungrouped';
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key)!.push(action);
+  }
+  const keys: string[] = [];
+  if (order) {
+    for (const k of order) {
+      if (map.has(k)) {
+        keys.push(k);
+      }
+    }
+  }
+  for (const k of map.keys()) {
+    if (!keys.includes(k)) {
+      keys.push(k);
+    }
+  }
+  return keys.map((key) => ({
+    key,
+    title: labels?.[key] ?? (key === '_ungrouped' ? 'Acciones' : key),
+    actions: map.get(key) ?? [],
+  }));
 }
 
 function missingRequiredFields(fields: ModuleField[] | undefined, values: Record<string, string>): string[] {
@@ -202,7 +244,13 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
     const path = buildPath(definition.path, fields, currentValues, runtime);
     const action = definition as ModuleAction;
     const isAction = kind === 'action';
-    const body = buildBody(fields, currentValues);
+    let body: Record<string, unknown>;
+    try {
+      body = buildBody(fields, currentValues);
+    } catch (parseErr) {
+      setError(String(parseErr));
+      return;
+    }
     const hasBody = Object.keys(body).length > 0;
 
     setLoading(true);
@@ -242,25 +290,36 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
     void execute(values);
   }
 
+  const httpMethod = kind === 'dataset' ? 'GET' : (definition as ModuleAction).method;
+
   return (
     <section className="card module-card">
-      <div className="card-header">
+      <div className="card-header module-card-header-inner">
         <div>
           <h2>{localizeUiText(vocab(definition.title))}</h2>
           <p className="text-secondary">{localizeText(vocab(definition.description))}</p>
         </div>
-        <span className="badge badge-neutral mono">{definition.path}</span>
+      </div>
+      <div className="module-endpoint-meta">
+        <span className={`http-method http-method-${httpMethod.toLowerCase()}`}>{httpMethod}</span>
+        <code className="endpoint-path" title={definition.path}>
+          {definition.path}
+        </code>
       </div>
 
       <form onSubmit={onSubmit} className="module-form-stack">
         {fields.length > 0 && (
           <div className="module-fields-grid">
             {fields.map((field) => (
-              <div key={field.name} className={`form-group ${field.type === 'textarea' ? 'full-width' : ''}`}>
+              <div
+                key={field.name}
+                className={`form-group ${field.type === 'textarea' || field.type === 'json' ? 'full-width' : ''}`}
+              >
                 <label>{localizeText(field.label)}</label>
-                {field.type === 'textarea' ? (
+                {field.type === 'textarea' || field.type === 'json' ? (
                   <textarea
-                    rows={3}
+                    rows={field.type === 'json' ? 4 : 3}
+                    className={field.type === 'json' ? 'mono' : undefined}
                     placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     value={values[field.name] ?? ''}
                     onChange={(event) =>
@@ -357,6 +416,7 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
           </div>
           <h1>{localizeUiText(vocab(module.title))}</h1>
           <p>{localizeText(vocab(module.summary))}</p>
+          {module.helpIntro && <p className="module-help-intro">{localizeText(module.helpIntro)}</p>}
         </div>
         <div className="module-runtime-card">
           <span>{t('module.runtime.activeOrg')}</span>
@@ -366,16 +426,18 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
       </div>
 
       <div className="stats-grid compact-grid">
-        <div className="stat-card">
-          <div className="stat-label">{sentenceCase(t('module.stats.datasets'))}</div>
-          <div className="stat-value">{module.datasets?.length ?? 0}</div>
-        </div>
+        {(module.datasets?.length ?? 0) > 0 && (
+          <div className="stat-card">
+            <div className="stat-label">{sentenceCase(t('module.stats.datasets'))}</div>
+            <div className="stat-value">{module.datasets?.length ?? 0}</div>
+          </div>
+        )}
         <div className="stat-card">
           <div className="stat-label">{sentenceCase(t('module.stats.actions'))}</div>
           <div className="stat-value">{module.actions?.length ?? 0}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">{sentenceCase(t('module.stats.basePath'))}</div>
+          <div className="stat-label">{sentenceCase(t('module.stats.consolePath'))}</div>
           <div className="stat-value stat-value-sm mono">/modules/{module.id}</div>
         </div>
       </div>
@@ -406,9 +468,9 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const bootstrap = await getAdminBootstrap();
+        const session = await getSession();
         if (!cancelled) {
-          setRuntime((current) => ({ ...current, orgId: bootstrap.settings.org_id }));
+          setRuntime((current) => ({ ...current, orgId: session.auth.org_id }));
           setBootstrapError('');
         }
       } catch (err) {
@@ -451,11 +513,26 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
             <h2>{sentenceCase(t('module.sections.actions'))}</h2>
             <span className="badge badge-neutral">{module.actions.length}</span>
           </div>
-          <div className="module-grid">
-            {module.actions.map((action) => (
-              <EndpointCard key={action.id} definition={action} runtime={runtime} kind="action" />
-            ))}
-          </div>
+          {(() => {
+            const actionGroups = groupedModuleActions(module);
+            const showGroupTitles =
+              actionGroups.length > 1 || (actionGroups[0] !== undefined && actionGroups[0].key !== '_ungrouped');
+            return actionGroups.map((section) => (
+              <div key={section.key} className="module-action-group">
+                {showGroupTitles && (
+                  <div className="module-action-group-heading">
+                    <h3>{section.title}</h3>
+                    <span className="badge badge-neutral">{section.actions.length}</span>
+                  </div>
+                )}
+                <div className="module-grid">
+                  {section.actions.map((action) => (
+                    <EndpointCard key={action.id} definition={action} runtime={runtime} kind="action" />
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       )}
     </>

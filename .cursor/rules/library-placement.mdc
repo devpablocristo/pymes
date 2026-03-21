@@ -1,0 +1,18 @@
+---
+description: Dónde vive código reutilizable — core, pymes-core/shared o internal del servicio
+alwaysApply: true
+---
+
+# Ubicación de código compartido (sin `pkgs/` en este repo)
+
+No se usa carpeta `pkgs/` en el monorepo: el código reutilizable se ubica así:
+
+1. **Librería `core`** (`github.com/devpablocristo/core/...`) — Código **agnóstico** y portable entre productos (authn, saas, governance, helpers HTTP, etc.). Se versiona fuera de Pymes y se importa por `go.mod` / `replace` local.
+2. **`pymes-core/shared/`** — Transversal **de este producto**: usado por más de un vertical o capa, pero acoplado a convenciones o conceptos Pymes.
+3. **`internal/` del backend que corresponda** — Lógica **atada al dominio** de un solo servicio o módulo (pymes-core, `professionals/backend`, `workshops/backend`). Si no sirve a otro bounded context, no sube a `shared` ni a `core`.
+
+## Test rápido
+
+- ¿Sirve a otro repo sin conocer Pymes? → **core** (o dependencia externa acorde).
+- ¿Es compartido entre verticales pero específico del producto? → **`pymes-core/shared/`**.
+- ¿Es exclusivo del módulo o muy acoplado al negocio de ese servicio? → **`internal/...`** del owner.

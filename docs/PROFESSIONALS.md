@@ -38,7 +38,7 @@ Regla de borde:
 
 - no importa dominio interno de `pymes-core`
 - integra por clientes HTTP y contratos internos
-- reutiliza solo runtime tecnico compartido desde `pymes-core/shared/` y `pkgs/`
+- reutiliza solo runtime tecnico compartido desde `pymes-core/shared/` y modulos agnosticos de la libreria `core` (`github.com/devpablocristo/core/...`)
 
 ## Superficie local
 

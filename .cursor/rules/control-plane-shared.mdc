@@ -9,13 +9,14 @@ Usar `pymes-core/shared/` para codigo que:
 
 - aplica a mas de un vertical;
 - pertenece a este producto;
-- no es lo bastante agnostico como para vivir en `pkgs/`.
+- no debe vivir en la libreria **`core`** (no es lo bastante agnostico o acopla convenciones Pymes).
 
 ## Regla de ubicacion
 
 - `vertical/` = solo delta exclusivo de esa vertical.
-- `pymes-core/shared/` = compartido del producto.
-- `pkgs/` = compartido portable entre proyectos.
+- `pymes-core/shared/` = compartido del producto entre verticales.
+- Libreria **`core`** = agnostico, importado como modulo Go (ver `library-placement.mdc`).
+- Codigo muy atado al dominio de un solo servicio = `internal/` de ese backend, no `shared`.
 
 ## Ejemplos de `pymes-core/shared/`
 

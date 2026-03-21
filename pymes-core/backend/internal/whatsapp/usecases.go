@@ -486,6 +486,14 @@ func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.
 		return domain.Connection{}, "", "", "", apperror.NewBusinessRule("party has no phone number")
 	}
 
+	optedIn, err := u.repo.IsOptedIn(ctx, orgID, partyID)
+	if err != nil {
+		return domain.Connection{}, "", "", "", fmt.Errorf("check whatsapp opt-in: %w", err)
+	}
+	if !optedIn {
+		return domain.Connection{}, "", "", "", apperror.NewBusinessRule("whatsapp opt-in required for this contact")
+	}
+
 	templates, err := u.repo.GetTemplates(ctx, orgID)
 	if err != nil {
 		return domain.Connection{}, "", "", "", err

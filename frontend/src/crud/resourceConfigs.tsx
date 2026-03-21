@@ -1,4 +1,4 @@
-import { CrudPage, type CrudFieldValue, type CrudPageConfig } from '../components/CrudPage';
+import { CrudPage, type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
 import { apiRequest } from '../lib/api';
 import type { ModuleDefinition } from '../lib/moduleCatalog';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
@@ -208,6 +208,43 @@ type Purchase = {
   }>;
 };
 
+type ProcurementRequest = {
+  id: string;
+  org_id?: string;
+  requester_actor?: string;
+  title: string;
+  description?: string;
+  category?: string;
+  status: string;
+  estimated_total: number;
+  currency?: string;
+  lines?: Array<{
+    id?: string;
+    product_id?: string | null;
+    description: string;
+    quantity: number;
+    unit_price_estimate: number;
+  }>;
+  created_at?: string;
+  updated_at?: string;
+  archived_at?: string | null;
+};
+
+type ProcurementPolicy = {
+  id: string;
+  org_id?: string;
+  name: string;
+  expression: string;
+  effect: string;
+  priority: number;
+  mode: string;
+  enabled: boolean;
+  action_filter: string;
+  system_filter: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 type Account = {
   id: string;
   type: string;
@@ -361,6 +398,47 @@ function parseCostLineItems(value: CrudFieldValue | undefined): Array<{
     unit_cost: Number(item.unit_cost ?? 0),
     tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
   })).filter((item) => item.description && item.quantity > 0);
+}
+
+function parseProcurementLines(value: CrudFieldValue | undefined): Array<{
+  product_id?: string;
+  description: string;
+  quantity: number;
+  unit_price_estimate: number;
+}> {
+  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los ítems deben ser un arreglo JSON');
+  return parsed
+    .map((item) => ({
+      product_id: asOptionalString(item.product_id as CrudFieldValue),
+      description: String(item.description ?? '').trim(),
+      quantity: Number(item.quantity ?? 0),
+      unit_price_estimate: Number(item.unit_price_estimate ?? item.unit_price ?? 0),
+    }))
+    .filter((item) => item.description && item.quantity > 0);
+}
+
+function toProcurementRequestBody(values: CrudFormValues): Record<string, unknown> {
+  return {
+    title: asString(values.title),
+    description: asOptionalString(values.description) ?? '',
+    category: asOptionalString(values.category) ?? '',
+    estimated_total: asNumber(values.estimated_total),
+    currency: asOptionalString(values.currency) ?? 'ARS',
+    lines: parseProcurementLines(values.lines_json),
+  };
+}
+
+function toProcurementPolicyBody(values: CrudFormValues): Record<string, unknown> {
+  return {
+    name: asString(values.name),
+    expression: asString(values.expression),
+    effect: asString(values.effect),
+    priority: asNumber(values.priority),
+    mode: asString(values.mode),
+    enabled: asBoolean(values.enabled),
+    action_filter: asOptionalString(values.action_filter) ?? '',
+    system_filter: asOptionalString(values.system_filter) ?? '',
+  };
 }
 
 function parseWorkOrderItems(value: CrudFieldValue | undefined): WorkOrderItem[] {
@@ -935,6 +1013,177 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) => asString(values.supplier_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
+  },
+  procurementRequests: {
+    supportsArchived: true,
+    label: 'solicitud de compra interna',
+    labelPlural: 'solicitudes de compra internas',
+    labelPluralCap: 'Solicitudes de compra internas',
+    dataSource: {
+      list: async ({ archived }) => {
+        const suffix = archived ? '?archived=true' : '';
+        const data = await apiRequest<{ items: ProcurementRequest[] }>(`/v1/procurement-requests${suffix}`);
+        return data.items ?? [];
+      },
+      create: async (values) => {
+        await apiRequest('/v1/procurement-requests', { method: 'POST', body: toProcurementRequestBody(values) });
+      },
+      update: async (row, values) => {
+        await apiRequest(`/v1/procurement-requests/${row.id}`, { method: 'PATCH', body: toProcurementRequestBody(values) });
+      },
+      deleteItem: async (row) => {
+        await apiRequest(`/v1/procurement-requests/${row.id}/archive`, { method: 'POST', body: {} });
+      },
+      restore: async (row) => {
+        await apiRequest(`/v1/procurement-requests/${row.id}/restore`, { method: 'POST', body: {} });
+      },
+      hardDelete: async (row) => {
+        await apiRequest(`/v1/procurement-requests/${row.id}`, { method: 'DELETE' });
+      },
+    },
+    columns: [
+      {
+        key: 'title',
+        header: 'Solicitud',
+        className: 'cell-name',
+        render: (_value, row: ProcurementRequest) => (
+          <>
+            <strong>{row.title || row.id}</strong>
+            <div className="text-secondary">
+              {row.requester_actor || '—'} · {row.status || 'draft'} · {row.currency || 'ARS'}{' '}
+              {Number(row.estimated_total ?? 0).toFixed(2)}
+            </div>
+          </>
+        ),
+      },
+      { key: 'category', header: 'Rubro', render: (v) => String(v ?? '').trim() || '—' },
+      { key: 'status', header: 'Estado' },
+    ],
+    formFields: [
+      { key: 'title', label: 'Título', required: true, placeholder: 'Ej. Repuestos oficina' },
+      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
+      { key: 'category', label: 'Categoría / rubro', placeholder: 'general, insumos, ...' },
+      { key: 'estimated_total', label: 'Total estimado', type: 'number' },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
+      {
+        key: 'lines_json',
+        label: 'Líneas JSON',
+        type: 'textarea',
+        required: true,
+        fullWidth: true,
+        placeholder:
+          '[{"description":"Item","quantity":1,"unit_price_estimate":1000}]',
+      },
+    ],
+    rowActions: [
+      {
+        id: 'submit',
+        label: 'Enviar',
+        kind: 'primary',
+        isVisible: (row, ctx) => !ctx.archived && row.status === 'draft',
+        onClick: async (row, helpers) => {
+          await apiRequest(`/v1/procurement-requests/${row.id}/submit`, { method: 'POST', body: {} });
+          await helpers.reload();
+        },
+      },
+      {
+        id: 'approve',
+        label: 'Aprobar',
+        kind: 'success',
+        isVisible: (row, ctx) => !ctx.archived && row.status === 'pending_approval',
+        onClick: async (row, helpers) => {
+          await apiRequest(`/v1/procurement-requests/${row.id}/approve`, { method: 'POST', body: {} });
+          await helpers.reload();
+        },
+      },
+      {
+        id: 'reject',
+        label: 'Rechazar',
+        kind: 'danger',
+        isVisible: (row, ctx) => !ctx.archived && row.status === 'pending_approval',
+        onClick: async (row, helpers) => {
+          await apiRequest(`/v1/procurement-requests/${row.id}/reject`, { method: 'POST', body: {} });
+          await helpers.reload();
+        },
+      },
+    ],
+    searchText: (row: ProcurementRequest) =>
+      [row.title, row.description, row.category, row.status, row.requester_actor].filter(Boolean).join(' '),
+    toFormValues: (row: ProcurementRequest) => ({
+      title: row.title ?? '',
+      description: row.description ?? '',
+      category: row.category ?? '',
+      estimated_total: row.estimated_total?.toString() ?? '0',
+      currency: row.currency ?? 'ARS',
+      lines_json: stringifyJSON(row.lines ?? []),
+    }),
+    isValid: (values) => asString(values.title).trim().length >= 2 && asString(values.lines_json).trim().length > 0,
+  },
+  procurementPolicies: {
+    label: 'política de compras',
+    labelPlural: 'políticas de compras',
+    labelPluralCap: 'Políticas de compras (governance)',
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items: ProcurementPolicy[] }>('/v1/procurement-policies');
+        return data.items ?? [];
+      },
+      create: async (values) => {
+        await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyBody(values) });
+      },
+      update: async (row, values) => {
+        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'PATCH', body: toProcurementPolicyBody(values) });
+      },
+      deleteItem: async (row) => {
+        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'DELETE' });
+      },
+    },
+    columns: [
+      {
+        key: 'name',
+        header: 'Política',
+        className: 'cell-name',
+        render: (_value, row: ProcurementPolicy) => (
+          <>
+            <strong>{row.name}</strong>
+            <div className="text-secondary">
+              {row.effect} · prioridad {row.priority} · {row.mode} · {row.enabled ? 'activa' : 'inactiva'}
+            </div>
+          </>
+        ),
+      },
+      { key: 'action_filter', header: 'Acción', className: 'cell-notes' },
+    ],
+    formFields: [
+      { key: 'name', label: 'Nombre', required: true },
+      { key: 'expression', label: 'Expresión CEL', type: 'textarea', required: true, fullWidth: true },
+      {
+        key: 'effect',
+        label: 'Efecto',
+        required: true,
+        placeholder: 'allow | deny | require_approval',
+      },
+      { key: 'priority', label: 'Prioridad', type: 'number' },
+      { key: 'mode', label: 'Modo', placeholder: 'enforce | shadow' },
+      { key: 'enabled', label: 'Activa', type: 'checkbox' },
+      { key: 'action_filter', label: 'Filtro de acción', placeholder: 'procurement.submit' },
+      { key: 'system_filter', label: 'Filtro de sistema', placeholder: 'pymes' },
+    ],
+    searchText: (row: ProcurementPolicy) => [row.name, row.expression, row.effect, row.action_filter].filter(Boolean).join(' '),
+    toFormValues: (row: ProcurementPolicy) => ({
+      name: row.name ?? '',
+      expression: row.expression ?? '',
+      effect: row.effect ?? '',
+      priority: row.priority?.toString() ?? '100',
+      mode: row.mode ?? 'enforce',
+      enabled: row.enabled ?? true,
+      action_filter: row.action_filter ?? '',
+      system_filter: row.system_filter ?? '',
+    }),
+    isValid: (values) =>
+      asString(values.name).trim().length >= 2 &&
+      asString(values.expression).trim().length > 0 &&
+      asString(values.effect).trim().length > 0,
   },
   accounts: {
     basePath: '/v1/accounts',
@@ -2108,7 +2357,7 @@ const csvStrategies: Record<string, CSVToolbarOptions<any>> = {
 csvStrategies.teachers = csvStrategies.professionals;
 
 type CrudModuleMeta = Pick<ModuleDefinition, 'group' | 'icon' | 'summary'> &
-  Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes'>>;
+  Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes' | 'datasets' | 'actions'>>;
 
 const crudModuleMeta: Partial<Record<keyof typeof rawResourceConfigs, CrudModuleMeta>> = {
   parties: {
@@ -2151,6 +2400,113 @@ const crudModuleMeta: Partial<Record<keyof typeof rawResourceConfigs, CrudModule
     icon: 'CP',
     summary: 'Circuito de compras, recepciones y costos.',
   },
+  procurementRequests: {
+    group: 'operations',
+    icon: 'SC',
+    summary: 'Solicitudes internas, aprobación y políticas CEL (governance).',
+    datasets: [
+      {
+        id: 'procurement-requests-active',
+        title: 'Solicitudes activas',
+        description: 'Listado excluye archivados (mismo contrato que el CRUD).',
+        path: '/v1/procurement-requests',
+        autoLoad: true,
+      },
+      {
+        id: 'procurement-requests-archived',
+        title: 'Solicitudes archivadas',
+        description: 'Incluye registros con archived_at; equivale a ?archived=true en el listado.',
+        path: '/v1/procurement-requests?archived=true',
+        autoLoad: true,
+      },
+    ],
+    actions: [
+      {
+        id: 'procurement-request-detail',
+        title: 'Detalle de solicitud',
+        description: 'GET por ID (misma entidad que edita el CRUD).',
+        path: '/v1/procurement-requests/:requestId',
+        method: 'GET',
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+      {
+        id: 'procurement-request-submit',
+        title: 'Enviar a evaluación',
+        description: 'Evalúa políticas CEL (governance) y actualiza estado.',
+        path: '/v1/procurement-requests/:requestId/submit',
+        method: 'POST',
+        response: 'json',
+        sendEmptyBody: true,
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+      {
+        id: 'procurement-request-approve',
+        title: 'Aprobar',
+        description: 'Solo si el estado lo permite (pending_approval).',
+        path: '/v1/procurement-requests/:requestId/approve',
+        method: 'POST',
+        response: 'json',
+        sendEmptyBody: true,
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+      {
+        id: 'procurement-request-reject',
+        title: 'Rechazar',
+        description: 'Solo si el estado lo permite (pending_approval).',
+        path: '/v1/procurement-requests/:requestId/reject',
+        method: 'POST',
+        response: 'json',
+        sendEmptyBody: true,
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+      {
+        id: 'procurement-request-archive',
+        title: 'Archivar',
+        description: 'Soft delete; el CRUD usa este endpoint en “Archivar”.',
+        path: '/v1/procurement-requests/:requestId/archive',
+        method: 'POST',
+        response: 'none',
+        sendEmptyBody: true,
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+      {
+        id: 'procurement-request-restore',
+        title: 'Restaurar',
+        description: 'Quita archived_at; usado desde la vista de archivados.',
+        path: '/v1/procurement-requests/:requestId/restore',
+        method: 'POST',
+        response: 'none',
+        sendEmptyBody: true,
+        fields: [{ name: 'requestId', label: 'ID de solicitud', location: 'path', required: true }],
+      },
+    ],
+  },
+  procurementPolicies: {
+    group: 'control',
+    icon: 'GP',
+    title: 'Políticas de compras',
+    navLabel: 'Políticas compras',
+    summary: 'Reglas CEL por organización para el circuito de solicitudes (motor governance).',
+    datasets: [
+      {
+        id: 'procurement-policies-list',
+        title: 'Políticas CEL',
+        description: 'Reglas por org; se evalúan al enviar una solicitud (submit).',
+        path: '/v1/procurement-policies',
+        autoLoad: true,
+      },
+    ],
+    actions: [
+      {
+        id: 'procurement-policy-detail',
+        title: 'Detalle de política',
+        description: 'GET por ID.',
+        path: '/v1/procurement-policies/:policyId',
+        method: 'GET',
+        fields: [{ name: 'policyId', label: 'ID de política', location: 'path', required: true }],
+      },
+    ],
+  },
   accounts: {
     group: 'commercial',
     icon: 'CC',
@@ -2192,6 +2548,8 @@ export const crudModuleCatalog = Object.fromEntries(
       icon: meta?.icon ?? 'CR',
       badge: meta?.badge,
       notes: meta?.notes,
+      datasets: meta?.datasets,
+      actions: meta?.actions,
     };
     return [resourceId, definition];
   }),

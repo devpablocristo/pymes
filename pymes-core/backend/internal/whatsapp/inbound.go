@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -115,7 +116,7 @@ func (u *Usecases) VerifyWebhook(mode, token, challenge string) (string, error) 
 func (u *Usecases) ValidateWebhookSignature(signatureHeader string, payload []byte) error {
 	secret := strings.TrimSpace(u.webhookAppSecret)
 	if secret == "" {
-		return nil
+		return apperror.New("service_unavailable", "whatsapp webhook app secret is not configured", http.StatusServiceUnavailable)
 	}
 
 	provided := strings.ToLower(strings.TrimSpace(signatureHeader))

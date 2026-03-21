@@ -7,14 +7,13 @@ alwaysApply: true
 
 - `pymes-core` es la base transversal obligatoria del producto.
 - **Si algo aplica a más de un vertical, va en código transversal en pymes-core.** No duplicar.
-- Hay dos niveles de compartido:
-- `pkgs/` = codigo agnostico, portable entre proyectos.
-- `pymes-core/shared/` = codigo transversal de este producto, reusable entre verticales pero no necesariamente portable a otro repo.
+- Hay dos niveles de compartido en este repo:
+- **Librería `core`** (`github.com/devpablocristo/core/...`) — primitivas agnósticas importadas por `go.mod` (ver `library-placement.mdc`).
+- `pymes-core/shared/` — código transversal de **este producto**, reusable entre verticales pero no necesariamente portable a otro repo.
 - Las verticales solo pueden contener funcionalidad exclusiva de su dominio; si deja de ser exclusiva, se extrae fuera de la vertical antes de extenderla.
 - Ninguna vertical puede reimplementar capacidades ya existentes en `pymes-core`.
 - Si una capacidad ya existe en `pymes-core`, la vertical la consume por HTTP mediante contratos internos estables.
-- `pkgs/*` solo contiene codigo agnostico. Ver `pkgs-agnostic-only.mdc`.
-- Si el codigo es transversal para este producto pero no es agnostico, NO va en `pkgs/`: va en `pymes-core/shared/`.
+- Si el código es transversal para este producto pero no pertenece en `core`, va en `pymes-core/shared/`. Si está muy atado al negocio de un solo servicio, queda en el `internal/` de ese backend.
 - No se permite duplicar en una vertical: auth, API keys, tenant/org bootstrap, party model, customers, products, appointments, quotes, sales, payments, WhatsApp, billing, admin, ni la base comun de AI, salvo extraccion explicita y justificada del core.
 - Todo prompt o diseño de vertical debe empezar declarando dos listas: `reutiliza desde pymes-core` y `crea nuevo en la vertical`.
 - Lo nuevo de la vertical debe ser solo el delta de dominio que `pymes-core` no modela.

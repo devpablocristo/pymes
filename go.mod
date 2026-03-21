@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/devpablocristo/core/authn/go v0.1.0
+	github.com/devpablocristo/core/governance/go v0.1.0
 	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
@@ -27,8 +28,14 @@ require (
 )
 
 require (
+	cel.dev/expr v0.24.0 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/devpablocristo/core/authz/go v0.1.0 // indirect
-	github.com/devpablocristo/core/notifications/go v0.1.0 // indirect
+	github.com/google/cel-go v0.26.1 // indirect
+	github.com/stoewer/go-strcase v1.2.0 // indirect
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 )
 
 require (
@@ -105,3 +112,5 @@ replace github.com/devpablocristo/core/authn/go => ../core/authn/go
 replace github.com/devpablocristo/core/authz/go => ../core/authz/go
 
 replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go
+
+replace github.com/devpablocristo/core/governance/go => ../core/governance/go

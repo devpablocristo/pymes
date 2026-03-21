@@ -20,7 +20,19 @@ from pymes_core_shared.ai_runtime import OrchestratorLimits, orchestrate
 from src.db.repository import AIRepository
 from pymes_core_shared.ai_runtime import LLMProvider, Message, ToolDeclaration
 from pymes_core_shared.ai_runtime import get_logger
-from src.tools import accounts, appointments, customers, inventory, payments, products, purchases, quotes, sales, suppliers
+from src.tools import (
+    accounts,
+    appointments,
+    customers,
+    inventory,
+    payments,
+    procurement_requests,
+    products,
+    purchases,
+    quotes,
+    sales,
+    suppliers,
+)
 
 logger = get_logger(__name__)
 
@@ -639,6 +651,39 @@ async def _build_procurement_tools(
         _ = org_id
         return await purchases.get_purchases_summary(client, auth)
 
+    async def _list_procurement_requests(org_id: str, limit: int = 20, archived: bool = False) -> dict[str, Any]:
+        _ = org_id
+        return await procurement_requests.list_procurement_requests(client, auth, limit=limit, archived=archived)
+
+    async def _create_procurement_request(
+        org_id: str,
+        title: str,
+        description: str = "",
+        category: str = "",
+        estimated_total: float = 0,
+        currency: str = "ARS",
+        lines: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        _ = org_id
+        return await procurement_requests.create_procurement_request(
+            client,
+            auth,
+            title=title,
+            description=description,
+            category=category,
+            estimated_total=estimated_total,
+            currency=currency,
+            lines=lines,
+        )
+
+    async def _get_procurement_request(org_id: str, request_id: str) -> dict[str, Any]:
+        _ = org_id
+        return await procurement_requests.get_procurement_request(client, auth, request_id=request_id)
+
+    async def _submit_procurement_request(org_id: str, request_id: str) -> dict[str, Any]:
+        _ = org_id
+        return await procurement_requests.submit_procurement_request(client, auth, request_id=request_id)
+
     async def _prepare_purchase_draft(
         org_id: str,
         supplier_name: str | None = None,
@@ -692,6 +737,49 @@ async def _build_procurement_tools(
         (_tool("get_stock_level", "Consultar stock de un producto", {"type": "object", "properties": {"product_id": {"type": "string"}}, "required": ["product_id"]}), _get_stock_level),
         (_tool("get_purchases", "Consultar compras recientes", {"type": "object", "properties": {}}), _get_purchases),
         (_tool("prepare_purchase_draft", "Preparar borrador de compra sin emitir la orden final", {"type": "object", "properties": {"supplier_name": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}}), _prepare_purchase_draft),
+        (
+            _tool(
+                "list_procurement_requests",
+                "Listar solicitudes internas de compra (borradores y enviadas)",
+                {"type": "object", "properties": {"limit": {"type": "integer"}, "archived": {"type": "boolean"}}},
+            ),
+            _list_procurement_requests,
+        ),
+        (
+            _tool(
+                "create_procurement_request",
+                "Crear borrador de solicitud interna de compra o gasto antes de enviarla a aprobacion",
+                {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "category": {"type": "string"},
+                        "estimated_total": {"type": "number"},
+                        "currency": {"type": "string"},
+                        "lines": {"type": "array", "items": {"type": "object"}},
+                    },
+                    "required": ["title"],
+                },
+            ),
+            _create_procurement_request,
+        ),
+        (
+            _tool(
+                "get_procurement_request",
+                "Obtener detalle de una solicitud interna por id",
+                {"type": "object", "properties": {"request_id": {"type": "string"}}, "required": ["request_id"]},
+            ),
+            _get_procurement_request,
+        ),
+        (
+            _tool(
+                "submit_procurement_request",
+                "Enviar solicitud interna: aplica politicas (governance) y puede crear orden de compra en borrador si corresponde",
+                {"type": "object", "properties": {"request_id": {"type": "string"}}, "required": ["request_id"]},
+            ),
+            _submit_procurement_request,
+        ),
     ]
 
     for declaration, raw_handler in specs:

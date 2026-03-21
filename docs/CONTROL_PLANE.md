@@ -8,7 +8,7 @@
 - API keys y seguridad interna
 - billing, auditoria, notificaciones y admin
 - customers, suppliers, products, inventory, sales, quotes, cashflow y reports
-- appointments, recurring, price lists, payments, returns, webhooks y WhatsApp
+- appointments, recurring, price lists, payments, returns, procurement (solicitudes internas y políticas CEL), webhooks y WhatsApp
 - runtime compartido reutilizado por otras verticales
 
 ## Piezas vigentes

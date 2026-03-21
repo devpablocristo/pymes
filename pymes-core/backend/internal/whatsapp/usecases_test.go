@@ -121,7 +121,12 @@ func (r *testRepo) ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.Op
 }
 
 func (r *testRepo) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error) {
-	return len(r.optIns) > 0, nil
+	for _, o := range r.optIns {
+		if o.OrgID == orgID && o.PartyID == partyID && o.Status == domain.OptInStatusOptedIn {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type testAIClient struct {
@@ -234,11 +239,12 @@ func TestHandleInboundWebhook(t *testing.T) {
 	}
 }
 
-func TestValidateWebhookSignatureAllowsDisabledSecret(t *testing.T) {
+func TestValidateWebhookSignatureRequiresSecret(t *testing.T) {
 	t.Parallel()
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "verify-token", "")
-	if err := uc.ValidateWebhookSignature("", []byte(`{"entry":[]}`)); err != nil {
-		t.Fatalf("ValidateWebhookSignature() error = %v, want nil when secret disabled", err)
+	err := uc.ValidateWebhookSignature("", []byte(`{"entry":[]}`))
+	if err == nil {
+		t.Fatal("ValidateWebhookSignature() error = nil, want error when app secret is not configured")
 	}
 }
 
@@ -271,6 +277,11 @@ func TestSendText(t *testing.T) {
 		},
 		partyPhone: "+5491112345678",
 		partyName:  "Juan",
+		optIns: []domain.OptIn{{
+			OrgID:   orgID,
+			PartyID: partyID,
+			Status:  domain.OptInStatusOptedIn,
+		}},
 	}
 	metaClient := &testMetaClient{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
@@ -292,6 +303,35 @@ func TestSendText(t *testing.T) {
 	}
 	if repo.savedMsg == nil {
 		t.Fatal("message was not saved to repository")
+	}
+}
+
+func TestSendTextRequiresOptIn(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	partyID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	repo := &testRepo{
+		domainConn: domain.Connection{
+			OrgID:         orgID,
+			PhoneNumberID: "123456789",
+			AccessToken:   "plain-token",
+			IsActive:      true,
+		},
+		partyPhone: "+5491112345678",
+		partyName:  "Juan",
+		// sin optIns -> IsOptedIn false
+	}
+	metaClient := &testMetaClient{}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
+
+	_, err := uc.SendText(context.Background(), domain.SendTextRequest{
+		OrgID:   orgID,
+		PartyID: partyID,
+		Body:    "Hola",
+		Actor:   "admin",
+	})
+	if err == nil {
+		t.Fatal("SendText() error = nil, want business rule when opt-in missing")
 	}
 }
 

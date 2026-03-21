@@ -63,6 +63,19 @@ INTERNAL_PROCUREMENT_BASE_TOOLS = frozenset(
         "get_stock_level",
         "get_purchases",
         "prepare_purchase_draft",
+        "list_procurement_requests",
+        "create_procurement_request",
+        "get_procurement_request",
+        "submit_procurement_request",
+    }
+)
+
+# Contador / finanzas: visibilidad del circuito sin crear ni enviar solicitudes.
+INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS = frozenset(
+    {
+        "list_procurement_requests",
+        "get_procurement_request",
+        "get_purchases",
     }
 )
 
@@ -101,6 +114,7 @@ ROLE_INTERNAL_SALES: dict[str, frozenset[str]] = {
 ROLE_INTERNAL_PROCUREMENT: dict[str, frozenset[str]] = {
     "admin": INTERNAL_PROCUREMENT_BASE_TOOLS,
     "almacenero": INTERNAL_PROCUREMENT_BASE_TOOLS,
+    "contador": INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS,
 }
 
 MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
@@ -119,6 +133,10 @@ MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "search_suppliers": frozenset({"suppliers"}),
     "get_purchases": frozenset({"purchases"}),
     "prepare_purchase_draft": frozenset({"purchases", "inventory", "products"}),
+    "list_procurement_requests": frozenset({"purchases"}),
+    "create_procurement_request": frozenset({"purchases"}),
+    "get_procurement_request": frozenset({"purchases"}),
+    "submit_procurement_request": frozenset({"purchases"}),
 }
 
 EXTERNAL_CONFIRM_REQUIRED = frozenset({"book_appointment"})
@@ -170,7 +188,7 @@ def build_internal_procurement_policy(auth: AuthContext, modules_active: list[st
         channel=channel,
         allowed_tools=_filter_by_modules(base, modules_active),
         confirm_required_tools=INTERNAL_PROCUREMENT_CONFIRM_REQUIRED,
-        max_tool_calls=5,
+        max_tool_calls=8,
         tool_timeout_seconds=10,
-        total_timeout_seconds=40,
+        total_timeout_seconds=45,
     )

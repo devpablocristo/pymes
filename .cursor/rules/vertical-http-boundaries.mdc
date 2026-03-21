@@ -7,9 +7,9 @@ alwaysApply: true
 
 - Si una vertical consume capacidades de otra vertical o de `pymes-core`, la integracion es por HTTP mediante contratos internos estables.
 - Una vertical no importa handlers, usecases, repositories ni dominio interno de otra vertical.
-- `pymes-core/shared/` y `pkgs/` son para codigo compartido; no se usan para saltar ownership funcional entre verticales.
+- `pymes-core/shared/` y la libreria **`core`** son para codigo compartido; no se usan para saltar ownership funcional entre verticales.
 - `pymes-core/shared/` contiene base transversal del producto, no features de negocio que pertenezcan a una vertical especifica.
-- `pkgs/` contiene solo codigo portable y agnostico al producto.
+- La libreria **`core`** contiene primitivas agnosticas (ver `library-placement.mdc`).
 - Cada llamada HTTP entre verticales debe tener timeout, autenticacion interna y manejo explicito de errores.
 - Los DTOs de integracion viven en el borde HTTP; no se comparte dominio interno entre verticales.
 - Mantener estos bordes aunque el repo use un solo modulo Go: modulo unico no implica acoplamiento de runtime.

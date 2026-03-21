@@ -8,7 +8,10 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 - `workshops/` — vertical talleres mecánicos (backend Go)
 - `frontend/` — consola React unificada
 - `ai/` — servicio FastAPI con Gemini
-- `pkgs/` — paquetes compartidos agnósticos (Go, Python, TypeScript)
+
+Código reutilizable: librería **`core`** (`github.com/devpablocristo/core/...`) para lo agnóstico; **`pymes-core/shared/`** para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
+
+Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`).
 
 ---
 
@@ -68,10 +71,9 @@ pymes-core/
 ├── infra/
 frontend/                           # consola React unificada
 ai/                                 # servicio FastAPI
-pkgs/                               # código agnóstico portable
-├── go-pkg/
-└── ts-pkg/
 ```
+
+Librerías agnósticas: módulos `github.com/devpablocristo/core/...` en `go.mod` (checkout local típico `../core`), no carpeta `pkgs/` en este repo.
 
 ### 5.2 Estructura de módulo
 
@@ -122,10 +124,11 @@ Los **mappers** viven en el adapter que los necesita:
 
 | Ubicación | Qué contiene | Criterio |
 |-----------|-------------|----------|
-| `pymes-core/shared/` | Código transversal del producto | Específico de pymes, usado por varios verticales |
-| `pkgs/` | Código agnóstico al proyecto | Se puede llevar a otro proyecto sin cambios |
+| Librería **`core`** (`github.com/devpablocristo/core/...`) | Primitivas agnósticas (authn, saas, governance, helpers HTTP, etc.) | Portable entre productos; versionada fuera de este repo |
+| `pymes-core/shared/` | Código transversal del producto | Específico de Pymes, usado por varios verticales o capas |
+| `internal/{modulo}/` del servicio owner | Dominio y adapters del módulo | Acoplado al negocio de ese backend; no se fuerza a `shared` ni a `core` |
 
-`pkgs/` no importa código de ningún servicio. `pymes-core/shared/` no sale del producto.
+`pymes-core/shared/` no sustituye la librería `core`: cada uno tiene su criterio (ver reglas `library-placement`).
 
 ### 5.5 Persistencia
 

@@ -9,7 +9,8 @@ La topologia activa hoy es:
 - `workshops/backend`: backend Go de la vertical umbrella `workshops`; hoy implementa `auto_repair` para talleres mecanicos LATAM
 - `frontend`: consola React unificada para core y verticales
 - `ai`: servicio FastAPI unificado para chat interno, publico y `professionals`
-- `pymes-core/shared/` y `pkgs/`: runtime y librerias compartidas
+- `pymes-core/shared/`: runtime compartido del producto (backend + AI)
+- Código reutilizable **agnóstico** vive en la librería **`core`** (módulos `github.com/devpablocristo/core/...`); lo atado al negocio de un solo servicio permanece en el **`internal/`** de ese backend (no se usa carpeta `pkgs/` en este monorepo)
 
 No existen deployables `pymes-core/ai` ni `professionals/ai`. El unico runtime AI vive en `ai/` y reutiliza piezas compartidas desde `pymes-core/shared/ai`.
 
@@ -56,7 +57,6 @@ pymes/
 │   └── shared/
 ├── docs/
 ├── frontend/
-├── pkgs/
 ├── professionals/
 │   ├── backend/
 │   └── infra/
@@ -68,6 +68,12 @@ pymes/
 └── Makefile
 ```
 
+## Solicitudes internas de compra (procurement)
+
+- Backend: `pymes-core/backend/internal/procurement` — `/v1/procurement-requests` (CRUD, archivado, submit/approve/reject), `/v1/procurement-policies` (CRUD de reglas CEL por org), evaluación al enviar con **core/governance**, webhooks outbound vía `outwebhooks`.
+- Frontend CRUD: `procurementRequests`, `procurementPolicies` en `frontend/src/crud/resourceConfigs.tsx` (incl. `dataSource` con `PATCH` y `?archived=true`).
+- Agente IA: modo procurement con tools (`list_procurement_requests`, `create_procurement_request`, etc.); rol `contador` con permisos de solo lectura acotados (ver `ai/src/agents/policy.py`).
+
 ## CRUDs unificados
 
 El frontend usa un blueprint unico de CRUD en:
@@ -75,7 +81,7 @@ El frontend usa un blueprint unico de CRUD en:
 - `frontend/src/components/CrudPage.tsx`
 - `frontend/src/crud/resourceConfigs.tsx`
 
-`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles`, los CRUDs del modulo `professionals/teachers` y los del subdominio `workshops/auto_repair`, con acciones custom cuando el flujo no es CRUD puro.
+`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `procurementRequests`, `procurementPolicies`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles`, los CRUDs del modulo `professionals/teachers` y los del subdominio `workshops/auto_repair`, con acciones custom cuando el flujo no es CRUD puro.
 
 Import / export masivo:
 
@@ -104,8 +110,11 @@ curl http://localhost:8200/healthz
 
 La documentacion canónica vive en `docs/`.
 
-- `docs/README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/PYMES_CORE.md`
-- `docs/PROFESSIONALS.md`
-- `docs/WORKSHOPS.md`
+- [docs/README.md](./docs/README.md) — índice
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — reglas de ownership e integración
+- [docs/PYMES_CORE.md](./docs/PYMES_CORE.md) — backend transversal, módulos, procurement
+- [docs/CORE_INTEGRATION.md](./docs/CORE_INTEGRATION.md) — uso de librerías `core` vs dominio Pymes
+- [docs/CONTROL_PLANE.md](./docs/CONTROL_PLANE.md) — control plane, seguridad interna, validación
+- [docs/PROFESSIONALS.md](./docs/PROFESSIONALS.md)
+- [docs/WORKSHOPS.md](./docs/WORKSHOPS.md)
+- [pymes-core/backend/docs/SAAS_CORE.md](./pymes-core/backend/docs/SAAS_CORE.md) — integración `core/saas/go`

@@ -32,6 +32,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/pdfgen"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/pricelists"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/publicapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes"
@@ -111,6 +112,7 @@ func InitializeApp() *app.App {
 	paymentsRepo := payments.NewRepository(db)
 	priceListsRepo := pricelists.NewRepository(db)
 	purchasesRepo := purchases.NewRepository(db)
+	procurementRepo := procurement.NewRepository(db)
 	recurringRepo := recurring.NewRepository(db)
 	schedulerRepo := scheduler.NewRepository(db)
 	timelineRepo := timeline.NewRepository(db)
@@ -135,6 +137,8 @@ func InitializeApp() *app.App {
 	paymentsUC := payments.NewUsecases(paymentsRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
+	procurementEngine := procurement.NewGovernanceEngine()
+	procurementUC := procurement.NewUsecases(procurementRepo, procurementEngine, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
@@ -200,6 +204,7 @@ func InitializeApp() *app.App {
 	paymentsHandler := payments.NewHandler(paymentsUC)
 	priceListsHandler := pricelists.NewHandler(priceListsUC)
 	purchasesHandler := purchases.NewHandler(purchasesUC)
+	procurementHandler := procurement.NewHandler(procurementUC)
 	quotesHandler := quotes.NewHandler(quotesUC)
 	reportsHandler := reports.NewHandler(reportsUC)
 	recurringHandler := recurring.NewHandler(recurringUC)
@@ -272,6 +277,7 @@ func InitializeApp() *app.App {
 	productsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	inventoryHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	procurementHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	cashflowHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	recurringHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	returnsHandler.RegisterRoutes(authGroup, rbacMiddleware)

@@ -8,7 +8,7 @@ Reglas madre del repo `pymes`.
 - `professionals/`: vertical umbrella especializada; hoy contiene el modulo `teachers`
 - `workshops/`: vertical umbrella especializada; hoy contiene el subdominio `auto_repair`
 - `pymes-core/shared/`: runtime compartido propio del producto
-- `pkgs/`: librerias agnosticas reutilizables fuera del repo
+- libreria **`core`** (`github.com/devpablocristo/core/...`): primitivas agnosticas fuera de este repo (importadas por `go.mod`)
 
 ## Deployables reales
 
@@ -39,16 +39,24 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 ## Reglas de shared
 
 - `pymes-core/shared/` contiene runtime, middleware, adapters y contratos internos del producto
-- `pkgs/` no contiene logica acoplada al negocio `pymes`
+- el codigo acoplado al negocio de un solo servicio vive en el `internal/` de ese backend, no en `core` ni se duplica como "paquete generico" en el monorepo
 
 ## Reglas de frontend
 
 - si un recurso es CRUD, primero se modela como configuracion del blueprint comun
 - el blueprint vive en `frontend/src/components/CrudPage.tsx`
 - las configuraciones viven en `frontend/src/crud/resourceConfigs.tsx`
+- el catálogo de módulos (`frontend/src/lib/moduleCatalog.ts`) fusiona definiciones estáticas y `crudModuleCatalog`; para un mismo `resourceId` **gana** el CRUD — datasets/actions extra del explorador API se declaran en `crudModuleMeta` dentro de `resourceConfigs.tsx`
 - el motor soporta CRUD completos y recursos parciales con acciones custom o formularios create/edit diferenciados
+- `dataSource` opcional: listados con query (`?archived=true`), `PATCH` en updates, etc., cuando el backend no coincide con el default `PUT`/`GET` del blueprint
 - paginas bespoke solo cuando el flujo deja de ser CRUD puro
 - las capacidades transversales no se duplican dentro de cada CRUD: import/export, documentos, pagos, timeline, attachments y webhooks se montan como acciones contextuales sobre servicios centrales
+
+## Documentación
+
+- índice: `docs/README.md`
+- backend transversal y listado de módulos: `docs/PYMES_CORE.md`
+- librerías `core` vs producto: `docs/CORE_INTEGRATION.md`
 
 ## Reglas de AI
 

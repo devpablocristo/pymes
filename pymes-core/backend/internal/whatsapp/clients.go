@@ -39,11 +39,12 @@ type AIMessageResponse struct {
 	ToolCalls      []string `json:"tool_calls"`
 }
 
-// metaSendResponse es la respuesta de Meta Graph API al enviar un mensaje.
+// metaSendResponse es la respuesta de Meta Graph API al enviar un mensaje o actualizar estado (p. ej. read).
 type metaSendResponse struct {
 	Messages []struct {
 		ID string `json:"id"`
 	} `json:"messages"`
+	Success bool `json:"success"`
 }
 
 func NewAIClient(baseURL, internalToken string) *AIClient {
@@ -143,12 +144,16 @@ func (c *MetaClient) sendMessage(ctx context.Context, phoneNumberID, accessToken
 
 	var sendResp metaSendResponse
 	if err := json.Unmarshal(respBody, &sendResp); err != nil {
-		return "", nil
+		return "", fmt.Errorf("decode whatsapp send response: %w", err)
 	}
-	if len(sendResp.Messages) > 0 {
+	if len(sendResp.Messages) > 0 && strings.TrimSpace(sendResp.Messages[0].ID) != "" {
 		return sendResp.Messages[0].ID, nil
 	}
-	return "", nil
+	// Marcar como leído u otras operaciones devuelven {"success": true} sin messages[].
+	if sendResp.Success {
+		return "", nil
+	}
+	return "", fmt.Errorf("meta graph api returned success without message id: %s", strings.TrimSpace(string(respBody)))
 }
 
 // SendTextMessage envía un mensaje de texto simple.

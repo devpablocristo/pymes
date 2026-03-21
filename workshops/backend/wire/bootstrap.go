@@ -22,6 +22,10 @@ import (
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
+	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
+	bikebicycles "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles"
+	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
+	bikeshopservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
@@ -48,16 +52,31 @@ func InitializeApp() *app.App {
 	servicesRepo := workshopservices.NewRepository(db)
 	workOrdersRepo := workorders.NewRepository(db)
 
+	bikeBicyclesRepo := bikebicycles.NewRepository(db)
+	bikeServicesRepo := bikeshopservices.NewRepository(db)
+	bikeWorkOrdersRepo := bikeworkorders.NewRepository(db)
+
 	vehiclesUC := vehicles.NewUsecases(vehiclesRepo, auditLog, cpClient)
 	servicesUC := workshopservices.NewUsecases(servicesRepo, auditLog, cpClient)
 	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient)
 	orchestrationUC := orchestration.NewUsecases(cpClient, workOrdersRepo, auditLog)
 
+	bikeBicyclesUC := bikebicycles.NewUsecases(bikeBicyclesRepo, auditLog, cpClient)
+	bikeServicesUC := bikeshopservices.NewUsecases(bikeServicesRepo, auditLog, cpClient)
+	bikeWorkOrdersUC := bikeworkorders.NewUsecases(bikeWorkOrdersRepo, auditLog, cpClient)
+	bikeOrchestrationUC := bikeorchestration.NewUsecases(cpClient, bikeWorkOrdersRepo, auditLog)
+
 	vehiclesHandler := vehicles.NewHandler(vehiclesUC)
 	servicesHandler := workshopservices.NewHandler(servicesUC)
 	workOrdersHandler := workorders.NewHandler(workOrdersUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
-	publicHandler := public.NewHandler(servicesUC, cpClient, &cpOrgResolver{client: cpClient})
+
+	bikeBicyclesHandler := bikebicycles.NewHandler(bikeBicyclesUC)
+	bikeServicesHandler := bikeshopservices.NewHandler(bikeServicesUC)
+	bikeWorkOrdersHandler := bikeworkorders.NewHandler(bikeWorkOrdersUC)
+	bikeOrchestrationHandler := bikeorchestration.NewHandler(bikeOrchestrationUC)
+
+	publicHandler := public.NewHandler(servicesUC, bikeServicesUC, cpClient, &cpOrgResolver{client: cpClient})
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -88,6 +107,12 @@ func InitializeApp() *app.App {
 	servicesHandler.RegisterRoutes(autoRepairGroup)
 	workOrdersHandler.RegisterRoutes(autoRepairGroup)
 	orchestrationHandler.RegisterRoutes(autoRepairGroup)
+
+	bikeShopGroup := authGroup.Group("/bike-shop")
+	bikeBicyclesHandler.RegisterRoutes(bikeShopGroup)
+	bikeServicesHandler.RegisterRoutes(bikeShopGroup)
+	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
+	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
 
 	// Legacy aliases from the initial workshops release.
 	vehiclesHandler.RegisterRoutes(authGroup)

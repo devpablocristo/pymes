@@ -13,6 +13,7 @@ const VERTICAL_OPTIONS: { value: VerticalType; label: string; desc: string }[] =
   { value: 'none', label: 'Solo comercial', desc: 'Ventas, stock, facturación' },
   { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, fichas, especialidades' },
   { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes de trabajo, servicios' },
+  { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, menú de servicios, turnos vía agenda' },
 ];
 
 type Step = 1 | 2 | 3 | 4;

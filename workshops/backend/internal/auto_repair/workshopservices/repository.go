@@ -12,6 +12,7 @@ import (
 	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/repository/models"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
+	workshopshared "github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
 )
 
 type Repository struct {
@@ -60,6 +61,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Service) (domain.Serv
 	row := models.ServiceModel{
 		ID:              uuid.New(),
 		OrgID:           in.OrgID,
+		Segment:         workshopshared.SegmentAutoRepair,
 		Code:            in.Code,
 		Name:            in.Name,
 		Description:     in.Description,
@@ -81,7 +83,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Service) (domain.Serv
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Service, error) {
 	var row models.ServiceModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND segment = ?", orgID, id, workshopshared.SegmentAutoRepair).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Service{}, gorm.ErrRecordNotFound
 		}
@@ -105,7 +107,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Service) (domain.Serv
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND segment = ?", in.OrgID, in.ID, workshopshared.SegmentAutoRepair).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Service{}, res.Error

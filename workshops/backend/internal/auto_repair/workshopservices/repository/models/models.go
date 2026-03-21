@@ -9,6 +9,7 @@ import (
 type ServiceModel struct {
 	ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID           uuid.UUID  `gorm:"type:uuid;index;not null"`
+	Segment         string     `gorm:"not null;default:'auto_repair'"`
 	Code            string     `gorm:"not null"`
 	Name            string     `gorm:"not null"`
 	Description     string     `gorm:"not null;default:''"`

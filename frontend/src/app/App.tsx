@@ -9,6 +9,8 @@ import { DashboardPage } from '../pages/DashboardPage';
 import { AutoRepairServicesPage } from '../pages/AutoRepairServicesPage';
 import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
 import { AutoRepairWorkOrdersPage } from '../pages/AutoRepairWorkOrdersPage';
+import { BeautySalonServicesPage } from '../pages/BeautySalonServicesPage';
+import { BeautyStaffPage } from '../pages/BeautyStaffPage';
 import { IntakesPage } from '../pages/IntakesPage';
 import { LoginPage } from '../pages/LoginPage';
 import { CustomersPage } from '../pages/CustomersPage';
@@ -73,6 +75,9 @@ export function App() {
                     <Route path="/workshops/auto-repair/vehicles" element={<AutoRepairVehiclesPage />} />
                     <Route path="/workshops/auto-repair/services" element={<AutoRepairServicesPage />} />
                     <Route path="/workshops/auto-repair/orders" element={<AutoRepairWorkOrdersPage />} />
+                    <Route path="/beauty" element={<Navigate to="/beauty/salon/staff" replace />} />
+                    <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
+                    <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
                   </Routes>
                 </Shell>
               </RequireOnboarding>

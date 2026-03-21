@@ -136,6 +136,19 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/workshops/auto-repair/orders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
   ], [t]);
 
+  const beautyIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18" />
+      <path d="M8 7c0-2 1.5-4 4-4s4 2 4 4c0 3-4 5-4 9" />
+      <path d="M16 7c0-2-1.5-4-4-4S8 5 8 7c0 3 4 5 4 9" />
+    </svg>
+  );
+
+  const beautyNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/beauty/salon/staff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
+    { to: '/beauty/salon/services', label: t('shell.nav.beautyServices'), icon: beautyIcon },
+  ], [t]);
+
   const settingsNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
     { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
@@ -168,10 +181,13 @@ export function Shell({ children }: { children: ReactNode }) {
     if (vertical === 'workshops') {
       result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
     }
+    if (vertical === 'beauty') {
+      result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });
+    }
     result.push(...moduleNav);
     result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [localizeUiText, mainNav, professionalsNav, sentenceCase, settingsNav, t, workshopsNav]);
+  }, [beautyNav, localizeUiText, mainNav, professionalsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
   function handleToggleTheme() {
     const next = toggleTheme();

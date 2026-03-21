@@ -63,6 +63,7 @@ services:
       VITE_API_URL: http://localhost:8100
       VITE_PROFESSIONALS_API_URL: http://localhost:8181
       VITE_WORKSHOPS_API_URL: http://localhost:8282
+      VITE_BEAUTY_API_URL: http://localhost:8383
     depends_on:
       - cp-backend
 
@@ -84,6 +85,7 @@ services:
       BACKEND_URL: http://cp-backend:8080
       PROFESSIONALS_BACKEND_URL: http://prof-backend:8081
       WORKSHOPS_BACKEND_URL: http://work-backend:8082
+      BEAUTY_BACKEND_URL: http://beauty-backend:8083
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
     depends_on:
       - cp-backend
@@ -145,6 +147,34 @@ services:
       cp-backend:
         condition: service_started
 
+  # ── Beauty / Salón Vertical ──
+
+  beauty-backend:
+    build:
+      context: ..
+      dockerfile: ./pymes/beauty/backend/Dockerfile.dev
+    ports:
+      - "8383:8083"
+    volumes:
+      - ./beauty/backend:/workspace/pymes/beauty/backend
+      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - beauty_backend_go_mod:/go/pkg/mod
+      - beauty_backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      PORT: 8083
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      PYMES_CORE_URL: http://cp-backend:8080
+      FRONTEND_URL: http://localhost:5180
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cp-backend:
+        condition: service_started
+
 volumes:
   pgdata:
   cp_backend_go_mod:
@@ -153,3 +183,5 @@ volumes:
   prof_backend_go_build:
   work_backend_go_mod:
   work_backend_go_build:
+  beauty_backend_go_mod:
+  beauty_backend_go_build:

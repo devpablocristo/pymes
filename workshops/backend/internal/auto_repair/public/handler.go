@@ -11,10 +11,16 @@ import (
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
 	svcdomain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
+	bikeservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
+	bikesvcdomain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices/usecases/domain"
 )
 
 type servicePort interface {
 	List(ctx context.Context, p workshopservices.ListParams) ([]svcdomain.Service, int64, bool, *uuid.UUID, error)
+}
+
+type bikeShopServicePort interface {
+	List(ctx context.Context, p bikeservices.ListParams) ([]bikesvcdomain.Service, int64, bool, *uuid.UUID, error)
 }
 
 type bookingPort interface {
@@ -26,22 +32,27 @@ type orgResolver interface {
 }
 
 type Handler struct {
-	services servicePort
-	bookings bookingPort
-	orgs     orgResolver
+	services         servicePort
+	bikeShopServices bikeShopServicePort
+	bookings         bookingPort
+	orgs             orgResolver
 }
 
-func NewHandler(services servicePort, bookings bookingPort, orgs orgResolver) *Handler {
+func NewHandler(services servicePort, bikeShopServices bikeShopServicePort, bookings bookingPort, orgs orgResolver) *Handler {
 	return &Handler{
-		services: services,
-		bookings: bookings,
-		orgs:     orgs,
+		services:         services,
+		bikeShopServices: bikeShopServices,
+		bookings:         bookings,
+		orgs:             orgs,
 	}
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/public/:org_slug/auto-repair/services", h.ListServices)
 	group.POST("/public/:org_slug/auto-repair/appointments", h.BookAppointment)
+
+	group.GET("/public/:org_slug/bike-shop/services", h.ListBikeShopServices)
+	group.POST("/public/:org_slug/bike-shop/appointments", h.BookAppointment)
 
 	group.GET("/public/:org_slug/workshops/services", h.ListServices)
 	group.POST("/public/:org_slug/workshops/appointments", h.BookAppointment)
@@ -74,6 +85,40 @@ func (h *Handler) ListServices(c *gin.Context) {
 		return
 	}
 	items, _, _, _, err := h.services.List(c.Request.Context(), workshopservices.ListParams{
+		OrgID:  orgID,
+		Limit:  100,
+		Search: strings.TrimSpace(c.Query("search")),
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	publicItems := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if !item.IsActive {
+			continue
+		}
+		publicItems = append(publicItems, map[string]any{
+			"id":              item.ID.String(),
+			"code":            item.Code,
+			"name":            item.Name,
+			"description":     item.Description,
+			"category":        item.Category,
+			"estimated_hours": item.EstimatedHours,
+			"base_price":      item.BasePrice,
+			"currency":        item.Currency,
+			"tax_rate":        item.TaxRate,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+}
+
+func (h *Handler) ListBikeShopServices(c *gin.Context) {
+	orgID, ok := h.resolveOrgID(c)
+	if !ok {
+		return
+	}
+	items, _, _, _, err := h.bikeShopServices.List(c.Request.Context(), bikeservices.ListParams{
 		OrgID:  orgID,
 		Limit:  100,
 		Search: strings.TrimSpace(c.Query("search")),

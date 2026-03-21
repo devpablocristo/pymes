@@ -10,11 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	apperror "github.com/devpablocristo/core/backend/go/apperror"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/party/handler/dto"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type usecasesPort interface {

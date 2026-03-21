@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/core/backend/go/apperror"
 )
 
 func (u *Usecases) savePreview(job previewJob) (string, error) {

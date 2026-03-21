@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -66,7 +66,7 @@ func (r *Repository) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) er
 }
 
 func (r *Repository) ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var endpoint models.EndpointModel
 	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, endpointID).Take(&endpoint).Error; err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (r *Repository) CreateOutbox(ctx context.Context, orgID uuid.UUID, eventTyp
 }
 
 func (r *Repository) ListPendingOutbox(ctx context.Context, limit int) ([]models.OutboxModel, error) {
-	limit = pagination.NormalizeLimit(limit, 50, 200)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 50, MaxLimit: 200})
 	var rows []models.OutboxModel
 	if err := r.db.WithContext(ctx).Where("status = ?", "pending").Order("created_at ASC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (r *Repository) CreateDelivery(ctx context.Context, endpointID uuid.UUID, e
 }
 
 func (r *Repository) ListRetryableDeliveries(ctx context.Context, limit int) ([]models.DeliveryModel, error) {
-	limit = pagination.NormalizeLimit(limit, 50, 200)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 50, MaxLimit: 200})
 	var rows []models.DeliveryModel
 	err := r.db.WithContext(ctx).
 		Where("delivered_at IS NULL AND attempts < 5 AND (next_retry IS NULL OR next_retry <= ?)", time.Now().UTC()).

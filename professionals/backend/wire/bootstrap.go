@@ -15,9 +15,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes"
@@ -28,6 +25,9 @@ import (
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties"
 	"github.com/devpablocristo/pymes/professionals/backend/migrations"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 )
 
 func InitializeApp() *app.App {
@@ -46,7 +46,7 @@ func InitializeApp() *app.App {
 	// Control-plane HTTP client
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 
-	// Auth middleware using pkgs/go-pkg/auth
+	// Auth middleware shared with the other Go backends.
 	identityResolver := buildIdentityResolver(cfg, logger)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, newAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 

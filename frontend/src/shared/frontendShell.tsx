@@ -1,8 +1,9 @@
 import { useEffect, type PropsWithChildren, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { SignIn, SignUp, UserButton, useAuth } from '@clerk/clerk-react';
-import { clerkEnabled } from '@pymes/ts-pkg/auth';
-import { registerTokenProvider } from '@pymes/ts-pkg/http';
+import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
+import { createClerkTokenProvider } from '@devpablocristo/core-authn/providers/clerk';
+import { clerkEnabled } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 
 export type TokenProvider = () => Promise<string | null>;
@@ -41,7 +42,7 @@ function ClerkAuthTokenBridge({
   const { getToken } = useAuth();
 
   useEffect(() => {
-    const provider = async () => (await getToken()) ?? null;
+    const provider = createClerkTokenProvider(getToken);
     registerProviders.forEach((registerProvider) => registerProvider(provider));
   }, [getToken, registerProviders]);
 

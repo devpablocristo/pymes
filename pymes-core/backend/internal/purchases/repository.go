@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/repository/models"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -28,7 +28,7 @@ type tenantSettings struct {
 }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ?", orgID)
 	if status != "" {
 		q = q.Where("status = ?", status)

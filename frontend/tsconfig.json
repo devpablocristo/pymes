@@ -14,9 +14,9 @@
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@pymes/ts-pkg": ["../pkgs/ts-pkg/src"],
-      "@pymes/ts-pkg/*": ["../pkgs/ts-pkg/src/*"]
+      "@devpablocristo/core-authn": ["./.deps/core/authn/ts/src/index.ts", "../../core/authn/ts/src/index.ts"],
+      "@devpablocristo/core-authn/*": ["./.deps/core/authn/ts/src/*", "../../core/authn/ts/src/*"]
     }
   },
-  "include": ["src", "../pkgs/ts-pkg/src"]
+  "include": ["src"]
 }

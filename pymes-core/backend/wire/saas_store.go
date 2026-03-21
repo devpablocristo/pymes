@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	utils "github.com/devpablocristo/core/backend/go/hashutil"
 	saasadmindomain "github.com/devpablocristo/core/saas/go/admin/usecases/domain"
 	saasbillingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
 	saasorgdomain "github.com/devpablocristo/core/saas/go/org/usecases/domain"
 	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -96,19 +96,19 @@ type pymesAPIKeyScopeRow struct {
 func (pymesAPIKeyScopeRow) TableName() string { return "org_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
-	OrgID                uuid.UUID   `gorm:"column:org_id"`
-	PlanCode             string      `gorm:"column:plan_code"`
-	HardLimits           []byte      `gorm:"column:hard_limits"`
-	HardLimitsJSON       []byte      `gorm:"column:hard_limits_json"`
-	BillingStatus        string      `gorm:"column:billing_status"`
-	StripeCustomerID     *string     `gorm:"column:stripe_customer_id"`
-	StripeSubscriptionID *string     `gorm:"column:stripe_subscription_id"`
-	Status               string      `gorm:"column:status"`
-	DeletedAt            *time.Time  `gorm:"column:deleted_at"`
-	PastDueSince         *time.Time  `gorm:"column:past_due_since"`
-	UpdatedBy            *string     `gorm:"column:updated_by"`
-	CreatedAt            time.Time   `gorm:"column:created_at"`
-	UpdatedAt            time.Time   `gorm:"column:updated_at"`
+	OrgID                uuid.UUID  `gorm:"column:org_id"`
+	PlanCode             string     `gorm:"column:plan_code"`
+	HardLimits           []byte     `gorm:"column:hard_limits"`
+	HardLimitsJSON       []byte     `gorm:"column:hard_limits_json"`
+	BillingStatus        string     `gorm:"column:billing_status"`
+	StripeCustomerID     *string    `gorm:"column:stripe_customer_id"`
+	StripeSubscriptionID *string    `gorm:"column:stripe_subscription_id"`
+	Status               string     `gorm:"column:status"`
+	DeletedAt            *time.Time `gorm:"column:deleted_at"`
+	PastDueSince         *time.Time `gorm:"column:past_due_since"`
+	UpdatedBy            *string    `gorm:"column:updated_by"`
+	CreatedAt            time.Time  `gorm:"column:created_at"`
+	UpdatedAt            time.Time  `gorm:"column:updated_at"`
 }
 
 func (pymesTenantSettingsRow) TableName() string { return "tenant_settings" }

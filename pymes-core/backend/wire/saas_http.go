@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/devpablocristo/core/backend/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
-	"github.com/devpablocristo/core/saas/go/httperr"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/shared/middleware"
+	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasusers "github.com/devpablocristo/core/saas/go/users"
 	"github.com/devpablocristo/core/saas/go/users/handler/dto"
 )

@@ -6,7 +6,6 @@ COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
 
 COPY frontend/ /workspace/frontend
-COPY pkgs/ts-pkg /workspace/pkgs/ts-pkg
 
 EXPOSE 5173
 

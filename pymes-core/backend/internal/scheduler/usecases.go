@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/resilience"
 	schedulerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/resilience"
 )
 
 type RepositoryPort interface {
@@ -182,7 +182,11 @@ func (u *Usecases) fetchRates(ctx context.Context) ([]remoteRate, error) {
 		return nil, nil
 	}
 	var payload []dolarAPIResponse
-	err := resilience.Retry(ctx, resilience.Backoff{Attempts: 3, Initial: 250 * time.Millisecond, Max: 1 * time.Second}, func(ctx context.Context) error {
+	err := resilience.Retry(ctx, resilience.Config{
+		Attempts:     3,
+		InitialDelay: 250 * time.Millisecond,
+		MaxDelay:     1 * time.Second,
+	}, func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://dolarapi.com/v1/dolares", nil)
 		if err != nil {
 			return err

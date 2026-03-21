@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/repository/models"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 )
@@ -22,7 +22,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
-	limit := pagination.NormalizeLimit(p.Limit, 20, 100)
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ?", p.OrgID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)

@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline/repository/models"
 	timelinedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -18,7 +18,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.TimelineEntryModel
 	if err := r.db.WithContext(ctx).
 		Where("org_id = ? AND entity_type = ? AND entity_id = ?", orgID, entityType, entityID).

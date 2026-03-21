@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/core/backend/go/apperror"
 )
 
 type Connection struct {

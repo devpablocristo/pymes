@@ -9,9 +9,10 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/canonicaljson"
+	"github.com/devpablocristo/core/backend/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {
@@ -29,8 +30,8 @@ func (r *Repository) Add(in domain.LogInput) domain.Entry {
 		prevHash = lastEntry.Hash
 	}
 
-	canonicalPayload, _ := utils.CanonicalJSON(in.Payload)
-	hash := utils.SHA256Hex(prevHash + string(canonicalPayload))
+	canonicalPayload, _ := canonicaljson.CanonicalJSON(in.Payload)
+	hash := hashutil.SHA256Hex(prevHash + string(canonicalPayload))
 
 	payloadJSON, _ := json.Marshal(in.Payload)
 	actorType := normalizeActorType(in.Actor.Type)

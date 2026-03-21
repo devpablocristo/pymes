@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"strings"
 
+	saasjwks "github.com/devpablocristo/core/authn/go/jwks"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	saasclerk "github.com/devpablocristo/core/saas/go/clerkwebhook"
 	saasidentity "github.com/devpablocristo/core/saas/go/identity"
-	saasjwks "github.com/devpablocristo/core/saas/go/identity/executor/jwks"
+	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasmigrations "github.com/devpablocristo/core/saas/go/migrations"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/shared/middleware"
 
 	"gorm.io/gorm"
 )

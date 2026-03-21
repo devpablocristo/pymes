@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	utils "github.com/devpablocristo/core/backend/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/users"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type internalAPIKeyResolver struct {

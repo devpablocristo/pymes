@@ -1,4 +1,8 @@
-import { request, requestResponse, type RequestOptions } from '@pymes/ts-pkg/http';
+import {
+  request,
+  requestResponse,
+  type RequestOptions,
+} from '@devpablocristo/core-authn/http/fetch';
 import type {
   DashboardResponse,
   DashboardSavePayload,

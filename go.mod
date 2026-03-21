@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
+	github.com/devpablocristo/core/authn/go v0.1.0
 	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
@@ -23,6 +24,11 @@ require (
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
+)
+
+require (
+	github.com/devpablocristo/core/authz/go v0.1.0 // indirect
+	github.com/devpablocristo/core/notifications/go v0.1.0 // indirect
 )
 
 require (
@@ -46,6 +52,7 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/devpablocristo/core/backend/go v0.1.0
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -90,3 +97,11 @@ require (
 )
 
 replace github.com/devpablocristo/core/saas/go => ../core/saas/go
+
+replace github.com/devpablocristo/core/backend/go => ../core/backend/go
+
+replace github.com/devpablocristo/core/authn/go => ../core/authn/go
+
+replace github.com/devpablocristo/core/authz/go => ../core/authz/go
+
+replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go

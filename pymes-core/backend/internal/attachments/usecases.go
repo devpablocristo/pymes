@@ -1,8 +1,8 @@
 package attachments
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
 	attachmentdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

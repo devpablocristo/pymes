@@ -16,7 +16,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/text/encoding/charmap"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/core/backend/go/apperror"
 )
 
 const maxImportRows = 10000

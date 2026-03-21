@@ -8,9 +8,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/currency/repository/models"
 	currencydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/currency/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct {
@@ -20,7 +20,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ExchangeRateModel{}).Where("org_id = ?", orgID)
 	if fromCurrency != "" {
 		q = q.Where("from_currency = ?", fromCurrency)

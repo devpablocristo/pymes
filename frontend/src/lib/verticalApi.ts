@@ -1,4 +1,4 @@
-import { request, type RequestOptions } from '@pymes/ts-pkg/http';
+import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
 
 type VerticalRequestConfig = {
   envVar: string;

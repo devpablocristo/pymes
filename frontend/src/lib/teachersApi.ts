@@ -1,4 +1,4 @@
-import { registerTokenProvider } from '@pymes/ts-pkg/http';
+import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
 import type {
   TeacherIntake,
   TeacherProfile,

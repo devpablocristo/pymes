@@ -5,7 +5,7 @@ El pymes-core importa `github.com/devpablocristo/core/saas/go` como **librería*
 ## Qué quedó en Pymes
 
 - **admin** (handlers + use cases + repo): ajustes de tenant **ERP** (`tenant_settings` con columnas de negocio), bootstrap, actividad.
-- **Auth en rutas protegidas**: middleware Gin que delega en `core/saas/go/shared/middleware` y copia `org_id`, `actor`, `role`, `scopes`, `auth_method` al contexto Gin (compatible con el resto de handlers).
+- **Auth en rutas protegidas**: middleware Gin que delega en `core/saas/go/middleware` y copia `org_id`, `actor`, `role`, `scopes`, `auth_method` al contexto Gin (compatible con el resto de handlers).
 
 ## Qué sirve core/saas/go (rutas bajo `/v1/`)
 

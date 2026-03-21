@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { clerkEnabled, clerkPublishableKey } from '@pymes/ts-pkg/auth';
+import { clerkEnabled, clerkPublishableKey } from './lib/auth';
 import { App } from './app/App';
 import { LanguageProvider } from './lib/i18n';
 import { applyTheme } from './lib/theme';

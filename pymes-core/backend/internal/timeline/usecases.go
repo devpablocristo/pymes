@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
 	timelinedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

@@ -10,10 +10,10 @@ import (
 	"github.com/go-pdf/fpdf"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
 	admindomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type QuotePort interface {

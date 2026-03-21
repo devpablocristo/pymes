@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/repository/models"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 var (
@@ -509,7 +509,7 @@ func (r *Repository) StoreWebhookEvent(ctx context.Context, in gatewaydomain.Web
 }
 
 func (r *Repository) LockPendingWebhookEvents(ctx context.Context, limit int) ([]gatewaydomain.WebhookEvent, error) {
-	limit = pagination.NormalizeLimit(limit, 50, 200)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 50, MaxLimit: 200})
 	var rows []models.PaymentGatewayEventModel
 	err := r.db.WithContext(ctx).
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).

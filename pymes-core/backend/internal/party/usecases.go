@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	apperror "github.com/devpablocristo/core/backend/go/apperror"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	apperror "github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

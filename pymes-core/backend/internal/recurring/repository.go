@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/repository/models"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -17,7 +17,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.RecurringExpenseModel{}).Where("org_id = ?", orgID)
 	if activeOnly {
 		q = q.Where("is_active = true")

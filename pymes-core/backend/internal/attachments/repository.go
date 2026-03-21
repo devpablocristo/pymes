@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/repository/models"
 	attachmentdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -44,7 +44,7 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 func (r *Repository) ListByEntity(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.AttachmentModel
 	if err := r.db.WithContext(ctx).Where("org_id = ? AND attachable_type = ? AND attachable_id = ?", orgID, entityType, entityID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err

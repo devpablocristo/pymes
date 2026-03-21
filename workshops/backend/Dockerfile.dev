@@ -19,7 +19,6 @@ RUN go mod download
 
 COPY pymes/workshops/backend /workspace/pymes/workshops/backend
 COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
-COPY pymes/pkgs/go-pkg /workspace/pymes/pkgs/go-pkg
 
 EXPOSE 8082
 

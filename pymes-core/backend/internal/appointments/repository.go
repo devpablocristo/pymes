@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments/repository/models"
 	appointmentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct {
@@ -21,7 +21,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 200)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 200})
 	q := r.db.WithContext(ctx).Model(&models.AppointmentModel{}).Where("org_id = ?", orgID)
 	if from != nil {
 		q = q.Where("start_at >= ?", from.UTC())

@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: frontend/.deps/core
+
       - name: Create env file
         run: |
           cat <<'EOF' > .env
@@ -22,6 +28,8 @@ jobs:
 
       - name: Build and start stack
         run: docker compose up -d --build
+        env:
+          CORE_REPO_PATH: ./frontend/.deps/core
 
       - name: Wait for services
         run: |
@@ -53,7 +61,11 @@ jobs:
       - name: Print container logs on failure
         if: failure()
         run: docker compose logs --no-color
+        env:
+          CORE_REPO_PATH: ./frontend/.deps/core
 
       - name: Stop stack
         if: always()
         run: docker compose down -v
+        env:
+          CORE_REPO_PATH: ./frontend/.deps/core

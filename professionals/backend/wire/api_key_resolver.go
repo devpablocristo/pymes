@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	utils "github.com/devpablocristo/core/backend/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type apiKeyResolver struct {

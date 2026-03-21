@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
 	currencydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/currency/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

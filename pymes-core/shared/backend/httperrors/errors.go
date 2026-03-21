@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
+	"github.com/devpablocristo/core/backend/go/apperror"
 )
 
 var (

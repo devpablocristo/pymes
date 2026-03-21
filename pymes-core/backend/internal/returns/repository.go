@@ -11,10 +11,10 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/pagination"
 	returnmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -45,7 +45,7 @@ type ApplyCreditInput struct {
 }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
 	if err != nil {
 		return nil, err
@@ -311,7 +311,7 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 }
 
 func (r *Repository) ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&returnmodels.CreditNoteModel{}).Where("org_id = ?", orgID)
 	if partyID != nil && *partyID != uuid.Nil {
 		q = q.Where("party_id = ?", *partyID)

@@ -30,8 +30,7 @@ services:
     volumes:
       - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
-      - ../core:/workspace/core
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -57,7 +56,7 @@ services:
       - ./frontend/index.html:/workspace/frontend/index.html
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
-      - ./pkgs/ts-pkg:/workspace/pkgs/ts-pkg
+      - ${CORE_REPO_PATH:-../core}:/workspace/frontend/.deps/core
     env_file:
       - .env
     environment:
@@ -76,7 +75,7 @@ services:
     volumes:
       - ./ai/src:/workspace/ai/src
       - ./pymes-core/shared/ai:/workspace/pymes-core/shared/ai
-      - ../core:/workspace/core
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
 
     env_file:
       - .env
@@ -101,8 +100,7 @@ services:
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
-      - ../core:/workspace/core
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -130,8 +128,7 @@ services:
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ./pkgs/go-pkg:/workspace/pymes/pkgs/go-pkg
-      - ../core:/workspace/core
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
+	"github.com/devpablocristo/core/backend/go/pagination"
 	profmodels "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
@@ -29,7 +29,7 @@ type ListParams struct {
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Specialty, int64, bool, *uuid.UUID, error) {
-	limit := pagination.NormalizeLimit(p.Limit, 20, 100)
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).Where("org_id = ?", p.OrgID)
 	if s := strings.TrimSpace(p.Search); s != "" {

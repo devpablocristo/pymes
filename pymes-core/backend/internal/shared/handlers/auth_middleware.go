@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/types"
+	types "github.com/devpablocristo/core/backend/go/contextkeys"
 )
 
 // JWTPrincipal is the minimal claim set resolved from a bearer token.

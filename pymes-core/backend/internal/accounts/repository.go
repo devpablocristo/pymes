@@ -8,9 +8,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/devpablocristo/core/backend/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts/repository/models"
 	accountsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/pagination"
 )
 
 type Repository struct{ db *gorm.DB }
@@ -18,7 +18,7 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.AccountModel{}).Where("org_id = ?", orgID)
 	if accountType != "" {
 		q = q.Where("type = ?", accountType)
@@ -41,7 +41,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, accountType, ent
 }
 
 func (r *Repository) ListMovements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
-	limit = pagination.NormalizeLimit(limit, 20, 100)
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var rows []models.MovementModel
 	if err := r.db.WithContext(ctx).Where("org_id = ? AND account_id = ?", orgID, accountID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err

@@ -1,7 +1,6 @@
 package outwebhooks
 
 import (
-	"errors"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -9,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -20,9 +20,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/backend/go/apperror"
 	webhookmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/apperror"
 )
 
 type RepositoryPort interface {

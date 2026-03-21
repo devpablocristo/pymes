@@ -11,9 +11,9 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
+	utils "github.com/devpablocristo/core/backend/go/tags"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products/repository/models"
 	productdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/products/usecases/domain"
-	"github.com/devpablocristo/pymes/pkgs/go-pkg/utils"
 )
 
 type Repository struct {

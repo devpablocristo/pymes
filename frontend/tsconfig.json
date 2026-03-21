@@ -15,7 +15,11 @@
     "baseUrl": ".",
     "paths": {
       "@devpablocristo/core-authn": ["./.deps/core/authn/ts/src/index.ts", "../../core/authn/ts/src/index.ts"],
-      "@devpablocristo/core-authn/*": ["./.deps/core/authn/ts/src/*", "../../core/authn/ts/src/*"]
+      "@devpablocristo/core-authn/*": ["./.deps/core/authn/ts/src/*", "../../core/authn/ts/src/*"],
+      "@devpablocristo/core-browser": ["./.deps/core/browser/ts/src/index.ts", "../../core/browser/ts/src/index.ts"],
+      "@devpablocristo/core-browser/*": ["./.deps/core/browser/ts/src/*", "../../core/browser/ts/src/*"],
+      "@devpablocristo/core-http": ["./.deps/core/http/ts/src/index.ts", "../../core/http/ts/src/index.ts"],
+      "@devpablocristo/core-http/*": ["./.deps/core/http/ts/src/*", "../../core/http/ts/src/*"]
     }
   },
   "include": ["src"]

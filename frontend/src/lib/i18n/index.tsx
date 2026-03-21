@@ -6,6 +6,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
+import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
 import { vocab } from '../vocabulary';
 import { authMessages } from './messages/auth';
 import { calendarMessages } from './messages/calendar';
@@ -18,6 +19,7 @@ import type { FlatMessages, LanguageCode, TranslationVariables, TranslationsByLa
 
 const STORAGE_KEY = 'pymes:language';
 const DEFAULT_LANGUAGE: LanguageCode = 'es';
+const storage = createBrowserStorageNamespace({ namespace: 'pymes-ui', hostAware: false });
 
 const supportedLanguages = [
   { code: 'es' as const, labelKey: 'common.language.es' },
@@ -95,7 +97,7 @@ function readStoredLanguage(): LanguageCode {
   if (typeof window === 'undefined') {
     return DEFAULT_LANGUAGE;
   }
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = storage.getString(STORAGE_KEY);
   return stored === 'en' || stored === 'es' ? stored : DEFAULT_LANGUAGE;
 }
 
@@ -132,7 +134,7 @@ export function LanguageProvider({
   const [language, setLanguageState] = useState<LanguageCode>(() => initialLanguage ?? readStoredLanguage());
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, language);
+    storage.setString(STORAGE_KEY, language);
     applyDocumentLanguage(language);
   }, [language]);
 

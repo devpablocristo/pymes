@@ -1,14 +1,17 @@
+import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
+
 const STORAGE_KEY = 'pymes:theme';
 type Theme = 'light' | 'dark';
+const storage = createBrowserStorageNamespace({ namespace: 'pymes-ui', hostAware: false });
 
 export function getTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = storage.getString(STORAGE_KEY);
   if (stored === 'dark' || stored === 'light') return stored;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 export function setTheme(theme: Theme): void {
-  localStorage.setItem(STORAGE_KEY, theme);
+  storage.setString(STORAGE_KEY, theme);
   applyTheme(theme);
 }
 

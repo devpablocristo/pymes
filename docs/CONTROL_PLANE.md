@@ -22,9 +22,17 @@ El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables uni
 
 ## Superficie local
 
-- backend: `http://localhost:8100`
-- AI unificado: `http://localhost:8200`
-- frontend unificado: `http://localhost:5180`
+| Servicio | URL típica (host) |
+|----------|-------------------|
+| Control plane | `http://localhost:8100` |
+| Vertical professionals | `http://localhost:8181` |
+| Vertical workshops | `http://localhost:8282` |
+| Vertical beauty | `http://localhost:8383` |
+| Vertical restaurants | `http://localhost:8484` |
+| Frontend | `http://localhost:5180` |
+| AI | `http://localhost:8200` |
+
+Variables frontend: `VITE_API_URL`, `VITE_PROFESSIONALS_API_URL`, `VITE_WORKSHOPS_API_URL`, `VITE_BEAUTY_API_URL`, `VITE_RESTAURANTS_API_URL`, `VITE_AI_API_URL` (ver `.env.example` y `docker-compose.yml`).
 
 Comandos (stack en contenedores):
 

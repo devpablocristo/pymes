@@ -57,6 +57,21 @@ Documentá en el equipo: *sin Clerk en local = modo consola con API key; con Cle
 - En **Perfil** (`/settings`), sin Clerk se muestra la **sesión resuelta** (`GET /v1/session`) y datos de **`GET /v1/users/me`** si hay usuario sincronizado (típicamente vacío con solo clave API). La **gestión de claves API** no está en la consola cliente: la operan soporte/operaciones vía herramientas internas o el mismo contrato HTTP (`/v1/orgs/{org_id}/api-keys`).
 - Uso pensado: **solo local**; no es un sustituto de producción.
 
+### APIs múltiples (verticales) en local
+
+Con **`docker compose`** levantado, el navegador suele hablar con varias bases URL:
+
+| Variable Vite (ejemplo) | Backend | Puerto host |
+|-------------------------|---------|-------------|
+| `VITE_API_URL` | Control plane (`pymes-core`) | `8100` |
+| `VITE_PROFESSIONALS_API_URL` | `professionals` | `8181` |
+| `VITE_WORKSHOPS_API_URL` | `workshops` | `8282` |
+| `VITE_BEAUTY_API_URL` | `beauty` | `8383` |
+| `VITE_RESTAURANTS_API_URL` | `restaurants` | `8484` |
+| `VITE_AI_API_URL` | Servicio `ai` | `8200` |
+
+Definición en **`.env.example`** y **`docker-compose.yml`** (servicio `frontend`).
+
 ### Puerto del API (8100 en el host)
 
 - **Con Docker (flujo habitual):** `cp-backend` escucha **8080 dentro del contenedor** y Compose publica **`8100:8080`** en el host. El navegador y Vite usan **`VITE_API_URL=http://localhost:8100`** (y el `.env` del compose ya lo suele fijar).

@@ -15,14 +15,16 @@ Backend y runtime compartidos del producto. **Owner funcional**: dominio comerci
 
 Cada carpeta es un bounded context con patrón hexagonal (`handler`, `usecases`, `repository`, `usecases/domain` cuando aplica):
 
-`accounts`, `admin`, `appointments`, `attachments`, `audit`, `cashflow`, `currency`, `customers`, `dashboard`, `dataio`, `inventory`, `notifications`, `outwebhooks`, `party`, `paymentgateway`, `payments`, `pdfgen`, `pricelists`, `procurement`, `products`, `publicapi`, `purchases`, `quotes`, `rbac`, `recurring`, `reports`, `returns`, `sales`, `scheduler`, `suppliers`, `timeline`, `users`, `whatsapp`.
+`accounts`, `admin`, `appointments`, `attachments`, `audit`, `cashflow`, `currency`, `customers`, `dashboard`, `dataio`, `inventory`, `notifications`, `outwebhooks`, `party`, `paymentgateway`, `payments`, `pdfgen`, `pricelists`, `procurement`, `products`, `publicapi`, `purchases`, `quotes`, `rbac`, `recurring`, `reports`, `returns`, `sales`, `scheduler`, `suppliers`, `timeline`, `whatsapp`.
+
+Paquete **`internal/users`**: helpers (p. ej. resolución de claves); **no** expone `handler` HTTP propio en Gin — el perfil de usuario en consola usa rutas SaaS (`GET /v1/users/me`, etc.).
 
 Además:
 
 - `internalapi` — rutas internas (API keys de servicio, etc.).
 - `shared/handlers` — auth, RBAC, CORS, límites de body, rate‑limit público.
 - `shared/authz` — helpers de autorización.
-- `verticals` — metadatos o convenciones; no sustituye verticales en `professionals/` ni `workshops/`.
+- `verticals` — metadatos o convenciones; no sustituye las verticales desplegables (`professionals/`, `workshops/`, `beauty/`, `restaurants/`).
 
 ## Integración externa librería `core`
 
@@ -36,6 +38,12 @@ Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-co
 - **Políticas CEL**: `/v1/procurement-policies` — CRUD por org; se evalúan al `submit` vía **core/governance** (no duplicar motor en Python).
 - **Webhooks**: eventos outbound (`procurement_request.*`, `procurement_policy.*`) encolados con el mismo patrón que otros módulos (`outwebhooks`).
 - Código: `pymes-core/backend/internal/procurement/`.
+
+## Auditoría y prevención de fraude
+
+El control plane registra acciones sensibles en **`audit_log`** (cadena con hash por organización) y expone `GET /v1/audit` y export CSV. Cada cobro exitoso sobre una venta genera además el evento **`payment.created`** (recurso `payment`) para conciliación caja–ventas y trazabilidad por actor.
+
+**Documentación canónica (obligatoria lectura para cambios en pagos, auditoría o permisos):** [pymes-core/docs/FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md).
 
 ## Migraciones
 

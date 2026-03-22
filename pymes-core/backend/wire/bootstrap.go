@@ -134,7 +134,7 @@ func InitializeApp() *app.App {
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	dataioUC := dataio.NewUsecases(dataioRepo, auditUC)
-	paymentsUC := payments.NewUsecases(paymentsRepo)
+	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	procurementEngine := procurement.NewGovernanceEngine()

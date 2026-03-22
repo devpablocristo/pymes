@@ -10,7 +10,12 @@ Vertical `beauty` para salones, barberías y estética en LATAM. El dominio prop
 
 ## Backend
 
-- `beauty/backend/cmd/local` (puerto local default `8083`)
+### Local (Docker Compose)
+
+- Servicio: **`beauty-backend`**, puerto host **8383** (mapa completo: [docs/README.md](./README.md)).
+- Binario local sin contenedor: `cmd/local` escucha **8083** por defecto dentro del proceso.
+
+- `beauty/backend/cmd/local`
 - `beauty/backend/wire/bootstrap.go`
 
 Rutas autenticadas (`/v1/beauty/...`):

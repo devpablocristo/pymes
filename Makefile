@@ -8,7 +8,7 @@ GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablo
 staticcheck:
 	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
 
-# Levanta stack local (Postgres, backends, frontend, AI, etc.)
+# Levanta stack local (Postgres, cp-backend, 4 verticales Go, frontend, AI)
 up:
 	docker compose up -d --build
 
@@ -26,7 +26,7 @@ build:
 	cd frontend && npm run build
 	cd ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src)
 
-# Tests (Go en los tres backends + frontend + AI si hay pytest)
+# Tests (Go en pymes-core + professionals + workshops + beauty + restaurants + frontend + AI)
 test:
 	cd pymes-core/backend && $(GO_PRIVATE) go test ./...
 	cd professionals/backend && $(GO_PRIVATE) go test ./...

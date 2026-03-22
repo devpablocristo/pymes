@@ -13,7 +13,7 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 
 Código reutilizable: librería **`core`** (`github.com/devpablocristo/core/...`) para lo agnóstico; **`pymes-core/shared/`** para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
 
-Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`).
+Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`pymes-core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
 
 ---
 
@@ -73,9 +73,13 @@ pymes-core/
 ├── infra/
 frontend/                           # consola React unificada
 ai/                                 # servicio FastAPI
+professionals/                      # vertical (backend + infra)
+workshops/                          # vertical (backend + infra)
+beauty/                             # vertical (backend + infra)
+restaurants/                        # vertical (backend/; infra opcional por vertical)
 ```
 
-Librerías agnósticas: módulos `github.com/devpablocristo/core/...` en `go.mod` (checkout local típico `../core`), no carpeta `pkgs/` en este repo.
+Librerías agnósticas: módulos `github.com/devpablocristo/core/...` en `go.mod` (checkout local típico `../core`), no carpeta `pkgs/` en este repo. Puertos locales: ver **`docs/README.md`** (tabla) y **`docker-compose.yml`**.
 
 ### 5.2 Estructura de módulo
 
@@ -235,6 +239,7 @@ Los **mappers** viven en el adapter que los necesita:
 - Sentinel errors en `repository.go`: `ErrNotFound`, `ErrAlreadyExists`, `ErrArchived`.
 - API keys obligatorias. Fail si no están configuradas.
 - Health endpoints (`/healthz`, `/readyz`) fuera de auth.
+- **Fraude / robos internos / trazabilidad de dinero:** documentación canónica en **[`pymes-core/docs/FRAUD_PREVENTION.md`](pymes-core/docs/FRAUD_PREVENTION.md)** (auditoría, evento `payment.created`, RBAC, export CSV, backlog). Cualquier cambio en cobros, `audit_log` o permisos de rutas sensibles debe mantener ese documento al día; está enlazado desde [`docs/README.md`](docs/README.md) y [`docs/PYMES_CORE.md`](docs/PYMES_CORE.md).
 
 ---
 
@@ -279,7 +284,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 ### Nombres prohibidos
 
 - NUNCA `web/`, `frontend/`, `ui/` → el frontend ya se llama `frontend/`
-- NUNCA `api/`, `server/` → usar nombre del producto (`pymes-core/`, `professionals/`, `workshops/`)
+- NUNCA `api/`, `server/` → usar nombre del producto (`pymes-core/`, `professionals/`, `workshops/`, `beauty/`, `restaurants/`)
 - NUNCA `postgres:16` sin `-alpine`
 
 ---

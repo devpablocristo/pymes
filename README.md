@@ -4,11 +4,13 @@ Monorepo SaaS multi-vertical para PyMEs LATAM.
 
 La topologia activa hoy es:
 
-- `pymes-core/backend`: backend Go transversal
-- `professionals/backend`: backend Go de la vertical umbrella `professionals`; hoy implementa el modulo `teachers`
-- `workshops/backend`: backend Go de la vertical umbrella `workshops`; hoy implementa `auto_repair` para talleres mecanicos LATAM
+- `pymes-core/backend`: backend Go transversal (control plane)
+- `professionals/backend`: vertical `professionals` — módulo `teachers`
+- `workshops/backend`: vertical `workshops` — subdominio `auto_repair` (talleres)
+- `beauty/backend`: vertical `beauty` — salón (equipo, servicios)
+- `restaurants/backend`: vertical `restaurants` — zonas, mesas, sesiones de mesa
 - `frontend`: consola React unificada para core y verticales
-- `ai`: servicio FastAPI unificado para chat interno, publico y `professionals`
+- `ai`: servicio FastAPI unificado (chat transversal, dominios `professionals/teachers` y `workshops/auto_repair`, chat comercial interno vía `ai/src/api/commercial_router.py`)
 - `pymes-core/shared/`: runtime compartido del producto (backend + AI)
 - Código reutilizable **agnóstico** vive en la librería **`core`** (módulos `github.com/devpablocristo/core/...`); lo atado al negocio de un solo servicio permanece en el **`internal/`** de ese backend (no se usa carpeta `pkgs/` en este monorepo)
 
@@ -31,6 +33,8 @@ Servicios expuestos al host (con `docker compose` levantado):
 - pymes-core backend: `http://localhost:8100`
 - professionals backend: `http://localhost:8181`
 - workshops backend: `http://localhost:8282`
+- beauty backend: `http://localhost:8383`
+- restaurants backend: `http://localhost:8484`
 - frontend unificado: `http://localhost:5180`
 - AI unificado: `http://localhost:8200`
 - PostgreSQL: `localhost:5434`
@@ -51,13 +55,19 @@ pymes/
 ├── ai/
 ├── pymes-core/
 │   ├── backend/
+│   ├── docs/              # p. ej. FRAUD_PREVENTION.md, SAAS en backend/docs
 │   ├── infra/
 │   └── shared/
-├── docs/
+├── beauty/
+│   ├── backend/
+│   └── infra/
+├── docs/                  # índice canónico: docs/README.md
 ├── frontend/
 ├── professionals/
 │   ├── backend/
 │   └── infra/
+├── restaurants/
+│   └── backend/           # sin `infra/` en el repo hoy
 ├── workshops/
 │   ├── backend/
 │   └── infra/
@@ -79,7 +89,7 @@ El frontend usa un blueprint unico de CRUD en:
 - `frontend/src/components/CrudPage.tsx`
 - `frontend/src/crud/resourceConfigs.tsx`
 
-`customers` es la referencia de UX y configuracion. El mismo motor hoy cubre `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `procurementRequests`, `procurementPolicies`, `accounts`, `parties`, `appointments`, `recurring`, `webhooks`, `roles`, los CRUDs del modulo `professionals/teachers` y los del subdominio `workshops/auto_repair`, con acciones custom cuando el flujo no es CRUD puro.
+`customers` es la referencia de UX y configuración. El mismo motor cubre el core vía `rawResourceConfigs` + entradas en `crudModuleMeta` (módulos visibles en `/modules/:id`): entre otros `parties`, `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `procurementRequests`, `procurementPolicies`, `accounts`, `appointments`, `recurring`, `webhooks`, `roles`; además CRUDs verticales `professionals` (`teachers`, `specialties`, `intakes`, `sessions`) y `workshops/auto_repair` (órdenes, vehículos, servicios, citas). **Beauty** y **restaurants** usan páginas dedicadas y rutas en `App.tsx` (no entran en `crudModuleCatalog`). Acciones de fila (PDF, cobros, etc.) viven en `resourceConfigs.tsx`.
 
 Import / export masivo:
 
@@ -91,8 +101,8 @@ Import / export masivo:
 
 ```bash
 make test
-make lint
-make frontend-build
+make staticcheck   # análisis estático Go (no existe target `lint` en Makefile)
+make build         # incluye `npm run build` del frontend
 ```
 
 Chequeos rapidos:
@@ -101,6 +111,8 @@ Chequeos rapidos:
 curl http://localhost:8100/healthz
 curl http://localhost:8181/healthz
 curl http://localhost:8282/healthz
+curl http://localhost:8383/healthz
+curl http://localhost:8484/healthz
 curl http://localhost:8200/healthz
 ```
 
@@ -113,6 +125,7 @@ La documentacion canónica vive en `docs/`.
 - [docs/PYMES_CORE.md](./docs/PYMES_CORE.md) — backend transversal, módulos, procurement
 - [docs/CORE_INTEGRATION.md](./docs/CORE_INTEGRATION.md) — uso de librerías `core` vs dominio Pymes
 - [docs/CONTROL_PLANE.md](./docs/CONTROL_PLANE.md) — control plane, seguridad interna, validación
-- [docs/PROFESSIONALS.md](./docs/PROFESSIONALS.md)
-- [docs/WORKSHOPS.md](./docs/WORKSHOPS.md)
+- [docs/AUTH.md](./docs/AUTH.md) — identidad (Clerk / API key) y puertos
+- [pymes-core/docs/FRAUD_PREVENTION.md](./pymes-core/docs/FRAUD_PREVENTION.md) — auditoría, cobros, RBAC (anti-fraude)
+- [docs/PROFESSIONALS.md](./docs/PROFESSIONALS.md) / [docs/WORKSHOPS.md](./docs/WORKSHOPS.md) / [docs/BEAUTY.md](./docs/BEAUTY.md) / [docs/RESTAURANTS.md](./docs/RESTAURANTS.md)
 - [pymes-core/backend/docs/SAAS_CORE.md](./pymes-core/backend/docs/SAAS_CORE.md) — integración `core/saas/go`

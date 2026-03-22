@@ -1,6 +1,6 @@
 # Docs
 
-Índice operativo y arquitectónico del monorepo `pymes`.
+Índice operativo y arquitectónico del monorepo `pymes`. Las tablas de **topología y puertos** deben coincidir con **`docker-compose.yml`** y **`Makefile`** en la raíz; ante desvío, actualizar primero el código de despliegue y luego este índice.
 
 ## Mapa documental
 
@@ -16,20 +16,27 @@
 | [WORKSHOPS.md](./WORKSHOPS.md) | Vertical umbrella `workshops` (`auto_repair`) |
 | [BEAUTY.md](./BEAUTY.md) | Vertical belleza/salón (`beauty`) |
 | [RESTAURANTS.md](./RESTAURANTS.md) | Vertical bares/restaurantes (`restaurants`) |
+| [FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md) | **Auditoría, cobros (`payment.created`), RBAC y controles anti-fraude** (prioridad producto) |
 
 Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](../pymes-core/backend/docs/SAAS_CORE.md).
 
 ## Topología vigente
 
-- `pymes-core/backend`: backend principal (control plane)
-- `professionals/backend`: backend de vertical
-- `workshops/backend`: backend de vertical
-- `beauty/backend`: backend de vertical (belleza/salón)
-- `restaurants/backend`: backend de vertical (bares/restaurantes)
-- `frontend`: consola React unificada
-- `ai`: servicio FastAPI unificado
-- `pymes-core/shared/`: runtime compartido del producto (backend + AI)
-- Librería **`core`** (`github.com/devpablocristo/core/...`): código agnóstico importado por `go.mod`; lo atado al negocio queda en `internal/` del servicio correspondiente (no hay `pkgs/` en este monorepo)
+| Pieza | Ruta | Puerto host típico (Compose) |
+|-------|------|------------------------------|
+| Control plane | `pymes-core/backend` | `8100` |
+| Vertical professionals | `professionals/backend` | `8181` |
+| Vertical workshops | `workshops/backend` | `8282` |
+| Vertical beauty | `beauty/backend` | `8383` |
+| Vertical restaurants | `restaurants/backend` | `8484` |
+| Frontend | `frontend/` | `5180` |
+| AI | `ai/` | `8200` |
+| Postgres | servicio `postgres` | `5434` → 5432 |
+| MailHog | servicio `mailhog` | `8025`, `1025` |
+
+- `pymes-core/shared/`: runtime compartido del producto (Go + Python para AI)
+- Librería **`core`** (`github.com/devpablocristo/core/...`): primitivas agnósticas vía `go.mod`; dominio Pymes en `internal/` de cada servicio (no hay `pkgs/` en este monorepo)
+- Documentación adicional bajo **`pymes-core/docs/`** (p. ej. anti-fraude); **`pymes-core/backend/docs/`** (SaaS embebido)
 
 ## Lectura recomendada
 
@@ -37,7 +44,9 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 2. [ARCHITECTURE.md](./ARCHITECTURE.md)
 3. [PYMES_CORE.md](./PYMES_CORE.md)
 4. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
-5. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
+5. [AUTH.md](./AUTH.md) (identidad y URLs de API)
+6. [FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md) (auditoría / cobros / RBAC)
+7. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
 
 ## Validación rápida
 
@@ -56,7 +65,7 @@ El blueprint reusable de CRUD vive en:
 - `frontend/src/crud/resourceConfigs.tsx`
 - Catálogo de módulos: `frontend/src/lib/moduleCatalog.ts` + `crudModuleCatalog` (generado desde `crudModuleMeta` en `resourceConfigs.tsx`)
 
-La regla práctica es: si un recurso es CRUD real, primero se modela como configuración del blueprint antes de crear una página bespoke. Cubre recursos del core (incl. procurement), `professionals/teachers` y `workshops/auto_repair`, con variantes parciales (`sales`, `purchases`, `accounts`, `roles`, etc.).
+La regla práctica es: si un recurso es CRUD real, primero se modela como configuración del blueprint antes de crear una página bespoke. Cubre recursos del core listados en `crudModuleMeta` dentro de `resourceConfigs.tsx` (incl. procurement), los CRUD verticales de **professionals** y **workshops**, y variantes parciales con acciones custom (`sales` con PDF/cobros, etc.). **Beauty** y **restaurants** hoy usan páginas y rutas propias en `App.tsx`, no el catálogo CRUD modular.
 
 Import / export:
 

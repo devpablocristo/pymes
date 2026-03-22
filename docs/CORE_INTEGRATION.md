@@ -40,6 +40,7 @@ Criterio: *¿otro producto podría usarlo sin conocer “Pymes”?*
 
 - El agente usa **herramientas HTTP** contra el backend de Pymes (no importa dominio Go).
 - Políticas de tools por rol (`policy.py`) son **producto**; los límites por módulo deben alinearse con los módulos que expone el tenant, sin copiar lógica del motor governance.
+- Chat comercial interno (`POST /v1/chat/commercial/sales` y `.../procurement`) usa el mismo token que el core; el frontend debe definir **`VITE_AI_API_URL`** (p. ej. `http://localhost:8200` con Compose).
 
 ## Módulos en la consola (`/modules/:id`)
 

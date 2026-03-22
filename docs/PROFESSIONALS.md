@@ -19,6 +19,11 @@
 - backend: `professionals/backend`
 - infra: `professionals/infra`
 
+### Local (Docker Compose)
+
+- Servicio: **`prof-backend`**, puerto host **8181** (ver `docker-compose.yml` en la raíz del monorepo).
+- Frontend: `VITE_PROFESSIONALS_API_URL=http://localhost:8181`.
+
 La consola web y el AI especializado viven dentro de los deployables unificados:
 
 - `frontend`

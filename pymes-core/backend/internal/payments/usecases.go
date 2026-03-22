@@ -16,9 +16,19 @@ type RepositoryPort interface {
 	CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error)
 }
 
-type Usecases struct{ repo RepositoryPort }
+// AuditPort registra cobros en audit_log (conciliación caja–venta y trazabilidad anti-fraude).
+type AuditPort interface {
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+}
 
-func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
+type Usecases struct {
+	repo  RepositoryPort
+	audit AuditPort
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
+	return &Usecases{repo: repo, audit: audit}
+}
 
 func (u *Usecases) ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error) {
 	return u.repo.ListSalePayments(ctx, orgID, saleID)
@@ -36,5 +46,21 @@ func (u *Usecases) CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUI
 		in.ReceivedAt = time.Now().UTC()
 	}
 	in.Method = method
-	return u.repo.CreateSalePayment(ctx, orgID, saleID, in)
+	out, err := u.repo.CreateSalePayment(ctx, orgID, saleID, in)
+	if err != nil {
+		return paymentsdomain.Payment{}, err
+	}
+	if u.audit != nil {
+		payload := map[string]any{
+			"sale_id":      saleID.String(),
+			"amount":       out.Amount,
+			"method":       out.Method,
+			"received_at": out.ReceivedAt.UTC().Format(time.RFC3339),
+		}
+		if strings.TrimSpace(out.Notes) != "" {
+			payload["notes"] = out.Notes
+		}
+		u.audit.Log(ctx, orgID.String(), out.CreatedBy, "payment.created", "payment", out.ID.String(), payload)
+	}
+	return out, nil
 }

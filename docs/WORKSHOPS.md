@@ -18,6 +18,11 @@ Vertical `workshops` para talleres LATAM. Subdominios canónicos: `auto_repair`,
 
 ## Backend
 
+### Local (Docker Compose)
+
+- Servicio: **`work-backend`**, puerto host **8282** (`docker-compose.yml` en la raíz del monorepo).
+- Frontend: `VITE_WORKSHOPS_API_URL=http://localhost:8282`.
+
 Entry point:
 
 - `workshops/backend/cmd/local`

@@ -28,7 +28,7 @@ Base autenticada bajo `/v1/restaurants`:
 
 ## Local
 
-- Servicio Compose: `restaurants-backend` (puerto host **8484** → 8084).
+- Servicio Compose: **`restaurants-backend`** (puerto host **8484** → 8084; índice de servicios: [docs/README.md](./README.md)).
 - Frontend: `VITE_RESTAURANTS_API_URL=http://localhost:8484`.
 - Onboarding: vertical `restaurants` en `TenantProfile` (localStorage).
 

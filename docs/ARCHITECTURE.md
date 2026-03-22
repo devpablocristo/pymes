@@ -4,21 +4,25 @@ Reglas madre del repo `pymes`.
 
 ## Ownership
 
-- `pymes-core/`: owner del dominio transversal
-- `professionals/`: vertical umbrella especializada; hoy contiene el modulo `teachers`
-- `workshops/`: vertical umbrella especializada; hoy contiene el subdominio `auto_repair`
-- `pymes-core/shared/`: runtime compartido propio del producto
-- libreria **`core`** (`github.com/devpablocristo/core/...`): primitivas agnosticas fuera de este repo (importadas por `go.mod`)
+- `pymes-core/`: owner del dominio transversal (control plane)
+- `professionals/`: vertical umbrella; módulo `teachers`
+- `workshops/`: vertical umbrella; subdominio `auto_repair`
+- `beauty/`: vertical belleza / salón (equipo, servicios)
+- `restaurants/`: vertical bares / restaurantes (zonas, mesas, sesiones)
+- `pymes-core/shared/`: runtime compartido propio del producto (Go + AI)
+- librería **`core`** (`github.com/devpablocristo/core/...`): primitivas agnósticas fuera de este repo (importadas por `go.mod`)
 
 ## Deployables reales
 
-- `pymes-core/backend`
-- `professionals/backend`
-- `workshops/backend`
-- `frontend`
-- `ai`
+- `pymes-core/backend` — control plane (`cp-backend` en Compose, puerto host típico `8100`)
+- `professionals/backend` — `8181`
+- `workshops/backend` — `8282`
+- `beauty/backend` — `8383`
+- `restaurants/backend` — `8484`
+- `frontend` — `5180`
+- `ai` — `8200`
 
-No hay deployables `pymes-core/ai` ni `professionals/ai`: la unica app de AI corre en `ai/`.
+No hay deployables `pymes-core/ai` ni `professionals/ai`: la única app de AI corre en `ai/`.
 
 Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen exponiendo capacidades de ambos bounded contexts, pero la verdad de negocio permanece en cada backend owner.
 
@@ -54,14 +58,16 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 
 ## Documentación
 
-- índice: `docs/README.md`
-- backend transversal y listado de módulos: `docs/PYMES_CORE.md`
-- librerías `core` vs producto: `docs/CORE_INTEGRATION.md`
+- Índice: `docs/README.md`
+- Backend transversal y módulos: `docs/PYMES_CORE.md`
+- Librerías `core` vs producto: `docs/CORE_INTEGRATION.md`
+- Identidad y puertos: `docs/AUTH.md`
+- Auditoría, cobros y controles internos: `pymes-core/docs/FRAUD_PREVENTION.md`
 
 ## Reglas de AI
 
-- `ai/` es el unico deployable de inteligencia artificial
-- el codigo compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `pymes-core/shared/ai`
-- la logica especifica de verticales vive en `ai/src/domains/<vertical>/<modulo_o_subdominio>`
-- hoy `professionals/teachers` ya esta consolidado en `ai/src/domains/professionals/teachers`
-- hoy `workshops/auto_repair` ya esta consolidado en `ai/src/domains/workshops/auto_repair`
+- `ai/` es el único deployable de inteligencia artificial
+- El código compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `pymes-core/shared/ai`
+- La lógica específica de verticales con tools propios vive en `ai/src/domains/<vertical>/<módulo>` — **hoy**: `professionals/teachers` y `workshops/auto_repair`
+- Chat comercial interno (ventas / procurement) contra el core: routers en `ai/src/api/commercial_router.py` (no bajo `domains/`)
+- **Beauty** y **restaurants** aún no tienen paquete dedicado bajo `ai/src/domains/`; cualquier asistente futuro debe seguir el mismo patrón (HTTP al vertical o core, sin importar dominio Go)

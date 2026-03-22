@@ -36,12 +36,16 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('roles');
   }
 
-  // Products, inventory, price lists: only if sells products
+  // Products, inventory, price lists, purchases: only if sells products
   if (sellsProducts || exploring) {
     visible.add('products');
     visible.add('inventory');
     visible.add('priceLists');
     visible.add('suppliers');
+    visible.add('purchases');
+    // Solicitudes internas + políticas (governance / CEL); backend: /v1/procurement-*
+    visible.add('procurementRequests');
+    visible.add('procurementPolicies');
   }
 
   // Quotes: only if sells products (services usually don't quote)
@@ -59,7 +63,6 @@ export function getVisibleModuleIds(): Set<string> {
 
   // Heavier finance: products + billing
   if ((sellsProducts && profile.usesBilling) || exploring) {
-    visible.add('purchases');
     visible.add('suppliers');
     visible.add('returns');
     visible.add('recurring');

@@ -20,6 +20,12 @@ const dashboardIcon = (
   </svg>
 );
 
+const assistantCommercialIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
 const adminIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
@@ -131,6 +137,11 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const mainNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
+    {
+      to: '/assistant/commercial',
+      label: t('shell.nav.assistantCommercial'),
+      icon: assistantCommercialIcon,
+    },
   ], [t]);
 
   const professionalsNav = useMemo<AppShellNavItem[]>(() => [

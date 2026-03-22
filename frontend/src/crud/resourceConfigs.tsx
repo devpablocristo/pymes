@@ -1,5 +1,5 @@
 import { CrudPage, type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
-import { apiRequest } from '../lib/api';
+import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import type { ModuleDefinition } from '../lib/moduleCatalog';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
 import {
@@ -855,6 +855,14 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     ],
     rowActions: [
       {
+        id: 'pdf',
+        label: 'PDF',
+        kind: 'secondary',
+        onClick: async (row: Quote) => {
+          await downloadAPIFile(`/v1/quotes/${row.id}/pdf`);
+        },
+      },
+      {
         id: 'send',
         label: 'Enviar',
         kind: 'secondary',
@@ -931,6 +939,72 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
+      {
+        id: 'receipt-pdf',
+        label: 'Recibo PDF',
+        kind: 'secondary',
+        onClick: async (row: Sale) => {
+          await downloadAPIFile(`/v1/sales/${row.id}/receipt`);
+        },
+      },
+      {
+        id: 'payments',
+        label: 'Cobros',
+        kind: 'secondary',
+        onClick: async (row: Sale, helpers) => {
+          try {
+            const { items } = await listSalePayments(row.id);
+            if (!items?.length) {
+              helpers.setError('No hay cobros registrados para esta venta.');
+              return;
+            }
+            const lines = items.map(
+              (p) =>
+                `${p.method} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`,
+            );
+            // Ventana legible para listas largas (alert trunca en algunos navegadores).
+            const w = window.open('', '_blank', 'noopener,noreferrer,width=520,height=480');
+            if (w) {
+              w.document.write(
+                `<pre style="font:14px/1.4 system-ui;padding:12px;white-space:pre-wrap">${lines.join(
+                  '\n',
+                )}</pre>`,
+              );
+              w.document.close();
+            }
+          } catch (err) {
+            helpers.setError(err instanceof Error ? err.message : 'No se pudieron cargar los cobros.');
+          }
+        },
+      },
+      {
+        id: 'add-payment',
+        label: 'Registrar cobro',
+        kind: 'success',
+        onClick: async (row: Sale, helpers) => {
+          const method = window.prompt('Método de cobro (ej. efectivo, transferencia, tarjeta):', 'efectivo');
+          if (method === null) return;
+          const trimmedMethod = method.trim();
+          if (!trimmedMethod) {
+            helpers.setError('El método de cobro es obligatorio.');
+            return;
+          }
+          const amountRaw = window.prompt('Monto cobrado:', '');
+          if (amountRaw === null) return;
+          const amount = Number(String(amountRaw).replace(',', '.'));
+          if (!Number.isFinite(amount) || amount <= 0) {
+            helpers.setError('El monto debe ser un número mayor a 0.');
+            return;
+          }
+          const notes = window.prompt('Notas (opcional):', '') ?? '';
+          try {
+            await createSalePayment(row.id, { method: trimmedMethod, amount, notes: notes.trim() || undefined });
+            await helpers.reload();
+          } catch (err) {
+            helpers.setError(err instanceof Error ? err.message : 'No se pudo registrar el cobro.');
+          }
+        },
+      },
       {
         id: 'void',
         label: 'Anular',

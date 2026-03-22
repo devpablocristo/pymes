@@ -3,6 +3,7 @@ import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Shell } from '../components/Shell';
 import { AdminPage } from '../pages/AdminPage';
+import { CommercialAssistantPage } from '../pages/CommercialAssistantPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { AutoRepairServicesPage } from '../pages/AutoRepairServicesPage';
 import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
@@ -15,6 +16,7 @@ import { RestaurantTableSessionsPage } from '../pages/RestaurantTableSessionsPag
 import { IntakesPage } from '../pages/IntakesPage';
 import { LoginPage } from '../pages/LoginPage';
 import { CustomersPage } from '../pages/CustomersPage';
+import { PurchasesPage } from '../pages/PurchasesPage';
 import { ModulePage } from '../pages/ModulePage';
 import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
 import { OnboardingPage } from '../pages/OnboardingPage';
@@ -50,9 +52,13 @@ export function App() {
                 <Shell>
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
+                    <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
                     <Route path="/modules/customers" element={<CustomersPage />} />
+                    <Route path="/modules/purchases" element={<PurchasesPage />} />
+                    <Route path="/compras" element={<PurchasesPage />} />
+                    <Route path="/purchases" element={<Navigate to="/compras" replace />} />
                     <Route path="/modules/:moduleId" element={<ModulePage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />

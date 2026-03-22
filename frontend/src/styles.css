@@ -3104,6 +3104,14 @@ textarea.input-readonly {
   padding: 0 0 0.75rem;
 }
 
+.commercial-chat-log {
+  max-height: 24rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
 .admin-activity-table {
   width: 100%;
   border-collapse: collapse;

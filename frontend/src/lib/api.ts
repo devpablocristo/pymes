@@ -72,6 +72,69 @@ export async function getAuditEntries(): Promise<{ items: AuditEntry[] }> {
   return request('/v1/audit');
 }
 
+export async function downloadAuditExportCsv(): Promise<string> {
+  return downloadAPIFile('/v1/audit/export?format=csv');
+}
+
+export type OrgMemberRow = {
+  id: string;
+  org_id?: string;
+  user_id: string;
+  role?: string;
+  joined_at?: string;
+  user?: { id?: string; email?: string; name?: string };
+};
+
+export async function listOrgMembers(orgId: string): Promise<{ items: OrgMemberRow[] }> {
+  return request(`/v1/orgs/${orgId}/members`);
+}
+
+export type RbacRoleSummary = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+export async function listRbacRoles(): Promise<{ items: RbacRoleSummary[] }> {
+  return request('/v1/roles');
+}
+
+export async function assignRbacRole(roleId: string, userId: string): Promise<void> {
+  await request(`/v1/roles/${roleId}/assign/${userId}`, { method: 'POST', body: {} });
+}
+
+export async function removeRbacRoleAssignment(roleId: string, userId: string): Promise<void> {
+  await request(`/v1/roles/${roleId}/assign/${userId}`, { method: 'DELETE' });
+}
+
+export async function getUserEffectivePermissions(userId: string): Promise<{ permissions: Record<string, string[]> }> {
+  return request(`/v1/users/${userId}/permissions`);
+}
+
+export type SalePaymentRow = {
+  id: string;
+  org_id?: string;
+  reference_type?: string;
+  reference_id?: string;
+  method: string;
+  amount: number;
+  notes?: string;
+  received_at: string;
+  created_by?: string;
+  created_at?: string;
+};
+
+export async function listSalePayments(saleId: string): Promise<{ items: SalePaymentRow[] }> {
+  return request(`/v1/sales/${saleId}/payments`);
+}
+
+export async function createSalePayment(
+  saleId: string,
+  body: { method: string; amount: number; notes?: string; received_at?: string },
+): Promise<SalePaymentRow> {
+  return request(`/v1/sales/${saleId}/payments`, { method: 'POST', body });
+}
+
 export async function getMe(): Promise<MeProfileResponse> {
   return request('/v1/users/me');
 }

@@ -1,9 +1,16 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { getAuditEntries, getTenantSettings, updateTenantSettings } from '../lib/api';
+import {
+  downloadAuditExportCsv,
+  getAuditEntries,
+  getSession,
+  getTenantSettings,
+  updateTenantSettings,
+} from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import { getTheme, toggleTheme } from '../lib/theme';
 import type { AuditEntry, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
+import { AdminRbacSection } from './AdminRbacSection';
 
 function formatDateTime(iso: string): string {
   try {
@@ -156,6 +163,9 @@ export function AdminPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sessionOrgId, setSessionOrgId] = useState('');
+  const [isConsoleAdmin, setIsConsoleAdmin] = useState(false);
+  const [auditExportBusy, setAuditExportBusy] = useState(false);
 
   function handleAppearanceToggle(): void {
     const next = toggleTheme();
@@ -180,6 +190,30 @@ export function AdminPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void getSession()
+      .then((s) => {
+        setSessionOrgId(s.auth.org_id);
+        setIsConsoleAdmin(s.auth.product_role === 'admin');
+      })
+      .catch(() => {
+        setSessionOrgId('');
+        setIsConsoleAdmin(false);
+      });
+  }, []);
+
+  async function handleAuditExportCsv(): Promise<void> {
+    setAuditExportBusy(true);
+    try {
+      await downloadAuditExportCsv();
+      setError('');
+    } catch (err) {
+      setError(formatFetchErrorForUser(err, 'No se pudo descargar el CSV de auditoría.'));
+    } finally {
+      setAuditExportBusy(false);
+    }
+  }
 
   function updateField<K extends keyof TenantFormState>(key: K, value: TenantFormState[K]): void {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -647,10 +681,22 @@ export function AdminPage() {
         )}
       </div>
 
+      {isConsoleAdmin && sessionOrgId ? <AdminRbacSection orgId={sessionOrgId} /> : null}
+
       <div className="card">
-        <div className="card-header">
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
           <h2>Registro de auditoría</h2>
-          <span className="badge badge-neutral">{activity.length} eventos</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span className="badge badge-neutral">{activity.length} eventos</span>
+            <button
+              type="button"
+              className="btn-sm btn-secondary"
+              disabled={auditExportBusy}
+              onClick={() => void handleAuditExportCsv()}
+            >
+              {auditExportBusy ? 'Descargando…' : 'Descargar CSV'}
+            </button>
+          </div>
         </div>
         {activity.length === 0 ? (
           <div className="empty-state">

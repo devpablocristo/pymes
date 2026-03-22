@@ -8,8 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/contextkeys"
-	pymestypes "github.com/devpablocristo/core/backend/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/core/backend/go/contextkeys"
 )
 
 // GinSaaSAuthMiddleware runs core/saas/go net/http auth and copies principal into Gin context
@@ -39,22 +38,22 @@ func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
 	if v := reqCtx.Value(ctxkeys.OrgID); v != nil {
 		if id, ok := v.(uuid.UUID); ok {
 			orgIDStr = id.String()
-			c.Set(pymestypes.CtxKeyOrgID, orgIDStr)
+			c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
 		}
 	}
 
 	if authMethod == "api_key" {
-		c.Set(pymestypes.CtxKeyActor, "api_key:"+orgIDStr)
-		c.Set(pymestypes.CtxKeyRole, "service")
+		c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
+		c.Set(ctxkeys.CtxKeyRole, "service")
 	} else {
 		if v := reqCtx.Value(ctxkeys.Actor); v != nil {
 			if s, ok := v.(string); ok && s != "" {
-				c.Set(pymestypes.CtxKeyActor, s)
+				c.Set(ctxkeys.CtxKeyActor, s)
 			}
 		}
 		if v := reqCtx.Value(ctxkeys.Role); v != nil {
 			if s, ok := v.(string); ok && s != "" {
-				c.Set(pymestypes.CtxKeyRole, s)
+				c.Set(ctxkeys.CtxKeyRole, s)
 			}
 		}
 	}
@@ -69,8 +68,8 @@ func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
 			scopes = intersectScopes(scopes, reqScopes)
 		}
 	}
-	c.Set(pymestypes.CtxKeyScopes, scopes)
-	c.Set(pymestypes.CtxKeyAuthMethod, authMethod)
+	c.Set(ctxkeys.CtxKeyScopes, scopes)
+	c.Set(ctxkeys.CtxKeyAuthMethod, authMethod)
 }
 
 func splitScopesCSV(v string) []string {

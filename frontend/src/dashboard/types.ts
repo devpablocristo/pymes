@@ -50,11 +50,6 @@ export type DashboardResponse = {
   available_widgets: DashboardWidgetDefinition[];
 };
 
-export type DashboardWidgetCatalogResponse = {
-  context: DashboardContext;
-  items: DashboardWidgetDefinition[];
-};
-
 export type DashboardSavePayload = {
   context: DashboardContext;
   items: DashboardLayoutItem[];
@@ -65,40 +60,6 @@ export type DashboardWidgetRendererProps = {
   item: DashboardLayoutItem;
   widget: DashboardWidgetDefinition;
 };
-
-export type DashboardContextDefinition = {
-  id: DashboardContext;
-  label: string;
-  kicker: string;
-  description: string;
-};
-
-export const dashboardContexts: DashboardContextDefinition[] = [
-  {
-    id: 'home',
-    label: 'Panel',
-    kicker: 'Base estable',
-    description: 'La vista inicial transversal para cada usuario autenticado.',
-  },
-  {
-    id: 'commercial',
-    label: 'Comercial',
-    kicker: 'Embudo',
-    description: 'Prioriza ventas, presupuestos y actividad del frente comercial.',
-  },
-  {
-    id: 'operations',
-    label: 'Operaciones',
-    kicker: 'Ejecución',
-    description: 'Expone alertas operativas, stock y ritmo diario del tenant.',
-  },
-  {
-    id: 'control',
-    label: 'Control',
-    kicker: 'Gobierno',
-    description: 'Concentra billing, cashflow, auditoria y supervision.',
-  },
-];
 
 export type SalesSummaryData = {
   period: string;

@@ -3,7 +3,6 @@ package outwebhooks
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -182,5 +181,3 @@ func containsEvent(events []string, eventType string) bool {
 	}
 	return false
 }
-
-func isNotFound(err error) bool { return errors.Is(err, gorm.ErrRecordNotFound) }

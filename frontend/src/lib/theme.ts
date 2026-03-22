@@ -10,7 +10,7 @@ export function getTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-export function setTheme(theme: Theme): void {
+function setTheme(theme: Theme): void {
   storage.setString(STORAGE_KEY, theme);
   applyTheme(theme);
 }

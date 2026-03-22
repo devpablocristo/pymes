@@ -2,7 +2,6 @@ package attachments
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -59,5 +58,3 @@ func (r *Repository) ListByEntity(ctx context.Context, orgID uuid.UUID, entityTy
 func toDomain(row models.AttachmentModel) attachmentdomain.Attachment {
 	return attachmentdomain.Attachment{ID: row.ID, OrgID: row.OrgID, AttachableType: row.AttachableType, AttachableID: row.AttachableID, FileName: row.FileName, ContentType: row.ContentType, SizeBytes: row.SizeBytes, StorageKey: row.StorageKey, UploadedBy: row.UploadedBy, CreatedAt: row.CreatedAt}
 }
-
-func nowUTC() time.Time { return time.Now().UTC() }

@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { getAuditEntries, getTenantSettings, updateTenantSettings } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
+import { useI18n } from '../lib/i18n';
+import { getTheme, toggleTheme } from '../lib/theme';
 import type { AuditEntry, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
 
 function formatDateTime(iso: string): string {
@@ -146,12 +148,19 @@ function settingsToForm(s: TenantSettings): TenantFormState {
 }
 
 export function AdminPage() {
+  const { t } = useI18n();
+  const [uiTheme, setUiTheme] = useState(getTheme);
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [form, setForm] = useState<TenantFormState | null>(null);
   const [activity, setActivity] = useState<AuditEntry[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  function handleAppearanceToggle(): void {
+    const next = toggleTheme();
+    setUiTheme(next);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -239,6 +248,23 @@ export function AdminPage() {
       <div className="page-header">
         <h1>Administración</h1>
         <p>Configuración del espacio y registro de actividad</p>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>{t('profile.admin.appearanceTitle')}</h2>
+        </div>
+        <p className="text-secondary">{t('profile.admin.appearanceLead')}</p>
+        <div className="actions-row" style={{ marginTop: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleAppearanceToggle}
+            title={uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
+          >
+            {uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

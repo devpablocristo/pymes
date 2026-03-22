@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm/clause"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	tablemodels "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/repository/models"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions/repository/models"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions/usecases/domain"
+	tablemodels "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/repository/models"
 )
 
 type Repository struct {

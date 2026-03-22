@@ -15,6 +15,14 @@ export const profileMessages: TranslationsByLanguage = {
       'Iniciaste sesión con Google. El email lo gestiona tu cuenta de Google.',
     'profile.section.personal': 'Datos personales',
     'profile.section.language': 'Idioma',
+    'profile.section.admin': 'Administración',
+    'profile.admin.lead':
+      'Monedas, prefijos de documentos, datos fiscales del comercio, plantillas de WhatsApp y registro de auditoría del tenant.',
+    'profile.admin.cta': 'Ir a administración',
+    'profile.admin.hintNonAdmin': 'Solo los administradores de la organización pueden cambiar estos ajustes.',
+    'profile.admin.appearanceTitle': 'Apariencia',
+    'profile.admin.appearanceLead':
+      'Tema claro u oscuro de la consola. La preferencia se guarda solo en este navegador.',
     'profile.section.billing': 'Facturación',
     'profile.labels.org': 'Organización',
     'profile.labels.accountType': 'Tipo de cuenta',
@@ -65,6 +73,14 @@ export const profileMessages: TranslationsByLanguage = {
       'You signed in with Google. Your email is managed by your Google account.',
     'profile.section.personal': 'Personal details',
     'profile.section.language': 'Language',
+    'profile.section.admin': 'Administration',
+    'profile.admin.lead':
+      'Currencies, document prefixes, business tax details, WhatsApp templates, and tenant audit log.',
+    'profile.admin.cta': 'Open administration',
+    'profile.admin.hintNonAdmin': 'Only organization administrators can change these settings.',
+    'profile.admin.appearanceTitle': 'Appearance',
+    'profile.admin.appearanceLead':
+      'Light or dark theme for the console. The preference is stored only in this browser.',
     'profile.section.billing': 'Billing',
     'profile.labels.org': 'Organization',
     'profile.labels.accountType': 'Account type',

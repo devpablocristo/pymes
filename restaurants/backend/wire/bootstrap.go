@@ -11,15 +11,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/areas"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/restaurants/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {

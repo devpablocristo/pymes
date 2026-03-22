@@ -49,7 +49,7 @@ func (r *Repository) ListMembers(orgID uuid.UUID) []Member {
 
 	result := make([]Member, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, Member{UserID: row.UserID, Email: row.Email, Role: row.Role})
+		result = append(result, Member(row))
 	}
 	return result
 }

@@ -3,13 +3,8 @@ import {
   requestResponse,
   type RequestOptions,
 } from '@devpablocristo/core-authn/http/fetch';
+import type { DashboardResponse, DashboardSavePayload } from '../dashboard/types';
 import type {
-  DashboardResponse,
-  DashboardSavePayload,
-  DashboardWidgetCatalogResponse,
-} from '../dashboard/types';
-import type {
-  AdminBootstrapResponse,
   APIKeyItem,
   BillingStatus,
   MeProfileResponse,
@@ -24,10 +19,6 @@ export async function getSession(): Promise<SessionResponse> {
   return request('/v1/session');
 }
 
-export async function getAdminBootstrap(): Promise<AdminBootstrapResponse> {
-  return request('/v1/admin/bootstrap');
-}
-
 export async function getTenantSettings(): Promise<TenantSettings> {
   return request('/v1/admin/tenant-settings');
 }
@@ -40,14 +31,6 @@ export async function updateTenantSettings(
 
 export async function getBillingStatus(): Promise<BillingStatus> {
   return request('/v1/billing/status');
-}
-
-export async function createCheckout(payload: {
-  plan_code: string;
-  success_url: string;
-  cancel_url: string;
-}): Promise<{ checkout_url: string }> {
-  return request('/v1/billing/checkout', { method: 'POST', body: payload });
 }
 
 export async function createPortal(payload: { return_url: string }): Promise<{ portal_url: string }> {
@@ -115,10 +98,6 @@ export async function resetDashboard(context = 'home'): Promise<DashboardRespons
     method: 'POST',
     body: {},
   });
-}
-
-export async function getDashboardWidgets(context = 'home'): Promise<DashboardWidgetCatalogResponse> {
-  return request(`/v1/dashboard/widgets?context=${encodeURIComponent(context)}`);
 }
 
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {

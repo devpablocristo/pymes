@@ -7,6 +7,7 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 - `professionals/` — vertical docentes/profesionales (backend Go)
 - `workshops/` — vertical talleres mecánicos (backend Go)
 - `beauty/` — vertical belleza / salón (equipo, menú de servicios; backend Go)
+- `restaurants/` — vertical bares / restaurantes (zonas, mesas, sesiones de mesa; backend Go)
 - `frontend/` — consola React unificada
 - `ai/` — servicio FastAPI con Gemini
 
@@ -203,7 +204,7 @@ Los **mappers** viven en el adapter que los necesita:
 ### 6.1 Selección de vertical
 
 - Cada tenant elige **una sola vertical** (o ninguna) durante el onboarding.
-- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'beauty'`).
+- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants'`).
 - El sidebar solo muestra la sección de la vertical elegida. Sin vertical = solo módulos comerciales/operaciones.
 - Las rutas de verticales no elegidas siguen existiendo (no se bloquean) pero no aparecen en la navegación.
 
@@ -259,7 +260,7 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 | Tipo | Servicio compose | Container resultante |
 |------|-----------------|---------------------|
 | Backend Go | `cp-backend` | `pymes-cp-backend-1` |
-| Backend vertical | `prof-backend`, `work-backend`, `beauty-backend` | `pymes-prof-backend-1` |
+| Backend vertical | `prof-backend`, `work-backend`, `beauty-backend`, `restaurants-backend` | `pymes-prof-backend-1` |
 | DB | `postgres` | `pymes-postgres-1` |
 | Frontend | `frontend` | `pymes-frontend-1` |
 | AI | `ai` | `pymes-ai-1` |

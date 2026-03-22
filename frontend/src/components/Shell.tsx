@@ -7,7 +7,6 @@ import type { ProductRole } from '../lib/types';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
-import { getTheme, toggleTheme } from '../lib/theme';
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
 }
@@ -60,6 +59,14 @@ const clockIcon = (
   </svg>
 );
 
+const utensilsIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2" />
+    <path d="M7 2v20" />
+    <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+  </svg>
+);
+
 const globeIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
@@ -107,7 +114,6 @@ const profileIcon = (
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
-  const [theme, setThemeState] = useState(getTheme);
   const [productRole, setProductRole] = useState<ProductRole | null>(null);
 
   useEffect(() => {
@@ -160,18 +166,24 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/beauty/salon/services', label: t('shell.nav.beautyServices'), icon: beautyIcon },
   ], [t]);
 
-  const settingsNav = useMemo<AppShellNavItem[]>(() => {
-    const items: AppShellNavItem[] = [];
-    if (productRole === 'admin') {
-      items.push({ to: '/admin', label: t('shell.nav.admin'), icon: adminIcon });
-    }
-    items.push(
+  const restaurantsNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/restaurants/dining/areas', label: t('shell.nav.restaurantAreas'), icon: dashboardIcon },
+      { to: '/restaurants/dining/tables', label: t('shell.nav.restaurantTables'), icon: utensilsIcon },
+      { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: clockIcon },
+    ],
+    [t],
+  );
+
+  const settingsNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
       { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
       { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
-    );
-    return items;
-  }, [productRole, t]);
+    ],
+    [t],
+  );
 
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
@@ -202,49 +214,22 @@ export function Shell({ children }: { children: ReactNode }) {
     if (vertical === 'beauty') {
       result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });
     }
+    if (vertical === 'restaurants') {
+      result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
+    }
     result.push(...moduleNav);
     result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [beautyNav, localizeUiText, mainNav, professionalsNav, sentenceCase, settingsNav, t, workshopsNav]);
+  }, [beautyNav, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
-  function handleToggleTheme() {
-    const next = toggleTheme();
-    setThemeState(next);
-  }
-
-  const themeToggle = (
-    <button
-      type="button"
-      className="theme-toggle"
-      onClick={handleToggleTheme}
-      title={theme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
-    >
-      {theme === 'dark' ? (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-          <circle cx="12" cy="12" r="5" />
-          <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-          <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-      )}
-    </button>
-  );
-
-  const footerControls = (
-    <div className="sidebar-footer-controls">
-      {productRole !== null && (
+  const footerControls =
+    productRole !== null ? (
+      <div className="sidebar-footer-controls">
         <span className="badge badge-neutral shell-product-role" title={t('shell.role.hint')}>
           {productRole === 'admin' ? t('shell.role.admin') : t('shell.role.user')}
         </span>
-      )}
-      {themeToggle}
-    </div>
-  );
+      </div>
+    ) : null;
 
   return (
     <AppShell

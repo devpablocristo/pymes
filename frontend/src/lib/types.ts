@@ -112,12 +112,7 @@ export type BootstrapAuthPayload = {
   auth_method: string;
 };
 
-export type AdminBootstrapResponse = {
-  auth: BootstrapAuthPayload;
-  settings: TenantSettings;
-};
-
-/** Misma forma que `AdminBootstrapResponse.auth` envuelta; para cualquier usuario autenticado. */
+/** Auth del tenant vía GET /v1/session. */
 export type SessionResponse = {
   auth: BootstrapAuthPayload;
 };

@@ -14,6 +14,11 @@ const VERTICAL_OPTIONS: { value: VerticalType; label: string; desc: string }[] =
   { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, fichas, especialidades' },
   { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes de trabajo, servicios' },
   { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, menú de servicios, turnos vía agenda' },
+  {
+    value: 'restaurants',
+    label: 'Bares / Restaurantes',
+    desc: 'Zonas del salón, mesas, sesiones de mesa; menú y ventas en el core',
+  },
 ];
 
 type Step = 1 | 2 | 3 | 4;

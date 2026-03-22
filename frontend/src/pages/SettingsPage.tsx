@@ -509,6 +509,24 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
           </div>
 
           {session && (
+            <div className="card profile-section-card">
+              <div className="card-header">
+                <h2>{t('profile.section.admin')}</h2>
+              </div>
+              <p className="text-secondary">{t('profile.admin.lead')}</p>
+              {session.auth.product_role === 'admin' ? (
+                <p>
+                  <Link to="/admin" className="btn-primary">
+                    {t('profile.admin.cta')}
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-muted">{t('profile.admin.hintNonAdmin')}</p>
+              )}
+            </div>
+          )}
+
+          {session && (
             <div className="card profile-section-card" id="facturacion">
               <div className="card-header">
                 <h2>{t('profile.section.billing')}</h2>

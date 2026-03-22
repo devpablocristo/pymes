@@ -152,19 +152,6 @@ func splitCSV(v string) []string {
 	return res
 }
 
-func sanitizeHeader(v string, maxLen int) string {
-	v = strings.TrimSpace(v)
-	if len(v) > maxLen {
-		v = v[:maxLen]
-	}
-	for _, ch := range v {
-		if ch < 32 || ch == 127 {
-			return ""
-		}
-	}
-	return v
-}
-
 func intersectScopes(a, b []string) []string {
 	if len(a) == 0 || len(b) == 0 {
 		return nil

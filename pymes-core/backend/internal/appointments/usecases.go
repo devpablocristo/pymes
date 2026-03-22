@@ -3,7 +3,6 @@ package appointments
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -247,10 +246,6 @@ func normalizeStatus(v string) string {
 		return "scheduled"
 	}
 	return status
-}
-
-func describeParseErr(field string, err error) error {
-	return fmt.Errorf("invalid %s: %w", field, err)
 }
 
 func nullableUUID(id *uuid.UUID) string {

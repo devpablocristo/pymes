@@ -26,5 +26,3 @@ const dashboardWidgetRegistry: Record<string, ComponentType<DashboardWidgetRende
 export function resolveDashboardWidget(widgetKey: string): ComponentType<DashboardWidgetRendererProps> {
   return dashboardWidgetRegistry[widgetKey] ?? UnknownWidget;
 }
-
-export { dashboardWidgetRegistry };

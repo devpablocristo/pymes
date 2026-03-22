@@ -1,8 +1,8 @@
 import type { DashboardLayoutItem, DashboardSavePayload, DashboardWidgetDefinition } from '../types';
 
-export const GRID_COLUMNS = 12;
+const GRID_COLUMNS = 12;
 
-export function indexWidgets(widgets: DashboardWidgetDefinition[]): Record<string, DashboardWidgetDefinition> {
+function indexWidgets(widgets: DashboardWidgetDefinition[]): Record<string, DashboardWidgetDefinition> {
   return widgets.reduce<Record<string, DashboardWidgetDefinition>>((acc, widget) => {
     acc[widget.widget_key] = widget;
     return acc;
@@ -176,10 +176,6 @@ export function toDashboardSavePayload(
 
 export function visibleItems(items: DashboardLayoutItem[]): DashboardLayoutItem[] {
   return sortLayoutItems(items).filter((item) => item.visible);
-}
-
-export function hiddenItems(items: DashboardLayoutItem[]): DashboardLayoutItem[] {
-  return sortLayoutItems(items).filter((item) => !item.visible);
 }
 
 function clampLayoutItem(

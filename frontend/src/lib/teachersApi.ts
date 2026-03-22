@@ -237,26 +237,3 @@ export async function getPublicTeachers(orgSlug: string): Promise<{ items: Teach
 export async function getTeachersPreviewBootstrap(): Promise<TeachersPreviewBootstrap> {
   return teachersRequest('/v1/teachers/public-preview/bootstrap');
 }
-
-export const registerProfessionalsTokenProvider = registerTeachersTokenProvider;
-export const getProfessionals = getTeachers;
-export const createProfessional = createTeacher;
-export const getProfessional = getTeacher;
-export const updateProfessional = updateTeacher;
-export const getSpecialties = getTeacherSpecialties;
-export const createSpecialty = createTeacherSpecialty;
-export const updateSpecialty = updateTeacherSpecialty;
-export const getProfileServices = getTeacherServices;
-export const updateProfileServices = updateTeacherServices;
-export const getIntakes = getTeacherIntakes;
-export const getIntake = getTeacherIntake;
-export const createIntake = createTeacherIntake;
-export const updateIntake = updateTeacherIntake;
-export const submitIntake = submitTeacherIntake;
-export const getSessions = getTeacherSessions;
-export const createSession = createTeacherSession;
-export const getSession = getTeacherSession;
-export const completeSession = completeTeacherSession;
-export const addSessionNote = addTeacherSessionNote;
-export const getPublicProfessionals = getPublicTeachers;
-export const getPublicPreviewBootstrap = getTeachersPreviewBootstrap;

@@ -10,6 +10,9 @@ import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
 import { AutoRepairWorkOrdersPage } from '../pages/AutoRepairWorkOrdersPage';
 import { BeautySalonServicesPage } from '../pages/BeautySalonServicesPage';
 import { BeautyStaffPage } from '../pages/BeautyStaffPage';
+import { RestaurantDiningAreasPage } from '../pages/RestaurantDiningAreasPage';
+import { RestaurantDiningTablesPage } from '../pages/RestaurantDiningTablesPage';
+import { RestaurantTableSessionsPage } from '../pages/RestaurantTableSessionsPage';
 import { IntakesPage } from '../pages/IntakesPage';
 import { LoginPage } from '../pages/LoginPage';
 import { CustomersPage } from '../pages/CustomersPage';
@@ -78,6 +81,10 @@ export function App() {
                     <Route path="/beauty" element={<Navigate to="/beauty/salon/staff" replace />} />
                     <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
                     <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
+                    <Route path="/restaurants" element={<Navigate to="/restaurants/dining/areas" replace />} />
+                    <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
+                    <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
+                    <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
                   </Routes>
                 </Shell>
               </RequireOnboarding>

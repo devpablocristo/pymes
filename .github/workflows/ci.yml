@@ -86,6 +86,26 @@ jobs:
           go test ./beauty/backend/...
           go build ./beauty/backend/...
 
+  restaurants-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
+          path: .deps/core
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+      - name: Link core for local replaces
+        run: ln -sfn "$PWD/.deps/core" ../core
+      - name: Verify restaurants backend
+        run: |
+          go vet ./restaurants/backend/...
+          go test ./restaurants/backend/...
+          go build ./restaurants/backend/...
+
   ai:
     runs-on: ubuntu-latest
     defaults:

@@ -15,6 +15,7 @@
 | [PROFESSIONALS.md](./PROFESSIONALS.md) | Vertical umbrella `professionals` (módulo `teachers`) |
 | [WORKSHOPS.md](./WORKSHOPS.md) | Vertical umbrella `workshops` (`auto_repair`) |
 | [BEAUTY.md](./BEAUTY.md) | Vertical belleza/salón (`beauty`) |
+| [RESTAURANTS.md](./RESTAURANTS.md) | Vertical bares/restaurantes (`restaurants`) |
 
 Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](../pymes-core/backend/docs/SAAS_CORE.md).
 
@@ -24,6 +25,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 - `professionals/backend`: backend de vertical
 - `workshops/backend`: backend de vertical
 - `beauty/backend`: backend de vertical (belleza/salón)
+- `restaurants/backend`: backend de vertical (bares/restaurantes)
 - `frontend`: consola React unificada
 - `ai`: servicio FastAPI unificado
 - `pymes-core/shared/`: runtime compartido del producto (backend + AI)
@@ -35,7 +37,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 2. [ARCHITECTURE.md](./ARCHITECTURE.md)
 3. [PYMES_CORE.md](./PYMES_CORE.md)
 4. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
-5. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) según vertical
+5. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
 
 ## Validación rápida
 

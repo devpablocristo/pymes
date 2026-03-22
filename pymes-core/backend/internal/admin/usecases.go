@@ -65,6 +65,13 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch
 	if patch.TaxRate != nil && *patch.TaxRate < 0 {
 		return domain.TenantSettings{}, apperror.NewBadInput("tax_rate must be >= 0")
 	}
+	if patch.SupportedCurrencies != nil {
+		norm, err := domain.NormalizeSupportedCurrencies(*patch.SupportedCurrencies)
+		if err != nil {
+			return domain.TenantSettings{}, apperror.NewBadInput(err.Error())
+		}
+		patch.SupportedCurrencies = &norm
+	}
 	return u.repo.UpdateTenantSettings(id, patch, actor), nil
 }
 

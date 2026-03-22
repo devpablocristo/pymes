@@ -4,6 +4,7 @@ type UpdateTenantSettingsRequest struct {
 	PlanCode                 *string        `json:"plan_code,omitempty"`
 	HardLimits               map[string]any `json:"hard_limits,omitempty"`
 	Currency                 *string        `json:"currency,omitempty"`
+	SupportedCurrencies      *[]string      `json:"supported_currencies,omitempty"`
 	TaxRate                  *float64       `json:"tax_rate,omitempty"`
 	QuotePrefix              *string        `json:"quote_prefix,omitempty"`
 	SalePrefix               *string        `json:"sale_prefix,omitempty"`

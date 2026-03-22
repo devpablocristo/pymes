@@ -2739,6 +2739,46 @@ textarea.input-readonly {
   color: var(--color-text-secondary);
 }
 
+.admin-currencies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 520px;
+}
+
+.admin-currency-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-currency-rank {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  min-width: 4.5rem;
+}
+
+.admin-currency-input {
+  flex: 1;
+  min-width: 5rem;
+  max-width: 120px;
+}
+
+.admin-currency-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-currency-add {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+}
+
 .admin-settings-form {
   padding: 0 0 0.5rem;
 }

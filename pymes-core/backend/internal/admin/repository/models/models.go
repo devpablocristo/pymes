@@ -14,7 +14,7 @@ type TenantSettingsModel struct {
 	StripeSubscriptionID     *string
 	BillingStatus            string  `gorm:"not null;default:trialing"`
 	Currency                 string  `gorm:"not null;default:ARS"`
-	SupportedCurrencies      []byte  `gorm:"type:jsonb;not null;default:'[]'"`
+	SupportedCurrencies      []byte  `gorm:"type:jsonb;not null"`
 	TaxRate                  float64 `gorm:"not null;default:21"`
 	QuotePrefix              string  `gorm:"not null;default:PRE"`
 	SalePrefix               string  `gorm:"not null;default:VTA"`

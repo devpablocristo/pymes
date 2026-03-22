@@ -47,7 +47,22 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	} else if planChanged {
 		m.HardLimits = mustJSON(DefaultHardLimits(m.PlanCode))
 	}
-	applyString(&m.Currency, patch.Currency)
+	if patch.SupportedCurrencies != nil {
+		list := *patch.SupportedCurrencies
+		m.SupportedCurrencies = mustJSON(list)
+		if len(list) > 0 {
+			m.Currency = list[0]
+			m.SecondaryCurrency = secondaryCurrencyFromSupportedList(list)
+		}
+	} else {
+		applyString(&m.Currency, patch.Currency)
+		applyString(&m.SecondaryCurrency, patch.SecondaryCurrency)
+		if patch.Currency != nil || patch.SecondaryCurrency != nil {
+			cur := defaultString(m.Currency, "ARS")
+			sec := strings.TrimSpace(m.SecondaryCurrency)
+			m.SupportedCurrencies = mustJSON(currencyPairToSupportedList(cur, sec))
+		}
+	}
 	applyFloat(&m.TaxRate, patch.TaxRate)
 	applyString(&m.QuotePrefix, patch.QuotePrefix)
 	applyString(&m.SalePrefix, patch.SalePrefix)
@@ -66,7 +81,6 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	applyBool(&m.AppointmentsEnabled, patch.AppointmentsEnabled)
 	applyString(&m.AppointmentLabel, patch.AppointmentLabel)
 	applyInt(&m.AppointmentReminderHours, patch.AppointmentReminderHours)
-	applyString(&m.SecondaryCurrency, patch.SecondaryCurrency)
 	applyString(&m.DefaultRateType, patch.DefaultRateType)
 	applyBool(&m.AutoFetchRates, patch.AutoFetchRates)
 	applyBool(&m.ShowDualPrices, patch.ShowDualPrices)
@@ -118,6 +132,8 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		limits = DefaultHardLimits(m.PlanCode)
 	}
 
+	supportedList := effectiveSupportedCurrenciesFromModel(m)
+
 	stripeCustomerID := ""
 	if m.StripeCustomerID != nil {
 		stripeCustomerID = strings.TrimSpace(*m.StripeCustomerID)
@@ -134,7 +150,8 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		BillingStatus:            m.BillingStatus,
 		StripeCustomerID:         stripeCustomerID,
 		StripeSubscriptionID:     stripeSubscriptionID,
-		Currency:                 m.Currency,
+		Currency:                 supportedList[0],
+		SupportedCurrencies:      supportedList,
 		TaxRate:                  m.TaxRate,
 		QuotePrefix:              m.QuotePrefix,
 		SalePrefix:               m.SalePrefix,
@@ -158,7 +175,7 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		AppointmentsEnabled:      m.AppointmentsEnabled,
 		AppointmentLabel:         m.AppointmentLabel,
 		AppointmentReminderHours: m.AppointmentReminderHours,
-		SecondaryCurrency:        m.SecondaryCurrency,
+		SecondaryCurrency:        secondaryCurrencyFromSupportedList(supportedList),
 		DefaultRateType:          m.DefaultRateType,
 		AutoFetchRates:           m.AutoFetchRates,
 		ShowDualPrices:           m.ShowDualPrices,
@@ -204,8 +221,9 @@ func DefaultHardLimits(plan string) map[string]any {
 
 func defaultTenantSettingsModel(orgID uuid.UUID) models.TenantSettingsModel {
 	return normalizeTenantSettingsModel(models.TenantSettingsModel{
-		OrgID: orgID,
-		HardLimits: mustJSON(DefaultHardLimits("starter")),
+		OrgID:               orgID,
+		HardLimits:          mustJSON(DefaultHardLimits("starter")),
+		SupportedCurrencies: mustJSON([]string{"ARS"}),
 	})
 }
 
@@ -287,4 +305,53 @@ func applyBool(dst *bool, src *bool) {
 	if src != nil {
 		*dst = *src
 	}
+}
+
+func effectiveSupportedCurrenciesFromModel(m models.TenantSettingsModel) []string {
+	var parsed []string
+	if len(m.SupportedCurrencies) > 0 {
+		_ = json.Unmarshal(m.SupportedCurrencies, &parsed)
+	}
+	var cleaned []string
+	for _, p := range parsed {
+		c := strings.ToUpper(strings.TrimSpace(p))
+		if c != "" {
+			cleaned = append(cleaned, c)
+		}
+	}
+	cleaned = dedupeCurrenciesKeepOrder(cleaned)
+	if len(cleaned) > 0 {
+		return cleaned
+	}
+	cur := defaultString(m.Currency, "ARS")
+	sec := strings.TrimSpace(m.SecondaryCurrency)
+	return currencyPairToSupportedList(cur, sec)
+}
+
+func dedupeCurrenciesKeepOrder(list []string) []string {
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		if !seen[x] {
+			seen[x] = true
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func currencyPairToSupportedList(primary, secondary string) []string {
+	cur := strings.ToUpper(strings.TrimSpace(defaultString(primary, "ARS")))
+	sec := strings.TrimSpace(secondary)
+	if sec == "" {
+		return []string{cur}
+	}
+	return dedupeCurrenciesKeepOrder([]string{cur, strings.ToUpper(sec)})
+}
+
+func secondaryCurrencyFromSupportedList(list []string) string {
+	if len(list) > 1 {
+		return list[1]
+	}
+	return ""
 }

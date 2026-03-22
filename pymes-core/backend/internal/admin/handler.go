@@ -82,6 +82,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		PlanCode:                 req.PlanCode,
 		HardLimits:               req.HardLimits,
 		Currency:                 req.Currency,
+		SupportedCurrencies:      req.SupportedCurrencies,
 		TaxRate:                  req.TaxRate,
 		QuotePrefix:              req.QuotePrefix,
 		SalePrefix:               req.SalePrefix,

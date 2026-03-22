@@ -131,7 +131,6 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const mainNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
-    { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
   ], [t]);
 
   const professionalsNav = useMemo<AppShellNavItem[]>(() => [
@@ -161,11 +160,18 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/beauty/salon/services', label: t('shell.nav.beautyServices'), icon: beautyIcon },
   ], [t]);
 
-  const settingsNav = useMemo<AppShellNavItem[]>(() => [
-    { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
-    { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
-    { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
-  ], [t]);
+  const settingsNav = useMemo<AppShellNavItem[]>(() => {
+    const items: AppShellNavItem[] = [];
+    if (productRole === 'admin') {
+      items.push({ to: '/admin', label: t('shell.nav.admin'), icon: adminIcon });
+    }
+    items.push(
+      { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
+      { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
+      { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
+    );
+    return items;
+  }, [productRole, t]);
 
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();

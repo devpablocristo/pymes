@@ -7,6 +7,8 @@ export type TenantSettings = {
   stripe_customer_id?: string;
   stripe_subscription_id?: string;
   currency: string;
+  /** Monedas habilitadas; la primera es la principal (`currency`). */
+  supported_currencies?: string[];
   tax_rate: number;
   quote_prefix: string;
   sale_prefix: string;
@@ -50,6 +52,7 @@ export type TenantSettingsUpdatePayload = {
   plan_code?: string;
   hard_limits?: Record<string, unknown>;
   currency?: string;
+  supported_currencies?: string[];
   tax_rate?: number;
   quote_prefix?: string;
   sale_prefix?: string;
@@ -68,7 +71,6 @@ export type TenantSettingsUpdatePayload = {
   appointments_enabled?: boolean;
   appointment_label?: string;
   appointment_reminder_hours?: number;
-  secondary_currency?: string;
   default_rate_type?: string;
   auto_fetch_rates?: boolean;
   show_dual_prices?: boolean;

@@ -24,8 +24,21 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
     return { error: 'Las horas de recordatorio deben ser un número ≥ 0.' };
   }
 
+  const seen = new Set<string>();
+  const supported_currencies: string[] = [];
+  for (const raw of f.currencies) {
+    const c = raw.trim().toUpperCase();
+    if (!c) continue;
+    if (seen.has(c)) continue;
+    seen.add(c);
+    supported_currencies.push(c);
+  }
+  if (supported_currencies.length === 0) {
+    return { error: 'Agregá al menos una moneda (código ISO, ej. ARS, USD).' };
+  }
+
   return {
-    currency: f.currency.trim(),
+    supported_currencies,
     tax_rate: tax,
     quote_prefix: f.quote_prefix.trim(),
     sale_prefix: f.sale_prefix.trim(),
@@ -44,7 +57,6 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
     appointments_enabled: f.appointments_enabled,
     appointment_label: f.appointment_label.trim(),
     appointment_reminder_hours: reminder,
-    secondary_currency: f.secondary_currency.trim(),
     default_rate_type: f.default_rate_type.trim(),
     auto_fetch_rates: f.auto_fetch_rates,
     show_dual_prices: f.show_dual_prices,
@@ -58,8 +70,17 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
   };
 }
 
+function currenciesFromTenant(s: TenantSettings): string[] {
+  if (Array.isArray(s.supported_currencies) && s.supported_currencies.length > 0) {
+    return s.supported_currencies.map((c) => String(c).trim());
+  }
+  const cur = (s.currency ?? 'ARS').trim() || 'ARS';
+  const sec = (s.secondary_currency ?? '').trim();
+  return sec ? [cur, sec] : [cur];
+}
+
 type TenantFormState = {
-  currency: string;
+  currencies: string[];
   tax_rate: string;
   quote_prefix: string;
   sale_prefix: string;
@@ -78,7 +99,6 @@ type TenantFormState = {
   appointments_enabled: boolean;
   appointment_label: string;
   appointment_reminder_hours: string;
-  secondary_currency: string;
   default_rate_type: string;
   auto_fetch_rates: boolean;
   show_dual_prices: boolean;
@@ -93,7 +113,7 @@ type TenantFormState = {
 
 function settingsToForm(s: TenantSettings): TenantFormState {
   return {
-    currency: s.currency ?? '',
+    currencies: currenciesFromTenant(s),
     tax_rate: String(s.tax_rate ?? ''),
     quote_prefix: s.quote_prefix ?? '',
     sale_prefix: s.sale_prefix ?? '',
@@ -112,7 +132,6 @@ function settingsToForm(s: TenantSettings): TenantFormState {
     appointments_enabled: Boolean(s.appointments_enabled),
     appointment_label: s.appointment_label ?? '',
     appointment_reminder_hours: String(s.appointment_reminder_hours ?? ''),
-    secondary_currency: s.secondary_currency ?? '',
     default_rate_type: s.default_rate_type ?? '',
     auto_fetch_rates: Boolean(s.auto_fetch_rates),
     show_dual_prices: Boolean(s.show_dual_prices),
@@ -155,6 +174,38 @@ export function AdminPage() {
 
   function updateField<K extends keyof TenantFormState>(key: K, value: TenantFormState[K]): void {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }
+
+  function updateCurrencyRow(index: number, value: string): void {
+    setForm((prev) => {
+      if (!prev) return prev;
+      const next = [...prev.currencies];
+      next[index] = value;
+      return { ...prev, currencies: next };
+    });
+  }
+
+  function addCurrencyRow(): void {
+    setForm((prev) => (prev ? { ...prev, currencies: [...prev.currencies, ''] } : prev));
+  }
+
+  function removeCurrencyRow(index: number): void {
+    setForm((prev) => {
+      if (!prev || prev.currencies.length <= 1) return prev;
+      const next = prev.currencies.filter((_, i) => i !== index);
+      return { ...prev, currencies: next };
+    });
+  }
+
+  function moveCurrencyRow(index: number, delta: number): void {
+    setForm((prev) => {
+      if (!prev) return prev;
+      const j = index + delta;
+      if (j < 0 || j >= prev.currencies.length) return prev;
+      const next = [...prev.currencies];
+      [next[index], next[j]] = [next[j], next[index]];
+      return { ...prev, currencies: next };
+    });
   }
 
   async function onSubmit(event: FormEvent): Promise<void> {
@@ -211,18 +262,61 @@ export function AdminPage() {
             </div>
 
             <section className="admin-settings-section">
-              <h3>Moneda e impuestos</h3>
-              <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Moneda principal</label>
-                  <input
-                    type="text"
-                    value={form.currency}
-                    onChange={(e) => updateField('currency', e.target.value)}
-                    placeholder="ARS"
-                    maxLength={8}
-                  />
-                </div>
+              <h3>Monedas e impuestos</h3>
+              <p className="admin-settings-hint">
+                La primera moneda es la principal (documentos y totales por defecto). Podés sumar las que uses en operaciones o cotizaciones.
+              </p>
+              <div className="admin-currencies-list">
+                {form.currencies.map((code, index) => (
+                  <div key={index} className="admin-currency-row">
+                    <span className="admin-currency-rank" title="Orden">
+                      {index === 0 ? 'Principal' : `${index + 1}`}
+                    </span>
+                    <input
+                      type="text"
+                      className="admin-currency-input"
+                      value={code}
+                      onChange={(e) => updateCurrencyRow(index, e.target.value)}
+                      placeholder="ARS"
+                      maxLength={8}
+                      autoCapitalize="characters"
+                    />
+                    <div className="admin-currency-actions">
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        disabled={index === 0}
+                        onClick={() => moveCurrencyRow(index, -1)}
+                        title="Subir"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        disabled={index >= form.currencies.length - 1}
+                        onClick={() => moveCurrencyRow(index, 1)}
+                        title="Bajar"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-danger btn-sm"
+                        disabled={form.currencies.length <= 1}
+                        onClick={() => removeCurrencyRow(index)}
+                        title="Quitar"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" className="btn-secondary btn-sm admin-currency-add" onClick={addCurrencyRow}>
+                  + Agregar moneda
+                </button>
+              </div>
+              <div className="admin-settings-grid" style={{ marginTop: '1rem' }}>
                 <div className="form-group">
                   <label>IVA / impuesto (%)</label>
                   <input
@@ -398,18 +492,8 @@ export function AdminPage() {
             </section>
 
             <section className="admin-settings-section">
-              <h3>Moneda secundaria y cotización</h3>
+              <h3>Cotización</h3>
               <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Moneda secundaria</label>
-                  <input
-                    type="text"
-                    value={form.secondary_currency}
-                    onChange={(e) => updateField('secondary_currency', e.target.value)}
-                    placeholder="USD"
-                    maxLength={8}
-                  />
-                </div>
                 <div className="form-group">
                   <label>Tipo de cotización por defecto</label>
                   <input

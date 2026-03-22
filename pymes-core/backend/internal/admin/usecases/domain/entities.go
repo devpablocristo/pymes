@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -60,6 +61,7 @@ type TenantSettingsPatch struct {
 	PlanCode                 *string        `json:"plan_code,omitempty"`
 	HardLimits               map[string]any `json:"hard_limits,omitempty"`
 	Currency                 *string        `json:"currency,omitempty"`
+	SupportedCurrencies      *[]string      `json:"supported_currencies,omitempty"`
 	TaxRate                  *float64       `json:"tax_rate,omitempty"`
 	QuotePrefix              *string        `json:"quote_prefix,omitempty"`
 	SalePrefix               *string        `json:"sale_prefix,omitempty"`
@@ -89,6 +91,38 @@ type TenantSettingsPatch struct {
 	ShowQRInPDF              *bool          `json:"show_qr_in_pdf,omitempty"`
 	WAPaymentTemplate        *string        `json:"wa_payment_template,omitempty"`
 	WAPaymentLinkTemplate    *string        `json:"wa_payment_link_template,omitempty"`
+}
+
+// NormalizeSupportedCurrencies valida y normaliza códigos (3–8 caracteres alfanuméricos; máx. 16).
+func NormalizeSupportedCurrencies(raw []string) ([]string, error) {
+	if len(raw) > 16 {
+		return nil, fmt.Errorf("supported_currencies: maximum 16 codes")
+	}
+	seen := make(map[string]bool)
+	out := make([]string, 0, len(raw))
+	for _, r := range raw {
+		c := strings.ToUpper(strings.TrimSpace(r))
+		if c == "" {
+			continue
+		}
+		n := utf8.RuneCountInString(c)
+		if n < 3 || n > 8 {
+			return nil, fmt.Errorf("supported_currencies: invalid code length for %q", r)
+		}
+		for _, ch := range c {
+			if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) {
+				return nil, fmt.Errorf("supported_currencies: invalid code %q", c)
+			}
+		}
+		if !seen[c] {
+			seen[c] = true
+			out = append(out, c)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("supported_currencies: at least one currency required")
+	}
+	return out, nil
 }
 
 type ActivityEvent struct {

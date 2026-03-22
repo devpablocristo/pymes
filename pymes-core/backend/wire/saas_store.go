@@ -21,6 +21,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// ErrUserProfileNotFound indica que no hay fila users para el external_id dado.
+var ErrUserProfileNotFound = errors.New("user profile not found")
+
 type pymesSaaSStore struct {
 	db               *gorm.DB
 	logger           *slog.Logger
@@ -54,6 +57,9 @@ type pymesUserRow struct {
 	ExternalID string     `gorm:"column:external_id"`
 	Email      string     `gorm:"column:email"`
 	Name       string     `gorm:"column:name"`
+	GivenName  string     `gorm:"column:given_name"`
+	FamilyName string     `gorm:"column:family_name"`
+	Phone      string     `gorm:"column:phone"`
 	AvatarURL  string     `gorm:"column:avatar_url"`
 	DeletedAt  *time.Time `gorm:"column:deleted_at"`
 	CreatedAt  time.Time  `gorm:"column:created_at"`
@@ -202,6 +208,134 @@ func (s *pymesSaaSStore) FindPrincipalByAPIKeyHash(ctx context.Context, apiKeyHa
 	}, key.ID.String(), nil
 }
 
+const maxUserProfileNameLen = 200
+const maxUserProfileGivenNameLen = 100
+const maxUserProfileFamilyNameLen = 100
+const maxUserProfilePhoneLen = 40
+
+func splitFullNameIntoParts(full string) (given, family string) {
+	full = strings.TrimSpace(full)
+	if full == "" {
+		return "", ""
+	}
+	idx := strings.IndexByte(full, ' ')
+	if idx < 0 {
+		return full, ""
+	}
+	return strings.TrimSpace(full[:idx]), strings.TrimSpace(full[idx+1:])
+}
+
+func joinDisplayName(given, family string) string {
+	given = strings.TrimSpace(given)
+	family = strings.TrimSpace(family)
+	if family == "" {
+		return given
+	}
+	if given == "" {
+		return family
+	}
+	return given + " " + family
+}
+
+// GetUserProfileExtrasByExternalID devuelve campos de perfil extendidos (Pymes) para enriquecer GET /users/me.
+func (s *pymesSaaSStore) GetUserProfileExtrasByExternalID(ctx context.Context, externalID string) (phone, givenName, familyName string, ok bool, err error) {
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return "", "", "", false, nil
+	}
+	var row struct {
+		Phone      string
+		GivenName  string `gorm:"column:given_name"`
+		FamilyName string `gorm:"column:family_name"`
+	}
+	e := s.db.WithContext(ctx).
+		Table("users").
+		Select("phone", "given_name", "family_name").
+		Where("external_id = ?", externalID).
+		Take(&row).Error
+	if errors.Is(e, gorm.ErrRecordNotFound) {
+		return "", "", "", false, nil
+	}
+	if e != nil {
+		return "", "", "", false, e
+	}
+	return strings.TrimSpace(row.Phone), strings.TrimSpace(row.GivenName), strings.TrimSpace(row.FamilyName), true, nil
+}
+
+// PatchUserPersonalFromRequest actualiza nombre (given/family o name legado) y/o teléfono.
+func (s *pymesSaaSStore) PatchUserPersonalFromRequest(ctx context.Context, externalID string, req *PatchMeProfileRequest) error {
+	if req == nil {
+		return fmt.Errorf("request required")
+	}
+	hasName := req.Name != nil || req.GivenName != nil || req.FamilyName != nil
+	if !hasName && req.Phone == nil {
+		return fmt.Errorf("no fields to update")
+	}
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return fmt.Errorf("external_id required")
+	}
+	var row pymesUserRow
+	err := s.db.WithContext(ctx).Where("external_id = ?", externalID).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrUserProfileNotFound
+	}
+	if err != nil {
+		return err
+	}
+	updates := map[string]any{}
+	if req.GivenName != nil || req.FamilyName != nil {
+		g := strings.TrimSpace(row.GivenName)
+		if req.GivenName != nil {
+			g = strings.TrimSpace(*req.GivenName)
+		}
+		f := strings.TrimSpace(row.FamilyName)
+		if req.FamilyName != nil {
+			f = strings.TrimSpace(*req.FamilyName)
+		}
+		if len([]rune(g)) > maxUserProfileGivenNameLen {
+			return fmt.Errorf("given name too long")
+		}
+		if len([]rune(f)) > maxUserProfileFamilyNameLen {
+			return fmt.Errorf("family name too long")
+		}
+		combined := joinDisplayName(g, f)
+		if combined == "" {
+			return fmt.Errorf("name cannot be empty")
+		}
+		if len([]rune(combined)) > maxUserProfileNameLen {
+			return fmt.Errorf("name too long")
+		}
+		updates["given_name"] = g
+		updates["family_name"] = f
+		updates["name"] = combined
+	} else if req.Name != nil {
+		n := strings.TrimSpace(*req.Name)
+		if n == "" {
+			return fmt.Errorf("name cannot be empty")
+		}
+		if len([]rune(n)) > maxUserProfileNameLen {
+			return fmt.Errorf("name too long")
+		}
+		g, f := splitFullNameIntoParts(n)
+		updates["given_name"] = g
+		updates["family_name"] = f
+		updates["name"] = joinDisplayName(g, f)
+	}
+	if req.Phone != nil {
+		p := strings.TrimSpace(*req.Phone)
+		if len([]rune(p)) > maxUserProfilePhoneLen {
+			return fmt.Errorf("phone too long")
+		}
+		updates["phone"] = p
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	updates["updated_at"] = time.Now().UTC()
+	return s.db.WithContext(ctx).Model(&pymesUserRow{}).Where("id = ?", row.ID).Updates(updates).Error
+}
+
 func (s *pymesSaaSStore) FindUserByExternalID(ctx context.Context, externalID string) (saasuserdomain.User, bool, error) {
 	var row pymesUserRow
 	err := s.db.WithContext(ctx).
@@ -224,11 +358,14 @@ func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name
 	err := s.db.WithContext(ctx).Where("external_id = ?", externalID).Take(&row).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		given, family := splitFullNameIntoParts(name)
 		row = pymesUserRow{
 			ID:         uuid.New(),
 			ExternalID: externalID,
 			Email:      email,
-			Name:       name,
+			Name:       joinDisplayName(given, family),
+			GivenName:  given,
+			FamilyName: family,
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		}
@@ -244,7 +381,10 @@ func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name
 		return saasuserdomain.User{}, err
 	}
 	row.Email = email
-	row.Name = name
+	given, family := splitFullNameIntoParts(name)
+	row.GivenName = given
+	row.FamilyName = family
+	row.Name = joinDisplayName(given, family)
 	if avatarURL != nil {
 		row.AvatarURL = strings.TrimSpace(*avatarURL)
 	}

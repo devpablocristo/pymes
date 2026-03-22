@@ -1,8 +1,96 @@
+/** Respuesta de GET/PATCH `/v1/admin/tenant-settings` (pymes-core admin). */
 export type TenantSettings = {
   org_id: string;
   plan_code: string;
   hard_limits: Record<string, unknown>;
+  billing_status: string;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  currency: string;
+  tax_rate: number;
+  quote_prefix: string;
+  sale_prefix: string;
+  next_quote_number: number;
+  next_sale_number: number;
+  allow_negative_stock: boolean;
+  purchase_prefix: string;
+  next_purchase_number: number;
+  return_prefix: string;
+  credit_note_prefix: string;
+  next_return_number: number;
+  next_credit_note_number: number;
+  business_name: string;
+  business_tax_id: string;
+  business_address: string;
+  business_phone: string;
+  business_email: string;
+  wa_quote_template: string;
+  wa_receipt_template: string;
+  wa_default_country_code: string;
+  appointments_enabled: boolean;
+  appointment_label: string;
+  appointment_reminder_hours: number;
+  secondary_currency: string;
+  default_rate_type: string;
+  auto_fetch_rates: boolean;
+  show_dual_prices: boolean;
+  bank_holder: string;
+  bank_cbu: string;
+  bank_alias: string;
+  bank_name: string;
+  show_qr_in_pdf: boolean;
+  wa_payment_template: string;
+  wa_payment_link_template: string;
+  updated_by?: string | null;
   updated_at: string;
+};
+
+/** Cuerpo de PATCH/PUT tenant-settings (campos opcionales; el backend hace merge). */
+export type TenantSettingsUpdatePayload = {
+  plan_code?: string;
+  hard_limits?: Record<string, unknown>;
+  currency?: string;
+  tax_rate?: number;
+  quote_prefix?: string;
+  sale_prefix?: string;
+  allow_negative_stock?: boolean;
+  purchase_prefix?: string;
+  return_prefix?: string;
+  credit_note_prefix?: string;
+  business_name?: string;
+  business_tax_id?: string;
+  business_address?: string;
+  business_phone?: string;
+  business_email?: string;
+  wa_quote_template?: string;
+  wa_receipt_template?: string;
+  wa_default_country_code?: string;
+  appointments_enabled?: boolean;
+  appointment_label?: string;
+  appointment_reminder_hours?: number;
+  secondary_currency?: string;
+  default_rate_type?: string;
+  auto_fetch_rates?: boolean;
+  show_dual_prices?: boolean;
+  bank_holder?: string;
+  bank_cbu?: string;
+  bank_alias?: string;
+  bank_name?: string;
+  show_qr_in_pdf?: boolean;
+  wa_payment_template?: string;
+  wa_payment_link_template?: string;
+};
+
+/** Entrada de GET `/v1/audit`. */
+export type AuditEntry = {
+  id: string;
+  org_id: string;
+  actor?: string;
+  actor_type?: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  created_at: string;
 };
 
 /** Rol de producto (consola): solo admin | user; el rol del token puede ser owner, admin, viewer, etc. */
@@ -38,6 +126,11 @@ export type MeProfileUser = {
   external_id: string;
   email: string;
   name: string;
+  /** Enriquecido por Pymes (`users.given_name` / `family_name`). */
+  given_name?: string | null;
+  family_name?: string | null;
+  /** Opcional; columna users.phone. */
+  phone?: string | null;
   avatar_url?: string | null;
 };
 

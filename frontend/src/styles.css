@@ -224,22 +224,18 @@ a {
 }
 
 .language-selector {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
-  flex: 1;
-}
-
-.language-selector-label {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .language-selector-input {
-  width: 100%;
-  min-width: 0;
+  width: auto;
+  min-width: 7.5rem;
+  max-width: 10.5rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: var(--color-sidebar-text-active);
@@ -690,7 +686,7 @@ code {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-/* Separador explícito entre Cuenta e Identidad y permisos */
+/* Separador dentro de Cuenta (bloque de usuario vs org / tipo) */
 .profile-section-divider {
   border: none;
   margin: 1rem 0 0;
@@ -709,6 +705,22 @@ code {
   max-width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+}
+
+/* Sustituye el <hr> entre bloque de avatar y filas de sesión en la tarjeta Cuenta */
+.profile-section-card > .profile-session-table {
+  margin-top: 1rem;
+}
+
+.profile-account-signout {
+  margin: 1rem 0 0;
+}
+
+.profile-account-identity-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  max-width: 28rem;
 }
 
 .profile-session-table tbody tr:hover {
@@ -825,6 +837,137 @@ code {
 .profile-account-email {
   margin: 0;
   font-size: 0.9rem;
+}
+
+.profile-field-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.35rem;
+  color: var(--color-text-muted);
+}
+
+.profile-field-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+}
+
+.profile-input {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.profile-personal-form .profile-form-actions {
+  margin-top: 1rem;
+}
+
+.profile-form-alert {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.profile-saved-hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.profile-readonly-dl {
+  margin: 0.5rem 0 0;
+}
+
+.profile-readonly-dl > div {
+  margin-bottom: 0.75rem;
+}
+
+.profile-readonly-dl dt {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.profile-readonly-dl dd {
+  margin: 0.15rem 0 0;
+}
+
+.profile-readonly-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .profile-readonly-name-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem 0;
+  }
+}
+
+.profile-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+  width: 100%;
+  max-width: calc(28rem + 1rem + 28rem);
+}
+
+.profile-name-field {
+  min-width: 0;
+}
+
+.profile-name-field .profile-field-label {
+  margin-top: 0;
+}
+
+.profile-name-field .profile-input {
+  max-width: none;
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .profile-name-row {
+    grid-template-columns: 1fr;
+    max-width: 28rem;
+  }
+
+  .profile-name-row .profile-name-field:not(:first-child) .profile-field-label {
+    margin-top: 0.75rem;
+  }
+}
+
+.profile-personal-readonly-hint {
+  margin-bottom: 0.75rem;
+}
+
+.profile-billing-table {
+  margin-top: 0.25rem;
+}
+
+.profile-billing-load-error {
+  margin-top: 0.5rem;
+}
+
+.profile-billing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.profile-billing-actions--tight {
+  margin-top: 0.75rem;
+}
+
+.profile-language-selector {
+  margin-top: 0.15rem;
+}
+
+.profile-form-actions--edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 /* ── Empty state ── */
@@ -956,7 +1099,8 @@ code {
   background: var(--color-primary-subtle);
 }
 
-.plan-card h3 {
+.plan-card h3,
+.plan-card h4 {
   font-size: 1.1rem;
   font-weight: 700;
   text-transform: capitalize;
@@ -2369,9 +2513,19 @@ code {
 }
 
 .weekly-cal-event {
+  /* Una sola columna de día: el grid padre es position:relative y left/right estiraba a todo el ancho. */
   position: absolute;
-  left: 2px;
-  right: 2px;
+  --cal-day: 0;
+  width: calc(
+    (100% - var(--weekly-cal-time-col)) / var(--weekly-cal-day-cols) - 4px
+  );
+  left: calc(
+    var(--weekly-cal-time-col) + var(--cal-day) * (100% - var(--weekly-cal-time-col)) /
+      var(--weekly-cal-day-cols) + 2px
+  );
+  right: auto;
+  top: calc(var(--weekly-cal-header-height) + var(--cal-top, 0px));
+  height: var(--cal-height, 58px);
   border-radius: var(--radius-sm);
   padding: 0.25rem 0.45rem;
   color: var(--color-on-primary);
@@ -2416,7 +2570,8 @@ code {
 
 @media (max-width: 768px) {
   .weekly-calendar-grid {
-    grid-template-columns: 44px repeat(7, 1fr);
+    --weekly-cal-time-col: 44px;
+    grid-template-columns: var(--weekly-cal-time-col) repeat(7, 1fr);
     min-height: 400px;
   }
 
@@ -2573,4 +2728,223 @@ code {
 .empty-state p {
   margin-bottom: 1rem;
   font-size: 1rem;
+}
+
+/* ── Admin / tenant settings ── */
+input.input-readonly,
+textarea.input-readonly {
+  cursor: not-allowed;
+  opacity: 0.85;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.admin-settings-form {
+  padding: 0 0 0.5rem;
+}
+
+.admin-settings-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.admin-settings-toolbar-bottom {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-section {
+  margin-top: 1.35rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-section:first-of-type {
+  margin-top: 0.75rem;
+  border-top: none;
+  padding-top: 0;
+}
+
+.admin-settings-section h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.65rem;
+  color: var(--color-text);
+}
+
+.admin-settings-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: -0.25rem 0 0.65rem;
+  line-height: 1.45;
+}
+
+.admin-settings-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.admin-settings-grid .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.admin-checkbox-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.15rem;
+}
+
+.admin-checkbox-row label {
+  margin-bottom: 0;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.admin-textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.admin-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.admin-activity-wrap {
+  overflow-x: auto;
+  padding: 0 0 0.75rem;
+}
+
+.admin-activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.admin-activity-table th,
+.admin-activity-table td {
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+}
+
+.admin-activity-table th {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-activity-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.admin-code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.admin-activity-id {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* API keys: permisos con checkboxes en lugar de texto crudo */
+.api-keys-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.api-keys-field-name input {
+  width: 100%;
+  max-width: 420px;
+}
+
+.api-keys-scopes-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem 1rem;
+  margin: 0;
+  max-width: 640px;
+}
+
+.api-keys-scopes-legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: 0 0.35rem;
+}
+
+.api-keys-scope-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-top: 0.65rem;
+  cursor: pointer;
+}
+
+.api-keys-scope-row:first-of-type {
+  margin-top: 0.35rem;
+}
+
+.api-keys-scope-row input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.api-keys-scope-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.api-keys-scope-label {
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.api-keys-scope-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.api-keys-create-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }

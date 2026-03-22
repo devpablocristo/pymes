@@ -1,3 +1,4 @@
+import { useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,8 +10,12 @@ import {
 import { DashboardBoard } from '../dashboard/components/DashboardBoard';
 import { WidgetCatalog } from '../dashboard/components/WidgetCatalog';
 import { getVisibleWidgetKeys } from '../lib/profileFilters';
+import { clerkEnabled } from '../lib/auth';
+import { useI18n } from '../lib/i18n';
+import { greetingDisplayName } from '../lib/profileDisplay';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { WeeklyCalendar } from '../components/WeeklyCalendar';
+import type { MeProfileResponse } from '../lib/types';
 import {
   type DashboardContext,
   type DashboardLayoutItem,
@@ -25,6 +30,25 @@ import {
   toggleLayoutItemVisibility,
   upsertWidgetInstance,
 } from '../dashboard/utils/layout';
+
+function DashboardWelcomeTitle({ me }: { me: MeProfileResponse | undefined }) {
+  const { t } = useI18n();
+  if (!clerkEnabled) {
+    const name = greetingDisplayName(me, undefined);
+    return <h1>{name ? t('dashboard.welcome', { name }) : t('dashboard.heading')}</h1>;
+  }
+  return <ClerkDashboardWelcomeTitle me={me} />;
+}
+
+function ClerkDashboardWelcomeTitle({ me }: { me: MeProfileResponse | undefined }) {
+  const { t } = useI18n();
+  const { user, isLoaded } = useUser();
+  const name = greetingDisplayName(me, user ?? undefined);
+  if (!isLoaded) {
+    return <h1>{t('dashboard.heading')}</h1>;
+  }
+  return <h1>{name ? t('dashboard.welcome', { name }) : t('dashboard.heading')}</h1>;
+}
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
@@ -132,18 +156,12 @@ export function DashboardPage() {
   }
 
   const profile = getTenantProfile();
-  const userName = String(
-    meQuery.data?.user?.name ??
-      meQuery.data?.user?.email ??
-      meQuery.data?.external_id ??
-      '',
-  );
 
   return (
     <>
       <div className="dashboard-shell-header">
         <div className="dashboard-welcome">
-          <h1>{userName ? `Hola, ${userName}` : 'Dashboard'}</h1>
+          <DashboardWelcomeTitle me={meQuery.data} />
           {profile?.businessName && (
             <p className="text-secondary">{profile.businessName}</p>
           )}

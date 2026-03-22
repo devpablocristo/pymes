@@ -1,7 +1,10 @@
 package domain
 
 import (
+	"fmt"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -14,6 +17,7 @@ type TenantSettings struct {
 	StripeCustomerID         string         `json:"stripe_customer_id,omitempty"`
 	StripeSubscriptionID     string         `json:"stripe_subscription_id,omitempty"`
 	Currency                 string         `json:"currency"`
+	SupportedCurrencies      []string       `json:"supported_currencies"`
 	TaxRate                  float64        `json:"tax_rate"`
 	QuotePrefix              string         `json:"quote_prefix"`
 	SalePrefix               string         `json:"sale_prefix"`

@@ -1,4 +1,5 @@
-package handlers
+// Package verticalgin: helpers Gin compartidos por verticales (auth desde shared/backend/auth).
+package verticalgin
 
 import (
 	"net/http"

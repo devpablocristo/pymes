@@ -1,4 +1,4 @@
-package values
+package vertvalues
 
 import (
 	"strings"

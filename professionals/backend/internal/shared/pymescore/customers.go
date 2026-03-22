@@ -13,7 +13,7 @@ func (c *Client) ResolveCustomer(ctx context.Context, orgID, name, phone, email 
 		"phone":  phone,
 		"email":  email,
 	}
-	result, err := c.post(ctx, "/v1/internal/v1/customers/resolve", orgID, payload)
+	result, err := c.Post(ctx, "/v1/internal/v1/customers/resolve", orgID, payload)
 	if err != nil {
 		return nil, fmt.Errorf("resolve customer: %w", err)
 	}

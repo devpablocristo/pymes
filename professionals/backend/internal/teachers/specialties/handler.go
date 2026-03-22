@@ -12,7 +12,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	sharedhandlers "github.com/devpablocristo/pymes/professionals/backend/internal/shared/handlers"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
 )
@@ -39,7 +39,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -75,7 +75,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -104,7 +104,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -128,7 +128,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) AssignProfessionals(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, specialtyID, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, specialtyID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

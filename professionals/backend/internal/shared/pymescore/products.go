@@ -21,7 +21,7 @@ func (c *Client) ListProducts(ctx context.Context, orgID string, query string, l
 	if encoded := params.Encode(); encoded != "" {
 		path += "?" + encoded
 	}
-	result, err := c.get(ctx, path, orgID)
+	result, err := c.Get(ctx, path, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}

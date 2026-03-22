@@ -11,7 +11,7 @@ import (
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type ListParams struct {
@@ -102,7 +102,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		return domain.Bicycle{}, err
 	}
 	if in.CustomerID != nil {
-		current.CustomerID = values.ParseOptionalUUID(*in.CustomerID)
+		current.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
 	}
 	if in.CustomerName != nil {
 		current.CustomerName = strings.TrimSpace(*in.CustomerName)

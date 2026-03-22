@@ -13,8 +13,8 @@ import (
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices/handler/dto"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices/usecases/domain"
-	sharedhandlers "github.com/devpablocristo/pymes/workshops/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type usecasesPort interface {
@@ -38,7 +38,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -71,7 +71,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -94,7 +94,7 @@ func (h *Handler) Create(c *gin.Context) {
 		BasePrice:       req.BasePrice,
 		Currency:        req.Currency,
 		TaxRate:         req.TaxRate,
-		LinkedProductID: values.ParseOptionalUUID(req.LinkedProductID),
+		LinkedProductID: vertvalues.ParseOptionalUUID(req.LinkedProductID),
 		IsActive:        isActive,
 	}, authCtx.Actor)
 	if err != nil {
@@ -105,7 +105,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -118,7 +118,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

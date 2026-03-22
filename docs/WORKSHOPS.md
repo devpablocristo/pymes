@@ -65,7 +65,7 @@ El subdominio `auto_repair` ya usa la misma forma interna que `professionals/tea
 - DTOs HTTP en `handler/dto`
 - modelos persistentes en `repository/models`
 - entidades de dominio en `usecases/domain`
-- helpers transversales en `workshops/backend/internal/shared/handlers` y `workshops/backend/internal/shared/values`
+- helpers transversales compartidos en `pymes-core/shared/backend/verticalgin` y `pymes-core/shared/backend/vertvalues`
 
 Eso deja una base uniforme para sumar despues `truck_repair` o `moto_repair` sin volver a inventar layout ni helpers. `bike_shop` sigue el mismo layout bajo `internal/bike_shop/`.
 

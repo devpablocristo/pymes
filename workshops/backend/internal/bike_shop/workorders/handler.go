@@ -14,8 +14,8 @@ import (
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/handler/dto"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/usecases/domain"
-	sharedhandlers "github.com/devpablocristo/pymes/workshops/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type usecasesPort interface {
@@ -39,7 +39,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -73,7 +73,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -87,12 +87,12 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bicycle_id"})
 		return
 	}
-	openedAt, err := sharedhandlers.ParseRFC3339(req.OpenedAt)
+	openedAt, err := verticalgin.ParseRFC3339(req.OpenedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid opened_at"})
 		return
 	}
-	promisedAt, err := sharedhandlers.ParseOptionalRFC3339(req.PromisedAt)
+	promisedAt, err := verticalgin.ParseOptionalRFC3339(req.PromisedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid promised_at"})
 		return
@@ -102,9 +102,9 @@ func (h *Handler) Create(c *gin.Context) {
 		Number:        req.Number,
 		BicycleID:     bicycleID,
 		BicycleLabel:  req.BicycleLabel,
-		CustomerID:    values.ParseOptionalUUID(req.CustomerID),
+		CustomerID:    vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName:  req.CustomerName,
-		AppointmentID: values.ParseOptionalUUID(req.AppointmentID),
+		AppointmentID: vertvalues.ParseOptionalUUID(req.AppointmentID),
 		Status:        req.Status,
 		RequestedWork: req.RequestedWork,
 		Diagnosis:     req.Diagnosis,
@@ -124,7 +124,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -137,7 +137,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -146,17 +146,17 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	promisedAt, err := sharedhandlers.ParseOptionalRFC3339Ptr(req.PromisedAt)
+	promisedAt, err := verticalgin.ParseOptionalRFC3339Ptr(req.PromisedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid promised_at"})
 		return
 	}
-	readyAt, err := sharedhandlers.ParseNullableRFC3339Ptr(req.ReadyAt)
+	readyAt, err := verticalgin.ParseNullableRFC3339Ptr(req.ReadyAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ready_at"})
 		return
 	}
-	deliveredAt, err := sharedhandlers.ParseNullableRFC3339Ptr(req.DeliveredAt)
+	deliveredAt, err := verticalgin.ParseNullableRFC3339Ptr(req.DeliveredAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid delivered_at"})
 		return
@@ -195,8 +195,8 @@ func toItems(payload []dto.WorkOrderLineInput) []domain.WorkOrderItem {
 	for _, item := range payload {
 		items = append(items, domain.WorkOrderItem{
 			ItemType:    item.ItemType,
-			ServiceID:   values.ParseOptionalUUID(item.ServiceID),
-			ProductID:   values.ParseOptionalUUID(item.ProductID),
+			ServiceID:   vertvalues.ParseOptionalUUID(item.ServiceID),
+			ProductID:   vertvalues.ParseOptionalUUID(item.ProductID),
 			Description: item.Description,
 			Quantity:    item.Quantity,
 			UnitPrice:   item.UnitPrice,

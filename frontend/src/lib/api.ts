@@ -15,7 +15,9 @@ import type {
   MeProfileResponse,
   NotificationPreference,
   SessionResponse,
+  AuditEntry,
   TenantSettings,
+  TenantSettingsUpdatePayload,
 } from './types';
 
 export async function getSession(): Promise<SessionResponse> {
@@ -30,11 +32,10 @@ export async function getTenantSettings(): Promise<TenantSettings> {
   return request('/v1/admin/tenant-settings');
 }
 
-export async function updateTenantSettings(payload: {
-  plan_code: string;
-  hard_limits?: Record<string, unknown>;
-}): Promise<TenantSettings> {
-  return request('/v1/admin/tenant-settings', { method: 'PUT', body: payload });
+export async function updateTenantSettings(
+  payload: TenantSettingsUpdatePayload,
+): Promise<TenantSettings> {
+  return request('/v1/admin/tenant-settings', { method: 'PATCH', body: payload });
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
@@ -84,12 +85,21 @@ export async function updateNotificationPreference(payload: {
   return request('/v1/notifications/preferences', { method: 'PUT', body: payload });
 }
 
-export async function getAuditEntries(): Promise<{ items: unknown[] }> {
+export async function getAuditEntries(): Promise<{ items: AuditEntry[] }> {
   return request('/v1/audit');
 }
 
 export async function getMe(): Promise<MeProfileResponse> {
   return request('/v1/users/me');
+}
+
+export async function patchMeProfile(payload: {
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  phone?: string;
+}): Promise<MeProfileResponse> {
+  return request('/v1/users/me/profile', { method: 'PATCH', body: payload });
 }
 
 export async function getDashboard(context = 'home'): Promise<DashboardResponse> {

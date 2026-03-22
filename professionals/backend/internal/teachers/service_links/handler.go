@@ -10,7 +10,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	sharedhandlers "github.com/devpablocristo/pymes/professionals/backend/internal/shared/handlers"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 )
@@ -32,7 +32,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, profileID, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -50,7 +50,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Replace(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, profileID, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, profileID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

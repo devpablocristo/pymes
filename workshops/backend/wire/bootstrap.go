@@ -17,13 +17,14 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
-	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
 	bikebicycles "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles"
+	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
 	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
 	bikeshopservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
@@ -45,7 +46,7 @@ func InitializeApp() *app.App {
 
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := buildIdentityResolver(cfg, logger)
-	authMiddleware := auth.NewAuthMiddleware(identityResolver, newAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
 
 	vehiclesRepo := vehicles.NewRepository(db)

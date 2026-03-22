@@ -8,8 +8,6 @@ import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
 import { getTheme, toggleTheme } from '../lib/theme';
-import { LanguageSelector } from './LanguageSelector';
-
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
 }
@@ -27,13 +25,6 @@ const adminIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-  </svg>
-);
-
-const billingIcon = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="1" y="4" width="22" height="16" rx="2" />
-    <line x1="1" y1="10" x2="23" y2="10" />
   </svg>
 );
 
@@ -141,7 +132,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const mainNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
     { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
-    { to: '/billing', label: t('shell.nav.billing'), icon: billingIcon },
   ], [t]);
 
   const professionalsNav = useMemo<AppShellNavItem[]>(() => [
@@ -246,7 +236,6 @@ export function Shell({ children }: { children: ReactNode }) {
           {productRole === 'admin' ? t('shell.role.admin') : t('shell.role.user')}
         </span>
       )}
-      <LanguageSelector />
       {themeToggle}
     </div>
   );

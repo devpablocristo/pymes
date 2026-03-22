@@ -7,7 +7,7 @@ import (
 )
 
 func (c *Client) GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error) {
-	result, err := c.get(ctx, fmt.Sprintf("/v1/internal/v1/products/%s", url.PathEscape(productID)), orgID)
+	result, err := c.Get(ctx, fmt.Sprintf("/v1/internal/v1/products/%s", url.PathEscape(productID)), orgID)
 	if err != nil {
 		return nil, fmt.Errorf("get product: %w", err)
 	}

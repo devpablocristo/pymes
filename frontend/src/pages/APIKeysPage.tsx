@@ -1,7 +1,18 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createAPIKey, deleteAPIKey, getAPIKeys, getSession, rotateAPIKey } from '../lib/api';
+import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import type { APIKeyItem, SessionResponse } from '../lib/types';
+
+/** Scopes que usa el core para acceso a consola/API con clave (ver authz en pymes-core). */
+const SCOPE_CONSOLE_READ = 'admin:console:read';
+const SCOPE_CONSOLE_WRITE = 'admin:console:write';
+
+function scopeBadgeLabel(scope: string, t: (key: string) => string): string {
+  if (scope === SCOPE_CONSOLE_READ) return t('apiKeys.scopes.consoleRead.label');
+  if (scope === SCOPE_CONSOLE_WRITE) return t('apiKeys.scopes.consoleWrite.label');
+  return scope;
+}
 
 export function APIKeysPage() {
   const { t } = useI18n();
@@ -10,7 +21,8 @@ export function APIKeysPage() {
   const [orgID, setOrgID] = useState('');
   const [keys, setKeys] = useState<APIKeyItem[]>([]);
   const [name, setName] = useState('');
-  const [scopes, setScopes] = useState('admin:console:read,admin:console:write');
+  const [scopeConsoleRead, setScopeConsoleRead] = useState(true);
+  const [scopeConsoleWrite, setScopeConsoleWrite] = useState(true);
   const [newRawKey, setNewRawKey] = useState('');
   const [error, setError] = useState('');
 
@@ -36,7 +48,7 @@ export function APIKeysPage() {
       }
     } catch (err) {
       setSession(null);
-      setError(String(err));
+      setError(formatFetchErrorForUser(err, t('apiKeys.error.unreachable')));
     } finally {
       setSessionLoading(false);
     }
@@ -46,22 +58,32 @@ export function APIKeysPage() {
     void load();
   }, []);
 
+  function selectedScopes(): string[] {
+    const list: string[] = [];
+    if (scopeConsoleRead) list.push(SCOPE_CONSOLE_READ);
+    if (scopeConsoleWrite) list.push(SCOPE_CONSOLE_WRITE);
+    return list;
+  }
+
   async function onCreate(event: FormEvent): Promise<void> {
     event.preventDefault();
     if (!orgID || !canManage) return;
+    const scopes = selectedScopes();
+    if (scopes.length === 0) {
+      setError(t('apiKeys.scopes.needOne'));
+      return;
+    }
     try {
       const resp = await createAPIKey(orgID, {
         name,
-        scopes: scopes
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        scopes,
       });
       setNewRawKey(resp.raw_key);
       setName('');
+      setError('');
       await loadKeys(orgID);
     } catch (err) {
-      setError(String(err));
+      setError(formatFetchErrorForUser(err, t('apiKeys.error.unreachable')));
     }
   }
 
@@ -72,7 +94,7 @@ export function APIKeysPage() {
       setNewRawKey(resp.raw_key);
       await loadKeys(orgID);
     } catch (err) {
-      setError(String(err));
+      setError(formatFetchErrorForUser(err, t('apiKeys.error.unreachable')));
     }
   }
 
@@ -82,7 +104,7 @@ export function APIKeysPage() {
       await deleteAPIKey(orgID, keyID);
       await loadKeys(orgID);
     } catch (err) {
-      setError(String(err));
+      setError(formatFetchErrorForUser(err, t('apiKeys.error.unreachable')));
     }
   }
 
@@ -145,18 +167,41 @@ export function APIKeysPage() {
           <h2>Nueva clave API</h2>
           {orgID && <span className="badge badge-neutral">Organizacion: {orgID}</span>}
         </div>
-        <form onSubmit={onCreate} className="form-row">
-          <div className="form-group grow">
+        <form onSubmit={onCreate} className="api-keys-create-form">
+          <div className="form-group api-keys-field-name">
             <label>Nombre</label>
             <input placeholder="Mi clave de produccion" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="form-group grow">
-            <label>Permisos</label>
-            <input value={scopes} onChange={(e) => setScopes(e.target.value)} />
+          <fieldset className="api-keys-scopes-fieldset">
+            <legend className="api-keys-scopes-legend">{t('apiKeys.scopes.section')}</legend>
+            <label className="api-keys-scope-row">
+              <input
+                type="checkbox"
+                checked={scopeConsoleRead}
+                onChange={(e) => setScopeConsoleRead(e.target.checked)}
+              />
+              <span className="api-keys-scope-text">
+                <span className="api-keys-scope-label">{t('apiKeys.scopes.consoleRead.label')}</span>
+                <span className="api-keys-scope-hint">{t('apiKeys.scopes.consoleRead.hint')}</span>
+              </span>
+            </label>
+            <label className="api-keys-scope-row">
+              <input
+                type="checkbox"
+                checked={scopeConsoleWrite}
+                onChange={(e) => setScopeConsoleWrite(e.target.checked)}
+              />
+              <span className="api-keys-scope-text">
+                <span className="api-keys-scope-label">{t('apiKeys.scopes.consoleWrite.label')}</span>
+                <span className="api-keys-scope-hint">{t('apiKeys.scopes.consoleWrite.hint')}</span>
+              </span>
+            </label>
+          </fieldset>
+          <div className="api-keys-create-actions">
+            <button type="submit" className="btn-primary">
+              Crear
+            </button>
           </div>
-          <button type="submit" className="btn-primary">
-            Crear
-          </button>
         </form>
       </div>
 
@@ -190,8 +235,8 @@ export function APIKeysPage() {
                     </td>
                     <td>
                       {key.scopes.map((s) => (
-                        <span key={s} className="badge badge-neutral">
-                          {s}
+                        <span key={s} className="badge badge-neutral" title={s}>
+                          {scopeBadgeLabel(s, t)}
                         </span>
                       ))}
                     </td>

@@ -24,6 +24,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 )
 
 func InitializeApp() *app.App {
@@ -40,7 +41,7 @@ func InitializeApp() *app.App {
 
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := buildIdentityResolver(cfg, logger)
-	authMiddleware := auth.NewAuthMiddleware(identityResolver, newAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
 
 	staffRepo := staff.NewRepository(db)

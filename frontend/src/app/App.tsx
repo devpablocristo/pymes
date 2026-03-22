@@ -4,7 +4,6 @@ import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Shell } from '../components/Shell';
 import { AdminPage } from '../pages/AdminPage';
 import { APIKeysPage } from '../pages/APIKeysPage';
-import { BillingPage } from '../pages/BillingPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { AutoRepairServicesPage } from '../pages/AutoRepairServicesPage';
 import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
@@ -50,7 +49,7 @@ export function App() {
                   <Routes>
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/billing" element={<BillingPage />} />
+                    <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
                     <Route path="/modules/customers" element={<CustomersPage />} />
                     <Route path="/modules/:moduleId" element={<ModulePage />} />
                     <Route path="/settings" element={<SettingsPage />} />

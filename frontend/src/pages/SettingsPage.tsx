@@ -1,10 +1,19 @@
-import { useOrganization, useUser } from '@clerk/clerk-react';
+import { useClerk, useOrganization, useUser } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getMe, getSession } from '../lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { AccountPlanSection } from '../components/AccountPlanSection';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { getMe, getSession, patchMeProfile } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
+import { clearTenantProfile } from '../lib/tenantProfile';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
+import {
+  clerkUserHasGoogleProvider,
+  displayFamilyFromUser,
+  displayGivenFromUser,
+  mergeClerkSessionWithApiUser,
+} from '../lib/profileDisplay';
 import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
 
 function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
@@ -74,35 +83,257 @@ function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
   );
 }
 
-/** Enriquece la tarjeta Cuenta: el JWT suele no traer email/nombre; Clerk en el browser sí. */
-function mergeClerkSessionWithApiUser(
-  clerkUser: NonNullable<ReturnType<typeof useUser>['user']>,
-  apiUser: MeProfileUser | null | undefined,
-): MeProfileUser {
-  const email =
-    clerkUser.primaryEmailAddress?.emailAddress?.trim() ||
-    apiUser?.email?.trim() ||
-    '';
-  const nameFromClerk =
-    (typeof clerkUser.fullName === 'string' ? clerkUser.fullName.trim() : '') ||
-    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() ||
-    clerkUser.username?.trim() ||
-    '';
-  const name = nameFromClerk || apiUser?.name?.trim() || '';
-  return {
-    id: apiUser?.id || clerkUser.id,
-    external_id: apiUser?.external_id || clerkUser.id,
-    email,
-    name,
-    avatar_url: clerkUser.imageUrl || apiUser?.avatar_url || null,
-  };
-}
-
 /** Solo se monta en modo Clerk para poder usar useOrganization sin romper el build sin ClerkProvider. */
 function ClerkProfileSessionRows({ session, t }: { session: SessionResponse; t: (key: string) => string }) {
   const { organization } = useOrganization();
   const clerkOrgName = organization?.name?.trim() || null;
   return <ProfileSessionRows session={session} clerkOrgName={clerkOrgName} t={t} />;
+}
+
+/** Solo con ClerkProvider montado (perfil en modo Clerk). */
+function ClerkAccountSignOutButton() {
+  const { signOut } = useClerk();
+  const { t } = useI18n();
+
+  async function handleSignOut(): Promise<void> {
+    await signOut({ redirectUrl: '/login' });
+  }
+
+  return (
+    <p className="profile-account-signout">
+      <button type="button" className="btn-secondary" onClick={() => void handleSignOut()}>
+        {t('profile.account.signOut')}
+      </button>
+    </p>
+  );
+}
+
+function LocalAccountSignOutButton() {
+  const navigate = useNavigate();
+  const { t } = useI18n();
+
+  function handleLeave(): void {
+    clearTenantProfile();
+    navigate('/onboarding', { replace: true });
+  }
+
+  return (
+    <p className="profile-account-signout">
+      <button type="button" className="btn-secondary" onClick={handleLeave}>
+        {t('profile.account.signOut')}
+      </button>
+    </p>
+  );
+}
+
+function PersonalDataForm({
+  displayUser,
+  canEdit,
+  onProfileUpdated,
+}: {
+  displayUser: MeProfileUser | null;
+  canEdit: boolean;
+  onProfileUpdated: (next: MeProfileResponse) => void;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [givenEdit, setGivenEdit] = useState('');
+  const [familyEdit, setFamilyEdit] = useState('');
+  const [phoneEdit, setPhoneEdit] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [savedHint, setSavedHint] = useState(false);
+
+  function syncFieldsFromDisplay(): void {
+    if (!displayUser) {
+      return;
+    }
+    setGivenEdit(displayGivenFromUser(displayUser));
+    setFamilyEdit(displayFamilyFromUser(displayUser));
+    setPhoneEdit((displayUser.phone ?? '').trim());
+  }
+
+  useEffect(() => {
+    if (!displayUser || editing) {
+      return;
+    }
+    syncFieldsFromDisplay();
+  }, [
+    editing,
+    displayUser?.id,
+    displayUser?.name,
+    displayUser?.given_name,
+    displayUser?.family_name,
+    displayUser?.phone,
+  ]);
+
+  function handleCancelEdit(): void {
+    syncFieldsFromDisplay();
+    setEditing(false);
+    setFormError('');
+    setSavedHint(false);
+  }
+
+  async function handleSave(): Promise<void> {
+    if (!canEdit || !displayUser) {
+      return;
+    }
+    setFormError('');
+    setSavedHint(false);
+    setSaving(true);
+    try {
+      const next = await patchMeProfile({
+        given_name: givenEdit.trim(),
+        family_name: familyEdit.trim(),
+        phone: phoneEdit.trim(),
+      });
+      onProfileUpdated(next);
+      setSavedHint(true);
+      setEditing(false);
+    } catch (e) {
+      setFormError(formatFetchErrorForUser(e, t('profile.error.unreachable')));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!canEdit) {
+    return (
+      <>
+        <p className="text-muted profile-personal-readonly-hint">{t('profile.personal.readOnlyJwt')}</p>
+        {displayUser && (
+          <dl className="profile-readonly-dl">
+            <div className="profile-readonly-name-row">
+              <div>
+                <dt>{t('profile.labels.givenName')}</dt>
+                <dd>{displayGivenFromUser(displayUser) || '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('profile.labels.familyName')}</dt>
+                <dd>{displayFamilyFromUser(displayUser) || '—'}</dd>
+              </div>
+            </div>
+            <div>
+              <dt>{t('profile.labels.phone')}</dt>
+              <dd>{(displayUser.phone ?? '').trim() || '—'}</dd>
+            </div>
+          </dl>
+        )}
+      </>
+    );
+  }
+
+  if (!displayUser) {
+    return <p className="text-muted">{t('profile.personal.noUser')}</p>;
+  }
+
+  if (!editing) {
+    return (
+      <div className="profile-personal-form profile-personal-form--readonly">
+        <dl className="profile-readonly-dl">
+          <div className="profile-readonly-name-row">
+            <div>
+              <dt>{t('profile.labels.givenName')}</dt>
+              <dd>{displayGivenFromUser(displayUser) || '—'}</dd>
+            </div>
+            <div>
+              <dt>{t('profile.labels.familyName')}</dt>
+              <dd>{displayFamilyFromUser(displayUser) || '—'}</dd>
+            </div>
+          </div>
+          <div>
+            <dt>{t('profile.labels.phone')}</dt>
+            <dd>{(displayUser.phone ?? '').trim() || '—'}</dd>
+          </div>
+        </dl>
+        <p className="profile-form-actions">
+          <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+            {t('profile.personal.edit')}
+          </button>
+        </p>
+        {savedHint && <p className="text-muted profile-saved-hint">{t('profile.personal.saved')}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="profile-personal-form">
+      <div className="profile-name-row">
+        <div className="profile-name-field">
+          <label className="profile-field-label" htmlFor="profile-given">
+            {t('profile.labels.givenName')}
+          </label>
+          <input
+            id="profile-given"
+            className="input profile-input"
+            value={givenEdit}
+            onChange={(e) => setGivenEdit(e.target.value)}
+            autoComplete="given-name"
+            maxLength={100}
+          />
+        </div>
+        <div className="profile-name-field">
+          <label className="profile-field-label" htmlFor="profile-family">
+            {t('profile.labels.familyName')}
+          </label>
+          <input
+            id="profile-family"
+            className="input profile-input"
+            value={familyEdit}
+            onChange={(e) => setFamilyEdit(e.target.value)}
+            autoComplete="family-name"
+            maxLength={100}
+          />
+        </div>
+      </div>
+      <p className="text-muted profile-field-hint">{t('profile.labels.phoneHint')}</p>
+      <label className="profile-field-label" htmlFor="profile-phone">
+        {t('profile.labels.phone')}
+      </label>
+      <input
+        id="profile-phone"
+        className="input profile-input"
+        type="tel"
+        value={phoneEdit}
+        onChange={(e) => setPhoneEdit(e.target.value)}
+        autoComplete="tel"
+        maxLength={40}
+      />
+      {formError && <p className="alert alert-error profile-form-alert">{formError}</p>}
+      <p className="profile-form-actions profile-form-actions--edit">
+        <button type="button" className="btn-primary" disabled={saving} onClick={() => void handleSave()}>
+          {saving ? t('profile.personal.saving') : t('profile.personal.save')}
+        </button>
+        <button type="button" className="btn-secondary" disabled={saving} onClick={handleCancelEdit}>
+          {t('profile.personal.cancel')}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function ClerkPersonalDataSection({
+  apiUser,
+  session,
+  onProfileUpdated,
+}: {
+  apiUser: MeProfileUser | null | undefined;
+  session: SessionResponse;
+  onProfileUpdated: (next: MeProfileResponse) => void;
+}) {
+  const { t } = useI18n();
+  const { isLoaded, user: clerkUser } = useUser();
+  const canEdit = session.auth.auth_method === 'jwt';
+
+  if (!isLoaded) {
+    return <p className="text-muted">{t('common.status.loading')}</p>;
+  }
+
+  const displayUser = clerkUser ? mergeClerkSessionWithApiUser(clerkUser, apiUser ?? undefined) : apiUser ?? null;
+
+  return (
+    <PersonalDataForm displayUser={displayUser} canEdit={canEdit} onProfileUpdated={onProfileUpdated} />
+  );
 }
 
 function ClerkProfileAccountSection({
@@ -120,7 +351,15 @@ function ClerkProfileAccountSection({
   }
 
   if (clerkUser) {
-    return <ProfileAccountBlock user={mergeClerkSessionWithApiUser(clerkUser, apiUser)} />;
+    const merged = mergeClerkSessionWithApiUser(clerkUser, apiUser);
+    return (
+      <>
+        <ProfileAccountBlock user={merged} />
+        {clerkUserHasGoogleProvider(clerkUser) && (
+          <p className="text-muted profile-account-identity-hint">{t('profile.account.signedInWithGoogle')}</p>
+        )}
+      </>
+    );
   }
 
   if (apiUser) {
@@ -210,12 +449,16 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
         </div>
       )}
 
-      <div className="card">
-        {loading ? (
+      {loading ? (
+        <div className="card">
           <p className="text-muted">{t('common.status.loading')}</p>
-        ) : (
-          <>
-            <h3 className="profile-subsection-title profile-subsection-title--first">{t('profile.section.account')}</h3>
+        </div>
+      ) : (
+        <>
+          <div className="card profile-section-card">
+            <div className="card-header">
+              <h2>{t('profile.section.account')}</h2>
+            </div>
             {clerkMode ? (
               <ClerkProfileAccountSection apiUser={user ?? undefined} accountLoadFailed={accountLoadFailed} />
             ) : user ? (
@@ -228,23 +471,53 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <p className="profile-account-panel-body">{t('profile.account.empty.body')}</p>
               </div>
             )}
+            {session &&
+              (clerkMode ? (
+                <ClerkProfileSessionRows session={session} t={t} />
+              ) : (
+                <ProfileSessionRows session={session} clerkOrgName={null} t={t} />
+              ))}
+            {clerkMode ? <ClerkAccountSignOutButton /> : <LocalAccountSignOutButton />}
+          </div>
 
-            {session && (
-              <>
-                <hr className="profile-section-divider" aria-hidden="true" />
-                <h3 className="profile-subsection-title profile-subsection-title--after-divider">
-                  {t('profile.section.session')}
-                </h3>
-                {clerkMode ? (
-                  <ClerkProfileSessionRows session={session} t={t} />
-                ) : (
-                  <ProfileSessionRows session={session} clerkOrgName={null} t={t} />
-                )}
-              </>
-            )}
-          </>
-        )}
-      </div>
+          {session && (
+            <div className="card profile-section-card">
+              <div className="card-header">
+                <h2>{t('profile.section.personal')}</h2>
+              </div>
+              {clerkMode ? (
+                <ClerkPersonalDataSection
+                  apiUser={user ?? undefined}
+                  session={session}
+                  onProfileUpdated={(next) => setMe(next)}
+                />
+              ) : (
+                <PersonalDataForm
+                  displayUser={user ?? null}
+                  canEdit={session.auth.auth_method === 'jwt'}
+                  onProfileUpdated={(next) => setMe(next)}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="card profile-section-card">
+            <div className="card-header">
+              <h2>{t('profile.section.language')}</h2>
+            </div>
+            <LanguageSelector className="profile-language-selector" />
+          </div>
+
+          {session && (
+            <div className="card profile-section-card" id="facturacion">
+              <div className="card-header">
+                <h2>{t('profile.section.billing')}</h2>
+              </div>
+              <AccountPlanSection session={session} />
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }

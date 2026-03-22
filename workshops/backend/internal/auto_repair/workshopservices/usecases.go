@@ -11,7 +11,7 @@ import (
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type ListParams struct {
@@ -124,7 +124,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.TaxRate = *in.TaxRate
 	}
 	if in.LinkedProductID != nil {
-		current.LinkedProductID = values.ParseOptionalUUID(*in.LinkedProductID)
+		current.LinkedProductID = vertvalues.ParseOptionalUUID(*in.LinkedProductID)
 	}
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
@@ -183,11 +183,11 @@ func (u *Usecases) enrichLinkedProduct(ctx context.Context, in *domain.Service) 
 		}
 	}
 	if in.BasePrice == 0 {
-		in.BasePrice = values.ParseFloat(product["price"])
+		in.BasePrice = vertvalues.ParseFloat(product["price"])
 	}
 	if in.TaxRate == 0 {
 		if value, ok := product["tax_rate"]; ok && value != nil {
-			in.TaxRate = values.ParseFloat(value)
+			in.TaxRate = vertvalues.ParseFloat(value)
 		}
 	}
 	return nil

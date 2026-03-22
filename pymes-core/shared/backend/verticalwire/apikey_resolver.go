@@ -1,4 +1,5 @@
-package wire
+// Package verticalwire centraliza wiring compartido entre lambdas verticales.
+package verticalwire
 
 import (
 	"sort"
@@ -28,7 +29,8 @@ type apiKeyScopeModel struct {
 
 func (apiKeyScopeModel) TableName() string { return "org_api_key_scopes" }
 
-func newAPIKeyResolver(db *gorm.DB) auth.APIKeyResolver {
+// NewAPIKeyResolver resuelve claves API contra las tablas compartidas con pymes-core.
+func NewAPIKeyResolver(db *gorm.DB) auth.APIKeyResolver {
 	return &apiKeyResolver{db: db}
 }
 

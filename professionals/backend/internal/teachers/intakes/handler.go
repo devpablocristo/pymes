@@ -12,8 +12,8 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	sharedhandlers "github.com/devpablocristo/pymes/professionals/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
 )
@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -58,7 +58,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -72,7 +72,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -93,21 +93,21 @@ func (h *Handler) Create(c *gin.Context) {
 		Payload:   req.Payload,
 	}
 	if req.AppointmentID != nil && strings.TrimSpace(*req.AppointmentID) != "" {
-		intake.AppointmentID = values.ParseOptionalUUID(*req.AppointmentID)
+		intake.AppointmentID = vertvalues.ParseOptionalUUID(*req.AppointmentID)
 		if intake.AppointmentID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment_id"})
 			return
 		}
 	}
 	if req.CustomerPartyID != nil && strings.TrimSpace(*req.CustomerPartyID) != "" {
-		intake.CustomerPartyID = values.ParseOptionalUUID(*req.CustomerPartyID)
+		intake.CustomerPartyID = vertvalues.ParseOptionalUUID(*req.CustomerPartyID)
 		if intake.CustomerPartyID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_party_id"})
 			return
 		}
 	}
 	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		intake.ProductID = values.ParseOptionalUUID(*req.ProductID)
+		intake.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
 		if intake.ProductID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
 			return
@@ -123,7 +123,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -134,21 +134,21 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	input := UpdateInput{Payload: req.Payload}
 	if req.AppointmentID != nil && strings.TrimSpace(*req.AppointmentID) != "" {
-		input.AppointmentID = values.ParseOptionalUUID(*req.AppointmentID)
+		input.AppointmentID = vertvalues.ParseOptionalUUID(*req.AppointmentID)
 		if input.AppointmentID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment_id"})
 			return
 		}
 	}
 	if req.CustomerPartyID != nil && strings.TrimSpace(*req.CustomerPartyID) != "" {
-		input.CustomerPartyID = values.ParseOptionalUUID(*req.CustomerPartyID)
+		input.CustomerPartyID = vertvalues.ParseOptionalUUID(*req.CustomerPartyID)
 		if input.CustomerPartyID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_party_id"})
 			return
 		}
 	}
 	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		input.ProductID = values.ParseOptionalUUID(*req.ProductID)
+		input.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
 		if input.ProductID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
 			return
@@ -164,7 +164,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Submit(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

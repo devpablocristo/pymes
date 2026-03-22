@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useI18n } from '../lib/i18n';
 import { vocab } from '../lib/vocabulary';
 import { apiRequest } from '../lib/api';
@@ -69,22 +69,20 @@ function toCalendarEvents(raw: RawAppointment[], untitledLabel: string): Calenda
     .filter((e): e is CalendarEvent => e !== null && e.startHour >= HOUR_START && e.startHour < HOUR_END);
 }
 
-// Deterministic demo data seeded by week dates
+// Deterministic demo data seeded by week dates — franjas de 1 h separadas ≥2 h para no superponer en la grilla.
 function generateDemoEvents(dates: Date[]): CalendarEvent[] {
   const names = ['María García', 'Juan Pérez', 'Ana López', 'Carlos Ruiz', 'Laura Díaz', 'Pedro Sánchez', 'Sofía Torres'];
   const events: CalendarEvent[] = [];
   let id = 0;
   const seed = dates[0].getDate();
 
-  for (let day = 0; day < 5; day++) {
+  for (let day = 0; day < 6; day++) {
     const count = 2 + ((seed + day) % 3);
-    const usedHours = new Set<number>();
-
+    // Desfase 0–1 h según semana/día; dentro del día solo saltos de 2 h (sin solapes).
+    const stagger = (seed + day * 3) % 2;
     for (let j = 0; j < count; j++) {
-      let hour = 8 + ((seed * 3 + day * 7 + j * 5) % 11);
-      while (usedHours.has(hour) || usedHours.has(hour - 1)) hour++;
-      if (hour >= HOUR_END - 1) continue;
-      usedHours.add(hour);
+      const hour = 8 + stagger + j * 2;
+      if (hour + 1 > HOUR_END) break;
 
       const nameIdx = (day * 3 + j + seed) % names.length;
       events.push({
@@ -93,7 +91,7 @@ function generateDemoEvents(dates: Date[]): CalendarEvent[] {
         day,
         startHour: hour,
         durationHours: 1,
-        color: EVENT_COLORS[nameIdx],
+        color: EVENT_COLORS[nameIdx % EVENT_COLORS.length],
       });
     }
   }
@@ -203,20 +201,21 @@ export function WeeklyCalendar() {
           ))}
 
           {events.map((event) => {
-            const top = (event.startHour - HOUR_START) * 60;
-            const height = event.durationHours * 60 - 2;
-            const col = event.day + 2;
+            const topPx = (event.startHour - HOUR_START) * 60;
+            const heightPx = Math.max(event.durationHours * 60 - 2, 24);
 
             return (
               <div
                 key={event.id}
                 className="weekly-cal-event"
-                style={{
-                  gridColumn: col,
-                  top: `${top}px`,
-                  height: `${height}px`,
-                  backgroundColor: event.color ?? '#3b82f6',
-                }}
+                style={
+                  {
+                    '--cal-day': event.day,
+                    '--cal-top': `${topPx}px`,
+                    '--cal-height': `${heightPx}px`,
+                    backgroundColor: event.color ?? '#3b82f6',
+                  } as CSSProperties
+                }
               >
                 <span className="weekly-cal-event-time">
                   {Math.floor(event.startHour).toString().padStart(2, '0')}:

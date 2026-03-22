@@ -2,7 +2,7 @@ import type { TranslationsByLanguage } from '../types';
 
 export const commonMessages: TranslationsByLanguage = {
   es: {
-    'common.language.label': 'Idioma',
+    'common.language.selectAria': 'Seleccionar idioma',
     'common.language.es': 'Español',
     'common.language.en': 'Inglés',
     'common.actions.save': 'Guardar',
@@ -23,7 +23,7 @@ export const commonMessages: TranslationsByLanguage = {
       'Revisá en Clerk Dashboard que exista http://localhost:5180 (y el puerto real) en dominios / orígenes permitidos. Abrí la consola del navegador (F12) por si hay bloqueo de red o extensiones. Probá también http://127.0.0.1:5180.',
   },
   en: {
-    'common.language.label': 'Language',
+    'common.language.selectAria': 'Select language',
     'common.language.es': 'Spanish',
     'common.language.en': 'English',
     'common.actions.save': 'Save',

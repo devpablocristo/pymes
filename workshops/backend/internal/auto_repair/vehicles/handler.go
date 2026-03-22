@@ -13,8 +13,8 @@ import (
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/handler/dto"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
-	sharedhandlers "github.com/devpablocristo/pymes/workshops/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type usecasesPort interface {
@@ -38,7 +38,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -71,7 +71,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -82,7 +82,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Vehicle{
 		OrgID:        orgID,
-		CustomerID:   values.ParseOptionalUUID(req.CustomerID),
+		CustomerID:   vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName: req.CustomerName,
 		LicensePlate: req.LicensePlate,
 		VIN:          req.VIN,
@@ -101,7 +101,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -114,7 +114,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

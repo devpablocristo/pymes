@@ -12,8 +12,8 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	sharedhandlers "github.com/devpablocristo/pymes/professionals/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/handler/dto"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
 )
@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -106,7 +106,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, ok := sharedhandlers.ParseAuthOrgID(c)
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -133,21 +133,21 @@ func (h *Handler) Create(c *gin.Context) {
 		Metadata:      req.Metadata,
 	}
 	if req.CustomerPartyID != nil && strings.TrimSpace(*req.CustomerPartyID) != "" {
-		session.CustomerPartyID = values.ParseOptionalUUID(*req.CustomerPartyID)
+		session.CustomerPartyID = vertvalues.ParseOptionalUUID(*req.CustomerPartyID)
 		if session.CustomerPartyID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_party_id"})
 			return
 		}
 	}
 	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		session.ProductID = values.ParseOptionalUUID(*req.ProductID)
+		session.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
 		if session.ProductID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
 			return
 		}
 	}
 	if req.StartedAt != nil && strings.TrimSpace(*req.StartedAt) != "" {
-		t, err := sharedhandlers.ParseOptionalRFC3339Ptr(req.StartedAt)
+		t, err := verticalgin.ParseOptionalRFC3339Ptr(req.StartedAt)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid started_at"})
 			return
@@ -166,7 +166,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -180,7 +180,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Complete(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -194,7 +194,7 @@ func (h *Handler) Complete(c *gin.Context) {
 
 func (h *Handler) CreateNote(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, sessionID, ok := sharedhandlers.ParseAuthOrgAndParamID(c, "id", "id")
+	orgID, sessionID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}

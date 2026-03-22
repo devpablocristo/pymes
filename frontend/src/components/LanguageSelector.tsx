@@ -1,16 +1,22 @@
 import { useI18n, type LanguageCode } from '../lib/i18n';
 
-export function LanguageSelector() {
+type LanguageSelectorProps = {
+  /** Clases extra para el contenedor (p. ej. en Perfil). */
+  className?: string;
+};
+
+export function LanguageSelector(props?: LanguageSelectorProps) {
+  const { className } = props ?? {};
   const { language, setLanguage, options, t } = useI18n();
+  const rootClass = ['language-selector', className].filter(Boolean).join(' ');
 
   return (
-    <label className="language-selector">
-      <span className="language-selector-label">{t('common.language.label')}</span>
+    <div className={rootClass}>
       <select
         className="language-selector-input"
         value={language}
         onChange={(event) => setLanguage(event.target.value as LanguageCode)}
-        aria-label={t('common.language.label')}
+        aria-label={t('common.language.selectAria')}
       >
         {options.map((option) => (
           <option key={option.code} value={option.code}>
@@ -18,6 +24,6 @@ export function LanguageSelector() {
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }

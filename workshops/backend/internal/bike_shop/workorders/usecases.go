@@ -12,7 +12,7 @@ import (
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/usecases/domain"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/values"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 )
 
 type ListParams struct {
@@ -129,13 +129,13 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.BicycleLabel = strings.ToUpper(strings.TrimSpace(*in.BicycleLabel))
 	}
 	if in.CustomerID != nil {
-		current.CustomerID = values.ParseOptionalUUID(*in.CustomerID)
+		current.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
 	}
 	if in.CustomerName != nil {
 		current.CustomerName = strings.TrimSpace(*in.CustomerName)
 	}
 	if in.AppointmentID != nil {
-		current.AppointmentID = values.ParseOptionalUUID(*in.AppointmentID)
+		current.AppointmentID = vertvalues.ParseOptionalUUID(*in.AppointmentID)
 	}
 	if in.Status != nil {
 		current.Status = strings.TrimSpace(*in.Status)
@@ -298,7 +298,7 @@ func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) e
 			}
 		}
 		if item.UnitPrice == 0 {
-			item.UnitPrice = values.ParseFloat(product["price"])
+			item.UnitPrice = vertvalues.ParseFloat(product["price"])
 		}
 	}
 	return nil

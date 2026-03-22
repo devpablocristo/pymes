@@ -10,9 +10,11 @@ import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/stor
 import { vocab } from '../vocabulary';
 import { apiKeysMessages } from './messages/apiKeys';
 import { authMessages } from './messages/auth';
+import { billingMessages } from './messages/billing';
 import { calendarMessages } from './messages/calendar';
 import { commonMessages } from './messages/common';
 import { crudMessages } from './messages/crud';
+import { dashboardMessages } from './messages/dashboard';
 import { moduleMessages } from './messages/module';
 import { profileMessages } from './messages/profile';
 import { shellMessages } from './messages/shell';
@@ -41,9 +43,11 @@ const messages = mergeMessages(
   crudMessages,
   moduleMessages,
   profileMessages,
+  billingMessages,
   authMessages,
   calendarMessages,
   apiKeysMessages,
+  dashboardMessages,
 );
 
 function hasLettersOrDigits(token: string): boolean {

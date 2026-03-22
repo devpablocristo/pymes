@@ -1,7 +1,9 @@
 package wire
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasusers "github.com/devpablocristo/core/saas/go/users"
 	"github.com/devpablocristo/core/saas/go/users/handler/dto"
+	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
@@ -42,6 +45,9 @@ func registerPymesSaaSRoutes(
 
 	registerProtected(mux, authMW, "GET /users/me", func(w http.ResponseWriter, r *http.Request) {
 		handleGetMe(w, r, store, httpAuth)
+	})
+	registerProtected(mux, authMW, "PATCH /users/me/profile", func(w http.ResponseWriter, r *http.Request) {
+		handlePatchMeProfile(w, r, store, httpAuth)
 	})
 	registerProtected(mux, authMW, "GET /orgs/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
@@ -135,12 +141,47 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{"auth": auth})
 }
 
-func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
-	if !ok {
-		httperr.Unauthorized(w, "principal not found")
+func enrichMeProfileWithUserExtras(ctx context.Context, store *pymesSaaSStore, profile saasuserdomain.MeProfile) (map[string]any, error) {
+	raw, err := json.Marshal(profile)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	if store == nil {
+		return out, nil
+	}
+	uObj, ok := out["user"].(map[string]any)
+	if !ok || uObj == nil {
+		return out, nil
+	}
+	extID, _ := uObj["external_id"].(string)
+	if strings.TrimSpace(extID) == "" {
+		return out, nil
+	}
+	phone, givenName, familyName, _, err := store.GetUserProfileExtrasByExternalID(ctx, extID)
+	if err != nil {
+		return nil, err
+	}
+	uObj["phone"] = phone
+	uObj["given_name"] = givenName
+	uObj["family_name"] = familyName
+	return out, nil
+}
+
+func writeEnrichedMeProfile(w http.ResponseWriter, ctx context.Context, store *pymesSaaSStore, profile saasuserdomain.MeProfile) {
+	out, err := enrichMeProfileWithUserExtras(ctx, store, profile)
+	if err != nil {
+		slog.Warn("enrich me profile", "err", err)
+		httperr.WriteJSON(w, http.StatusOK, profile)
 		return
 	}
+	httperr.WriteJSON(w, http.StatusOK, out)
+}
+
+func loadMeProfile(ctx context.Context, r *http.Request, principal kerneldomain.Principal, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) (saasuserdomain.MeProfile, error) {
 	usersUC := saasusers.NewUseCases(store)
 	handler := saasusers.NewHandler(usersUC)
 	req := dto.GetMeRequest{
@@ -149,17 +190,16 @@ func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, 
 		Role:       principal.Role,
 		Scopes:     principal.Scopes,
 	}
-	resp, err := handler.GetMe(r.Context(), req)
+	resp, err := handler.GetMe(ctx, req)
 	if err != nil {
-		httperr.WriteFrom(w, err)
-		return
+		return saasuserdomain.MeProfile{}, err
 	}
 
 	// Sin webhook de Clerk: el JWT ya está verificado en el middleware; creamos usuario + membresía desde claims.
 	if principal.AuthMethod == "jwt" && resp.Profile.User == nil && strings.TrimSpace(httpAuth.JWKSURL) != "" {
 		raw, bearerOK := authn.BearerToken(r.Header.Get("Authorization"))
 		if bearerOK && strings.TrimSpace(raw) != "" {
-			if claims, vErr := verifyJWTClaimsMap(r.Context(), raw, httpAuth.JWKSURL, httpAuth.JWTIssuer); vErr == nil {
+			if claims, vErr := verifyJWTClaimsMap(ctx, raw, httpAuth.JWKSURL, httpAuth.JWTIssuer); vErr == nil {
 				if sub := stringClaim(claims, "sub"); sub != "" && sub == strings.TrimSpace(principal.Actor) {
 					email := clerkEmailFromClaims(claims)
 					name := clerkDisplayNameFromClaims(claims)
@@ -169,9 +209,9 @@ func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, 
 					if name == "" {
 						name = "User"
 					}
-					if _, upErr := store.UpsertUser(r.Context(), principal.Actor, email, name, nil); upErr == nil {
-						_, _ = store.SyncMembership(r.Context(), principal.TenantID, principal.Actor, email, name, nil, principal.Role)
-						if resp2, gErr := handler.GetMe(r.Context(), req); gErr == nil {
+					if _, upErr := store.UpsertUser(ctx, principal.Actor, email, name, nil); upErr == nil {
+						_, _ = store.SyncMembership(ctx, principal.TenantID, principal.Actor, email, name, nil, principal.Role)
+						if resp2, gErr := handler.GetMe(ctx, req); gErr == nil {
 							resp = resp2
 						}
 					}
@@ -180,7 +220,63 @@ func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, 
 		}
 	}
 
-	httperr.WriteJSON(w, http.StatusOK, resp.Profile)
+	return resp.Profile, nil
+}
+
+func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		httperr.Unauthorized(w, "principal not found")
+		return
+	}
+	profile, err := loadMeProfile(r.Context(), r, principal, store, httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	writeEnrichedMeProfile(w, r.Context(), store, profile)
+}
+
+func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	if !ok {
+		httperr.Unauthorized(w, "principal not found")
+		return
+	}
+	if principal.AuthMethod != "jwt" {
+		httperr.Forbidden(w, "profile update requires a user session (JWT)")
+		return
+	}
+	var req PatchMeProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	if req.Name == nil && req.GivenName == nil && req.FamilyName == nil && req.Phone == nil {
+		httperr.BadRequest(w, "no fields to update")
+		return
+	}
+	err := store.PatchUserPersonalFromRequest(r.Context(), principal.Actor, &req)
+	if errors.Is(err, ErrUserProfileNotFound) {
+		httperr.NotFound(w, "user not found")
+		return
+	}
+	if err != nil {
+		msg := err.Error()
+		if msg == "name cannot be empty" || msg == "name too long" || msg == "phone too long" ||
+			msg == "given name too long" || msg == "family name too long" {
+			httperr.BadRequest(w, msg)
+			return
+		}
+		httperr.WriteFrom(w, err)
+		return
+	}
+	profile, err := loadMeProfile(r.Context(), r, principal, store, httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	writeEnrichedMeProfile(w, r.Context(), store, profile)
 }
 
 func handleListMembers(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {

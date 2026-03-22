@@ -2,12 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
-import type { MeProfileResponse, SessionResponse } from '../lib/types';
+import type { BillingStatus, MeProfileResponse, SessionResponse } from '../lib/types';
 
 const apiMocks = vi.hoisted(() => ({
   getSession: vi.fn<[], Promise<SessionResponse>>(),
   getMe: vi.fn<[], Promise<MeProfileResponse>>(),
+  getBillingStatus: vi.fn<[], Promise<BillingStatus>>(),
 }));
+
+const signOutMock = vi.hoisted(() => vi.fn<[], Promise<void>>().mockResolvedValue(undefined));
 
 const useUserMock = vi.hoisted(() =>
   vi.fn(() => ({
@@ -33,11 +36,13 @@ vi.mock('@clerk/clerk-react', () => ({
   useOrganization: () => ({
     organization: { id: 'org_mock', name: 'Organización desde Clerk' },
   }),
+  useClerk: () => ({ signOut: signOutMock }),
 }));
 
 vi.mock('../lib/api', () => ({
   getSession: () => apiMocks.getSession(),
   getMe: () => apiMocks.getMe(),
+  getBillingStatus: () => apiMocks.getBillingStatus(),
 }));
 
 import { SettingsPage } from './SettingsPage';
@@ -81,6 +86,14 @@ describe('SettingsPage (modo Clerk)', () => {
   beforeEach(() => {
     apiMocks.getSession.mockResolvedValue(sessionJwt);
     apiMocks.getMe.mockResolvedValue(meWithPlaceholderUser);
+    apiMocks.getBillingStatus.mockResolvedValue({
+      org_id: sessionJwt.auth.org_id,
+      plan_code: 'starter',
+      status: 'active',
+      hard_limits: {},
+      usage: {},
+      current_period_end: new Date().toISOString(),
+    });
     useUserMock.mockImplementation(() => ({
       isLoaded: true,
       user: {
@@ -95,7 +108,7 @@ describe('SettingsPage (modo Clerk)', () => {
     }));
   });
 
-  it('muestra nombre de organización desde Clerk en Identidad y permisos', async () => {
+  it('muestra nombre de organización desde Clerk en Cuenta', async () => {
     renderSettingsClerk();
 
     await waitFor(() => {
@@ -116,6 +129,8 @@ describe('SettingsPage (modo Clerk)', () => {
     });
 
     expect(screen.getByText('Ana López')).toBeInTheDocument();
+    expect(screen.getByText(/^Ana$/)).toBeInTheDocument();
+    expect(screen.getByText(/^López$/)).toBeInTheDocument();
     expect(screen.getByText('ana@example.com')).toBeInTheDocument();
     expect(screen.queryByText(/users\.clerk\.placeholder/)).not.toBeInTheDocument();
   });

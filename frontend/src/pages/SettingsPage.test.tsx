@@ -1,13 +1,15 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
-import type { MeProfileResponse, SessionResponse } from '../lib/types';
+import type { BillingStatus, MeProfileResponse, SessionResponse } from '../lib/types';
 import { SettingsPage } from './SettingsPage';
 
 const apiMocks = vi.hoisted(() => ({
   getSession: vi.fn<[], Promise<SessionResponse>>(),
   getMe: vi.fn<[], Promise<MeProfileResponse>>(),
+  getBillingStatus: vi.fn<[], Promise<BillingStatus>>(),
+  createPortal: vi.fn<[], Promise<{ portal_url: string }>>(),
 }));
 
 vi.mock('../lib/auth', () => ({
@@ -17,6 +19,8 @@ vi.mock('../lib/auth', () => ({
 vi.mock('../lib/api', () => ({
   getSession: () => apiMocks.getSession(),
   getMe: () => apiMocks.getMe(),
+  getBillingStatus: () => apiMocks.getBillingStatus(),
+  createPortal: () => apiMocks.createPortal(),
 }));
 
 const sessionFixture: SessionResponse = {
@@ -52,6 +56,15 @@ describe('SettingsPage (modo clave API)', () => {
   beforeEach(() => {
     apiMocks.getSession.mockResolvedValue(sessionFixture);
     apiMocks.getMe.mockResolvedValue(meWithoutUser);
+    apiMocks.getBillingStatus.mockResolvedValue({
+      org_id: sessionFixture.auth.org_id,
+      plan_code: 'starter',
+      status: 'active',
+      hard_limits: {},
+      usage: {},
+      current_period_end: new Date().toISOString(),
+    });
+    apiMocks.createPortal.mockResolvedValue({ portal_url: 'https://example.com/portal' });
   });
 
   it('muestra badge de modo consola, sesión y panel vacío de cuenta esperado', async () => {
@@ -62,14 +75,20 @@ describe('SettingsPage (modo clave API)', () => {
     await waitFor(() => {
       expect(apiMocks.getSession).toHaveBeenCalled();
       expect(apiMocks.getMe).toHaveBeenCalled();
+      expect(apiMocks.getBillingStatus).toHaveBeenCalled();
     });
 
     expect(screen.getByText('Modo consola · clave API')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Sesión en este entorno' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Cuenta' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Identidad y permisos' })).toBeInTheDocument();
-    expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
-    expect(screen.getByText('Administrador')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Datos personales' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Idioma' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Facturación' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Seleccionar idioma' })).toBeInTheDocument();
+    const facturacionCard = screen.getByRole('heading', { level: 2, name: 'Facturación' }).closest('.card');
+    expect(facturacionCard).toBeTruthy();
+    expect(within(facturacionCard as HTMLElement).getByText('Tipo de plan')).toBeInTheDocument();
+    expect(within(facturacionCard as HTMLElement).getByText('Inicial')).toBeInTheDocument();
 
     expect(screen.getByText('Sin perfil de usuario en este modo')).toBeInTheDocument();
     expect(
@@ -110,9 +129,8 @@ describe('SettingsPage (modo clave API)', () => {
       expect(apiMocks.getSession).toHaveBeenCalled();
     });
 
-    expect(
-      screen.getAllByRole('heading', { level: 3, name: 'Identidad y permisos' }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
+    expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
   });
 
   it('si falla /v1/users/me con error de red, muestra aviso y cuenta no disponible', async () => {

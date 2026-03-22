@@ -15,6 +15,7 @@ import (
 	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasmigrations "github.com/devpablocristo/core/saas/go/migrations"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -45,6 +46,8 @@ type SaaSConfig struct {
 type SaaSServices struct {
 	Mux            *http.ServeMux
 	AuthMiddleware func(http.Handler) http.Handler
+	// ResolveOrgRef mapea external_id (Clerk org_...), slug o UUID a org UUID interno (misma lógica que JWT en core).
+	ResolveOrgRef func(ctx context.Context, ref string) (uuid.UUID, bool, error)
 }
 
 // SetupSaaS initializes core/saas/go on the given GORM DB (same PostgreSQL as Pymes).
@@ -106,9 +109,25 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	clerkHandler.Register(mux)
 	saasbilling.NewWebhookHandler(billingRuntime).Register(mux)
 
+	resolveOrgRef := func(ctx context.Context, ref string) (uuid.UUID, bool, error) {
+		idStr, ok, err := store.FindOrgIDByExternalID(ctx, ref)
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+		if !ok {
+			return uuid.Nil, false, nil
+		}
+		id, err := uuid.Parse(strings.TrimSpace(idStr))
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+		return id, true, nil
+	}
+
 	return &SaaSServices{
 		Mux:            mux,
 		AuthMiddleware: authMW,
+		ResolveOrgRef:  resolveOrgRef,
 	}, nil
 }
 

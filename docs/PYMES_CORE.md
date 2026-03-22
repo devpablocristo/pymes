@@ -45,6 +45,19 @@ El control plane registra acciones sensibles en **`audit_log`** (cadena con hash
 
 **Documentación canónica (obligatoria lectura para cambios en pagos, auditoría o permisos):** [pymes-core/docs/FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md).
 
+## Seeds de desarrollo (SQL en migraciones)
+
+Los datos de demo para la org local `00000000-0000-0000-0000-000000000001` viven en migraciones **up** (se aplican una vez por base):
+
+| Archivo | Contenido |
+|---------|-----------|
+| `0004_local_seed.up.sql` | Org, usuario admin, API key `psk_local_admin`, tenant starter |
+| `0007_core_seed.up.sql` | Clientes, proveedores, productos, stock, cotización, ventas, movimientos de stock/caja |
+| `0013_rbac_seed.up.sql` | Roles semilla (`admin`, `vendedor`, `cajero`, …), permisos, lista de precios default |
+| `0030_transversal_modules_seed.up.sql` | Ítems de lista de precios, citas, gastos recurrentes, compras, solicitud de compra interna (draft), webhooks inactivos, cuentas AR/AP en cero |
+
+**Taller mecánico (workshops):** `workshops/backend/migrations/0003_auto_repair_seed.up.sql` — vehículo demo, servicios `auto_repair`, dos órdenes de trabajo con ítems (referencia al cliente/producto del core).
+
 ## Migraciones
 
 - Directorio: `pymes-core/backend/migrations/`.

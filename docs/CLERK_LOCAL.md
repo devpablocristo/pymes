@@ -37,6 +37,27 @@ Opcional:
 - **`CLERK_WEBHOOK_SECRET`**: si configurás el webhook de Clerk hacia tu backend para sync de usuarios/orgs (`docs/AUTH.md`).
 - **`JWT_AUDIENCE`**: solo si tu validación exige `aud` y Clerk lo emite; en muchos entornos se deja vacío.
 
+### 2.1 JWT de sesión y organización (verticales / Talleres)
+
+La consola llama al **control plane** y a **verticales** (p. ej. talleres) con el mismo **Bearer** de Clerk. Si en Perfil ves el **nombre** de la org pero los módulos de vertical responden `invalid org`, casi siempre falta contexto de organización en el token o el token quedó viejo.
+
+1. En **Clerk Dashboard** → tu aplicación → **Sessions** (o **JWT Templates**) → **Customize session token** (plantilla del token de sesión).
+2. Incluí claims que el backend pueda leer, alineados con `JWT_ORG_CLAIM` (por defecto `org_id`). Ejemplo mínimo útil con Organizations:
+
+```json
+{
+  "org_id": "{{org.id}}",
+  "org_role": "{{org.role}}",
+  "org_permissions": "{{org_membership.public_metadata.permissions}}"
+}
+```
+
+- `{{org.id}}` en Clerk es el id tipo `org_...`; el control plane lo resuelve al UUID interno en Postgres.
+3. Guardá, **cerrá sesión en la consola** y volvé a entrar; elegí la organización en el **selector de org** (barra lateral inferior, junto a tu avatar).
+4. En **Ajustes → Perfil** deberías ver **“Organización en el API (UUID)”** con un UUID válido; si aparece “—” o un aviso, el API aún no tiene tenant resuelto (webhook, plantilla o org no seleccionada).
+
+Documentación Clerk: [Customize session token](https://clerk.com/docs/backend-requests/custom-session-token).
+
 ## 3. Reiniciar contenedores
 
 ```bash

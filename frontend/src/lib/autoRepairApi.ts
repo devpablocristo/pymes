@@ -14,6 +14,8 @@ function translateAutoRepairError(message: string): string {
       return 'La ruta no existe en el backend de talleres.';
     case 'organization not found':
       return 'No se encontro la organizacion.';
+    case 'invalid org':
+      return 'No pudimos identificar tu empresa en esta sesion. Elegila en el menu de la barra lateral (arriba de tu foto), recarga la pagina o cerre sesion y volve a entrar.';
     default:
       return trimmed;
   }

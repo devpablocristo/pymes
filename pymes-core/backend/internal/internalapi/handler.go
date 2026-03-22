@@ -81,6 +81,8 @@ type Handler struct {
 	sales     salePort
 	gateway   paymentGatewayPort
 	apiKeys   apiKeyResolverPort
+	// resolveOrgRef traduce Clerk org_... / slug / UUID (opcional; nil = ruta no registrada).
+	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error)
 }
 
 func NewHandler(
@@ -93,23 +95,28 @@ func NewHandler(
 	sales salePort,
 	gateway paymentGatewayPort,
 	apiKeys apiKeyResolverPort,
+	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error),
 ) *Handler {
 	return &Handler{
-		admin:     admin,
-		parties:   parties,
-		customers: customers,
-		products:  products,
-		appts:     appts,
-		quotes:    quotes,
-		sales:     sales,
-		gateway:   gateway,
-		apiKeys:   apiKeys,
+		admin:         admin,
+		parties:       parties,
+		customers:     customers,
+		products:      products,
+		appts:         appts,
+		quotes:        quotes,
+		sales:         sales,
+		gateway:       gateway,
+		apiKeys:       apiKeys,
+		resolveOrgRef: resolveOrgRef,
 	}
 }
 
 func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/orgs/:org_id/bootstrap", h.GetBootstrap)
 	internal.GET("/orgs/:org_id/settings", h.GetSettings)
+	if h.resolveOrgRef != nil {
+		internal.GET("/orgs/resolve-ref", h.ResolveOrgRef)
+	}
 	internal.POST("/api-keys/resolve", h.ResolveAPIKey)
 	internal.GET("/parties/:party_id", h.GetParty)
 	internal.GET("/customers/:id", h.GetCustomer)
@@ -149,6 +156,28 @@ func (h *Handler) GetSettings(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) ResolveOrgRef(c *gin.Context) {
+	if h.resolveOrgRef == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "org resolve unavailable"})
+		return
+	}
+	ref := strings.TrimSpace(c.Query("ref"))
+	if ref == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ref query param required"})
+		return
+	}
+	id, ok, err := h.resolveOrgRef(c.Request.Context(), ref)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve organization"})
+		return
+	}
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"org_id": id.String()})
 }
 
 func (h *Handler) ResolveAPIKey(c *gin.Context) {

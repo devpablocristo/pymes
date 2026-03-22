@@ -11,6 +11,9 @@ type Config struct {
 	DatabaseURL          string
 	JWKSURL              string
 	JWTIssuer            string
+	JWTAudience          string
+	JWTOrgClaim          string
+	JWTRoleClaim         string
 	AuthEnableJWT        bool
 	AuthAllowAPIKey      bool
 	InternalServiceToken string
@@ -28,6 +31,9 @@ func Load(opts Options) Config {
 		DatabaseURL:          getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
 		JWKSURL:              os.Getenv("JWKS_URL"),
 		JWTIssuer:            os.Getenv("JWT_ISSUER"),
+		JWTAudience:          os.Getenv("JWT_AUDIENCE"),
+		JWTOrgClaim:          os.Getenv("JWT_ORG_CLAIM"),
+		JWTRoleClaim:         os.Getenv("JWT_ROLE_CLAIM"),
 		AuthEnableJWT:        getEnvBool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:      getEnvBool("AUTH_ALLOW_API_KEY", true),
 		InternalServiceToken: getEnv("INTERNAL_SERVICE_TOKEN", "local-internal-token"),

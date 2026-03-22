@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -219,7 +220,11 @@ func InitializeApp() *app.App {
 	timelineHandler := timeline.NewHandler(timelineUC)
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db))
+	var resolveOrgRefFn func(context.Context, string) (uuid.UUID, bool, error)
+	if saasSvc != nil {
+		resolveOrgRefFn = saasSvc.ResolveOrgRef
+	}
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())

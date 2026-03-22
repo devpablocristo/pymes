@@ -34,7 +34,17 @@ vi.mock('../lib/auth', () => ({
 vi.mock('@clerk/clerk-react', () => ({
   useUser: () => useUserMock(),
   useOrganization: () => ({
-    organization: { id: 'org_mock', name: 'Organización desde Clerk' },
+    isLoaded: true,
+    organization: {
+      id: 'org_mock',
+      name: 'Organización desde Clerk',
+      update: vi.fn().mockResolvedValue(undefined),
+    },
+  }),
+  useAuth: () => ({
+    isLoaded: true,
+    orgId: 'org_mock',
+    orgRole: 'org:admin',
   }),
   useClerk: () => ({ signOut: signOutMock }),
 }));

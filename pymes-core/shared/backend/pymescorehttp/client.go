@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -73,6 +74,13 @@ func (c *Client) setHeaders(req *http.Request, orgID string) {
 	if orgID != "" {
 		req.Header.Set("X-Org-ID", orgID)
 	}
+}
+
+// ResolveOrgRef traduce external_id de Clerk (org_...), slug o UUID a org_id interno (vía core internal API).
+func (c *Client) ResolveOrgRef(ctx context.Context, ref string) (map[string]any, error) {
+	q := url.Values{}
+	q.Set("ref", ref)
+	return c.Get(ctx, "/v1/internal/v1/orgs/resolve-ref?"+q.Encode(), "")
 }
 
 func (c *Client) decode(resp *http.Response) (map[string]any, error) {

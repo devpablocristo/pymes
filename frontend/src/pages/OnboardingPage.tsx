@@ -1,5 +1,8 @@
+import { useClerk, useOrganization } from '@clerk/clerk-react';
+import { isClerkAPIResponseError } from '@clerk/clerk-react/errors';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clerkEnabled } from '../lib/auth';
 import {
   saveTenantProfile,
   type PaymentMethod,
@@ -10,15 +13,11 @@ import {
 } from '../lib/tenantProfile';
 
 const VERTICAL_OPTIONS: { value: VerticalType; label: string; desc: string }[] = [
-  { value: 'none', label: 'Solo comercial', desc: 'Ventas, stock, facturación' },
-  { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, fichas, especialidades' },
-  { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes de trabajo, servicios' },
-  { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, menú de servicios, turnos vía agenda' },
-  {
-    value: 'restaurants',
-    label: 'Bares / Restaurantes',
-    desc: 'Zonas del salón, mesas, sesiones de mesa; menú y ventas en el core',
-  },
+  { value: 'none', label: 'Solo comercial', desc: 'Ventas, stock y cobros' },
+  { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, alumnos y fichas' },
+  { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes y servicios' },
+  { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, servicios y agenda' },
+  { value: 'restaurants', label: 'Bares / Restaurantes', desc: 'Salón, mesas y sesiones' },
 ];
 
 type Step = 1 | 2 | 3 | 4;
@@ -56,7 +55,53 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'mixed', label: 'Mixto (varios)' },
 ];
 
+/** Recursos Clerk mínimos para crear la org al terminar el onboarding (si aún no hay una activa). */
+type ClerkOnboardingBridges = {
+  loaded: boolean;
+  createOrganization: (params: { name: string }) => Promise<{ id: string }>;
+  setActive: (params: { organization: string }) => Promise<void>;
+  /** Si ya hay org (p. ej. invitación), no la creamos ni renombramos aquí. */
+  organization: { id: string } | null;
+  orgLoaded: boolean;
+};
+
+function formatClerkFinishError(err: unknown, generic: string): string {
+  if (isClerkAPIResponseError(err)) {
+    const first = err.errors?.[0];
+    const msg = first && typeof first === 'object' && 'message' in first ? String(first.message) : '';
+    if (msg.trim()) {
+      return msg.trim();
+    }
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message.trim();
+  }
+  return generic;
+}
+
+function OnboardingPageClerkBridge() {
+  const clerk = useClerk();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+
+  const bridges: ClerkOnboardingBridges = {
+    loaded: clerk.loaded,
+    createOrganization: (params) => clerk.createOrganization(params),
+    setActive: (params) => clerk.setActive(params),
+    organization: organization ? { id: organization.id } : null,
+    orgLoaded,
+  };
+
+  return <OnboardingPageInner clerkBridges={bridges} />;
+}
+
 export function OnboardingPage() {
+  if (!clerkEnabled) {
+    return <OnboardingPageInner clerkBridges={null} />;
+  }
+  return <OnboardingPageClerkBridge />;
+}
+
+function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBridges | null }) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
 
@@ -71,12 +116,18 @@ export function OnboardingPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [vertical, setVertical] = useState<VerticalType>('none');
 
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState('');
+
   const canNext: Record<Step, boolean> = {
     1: businessName.trim().length >= 2 && teamSize !== '',
     2: sells !== '' && (clientLabel !== '' || customClientLabel.trim() !== '') && usesScheduling !== null && usesBilling !== null,
     3: currency !== '' && paymentMethod !== '',
     4: true,
   };
+
+  const clerkReady = !clerkBridges || (clerkBridges.loaded && clerkBridges.orgLoaded);
+  const canFinishStep4 = canNext[4] && !finishing && clerkReady;
 
   function next() {
     if (step < 4) setStep((step + 1) as Step);
@@ -86,7 +137,7 @@ export function OnboardingPage() {
     if (step > 1) setStep((step - 1) as Step);
   }
 
-  function finish() {
+  async function finish() {
     const profile: TenantProfile = {
       businessName: businessName.trim(),
       teamSize: teamSize as TeamSize,
@@ -99,6 +150,36 @@ export function OnboardingPage() {
       vertical,
       completedAt: new Date().toISOString(),
     };
+
+    setFinishError('');
+
+    if (clerkBridges) {
+      if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
+        setFinishError(
+          'Todavía se está cargando tu sesión. Esperá un momento y volvé a intentar.',
+        );
+        return;
+      }
+      setFinishing(true);
+      try {
+        const name = profile.businessName.trim();
+        if (!clerkBridges.organization) {
+          const created = await clerkBridges.createOrganization({ name });
+          await clerkBridges.setActive({ organization: created.id });
+        }
+      } catch (err) {
+        setFinishError(
+          formatClerkFinishError(
+            err,
+            'No se pudo crear o actualizar la organización. Reintentá o volvé a iniciar sesión.',
+          ),
+        );
+        setFinishing(false);
+        return;
+      }
+      setFinishing(false);
+    }
+
     saveTenantProfile(profile);
     navigate('/', { replace: true });
   }
@@ -153,7 +234,7 @@ export function OnboardingPage() {
 
               <div className="onboarding-field">
                 <label>¿Qué tipo de negocio es?</label>
-                <div className="onboarding-options">
+                <div className="onboarding-options onboarding-options-vertical">
                   {VERTICAL_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
@@ -199,7 +280,10 @@ export function OnboardingPage() {
                       key={lbl}
                       type="button"
                       className={`onboarding-chip${clientLabel === lbl ? ' selected' : ''}`}
-                      onClick={() => { setClientLabel(lbl); setCustomClientLabel(''); }}
+                      onClick={() => {
+                        setClientLabel(lbl);
+                        setCustomClientLabel('');
+                      }}
                     >
                       {lbl}
                     </button>
@@ -273,7 +357,9 @@ export function OnboardingPage() {
                 <label>¿En qué moneda operás?</label>
                 <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {CURRENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -341,6 +427,7 @@ export function OnboardingPage() {
                   <strong>{PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.label ?? paymentMethod}</strong>
                 </div>
               </div>
+              {finishError && <p className="alert alert-error onboarding-finish-error">{finishError}</p>}
             </div>
           )}
         </div>
@@ -366,9 +453,10 @@ export function OnboardingPage() {
             <button
               type="button"
               className="onboarding-btn-next onboarding-btn-finish"
-              onClick={finish}
+              disabled={!canFinishStep4}
+              onClick={() => void finish()}
             >
-              Empezar
+              {finishing ? 'Guardando…' : 'Empezar'}
             </button>
           )}
         </div>

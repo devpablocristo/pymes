@@ -231,6 +231,25 @@ a {
   width: 100%;
 }
 
+.shell-clerk-auth {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.shell-org-switcher-root {
+  width: 100%;
+  min-width: 0;
+}
+
+.shell-org-switcher-trigger {
+  width: 100%;
+  max-width: 100%;
+}
+
 .shell-product-role {
   flex-shrink: 0;
   max-width: 100%;
@@ -2195,7 +2214,11 @@ code {
   justify-content: center;
   background: var(--color-sidebar);
   position: relative;
-  overflow: hidden;
+  /* Permitir scroll cuando el paso tiene muchas opciones (evita cortar los <small>). */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.25rem 0.75rem;
+  box-sizing: border-box;
 }
 
 .onboarding-layout::before {
@@ -2220,7 +2243,8 @@ code {
   max-width: 540px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  margin: auto;
 }
 
 .onboarding-header {
@@ -2267,7 +2291,8 @@ code {
 
 .onboarding-body {
   padding: 2rem 2.5rem;
-  min-height: 320px;
+  min-height: min(320px, 45vh);
+  flex: 1 1 auto;
 }
 
 .onboarding-step h2 {
@@ -2317,18 +2342,33 @@ code {
 
 .onboarding-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 13.5rem));
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+/* Descripciones largas: una columna para que el texto no invada la celda vecina (grid min-width:auto). */
+.onboarding-options-vertical {
+  grid-template-columns: minmax(0, 22.5rem);
+  justify-content: center;
+}
+
+.onboarding-options-vertical .onboarding-option {
+  max-width: none;
+  width: 100%;
+  justify-self: stretch;
 }
 
 .onboarding-options-row {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 5.75rem));
+  justify-content: center;
 }
 
 .onboarding-option {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  align-items: stretch;
+  gap: 0.2rem;
   padding: 0.75rem 0.85rem;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -2337,6 +2377,14 @@ code {
   cursor: pointer;
   text-align: left;
   transition: all var(--transition);
+  width: 100%;
+  max-width: 13.5rem;
+  justify-self: center;
+  box-sizing: border-box;
+  /* Evita solapamiento entre celdas de la grilla */
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .onboarding-option:hover {
@@ -2353,17 +2401,23 @@ code {
 .onboarding-option strong {
   font-size: 0.87rem;
   font-weight: 600;
+  min-width: 0;
 }
 
 .onboarding-option small {
+  display: block;
   font-size: 0.75rem;
+  line-height: 1.45;
   color: var(--color-text-muted);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .onboarding-option.compact {
   align-items: center;
   text-align: center;
   padding: 0.65rem 0.5rem;
+  max-width: 5.75rem;
 }
 
 .onboarding-chips {
@@ -2535,10 +2589,23 @@ code {
 
   .onboarding-options {
     grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .onboarding-option {
+    max-width: none;
+    justify-self: stretch;
   }
 
   .onboarding-options-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 16rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .onboarding-option.compact {
+    max-width: none;
   }
 }
 

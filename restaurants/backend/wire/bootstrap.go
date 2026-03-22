@@ -34,7 +34,7 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	identityResolver := buildIdentityResolver(cfg, logger)
+	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, nil)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
 
@@ -76,19 +76,6 @@ func InitializeApp() *app.App {
 	sessionsHandler.RegisterRoutes(restaurantsGroup)
 
 	return &app.App{Router: router}
-}
-
-func buildIdentityResolver(cfg config.Config, logger zerolog.Logger) *auth.IdentityResolver {
-	if cfg.JWKSURL == "" {
-		logger.Warn().Msg("JWKS_URL not set; JWT auth will fail unless AUTH_ENABLE_JWT=false")
-		return auth.NewIdentityResolver(nil, cfg.JWTIssuer)
-	}
-	verifier, err := auth.NewJWKSVerifier(cfg.JWKSURL)
-	if err != nil {
-		logger.Error().Err(err).Msg("invalid JWKS verifier; JWT auth will fail")
-		return auth.NewIdentityResolver(nil, cfg.JWTIssuer)
-	}
-	return auth.NewIdentityResolver(verifier, cfg.JWTIssuer)
 }
 
 func setupLogger() zerolog.Logger {

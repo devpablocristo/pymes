@@ -1,4 +1,4 @@
-import { useClerk, useOrganization, useUser } from '@clerk/clerk-react';
+import { useAuth, useClerk, useOrganization, useUser } from '@clerk/clerk-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
@@ -40,11 +40,14 @@ function ProfileSessionRows({
   session,
   clerkOrgName,
   t,
+  hideOrgRow = false,
 }: {
   session: SessionResponse;
   /** Nombre de la org activa en Clerk (solo modo Clerk); prioridad sobre org_name del API. */
   clerkOrgName?: string | null;
   t: (key: string) => string;
+  /** En modo Clerk el nombre de la org se edita arriba; acá solo tipo de cuenta. */
+  hideOrgRow?: boolean;
 }) {
   const { auth } = session;
   const orgLabel = profileOrgLabel(auth, clerkOrgName);
@@ -52,12 +55,14 @@ function ProfileSessionRows({
   return (
     <table className="profile-session-table">
       <tbody>
-        <tr>
-          <th scope="row">{t('profile.labels.org')}</th>
-          <td>
-            <span className="profile-session-value">{orgLabel}</span>
-          </td>
-        </tr>
+        {!hideOrgRow && (
+          <tr>
+            <th scope="row">{t('profile.labels.org')}</th>
+            <td>
+              <span className="profile-session-value">{orgLabel}</span>
+            </td>
+          </tr>
+        )}
         <tr>
           <th scope="row">{t('profile.labels.accountType')}</th>
           <td>
@@ -92,11 +97,143 @@ function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
   );
 }
 
+/** Nombre de organización: solo aquí (y en onboarding), sin OrganizationSwitcher en la barra. */
+function ClerkOrganizationNameSection({ t }: { t: (key: string) => string }) {
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { orgRole, isLoaded: authLoaded } = useAuth();
+
+  const [editing, setEditing] = useState(false);
+  const [nameEdit, setNameEdit] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [savedHint, setSavedHint] = useState(false);
+
+  useEffect(() => {
+    if (!organization || editing) {
+      return;
+    }
+    setNameEdit(organization.name.trim());
+  }, [editing, organization?.id, organization?.name]);
+
+  function handleCancelEdit(): void {
+    if (organization) {
+      setNameEdit(organization.name.trim());
+    }
+    setEditing(false);
+    setFormError('');
+    setSavedHint(false);
+  }
+
+  async function handleSave(): Promise<void> {
+    if (!organization) {
+      return;
+    }
+    const nextName = nameEdit.trim();
+    if (nextName.length < 2) {
+      setFormError(t('profile.org.validationMin'));
+      return;
+    }
+    setFormError('');
+    setSavedHint(false);
+    setSaving(true);
+    try {
+      await organization.update({ name: nextName });
+      setSavedHint(true);
+      setEditing(false);
+    } catch {
+      setFormError(t('profile.org.saveError'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!orgLoaded || !authLoaded) {
+    return <p className="text-muted">{t('common.status.loading')}</p>;
+  }
+
+  if (!organization) {
+    return <p className="text-muted">{t('profile.org.noOrganization')}</p>;
+  }
+
+  const canEdit = orgRole === 'org:admin';
+
+  if (!canEdit) {
+    return (
+      <div className="profile-org-readonly">
+        <dl className="profile-readonly-dl">
+          <div>
+            <dt>{t('profile.labels.org')}</dt>
+            <dd>
+              <span className="profile-session-value">{organization.name.trim() || '—'}</span>
+            </dd>
+          </div>
+        </dl>
+        <p className="text-muted profile-org-member-hint">{t('profile.org.readOnlyMember')}</p>
+      </div>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <div className="profile-personal-form profile-personal-form--readonly profile-org-name-block">
+        <dl className="profile-readonly-dl">
+          <div>
+            <dt>{t('profile.labels.org')}</dt>
+            <dd>
+              <span className="profile-session-value">{organization.name.trim() || '—'}</span>
+            </dd>
+          </div>
+        </dl>
+        <p className="text-muted profile-field-hint">{t('profile.org.nameHint')}</p>
+        <p className="profile-form-actions">
+          <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+            {t('profile.org.edit')}
+          </button>
+        </p>
+        {savedHint && <p className="text-muted profile-saved-hint">{t('profile.org.saved')}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="profile-personal-form profile-org-name-block">
+      <label className="profile-field-label" htmlFor="profile-org-name">
+        {t('profile.labels.org')}
+      </label>
+      <input
+        id="profile-org-name"
+        className="input profile-input"
+        value={nameEdit}
+        onChange={(e) => setNameEdit(e.target.value)}
+        autoComplete="organization"
+        maxLength={100}
+      />
+      {formError && <p className="alert alert-error profile-form-alert">{formError}</p>}
+      <p className="profile-form-actions profile-form-actions--edit">
+        <button type="button" className="btn-primary" disabled={saving} onClick={() => void handleSave()}>
+          {saving ? t('profile.org.saving') : t('profile.org.save')}
+        </button>
+        <button type="button" className="btn-secondary" disabled={saving} onClick={handleCancelEdit}>
+          {t('profile.personal.cancel')}
+        </button>
+      </p>
+    </div>
+  );
+}
+
 /** Solo se monta en modo Clerk para poder usar useOrganization sin romper el build sin ClerkProvider. */
-function ClerkProfileSessionRows({ session, t }: { session: SessionResponse; t: (key: string) => string }) {
+function ClerkProfileSessionRows({
+  session,
+  t,
+  hideOrgRow,
+}: {
+  session: SessionResponse;
+  t: (key: string) => string;
+  hideOrgRow?: boolean;
+}) {
   const { organization } = useOrganization();
   const clerkOrgName = organization?.name?.trim() || null;
-  return <ProfileSessionRows session={session} clerkOrgName={clerkOrgName} t={t} />;
+  return <ProfileSessionRows session={session} clerkOrgName={clerkOrgName} t={t} hideOrgRow={hideOrgRow} />;
 }
 
 /** Solo con ClerkProvider montado (perfil en modo Clerk). */
@@ -490,9 +627,10 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <p className="profile-account-panel-body">{t('profile.account.empty.body')}</p>
               </div>
             )}
+            {clerkMode && <ClerkOrganizationNameSection t={t} />}
             {session &&
               (clerkMode ? (
-                <ClerkProfileSessionRows session={session} t={t} />
+                <ClerkProfileSessionRows session={session} t={t} hideOrgRow />
               ) : (
                 <ProfileSessionRows session={session} clerkOrgName={null} t={t} />
               ))}

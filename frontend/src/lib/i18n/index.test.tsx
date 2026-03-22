@@ -23,7 +23,7 @@ describe('LanguageProvider', () => {
     const scope = within(view.container);
 
     expect(scope.getByTestId('dashboard')).toHaveTextContent('Dashboard');
-    expect(scope.getByTestId('admin')).toHaveTextContent('Administración');
+    expect(scope.getByTestId('admin')).toHaveTextContent('Consola');
   });
 
   it('switches shared labels to English without translating Dashboard', () => {
@@ -35,7 +35,7 @@ describe('LanguageProvider', () => {
     const scope = within(view.container);
 
     expect(scope.getByTestId('dashboard')).toHaveTextContent('Dashboard');
-    expect(scope.getByTestId('admin')).toHaveTextContent('Administration');
+    expect(scope.getByTestId('admin')).toHaveTextContent('Console');
   });
 
   it('normalizes UI labels to sentence case while preserving acronyms and Dashboard', () => {

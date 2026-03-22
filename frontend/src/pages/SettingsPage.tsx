@@ -1,6 +1,6 @@
 import { useClerk, useOrganization, useUser } from '@clerk/clerk-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
@@ -526,24 +526,6 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
             </div>
             <LanguageSelector className="profile-language-selector" />
           </div>
-
-          {session && (
-            <div className="card profile-section-card">
-              <div className="card-header">
-                <h2>{t('profile.section.admin')}</h2>
-              </div>
-              <p className="text-secondary profile-section-lead">{t('profile.admin.lead')}</p>
-              {session.auth.product_role === 'admin' ? (
-                <p className="profile-form-actions">
-                  <Link to="/admin" className="btn-secondary">
-                    {t('profile.admin.cta')}
-                  </Link>
-                </p>
-              ) : (
-                <p className="text-muted">{t('profile.admin.hintNonAdmin')}</p>
-              )}
-            </div>
-          )}
 
           {session && (
             <div className="card profile-section-card" id="facturacion">

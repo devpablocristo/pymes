@@ -3,7 +3,7 @@ import type { TranslationsByLanguage } from '../types';
 export const profileMessages: TranslationsByLanguage = {
   es: {
     'profile.page.title': 'Perfil',
-    'profile.page.subtitle': 'Gestioná tu cuenta y preferencias',
+    'profile.page.subtitle': 'Datos personales, idioma y facturación',
     'profile.apiMode.title': 'Sesión en este entorno',
     'profile.apiMode.badge': 'Modo consola · clave API',
     'profile.apiMode.lead':
@@ -14,11 +14,6 @@ export const profileMessages: TranslationsByLanguage = {
       'Iniciaste sesión con Google. El email lo gestiona tu cuenta de Google.',
     'profile.section.personal': 'Datos personales',
     'profile.section.language': 'Idioma',
-    'profile.section.admin': 'Administración',
-    'profile.admin.lead':
-      'Monedas, prefijos de documentos, datos fiscales del comercio, plantillas de WhatsApp y registro de auditoría del tenant.',
-    'profile.admin.cta': 'Ir a administración',
-    'profile.admin.hintNonAdmin': 'Solo los administradores de la organización pueden cambiar estos ajustes.',
     'profile.admin.appearanceTitle': 'Apariencia',
     'profile.admin.appearanceLead':
       'Tema claro u oscuro de la consola. La preferencia se guarda solo en este navegador.',
@@ -60,7 +55,7 @@ export const profileMessages: TranslationsByLanguage = {
   },
   en: {
     'profile.page.title': 'Profile',
-    'profile.page.subtitle': 'Manage your account and preferences',
+    'profile.page.subtitle': 'Personal details, language, and billing',
     'profile.apiMode.title': 'Session in this environment',
     'profile.apiMode.badge': 'Console mode · API key',
     'profile.apiMode.lead':
@@ -71,11 +66,6 @@ export const profileMessages: TranslationsByLanguage = {
       'You signed in with Google. Your email is managed by your Google account.',
     'profile.section.personal': 'Personal details',
     'profile.section.language': 'Language',
-    'profile.section.admin': 'Administration',
-    'profile.admin.lead':
-      'Currencies, document prefixes, business tax details, WhatsApp templates, and tenant audit log.',
-    'profile.admin.cta': 'Open administration',
-    'profile.admin.hintNonAdmin': 'Only organization administrators can change these settings.',
     'profile.admin.appearanceTitle': 'Appearance',
     'profile.admin.appearanceLead':
       'Light or dark theme for the console. The preference is stored only in this browser.',

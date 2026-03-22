@@ -171,9 +171,9 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const settingsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
-      { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
+      { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
+      { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
     ],
     [t],
   );

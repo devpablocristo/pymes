@@ -10,8 +10,8 @@
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [CONTROL_PLANE.md](./CONTROL_PLANE.md) | Control plane, seguridad interna, comandos de validación |
-| [AUTH.md](./AUTH.md) | Identidad, Clerk vs local; **prioridad dev:** API key / consola técnica sin Clerk |
-| [CLERK_LOCAL.md](./CLERK_LOCAL.md) | Checklist para **encender Clerk** en local con Docker (`VITE_CLERK_*`, JWKS, issuer) |
+| [AUTH.md](./AUTH.md) | Identidad (Clerk vs API key), rutas, org en consola; puntero a checklist local |
+| [CLERK_LOCAL.md](./CLERK_LOCAL.md) | Clerk en Docker: `.env`, JWKS, token de sesión, onboarding/org, troubleshooting `invalid org` |
 | [PROFESSIONALS.md](./PROFESSIONALS.md) | Vertical umbrella `professionals` (módulo `teachers`) |
 | [WORKSHOPS.md](./WORKSHOPS.md) | Vertical umbrella `workshops` (`auto_repair`) |
 | [BEAUTY.md](./BEAUTY.md) | Vertical belleza/salón (`beauty`) |
@@ -44,7 +44,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 2. [ARCHITECTURE.md](./ARCHITECTURE.md)
 3. [PYMES_CORE.md](./PYMES_CORE.md)
 4. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
-5. [AUTH.md](./AUTH.md) (identidad y URLs de API)
+5. [AUTH.md](./AUTH.md) y, si usás Clerk en local, [CLERK_LOCAL.md](./CLERK_LOCAL.md)
 6. [FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md) (auditoría / cobros / RBAC)
 7. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
 
@@ -53,7 +53,8 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 ```bash
 make up
 make build
-make test
+make lint    # opcional: staticcheck Go + ruff en ai/ (antes de PR)
+make test    # incluye ruff + pytest en ai/, tests Go y frontend
 make down
 ```
 

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
 from src.api.deps import get_backend_client, get_llm_provider, get_repository

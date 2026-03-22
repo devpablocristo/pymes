@@ -13,7 +13,7 @@ Plataforma SaaS multi-vertical para PyMEs latinoamericanas. Monorepo con:
 
 Código reutilizable: librería **`core`** (`github.com/devpablocristo/core/...`) para lo agnóstico; **`pymes-core/shared/`** para lo transversal del producto; lo atado al dominio de un servicio en el **`internal/`** de ese backend (no hay carpeta `pkgs/` en este repo).
 
-Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`pymes-core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
+Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/AUTH.md`** (identidad y acceso), **`docs/CLERK_LOCAL.md`** (Clerk en Docker, org y JWT), **`docs/PYMES_CORE.md`** (backend transversal), **`docs/CORE_INTEGRATION.md`** (librerías `core`), **`pymes-core/docs/FRAUD_PREVENTION.md`** (auditoría, cobros, RBAC / anti-fraude).
 
 ---
 

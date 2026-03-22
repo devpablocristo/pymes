@@ -110,10 +110,3 @@ export function greetingDisplayName(
 
   return (me?.external_id ?? '').trim();
 }
-
-export function clerkUserHasGoogleProvider(user: ClerkUserProfileSource | null | undefined): boolean {
-  if (!user?.externalAccounts?.length) {
-    return false;
-  }
-  return user.externalAccounts.some((a) => a.provider.toLowerCase().includes('google'));
-}

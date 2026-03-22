@@ -1,8 +1,11 @@
 # Vertical Restaurantes / Bares (`restaurants`)
 
+## Autenticación
+
+Rutas bajo `/v1/restaurants/...` exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto; con Clerk, org activa en el JWT. Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+
 ## Reutiliza desde pymes-core
 
-- Autenticación (JWT / API key), resolución de org, middleware compartido.
 - **Clientes, productos (menú), ventas, cobros, stock, agenda** y el resto del plano comercial: solo vía el control plane y módulos del frontend del core, **sin duplicar** en esta vertical.
 
 ## Crea nuevo en la vertical

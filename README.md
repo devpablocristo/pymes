@@ -26,7 +26,7 @@ make up
 
 **Flujo habitual:** todo el stack en **contenedores** (`make up`); no hace falta levantar backends ni el frontend como procesos nativos en el host.
 
-**Identidad en local:** por defecto se trabaja **sin Clerk** y con **clave API** (`psk_local_admin` en `.env.example`). Ver [docs/AUTH.md](docs/AUTH.md). Para **login con Clerk** en Docker: [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md).
+**Identidad:** sin Clerk → API key local (`psk_local_admin` en `.env.example`). Con Clerk → [docs/AUTH.md](docs/AUTH.md) y checklist [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md) (onboarding crea org; perfil renombra).
 
 Servicios expuestos al host (con `docker compose` levantado):
 
@@ -100,8 +100,10 @@ Import / export masivo:
 ## Validacion
 
 ```bash
-make test
-make staticcheck   # análisis estático Go (no existe target `lint` en Makefile)
+make test          # incluye `ruff check` del servicio AI antes de pytest
+make lint          # `staticcheck` (Go) + `ruff` (AI)
+make staticcheck   # solo análisis estático Go
+make ruff          # solo lint Python en `ai/src`
 make build         # incluye `npm run build` del frontend
 ```
 
@@ -125,7 +127,8 @@ La documentacion canónica vive en `docs/`.
 - [docs/PYMES_CORE.md](./docs/PYMES_CORE.md) — backend transversal, módulos, procurement
 - [docs/CORE_INTEGRATION.md](./docs/CORE_INTEGRATION.md) — uso de librerías `core` vs dominio Pymes
 - [docs/CONTROL_PLANE.md](./docs/CONTROL_PLANE.md) — control plane, seguridad interna, validación
-- [docs/AUTH.md](./docs/AUTH.md) — identidad (Clerk / API key) y puertos
+- [docs/AUTH.md](./docs/AUTH.md) — identidad (Clerk / API key) y org en consola
+- [docs/CLERK_LOCAL.md](./docs/CLERK_LOCAL.md) — Clerk en Docker, JWT y troubleshooting
 - [pymes-core/docs/FRAUD_PREVENTION.md](./pymes-core/docs/FRAUD_PREVENTION.md) — auditoría, cobros, RBAC (anti-fraude)
 - [docs/PROFESSIONALS.md](./docs/PROFESSIONALS.md) / [docs/WORKSHOPS.md](./docs/WORKSHOPS.md) / [docs/BEAUTY.md](./docs/BEAUTY.md) / [docs/RESTAURANTS.md](./docs/RESTAURANTS.md)
 - [pymes-core/backend/docs/SAAS_CORE.md](./pymes-core/backend/docs/SAAS_CORE.md) — integración `core/saas/go`

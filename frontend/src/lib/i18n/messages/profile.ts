@@ -10,8 +10,6 @@ export const profileMessages: TranslationsByLanguage = {
       'Sin sesión Clerk en el navegador: la consola usa JWT o clave API contra el backend (flujo habitual en desarrollo; ver docs/AUTH.md). Las claves para integraciones las gestiona atención al cliente / operaciones, no desde esta consola. Abajo tenés el contexto que resolvió el API.',
     'profile.section.account': 'Cuenta',
     'profile.account.signOut': 'Cerrar sesión',
-    'profile.account.signedInWithGoogle':
-      'Iniciaste sesión con Google. El email lo gestiona tu cuenta de Google.',
     'profile.section.personal': 'Datos personales',
     'profile.section.language': 'Idioma',
     'profile.admin.appearanceTitle': 'Apariencia',
@@ -72,8 +70,6 @@ export const profileMessages: TranslationsByLanguage = {
       'No Clerk session in the browser: the console uses a JWT or API key against the backend (usual dev flow; see docs/AUTH.md). Integration keys are managed by customer operations, not from this console. Below is the context the API resolved.',
     'profile.section.account': 'Account',
     'profile.account.signOut': 'Sign out',
-    'profile.account.signedInWithGoogle':
-      'You signed in with Google. Your email is managed by your Google account.',
     'profile.section.personal': 'Personal details',
     'profile.section.language': 'Language',
     'profile.admin.appearanceTitle': 'Appearance',

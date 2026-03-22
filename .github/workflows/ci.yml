@@ -133,6 +133,7 @@ jobs:
       - name: Verify AI service
         run: |
           python -m compileall -q src
+          ruff check src
           pytest -q
 
   frontend:

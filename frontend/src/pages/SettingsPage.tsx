@@ -6,14 +6,10 @@ import { LanguageSelector } from '../components/LanguageSelector';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
 import { clearTenantProfile } from '../lib/tenantProfile';
+import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
-import {
-  clerkUserHasGoogleProvider,
-  displayFamilyFromUser,
-  displayGivenFromUser,
-  mergeClerkSessionWithApiUser,
-} from '../lib/profileDisplay';
+import { displayFamilyFromUser, displayGivenFromUser, mergeClerkSessionWithApiUser } from '../lib/profileDisplay';
 import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
 
 /** Evita spinner infinito si Clerk/getToken o la red no resuelven. */
@@ -46,7 +42,7 @@ function ProfileSessionRows({
   /** Nombre de la org activa en Clerk (solo modo Clerk); prioridad sobre org_name del API. */
   clerkOrgName?: string | null;
   t: (key: string) => string;
-  /** En modo Clerk el nombre de la org se edita arriba; acá solo tipo de cuenta. */
+  /** En modo Clerk la org se edita en un bloque aparte debajo de esta tabla. */
   hideOrgRow?: boolean;
 }) {
   const { auth } = session;
@@ -55,6 +51,12 @@ function ProfileSessionRows({
   return (
     <table className="profile-session-table">
       <tbody>
+        <tr>
+          <th scope="row">{t('profile.labels.accountType')}</th>
+          <td>
+            <span className="profile-session-value">{typeLabel}</span>
+          </td>
+        </tr>
         {!hideOrgRow && (
           <tr>
             <th scope="row">{t('profile.labels.org')}</th>
@@ -63,12 +65,6 @@ function ProfileSessionRows({
             </td>
           </tr>
         )}
-        <tr>
-          <th scope="row">{t('profile.labels.accountType')}</th>
-          <td>
-            <span className="profile-session-value">{typeLabel}</span>
-          </td>
-        </tr>
       </tbody>
     </table>
   );
@@ -140,8 +136,8 @@ function ClerkOrganizationNameSection({ t }: { t: (key: string) => string }) {
       await organization.update({ name: nextName });
       setSavedHint(true);
       setEditing(false);
-    } catch {
-      setFormError(t('profile.org.saveError'));
+    } catch (err) {
+      setFormError(formatClerkAPIUserMessage(err, t('profile.org.saveError')));
     } finally {
       setSaving(false);
     }
@@ -498,14 +494,7 @@ function ClerkProfileAccountSection({
 
   if (clerkUser) {
     const merged = mergeClerkSessionWithApiUser(clerkUser, apiUser);
-    return (
-      <>
-        <ProfileAccountBlock user={merged} />
-        {clerkUserHasGoogleProvider(clerkUser) && (
-          <p className="text-muted profile-account-identity-hint">{t('profile.account.signedInWithGoogle')}</p>
-        )}
-      </>
-    );
+    return <ProfileAccountBlock user={merged} />;
   }
 
   if (apiUser) {
@@ -627,7 +616,6 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <p className="profile-account-panel-body">{t('profile.account.empty.body')}</p>
               </div>
             )}
-            {clerkMode && <ClerkOrganizationNameSection t={t} />}
             {session &&
               (clerkMode ? (
                 <ClerkProfileSessionRows session={session} t={t} hideOrgRow />
@@ -635,6 +623,11 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <ProfileSessionRows session={session} clerkOrgName={null} t={t} />
               ))}
             {clerkMode ? <ClerkAccountSignOutButton /> : <LocalAccountSignOutButton />}
+            {clerkMode && (
+              <div className="profile-org-after-signout">
+                <ClerkOrganizationNameSection t={t} />
+              </div>
+            )}
           </div>
 
           {session && (

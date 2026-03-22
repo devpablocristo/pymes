@@ -61,7 +61,7 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 - Índice: `docs/README.md`
 - Backend transversal y módulos: `docs/PYMES_CORE.md`
 - Librerías `core` vs producto: `docs/CORE_INTEGRATION.md`
-- Identidad y puertos: `docs/AUTH.md`
+- Identidad, org en consola y puertos: `docs/AUTH.md` — Clerk en Docker y JWT: `docs/CLERK_LOCAL.md`
 - Auditoría, cobros y controles internos: `pymes-core/docs/FRAUD_PREVENTION.md`
 
 ## Reglas de AI

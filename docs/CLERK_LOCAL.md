@@ -1,48 +1,54 @@
 # Clerk en local (Docker)
 
-Checklist para usar **login real** con Clerk contra el stack en contenedores (`make up`).
+Checklist para **login con Clerk** contra el stack en contenedores (`make up`). Identidad general: **[AUTH.md](./AUTH.md)**.
 
 ## 1. Clerk Dashboard
 
-1. Creá una aplicación en [Clerk](https://dashboard.clerk.com).
-2. **API keys**: copiá la **Publishable key** (`pk_test_...`).
-3. **Configure → Domains** (o la sección donde figure el **Frontend API**): anotá la URL base del Frontend API (p. ej. `https://tu-app-123.clerk.accounts.dev`). Los tokens JWT suelen tener `iss` igual a esa URL (sin barra final).
-4. **Allowed origins / Authorized parties**: agregá `http://localhost:5180` (puerto del frontend en `docker-compose`).
-5. **Redirect URLs** para sign-in / sign-up: incluí URLs bajo `http://localhost:5180` (p. ej. `http://localhost:5180/login`, `http://localhost:5180/signup` si Clerk las pide explícitas).
+1. Aplicación en [Clerk](https://dashboard.clerk.com).
+2. **API keys** → **Publishable key** (`pk_test_...`).
+3. **Frontend API** (Domains / Configure): anotá la URL base (p. ej. `https://tu-app.clerk.accounts.dev`). El JWT usa `iss` igual a esa URL (sin barra final).
+4. **Allowed origins**: `http://localhost:5180` (frontend en Compose).
+5. **Redirect URLs** de sign-in / sign-up bajo `http://localhost:5180` (`/login`, `/signup` si Clerk las pide).
 
-## 2. Archivo `.env` en la raíz del monorepo (`pymes/`)
+## 2. Variables en `.env` (raíz del monorepo)
 
 Copiá desde `.env.example` y completá:
 
 ```bash
-# Frontend (Vite — obligatorio para encender Clerk en la consola)
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-# Backend (cp-backend — validar el Bearer que envía el navegador)
-# JWKS: Frontend API + /.well-known/jwks.json (ver [Manual JWT verification](https://clerk.com/docs/backend-requests/manual-jwt))
 JWKS_URL=https://TU-FRONTEND-API-HOST/.well-known/jwks.json
 JWT_ISSUER=https://TU-FRONTEND-API-HOST
 AUTH_ENABLE_JWT=true
 AUTH_ALLOW_API_KEY=true
 ```
 
-Sustituí `TU-FRONTEND-API-HOST` por el host que muestra Clerk (sin path). Si el backend rechaza el token (`401`), compará el claim `iss` de un JWT decodificado (jwt.io) con `JWT_ISSUER` — deben coincidir (el backend acepta `iss` con o sin barra final).
+Si el backend responde **401** al Bearer, compará el claim `iss` del JWT (p. ej. jwt.io) con `JWT_ISSUER` (el código acepta con o sin barra final).
 
-Si el JWT trae una organización de Clerk (`org_id` / `o.id` tipo `org_...`) y aún no corriste el webhook, el **control plane** puede **crear automáticamente** la fila en `orgs` con ese `external_id` en el primer request autenticado (JWT ya validado con JWKS). Para nombres reales seguí usando el webhook de Clerk.
+Opcional: `CLERK_WEBHOOK_SECRET` (sync usuarios/orgs, ver [AUTH.md](./AUTH.md)); `JWT_AUDIENCE` solo si tu instancia exige `aud`.
 
-En **`GET /v1/users/me`** con **JWT** (sin fila previa en `users`), el backend intenta **sync perezoso**: vuelve a verificar el Bearer con JWKS y hace `UpsertUser` + `SyncMembership` usando claims (`email`, `email_addresses`, `name`, `first_name`/`last_name`, etc.). Si tu plantilla de sesión de Clerk no incluye email, se usa un placeholder `...@users.clerk.placeholder`. En producción conviene **webhook** + claims explícitos.
+### Sync lazy y `orgs`
 
-Opcional:
+Si el JWT trae `org_...` (`org_id` en plantilla o `o.id` en token v2) y aún no hay fila, el control plane puede **crear** la org mínima en el primer request válido. Para nombres y datos ricos, conviene **webhook** de Clerk.
 
-- **`CLERK_WEBHOOK_SECRET`**: si configurás el webhook de Clerk hacia tu backend para sync de usuarios/orgs (`docs/AUTH.md`).
-- **`JWT_AUDIENCE`**: solo si tu validación exige `aud` y Clerk lo emite; en muchos entornos se deja vacío.
+`GET /v1/users/me` con JWT hace sync perezoso de usuario si falta fila. Sin email en claims puede quedar placeholder `...@users.clerk.placeholder`.
 
-### 2.1 JWT de sesión y organización (verticales / Talleres)
+## 3. Organización en la consola (producto)
 
-La consola llama al **control plane** y a **verticales** (p. ej. talleres) con el mismo **Bearer** de Clerk. Si en Perfil ves el **nombre** de la org pero los módulos de vertical responden `invalid org`, casi siempre falta contexto de organización en el token o el token quedó viejo.
+Las **verticales** (p. ej. talleres) necesitan un **UUID de org** en el contexto de auth; sale del JWT + resolución `org_...` → Postgres vía API interna del core.
 
-1. En **Clerk Dashboard** → tu aplicación → **Sessions** (o **JWT Templates**) → **Customize session token** (plantilla del token de sesión).
-2. Incluí claims que el backend pueda leer, alineados con `JWT_ORG_CLAIM` (por defecto `org_id`). Ejemplo mínimo útil con Organizations:
+Comportamiento actual del **frontend**:
+
+| Pieza | Rol |
+|--------|-----|
+| `/onboarding` | Protegido con sesión Clerk. Al finalizar, si no hay org activa, **crea** org en Clerk y `setActive` + recarga de sesión para renovar el JWT. |
+| `ClerkSessionOrgSync` | Si hay **una sola** membresía y no hay org activa, hace `setActive` automático (no hay selector de org en la barra). |
+| **Perfil → Cuenta** | **Tipo de cuenta** primero; **Organización** debajo; admins pueden **renombrar** la org (`organization.update` en Clerk). |
+| Barra lateral | Solo **UserButton** de Clerk (sin `OrganizationSwitcher`). |
+
+**Token de sesión:** Clerk **v2** incluye el claim compacto **`o`** con `id` (`org_...`) cuando hay organización activa. El backend también acepta claims planos `org_id` / `tenant_id` según `JWT_ORG_CLAIM`. Si ves **`invalid org`** en una vertical: no hay org en el JWT (sesión sin org activa o token viejo) → completá onboarding, recargá, o cerrá sesión y volvé a entrar.
+
+Plantilla opcional en **Sessions → Customize session token** (si necesitás claims extra explícitos):
 
 ```json
 {
@@ -52,39 +58,29 @@ La consola llama al **control plane** y a **verticales** (p. ej. talleres) con e
 }
 ```
 
-- `{{org.id}}` en Clerk es el id tipo `org_...`; el control plane lo resuelve al UUID interno en Postgres.
-3. Guardá, **cerrá sesión en la consola** y volvé a entrar; elegí la organización en el **selector de org** (barra lateral inferior, junto a tu avatar).
-4. En **Ajustes → Perfil** deberías ver **“Organización en el API (UUID)”** con un UUID válido; si aparece “—” o un aviso, el API aún no tiene tenant resuelto (webhook, plantilla o org no seleccionada).
+Doc Clerk: [Customize session token](https://clerk.com/docs/backend-requests/custom-session-token).
 
-Documentación Clerk: [Customize session token](https://clerk.com/docs/backend-requests/custom-session-token).
-
-## 3. Reiniciar contenedores
+## 4. Reiniciar contenedores
 
 ```bash
 docker compose down
 docker compose up -d --build
 ```
 
-O `make up`. El frontend debe recibir `VITE_CLERK_PUBLISHABLE_KEY` (está referenciada en `docker-compose.yml`).
+Tras cambiar dependencias de `frontend/package.json`, reconstruí la imagen del frontend.
 
-**Si agregaste o cambiaste dependencias en `frontend/package.json`:** hay que **reconstruir la imagen del frontend** (`docker compose build frontend` o `up -d --build` completo). Si no, Vite en el contenedor seguirá sin esos paquetes y fallará el `import`.
+## 5. Probar
 
-## 4. Probar
+1. `http://localhost:5180/login` → Sign in de Clerk. La ruta debe ser **`/login/*`** en React Router (subtareas tipo `choose-organization`).
+2. Con sesión, el cliente manda **Bearer**; la API key del `.env` no se usa mientras haya token.
+3. **Perfil** (`/settings`): `/v1/session` y `/v1/users/me`; gestión de cuenta Clerk en **UserButton**.
 
-1. Abrí `http://localhost:5180/login` → debería mostrarse el **Sign in** de Clerk (no la pantalla “modo local”).
-   - Clerk redirige a subrutas (p. ej. `/login/tasks/choose-organization`). En React Router la ruta debe ser **`/login/*`**, no solo `/login`; si no, la pantalla queda en blanco en esas URLs.
-2. Tras iniciar sesión, el cliente envía **Bearer** (JWT de sesión); la clave API del `.env` no se usa mientras haya token (`core-authn` prioriza Bearer).
-3. **Perfil** (`/settings`) → datos desde la API (`/v1/session`, `/v1/users/me`); contraseña y 2FA siguen en Clerk (UserButton).
+### Si el frontend no llega al API
 
-## 4.1 Si el frontend dice que no puede conectar a la API
+- `docker compose ps`: `cp-backend` up, puerto **8100**. `curl -s http://localhost:8100/healthz`
+- Desde otra máquina: `VITE_API_URL` al host alcanzable, no `localhost` del servidor.
 
-- Revisá `docker compose ps`: **`cp-backend`** debe estar **Up** y el puerto **8100** mapeado. `curl -s http://localhost:8100/healthz` → `{"status":"ok"}`.
-- Tras un `docker compose up` reciente, Postgres puede estar unos segundos en “starting up”; el **control plane** espera con `pg_isready` antes de arrancar. Si igual ves el error, `docker compose restart cp-backend`.
-- Si abrís la consola desde **otra máquina** (no `localhost`), `VITE_API_URL` debe apuntar al **host alcanzable** (p. ej. IP de la PC), no a `localhost`.
+## 6. Volver a modo solo API key
 
-## 5. Volver a modo consola (solo API key)
-
-- Dejá **`VITE_CLERK_PUBLISHABLE_KEY` vacío** en `.env`.
-- Reiniciá el frontend (`docker compose up -d --build frontend` o `make up`).
-
-Documentación general: [AUTH.md](./AUTH.md).
+- `VITE_CLERK_PUBLISHABLE_KEY` vacío en `.env`.
+- Rebuild/restart del frontend.

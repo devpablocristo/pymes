@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from pymes_core_shared.ai_runtime import (
     apply_permissive_cors,
     install_request_context_middleware,

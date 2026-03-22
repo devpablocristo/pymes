@@ -123,9 +123,12 @@ describe('SettingsPage (modo Clerk)', () => {
 
     await waitFor(() => {
       expect(apiMocks.getSession).toHaveBeenCalled();
+      expect(apiMocks.getMe).toHaveBeenCalled();
     });
 
-    expect(screen.getByText('Organización desde Clerk')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Organización desde Clerk')).toBeInTheDocument();
+    });
     expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
     expect(screen.getByText('Administrador')).toBeInTheDocument();
   });

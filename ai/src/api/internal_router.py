@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field

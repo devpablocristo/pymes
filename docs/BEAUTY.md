@@ -10,6 +10,10 @@ Vertical `beauty` para salones, barberías y estética en LATAM. El dominio prop
 
 ## Backend
 
+### Autenticación
+
+Rutas bajo `/v1/beauty/...` exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, el Bearer debe incluir organización activa (`org_...` resuelto vía control plane). Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+
 ### Local (Docker Compose)
 
 - Servicio: **`beauty-backend`**, puerto host **8383** (mapa completo: [docs/README.md](./README.md)).

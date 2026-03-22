@@ -16,6 +16,7 @@ import { commonMessages } from './messages/common';
 import { crudMessages } from './messages/crud';
 import { dashboardMessages } from './messages/dashboard';
 import { moduleMessages } from './messages/module';
+import { onboardingMessages } from './messages/onboarding';
 import { profileMessages } from './messages/profile';
 import { shellMessages } from './messages/shell';
 import { translateLegacyText } from './legacy';
@@ -42,6 +43,7 @@ const messages = mergeMessages(
   shellMessages,
   crudMessages,
   moduleMessages,
+  onboardingMessages,
   profileMessages,
   billingMessages,
   authMessages,

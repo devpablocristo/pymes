@@ -18,6 +18,10 @@ Vertical `workshops` para talleres LATAM. Subdominios canónicos: `auto_repair`,
 
 ## Backend
 
+### Autenticación
+
+Rutas bajo `/v1/auto-repair/...` (y aliases) exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, el Bearer debe incluir organización activa (`org_...` resuelto vía control plane). Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+
 ### Local (Docker Compose)
 
 - Servicio: **`work-backend`**, puerto host **8282** (`docker-compose.yml` en la raíz del monorepo).

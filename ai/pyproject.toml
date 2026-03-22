@@ -23,5 +23,15 @@ dependencies = [
   "opentelemetry-instrumentation-httpx>=0.49b0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0", "ruff>=0.9.0"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src", "../pymes-core/shared/ai/src", "../../core/ai/python/src"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# F + errores de sintaxis; sin isort/UP hasta normalizar el árbol en un paso aparte
+select = ["E4", "E7", "E9", "F"]

@@ -15,7 +15,8 @@ function translateAutoRepairError(message: string): string {
     case 'organization not found':
       return 'No se encontro la organizacion.';
     case 'invalid org':
-      return 'No pudimos identificar tu empresa en esta sesion. Elegila en el menu de la barra lateral (arriba de tu foto), recarga la pagina o cerre sesion y volve a entrar.';
+    case 'invalid org identifier':
+      return 'No hay una empresa válida en la sesión para Talleres. Con Clerk: completá el onboarding (al final se crea la organización), recargá la página o cerrá sesión y volvé a entrar para renovar el token.';
     default:
       return trimmed;
   }

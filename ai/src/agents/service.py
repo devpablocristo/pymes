@@ -9,7 +9,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from src.agents.audit import has_processed_request, record_agent_event
-from src.agents.contracts import CommercialContractEnvelope, CommercialContractPayload
+from src.agents.contracts import CommercialContractEnvelope
 from src.agents.policy import CommercialPolicy, build_external_sales_policy, build_internal_procurement_policy, build_internal_sales_policy
 from src.api.external_chat_support import get_external_conversation, history_to_messages
 from src.backend_client.auth import AuthContext

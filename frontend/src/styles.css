@@ -802,11 +802,8 @@ code {
   margin: 1rem 0 0;
 }
 
-.profile-account-identity-hint {
-  margin: 0.65rem 0 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  max-width: 28rem;
+.profile-org-after-signout {
+  margin-top: 2rem;
 }
 
 .profile-session-table tbody tr:hover {

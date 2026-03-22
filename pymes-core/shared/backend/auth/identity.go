@@ -83,6 +83,9 @@ func (r *IdentityResolver) ResolvePrincipal(ctx context.Context, token string) (
 	orgNames = append(orgNames, "tenant_id", "org_id", "o.id")
 
 	rawOrg := firstStringClaim(claims, orgNames...)
+	if strings.TrimSpace(rawOrg) == "" {
+		rawOrg = clerkCompactOrgIDFromClaims(claims)
+	}
 
 	roleNames := make([]string, 0, 5)
 	if c := strings.TrimSpace(r.cfg.RoleClaim); c != "" {
@@ -147,6 +150,21 @@ func audienceMatches(value any, audience string) bool {
 		}
 	}
 	return false
+}
+
+// clerkCompactOrgIDFromClaims obtiene org_... del claim "o" (session token Clerk v2).
+// Ver: https://clerk.com/docs/guides/sessions/session-tokens#organization-claim
+func clerkCompactOrgIDFromClaims(claims jwt.MapClaims) string {
+	raw, ok := claims["o"]
+	if !ok || raw == nil {
+		return ""
+	}
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return ""
+	}
+	id := strings.TrimSpace(toStringClaim(m["id"]))
+	return id
 }
 
 func firstStringClaim(claims jwt.MapClaims, names ...string) string {

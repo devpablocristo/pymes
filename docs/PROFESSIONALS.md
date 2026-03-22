@@ -19,6 +19,10 @@
 - backend: `professionals/backend`
 - infra: `professionals/infra`
 
+### Autenticación
+
+Rutas bajo `/v1/teachers/...` (y aliases) exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, org activa en el token. Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+
 ### Local (Docker Compose)
 
 - Servicio: **`prof-backend`**, puerto host **8181** (ver `docker-compose.yml` en la raíz del monorepo).

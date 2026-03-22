@@ -1,8 +1,9 @@
-import { useClerk, useOrganization } from '@clerk/clerk-react';
-import { isClerkAPIResponseError } from '@clerk/clerk-react/errors';
+import { useClerk, useOrganization, useSession } from '@clerk/clerk-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
+import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
+import { useI18n } from '../lib/i18n';
 import {
   saveTenantProfile,
   type PaymentMethod,
@@ -63,24 +64,13 @@ type ClerkOnboardingBridges = {
   /** Si ya hay org (p. ej. invitación), no la creamos ni renombramos aquí. */
   organization: { id: string } | null;
   orgLoaded: boolean;
+  /** Tras crear org y setActive, renueva la sesión para que el JWT traiga el claim de organización. */
+  afterSetActiveOrg?: () => Promise<void>;
 };
-
-function formatClerkFinishError(err: unknown, generic: string): string {
-  if (isClerkAPIResponseError(err)) {
-    const first = err.errors?.[0];
-    const msg = first && typeof first === 'object' && 'message' in first ? String(first.message) : '';
-    if (msg.trim()) {
-      return msg.trim();
-    }
-  }
-  if (err instanceof Error && err.message.trim()) {
-    return err.message.trim();
-  }
-  return generic;
-}
 
 function OnboardingPageClerkBridge() {
   const clerk = useClerk();
+  const { session } = useSession();
   const { organization, isLoaded: orgLoaded } = useOrganization();
 
   const bridges: ClerkOnboardingBridges = {
@@ -89,6 +79,11 @@ function OnboardingPageClerkBridge() {
     setActive: (params) => clerk.setActive(params),
     organization: organization ? { id: organization.id } : null,
     orgLoaded,
+    afterSetActiveOrg: session
+      ? async () => {
+          await session.reload();
+        }
+      : undefined,
   };
 
   return <OnboardingPageInner clerkBridges={bridges} />;
@@ -103,6 +98,7 @@ export function OnboardingPage() {
 
 function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBridges | null }) {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [step, setStep] = useState<Step>(1);
 
   const [businessName, setBusinessName] = useState('');
@@ -155,9 +151,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
     if (clerkBridges) {
       if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
-        setFinishError(
-          'Todavía se está cargando tu sesión. Esperá un momento y volvé a intentar.',
-        );
+        setFinishError(t('onboarding.clerk.sessionNotReady'));
         return;
       }
       setFinishing(true);
@@ -166,18 +160,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         if (!clerkBridges.organization) {
           const created = await clerkBridges.createOrganization({ name });
           await clerkBridges.setActive({ organization: created.id });
+          await clerkBridges.afterSetActiveOrg?.();
         }
       } catch (err) {
         setFinishError(
-          formatClerkFinishError(
-            err,
-            'No se pudo crear o actualizar la organización. Reintentá o volvé a iniciar sesión.',
-          ),
+          formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')),
         );
-        setFinishing(false);
         return;
+      } finally {
+        setFinishing(false);
       }
-      setFinishing(false);
     }
 
     saveTenantProfile(profile);
@@ -456,7 +448,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               disabled={!canFinishStep4}
               onClick={() => void finish()}
             >
-              {finishing ? 'Guardando…' : 'Empezar'}
+              {finishing ? t('common.status.saving') : 'Empezar'}
             </button>
           )}
         </div>

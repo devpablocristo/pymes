@@ -1,5 +1,6 @@
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
+import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Shell } from '../components/Shell';
 import { AdminPage } from '../pages/AdminPage';
@@ -26,6 +27,7 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { SignupPage } from '../pages/SignupPage';
 import { SpecialtiesPage } from '../pages/SpecialtiesPage';
 import { TeachersPage } from '../pages/TeachersPage';
+import { clerkEnabled } from '../lib/auth';
 import { hasCompletedOnboarding } from '../lib/tenantProfile';
 
 function RequireOnboarding({ children }: { children: React.ReactNode }) {
@@ -39,6 +41,7 @@ export function App() {
   return (
     <>
       <AuthTokenBridge />
+      {clerkEnabled && <ClerkSessionOrgSync />}
       <Routes>
         {/* Clerk (path routing) usa subrutas: /login/tasks/choose-organization, etc. */}
         <Route path="/login/*" element={<LoginPage />} />

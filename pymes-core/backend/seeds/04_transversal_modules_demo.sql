@@ -40,7 +40,11 @@ BEGIN
     pr1 := uuid_generate_v5(v_org, 'pymes-seed/v1/procurement/1');
     wh1 := uuid_generate_v5(v_org, 'pymes-seed/v1/webhook/1');
 
-    IF NOT EXISTS (SELECT 1 FROM customers WHERE id = c1 AND org_id = v_org) THEN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM party_roles
+        WHERE party_id = c1 AND org_id = v_org AND role = 'customer' AND is_active = true
+    ) THEN
         RETURN;
     END IF;
 
@@ -55,19 +59,19 @@ BEGIN
     t_start := date_trunc('day', now() AT TIME ZONE 'UTC') + interval '2 days' + interval '10 hours';
     t_end := t_start + interval '1 hour';
 
-    INSERT INTO appointments (id, org_id, customer_id, customer_name, customer_phone, title, description, status, start_at, end_at, duration, assigned_to, notes, created_by)
+    INSERT INTO appointments (id, org_id, party_id, party_name, party_phone, title, description, status, start_at, end_at, duration, assigned_to, notes, created_by)
     VALUES
         (ap1, v_org, c1, 'Cliente Demo Uno', '+54-11-1000-0001', 'Visita comercial', 'Seguimiento de cotización', 'confirmed', t_start, t_end, 60, 'seed', 'seed appointment', 'seed'),
         (ap2, v_org, c2, 'Cliente Demo Dos', '+54-11-1000-0002', 'Entrega estimada', 'Coordinar logística', 'scheduled', t_start + interval '1 day', t_end + interval '1 day', 60, '', 'seed appointment', 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO recurring_expenses (id, org_id, description, amount, currency, category, payment_method, frequency, day_of_month, supplier_id, is_active, next_due_date, notes, created_by)
+    INSERT INTO recurring_expenses (id, org_id, description, amount, currency, category, payment_method, frequency, day_of_month, party_id, is_active, next_due_date, notes, created_by)
     VALUES
         (rec1, v_org, 'Alquiler local (demo)', 350000.00, 'ARS', 'Operaciones', 'transfer', 'monthly', 5, s1, true, (current_date + interval '15 days')::date, 'seed', 'seed'),
         (uuid_generate_v5(v_org, 'pymes-seed/v1/recurring/2'), v_org, 'Software contable', 45000.00, 'ARS', 'Administración', 'card', 'monthly', 10, NULL, true, (current_date + interval '20 days')::date, 'seed', 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO purchases (id, org_id, number, supplier_id, supplier_name, status, payment_status, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO purchases (id, org_id, number, party_id, party_name, status, payment_status, subtotal, tax_total, total, currency, notes, created_by)
     VALUES
         (pur1, v_org, 'CPA-SEED-001', s1, 'Proveedor Demo 1', 'received', 'paid', 10000.00, 2100.00, 12100.00, 'ARS', 'Compra semilla recibida', 'seed'),
         (pur2, v_org, 'CPA-SEED-002', s1, 'Proveedor Demo 1', 'draft', 'pending', 5000.00, 1050.00, 6050.00, 'ARS', 'Borrador de compra', 'seed')
@@ -95,7 +99,7 @@ BEGIN
         (wh1, v_org, 'https://example.local/pymes-webhook-demo', 'seed-secret-change-me', ARRAY['sale.created', 'purchase.received'], false, 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO accounts (id, org_id, type, entity_type, entity_id, entity_name, balance, currency, credit_limit)
+    INSERT INTO accounts (id, org_id, type, entity_type, party_id, party_name, balance, currency, credit_limit)
     VALUES
         (uuid_generate_v5(v_org, 'pymes-seed/v1/account/receivable-c1'), v_org, 'receivable', 'customer', c1, 'Cliente Demo Uno', 0.00, 'ARS', 500000.00),
         (uuid_generate_v5(v_org, 'pymes-seed/v1/account/payable-s1'), v_org, 'payable', 'supplier', s1, 'Proveedor Demo 1', 0.00, 'ARS', 0)

@@ -1,10 +1,10 @@
 package dataio
 
 import (
-	"errors"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -187,7 +187,7 @@ func (r *Repository) ExportSales(ctx context.Context, orgID uuid.UUID, from, to 
 		SELECT
 			s.number,
 			to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
-			COALESCE(s.party_name, s.customer_name, ''),
+			COALESCE(s.party_name, ''),
 			s.payment_method,
 			s.subtotal,
 			s.tax_total,

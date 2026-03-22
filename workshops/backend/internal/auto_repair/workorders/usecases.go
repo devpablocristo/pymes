@@ -47,6 +47,7 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error)
+	MarkReadyPickupNotified(ctx context.Context, orgID, id uuid.UUID, at time.Time) error
 }
 
 type AuditPort interface {
@@ -59,14 +60,20 @@ type controlPlanePort interface {
 	GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error)
 }
 
-type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
-	cp    controlPlanePort
+// whatsAppNotifier envía texto vía API interna de pymes-core (opt-in y reglas en el core).
+type whatsAppNotifier interface {
+	SendInternalWhatsAppText(ctx context.Context, orgID string, partyID uuid.UUID, body string) error
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort, cp controlPlanePort) *Usecases {
-	return &Usecases{repo: repo, audit: audit, cp: cp}
+type Usecases struct {
+	repo     RepositoryPort
+	audit    AuditPort
+	cp       controlPlanePort
+	whatsapp whatsAppNotifier
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, cp controlPlanePort, wa whatsAppNotifier) *Usecases {
+	return &Usecases{repo: repo, audit: audit, cp: cp, whatsapp: wa}
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
@@ -118,6 +125,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.WorkOrder{}, err
 	}
+	prevCanon := normalizeWorkOrderStatus(current.Status)
 	if in.VehicleID != nil {
 		parsed, err := uuid.Parse(strings.TrimSpace(*in.VehicleID))
 		if err != nil {
@@ -138,7 +146,11 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.AppointmentID = vertvalues.ParseOptionalUUID(*in.AppointmentID)
 	}
 	if in.Status != nil {
-		current.Status = strings.TrimSpace(*in.Status)
+		nextRaw := strings.TrimSpace(*in.Status)
+		if err := validateWorkOrderStatusTransition(current.Status, nextRaw); err != nil {
+			return domain.WorkOrder{}, err
+		}
+		current.Status = nextRaw
 	}
 	if in.RequestedWork != nil {
 		current.RequestedWork = strings.TrimSpace(*in.RequestedWork)
@@ -173,6 +185,15 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if err := normalizeWorkOrder(&current); err != nil {
 		return domain.WorkOrder{}, err
 	}
+	nextCanon := normalizeWorkOrderStatus(current.Status)
+	if nextCanon == "ready_for_pickup" && prevCanon != "ready_for_pickup" && current.ReadyAt == nil {
+		t := time.Now().UTC()
+		current.ReadyAt = &t
+	}
+	if nextCanon == "delivered" && prevCanon != "delivered" && current.DeliveredAt == nil {
+		t := time.Now().UTC()
+		current.DeliveredAt = &t
+	}
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -180,10 +201,54 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.WorkOrder{}, err
 	}
+	u.maybeNotifyReadyForPickup(ctx, orgID, actor, prevCanon, &out)
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{"number": out.Number, "status": out.Status})
 	}
 	return out, nil
+}
+
+func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUID, actor, prevCanon string, out *domain.WorkOrder) {
+	if u.whatsapp == nil || out == nil {
+		return
+	}
+	if normalizeWorkOrderStatus(out.Status) != "ready_for_pickup" {
+		return
+	}
+	if prevCanon == "ready_for_pickup" {
+		return
+	}
+	if out.CustomerID == nil {
+		return
+	}
+	if out.ReadyPickupNotifiedAt != nil {
+		return
+	}
+	plate := strings.TrimSpace(out.VehiclePlate)
+	msg := fmt.Sprintf("Hola: su vehículo está listo para retirar. Orden %s", strings.TrimSpace(out.Number))
+	if plate != "" {
+		msg += fmt.Sprintf(" · Patente %s", plate)
+	}
+	msg += ". Coordiná la entrega con el taller."
+	if err := u.whatsapp.SendInternalWhatsAppText(ctx, orgID.String(), *out.CustomerID, msg); err != nil {
+		if u.audit != nil {
+			u.audit.Log(ctx, orgID.String(), actor, "work_order.ready_whatsapp_failed", "work_order", out.ID.String(), map[string]any{
+				"error": "send_failed",
+			})
+		}
+		return
+	}
+	at := time.Now().UTC()
+	if err := u.repo.MarkReadyPickupNotified(ctx, orgID, out.ID, at); err != nil {
+		if u.audit != nil {
+			u.audit.Log(ctx, orgID.String(), actor, "work_order.ready_whatsapp_mark_failed", "work_order", out.ID.String(), map[string]any{})
+		}
+		return
+	}
+	out.ReadyPickupNotifiedAt = &at
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "work_order.ready_whatsapp_sent", "work_order", out.ID.String(), map[string]any{})
+	}
 }
 
 func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error) {
@@ -204,7 +269,7 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.Number = strings.ToUpper(strings.TrimSpace(in.Number))
 	in.VehiclePlate = strings.ToUpper(strings.TrimSpace(in.VehiclePlate))
 	in.CustomerName = strings.TrimSpace(in.CustomerName)
-	in.Status = normalizeStatus(in.Status)
+	in.Status = normalizeWorkOrderStatus(in.Status)
 	in.RequestedWork = strings.TrimSpace(in.RequestedWork)
 	in.Diagnosis = strings.TrimSpace(in.Diagnosis)
 	in.Notes = strings.TrimSpace(in.Notes)
@@ -302,15 +367,6 @@ func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) e
 		}
 	}
 	return nil
-}
-
-func normalizeStatus(raw string) string {
-	switch strings.TrimSpace(raw) {
-	case "diagnosis", "in_progress", "ready", "delivered", "invoiced", "cancelled":
-		return strings.TrimSpace(raw)
-	default:
-		return "received"
-	}
 }
 
 func normalizeItemType(raw string) string {

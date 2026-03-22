@@ -19,7 +19,6 @@ import { moduleMessages } from './messages/module';
 import { onboardingMessages } from './messages/onboarding';
 import { profileMessages } from './messages/profile';
 import { shellMessages } from './messages/shell';
-import { translateLegacyText } from './legacy';
 import type { FlatMessages, LanguageCode, TranslationVariables, TranslationsByLanguage } from './types';
 
 const STORAGE_KEY = 'pymes:language';
@@ -129,9 +128,9 @@ const defaultContext: I18nContextValue = {
   language: DEFAULT_LANGUAGE,
   setLanguage: () => undefined,
   t: (key, variables) => getMessage(DEFAULT_LANGUAGE, key, variables),
-  localizeText: (text) => translateLegacyText(vocab(text), DEFAULT_LANGUAGE),
+  localizeText: (text) => vocab(text),
   sentenceCase: toSentenceCase,
-  localizeUiText: (text) => toSentenceCase(translateLegacyText(vocab(text), DEFAULT_LANGUAGE)),
+  localizeUiText: (text) => toSentenceCase(vocab(text)),
   options: supportedLanguages,
 };
 
@@ -152,9 +151,9 @@ export function LanguageProvider({
     language,
     setLanguage: setLanguageState,
     t: (key, variables) => getMessage(language, key, variables),
-    localizeText: (text) => translateLegacyText(vocab(text), language),
+    localizeText: (text) => vocab(text),
     sentenceCase: toSentenceCase,
-    localizeUiText: (text) => toSentenceCase(translateLegacyText(vocab(text), language)),
+    localizeUiText: (text) => toSentenceCase(vocab(text)),
     options: supportedLanguages,
   }), [language]);
 

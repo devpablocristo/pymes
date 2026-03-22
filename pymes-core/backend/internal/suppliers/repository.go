@@ -16,9 +16,7 @@ import (
 	supplierdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/usecases/domain"
 )
 
-type Repository struct {
-	db *gorm.DB
-}
+type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
@@ -142,19 +140,7 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 		`, uuid.New(), partyID, in.OrgID, string(roleMetadata)).Error; err != nil {
 			return err
 		}
-		return upsertLegacySupplier(ctx, tx, supplierdomain.Supplier{
-			ID:          partyID,
-			OrgID:       in.OrgID,
-			Name:        in.Name,
-			TaxID:       in.TaxID,
-			Email:       in.Email,
-			Phone:       in.Phone,
-			Address:     in.Address,
-			ContactName: in.ContactName,
-			Notes:       in.Notes,
-			Tags:        in.Tags,
-			Metadata:    metadata,
-		})
+		return nil
 	}); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
@@ -215,7 +201,7 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 			return err
 		}
 		in.Metadata = metadata
-		return upsertLegacySupplier(ctx, tx, in)
+		return nil
 	}); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
@@ -233,7 +219,7 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 		if res.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
 		}
-		return softDeleteLegacySupplier(ctx, tx, orgID, id)
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -295,55 +281,4 @@ func stringValue(m map[string]any, key string) string {
 		return strings.TrimSpace(v)
 	}
 	return ""
-}
-
-func upsertLegacySupplier(ctx context.Context, tx *gorm.DB, in supplierdomain.Supplier) error {
-	exists, err := legacySupplierTableExists(ctx, tx)
-	if err != nil || !exists {
-		return err
-	}
-	addr, _ := json.Marshal(in.Address)
-	meta, _ := json.Marshal(defaultMetadata(in.Metadata))
-	return tx.Exec(`
-		INSERT INTO suppliers (
-			id, org_id, name, tax_id, email, phone, address, contact_name, notes, tags, metadata, created_at, updated_at, deleted_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, now(), now(), NULL)
-		ON CONFLICT (id) DO UPDATE SET
-			name = EXCLUDED.name,
-			tax_id = EXCLUDED.tax_id,
-			email = EXCLUDED.email,
-			phone = EXCLUDED.phone,
-			address = EXCLUDED.address,
-			contact_name = EXCLUDED.contact_name,
-			notes = EXCLUDED.notes,
-			tags = EXCLUDED.tags,
-			metadata = EXCLUDED.metadata,
-			updated_at = now(),
-			deleted_at = NULL
-	`, in.ID, in.OrgID, strings.TrimSpace(in.Name), strings.TrimSpace(in.TaxID), strings.TrimSpace(in.Email), strings.TrimSpace(in.Phone), string(addr), strings.TrimSpace(in.ContactName), strings.TrimSpace(in.Notes), pq.StringArray(utils.NormalizeTags(in.Tags)), string(meta)).Error
-}
-
-func softDeleteLegacySupplier(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID) error {
-	exists, err := legacySupplierTableExists(ctx, tx)
-	if err != nil || !exists {
-		return err
-	}
-	return tx.Table("suppliers").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
-		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")}).Error
-}
-
-func legacySupplierTableExists(ctx context.Context, tx *gorm.DB) (bool, error) {
-	var exists bool
-	err := tx.WithContext(ctx).Raw(`
-		SELECT EXISTS (
-			SELECT 1
-			FROM pg_class c
-			JOIN pg_namespace n ON n.oid = c.relnamespace
-			WHERE n.nspname = current_schema()
-			  AND c.relname = 'suppliers'
-			  AND c.relkind = 'r'
-		)
-	`).Scan(&exists).Error
-	return exists, err
 }

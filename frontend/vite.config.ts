@@ -24,6 +24,30 @@ const coreHttpPath = coreHttpCandidates.find((candidate) => fs.existsSync(candid
 export default defineConfig({
   envDir: '..',
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@clerk/')) {
+              return 'vendor-clerk';
+            }
+            if (id.includes('react-router')) {
+              return 'vendor-router';
+            }
+            return 'vendor';
+          }
+          if (id.includes('/src/crud/') || id.includes('/src/pages/ModulePage')) {
+            return 'app-crud';
+          }
+          if (id.includes('/src/shared/frontendShell') || id.includes('/src/components/Shell') || id.includes('/src/pages/DashboardPage')) {
+            return 'app-shell';
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@devpablocristo/core-authn': coreAuthPath,

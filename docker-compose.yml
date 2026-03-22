@@ -39,6 +39,7 @@ services:
     env_file:
       - .env
     environment:
+      ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       SMTP_HOST: mailhog
       FRONTEND_URL: http://localhost:5180
@@ -100,6 +101,7 @@ services:
     env_file:
       - .env
     environment:
+      AI_ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
       BACKEND_URL: http://cp-backend:8080
       PROFESSIONALS_BACKEND_URL: http://prof-backend:8081
@@ -130,6 +132,7 @@ services:
       - .env
     environment:
       PORT: 8081
+      ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
@@ -159,6 +162,7 @@ services:
       - .env
     environment:
       PORT: 8082
+      ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
@@ -191,6 +195,7 @@ services:
       - .env
     environment:
       PORT: 8083
+      ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
@@ -220,6 +225,7 @@ services:
       - .env
     environment:
       PORT: 8084
+      ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180

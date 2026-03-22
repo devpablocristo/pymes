@@ -56,7 +56,21 @@ export type AutoRepairWorkOrder = {
   appointment_id?: string;
   quote_id?: string;
   sale_id?: string;
-  status: 'received' | 'diagnosis' | 'in_progress' | 'ready' | 'delivered' | 'invoiced' | 'cancelled';
+  status:
+    | 'received'
+    | 'diagnosing'
+    | 'quote_pending'
+    | 'awaiting_parts'
+    | 'in_progress'
+    | 'quality_check'
+    | 'ready_for_pickup'
+    | 'delivered'
+    | 'invoiced'
+    | 'cancelled'
+    | 'on_hold'
+    // Legacy API / datos previos
+    | 'diagnosis'
+    | 'ready';
   requested_work: string;
   diagnosis: string;
   notes: string;
@@ -70,6 +84,7 @@ export type AutoRepairWorkOrder = {
   promised_at?: string;
   ready_at?: string;
   delivered_at?: string;
+  ready_pickup_notified_at?: string;
   created_by: string;
   created_at: string;
   updated_at: string;

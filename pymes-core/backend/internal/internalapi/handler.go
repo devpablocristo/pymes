@@ -27,6 +27,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/users"
+	wapdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
 type adminPort interface {
@@ -71,6 +72,10 @@ type apiKeyResolverPort interface {
 	ResolveAPIKey(raw string) (users.ResolvedAPIKey, bool)
 }
 
+type whatsAppSendPort interface {
+	SendText(ctx context.Context, req wapdomain.SendTextRequest) (wapdomain.Message, error)
+}
+
 type Handler struct {
 	admin     adminPort
 	parties   partyPort
@@ -81,6 +86,7 @@ type Handler struct {
 	sales     salePort
 	gateway   paymentGatewayPort
 	apiKeys   apiKeyResolverPort
+	whatsapp  whatsAppSendPort
 	// resolveOrgRef traduce Clerk org_... / slug / UUID (opcional; nil = ruta no registrada).
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error)
 }
@@ -95,6 +101,7 @@ func NewHandler(
 	sales salePort,
 	gateway paymentGatewayPort,
 	apiKeys apiKeyResolverPort,
+	whatsapp whatsAppSendPort,
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error),
 ) *Handler {
 	return &Handler{
@@ -107,6 +114,7 @@ func NewHandler(
 		sales:         sales,
 		gateway:       gateway,
 		apiKeys:       apiKeys,
+		whatsapp:      whatsapp,
 		resolveOrgRef: resolveOrgRef,
 	}
 }
@@ -128,6 +136,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
 	internal.POST("/sales/:id/payment-link", h.CreateSalePaymentLink)
+	internal.POST("/whatsapp/send-text", h.InternalSendWhatsAppText)
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {
@@ -646,4 +655,41 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 		"expires_at":     pref.ExpiresAt.UTC().Format(time.RFC3339),
 		"created_at":     pref.CreatedAt.UTC().Format(time.RFC3339),
 	})
+}
+
+// InternalSendWhatsAppText permite a servicios internos (p. ej. vertical talleres) enviar texto respetando opt-in en el core.
+func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
+	if h.whatsapp == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "whatsapp send unavailable"})
+		return
+	}
+	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
+		return
+	}
+	var req struct {
+		PartyID string `json:"party_id" binding:"required"`
+		Body    string `json:"body" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	partyID, err := uuid.Parse(strings.TrimSpace(req.PartyID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
+		return
+	}
+	_, err = h.whatsapp.SendText(c.Request.Context(), wapdomain.SendTextRequest{
+		OrgID:   orgID,
+		PartyID: partyID,
+		Body:    strings.TrimSpace(req.Body),
+		Actor:   "internal-service:workshops",
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"status": "sent"})
 }

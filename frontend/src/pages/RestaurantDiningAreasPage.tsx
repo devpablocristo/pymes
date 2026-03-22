@@ -1,5 +1,5 @@
-import { ConfiguredCrudPage } from '../crud/resourceConfigs';
+import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
 
 export function RestaurantDiningAreasPage() {
-  return <ConfiguredCrudPage resourceId="restaurantDiningAreas" />;
+  return <LazyConfiguredCrudPage resourceId="restaurantDiningAreas" />;
 }

@@ -1,5 +1,5 @@
-import { ConfiguredCrudPage } from '../crud/resourceConfigs';
+import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
 
 export function AutoRepairServicesPage() {
-  return <ConfiguredCrudPage resourceId="workshopServices" />;
+  return <LazyConfiguredCrudPage resourceId="workshopServices" />;
 }

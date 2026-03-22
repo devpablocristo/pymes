@@ -114,14 +114,6 @@ func InitializeApp() *app.App {
 	sessionsHandler.RegisterRoutes(teachersGroup)
 	orchestrationHandler.RegisterRoutes(teachersGroup)
 
-	// Legacy aliases from the initial professionals release.
-	profilesHandler.RegisterRoutes(authGroup)
-	specialtiesHandler.RegisterRoutes(authGroup)
-	serviceLinksHandler.RegisterRoutes(authGroup)
-	intakesHandler.RegisterRoutes(authGroup)
-	sessionsHandler.RegisterRoutes(authGroup)
-	orchestrationHandler.RegisterRoutes(authGroup)
-
 	return &app.App{Router: router}
 }
 

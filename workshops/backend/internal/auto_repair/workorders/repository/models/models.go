@@ -27,13 +27,14 @@ type WorkOrderModel struct {
 	SubtotalParts    float64    `gorm:"not null;default:0"`
 	TaxTotal         float64    `gorm:"not null;default:0"`
 	Total            float64    `gorm:"not null;default:0"`
-	OpenedAt         time.Time  `gorm:"not null"`
-	PromisedAt       *time.Time
-	ReadyAt          *time.Time
-	DeliveredAt      *time.Time
-	CreatedBy        string `gorm:"not null;default:''"`
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	OpenedAt              time.Time  `gorm:"not null"`
+	PromisedAt            *time.Time
+	ReadyAt               *time.Time
+	DeliveredAt           *time.Time
+	ReadyPickupNotifiedAt *time.Time
+	CreatedBy             string     `gorm:"not null;default:''"`
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 func (WorkOrderModel) TableName() string { return "workshops.work_orders" }

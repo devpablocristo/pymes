@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
 import { getSession } from '../lib/api';
-import { moduleGroups, moduleList } from '../lib/moduleCatalog';
+import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
 import type { ProductRole } from '../lib/types';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
+
+type ModuleGroup = {
+  id: string;
+  label: string;
+};
+
+type ModuleListItem = {
+  id: string;
+  group: string;
+  navLabel: string;
+  icon: string;
+};
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
 }
@@ -55,6 +67,14 @@ const documentIcon = (
     <line x1="16" y1="13" x2="8" y2="13" />
     <line x1="16" y1="17" x2="8" y2="17" />
     <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+const kanbanBoardIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="5" height="16" rx="1" />
+    <rect x="10" y="7" width="5" height="13" rx="1" />
+    <rect x="17" y="10" width="4" height="10" rx="1" />
   </svg>
 );
 
@@ -115,6 +135,10 @@ const profileIcon = (
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
   const [productRole, setProductRole] = useState<ProductRole | null>(null);
+  const [catalog, setCatalog] = useState<{ groups: ModuleGroup[]; modules: ModuleListItem[] }>({
+    groups: [],
+    modules: [],
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +154,26 @@ export function Shell({ children }: { children: ReactNode }) {
         }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadModuleCatalog().then((mod) => {
+      if (!cancelled) {
+        setCatalog({
+          groups: mod.moduleGroups.map((group) => ({ id: group.id, label: group.label })),
+          modules: mod.moduleList.map((module) => ({
+            id: module.id,
+            group: module.group,
+            navLabel: module.navLabel,
+            icon: module.icon,
+          })),
+        });
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -156,6 +200,7 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/workshops/auto-repair/vehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
     { to: '/workshops/auto-repair/services', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
     { to: '/workshops/auto-repair/orders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+    { to: '/workshops/auto-repair/orders/board', label: t('shell.nav.autoRepairOrdersBoard'), icon: kanbanBoardIcon },
   ], [t]);
 
   const beautyIcon = (
@@ -194,9 +239,9 @@ export function Shell({ children }: { children: ReactNode }) {
     const profile = getTenantProfile();
     const vertical = profile?.vertical ?? 'none';
 
-    const moduleNav = moduleGroups.map<AppShellNavSection>((group) => ({
+    const moduleNav = catalog.groups.map<AppShellNavSection>((group) => ({
       label: localizeUiText(group.label),
-      items: moduleList
+      items: catalog.modules
         .filter((module) => module.group === group.id && visibleIds.has(module.id))
         .sort((left, right) => localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))))
         .map((module) => ({
@@ -224,7 +269,7 @@ export function Shell({ children }: { children: ReactNode }) {
     result.push(...moduleNav);
     result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [beautyNav, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
+  }, [beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
   const footerControls =
     productRole !== null ? (

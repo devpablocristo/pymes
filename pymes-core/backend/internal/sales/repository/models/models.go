@@ -11,8 +11,8 @@ type SaleModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
 	Number        string     `gorm:"not null"`
-	CustomerID    *uuid.UUID `gorm:"column:customer_id;type:uuid"`
-	CustomerName  string     `gorm:"column:customer_name"`
+	CustomerID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
+	CustomerName  string     `gorm:"column:party_name"`
 	QuoteID       *uuid.UUID `gorm:"type:uuid"`
 	Status        string     `gorm:"not null"`
 	PaymentMethod string     `gorm:"not null"`

@@ -423,58 +423,12 @@ func defaultString(v, def string) string {
 	return v
 }
 
-func (r *Repository) salesPartyIDSelectExpr(ctx context.Context, qualifier string) (string, error) {
-	column, err := r.salesColumnName(ctx, "party_id", "customer_id")
-	if err != nil {
-		return "", err
-	}
-	if column == "" {
-		return "NULL::uuid AS party_id", nil
-	}
-	return qualifyColumn(qualifier, column) + " AS party_id", nil
+func (r *Repository) salesPartyIDSelectExpr(_ context.Context, qualifier string) (string, error) {
+	return qualifyColumn(qualifier, "party_id") + " AS party_id", nil
 }
 
-func (r *Repository) salesPartyNameSelectExpr(ctx context.Context, qualifier string) (string, error) {
-	column, err := r.salesColumnName(ctx, "party_name", "customer_name")
-	if err != nil {
-		return "", err
-	}
-	if column == "" {
-		return "'' AS party_name", nil
-	}
-	return fmt.Sprintf("COALESCE(%s, '') AS party_name", qualifyColumn(qualifier, column)), nil
-}
-
-func (r *Repository) salesColumnName(ctx context.Context, preferred, fallback string) (string, error) {
-	hasPreferred, err := r.tableHasColumn(ctx, "sales", preferred)
-	if err != nil {
-		return "", err
-	}
-	if hasPreferred {
-		return preferred, nil
-	}
-	hasFallback, err := r.tableHasColumn(ctx, "sales", fallback)
-	if err != nil {
-		return "", err
-	}
-	if hasFallback {
-		return fallback, nil
-	}
-	return "", nil
-}
-
-func (r *Repository) tableHasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
-	var exists bool
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT EXISTS (
-			SELECT 1
-			FROM information_schema.columns
-			WHERE table_schema = current_schema()
-			  AND table_name = ?
-			  AND column_name = ?
-		)
-	`, tableName, columnName).Scan(&exists).Error
-	return exists, err
+func (r *Repository) salesPartyNameSelectExpr(_ context.Context, qualifier string) (string, error) {
+	return fmt.Sprintf("COALESCE(%s, '') AS party_name", qualifyColumn(qualifier, "party_name")), nil
 }
 
 func qualifyColumn(qualifier, column string) string {

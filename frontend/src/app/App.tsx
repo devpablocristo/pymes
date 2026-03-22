@@ -1,34 +1,43 @@
+import { Suspense, lazy, type ReactNode } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
-import { Shell } from '../components/Shell';
-import { AdminPage } from '../pages/AdminPage';
-import { CommercialAssistantPage } from '../pages/CommercialAssistantPage';
-import { DashboardPage } from '../pages/DashboardPage';
-import { AutoRepairServicesPage } from '../pages/AutoRepairServicesPage';
-import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
-import { AutoRepairWorkOrdersPage } from '../pages/AutoRepairWorkOrdersPage';
-import { BeautySalonServicesPage } from '../pages/BeautySalonServicesPage';
-import { BeautyStaffPage } from '../pages/BeautyStaffPage';
-import { RestaurantDiningAreasPage } from '../pages/RestaurantDiningAreasPage';
-import { RestaurantDiningTablesPage } from '../pages/RestaurantDiningTablesPage';
-import { RestaurantTableSessionsPage } from '../pages/RestaurantTableSessionsPage';
-import { IntakesPage } from '../pages/IntakesPage';
-import { LoginPage } from '../pages/LoginPage';
-import { CustomersPage } from '../pages/CustomersPage';
-import { PurchasesPage } from '../pages/PurchasesPage';
-import { ModulePage } from '../pages/ModulePage';
-import { NotificationPreferencesPage } from '../pages/NotificationPreferencesPage';
-import { OnboardingPage } from '../pages/OnboardingPage';
-import { PublicPreviewPage } from '../pages/PublicPreviewPage';
-import { SessionsPage } from '../pages/SessionsPage';
-import { SettingsPage } from '../pages/SettingsPage';
-import { SignupPage } from '../pages/SignupPage';
-import { SpecialtiesPage } from '../pages/SpecialtiesPage';
-import { TeachersPage } from '../pages/TeachersPage';
 import { clerkEnabled } from '../lib/auth';
 import { hasCompletedOnboarding } from '../lib/tenantProfile';
+
+const Shell = lazy(() => import('../components/Shell').then((mod) => ({ default: mod.Shell })));
+const AdminPage = lazy(() => import('../pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
+const AutoRepairServicesPage = lazy(() => import('../pages/AutoRepairServicesPage').then((mod) => ({ default: mod.AutoRepairServicesPage })));
+const AutoRepairVehiclesPage = lazy(() => import('../pages/AutoRepairVehiclesPage').then((mod) => ({ default: mod.AutoRepairVehiclesPage })));
+const AutoRepairWorkOrdersPage = lazy(() => import('../pages/AutoRepairWorkOrdersPage').then((mod) => ({ default: mod.AutoRepairWorkOrdersPage })));
+const AutoRepairWorkOrdersKanbanPage = lazy(() =>
+  import('../pages/AutoRepairWorkOrdersKanbanPage').then((mod) => ({ default: mod.AutoRepairWorkOrdersKanbanPage })),
+);
+const BeautySalonServicesPage = lazy(() => import('../pages/BeautySalonServicesPage').then((mod) => ({ default: mod.BeautySalonServicesPage })));
+const BeautyStaffPage = lazy(() => import('../pages/BeautyStaffPage').then((mod) => ({ default: mod.BeautyStaffPage })));
+const CommercialAssistantPage = lazy(() => import('../pages/CommercialAssistantPage').then((mod) => ({ default: mod.CommercialAssistantPage })));
+const CustomersPage = lazy(() => import('../pages/CustomersPage').then((mod) => ({ default: mod.CustomersPage })));
+const DashboardPage = lazy(() => import('../pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })));
+const IntakesPage = lazy(() => import('../pages/IntakesPage').then((mod) => ({ default: mod.IntakesPage })));
+const LoginPage = lazy(() => import('../pages/LoginPage').then((mod) => ({ default: mod.LoginPage })));
+const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) => ({ default: mod.ModulePage })));
+const NotificationPreferencesPage = lazy(() => import('../pages/NotificationPreferencesPage').then((mod) => ({ default: mod.NotificationPreferencesPage })));
+const OnboardingPage = lazy(() => import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })));
+const PublicPreviewPage = lazy(() => import('../pages/PublicPreviewPage').then((mod) => ({ default: mod.PublicPreviewPage })));
+const PurchasesPage = lazy(() => import('../pages/PurchasesPage').then((mod) => ({ default: mod.PurchasesPage })));
+const RestaurantDiningAreasPage = lazy(() => import('../pages/RestaurantDiningAreasPage').then((mod) => ({ default: mod.RestaurantDiningAreasPage })));
+const RestaurantDiningTablesPage = lazy(() => import('../pages/RestaurantDiningTablesPage').then((mod) => ({ default: mod.RestaurantDiningTablesPage })));
+const RestaurantTableSessionsPage = lazy(() => import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })));
+const SessionsPage = lazy(() => import('../pages/SessionsPage').then((mod) => ({ default: mod.SessionsPage })));
+const SettingsPage = lazy(() => import('../pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })));
+const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
+const SpecialtiesPage = lazy(() => import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })));
+const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({ default: mod.TeachersPage })));
+
+function Suspended({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="card"><p>Cargando…</p></div>}>{children}</Suspense>;
+}
 
 function RequireOnboarding({ children }: { children: React.ReactNode }) {
   if (!hasCompletedOnboarding()) {
@@ -44,13 +53,15 @@ export function App() {
       {clerkEnabled && <ClerkSessionOrgSync />}
       <Routes>
         {/* Clerk (path routing) usa subrutas: /login/tasks/choose-organization, etc. */}
-        <Route path="/login/*" element={<LoginPage />} />
-        <Route path="/signup/*" element={<SignupPage />} />
+        <Route path="/login/*" element={<Suspended><LoginPage /></Suspended>} />
+        <Route path="/signup/*" element={<Suspended><SignupPage /></Suspended>} />
         <Route
           path="/onboarding"
           element={
             <ProtectedRoute>
-              <OnboardingPage />
+              <Suspended>
+                <OnboardingPage />
+              </Suspended>
             </ProtectedRoute>
           }
         />
@@ -59,49 +70,40 @@ export function App() {
           element={
             <ProtectedRoute>
               <RequireOnboarding>
-                <Shell>
-                  <Routes>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
-                    <Route path="/modules/customers" element={<CustomersPage />} />
-                    <Route path="/modules/purchases" element={<PurchasesPage />} />
-                    <Route path="/compras" element={<PurchasesPage />} />
-                    <Route path="/purchases" element={<Navigate to="/compras" replace />} />
-                    <Route path="/modules/:moduleId" element={<ModulePage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
-                    <Route
-                      path="/settings/notifications"
-                      element={<NotificationPreferencesPage />}
-                    />
-                    <Route path="/professionals" element={<Navigate to="/professionals/teachers" replace />} />
-                    <Route path="/specialties" element={<Navigate to="/professionals/teachers/specialties" replace />} />
-                    <Route path="/intakes" element={<Navigate to="/professionals/teachers/intakes" replace />} />
-                    <Route path="/sessions" element={<Navigate to="/professionals/teachers/sessions" replace />} />
-                    <Route path="/public" element={<Navigate to="/professionals/teachers/public" replace />} />
-                    <Route path="/professionals/teachers" element={<TeachersPage />} />
-                    <Route path="/professionals/teachers/specialties" element={<SpecialtiesPage />} />
-                    <Route path="/professionals/teachers/intakes" element={<IntakesPage />} />
-                    <Route path="/professionals/teachers/sessions" element={<SessionsPage />} />
-                    <Route path="/professionals/teachers/public" element={<PublicPreviewPage />} />
-                    <Route path="/workshops" element={<Navigate to="/workshops/auto-repair/vehicles" replace />} />
-                    <Route path="/workshops/vehicles" element={<Navigate to="/workshops/auto-repair/vehicles" replace />} />
-                    <Route path="/workshops/services" element={<Navigate to="/workshops/auto-repair/services" replace />} />
-                    <Route path="/workshops/orders" element={<Navigate to="/workshops/auto-repair/orders" replace />} />
-                    <Route path="/workshops/auto-repair/vehicles" element={<AutoRepairVehiclesPage />} />
-                    <Route path="/workshops/auto-repair/services" element={<AutoRepairServicesPage />} />
-                    <Route path="/workshops/auto-repair/orders" element={<AutoRepairWorkOrdersPage />} />
-                    <Route path="/beauty" element={<Navigate to="/beauty/salon/staff" replace />} />
-                    <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
-                    <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
-                    <Route path="/restaurants" element={<Navigate to="/restaurants/dining/areas" replace />} />
-                    <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
-                    <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
-                    <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
-                  </Routes>
-                </Shell>
+                <Suspended>
+                  <Shell>
+                    <Routes>
+                      <Route path="/" element={<DashboardPage />} />
+                      <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
+                      <Route path="/modules/customers" element={<CustomersPage />} />
+                      <Route path="/modules/purchases" element={<PurchasesPage />} />
+                      <Route path="/compras" element={<PurchasesPage />} />
+                      <Route path="/modules/:moduleId" element={<ModulePage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
+                      <Route
+                        path="/settings/notifications"
+                        element={<NotificationPreferencesPage />}
+                      />
+                      <Route path="/professionals/teachers" element={<TeachersPage />} />
+                      <Route path="/professionals/teachers/specialties" element={<SpecialtiesPage />} />
+                      <Route path="/professionals/teachers/intakes" element={<IntakesPage />} />
+                      <Route path="/professionals/teachers/sessions" element={<SessionsPage />} />
+                      <Route path="/professionals/teachers/public" element={<PublicPreviewPage />} />
+                      <Route path="/workshops/auto-repair/vehicles" element={<AutoRepairVehiclesPage />} />
+                      <Route path="/workshops/auto-repair/services" element={<AutoRepairServicesPage />} />
+                      <Route path="/workshops/auto-repair/orders" element={<AutoRepairWorkOrdersPage />} />
+                      <Route path="/workshops/auto-repair/orders/board" element={<AutoRepairWorkOrdersKanbanPage />} />
+                      <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
+                      <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
+                      <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
+                      <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
+                      <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
+                    </Routes>
+                  </Shell>
+                </Suspended>
               </RequireOnboarding>
             </ProtectedRoute>
           }

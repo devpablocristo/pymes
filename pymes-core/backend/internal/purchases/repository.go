@@ -151,7 +151,12 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 
 func (r *Repository) GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error) {
 	var name string
-	err := r.db.WithContext(ctx).Table("suppliers").Select("name").Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, supplierID).Take(&name).Error
+	err := r.db.WithContext(ctx).
+		Table("parties p").
+		Select("p.display_name").
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
+		Where("p.org_id = ? AND p.id = ? AND p.deleted_at IS NULL", orgID, supplierID).
+		Take(&name).Error
 	return name, err
 }
 

@@ -23,7 +23,6 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
 
 
-@router.post("/v1/workshops/chat", include_in_schema=False)
 @router.post("/v1/workshops/auto-repair/chat")
 async def chat_auto_repair(
     req: ChatRequest,

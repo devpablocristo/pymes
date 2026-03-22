@@ -183,7 +183,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 		q = q.Where("status = ?", s)
 	}
 	if p.CustomerID != nil && *p.CustomerID != uuid.Nil {
-		q = q.Where("customer_id = ?", *p.CustomerID)
+		q = q.Where("party_id = ?", *p.CustomerID)
 	}
 	if p.From != nil {
 		q = q.Where("created_at >= ?", *p.From)
@@ -265,15 +265,15 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 		}
 
 		updates := map[string]any{
-			"customer_id":   in.CustomerID,
-			"customer_name": strings.TrimSpace(in.CustomerName),
-			"subtotal":      in.Subtotal,
-			"tax_total":     in.TaxTotal,
-			"total":         in.Total,
-			"currency":      strings.TrimSpace(in.Currency),
-			"notes":         strings.TrimSpace(in.Notes),
-			"valid_until":   in.ValidUntil,
-			"updated_at":    gorm.Expr("now()"),
+			"party_id":    in.CustomerID,
+			"party_name":  strings.TrimSpace(in.CustomerName),
+			"subtotal":    in.Subtotal,
+			"tax_total":   in.TaxTotal,
+			"total":       in.Total,
+			"currency":    strings.TrimSpace(in.Currency),
+			"notes":       strings.TrimSpace(in.Notes),
+			"valid_until": in.ValidUntil,
+			"updated_at":  gorm.Expr("now()"),
 		}
 		if err := tx.Model(&models.QuoteModel{}).
 			Where("org_id = ? AND id = ? AND status = 'draft'", in.OrgID, in.ID).

@@ -20,7 +20,7 @@ Vertical `workshops` para talleres LATAM. Subdominios canónicos: `auto_repair`,
 
 ### Autenticación
 
-Rutas bajo `/v1/auto-repair/...` (y aliases) exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, el Bearer debe incluir organización activa (`org_...` resuelto vía control plane). Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+Rutas bajo `/v1/auto-repair/...` exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, el Bearer debe incluir organización activa (`org_...` resuelto vía control plane). Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
 
 ### Local (Docker Compose)
 
@@ -62,10 +62,6 @@ Superficie publica:
 - `POST /v1/public/:org_slug/auto-repair/appointments`
 - `GET /v1/public/:org_slug/bike-shop/services`
 - `POST /v1/public/:org_slug/bike-shop/appointments`
-
-Compatibilidad:
-
-- las rutas legacy `/v1/vehicles`, `/v1/workshop-services`, `/v1/work-orders` y afines siguen vivas como alias
 
 ## Estructura interna estandar
 
@@ -120,14 +116,6 @@ Rutas:
 - `/workshops/auto-repair/services`
 - `/workshops/auto-repair/orders`
 
-Compatibilidad:
-
-- `/workshops/vehicles`
-- `/workshops/services`
-- `/workshops/orders`
-
-redireccionan al subdominio canonico `auto-repair`.
-
 Las tres usan el blueprint comun `CrudPage`.
 
 Capacidades contextuales en OT:
@@ -147,11 +135,6 @@ Rutas:
 
 - `POST /v1/workshops/auto-repair/chat`
 - `POST /v1/workshops/auto-repair/public/:org_slug/chat`
-
-Compatibilidad:
-
-- `POST /v1/workshops/chat`
-- `POST /v1/workshops/public/:org_slug/chat`
 
 Import / export:
 

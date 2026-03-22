@@ -64,8 +64,8 @@ type BookInput struct {
 
 type AppointmentPublic struct {
 	ID            uuid.UUID `json:"id"`
-	CustomerName  string    `json:"party_name" gorm:"column:customer_name"`
-	CustomerPhone string    `json:"party_phone" gorm:"column:customer_phone"`
+	CustomerName  string    `json:"party_name" gorm:"column:party_name"`
+	CustomerPhone string    `json:"party_phone" gorm:"column:party_phone"`
 	Title         string    `json:"title"`
 	Status        string    `json:"status"`
 	StartAt       time.Time `json:"start_at"`
@@ -275,18 +275,18 @@ func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, in BookInput) (A
 	}
 
 	err = r.db.WithContext(ctx).Table("appointments").Create(map[string]any{
-		"id":             appointment.ID,
-		"org_id":         orgID,
-		"customer_name":  appointment.CustomerName,
-		"customer_phone": appointment.CustomerPhone,
-		"title":          appointment.Title,
-		"status":         appointment.Status,
-		"start_at":       appointment.StartAt,
-		"end_at":         appointment.EndAt,
-		"duration":       appointment.Duration,
-		"created_by":     "public-api",
-		"created_at":     time.Now().UTC(),
-		"updated_at":     time.Now().UTC(),
+		"id":          appointment.ID,
+		"org_id":      orgID,
+		"party_name":  appointment.CustomerName,
+		"party_phone": appointment.CustomerPhone,
+		"title":       appointment.Title,
+		"status":      appointment.Status,
+		"start_at":    appointment.StartAt,
+		"end_at":      appointment.EndAt,
+		"duration":    appointment.Duration,
+		"created_by":  "public-api",
+		"created_at":  time.Now().UTC(),
+		"updated_at":  time.Now().UTC(),
 	}).Error
 	if err != nil {
 		return AppointmentPublic{}, err
@@ -309,8 +309,8 @@ func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone str
 	var rows []AppointmentPublic
 	err := r.db.WithContext(ctx).
 		Table("appointments").
-		Select("id, customer_name, customer_phone, title, status, start_at, end_at, duration").
-		Where("org_id = ? AND regexp_replace(customer_phone, '[^0-9]', '', 'g') = ?", orgID, phoneDigits).
+		Select("id, party_name, party_phone, title, status, start_at, end_at, duration").
+		Where("org_id = ? AND regexp_replace(party_phone, '[^0-9]', '', 'g') = ?", orgID, phoneDigits).
 		Order("start_at DESC").
 		Limit(limit).
 		Scan(&rows).Error

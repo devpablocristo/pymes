@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
-import { ConfiguredCrudPage, hasCrudResource } from '../crud/resourceConfigs';
+import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
 import {
   moduleCatalog,
   moduleGroups,
@@ -541,8 +541,25 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
 
 export function ModulePage() {
   const { moduleId = '' } = useParams();
-  if (hasCrudResource(moduleId)) {
-    return <ConfiguredCrudPage resourceId={moduleId} />;
+  const [isCrudModule, setIsCrudModule] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void hasLazyCrudResource(moduleId).then((result) => {
+      if (!cancelled) {
+        setIsCrudModule(result);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleId]);
+
+  if (isCrudModule == null) {
+    return <div className="card"><p>Cargando modulo…</p></div>;
+  }
+  if (isCrudModule) {
+    return <LazyConfiguredCrudPage resourceId={moduleId} />;
   }
   return <ModuleExplorerPage moduleId={moduleId} />;
 }

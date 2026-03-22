@@ -21,7 +21,7 @@
 
 ### Autenticación
 
-Rutas bajo `/v1/teachers/...` (y aliases) exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, org activa en el token. Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
+Rutas bajo `/v1/teachers/...` exigen JWT (o API key si el servicio lo permite) con **org UUID** válido en contexto. Con Clerk, org activa en el token. Ver [AUTH.md](./AUTH.md) y [CLERK_LOCAL.md](./CLERK_LOCAL.md).
 
 ### Local (Docker Compose)
 
@@ -63,16 +63,6 @@ Rutas frontend canonicas:
 - `/professionals/teachers/sessions`
 - `/professionals/teachers/public`
 
-Compatibilidad:
-
-- `/professionals`
-- `/specialties`
-- `/intakes`
-- `/sessions`
-- `/public`
-
-redireccionan al modulo canonico `teachers`.
-
 API canonica:
 
 - `GET/POST/PUT /v1/teachers/professionals`
@@ -83,21 +73,10 @@ API canonica:
 - `POST /v1/teachers/sessions/:id/notes`
 - `GET /v1/teachers/public-preview/bootstrap`
 
-Compatibilidad:
-
-- las rutas legacy `/v1/professionals`, `/v1/specialties`, `/v1/intakes`, `/v1/sessions` y asociadas siguen vivas como alias
-
 AI canonico:
 
 - `POST /v1/professionals/teachers/chat`
 - `POST /v1/professionals/teachers/public/:org_slug/chat`
-
-Compatibilidad AI:
-
-- `/v1/professionals/chat`
-- `/v1/professionals/public/:org_slug/chat`
-
-siguen existiendo como alias.
 
 ## Estructura interna estandar
 

@@ -27,12 +27,13 @@ type WorkOrder struct {
 	SubtotalParts    float64
 	TaxTotal         float64
 	Total            float64
-	OpenedAt         time.Time
-	PromisedAt       *time.Time
-	ReadyAt          *time.Time
-	DeliveredAt      *time.Time
-	CreatedBy        string
-	CreatedAt        time.Time
+	OpenedAt              time.Time
+	PromisedAt            *time.Time
+	ReadyAt               *time.Time
+	DeliveredAt           *time.Time
+	ReadyPickupNotifiedAt *time.Time
+	CreatedBy             string
+	CreatedAt             time.Time
 	UpdatedAt        time.Time
 	Items            []WorkOrderItem
 }

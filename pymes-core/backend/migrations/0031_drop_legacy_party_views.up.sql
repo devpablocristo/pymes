@@ -1,0 +1,2 @@
+DROP VIEW IF EXISTS suppliers;
+DROP VIEW IF EXISTS customers;

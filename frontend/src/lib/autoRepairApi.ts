@@ -102,8 +102,19 @@ export async function updateAutoRepairService(
   return autoRepairRequest(`/v1/auto-repair/workshop-services/${id}`, { method: 'PUT', body: data });
 }
 
-export async function getAutoRepairWorkOrders(): Promise<{ items: AutoRepairWorkOrder[] }> {
-  return autoRepairRequest('/v1/auto-repair/work-orders');
+export async function getAutoRepairWorkOrders(params?: {
+  limit?: number;
+  search?: string;
+  status?: string;
+  after?: string;
+}): Promise<{ items: AutoRepairWorkOrder[]; total?: number; has_more?: boolean; next_cursor?: string }> {
+  const q = new URLSearchParams();
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.search) q.set('search', params.search);
+  if (params?.status) q.set('status', params.status);
+  if (params?.after) q.set('after', params.after);
+  const suffix = q.toString() ? `?${q.toString()}` : '';
+  return autoRepairRequest(`/v1/auto-repair/work-orders${suffix}`);
 }
 
 export async function createAutoRepairWorkOrder(data: {
@@ -149,6 +160,17 @@ export async function updateAutoRepairWorkOrder(
   return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`, { method: 'PUT', body: data });
 }
 
+export async function patchAutoRepairWorkOrder(
+  id: string,
+  data: Partial<{
+    status: string;
+    vehicle_id: string;
+    promised_at: string;
+  }>,
+): Promise<AutoRepairWorkOrder> {
+  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`, { method: 'PATCH', body: data });
+}
+
 export async function createAutoRepairAppointment(data: {
   customer_id?: string;
   customer_name: string;
@@ -187,6 +209,7 @@ export const updateWorkshopService = updateAutoRepairService;
 export const getWorkOrders = getAutoRepairWorkOrders;
 export const createWorkOrder = createAutoRepairWorkOrder;
 export const updateWorkOrder = updateAutoRepairWorkOrder;
+export const patchWorkOrder = patchAutoRepairWorkOrder;
 export const createWorkshopAppointment = createAutoRepairAppointment;
 export const createWorkOrderQuote = createAutoRepairQuote;
 export const createWorkOrderSale = createAutoRepairSale;

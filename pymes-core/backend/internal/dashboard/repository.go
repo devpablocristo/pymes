@@ -2,9 +2,9 @@
 package dashboard
 
 import (
-	"errors"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -278,15 +278,11 @@ func (r *Repository) LoadLowStock(ctx context.Context, orgID uuid.UUID) (dashboa
 
 func (r *Repository) LoadRecentSales(ctx context.Context, orgID uuid.UUID) (dashboarddomain.RecentSalesData, error) {
 	out := dashboarddomain.RecentSalesData{}
-	customerNameExpr, err := r.salesPartyNameExpr(ctx)
-	if err != nil {
-		return dashboarddomain.RecentSalesData{}, err
-	}
-	err = r.db.WithContext(ctx).Raw(fmt.Sprintf(`
+	err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			id::text AS id,
 			number,
-			%s AS customer_name,
+			COALESCE(party_name, '') AS customer_name,
 			total,
 			currency,
 			to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
@@ -294,7 +290,7 @@ func (r *Repository) LoadRecentSales(ctx context.Context, orgID uuid.UUID) (dash
 		WHERE org_id = ?
 		ORDER BY created_at DESC
 		LIMIT 6
-	`, customerNameExpr), orgID).Scan(&out.Items).Error
+	`, orgID).Scan(&out.Items).Error
 	return out, err
 }
 
@@ -392,38 +388,6 @@ func decodeObject(raw []byte) map[string]any {
 		return map[string]any{}
 	}
 	return out
-}
-
-func (r *Repository) salesPartyNameExpr(ctx context.Context) (string, error) {
-	hasPartyName, err := r.tableHasColumn(ctx, "sales", "party_name")
-	if err != nil {
-		return "", err
-	}
-	if hasPartyName {
-		return "COALESCE(party_name, '')", nil
-	}
-	hasCustomerName, err := r.tableHasColumn(ctx, "sales", "customer_name")
-	if err != nil {
-		return "", err
-	}
-	if hasCustomerName {
-		return "COALESCE(customer_name, '')", nil
-	}
-	return "''", nil
-}
-
-func (r *Repository) tableHasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
-	var exists bool
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT EXISTS (
-			SELECT 1
-			FROM information_schema.columns
-			WHERE table_schema = current_schema()
-			  AND table_name = ?
-			  AND column_name = ?
-		)
-	`, tableName, columnName).Scan(&exists).Error
-	return exists, err
 }
 
 func boolStatus(active bool) string {

@@ -9,9 +9,9 @@ import (
 type AppointmentModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
-	CustomerID    *uuid.UUID `gorm:"column:customer_id;type:uuid"`
-	CustomerName  string     `gorm:"column:customer_name"`
-	CustomerPhone string     `gorm:"column:customer_phone"`
+	CustomerID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
+	CustomerName  string     `gorm:"column:party_name"`
+	CustomerPhone string     `gorm:"column:party_phone"`
 	Title         string
 	Description   string
 	Status        string

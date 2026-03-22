@@ -46,12 +46,13 @@ type WorkOrderItem struct {
 	TaxTotal         float64             `json:"tax_total"`
 	Total            float64             `json:"total"`
 	OpenedAt         string              `json:"opened_at"`
-	PromisedAt       *string             `json:"promised_at,omitempty"`
-	ReadyAt          *string             `json:"ready_at,omitempty"`
-	DeliveredAt      *string             `json:"delivered_at,omitempty"`
-	CreatedBy        string              `json:"created_by"`
-	CreatedAt        string              `json:"created_at"`
-	UpdatedAt        string              `json:"updated_at"`
+	PromisedAt            *string `json:"promised_at,omitempty"`
+	ReadyAt               *string `json:"ready_at,omitempty"`
+	DeliveredAt           *string `json:"delivered_at,omitempty"`
+	ReadyPickupNotifiedAt *string `json:"ready_pickup_notified_at,omitempty"`
+	CreatedBy             string  `json:"created_by"`
+	CreatedAt             string  `json:"created_at"`
+	UpdatedAt             string  `json:"updated_at"`
 	Items            []WorkOrderLineItem `json:"items"`
 }
 

@@ -20,7 +20,6 @@ class PublicChatRequest(BaseModel):
     phone: str | None = None
 
 
-@router.post("/v1/workshops/public/{org_slug}/chat", include_in_schema=False)
 @router.post("/v1/workshops/auto-repair/public/{org_slug}/chat")
 async def chat_auto_repair_public(
     req: PublicChatRequest,

@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.POST("/work-orders", h.Create)
 	authGroup.GET("/work-orders/:id", h.Get)
 	authGroup.PUT("/work-orders/:id", h.Update)
+	authGroup.PATCH("/work-orders/:id", h.Update)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -266,6 +267,10 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 	if item.DeliveredAt != nil {
 		value := item.DeliveredAt.UTC().Format(time.RFC3339)
 		result.DeliveredAt = &value
+	}
+	if item.ReadyPickupNotifiedAt != nil {
+		value := item.ReadyPickupNotifiedAt.UTC().Format(time.RFC3339)
+		result.ReadyPickupNotifiedAt = &value
 	}
 	return result
 }

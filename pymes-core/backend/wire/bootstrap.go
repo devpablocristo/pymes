@@ -242,7 +242,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), whatsappUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())

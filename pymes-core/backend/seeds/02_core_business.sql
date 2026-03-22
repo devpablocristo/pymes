@@ -32,115 +32,39 @@ BEGIN
     sale1 := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/1');
     sale2 := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/2');
 
-    INSERT INTO customers (id, org_id, type, name, tax_id, email, phone, notes, tags)
-    VALUES
-        (c1, v_org, 'person', 'Cliente Demo Uno', NULL, 'cliente1@local.dev', '+54-11-1000-0001', 'seed', ARRAY['demo']),
-        (c2, v_org, 'company', 'Cliente Demo Dos', '20111222333', 'compras@demo2.local', '+54-11-1000-0002', 'seed', ARRAY['demo', 'vip']),
-        (c3, v_org, 'person', 'Cliente Demo Tres', NULL, NULL, '+54-11-1000-0003', 'seed', ARRAY['demo'])
-    ON CONFLICT (id) DO NOTHING;
-
-    INSERT INTO suppliers (id, org_id, name, tax_id, email, phone, contact_name, notes, tags)
-    VALUES
-        (s1, v_org, 'Proveedor Demo 1', '30700111223', 'ventas@prov1.local', '+54-11-2000-0001', 'Lucia', 'seed', ARRAY['demo']),
-        (s2, v_org, 'Proveedor Demo 2', NULL, 'ventas@prov2.local', '+54-11-2000-0002', 'Martin', 'seed', ARRAY['demo'])
-    ON CONFLICT (id) DO NOTHING;
-
-    -- Party model: la API de clientes lista desde parties + party_roles; espejo de customers/suppliers.
     INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
-    SELECT
-        c.id,
-        c.org_id,
-        CASE WHEN c.type = 'company' THEN 'organization' ELSE 'person' END,
-        c.name,
-        NULLIF(TRIM(c.email), ''),
-        NULLIF(TRIM(c.phone), ''),
-        COALESCE(c.address, '{}'::jsonb),
-        NULLIF(TRIM(c.tax_id), ''),
-        COALESCE(c.notes, ''),
-        COALESCE(c.tags, '{}'::text[]),
-        COALESCE(c.metadata, '{}'::jsonb),
-        c.created_at,
-        c.updated_at,
-        c.deleted_at
-    FROM customers c
-    WHERE c.org_id = v_org AND c.id IN (c1, c2, c3)
+    VALUES
+        (c1, v_org, 'person', 'Cliente Demo Uno', 'cliente1@local.dev', '+54-11-1000-0001', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], '{}'::jsonb, now(), now(), NULL),
+        (c2, v_org, 'organization', 'Cliente Demo Dos', 'compras@demo2.local', '+54-11-1000-0002', '{}'::jsonb, '20111222333', 'seed', ARRAY['demo', 'vip'], '{}'::jsonb, now(), now(), NULL),
+        (c3, v_org, 'person', 'Cliente Demo Tres', NULL, '+54-11-1000-0003', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], '{}'::jsonb, now(), now(), NULL),
+        (s1, v_org, 'organization', 'Proveedor Demo 1', 'ventas@prov1.local', '+54-11-2000-0001', '{}'::jsonb, '30700111223', 'seed', ARRAY['demo'], jsonb_build_object('contact_name', 'Lucia'), now(), now(), NULL),
+        (s2, v_org, 'organization', 'Proveedor Demo 2', 'ventas@prov2.local', '+54-11-2000-0002', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], jsonb_build_object('contact_name', 'Martin'), now(), now(), NULL)
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO party_persons (party_id, first_name, last_name)
-    SELECT
-        c.id,
-        split_part(TRIM(c.name), ' ', 1),
-        NULLIF(TRIM(regexp_replace(TRIM(c.name), '^[^ ]+\s*', '')), '')
-    FROM customers c
-    WHERE c.org_id = v_org AND c.id IN (c1, c2, c3) AND c.type = 'person'
+    VALUES
+        (c1, 'Cliente', 'Demo Uno'),
+        (c3, 'Cliente', 'Demo Tres')
     ON CONFLICT (party_id) DO NOTHING;
 
     INSERT INTO party_organizations (party_id, legal_name, trade_name, tax_condition)
-    SELECT
-        c.id,
-        c.name,
-        c.name,
-        COALESCE(c.metadata->>'tax_condition', '')
-    FROM customers c
-    WHERE c.org_id = v_org AND c.id IN (c1, c2, c3) AND c.type = 'company'
+    VALUES
+        (c2, 'Cliente Demo Dos', 'Cliente Demo Dos', ''),
+        (s1, 'Proveedor Demo 1', 'Proveedor Demo 1', ''),
+        (s2, 'Proveedor Demo 2', 'Proveedor Demo 2', '')
     ON CONFLICT (party_id) DO NOTHING;
 
     INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-    SELECT gen_random_uuid(), c.id, c.org_id, 'customer', true, c.price_list_id, '{}'::jsonb, c.created_at
-    FROM customers c
-    WHERE c.org_id = v_org AND c.id IN (c1, c2, c3)
-    ON CONFLICT (party_id, org_id, role) DO NOTHING;
-
-    INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
-    SELECT
-        s.id,
-        s.org_id,
-        'organization',
-        s.name,
-        NULLIF(TRIM(s.email), ''),
-        NULLIF(TRIM(s.phone), ''),
-        COALESCE(s.address, '{}'::jsonb),
-        NULLIF(TRIM(s.tax_id), ''),
-        COALESCE(s.notes, ''),
-        COALESCE(s.tags, '{}'::text[]),
-        COALESCE(s.metadata, '{}'::jsonb)
-            || CASE
-                WHEN COALESCE(NULLIF(TRIM(s.contact_name), ''), '') = '' THEN '{}'::jsonb
-                ELSE jsonb_build_object('contact_name', s.contact_name)
-            END,
-        s.created_at,
-        s.updated_at,
-        s.deleted_at
-    FROM suppliers s
-    WHERE s.org_id = v_org AND s.id IN (s1, s2)
-    ON CONFLICT (id) DO NOTHING;
-
-    INSERT INTO party_organizations (party_id, legal_name, trade_name, tax_condition)
-    SELECT
-        s.id,
-        s.name,
-        s.name,
-        COALESCE(s.metadata->>'tax_condition', '')
-    FROM suppliers s
-    WHERE s.org_id = v_org AND s.id IN (s1, s2)
-    ON CONFLICT (party_id) DO NOTHING;
-
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-    SELECT
-        gen_random_uuid(),
-        s.id,
-        s.org_id,
-        'supplier',
-        true,
-        NULL::uuid,
-        CASE
-            WHEN COALESCE(NULLIF(TRIM(s.contact_name), ''), '') = '' THEN '{}'::jsonb
-            ELSE jsonb_build_object('contact_name', s.contact_name)
-        END,
-        s.created_at
-    FROM suppliers s
-    WHERE s.org_id = v_org AND s.id IN (s1, s2)
-    ON CONFLICT (party_id, org_id, role) DO NOTHING;
+    VALUES
+        (gen_random_uuid(), c1, v_org, 'customer', true, NULL::uuid, '{}'::jsonb, now()),
+        (gen_random_uuid(), c2, v_org, 'customer', true, NULL::uuid, '{}'::jsonb, now()),
+        (gen_random_uuid(), c3, v_org, 'customer', true, NULL::uuid, '{}'::jsonb, now()),
+        (gen_random_uuid(), s1, v_org, 'supplier', true, NULL::uuid, jsonb_build_object('contact_name', 'Lucia'), now()),
+        (gen_random_uuid(), s2, v_org, 'supplier', true, NULL::uuid, jsonb_build_object('contact_name', 'Martin'), now())
+    ON CONFLICT (party_id, org_id, role) DO UPDATE SET
+        is_active = EXCLUDED.is_active,
+        price_list_id = EXCLUDED.price_list_id,
+        metadata = EXCLUDED.metadata;
 
     -- Índice único (org_id, sku) es parcial → no sirve para ON CONFLICT; upsert manual.
     SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
@@ -192,7 +116,7 @@ BEGIN
             min_quantity = EXCLUDED.min_quantity,
             updated_at = now();
 
-    INSERT INTO quotes (id, org_id, number, customer_id, customer_name, status, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO quotes (id, org_id, number, party_id, party_name, status, subtotal, tax_total, total, currency, notes, created_by)
     VALUES (q1, v_org, 'PRE-00001', c1, 'Cliente Demo Uno', 'accepted', 40000, 8400, 48400, 'ARS', 'seed quote', 'seed')
     ON CONFLICT (org_id, number) DO NOTHING;
     SELECT id INTO q1 FROM quotes WHERE org_id = v_org AND number = 'PRE-00001' LIMIT 1;
@@ -207,7 +131,7 @@ BEGIN
         (uuid_generate_v5(v_org, 'pymes-seed/v1/quote-item/2'), q1, p4, 'Servicio Demo Instalación', 1, 25000, 21, 25000, 2)
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO sales (id, org_id, number, customer_id, customer_name, quote_id, status, payment_method, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO sales (id, org_id, number, party_id, party_name, quote_id, status, payment_method, subtotal, tax_total, total, currency, notes, created_by)
     VALUES
         (sale1, v_org, 'VTA-00001', c1, 'Cliente Demo Uno', q1, 'completed', 'transfer', 40000, 8400, 48400, 'ARS', 'seed sale 1', 'seed'),
         (sale2, v_org, 'VTA-00002', c2, 'Cliente Demo Dos', NULL, 'completed', 'cash', 9500, 1995, 11495, 'ARS', 'seed sale 2', 'seed')

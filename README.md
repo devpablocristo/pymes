@@ -24,6 +24,11 @@ make up
 # equivalente: docker compose up -d --build
 ```
 
+Prerequisitos locales:
+
+- Node `>= 20.9.0` para `frontend/` (`.nvmrc` fijado en `20.9.0`; Clerk ya exige esa base).
+- `ENVIRONMENT=development` en backends Go y `AI_ENVIRONMENT=development` en AI para desarrollo local.
+
 **Flujo habitual:** todo el stack en **contenedores** (`make up`); no hace falta levantar backends ni el frontend como procesos nativos en el host.
 
 **Identidad:** sin Clerk → API key local `psk_local_admin` (la crean los **seeds** del core, no las migraciones: `PYMES_SEED_DEMO=true` en Compose o `make seed-core-demo` con `DATABASE_URL`). Con Clerk → [docs/AUTH.md](docs/AUTH.md) y [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md).
@@ -47,6 +52,11 @@ API key local de desarrollo:
 ## Desarrollo avanzado (sin contenedor para un servicio)
 
 Si necesitás ejecutar un solo binario en el host (p. ej. depurar `pymes-core` con Delve), alineá `DATABASE_URL`, `PORT` y `VITE_API_URL` como en [docs/AUTH.md](docs/AUTH.md) (*puerto del API*). No es el flujo por defecto del equipo.
+
+Variables operativas relevantes:
+
+- `ENVIRONMENT`: `development|dev|local|test` mantienen ergonomía local; `staging|production` activan hardening de secretos.
+- `AI_ENVIRONMENT`: misma regla para `ai/`.
 
 ## Estructura
 

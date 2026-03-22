@@ -2,14 +2,10 @@ package pymescore
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 func (c *Client) GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error) {
-	result, err := c.Get(ctx, fmt.Sprintf("/v1/internal/v1/products/%s", url.PathEscape(productID)), orgID)
-	if err != nil {
-		return nil, fmt.Errorf("get product: %w", err)
-	}
-	return result, nil
+	return pymescoreops.GetProduct(ctx, c.Client, orgID, productID)
 }

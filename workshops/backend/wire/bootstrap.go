@@ -73,7 +73,7 @@ func InitializeApp() *app.App {
 
 	vehiclesUC := vehicles.NewUsecases(vehiclesRepo, auditLog, cpClient)
 	servicesUC := workshopservices.NewUsecases(servicesRepo, auditLog, cpClient)
-	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient)
+	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient, cpClient)
 	orchestrationUC := orchestration.NewUsecases(cpClient, workOrdersRepo, auditLog)
 
 	bikeBicyclesUC := bikebicycles.NewUsecases(bikeBicyclesRepo, auditLog, cpClient)
@@ -128,12 +128,6 @@ func InitializeApp() *app.App {
 	bikeServicesHandler.RegisterRoutes(bikeShopGroup)
 	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
 	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
-
-	// Legacy aliases from the initial workshops release.
-	vehiclesHandler.RegisterRoutes(authGroup)
-	servicesHandler.RegisterRoutes(authGroup)
-	workOrdersHandler.RegisterRoutes(authGroup)
-	orchestrationHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }

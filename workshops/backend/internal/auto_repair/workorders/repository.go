@@ -22,7 +22,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
-	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 250})
 	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ?", p.OrgID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)
@@ -88,10 +88,11 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			TaxTotal:         in.TaxTotal,
 			Total:            in.Total,
 			OpenedAt:         in.OpenedAt,
-			PromisedAt:       in.PromisedAt,
-			ReadyAt:          in.ReadyAt,
-			DeliveredAt:      in.DeliveredAt,
-			CreatedBy:        in.CreatedBy,
+			PromisedAt:            in.PromisedAt,
+			ReadyAt:               in.ReadyAt,
+			DeliveredAt:           in.DeliveredAt,
+			ReadyPickupNotifiedAt: in.ReadyPickupNotifiedAt,
+			CreatedBy:             in.CreatedBy,
 			CreatedAt:        time.Now().UTC(),
 			UpdatedAt:        time.Now().UTC(),
 		}
@@ -143,10 +144,11 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			"tax_total":         in.TaxTotal,
 			"total":             in.Total,
 			"opened_at":         in.OpenedAt,
-			"promised_at":       in.PromisedAt,
-			"ready_at":          in.ReadyAt,
-			"delivered_at":      in.DeliveredAt,
-			"updated_at":        time.Now().UTC(),
+			"promised_at":               in.PromisedAt,
+			"ready_at":                  in.ReadyAt,
+			"delivered_at":              in.DeliveredAt,
+			"ready_pickup_notified_at":  in.ReadyPickupNotifiedAt,
+			"updated_at":                time.Now().UTC(),
 		}
 		res := tx.Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates)
 		if res.Error != nil {
@@ -182,6 +184,23 @@ func (r *Repository) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, 
 		return domain.WorkOrder{}, gorm.ErrRecordNotFound
 	}
 	return r.GetByID(ctx, orgID, id)
+}
+
+// MarkReadyPickupNotified marca idempotencia del aviso WhatsApp de listo para retirar.
+func (r *Repository) MarkReadyPickupNotified(ctx context.Context, orgID, id uuid.UUID, at time.Time) error {
+	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
+		Where("org_id = ? AND id = ?", orgID, id).
+		Updates(map[string]any{
+			"ready_pickup_notified_at": at,
+			"updated_at":             time.Now().UTC(),
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) replaceItems(ctx context.Context, tx *gorm.DB, orgID, workOrderID uuid.UUID, items []domain.WorkOrderItem) error {
@@ -277,10 +296,11 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 		TaxTotal:         row.TaxTotal,
 		Total:            row.Total,
 		OpenedAt:         row.OpenedAt,
-		PromisedAt:       row.PromisedAt,
-		ReadyAt:          row.ReadyAt,
-		DeliveredAt:      row.DeliveredAt,
-		CreatedBy:        row.CreatedBy,
+		PromisedAt:            row.PromisedAt,
+		ReadyAt:               row.ReadyAt,
+		DeliveredAt:           row.DeliveredAt,
+		ReadyPickupNotifiedAt: row.ReadyPickupNotifiedAt,
+		CreatedBy:             row.CreatedBy,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
 		Items:            items,

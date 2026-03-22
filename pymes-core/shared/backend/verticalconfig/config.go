@@ -90,6 +90,11 @@ func isLocalEnvironment(environment string) bool {
 	}
 }
 
+// IsLocalEnvironment indica ambiente de desarrollo local (no usar overrides de org en prod).
+func IsLocalEnvironment(environment string) bool {
+	return isLocalEnvironment(environment)
+}
+
 func validateInternalServiceToken(environment, token string) {
 	normalizedToken := strings.TrimSpace(token)
 	if isLocalEnvironment(environment) {

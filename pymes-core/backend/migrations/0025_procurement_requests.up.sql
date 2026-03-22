@@ -50,20 +50,27 @@ CREATE TABLE IF NOT EXISTS procurement_policies (
 
 CREATE INDEX IF NOT EXISTS idx_procurement_policies_org ON procurement_policies(org_id);
 
--- Permisos para roles de demo (admin ya tiene *:* vía RBAC en app)
+-- Permisos para roles de demo (solo si existen: el seed RBAC vive en seeds/03_rbac.sql)
 DO $$
 DECLARE
     r_almacenero uuid := '21000000-0000-0000-0000-000000000005';
     r_contador uuid := '21000000-0000-0000-0000-000000000004';
 BEGIN
-    INSERT INTO role_permissions (id, role_id, resource, action)
-    VALUES
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'read'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'create'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'update'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'submit'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'read'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'approve'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'reject')
-    ON CONFLICT (role_id, resource, action) DO NOTHING;
+    IF EXISTS (SELECT 1 FROM roles WHERE id = r_almacenero) THEN
+        INSERT INTO role_permissions (id, role_id, resource, action)
+        VALUES
+            (gen_random_uuid(), r_almacenero, 'procurement_requests', 'read'),
+            (gen_random_uuid(), r_almacenero, 'procurement_requests', 'create'),
+            (gen_random_uuid(), r_almacenero, 'procurement_requests', 'update'),
+            (gen_random_uuid(), r_almacenero, 'procurement_requests', 'submit')
+        ON CONFLICT (role_id, resource, action) DO NOTHING;
+    END IF;
+    IF EXISTS (SELECT 1 FROM roles WHERE id = r_contador) THEN
+        INSERT INTO role_permissions (id, role_id, resource, action)
+        VALUES
+            (gen_random_uuid(), r_contador, 'procurement_requests', 'read'),
+            (gen_random_uuid(), r_contador, 'procurement_requests', 'approve'),
+            (gen_random_uuid(), r_contador, 'procurement_requests', 'reject')
+        ON CONFLICT (role_id, resource, action) DO NOTHING;
+    END IF;
 END $$;

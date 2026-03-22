@@ -79,3 +79,82 @@
   font-size: 0.85rem;
   color: var(--text-secondary, #666);
 }
+
+.wo-kanban__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.wo-kanban__subtitle {
+  margin: 0.25rem 0 0;
+  max-width: 42rem;
+}
+
+.wo-kanban__subtitle a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.wo-kanban__toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.wo-kanban__toolbar-actions input[type='search'] {
+  min-width: 14rem;
+  flex: 1;
+  max-width: 24rem;
+}
+
+.wo-kanban__stats {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #666);
+}
+
+.wo-kanban__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.wo-kanban__empty {
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.wo-kanban__empty p {
+  margin: 0 0 1rem;
+  color: var(--text-secondary, #666);
+}
+
+.wo-kanban__column--over {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+  background: var(--surface-muted, rgba(37, 99, 235, 0.06));
+}
+
+.wo-kanban__column-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 6rem;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding-bottom: 0.25rem;
+}
+
+.wo-kanban__card {
+  touch-action: none;
+}
+
+.wo-kanban__card--overlay {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-width: 17rem;
+}

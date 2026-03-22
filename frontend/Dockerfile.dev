@@ -7,6 +7,9 @@ RUN npm install
 
 COPY frontend/ /workspace/frontend
 
+COPY frontend/docker-entrypoint-dev.sh /usr/local/bin/docker-entrypoint-dev.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-dev.sh
+
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-dev.sh"]

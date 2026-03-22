@@ -26,7 +26,7 @@ import {
   createWorkshopAppointment,
   createWorkshopService,
   createWorkshopVehicle,
-  getWorkOrders,
+  getAllWorkOrders,
   getWorkshopServices,
   getWorkshopVehicles,
   updateWorkOrder,
@@ -2236,7 +2236,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'ordenes de trabajo',
     labelPluralCap: 'Ordenes de trabajo',
     dataSource: {
-      list: async () => (await getWorkOrders()).items ?? [],
+      list: async () => getAllWorkOrders(),
       create: async (values) => {
         await createWorkOrder({
           number: asOptionalString(values.number),

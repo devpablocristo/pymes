@@ -46,8 +46,9 @@ services:
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
       PYMES_SEED_DEMO: "true"
-      # Opcional Clerk dev: descomentá y poné tu org_... (la fila debe existir en `orgs` antes del arranque).
-      # PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_xxxxxxxx"
+      # Sobrescribe .env: un org_... de Clerk que aún no está en `orgs` hace fallar el arranque. Vacío = org demo fija (01_local_org).
+      # Para sembrar contra Clerk en Docker, usá docker-compose.override.yml con PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_..."
+      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 5s
@@ -66,6 +67,8 @@ services:
     ports:
       - "5180:5173"
     volumes:
+      - ./frontend/package.json:/workspace/frontend/package.json
+      - ./frontend/package-lock.json:/workspace/frontend/package-lock.json
       - ./frontend/src:/workspace/frontend/src
       - ./frontend/public:/workspace/frontend/public
       - ./frontend/index.html:/workspace/frontend/index.html
@@ -168,8 +171,9 @@ services:
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       PYMES_SEED_DEMO: "true"
-      # Mismo valor que cp-backend si usás seed Clerk (mismo tenant que el core).
-      # PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_xxxxxxxx"
+      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
+      # Clerk resuelve otra org que la demo seed (000...001); sin esto la lista de OT queda vacía.
+      PYMES_DEV_FORCE_ORG_UUID: "00000000-0000-0000-0000-000000000001"
     depends_on:
       postgres:
         condition: service_healthy

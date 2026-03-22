@@ -99,11 +99,11 @@ BEGIN
         (wh1, v_org, 'https://example.local/pymes-webhook-demo', 'seed-secret-change-me', ARRAY['sale.created', 'purchase.received'], false, 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO accounts (id, org_id, type, entity_type, party_id, party_name, balance, currency, credit_limit)
+    INSERT INTO accounts (id, org_id, type, party_id, party_name, balance, currency, credit_limit)
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/account/receivable-c1'), v_org, 'receivable', 'customer', c1, 'Cliente Demo Uno', 0.00, 'ARS', 500000.00),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/account/payable-s1'), v_org, 'payable', 'supplier', s1, 'Proveedor Demo 1', 0.00, 'ARS', 0)
-    ON CONFLICT (org_id, entity_type, entity_id) DO NOTHING;
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/account/receivable-c1'), v_org, 'receivable', c1, 'Cliente Demo Uno', 0.00, 'ARS', 500000.00),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/account/payable-s1'), v_org, 'payable', s1, 'Proveedor Demo 1', 0.00, 'ARS', 0)
+    ON CONFLICT (id) DO NOTHING;
 
     UPDATE tenant_settings
        SET next_purchase_number = GREATEST(next_purchase_number, 3),

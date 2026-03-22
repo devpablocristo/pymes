@@ -80,13 +80,25 @@ BEGIN
         (gen_random_uuid(), r_contador, 'returns', 'read'),
         (gen_random_uuid(), r_contador, 'recurring', 'read'),
         (gen_random_uuid(), r_contador, 'price_lists', 'read'),
+        (gen_random_uuid(), r_contador, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_contador, 'procurement_requests', 'approve'),
+        (gen_random_uuid(), r_contador, 'procurement_requests', 'reject'),
+        (gen_random_uuid(), r_contador, 'procurement_policies', 'read'),
 
         (gen_random_uuid(), r_almacenero, 'inventory', 'read'),
         (gen_random_uuid(), r_almacenero, 'inventory', 'create'),
         (gen_random_uuid(), r_almacenero, 'inventory', 'update'),
         (gen_random_uuid(), r_almacenero, 'products', 'read'),
         (gen_random_uuid(), r_almacenero, 'purchases', 'read'),
-        (gen_random_uuid(), r_almacenero, 'returns', 'read')
+        (gen_random_uuid(), r_almacenero, 'returns', 'read'),
+        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'create'),
+        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'update'),
+        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'submit'),
+        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'read'),
+        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'create'),
+        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'update'),
+        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'delete')
     ON CONFLICT (role_id, resource, action) DO NOTHING;
 
     IF EXISTS (

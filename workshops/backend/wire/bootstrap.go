@@ -18,6 +18,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/seedtarget"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
@@ -116,6 +117,7 @@ func InitializeApp() *app.App {
 
 	authGroup := v1.Group("")
 	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(verticalgin.DevForceOrgMiddleware(cfg.Environment, os.Getenv("PYMES_DEV_FORCE_ORG_UUID")))
 
 	autoRepairGroup := authGroup.Group("/auto-repair")
 	vehiclesHandler.RegisterRoutes(autoRepairGroup)

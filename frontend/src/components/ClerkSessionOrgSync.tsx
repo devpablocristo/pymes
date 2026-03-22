@@ -1,4 +1,4 @@
-import { useAuth, useOrganizationList } from '@clerk/clerk-react';
+import { useAuth, useOrganizationList } from '@clerk/react';
 import { useEffect, useRef } from 'react';
 import { clerkEnabled } from '../lib/auth';
 

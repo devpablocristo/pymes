@@ -26,7 +26,7 @@ make up
 
 **Flujo habitual:** todo el stack en **contenedores** (`make up`); no hace falta levantar backends ni el frontend como procesos nativos en el host.
 
-**Identidad:** sin Clerk → API key local (`psk_local_admin` en `.env.example`). Con Clerk → [docs/AUTH.md](docs/AUTH.md) y checklist [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md) (onboarding crea org; perfil renombra).
+**Identidad:** sin Clerk → API key local `psk_local_admin` (la crean los **seeds** del core, no las migraciones: `PYMES_SEED_DEMO=true` en Compose o `make seed-core-demo` con `DATABASE_URL`). Con Clerk → [docs/AUTH.md](docs/AUTH.md) y [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md).
 
 Servicios expuestos al host (con `docker compose` levantado):
 

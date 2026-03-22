@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ─────────────────────────────────────────────
 # E2E tests for control-plane API
-# Requires: docker compose up running
+# Requires: docker compose up (cp-backend con PYMES_SEED_DEMO → API key psk_local_admin)
 # Usage: ./scripts/e2e-test.sh [BASE_URL]
 # ─────────────────────────────────────────────
 

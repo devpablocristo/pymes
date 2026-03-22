@@ -1,4 +1,4 @@
-import { useAuth, useClerk, useOrganization, useUser } from '@clerk/clerk-react';
+import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';

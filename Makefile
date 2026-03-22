@@ -1,6 +1,6 @@
 # Pymes — comandos frecuentes. Flujo local habitual: todo en contenedores (`make up`), no apps nativas en el host.
 # docker-compose.yml en la raíz de este directorio.
-.PHONY: up down build test logs ps staticcheck ruff lint
+.PHONY: up down build test logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
 
@@ -14,6 +14,27 @@ ruff:
 
 # Go staticcheck + ruff AI
 lint: staticcheck ruff
+
+# Demo SQL del control plane (orden: org → negocio → RBAC → transversal). No son migraciones.
+# En Docker: PYMES_SEED_DEMO=true en cp-backend aplica lo mismo al arrancar.
+seed-core-demo:
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "Definí DATABASE_URL (ej. postgres://postgres:postgres@localhost:5434/pymes?sslmode=disable)" >&2; \
+		exit 1; \
+	fi
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f pymes-core/backend/seeds/01_local_org.sql
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f pymes-core/backend/seeds/02_core_business.sql
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f pymes-core/backend/seeds/03_rbac.sql
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f pymes-core/backend/seeds/04_transversal_modules_demo.sql
+
+# Demo workshops auto_repair (misma DB que el core; requiere seed-core-demo antes).
+# En Docker: PYMES_SEED_DEMO=true en work-backend.
+seed-workshops-demo:
+	@if [ -z "$(DATABASE_URL)" ]; then \
+		echo "Definí DATABASE_URL" >&2; \
+		exit 1; \
+	fi
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f workshops/backend/seeds/auto_repair_demo.sql
 
 # Levanta stack local (Postgres, cp-backend, 4 verticales Go, frontend, AI)
 up:

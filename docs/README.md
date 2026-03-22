@@ -51,12 +51,14 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 ## Validación rápida
 
 ```bash
-make up
+make up      # migraciones + seeds demo si PYMES_SEED_DEMO en compose
 make build
 make lint    # opcional: staticcheck Go + ruff en ai/ (antes de PR)
 make test    # incluye ruff + pytest en ai/, tests Go y frontend
 make down
 ```
+
+Sin Docker: tras migrar, `DATABASE_URL=... make seed-core-demo` (y `make seed-workshops-demo` si usás talleres).
 
 ## Frontend CRUD
 

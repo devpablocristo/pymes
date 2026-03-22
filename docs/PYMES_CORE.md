@@ -45,24 +45,27 @@ El control plane registra acciones sensibles en **`audit_log`** (cadena con hash
 
 **Documentación canónica (obligatoria lectura para cambios en pagos, auditoría o permisos):** [pymes-core/docs/FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md).
 
-## Seeds de desarrollo (SQL en migraciones)
+## Seeds de desarrollo
 
-Los datos de demo para la org local `00000000-0000-0000-0000-000000000001` viven en migraciones **up** (se aplican una vez por base):
+**Regla:** las migraciones solo versionan **esquema**. Los datos de demo están en `pymes-core/backend/seeds/` y se aplican con **`PYMES_SEED_DEMO=true`** (Compose ya lo pone en `cp-backend`) o con `make seed-core-demo` + `DATABASE_URL`.
 
-| Archivo | Contenido |
-|---------|-----------|
-| `0004_local_seed.up.sql` | Org, usuario admin, API key `psk_local_admin`, tenant starter |
-| `0007_core_seed.up.sql` | Clientes, proveedores, productos, stock, cotización, ventas, movimientos de stock/caja |
-| `0013_rbac_seed.up.sql` | Roles semilla (`admin`, `vendedor`, `cajero`, …), permisos, lista de precios default |
-| `0030_transversal_modules_seed.up.sql` | Ítems de lista de precios, citas, gastos recurrentes, compras, solicitud de compra interna (draft), webhooks inactivos, cuentas AR/AP en cero |
+| Script (orden) | Contenido |
+|----------------|-----------|
+| `01_local_org.sql` | Org local, usuario admin, API key `psk_local_admin` |
+| `02_core_business.sql` | Clientes, proveedores, productos, stock, cotización, ventas, caja |
+| `03_rbac.sql` | Roles, permisos, lista de precios default |
+| `04_transversal_modules_demo.sql` | Citas, recurrentes, compras, procurement, webhooks, cuentas |
 
-**Taller mecánico (workshops):** `workshops/backend/migrations/0003_auto_repair_seed.up.sql` — vehículo demo, servicios `auto_repair`, dos órdenes de trabajo con ítems (referencia al cliente/producto del core).
+Los archivos `0004_local_seed`, `0007_core_seed`, `0013_rbac_seed` y `0030_transversal_modules_seed` en `migrations/` conservan el **número de versión** pero su `up`/`down` es no-op (`SELECT 1`).
+
+**Workshops:** `workshops/backend/seeds/auto_repair_demo.sql` — mismo patrón; `PYMES_SEED_DEMO` en `work-backend` o `make seed-workshops-demo` (después del seed del core).
 
 ## Migraciones
 
 - Directorio: `pymes-core/backend/migrations/`.
 - Runner: `pymes-core/backend/migrations/runner.go`.
-- **No** editar migraciones ya aplicadas; crear siempre `NNNN_descripcion.up.sql` nuevas.
+- **No** editar migraciones ya aplicadas; nuevas `NNNN_*.up.sql` solo para **DDL / constraints**.
+- **No** añadir migraciones que solo inserten datos de demo; usar `seeds/` + `PYMES_SEED_DEMO` o `make seed-core-demo`.
 
 ## Cómo ejecutar y probar
 

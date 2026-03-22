@@ -43,6 +43,16 @@ services:
       SMTP_HOST: mailhog
       FRONTEND_URL: http://localhost:5180
       PAYMENT_GATEWAY_MODE: demo
+      # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
+      PYMES_SEED_DEMO: "true"
+      # Opcional Clerk dev: descomentá y poné tu org_... (la fila debe existir en `orgs` antes del arranque).
+      # PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_xxxxxxxx"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 120s
     depends_on:
       postgres:
         condition: service_healthy
@@ -128,7 +138,7 @@ services:
       postgres:
         condition: service_healthy
       cp-backend:
-        condition: service_started
+        condition: service_healthy
 
   # ── Workshops Vertical ──
 
@@ -153,11 +163,14 @@ services:
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+      PYMES_SEED_DEMO: "true"
+      # Mismo valor que cp-backend si usás seed Clerk (mismo tenant que el core).
+      # PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_xxxxxxxx"
     depends_on:
       postgres:
         condition: service_healthy
       cp-backend:
-        condition: service_started
+        condition: service_healthy
 
   # ── Beauty / Salón Vertical ──
 
@@ -186,7 +199,7 @@ services:
       postgres:
         condition: service_healthy
       cp-backend:
-        condition: service_started
+        condition: service_healthy
 
   # ── Restaurants / Bares Vertical ──
 
@@ -215,7 +228,7 @@ services:
       postgres:
         condition: service_healthy
       cp-backend:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:

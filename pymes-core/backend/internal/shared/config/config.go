@@ -2,13 +2,18 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
+
+const localInternalServiceToken = "local-internal-token"
 
 // Config centraliza la configuracion externa para mantener el mismo codigo entre ambientes.
 type Config struct {
 	Port                        string
+	Environment                 string
 	DatabaseURL                 string
 	JWKSURL                     string
 	JWTIssuer                   string
@@ -49,12 +54,18 @@ type Config struct {
 	MPRedirectURI               string
 	PaymentGatewayMode          string
 	PaymentGatewayEncryptionKey string
+	// SeedDemoData aplica SQL embebido en backend/seeds/ tras migrar (solo desarrollo / compose).
+	SeedDemoData bool
+	// SeedDemoOrgExternalID: si está definido (ej. org_xxx de Clerk), los seeds usan esa fila en orgs.external_id
+	// y no crean la org local fija. La fila debe existir antes del arranque (login o webhook).
+	SeedDemoOrgExternalID string
 }
 
 // LoadFromEnv carga valores con defaults seguros para desarrollo local.
 func LoadFromEnv() Config {
-	return Config{
+	cfg := Config{
 		Port:                        getEnv("PORT", "8080"),
+		Environment:                 normalizeEnvironment(getEnv("ENVIRONMENT", "development")),
 		DatabaseURL:                 getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
 		JWKSURL:                     os.Getenv("JWKS_URL"),
 		JWTIssuer:                   os.Getenv("JWT_ISSUER"),
@@ -84,7 +95,7 @@ func LoadFromEnv() Config {
 		S3Region:                    getEnv("S3_REGION", "us-east-1"),
 		SchedulerSecret:             os.Getenv("SCHEDULER_SECRET"),
 		ExchangeRateProvider:        getEnv("EXCHANGE_RATE_PROVIDER", "manual"),
-		InternalServiceToken:        getEnv("INTERNAL_SERVICE_TOKEN", "local-internal-token"),
+		InternalServiceToken:        strings.TrimSpace(getEnv("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
 		AIServiceURL:                getEnv("AI_SERVICE_URL", "http://ai:8000"),
 		WhatsAppWebhookVerifyToken:  os.Getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN"),
 		WhatsAppAppSecret:           os.Getenv("WHATSAPP_APP_SECRET"),
@@ -95,7 +106,11 @@ func LoadFromEnv() Config {
 		MPRedirectURI:               os.Getenv("MP_REDIRECT_URI"),
 		PaymentGatewayMode:          getEnv("PAYMENT_GATEWAY_MODE", "mercadopago"),
 		PaymentGatewayEncryptionKey: os.Getenv("PAYMENT_GATEWAY_ENCRYPTION_KEY"),
+		SeedDemoData:                getEnvBool("PYMES_SEED_DEMO", false),
+		SeedDemoOrgExternalID:       strings.TrimSpace(os.Getenv("PYMES_SEED_DEMO_ORG_EXTERNAL_ID")),
 	}
+	validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken)
+	return cfg
 }
 
 func getEnv(key, fallback string) string {
@@ -127,4 +142,31 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func normalizeEnvironment(value string) string {
+	normalized := strings.TrimSpace(strings.ToLower(value))
+	if normalized == "" {
+		return "development"
+	}
+	return normalized
+}
+
+func isLocalEnvironment(environment string) bool {
+	switch normalizeEnvironment(environment) {
+	case "development", "dev", "local", "test":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateInternalServiceToken(environment, token string) {
+	normalizedToken := strings.TrimSpace(token)
+	if isLocalEnvironment(environment) {
+		return
+	}
+	if normalizedToken == "" || strings.EqualFold(normalizedToken, localInternalServiceToken) {
+		panic(fmt.Sprintf("invalid INTERNAL_SERVICE_TOKEN for %s environment", normalizeEnvironment(environment)))
+	}
 }

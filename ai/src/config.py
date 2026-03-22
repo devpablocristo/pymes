@@ -1,6 +1,10 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LOCAL_INTERNAL_SERVICE_TOKEN = "local-internal-token"
+LOCAL_ENVIRONMENTS = {"", "development", "dev", "local", "test"}
 
 
 class Settings(BaseSettings):
@@ -32,6 +36,29 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str = ""
 
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
+
+    @property
+    def normalized_environment(self) -> str:
+        return self.ai_environment.strip().lower() or "development"
+
+    @property
+    def is_local_environment(self) -> bool:
+        return self.normalized_environment in LOCAL_ENVIRONMENTS
+
+    @model_validator(mode="after")
+    def validate_internal_service_token(self) -> "Settings":
+        token = self.internal_service_token.strip()
+        if self.is_local_environment:
+            self.ai_environment = self.normalized_environment
+            self.internal_service_token = token or LOCAL_INTERNAL_SERVICE_TOKEN
+            return self
+
+        if not token or token == LOCAL_INTERNAL_SERVICE_TOKEN:
+            raise ValueError("INTERNAL_SERVICE_TOKEN must be configured with a non-default value outside local environments")
+
+        self.ai_environment = self.normalized_environment
+        self.internal_service_token = token
+        return self
 
 
 @lru_cache

@@ -32,8 +32,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/payments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/pdfgen"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/pricelists"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/publicapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes"
@@ -49,7 +49,9 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
+	"github.com/devpablocristo/pymes/pymes-core/backend/seeds"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/seedtarget"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 )
 
@@ -66,23 +68,39 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
+	if cfg.SeedDemoData {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		seedOrg, err := seedtarget.ResolveDemoOrgUUID(ctx, db, cfg.SeedDemoOrgExternalID)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("demo seed org resolution failed")
+		}
+		clerkMode := cfg.SeedDemoOrgExternalID != ""
+		if err := seeds.Run(ctx, db, logger, seeds.Params{
+			TargetOrgUUID: seedOrg,
+			ClerkMode:     clerkMode,
+		}); err != nil {
+			logger.Fatal().Err(err).Msg("demo seeds failed (set PYMES_SEED_DEMO=false to skip)")
+		}
+	}
+
 	saasSvc, err := SetupSaaS(db, SaaSConfig{
-		StripeSecretKey:         cfg.StripeSecretKey,
-		StripeWebhookSecret:     cfg.StripeWebhookSecret,
-		StripePriceStarter:      cfg.StripePriceStarter,
-		StripePriceGrowth:       cfg.StripePriceGrowth,
-		StripePriceEnterprise:   cfg.StripePriceEnterprise,
-		FrontendURL:             cfg.FrontendURL,
-		ClerkWebhookSecret:      cfg.ClerkWebhookSecret,
-		JWKSURL:                 cfg.JWKSURL,
-		JWTIssuer:               cfg.JWTIssuer,
-		JWTAudience:             cfg.JWTAudience,
-		JWTOrgClaim:             cfg.JWTOrgClaim,
-		JWTRoleClaim:            cfg.JWTRoleClaim,
-		JWTScopesClaim:          cfg.JWTScopesClaim,
-		JWTActorClaim:           cfg.JWTActorClaim,
-		AuthEnableJWT:           cfg.AuthEnableJWT,
-		AuthAllowAPIKey:         cfg.AuthAllowAPIKey,
+		StripeSecretKey:       cfg.StripeSecretKey,
+		StripeWebhookSecret:   cfg.StripeWebhookSecret,
+		StripePriceStarter:    cfg.StripePriceStarter,
+		StripePriceGrowth:     cfg.StripePriceGrowth,
+		StripePriceEnterprise: cfg.StripePriceEnterprise,
+		FrontendURL:           cfg.FrontendURL,
+		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,
+		JWKSURL:               cfg.JWKSURL,
+		JWTIssuer:             cfg.JWTIssuer,
+		JWTAudience:           cfg.JWTAudience,
+		JWTOrgClaim:           cfg.JWTOrgClaim,
+		JWTRoleClaim:          cfg.JWTRoleClaim,
+		JWTScopesClaim:        cfg.JWTScopesClaim,
+		JWTActorClaim:         cfg.JWTActorClaim,
+		AuthEnableJWT:         cfg.AuthEnableJWT,
+		AuthAllowAPIKey:       cfg.AuthAllowAPIKey,
 	}, slog.Default())
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to initialize core/saas/go")

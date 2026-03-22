@@ -31,7 +31,7 @@ vi.mock('../lib/auth', () => ({
   clerkEnabled: true,
 }));
 
-vi.mock('@clerk/clerk-react', () => ({
+vi.mock('@clerk/react', () => ({
   useUser: () => useUserMock(),
   useOrganization: () => ({
     isLoaded: true,

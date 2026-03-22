@@ -1,6 +1,6 @@
 import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, useLocation } from 'react-router-dom';
-import { SignIn, SignUp, UserButton, useAuth } from '@clerk/clerk-react';
+import { SignIn, SignUp, UserButton, useAuth } from '@clerk/react';
 import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
 import { createClerkTokenProvider } from '@devpablocristo/core-authn/providers/clerk';
 import { clerkEnabled } from '../lib/auth';

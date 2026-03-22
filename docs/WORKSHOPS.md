@@ -26,7 +26,7 @@ Rutas bajo `/v1/auto-repair/...` (y aliases) exigen JWT (o API key si el servici
 
 - Servicio: **`work-backend`**, puerto host **8282** (`docker-compose.yml` en la raíz del monorepo).
 - Frontend: `VITE_WORKSHOPS_API_URL=http://localhost:8282`.
-- **Seed SQL** (`0003_auto_repair_seed.up.sql`): vehículo patente `AB 123 CD`, servicios `SRV-OIL` / `SRV-BRAKE`, órdenes `OT-SEED-001` y `OT-SEED-002` para la org local del core (requiere `0007_core_seed` aplicado en la misma base).
+- **Seed SQL** (`workshops/backend/seeds/auto_repair_demo.sql`): vehículo patente `AB 123 CD`, servicios `SRV-OIL` / `SRV-BRAKE`, órdenes `OT-SEED-001` y `OT-SEED-002` (requiere seeds del core en la misma base). En Compose: `PYMES_SEED_DEMO=true` en `work-backend`; manual: `make seed-workshops-demo` tras `make seed-core-demo`.
 
 Entry point:
 

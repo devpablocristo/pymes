@@ -16,6 +16,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/seedtarget"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
@@ -30,6 +31,7 @@ import (
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
+	workshopseeds "github.com/devpablocristo/pymes/workshops/backend/seeds"
 )
 
 func InitializeApp() *app.App {
@@ -42,6 +44,18 @@ func InitializeApp() *app.App {
 	}
 	if err := migrations.Run(db, logger); err != nil {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
+	}
+
+	if cfg.SeedDemoData {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		seedOrg, err := seedtarget.ResolveDemoOrgUUID(ctx, db, cfg.SeedDemoOrgExternalID)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("workshops demo seed org resolution failed")
+		}
+		if err := workshopseeds.Run(ctx, db, logger, seedOrg); err != nil {
+			logger.Fatal().Err(err).Msg("workshops demo seed failed (set PYMES_SEED_DEMO=false to skip)")
+		}
 	}
 
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)

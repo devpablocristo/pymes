@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.24.2",
+    "@clerk/react": "^6.1.2",
     "@clerk/localizations": "^4.2.3",
     "@clerk/themes": "^2.4.57",
     "@tanstack/react-query": "^5.66.0",

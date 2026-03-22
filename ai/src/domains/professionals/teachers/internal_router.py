@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
-from typing import Any
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from pymes_core_shared.ai_runtime import AuthContext, Message, get_logger, orchestrate
+from pymes_core_shared.ai_runtime import AuthContext, get_logger
+from src.api.chat_stream import Message, stream_orchestrated_chat
 from src.api.sse import EventSourceResponse
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient
 from src.domains.professionals.teachers.deps import (
@@ -23,16 +21,6 @@ logger = get_logger(__name__)
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-
-
-def estimate_tokens(text: str) -> int:
-    if not text:
-        return 0
-    return max(1, len(text) // 4)
-
-
-def to_sse_event(event: str, payload: dict[str, Any]) -> dict[str, str]:
-    return {"event": event, "data": json.dumps(payload, ensure_ascii=False)}
 
 
 @router.post("/v1/professionals/chat", include_in_schema=False)
@@ -52,47 +40,26 @@ async def chat_teachers(
         Message(role="user", content=req.message.strip()),
     ]
 
-    async def event_stream():
-        assistant_parts: list[str] = []
-        tool_calls: list[str] = []
-        tokens_in = estimate_tokens("\n".join(m.content for m in llm_messages))
-
-        try:
-            async for chunk in orchestrate(
-                llm=llm,
-                messages=llm_messages,
-                tools=declarations,
-                tool_handlers=handlers,
-                org_id=auth.org_id,
-            ):
-                if chunk.type == "text" and chunk.text:
-                    assistant_parts.append(chunk.text)
-                    yield to_sse_event("text", {"content": chunk.text})
-                    continue
-                if chunk.type == "tool_call" and chunk.tool_call:
-                    tool_name = str(chunk.tool_call.get("name", ""))
-                    if tool_name:
-                        tool_calls.append(tool_name)
-                    yield to_sse_event("tool_call", {"tool": tool_name, "status": "executing"})
-                    continue
-                if chunk.type == "tool_result" and chunk.tool_call:
-                    tool_name = str(chunk.tool_call.get("name", ""))
-                    yield to_sse_event("tool_result", {"tool": tool_name, "status": "done"})
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("teachers_chat_failed", org_id=auth.org_id, user_id=auth.actor, error=str(exc))
-            yield to_sse_event("error", {"message": "error processing request"})
-
-        assistant_text = "".join(assistant_parts).strip() or "No pude generar una respuesta en este momento."
-        tokens_out = estimate_tokens(assistant_text)
-
+    async def on_success(result):
         logger.info(
             "teachers_chat_completed",
             org_id=auth.org_id,
             user_id=auth.actor,
-            tool_calls=len(tool_calls),
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
+            tool_calls=len(result.tool_calls),
+            tokens_input=result.tokens_input,
+            tokens_output=result.tokens_output,
         )
-        yield to_sse_event("done", {"tokens_used": tokens_in + tokens_out})
+        return None
 
-    return EventSourceResponse(event_stream())
+    return EventSourceResponse(
+        stream_orchestrated_chat(
+            llm=llm,
+            llm_messages=llm_messages,
+            declarations=declarations,
+            handlers=handlers,
+            org_id=auth.org_id,
+            failure_event="teachers_chat_failed",
+            failure_context={"org_id": auth.org_id, "user_id": auth.actor},
+            on_success=on_success,
+        )
+    )

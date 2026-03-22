@@ -1,4 +1,4 @@
-import { useClerk, useOrganization, useSession } from '@clerk/clerk-react';
+import { useClerk, useOrganization, useSession } from '@clerk/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';

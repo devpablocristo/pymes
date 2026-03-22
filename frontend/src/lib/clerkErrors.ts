@@ -1,4 +1,4 @@
-import { isClerkAPIResponseError } from '@clerk/clerk-react/errors';
+import { isClerkAPIResponseError } from '@clerk/react/errors';
 
 /**
  * Mensaje legible para UI a partir de errores de la API de Clerk (crear org, update, etc.).

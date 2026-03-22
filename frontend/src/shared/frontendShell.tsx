@@ -9,8 +9,10 @@ import { useI18n } from '../lib/i18n';
 export type TokenProvider = () => Promise<string | null>;
 export type TokenProviderRegistrar = (provider: TokenProvider) => void;
 
+const defaultRegisterProviders: TokenProviderRegistrar[] = [registerTokenProvider];
+
 export function SharedAuthTokenBridge({
-  registerProviders = [registerTokenProvider],
+  registerProviders = defaultRegisterProviders,
 }: {
   registerProviders?: TokenProviderRegistrar[];
 }) {

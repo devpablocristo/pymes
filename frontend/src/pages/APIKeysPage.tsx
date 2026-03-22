@@ -1,3 +1,8 @@
+/**
+ * Pantalla de gestión de claves API (core /v1/orgs/.../api-keys).
+ * No está enlazada en la consola cliente Pymes: las claves las operan soporte/operaciones.
+ * Se mantiene el módulo por si se reutiliza en otra herramienta interna o para desarrollo manual.
+ */
 import { FormEvent, useEffect, useState } from 'react';
 import { createAPIKey, deleteAPIKey, getAPIKeys, getSession, rotateAPIKey } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';

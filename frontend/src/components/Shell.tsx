@@ -92,12 +92,6 @@ const wrenchIcon = (
   </svg>
 );
 
-const keyIcon = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-  </svg>
-);
-
 const bellIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -178,7 +172,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const settingsNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
-      { to: '/settings/keys', label: t('shell.nav.apiKeys'), icon: keyIcon },
       { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
     ],

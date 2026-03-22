@@ -3,7 +3,6 @@ import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Shell } from '../components/Shell';
 import { AdminPage } from '../pages/AdminPage';
-import { APIKeysPage } from '../pages/APIKeysPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { AutoRepairServicesPage } from '../pages/AutoRepairServicesPage';
 import { AutoRepairVehiclesPage } from '../pages/AutoRepairVehiclesPage';
@@ -56,7 +55,7 @@ export function App() {
                     <Route path="/modules/customers" element={<CustomersPage />} />
                     <Route path="/modules/:moduleId" element={<ModulePage />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/settings/keys" element={<APIKeysPage />} />
+                    <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
                     <Route
                       path="/settings/notifications"
                       element={<NotificationPreferencesPage />}

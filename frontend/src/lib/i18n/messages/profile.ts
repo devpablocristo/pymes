@@ -7,8 +7,7 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.apiMode.title': 'Sesión en este entorno',
     'profile.apiMode.badge': 'Modo consola · clave API',
     'profile.apiMode.lead':
-      'Sin sesión Clerk en el navegador: la consola usa JWT o clave API contra el backend. Es el flujo habitual en desarrollo (ver docs/AUTH.md). Abajo tenés el contexto que resolvió el API.',
-    'profile.apiMode.keysCta': 'Gestionar claves API',
+      'Sin sesión Clerk en el navegador: la consola usa JWT o clave API contra el backend (flujo habitual en desarrollo; ver docs/AUTH.md). Las claves para integraciones las gestiona atención al cliente / operaciones, no desde esta consola. Abajo tenés el contexto que resolvió el API.',
     'profile.section.account': 'Cuenta',
     'profile.account.signOut': 'Cerrar sesión',
     'profile.account.signedInWithGoogle':
@@ -65,8 +64,7 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.apiMode.title': 'Session in this environment',
     'profile.apiMode.badge': 'Console mode · API key',
     'profile.apiMode.lead':
-      'No Clerk session in the browser: the console uses a JWT or API key against the backend. This is the usual dev flow (see docs/AUTH.md). Below is the context the API resolved.',
-    'profile.apiMode.keysCta': 'Manage API keys',
+      'No Clerk session in the browser: the console uses a JWT or API key against the backend (usual dev flow; see docs/AUTH.md). Integration keys are managed by customer operations, not from this console. Below is the context the API resolved.',
     'profile.section.account': 'Account',
     'profile.account.signOut': 'Sign out',
     'profile.account.signedInWithGoogle':

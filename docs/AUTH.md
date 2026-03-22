@@ -54,7 +54,7 @@ Documentá en el equipo: *sin Clerk en local = modo consola con API key; con Cle
 
 - Dejar **`VITE_CLERK_PUBLISHABLE_KEY` vacío** → Clerk deshabilitado en el cliente.
 - La consola **no** fuerza login en el navegador; sirve para trabajar con **API key** (`VITE_API_KEY`, etc.) contra el control plane.
-- En **Perfil** (`/settings`), sin Clerk se muestra la **sesión resuelta** (`GET /v1/session`) y datos de **`GET /v1/users/me`** si hay usuario sincronizado (típicamente vacío con solo clave API); enlace a **Claves API** para rotar credenciales.
+- En **Perfil** (`/settings`), sin Clerk se muestra la **sesión resuelta** (`GET /v1/session`) y datos de **`GET /v1/users/me`** si hay usuario sincronizado (típicamente vacío con solo clave API). La **gestión de claves API** no está en la consola cliente: la operan soporte/operaciones vía herramientas internas o el mismo contrato HTTP (`/v1/orgs/{org_id}/api-keys`).
 - Uso pensado: **solo local**; no es un sustituto de producción.
 
 ### Puerto del API (8100 en el host)

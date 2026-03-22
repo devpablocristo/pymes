@@ -1,5 +1,5 @@
 import { useClerk, useOrganization, useUser } from '@clerk/clerk-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
 import { LanguageSelector } from '../components/LanguageSelector';
@@ -15,6 +15,15 @@ import {
   mergeClerkSessionWithApiUser,
 } from '../lib/profileDisplay';
 import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
+
+/** Evita spinner infinito si Clerk/getToken o la red no resuelven. */
+const PROFILE_LOAD_TIMEOUT_MS = 45_000;
+
+function rejectAfterMs(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error(message)), ms);
+  });
+}
 
 function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
   const clerk = clerkOrgName?.trim() || '';
@@ -380,6 +389,8 @@ function ClerkProfileAccountSection({
 
 function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
   const { t } = useI18n();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [me, setMe] = useState<MeProfileResponse | null>(null);
@@ -392,24 +403,37 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     void (async () => {
+      const tr = tRef.current;
       try {
-        const [sessionRes, meRes] = await Promise.allSettled([getSession(), getMe()]);
+        const [sessionRes, meRes] = await Promise.race([
+          Promise.allSettled([getSession(), getMe()]),
+          rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
+        ]);
         if (cancelled) return;
         if (sessionRes.status === 'fulfilled') {
           setSession(sessionRes.value);
           setError('');
         } else {
           setSession(null);
-          setError(formatFetchErrorForUser(sessionRes.reason, t('profile.error.unreachable')));
+          setError(formatFetchErrorForUser(sessionRes.reason, tr('profile.error.unreachable')));
         }
         if (meRes.status === 'fulfilled') {
           setMe(meRes.value);
           setMeWarning('');
         } else {
           setMe(null);
-          setMeWarning(formatFetchErrorForUser(meRes.reason, t('profile.error.meUnreachable')));
+          setMeWarning(formatFetchErrorForUser(meRes.reason, tr('profile.error.meUnreachable')));
         }
+      } catch (e) {
+        if (cancelled) return;
+        setSession(null);
+        setMe(null);
+        const unreachable = tr('profile.error.unreachable');
+        const isTimeout = e instanceof Error && e.message === 'profile_fetch_timeout';
+        setError(isTimeout ? unreachable : formatFetchErrorForUser(e, unreachable));
+        setMeWarning('');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -417,7 +441,7 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [reloadToken, t]);
+  }, [reloadToken]);
 
   return (
     <>
@@ -441,11 +465,6 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
             <span className="badge badge-neutral profile-mode-badge">{t('profile.apiMode.badge')}</span>
           </div>
           <p className="profile-api-mode-lead">{t('profile.apiMode.lead')}</p>
-          <p>
-            <Link to="/settings/keys" className="btn-secondary">
-              {t('profile.apiMode.keysCta')}
-            </Link>
-          </p>
         </div>
       )}
 

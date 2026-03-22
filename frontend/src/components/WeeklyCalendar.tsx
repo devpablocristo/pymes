@@ -9,13 +9,21 @@ type CalendarEvent = {
   day: number; // 0=Mon … 6=Sun
   startHour: number;
   durationHours: number;
-  color?: string;
 };
 
 const HOUR_START = 7;
 const HOUR_END = 22;
 const HOURS = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
-const EVENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const EVENT_TONE_MOD = 4;
+
+/** Tono estable por id — paleta solo con variables del tema (CSS .weekly-cal-event--tone-*). */
+function eventToneFromId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % EVENT_TONE_MOD;
+}
 
 function getWeekDates(offset: number): Date[] {
   const now = new Date();
@@ -51,7 +59,7 @@ type RawAppointment = {
 
 function toCalendarEvents(raw: RawAppointment[], untitledLabel: string): CalendarEvent[] {
   return raw
-    .map((apt, i) => {
+    .map((apt) => {
       const dateStr = apt.scheduled_at ?? apt.start_time ?? apt.started_at;
       if (!dateStr) return null;
       const date = new Date(dateStr);
@@ -63,7 +71,6 @@ function toCalendarEvents(raw: RawAppointment[], untitledLabel: string): Calenda
         day: dayOfWeek,
         startHour: hour,
         durationHours: (apt.duration_minutes ?? 60) / 60,
-        color: EVENT_COLORS[i % EVENT_COLORS.length],
       } as CalendarEvent;
     })
     .filter((e): e is CalendarEvent => e !== null && e.startHour >= HOUR_START && e.startHour < HOUR_END);
@@ -91,7 +98,6 @@ function generateDemoEvents(dates: Date[]): CalendarEvent[] {
         day,
         startHour: hour,
         durationHours: 1,
-        color: EVENT_COLORS[nameIdx % EVENT_COLORS.length],
       });
     }
   }
@@ -204,16 +210,16 @@ export function WeeklyCalendar() {
             const topPx = (event.startHour - HOUR_START) * 60;
             const heightPx = Math.max(event.durationHours * 60 - 2, 24);
 
+            const tone = eventToneFromId(event.id);
             return (
               <div
                 key={event.id}
-                className="weekly-cal-event"
+                className={`weekly-cal-event weekly-cal-event--tone-${tone}`}
                 style={
                   {
                     '--cal-day': event.day,
                     '--cal-top': `${topPx}px`,
                     '--cal-height': `${heightPx}px`,
-                    backgroundColor: event.color ?? '#3b82f6',
                   } as CSSProperties
                 }
               >

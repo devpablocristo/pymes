@@ -2,17 +2,40 @@ import { useEffect, useState } from 'react';
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/api';
 import type { NotificationPreference } from '../lib/types';
 
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  welcome: 'Bienvenida',
+  plan_upgraded: 'Cambio de plan',
+  payment_failed: 'Fallo de pago',
+  subscription_canceled: 'Suscripción cancelada',
+};
+
+const CHANNEL_LABELS: Record<string, string> = {
+  email: 'Correo',
+};
+
+function labelForType(code: string): string {
+  return NOTIFICATION_TYPE_LABELS[code] ?? code;
+}
+
+function labelForChannel(code: string): string {
+  return CHANNEL_LABELS[code] ?? code;
+}
+
 export function NotificationPreferencesPage() {
   const [items, setItems] = useState<NotificationPreference[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   async function load(): Promise<void> {
+    setLoading(true);
     try {
       const response = await getNotificationPreferences();
       setItems(response.items);
       setError('');
     } catch (err) {
       setError(String(err));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -47,9 +70,13 @@ export function NotificationPreferencesPage() {
           <h2>Preferencias</h2>
           <span className="badge badge-neutral">{items.length} reglas</span>
         </div>
-        {items.length === 0 ? (
+        {loading ? (
           <div className="empty-state">
-            <p>Sin preferencias configuradas</p>
+            <p>Cargando…</p>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="empty-state">
+            <p>No hay tipos de notificación disponibles. Actualizá el backend o contactá soporte.</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -58,15 +85,15 @@ export function NotificationPreferencesPage() {
                 <tr>
                   <th>Tipo</th>
                   <th>Canal</th>
-                  <th>Estado</th>
+                  <th>Activo</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={`${item.notification_type}-${item.channel}`}>
-                    <td className="text-semibold">{item.notification_type}</td>
+                    <td className="text-semibold">{labelForType(item.notification_type)}</td>
                     <td>
-                      <span className="badge badge-neutral">{item.channel}</span>
+                      <span className="badge badge-neutral">{labelForChannel(item.channel)}</span>
                     </td>
                     <td>
                       <label className="toggle" onClick={() => void toggle(item)}>

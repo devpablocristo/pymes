@@ -72,6 +72,18 @@ func (r *Repository) GetPreferences(userID uuid.UUID) []domain.Preference {
 	return result
 }
 
+// IsNotificationEnabled returns true when the user has not set a row (default opt-in)
+// or when the stored preference is enabled.
+func (r *Repository) IsNotificationEnabled(userID uuid.UUID, notifType, channel string) bool {
+	var m models.NotificationPreferenceModel
+	err := r.db.Where("user_id = ? AND notification_type = ? AND channel = ?", userID, notifType, channel).
+		First(&m).Error
+	if err != nil {
+		return true
+	}
+	return m.Enabled
+}
+
 func (r *Repository) UpsertPreference(userID uuid.UUID, notifType, channel string, enabled bool) domain.Preference {
 	var m models.NotificationPreferenceModel
 	result := r.db.Where("user_id = ? AND notification_type = ? AND channel = ?", userID, notifType, channel).First(&m)

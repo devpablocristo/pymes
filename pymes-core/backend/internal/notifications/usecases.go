@@ -22,6 +22,7 @@ type RepositoryPort interface {
 	GetUserByExternalID(externalID string) (uuid.UUID, string, bool)
 	ListMembers(orgID uuid.UUID) []Member
 	GetPreferences(userID uuid.UUID) []domain.Preference
+	IsNotificationEnabled(userID uuid.UUID, notifType, channel string) bool
 	UpsertPreference(userID uuid.UUID, notifType, channel string, enabled bool) domain.Preference
 	HasLogByDedupKey(key string) bool
 	CreateLog(entry domain.Log)
@@ -49,7 +50,37 @@ func (u *Usecases) GetPreferencesByActor(ctx context.Context, actor string) ([]d
 	if !ok {
 		return nil, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
-	return u.repo.GetPreferences(userID), nil
+	return mergePreferenceCatalog(userID, u.repo.GetPreferences(userID)), nil
+}
+
+func prefKey(notifType, channel string) string {
+	return notifType + "\x00" + channel
+}
+
+// mergePreferenceCatalog joins the product catalog with stored rows so GET never returns empty
+// when the user has no rows yet (default enabled until they opt out).
+func mergePreferenceCatalog(userID uuid.UUID, stored []domain.Preference) []domain.Preference {
+	byKey := make(map[string]domain.Preference, len(stored))
+	for _, p := range stored {
+		byKey[prefKey(p.NotificationType, p.Channel)] = p
+	}
+	cat := preferenceCatalog()
+	out := make([]domain.Preference, 0, len(cat))
+	for _, e := range cat {
+		k := prefKey(e.notificationType, e.channel)
+		if p, ok := byKey[k]; ok {
+			p.UserID = userID
+			out = append(out, p)
+			continue
+		}
+		out = append(out, domain.Preference{
+			UserID:           userID,
+			NotificationType: e.notificationType,
+			Channel:          e.channel,
+			Enabled:          true,
+		})
+	}
+	return out
 }
 
 func (u *Usecases) UpdatePreferenceByActor(ctx context.Context, actor, notifType, channel string, enabled bool) (domain.Preference, error) {
@@ -86,6 +117,9 @@ func (u *Usecases) NotifyUser(ctx context.Context, userExternalID string, notifT
 }
 
 func (u *Usecases) sendToUser(ctx context.Context, orgID uuid.UUID, userID uuid.UUID, email, notifType string, data map[string]string) error {
+	if !u.repo.IsNotificationEnabled(userID, notifType, "email") {
+		return nil
+	}
 	hourBucket := time.Now().UTC().Format("2006010215")
 	referenceID := data["reference_id"]
 	dedupKey := fmt.Sprintf("%s|%s|%s|%s", notifType, userID.String(), referenceID, hourBucket)

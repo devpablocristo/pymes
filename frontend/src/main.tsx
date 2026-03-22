@@ -27,10 +27,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: '2rem', fontFamily: 'system-ui' }}>
+        <div className="error-boundary-fallback">
           <h1>Something went wrong</h1>
-          <p>Please reload the page. If the problem persists, contact support.</p>
-          <button onClick={() => window.location.reload()}>Reload</button>
+          <p className="text-secondary u-mb-md">Please reload the page. If the problem persists, contact support.</p>
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            Reload
+          </button>
         </div>
       );
     }

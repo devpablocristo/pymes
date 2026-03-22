@@ -2404,12 +2404,8 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         header: 'Color',
         render: (value) => (
           <span
-            className="badge"
-            style={{
-              background: String(value || '#6366f1'),
-              color: 'var(--color-on-primary)',
-              minWidth: '2.5rem',
-            }}
+            className="badge badge-swatch"
+            style={{ background: String(value || '#6366f1') }}
           >
             {' '}
           </span>

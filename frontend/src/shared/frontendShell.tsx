@@ -80,9 +80,9 @@ function ClerkProtectedRoute({ children }: PropsWithChildren) {
       <div className="app-layout">
         <div className="main-content">
           {loadTimedOut ? (
-            <div className="auth-card" style={{ maxWidth: '36rem', margin: '2rem auto' }}>
-              <h1 style={{ fontSize: '1.1rem' }}>{t('auth.clerk.loadTimeout.title')}</h1>
-              <p style={{ marginTop: '0.75rem', lineHeight: 1.5 }}>{t('auth.clerk.loadTimeout.hint')}</p>
+            <div className="auth-card auth-state-card">
+              <h1 className="auth-state-title">{t('auth.clerk.loadTimeout.title')}</h1>
+              <p className="auth-state-body">{t('auth.clerk.loadTimeout.hint')}</p>
             </div>
           ) : (
             <div className="spinner" />
@@ -184,7 +184,7 @@ export function AppShell({
         </nav>
 
         <div className="sidebar-footer">
-          {footerContent ?? (clerkEnabled ? <UserButton /> : <span style={{ fontSize: '0.78rem' }}>{t('shell.footer.localDev')}</span>)}
+          {footerContent ?? (clerkEnabled ? <UserButton /> : <span className="shell-footer-caption">{t('shell.footer.localDev')}</span>)}
         </div>
       </aside>
 

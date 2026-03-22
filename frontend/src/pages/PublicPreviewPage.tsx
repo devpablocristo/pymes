@@ -56,7 +56,7 @@ export function PublicPreviewPage() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="card u-mb-md">
         <div className="card-header">
           <h2>Configuración</h2>
         </div>
@@ -69,7 +69,7 @@ export function PublicPreviewPage() {
         </div>
       </div>
 
-      <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>
+      <div className="alert alert-warning u-mb-md">
         Esta es una vista previa. La pagina publica real se sirve desde una URL separada.
       </div>
 
@@ -82,16 +82,16 @@ export function PublicPreviewPage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+        <div className="grid-cards-auto">
           {items.map((item) => (
             <div key={item.id} className="card">
               <div className="card-header">
                 <h2>{item.headline || item.public_slug || 'Teacher'}</h2>
                 {item.is_bookable && <span className="badge badge-success">Reservable</span>}
               </div>
-              {item.bio && <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.87rem', marginBottom: '0.75rem' }}>{item.bio}</p>}
+              {item.bio && <p className="text-secondary-lead">{item.bio}</p>}
               {(item.specialties ?? []).length > 0 && (
-                <div className="actions-row" style={{ flexWrap: 'wrap' }}>
+                <div className="actions-row actions-row--wrap">
                   {item.specialties.map((spec) => (
                     <span
                       key={typeof spec === 'string' ? spec : spec.id || spec.code || spec.name}
@@ -103,7 +103,7 @@ export function PublicPreviewPage() {
                 </div>
               )}
               {item.public_slug && (
-                <div style={{ marginTop: '0.75rem' }}>
+                <div className="u-mt-sm">
                   <span className="text-secondary">Slug: </span>
                   <span className="mono">{item.public_slug}</span>
                 </div>

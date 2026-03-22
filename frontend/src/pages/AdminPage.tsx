@@ -255,7 +255,7 @@ export function AdminPage() {
           <h2>{t('profile.admin.appearanceTitle')}</h2>
         </div>
         <p className="text-secondary">{t('profile.admin.appearanceLead')}</p>
-        <div className="actions-row" style={{ marginTop: '0.75rem' }}>
+        <div className="actions-row u-mt-sm">
           <button
             type="button"
             className="btn-secondary"
@@ -342,7 +342,7 @@ export function AdminPage() {
                   + Agregar moneda
                 </button>
               </div>
-              <div className="admin-settings-grid" style={{ marginTop: '1rem' }}>
+              <div className="admin-settings-grid u-mt-md">
                 <div className="form-group">
                   <label>IVA / impuesto (%)</label>
                   <input

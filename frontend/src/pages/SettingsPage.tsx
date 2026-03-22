@@ -532,10 +532,10 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
               <div className="card-header">
                 <h2>{t('profile.section.admin')}</h2>
               </div>
-              <p className="text-secondary">{t('profile.admin.lead')}</p>
+              <p className="text-secondary profile-section-lead">{t('profile.admin.lead')}</p>
               {session.auth.product_role === 'admin' ? (
-                <p>
-                  <Link to="/admin" className="btn-primary">
+                <p className="profile-form-actions">
+                  <Link to="/admin" className="btn-secondary">
                     {t('profile.admin.cta')}
                   </Link>
                 </p>

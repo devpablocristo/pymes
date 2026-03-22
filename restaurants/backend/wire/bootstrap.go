@@ -147,39 +147,3 @@ func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-func newPublicRateLimit(limit int) gin.HandlerFunc {
-	if limit <= 0 {
-		limit = 30
-	}
-	type state struct {
-		mu   syncPkg.Mutex
-		hits map[string][]time.Time
-	}
-	s := &state{hits: make(map[string][]time.Time)}
-
-	return func(c *gin.Context) {
-		key := c.ClientIP()
-		now := time.Now().UTC()
-		windowStart := now.Add(-1 * time.Minute)
-
-		s.mu.Lock()
-		history := s.hits[key]
-		filtered := make([]time.Time, 0, len(history)+1)
-		for _, ts := range history {
-			if ts.After(windowStart) {
-				filtered = append(filtered, ts)
-			}
-		}
-		if len(filtered) >= limit {
-			s.hits[key] = filtered
-			s.mu.Unlock()
-			c.AbortWithStatusJSON(429, gin.H{"error": "rate limit exceeded"})
-			return
-		}
-		filtered = append(filtered, now)
-		s.hits[key] = filtered
-		s.mu.Unlock()
-		c.Next()
-	}
-}

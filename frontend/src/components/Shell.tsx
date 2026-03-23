@@ -225,6 +225,15 @@ export function Shell({ children }: { children: ReactNode }) {
     [t],
   );
 
+  const automationNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/automation-rules', label: t('shell.nav.automationRules'), icon: adminIcon },
+      { to: '/approvals', label: t('shell.nav.approvals'), icon: bellIcon },
+      { to: '/watcher-config', label: t('shell.nav.watcherConfig'), icon: clockIcon },
+    ],
+    [t],
+  );
+
   const settingsNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
@@ -267,9 +276,10 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     result.push(...moduleNav);
+    result.push({ label: sentenceCase(t('shell.sections.automation')), items: automationNav });
     result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
+  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
 
   const footerControls =
     productRole !== null ? (

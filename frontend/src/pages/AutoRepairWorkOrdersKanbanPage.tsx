@@ -3,21 +3,26 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
+import { WorkOrderKanbanDetailModal } from '../components/WorkOrderKanbanDetailModal';
 import { getAllAutoRepairWorkOrders, patchAutoRepairWorkOrder } from '../lib/autoRepairApi';
 import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
 import './AutoRepairWorkOrdersKanbanPage.css';
 
-/** Referencia OSS: tablero multi-columna con @dnd-kit (MIT) — ver MultipleContainers en clauderic/dnd-kit. */
+type SuppressCardOpen = { id: string | null; until: number };
+
 const COLUMN_ORDER = [
   { status: 'received', label: 'Recibido' },
   { status: 'diagnosing', label: 'Diagnóstico' },
@@ -33,6 +38,19 @@ const COLUMN_ORDER = [
 ] as const;
 
 const COLUMN_IDS = new Set(COLUMN_ORDER.map((c) => c.status));
+
+/** Prioriza columna bajo el puntero; si no, intersección (huecos vacíos); último recurso esquinas (estilo Trello / dnd-kit). */
+const kanbanCollisionDetection: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args);
+  if (pointer.length > 0) {
+    return pointer;
+  }
+  const rect = rectIntersection(args);
+  if (rect.length > 0) {
+    return rect;
+  }
+  return closestCorners(args);
+};
 
 export function canonicalWorkOrderStatus(raw: string): string {
   const s = (raw || '').toLowerCase().trim();
@@ -95,14 +113,15 @@ function CardPreview({ row }: { row: AutoRepairWorkOrder }) {
 
 function KanbanCard({
   row,
-  disabled,
+  onOpenClick,
+  suppressOpenRef,
 }: {
   row: AutoRepairWorkOrder;
-  disabled: boolean;
+  onOpenClick: (row: AutoRepairWorkOrder) => void;
+  suppressOpenRef: RefObject<SuppressCardOpen>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: row.id,
-    disabled,
   });
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -114,8 +133,23 @@ function KanbanCard({
   if (overdue) cls.push('wo-kanban__card--overdue');
   else if (soon) cls.push('wo-kanban__card--soon');
 
+  const handleClick = () => {
+    const s = suppressOpenRef.current;
+    if (s != null && s.id === row.id && Date.now() < s.until) return;
+    onOpenClick(row);
+  };
+
   return (
-    <div ref={setNodeRef} style={style} className={cls.join(' ')} {...listeners} {...attributes}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cls.join(' ')}
+      title="Clic para editar · arrastrar para mover"
+      {...listeners}
+      {...attributes}
+      draggable={false}
+      onClick={handleClick}
+    >
       <strong>{row.number}</strong>
       <div className="wo-kanban__card-meta">
         {row.vehicle_plate || '—'} · {row.customer_name || 'Sin cliente'}
@@ -131,21 +165,44 @@ function KanbanCard({
   );
 }
 
-function KanbanColumn({
+function KanbanColumnBody({
   status,
   label,
+  count,
+  boardDragging,
   children,
 }: {
   status: string;
   label: string;
+  count: number;
+  boardDragging: boolean;
   children: ReactNode;
 }) {
   const id = `col-${status}`;
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={`wo-kanban__column ${isOver ? 'wo-kanban__column--over' : ''}`} data-column={status}>
-      <div className="wo-kanban__column-title">{label}</div>
+    <div
+      ref={setNodeRef}
+      className={`wo-kanban__column-body ${isOver ? 'wo-kanban__column-body--over' : ''} ${boardDragging ? 'wo-kanban__column-body--dragging' : ''}`}
+      data-column={status}
+    >
+      <div className="wo-kanban__column-head">
+        <span className="wo-kanban__column-label">{label}</span>
+        <div className="wo-kanban__column-head-actions">
+          <span className="wo-kanban__column-count">{count}</span>
+          <span className="wo-kanban__column-menu" aria-hidden="true">
+            ···
+          </span>
+        </div>
+      </div>
       <div className="wo-kanban__column-scroll">{children}</div>
+      {boardDragging && count === 0 ? <div className="wo-kanban__drop-hint">Soltar aquí</div> : null}
+      <Link to="/workshops/auto-repair/orders" className="wo-kanban__column-add" draggable={false}>
+        <span className="wo-kanban__column-add-icon" aria-hidden="true">
+          +
+        </span>
+        Añadir orden
+      </Link>
     </div>
   );
 }
@@ -155,8 +212,12 @@ export function AutoRepairWorkOrdersKanbanPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [movingId, setMovingId] = useState<string | null>(null);
   const [activeDrag, setActiveDrag] = useState<AutoRepairWorkOrder | null>(null);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const itemsRef = useRef<AutoRepairWorkOrder[]>([]);
+  itemsRef.current = items;
+  const suppressCardOpenRef = useRef<SuppressCardOpen>({ id: null, until: 0 });
+  const activeDragIdRef = useRef<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -211,51 +272,62 @@ export function AutoRepairWorkOrdersKanbanPage() {
     return map;
   }, [filtered]);
 
+  const boardDragging = activeDrag != null;
+
   const handleDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id);
-    setActiveDrag(items.find((x) => x.id === id) ?? null);
+    activeDragIdRef.current = id;
+    setActiveDrag(itemsRef.current.find((x) => x.id === id) ?? null);
   };
 
-  const handleDragEnd = async (e: DragEndEvent) => {
+  /** Sincrónico: dnd-kit debe terminar el ciclo sin await; el PATCH va aparte. */
+  const handleDragEnd = (e: DragEndEvent) => {
+    suppressCardOpenRef.current = { id: String(e.active.id), until: Date.now() + 260 };
+    activeDragIdRef.current = null;
     const { active, over } = e;
     setActiveDrag(null);
     const id = String(active.id);
-    const targetStatus = resolveDropStatus(over?.id != null ? String(over.id) : undefined, items);
+    const snapshot = itemsRef.current;
+    const targetStatus = resolveDropStatus(over?.id != null ? String(over.id) : undefined, snapshot);
     if (!targetStatus) return;
-    const row = items.find((x) => x.id === id);
+    const row = snapshot.find((x) => x.id === id);
     if (!row || canonicalWorkOrderStatus(row.status) === targetStatus) return;
-    setMovingId(id);
+
+    setItems((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, status: targetStatus as AutoRepairWorkOrder['status'] } : x)),
+    );
+
     setError(null);
-    try {
-      await patchAutoRepairWorkOrder(id, { status: targetStatus });
-      setItems((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, status: targetStatus as AutoRepairWorkOrder['status'] } : x)),
-      );
-    } catch (err) {
+    void patchAutoRepairWorkOrder(id, { status: targetStatus }).catch(async (err: unknown) => {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar el estado');
       await load();
-    } finally {
-      setMovingId(null);
-    }
+    });
   };
 
   const handleDragCancel = () => {
+    const id = activeDragIdRef.current;
+    if (id) suppressCardOpenRef.current = { id, until: Date.now() + 260 };
+    activeDragIdRef.current = null;
     setActiveDrag(null);
+  };
+
+  const handleCardOpen = (row: AutoRepairWorkOrder) => {
+    setDetailOrderId(row.id);
+  };
+
+  const handleModalSaved = (wo: AutoRepairWorkOrder) => {
+    setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
   };
 
   const totalVisible = filtered.length;
 
   return (
-    <div className="card wo-kanban">
+    <div className="wo-kanban">
       <div className="wo-kanban__toolbar">
         <div>
           <h1 className="wo-kanban__title">Tablero de órdenes</h1>
           <p className="wo-kanban__muted wo-kanban__subtitle">
-            Estilo tablero: arrastrá tarjetas entre columnas (validación en servidor). Comportamiento similar a{' '}
-            <a href="https://github.com/clauderic/dnd-kit" target="_blank" rel="noreferrer">
-              dnd-kit
-            </a>{' '}
-            (Kanban multi-contenedor).
+            Clic en una tarjeta para editar. Arrastrá entre listas para cambiar estado (se guarda al soltar).
           </p>
         </div>
         <div className="wo-kanban__toolbar-actions">
@@ -297,27 +369,46 @@ export function AutoRepairWorkOrdersKanbanPage() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={kanbanCollisionDetection}
+        autoScroll={false}
         onDragStart={handleDragStart}
-        onDragEnd={(ev) => void handleDragEnd(ev)}
+        onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
         <div className="wo-kanban__board">
           {COLUMN_ORDER.map((col) => {
             const columnItems = byColumn.get(col.status) ?? [];
             return (
-              <KanbanColumn key={col.status} status={col.status} label={`${col.label} · ${columnItems.length}`}>
-                {columnItems.map((row) => (
-                  <KanbanCard key={row.id} row={row} disabled={movingId === row.id} />
-                ))}
-              </KanbanColumn>
+              <div key={col.status} className="wo-kanban__column-shell">
+                <KanbanColumnBody
+                  status={col.status}
+                  label={col.label}
+                  count={columnItems.length}
+                  boardDragging={boardDragging}
+                >
+                  {columnItems.map((row) => (
+                    <KanbanCard
+                      key={row.id}
+                      row={row}
+                      onOpenClick={handleCardOpen}
+                      suppressOpenRef={suppressCardOpenRef}
+                    />
+                  ))}
+                </KanbanColumnBody>
+              </div>
             );
           })}
         </div>
-        <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
+        <DragOverlay dropAnimation={{ duration: 160, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
           {activeDrag ? <CardPreview row={activeDrag} /> : null}
         </DragOverlay>
       </DndContext>
+
+      <WorkOrderKanbanDetailModal
+        orderId={detailOrderId}
+        onClose={() => setDetailOrderId(null)}
+        onSaved={handleModalSaved}
+      />
     </div>
   );
 }

@@ -28,6 +28,15 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
         yield session
 
 
+from contextlib import asynccontextmanager  # noqa: E402
+
+@asynccontextmanager
+async def get_session() -> AsyncIterator[AsyncSession]:
+    """Context manager para obtener una sesión de DB fuera de FastAPI Depends."""
+    async with SessionLocal() as session:
+        yield session
+
+
 async def ping_database() -> None:
     async with engine.connect() as conn:
         await conn.execute(text("SELECT 1"))

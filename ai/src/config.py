@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     otel_service_name: str = "pymes-ai"
     otel_exporter_otlp_endpoint: str = ""
 
+    # Nexus Review — gobernanza de acciones
+    review_url: str = ""
+    review_api_key: str = ""
+    review_callback_token: str = ""
+
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 
     @property
@@ -44,6 +49,10 @@ class Settings(BaseSettings):
     @property
     def is_local_environment(self) -> bool:
         return self.normalized_environment in LOCAL_ENVIRONMENTS
+
+    @property
+    def review_enabled(self) -> bool:
+        return bool(self.review_url.strip())
 
     @model_validator(mode="after")
     def validate_internal_service_token(self) -> "Settings":

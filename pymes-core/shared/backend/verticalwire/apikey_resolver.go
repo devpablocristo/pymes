@@ -23,7 +23,7 @@ type apiKeyModel struct {
 func (apiKeyModel) TableName() string { return "org_api_keys" }
 
 type apiKeyScopeModel struct {
-	KeyID uuid.UUID `gorm:"type:uuid;index;not null"`
+	KeyID uuid.UUID `gorm:"type:uuid;index;not null;column:api_key_id"`
 	Scope string    `gorm:"not null"`
 }
 
@@ -37,12 +37,12 @@ func NewAPIKeyResolver(db *gorm.DB) auth.APIKeyResolver {
 func (r *apiKeyResolver) ResolveAPIKey(raw string) (auth.ResolvedKey, bool) {
 	hash := utils.SHA256Hex(raw)
 	var key apiKeyModel
-	if err := r.db.Where("key_hash = ?", hash).First(&key).Error; err != nil {
+	if err := r.db.Where("api_key_hash = ?", hash).First(&key).Error; err != nil {
 		return auth.ResolvedKey{}, false
 	}
 
 	var scopeModels []apiKeyScopeModel
-	r.db.Where("key_id = ?", key.ID).Find(&scopeModels)
+	r.db.Where("api_key_id = ?", key.ID).Find(&scopeModels)
 	scopes := make([]string, 0, len(scopeModels))
 	for _, scope := range scopeModels {
 		scopes = append(scopes, scope.Scope)

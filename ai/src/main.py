@@ -27,7 +27,9 @@ from pymes_core_shared.ai_runtime import create_provider
 from pymes_core_shared.ai_runtime import AuthMiddleware
 from pymes_core_shared.ai_runtime import RateLimitMiddleware
 from pymes_core_shared.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
+from src.api.review_callback import router as review_callback_router
 from src.observability.otel import configure_opentelemetry
+from src.review_client.client import ReviewClient
 
 settings = get_settings()
 configure_logging(settings.ai_log_level, json_logs=settings.ai_log_json)
@@ -51,6 +53,15 @@ async def lifespan(app: FastAPI):
         internal_token=settings.internal_service_token,
     )
     app.state.llm_provider = create_provider(settings)
+    # Nexus Review — gobernanza de acciones (opcional)
+    if settings.review_enabled:
+        app.state.review_client = ReviewClient(
+            base_url=settings.review_url,
+            api_key=settings.review_api_key,
+        )
+        logger.info("review_client_enabled", review_url=settings.review_url)
+    else:
+        app.state.review_client = None
     if not getattr(app.state, "otel_configured", False):
         configure_opentelemetry(app, settings, app.state.backend_client)
         app.state.otel_configured = True
@@ -66,6 +77,8 @@ async def lifespan(app: FastAPI):
     await app.state.backend_client.close()
     await app.state.teachers_backend_client.close()
     await app.state.auto_repair_backend_client.close()
+    if app.state.review_client is not None:
+        await app.state.review_client.close()
 
 
 app = FastAPI(title="pymes-ai", version="0.1.0", lifespan=lifespan)
@@ -85,6 +98,7 @@ app.include_router(teachers_chat_router)
 app.include_router(teachers_public_router)
 app.include_router(auto_repair_chat_router)
 app.include_router(auto_repair_public_router)
+app.include_router(review_callback_router)
 register_common_exception_handlers(app, logger)
 
 

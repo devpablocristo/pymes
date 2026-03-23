@@ -102,6 +102,10 @@ export async function updateAutoRepairService(
   return autoRepairRequest(`/v1/auto-repair/workshop-services/${id}`, { method: 'PUT', body: data });
 }
 
+export async function getAutoRepairWorkOrder(id: string): Promise<AutoRepairWorkOrder> {
+  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`);
+}
+
 export async function getAutoRepairWorkOrders(params?: {
   limit?: number;
   search?: string;

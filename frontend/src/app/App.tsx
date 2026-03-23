@@ -34,6 +34,9 @@ const SettingsPage = lazy(() => import('../pages/SettingsPage').then((mod) => ({
 const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
 const SpecialtiesPage = lazy(() => import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })));
 const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({ default: mod.TeachersPage })));
+const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
+const ApprovalInboxPage = lazy(() => import('../pages/ApprovalInboxPage'));
+const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 
 function Suspended({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="card"><p>Cargando…</p></div>}>{children}</Suspense>;
@@ -101,6 +104,9 @@ export function App() {
                       <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
                       <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
                       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
+                      <Route path="/automation-rules" element={<AutomationRulesPage />} />
+                      <Route path="/approvals" element={<ApprovalInboxPage />} />
+                      <Route path="/watcher-config" element={<WatcherConfigPage />} />
                     </Routes>
                   </Shell>
                 </Suspended>

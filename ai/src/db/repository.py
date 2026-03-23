@@ -252,6 +252,41 @@ class AIRepository:
             return "starter"
         return str(plan).strip().lower() or "starter"
 
+    async def find_conversation_by_review_request(self, review_request_id: str) -> AIConversation | None:
+        """Busca conversación con un review_request_id pendiente."""
+        query = select(AIConversation).where(
+            AIConversation.review_request_id == review_request_id,
+        ).limit(1)
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
+    async def clear_pending_review(self, conversation_id: str) -> None:
+        """Limpia el estado de review pendiente de una conversación."""
+        row = await self.db.get(AIConversation, conversation_id)
+        if row is not None:
+            row.pending_action = None
+            row.review_request_id = None
+            row.review_status = None
+            row.updated_at = datetime.now(UTC)
+            await self.db.commit()
+
+    async def set_pending_review(
+        self,
+        conversation_id: str,
+        *,
+        pending_action: dict,
+        review_request_id: str,
+        review_status: str = "pending_approval",
+    ) -> None:
+        """Guarda una acción pendiente de aprobación en la conversación."""
+        row = await self.db.get(AIConversation, conversation_id)
+        if row is not None:
+            row.pending_action = pending_action
+            row.review_request_id = review_request_id
+            row.review_status = review_status
+            row.updated_at = datetime.now(UTC)
+            await self.db.commit()
+
     async def has_agent_request(self, org_id: str, request_id: str) -> bool:
         normalized = str(request_id).strip()
         if not normalized:

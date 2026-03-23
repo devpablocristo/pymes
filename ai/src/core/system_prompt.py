@@ -30,6 +30,12 @@ def build_system_prompt(mode: str, auth: AuthContext | None, dossier: dict) -> s
             f"Sos el asistente de {business_name}. Estas hablando con un cliente externo. "
             "Nunca reveles informacion interna financiera ni de otros clientes."
         )
+        prompt.append(
+            "Si una accion requiere aprobacion del dueno (como descuentos, cancelaciones, o reembolsos), "
+            "avisa al cliente que su solicitud fue enviada al equipo y que le responderan a la brevedad. "
+            "Si una accion no esta permitida, explica amablemente que no puede procesarse por este canal "
+            "y sugeri contactar al local directamente."
+        )
 
     onboarding = dossier.get("onboarding", {})
     if onboarding.get("status") != "completed":

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/backend/seeds"
@@ -278,6 +280,7 @@ func InitializeApp() *app.App {
 
 	authGroup := v1.Group("")
 	authGroup.Use(GinSaaSAuthMiddleware(saasSvc))
+	authGroup.Use(NewGinDevForceOrgMiddleware(cfg.Environment, os.Getenv("PYMES_DEV_FORCE_ORG_UUID")))
 	adminHandler.RegisterRoutes(authGroup)
 	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
@@ -308,6 +311,16 @@ func InitializeApp() *app.App {
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
+
+	// Review proxy — opcional, se activa si REVIEW_URL está configurado
+	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
+	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
+	if reviewURL != "" {
+		reviewClient := reviewproxy.NewClient(reviewURL, reviewAPIKey)
+		reviewHandler := reviewproxy.NewHandler(reviewClient)
+		reviewHandler.RegisterRoutes(authGroup)
+		log.Info().Str("review_url", reviewURL).Msg("review proxy enabled")
+	}
 
 	AttachSaaSUnmatchedRoutes(router, saasSvc)
 

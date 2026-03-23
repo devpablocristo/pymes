@@ -38,19 +38,15 @@ func normalizeWorkOrderStatus(raw string) string {
 	}
 }
 
-// allowedWorkOrderTransitions define transiciones válidas entre estados canónicos (taller auto_repair).
-var allowedWorkOrderTransitions = map[string][]string{
-	"received":           {"diagnosing", "on_hold", "cancelled"},
-	"diagnosing":         {"quote_pending", "received", "on_hold", "cancelled"},
-	"quote_pending":      {"awaiting_parts", "in_progress", "diagnosing", "on_hold", "cancelled"},
-	"awaiting_parts":     {"in_progress", "quote_pending", "on_hold", "cancelled"},
-	"in_progress":        {"quality_check", "awaiting_parts", "on_hold", "cancelled"},
-	"quality_check":      {"ready_for_pickup", "in_progress", "on_hold", "cancelled"},
-	"ready_for_pickup":   {"delivered", "in_progress", "on_hold", "cancelled"},
-	"delivered":          {"invoiced", "ready_for_pickup", "on_hold", "cancelled"},
-	"on_hold":            {"received", "diagnosing", "quote_pending", "awaiting_parts", "in_progress", "quality_check", "ready_for_pickup", "cancelled"},
-	"invoiced":           {},
-	"cancelled":          {},
+// isWorkOrderKanbanOpenStatus son columnas del tablero operativo (movimiento libre estilo Trello/Kanban).
+func isWorkOrderKanbanOpenStatus(s string) bool {
+	switch normalizeWorkOrderStatus(s) {
+	case "received", "diagnosing", "quote_pending", "awaiting_parts",
+		"in_progress", "quality_check", "ready_for_pickup", "delivered", "on_hold":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateWorkOrderStatusTransition(fromRaw, toRaw string) error {
@@ -62,18 +58,20 @@ func validateWorkOrderStatusTransition(fromRaw, toRaw string) error {
 	if from == "invoiced" || from == "cancelled" {
 		return fmt.Errorf("work order status is terminal (%s): %w", from, httperrors.ErrConflict)
 	}
-	for _, allowed := range allowedWorkOrderTransitions[from] {
-		if allowed == to {
-			return nil
-		}
+	// Kanban: cualquier salto entre columnas operativas (arrastre en UI).
+	if isWorkOrderKanbanOpenStatus(from) && isWorkOrderKanbanOpenStatus(to) {
+		return nil
 	}
-	// Transición a facturado desde flujo comercial (además de delivered).
+	if to == "cancelled" {
+		return nil
+	}
 	if to == "invoiced" {
 		for _, allowed := range []string{"delivered", "ready_for_pickup", "in_progress", "quality_check", "quote_pending"} {
 			if from == allowed {
 				return nil
 			}
 		}
+		return fmt.Errorf("invalid work order status transition from %q to %q: %w", from, to, httperrors.ErrBadInput)
 	}
 	return fmt.Errorf("invalid work order status transition from %q to %q: %w", from, to, httperrors.ErrBadInput)
 }

@@ -220,7 +220,7 @@ func TestUpdateStatusTransitionAllowsPipeline(t *testing.T) {
 	}
 }
 
-func TestUpdateStatusTransitionRejectsSkipAhead(t *testing.T) {
+func TestUpdateStatusTransitionAllowsKanbanSkipAhead(t *testing.T) {
 	t.Parallel()
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	id := uuid.MustParse("00000000-0000-0000-0000-000000000098")
@@ -230,11 +230,30 @@ func TestUpdateStatusTransitionRejectsSkipAhead(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil, nil)
 	ctx := context.Background()
 	next := "ready_for_pickup"
+	if _, err := uc.Update(ctx, orgID, id, UpdateInput{Status: &next}, "tester"); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	stored := repo.orders[fakeOrderKey(orgID, id)]
+	if stored.Status != "ready_for_pickup" {
+		t.Fatalf("status = %q, want ready_for_pickup", stored.Status)
+	}
+}
+
+func TestUpdateStatusTransitionBlocksFromInvoiced(t *testing.T) {
+	t.Parallel()
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	id := uuid.MustParse("00000000-0000-0000-0000-000000000097")
+	repo := &fakeRepo{orders: map[string]domain.WorkOrder{
+		fakeOrderKey(orgID, id): sampleWorkOrder(orgID, id, "invoiced"),
+	}}
+	uc := NewUsecases(repo, nil, nil, nil)
+	ctx := context.Background()
+	next := "delivered"
 	_, err := uc.Update(ctx, orgID, id, UpdateInput{Status: &next}, "tester")
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !errors.Is(err, httperrors.ErrBadInput) {
-		t.Fatalf("expected ErrBadInput, got %v", err)
+	if !errors.Is(err, httperrors.ErrConflict) {
+		t.Fatalf("expected ErrConflict, got %v", err)
 	}
 }

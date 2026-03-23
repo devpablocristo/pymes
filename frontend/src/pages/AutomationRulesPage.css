@@ -1,0 +1,153 @@
+.automation-rules-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.automation-rules-page h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.automation-rules-page .subtitle {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 24px;
+}
+
+.rules-category {
+  margin-bottom: 24px;
+}
+
+.rules-category h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rule-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.rule-card .rule-info {
+  flex: 1;
+}
+
+.rule-card .rule-name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.rule-card .rule-risk {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.rule-card .rule-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-card select {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.rule-card select.effect-allow {
+  border-color: #10b981;
+  color: #059669;
+}
+
+.rule-card select.effect-require {
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+.rule-card select.effect-deny {
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+.rule-card .threshold-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.rule-card .threshold-input input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.automation-rules-page .save-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.automation-rules-page .save-btn {
+  padding: 8px 24px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.automation-rules-page .save-btn:hover {
+  background: #1d4ed8;
+}
+
+.automation-rules-page .save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.automation-rules-page .status-msg {
+  font-size: 0.875rem;
+  margin-top: 8px;
+  text-align: right;
+}
+
+.automation-rules-page .status-msg.success {
+  color: #059669;
+}
+
+.automation-rules-page .status-msg.error {
+  color: #dc2626;
+}
+
+.automation-rules-page .loading {
+  text-align: center;
+  padding: 48px;
+  color: #6b7280;
+}

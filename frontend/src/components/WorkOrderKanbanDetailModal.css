@@ -1,0 +1,208 @@
+/* Modal detalle OT — estilo acorde al tablero Trello oscuro (solo el panel, sin fondo full-bleed) */
+
+.wo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem 2rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.wo-modal {
+  width: min(720px, 100%);
+  max-height: min(90vh, 900px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1d2127;
+  color: #e6edf3;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.wo-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wo-modal__title-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.wo-modal__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9fadbc;
+  margin-bottom: 0.35rem;
+}
+
+.wo-modal__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.wo-modal__close {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #9fadbc;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wo-modal__close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.wo-modal__body {
+  padding: 1rem 1.1rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wo-modal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+@media (max-width: 560px) {
+  .wo-modal__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wo-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.wo-modal__field--full {
+  grid-column: 1 / -1;
+}
+
+.wo-modal__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9fadbc;
+}
+
+.wo-modal__input,
+.wo-modal__select,
+.wo-modal__textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #22272b;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.wo-modal__input:focus,
+.wo-modal__select:focus,
+.wo-modal__textarea:focus {
+  outline: none;
+  border-color: rgba(87, 157, 255, 0.55);
+  box-shadow: 0 0 0 2px rgba(87, 157, 255, 0.15);
+}
+
+.wo-modal__textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.wo-modal__readonly {
+  font-size: 0.8rem;
+  color: #9fadbc;
+  padding: 0.35rem 0;
+}
+
+.wo-modal__items {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #c4cdd5;
+}
+
+.wo-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.25rem;
+}
+
+.wo-modal__btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.wo-modal__btn--ghost {
+  background: transparent;
+  color: #9fadbc;
+}
+
+.wo-modal__btn--ghost:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wo-modal__btn--primary {
+  background: #579dff;
+  color: #101204;
+}
+
+.wo-modal__btn--primary:hover {
+  filter: brightness(1.06);
+}
+
+.wo-modal__btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wo-modal__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f87171;
+}
+
+.wo-modal__loading {
+  margin: 0;
+  color: #9fadbc;
+  font-size: 0.9rem;
+}

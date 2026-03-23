@@ -1,8 +1,6 @@
 package reviewproxy
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -46,7 +44,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 func (h *Handler) listPolicies(c *gin.Context) {
-	data, status, err := h.client.ListPolicies(c.Request.Context())
+	status, data, err := h.client.ListPolicies(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: list policies failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -77,13 +75,8 @@ func (h *Handler) createPolicy(c *gin.Context) {
 		"effect":      req.Effect,
 		"mode":        req.Mode,
 	}
-	body, err := json.Marshal(reviewBody)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "Error interno al crear la regla"})
-		return
-	}
 
-	data, status, err := h.client.CreatePolicy(c.Request.Context(), bytes.NewReader(body))
+	status, data, err := h.client.CreatePolicy(c.Request.Context(), reviewBody)
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: create policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -117,17 +110,10 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 		updates["mode"] = *req.Mode
 	}
 	if req.Condition != nil {
-		// Necesitamos el action_type para construir CEL; extraer del body original si no viene
 		updates["expression"] = BuildCELExpression("", req.Condition)
 	}
 
-	body, err := json.Marshal(updates)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "Error interno"})
-		return
-	}
-
-	data, status, err := h.client.UpdatePolicy(c.Request.Context(), id, bytes.NewReader(body))
+	status, data, err := h.client.UpdatePolicy(c.Request.Context(), id, updates)
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: update policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -153,7 +139,7 @@ func (h *Handler) deletePolicy(c *gin.Context) {
 }
 
 func (h *Handler) listActionTypes(c *gin.Context) {
-	data, status, err := h.client.ListActionTypes(c.Request.Context())
+	status, data, err := h.client.ListActionTypes(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: list action types failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -163,7 +149,7 @@ func (h *Handler) listActionTypes(c *gin.Context) {
 }
 
 func (h *Handler) listPendingApprovals(c *gin.Context) {
-	data, status, err := h.client.ListPendingApprovals(c.Request.Context())
+	status, data, err := h.client.ListPendingApprovals(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: list pending approvals failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -184,13 +170,9 @@ func (h *Handler) approve(c *gin.Context) {
 		req = dto.ApprovalDecisionRequest{}
 	}
 
-	body, err := json.Marshal(map[string]string{"decided_by": "owner", "note": req.Note})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "Error interno"})
-		return
-	}
+	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	data, status, err := h.client.Approve(c.Request.Context(), id, bytes.NewReader(body))
+	status, data, err := h.client.Approve(c.Request.Context(), id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: approve failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -211,13 +193,9 @@ func (h *Handler) reject(c *gin.Context) {
 		req = dto.ApprovalDecisionRequest{}
 	}
 
-	body, err := json.Marshal(map[string]string{"decided_by": "owner", "note": req.Note})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "Error interno"})
-		return
-	}
+	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	data, status, err := h.client.Reject(c.Request.Context(), id, bytes.NewReader(body))
+	status, data, err := h.client.Reject(c.Request.Context(), id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("review proxy: reject failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -231,3 +209,4 @@ func (h *Handler) getConditionTemplates(c *gin.Context) {
 	templates := GetConditionTemplates(actionType)
 	c.JSON(http.StatusOK, dto.ConditionTemplatesResponse{Templates: templates})
 }
+

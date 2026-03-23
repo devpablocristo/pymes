@@ -14,13 +14,18 @@
       "Bash(find /home/pablo/Projects/Pablo/pymes/ai/tests -name *.py -exec grep -l \"control-plane\\\\|pymes_control_plane_shared\" {})",
       "Bash(find /home/pablo/Projects/Pablo/pymes/pymes-core/shared/ai -name *.py -exec grep -l \"pymes_control_plane_shared\\\\|control-plane\" {})",
       "Bash(xargs -r sed -i 's|control-plane|pymes-core|g')",
-      "Bash(find /home/pablo/Projects/Pablo/pymes/.cursor/rules -name *.mdc -exec grep -l control-plane {})"
+      "Bash(find /home/pablo/Projects/Pablo/pymes/.cursor/rules -name *.mdc -exec grep -l control-plane {})",
+      "Bash(ls /home/pablo/Projects/Pablo/pymes/ai/src/agents/review*)",
+      "Bash(ls /home/pablo/Projects/Pablo/pymes/ai/src/tools/review*)",
+      "Bash(ls /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Auto* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Approval* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Watcher*)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",
       "/home/pablo/Projects/Pablo/saas-core/identity",
       "/home/pablo/Projects/Pablo/saas-core/billing",
-      "/home/pablo/Projects/Pablo/saas-core/admin"
+      "/home/pablo/Projects/Pablo/saas-core/admin",
+      "/home/pablo/Projects/Pablo/nexus/v3/companion",
+      "/home/pablo/Projects/Pablo/core/ai/python/src/core_ai"
     ]
   }
 }

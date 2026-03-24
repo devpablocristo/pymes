@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	apperror "github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/party/handler/dto"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
@@ -353,7 +353,7 @@ func parseRelationshipDates(fromRaw, thruRaw *string) (time.Time, *time.Time, er
 	if fromRaw != nil && strings.TrimSpace(*fromRaw) != "" {
 		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*fromRaw))
 		if err != nil {
-			return time.Time{}, nil, apperror.NewBadInput("invalid from_date")
+			return time.Time{}, nil, domainerr.Validation("invalid from_date")
 		}
 		from = parsed.UTC()
 	}
@@ -361,7 +361,7 @@ func parseRelationshipDates(fromRaw, thruRaw *string) (time.Time, *time.Time, er
 	if thruRaw != nil && strings.TrimSpace(*thruRaw) != "" {
 		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*thruRaw))
 		if err != nil {
-			return time.Time{}, nil, apperror.NewBadInput("invalid thru_date")
+			return time.Time{}, nil, domainerr.Validation("invalid thru_date")
 		}
 		parsed = parsed.UTC()
 		thru = &parsed

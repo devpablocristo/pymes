@@ -8,13 +8,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"net/http"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 type Connection struct {
@@ -98,17 +98,17 @@ type metaInboundMessage struct {
 
 func (u *Usecases) VerifyWebhook(mode, token, challenge string) (string, error) {
 	if strings.TrimSpace(mode) != "subscribe" {
-		return "", apperror.NewBadInput("invalid webhook mode")
+		return "", domainerr.Validation("invalid webhook mode")
 	}
 	if strings.TrimSpace(challenge) == "" {
-		return "", apperror.NewBadInput("missing webhook challenge")
+		return "", domainerr.Validation("missing webhook challenge")
 	}
 	expected := strings.TrimSpace(u.webhookVerifyToken)
 	if expected == "" {
-		return "", apperror.NewForbidden("whatsapp webhook verify token not configured")
+		return "", domainerr.Forbidden("whatsapp webhook verify token not configured")
 	}
 	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(token)), []byte(expected)) != 1 {
-		return "", apperror.NewForbidden("invalid webhook verify token")
+		return "", domainerr.Forbidden("invalid webhook verify token")
 	}
 	return strings.TrimSpace(challenge), nil
 }
@@ -116,33 +116,33 @@ func (u *Usecases) VerifyWebhook(mode, token, challenge string) (string, error) 
 func (u *Usecases) ValidateWebhookSignature(signatureHeader string, payload []byte) error {
 	secret := strings.TrimSpace(u.webhookAppSecret)
 	if secret == "" {
-		return apperror.New("service_unavailable", "whatsapp webhook app secret is not configured", http.StatusServiceUnavailable)
+		return domainerr.Unavailable("whatsapp webhook app secret is not configured")
 	}
 
 	provided := strings.ToLower(strings.TrimSpace(signatureHeader))
 	if !strings.HasPrefix(provided, "sha256=") {
-		return apperror.NewForbidden("invalid whatsapp webhook signature")
+		return domainerr.Forbidden("invalid whatsapp webhook signature")
 	}
 	provided = strings.TrimSpace(strings.TrimPrefix(provided, "sha256="))
 	if provided == "" {
-		return apperror.NewForbidden("invalid whatsapp webhook signature")
+		return domainerr.Forbidden("invalid whatsapp webhook signature")
 	}
 
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write(payload)
 	expected := hex.EncodeToString(mac.Sum(nil))
 	if len(provided) != len(expected) || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
-		return apperror.NewForbidden("invalid whatsapp webhook signature")
+		return domainerr.Forbidden("invalid whatsapp webhook signature")
 	}
 	return nil
 }
 
 func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (InboundResult, error) {
 	if u.ai == nil {
-		return InboundResult{}, apperror.New("service_unavailable", "whatsapp ai bridge not configured", 503)
+		return InboundResult{}, domainerr.Unavailable("whatsapp ai bridge not configured")
 	}
 	if u.meta == nil {
-		return InboundResult{}, apperror.New("service_unavailable", "whatsapp delivery not configured", 503)
+		return InboundResult{}, domainerr.Unavailable("whatsapp delivery not configured")
 	}
 
 	messages, err := parseInboundMessages(payload)
@@ -166,10 +166,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 
 		reply, err := u.ai.ProcessWhatsApp(ctx, msg)
 		if err != nil {
-			return result, apperror.New("upstream_error", "failed to process whatsapp message", 502).WithMeta(map[string]any{
-				"phone_number_id": msg.PhoneNumberID,
-				"message_id":      msg.MessageID,
-			})
+			return result, fmt.Errorf("process whatsapp message phone=%s msg=%s: %w", msg.PhoneNumberID, msg.MessageID, domainerr.UpstreamError("failed to process whatsapp message"))
 		}
 		result.Processed++
 		if strings.TrimSpace(reply.Reply) == "" {
@@ -178,13 +175,10 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 
 		accessToken, err := u.resolveAccessToken(conn.AccessToken)
 		if err != nil {
-			return result, apperror.New("upstream_error", "failed to decrypt whatsapp access token", 502)
+			return result, domainerr.UpstreamError("failed to decrypt whatsapp access token")
 		}
 		if _, err := u.meta.SendTextMessage(ctx, conn.PhoneNumberID, accessToken, msg.FromPhone, reply.Reply); err != nil {
-			return result, apperror.New("upstream_error", "failed to send whatsapp response", 502).WithMeta(map[string]any{
-				"phone_number_id": msg.PhoneNumberID,
-				"message_id":      msg.MessageID,
-			})
+			return result, fmt.Errorf("send whatsapp response phone=%s msg=%s: %w", msg.PhoneNumberID, msg.MessageID, domainerr.UpstreamError("failed to send whatsapp response"))
 		}
 		result.Replied++
 	}
@@ -194,7 +188,7 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 func (u *Usecases) resolveAccessToken(stored string) (string, error) {
 	token := strings.TrimSpace(stored)
 	if token == "" {
-		return "", apperror.NewBadInput("whatsapp access token is empty")
+		return "", domainerr.Validation("whatsapp access token is empty")
 	}
 	if u.tokenCrypto == nil {
 		return token, nil
@@ -205,7 +199,7 @@ func (u *Usecases) resolveAccessToken(stored string) (string, error) {
 func parseInboundMessages(payload []byte) ([]InboundMessage, error) {
 	var envelope metaWebhookEnvelope
 	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return nil, apperror.NewBadInput("invalid whatsapp webhook payload")
+		return nil, domainerr.Validation("invalid whatsapp webhook payload")
 	}
 
 	out := make([]InboundMessage, 0)

@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: pymes-pymes-core-shared
+Version: 0.0.0
+Summary: Codigo transversal compartido del producto pymes
+Requires-Python: >=3.12
+Requires-Dist: core-ai

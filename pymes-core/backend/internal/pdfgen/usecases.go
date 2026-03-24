@@ -10,7 +10,7 @@ import (
 	"github.com/go-pdf/fpdf"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	admindomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
@@ -40,7 +40,7 @@ func NewUsecases(quotes QuotePort, sales SalePort, admin AdminPort) *Usecases {
 
 func (u *Usecases) RenderQuotePDF(ctx context.Context, orgID, quoteID uuid.UUID) ([]byte, string, error) {
 	if u.quotes == nil || u.admin == nil {
-		return nil, "", apperror.NewBadInput("pdf service unavailable")
+		return nil, "", domainerr.Validation("pdf service unavailable")
 	}
 	quote, err := u.quotes.GetByID(ctx, orgID, quoteID)
 	if err != nil {
@@ -61,7 +61,7 @@ func (u *Usecases) RenderQuotePDF(ctx context.Context, orgID, quoteID uuid.UUID)
 
 func (u *Usecases) RenderSaleReceipt(ctx context.Context, orgID, saleID uuid.UUID) ([]byte, string, error) {
 	if u.sales == nil || u.admin == nil {
-		return nil, "", apperror.NewBadInput("pdf service unavailable")
+		return nil, "", domainerr.Validation("pdf service unavailable")
 	}
 	sale, err := u.sales.GetByID(ctx, orgID, saleID)
 	if err != nil {

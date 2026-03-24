@@ -1,170 +1,105 @@
 package auth
 
 import (
-	"crypto/subtle"
-	"net/http"
-	"strings"
+	"context"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	types "github.com/devpablocristo/core/backend/go/contextkeys"
+	authn "github.com/devpablocristo/core/authn/go"
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
 )
 
+// AuthMiddleware re-exporta el tipo de core.
+type AuthMiddleware = ginmw.AuthMiddleware
+
+// AuthContext re-exporta el tipo de core.
+type AuthContext = ginmw.AuthContext
+
+// APIKeyResolver interfaz legacy para resolver API keys por hash.
+// Los verticales implementan esto vía verticalwire.NewAPIKeyResolver.
 type APIKeyResolver interface {
 	ResolveAPIKey(raw string) (ResolvedKey, bool)
 }
 
+// ResolvedKey identidad resuelta desde una API key.
 type ResolvedKey struct {
 	ID     uuid.UUID
 	OrgID  uuid.UUID
 	Scopes []string
 }
 
-type AuthMiddleware struct {
-	identity      *IdentityResolver
-	keyResolver   APIKeyResolver
-	authEnableJWT bool
-	authAllowKey  bool
+// jwtAdapter adapta IdentityResolver a authn.Authenticator.
+type jwtAdapter struct {
+	resolver *IdentityResolver
 }
 
+func (a *jwtAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*authn.Principal, error) {
+	bc, ok := cred.(authn.BearerCredential)
+	if !ok {
+		return nil, authn.ErrWrongCredentialKind
+	}
+	p, err := a.resolver.ResolvePrincipal(ctx, bc.Token)
+	if err != nil {
+		return nil, err
+	}
+	return &authn.Principal{
+		OrgID:      p.OrgID,
+		Actor:      p.Actor,
+		Role:       p.Role,
+		Scopes:     p.Scopes,
+		AuthMethod: "jwt",
+	}, nil
+}
+
+// apiKeyAdapter adapta APIKeyResolver legacy a authn.Authenticator.
+type apiKeyAdapter struct {
+	resolver APIKeyResolver
+}
+
+func (a *apiKeyAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*authn.Principal, error) {
+	kc, ok := cred.(authn.APIKeyCredential)
+	if !ok {
+		return nil, authn.ErrWrongCredentialKind
+	}
+	key, found := a.resolver.ResolveAPIKey(kc.Key)
+	if !found {
+		return nil, fmt.Errorf("authn: invalid api key")
+	}
+	return &authn.Principal{
+		OrgID:      key.OrgID.String(),
+		Actor:      "api_key:" + key.ID.String(),
+		Role:       "service",
+		Scopes:     key.Scopes,
+		AuthMethod: "api_key",
+	}, nil
+}
+
+// NewAuthMiddleware crea middleware de autenticación. Delega a core.
 func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, authEnableJWT, authAllowKey bool) *AuthMiddleware {
-	return &AuthMiddleware{
-		identity:      identity,
-		keyResolver:   keyResolver,
-		authEnableJWT: authEnableJWT,
-		authAllowKey:  authAllowKey,
+	var jwtAuth authn.Authenticator
+	if authEnableJWT && identity != nil {
+		jwtAuth = &jwtAdapter{resolver: identity}
 	}
-}
-
-type AuthContext struct {
-	OrgID      string   `json:"org_id"`
-	Actor      string   `json:"actor"`
-	Role       string   `json:"role"`
-	Scopes     []string `json:"scopes"`
-	AuthMethod string   `json:"auth_method"`
-}
-
-func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if m.authEnableJWT {
-			header := strings.TrimSpace(c.GetHeader("Authorization"))
-			if strings.HasPrefix(strings.ToLower(header), "bearer ") {
-				token := strings.TrimSpace(header[len("Bearer "):])
-				principal, err := m.identity.ResolvePrincipal(c.Request.Context(), token)
-				if err == nil {
-					c.Set(types.CtxKeyOrgID, principal.OrgID)
-					c.Set(types.CtxKeyActor, principal.Actor)
-					c.Set(types.CtxKeyRole, principal.Role)
-					c.Set(types.CtxKeyScopes, principal.Scopes)
-					c.Set(types.CtxKeyAuthMethod, "jwt")
-					c.Next()
-					return
-				}
-			}
-		}
-
-		if m.authAllowKey {
-			rawKey := strings.TrimSpace(c.GetHeader("X-API-KEY"))
-			if rawKey != "" && m.keyResolver != nil {
-				key, ok := m.keyResolver.ResolveAPIKey(rawKey)
-				if ok {
-					actor := "api_key:" + key.ID.String()
-					role := "service"
-					reqScopes := splitCSV(c.GetHeader("X-Scopes"))
-					scopes := key.Scopes
-					if len(reqScopes) > 0 {
-						scopes = intersectScopes(key.Scopes, reqScopes)
-					}
-					c.Set(types.CtxKeyOrgID, key.OrgID.String())
-					c.Set(types.CtxKeyActor, actor)
-					c.Set(types.CtxKeyRole, role)
-					c.Set(types.CtxKeyScopes, scopes)
-					c.Set(types.CtxKeyAuthMethod, "api_key")
-					c.Next()
-					return
-				}
-			}
-		}
-
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		c.Abort()
+	var apiKeyAuth authn.Authenticator
+	if authAllowKey && keyResolver != nil {
+		apiKeyAuth = &apiKeyAdapter{resolver: keyResolver}
 	}
+	return ginmw.NewAuthMiddleware(jwtAuth, apiKeyAuth)
 }
 
+// GetAuthContext extrae el contexto de autenticación. Delega a core.
 func GetAuthContext(c *gin.Context) AuthContext {
-	orgID, _ := c.Get(types.CtxKeyOrgID)
-	actor, _ := c.Get(types.CtxKeyActor)
-	role, _ := c.Get(types.CtxKeyRole)
-	scopes, _ := c.Get(types.CtxKeyScopes)
-	authMethod, _ := c.Get(types.CtxKeyAuthMethod)
-
-	ctxScopes, _ := scopes.([]string)
-	return AuthContext{
-		OrgID:      asString(orgID),
-		Actor:      asString(actor),
-		Role:       asString(role),
-		Scopes:     ctxScopes,
-		AuthMethod: asString(authMethod),
-	}
+	return ginmw.GetAuthContext(c)
 }
 
-func NewInternalServiceAuth(token string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if strings.TrimSpace(token) == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "internal service auth is not configured"})
-			return
-		}
-		provided := strings.TrimSpace(c.GetHeader("X-Internal-Service-Token"))
-		if subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			return
-		}
-		c.Next()
+// ParseAuthOrgID extrae y parsea el org_id del auth context.
+func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
+	auth := GetAuthContext(c)
+	orgID, err := uuid.Parse(auth.OrgID)
+	if err != nil {
+		return uuid.Nil, false
 	}
-}
-
-func asString(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return ""
-}
-
-func splitCSV(v string) []string {
-	if strings.TrimSpace(v) == "" {
-		return nil
-	}
-	parts := strings.Split(v, ",")
-	res := make([]string, 0, len(parts))
-	seen := make(map[string]struct{})
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		if _, ok := seen[p]; ok {
-			continue
-		}
-		seen[p] = struct{}{}
-		res = append(res, p)
-	}
-	return res
-}
-
-func intersectScopes(a, b []string) []string {
-	if len(a) == 0 || len(b) == 0 {
-		return nil
-	}
-	m := make(map[string]struct{}, len(a))
-	for _, s := range a {
-		m[s] = struct{}{}
-	}
-	res := make([]string, 0)
-	for _, s := range b {
-		if _, ok := m[s]; ok {
-			res = append(res, s)
-		}
-	}
-	return res
+	return orgID, true
 }

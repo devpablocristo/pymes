@@ -3,9 +3,9 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
+
+	"github.com/devpablocristo/core/backend/go/envconfig"
 )
 
 const localInternalServiceToken = "local-internal-token"
@@ -64,109 +64,61 @@ type Config struct {
 // LoadFromEnv carga valores con defaults seguros para desarrollo local.
 func LoadFromEnv() Config {
 	cfg := Config{
-		Port:                        getEnv("PORT", "8080"),
-		Environment:                 normalizeEnvironment(getEnv("ENVIRONMENT", "development")),
-		DatabaseURL:                 getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
-		JWKSURL:                     os.Getenv("JWKS_URL"),
-		JWTIssuer:                   os.Getenv("JWT_ISSUER"),
-		JWTAudience:                 os.Getenv("JWT_AUDIENCE"),
-		JWTOrgClaim:                 os.Getenv("JWT_ORG_CLAIM"),
-		JWTRoleClaim:                os.Getenv("JWT_ROLE_CLAIM"),
-		JWTScopesClaim:              os.Getenv("JWT_SCOPES_CLAIM"),
-		JWTActorClaim:               os.Getenv("JWT_ACTOR_CLAIM"),
-		AuthEnableJWT:               getEnvBool("AUTH_ENABLE_JWT", true),
-		AuthAllowAPIKey:             getEnvBool("AUTH_ALLOW_API_KEY", true),
-		ClerkWebhookSecret:          os.Getenv("CLERK_WEBHOOK_SECRET"),
-		StripeSecretKey:             os.Getenv("STRIPE_SECRET_KEY"),
-		StripeWebhookSecret:         os.Getenv("STRIPE_WEBHOOK_SECRET"),
-		NotificationBackend:         getEnv("NOTIFICATION_BACKEND", "noop"),
-		FrontendURL:                 getEnv("FRONTEND_URL", "http://localhost:5173"),
-		AWSRegion:                   getEnv("AWS_REGION", "us-east-1"),
-		AWSSesFromEmail:             os.Getenv("AWS_SES_FROM_EMAIL"),
-		SMTPHost:                    getEnv("SMTP_HOST", "localhost"),
-		SMTPPort:                    getEnvInt("SMTP_PORT", 1025),
-		SMTPUser:                    os.Getenv("SMTP_USER"),
-		SMTPPassword:                os.Getenv("SMTP_PASSWORD"),
-		StripePriceStarter:          os.Getenv("STRIPE_PRICE_STARTER"),
-		StripePriceGrowth:           os.Getenv("STRIPE_PRICE_GROWTH"),
-		StripePriceEnterprise:       os.Getenv("STRIPE_PRICE_ENTERPRISE"),
-		StorageBackend:              getEnv("STORAGE_BACKEND", "local"),
-		S3Bucket:                    os.Getenv("S3_BUCKET"),
-		S3Region:                    getEnv("S3_REGION", "us-east-1"),
-		SchedulerSecret:             os.Getenv("SCHEDULER_SECRET"),
-		ExchangeRateProvider:        getEnv("EXCHANGE_RATE_PROVIDER", "manual"),
-		InternalServiceToken:        strings.TrimSpace(getEnv("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
-		AIServiceURL:                getEnv("AI_SERVICE_URL", "http://ai:8000"),
-		WhatsAppWebhookVerifyToken:  os.Getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN"),
-		WhatsAppAppSecret:           os.Getenv("WHATSAPP_APP_SECRET"),
-		WhatsAppGraphAPIBaseURL:     getEnv("WHATSAPP_GRAPH_API_BASE_URL", "https://graph.facebook.com/v23.0"),
-		MPAppID:                     os.Getenv("MP_APP_ID"),
-		MPClientSecret:              os.Getenv("MP_CLIENT_SECRET"),
-		MPWebhookSecret:             os.Getenv("MP_WEBHOOK_SECRET"),
-		MPRedirectURI:               os.Getenv("MP_REDIRECT_URI"),
-		PaymentGatewayMode:          getEnv("PAYMENT_GATEWAY_MODE", "mercadopago"),
-		PaymentGatewayEncryptionKey: os.Getenv("PAYMENT_GATEWAY_ENCRYPTION_KEY"),
-		SeedDemoData:                getEnvBool("PYMES_SEED_DEMO", false),
-		SeedDemoOrgExternalID:       strings.TrimSpace(os.Getenv("PYMES_SEED_DEMO_ORG_EXTERNAL_ID")),
+		Port:                        envconfig.Get("PORT", "8080"),
+		Environment:                 envconfig.NormalizeEnv(envconfig.Get("ENVIRONMENT", "development")),
+		DatabaseURL:                 envconfig.Get("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pymes?sslmode=disable"),
+		JWKSURL:                     envconfig.Get("JWKS_URL", ""),
+		JWTIssuer:                   envconfig.Get("JWT_ISSUER", ""),
+		JWTAudience:                 envconfig.Get("JWT_AUDIENCE", ""),
+		JWTOrgClaim:                 envconfig.Get("JWT_ORG_CLAIM", ""),
+		JWTRoleClaim:                envconfig.Get("JWT_ROLE_CLAIM", ""),
+		JWTScopesClaim:              envconfig.Get("JWT_SCOPES_CLAIM", ""),
+		JWTActorClaim:               envconfig.Get("JWT_ACTOR_CLAIM", ""),
+		AuthEnableJWT:               envconfig.Bool("AUTH_ENABLE_JWT", true),
+		AuthAllowAPIKey:             envconfig.Bool("AUTH_ALLOW_API_KEY", true),
+		ClerkWebhookSecret:          envconfig.Get("CLERK_WEBHOOK_SECRET", ""),
+		StripeSecretKey:             envconfig.Get("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:         envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
+		NotificationBackend:         envconfig.Get("NOTIFICATION_BACKEND", "noop"),
+		FrontendURL:                 envconfig.Get("FRONTEND_URL", "http://localhost:5173"),
+		AWSRegion:                   envconfig.Get("AWS_REGION", "us-east-1"),
+		AWSSesFromEmail:             envconfig.Get("AWS_SES_FROM_EMAIL", ""),
+		SMTPHost:                    envconfig.Get("SMTP_HOST", "localhost"),
+		SMTPPort:                    envconfig.Int("SMTP_PORT", 1025),
+		SMTPUser:                    envconfig.Get("SMTP_USER", ""),
+		SMTPPassword:                envconfig.Get("SMTP_PASSWORD", ""),
+		StripePriceStarter:          envconfig.Get("STRIPE_PRICE_STARTER", ""),
+		StripePriceGrowth:           envconfig.Get("STRIPE_PRICE_GROWTH", ""),
+		StripePriceEnterprise:       envconfig.Get("STRIPE_PRICE_ENTERPRISE", ""),
+		StorageBackend:              envconfig.Get("STORAGE_BACKEND", "local"),
+		S3Bucket:                    envconfig.Get("S3_BUCKET", ""),
+		S3Region:                    envconfig.Get("S3_REGION", "us-east-1"),
+		SchedulerSecret:             envconfig.Get("SCHEDULER_SECRET", ""),
+		ExchangeRateProvider:        envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
+		InternalServiceToken:        strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
+		AIServiceURL:                envconfig.Get("AI_SERVICE_URL", "http://ai:8000"),
+		WhatsAppWebhookVerifyToken:  envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),
+		WhatsAppAppSecret:           envconfig.Get("WHATSAPP_APP_SECRET", ""),
+		WhatsAppGraphAPIBaseURL:     envconfig.Get("WHATSAPP_GRAPH_API_BASE_URL", "https://graph.facebook.com/v23.0"),
+		MPAppID:                     envconfig.Get("MP_APP_ID", ""),
+		MPClientSecret:              envconfig.Get("MP_CLIENT_SECRET", ""),
+		MPWebhookSecret:             envconfig.Get("MP_WEBHOOK_SECRET", ""),
+		MPRedirectURI:               envconfig.Get("MP_REDIRECT_URI", ""),
+		PaymentGatewayMode:          envconfig.Get("PAYMENT_GATEWAY_MODE", "mercadopago"),
+		PaymentGatewayEncryptionKey: envconfig.Get("PAYMENT_GATEWAY_ENCRYPTION_KEY", ""),
+		SeedDemoData:                envconfig.Bool("PYMES_SEED_DEMO", false),
+		SeedDemoOrgExternalID:       strings.TrimSpace(envconfig.Get("PYMES_SEED_DEMO_ORG_EXTERNAL_ID", "")),
 	}
 	validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken)
 	return cfg
 }
 
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func getEnvBool(key string, fallback bool) bool {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
-	}
-	parsed, err := strconv.ParseBool(v)
-	if err != nil {
-		return fallback
-	}
-	return parsed
-}
-
-func getEnvInt(key string, fallback int) int {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
-	}
-	parsed, err := strconv.Atoi(v)
-	if err != nil {
-		return fallback
-	}
-	return parsed
-}
-
-func normalizeEnvironment(value string) string {
-	normalized := strings.TrimSpace(strings.ToLower(value))
-	if normalized == "" {
-		return "development"
-	}
-	return normalized
-}
-
-func isLocalEnvironment(environment string) bool {
-	switch normalizeEnvironment(environment) {
-	case "development", "dev", "local", "test":
-		return true
-	default:
-		return false
-	}
-}
-
 func validateInternalServiceToken(environment, token string) {
 	normalizedToken := strings.TrimSpace(token)
-	if isLocalEnvironment(environment) {
+	if envconfig.IsLocal(environment) {
 		return
 	}
 	if normalizedToken == "" || strings.EqualFold(normalizedToken, localInternalServiceToken) {
-		panic(fmt.Sprintf("invalid INTERNAL_SERVICE_TOKEN for %s environment", normalizeEnvironment(environment)))
+		panic(fmt.Sprintf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment)))
 	}
 }

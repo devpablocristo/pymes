@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	paymentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/payments/usecases/domain"
 )
 
@@ -41,16 +41,16 @@ func (r *Repository) CreateSalePayment(ctx context.Context, orgID, saleID uuid.U
 		}
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("total, amount_paid, currency, payment_method").Where("org_id = ? AND id = ?", orgID, saleID).Take(&sale).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return apperror.NewNotFound("sale", saleID.String())
+				return domainerr.NotFoundf("sale", saleID.String())
 			}
 			return err
 		}
 		pending := sale.Total - sale.AmountPaid
 		if pending <= 0 {
-			return apperror.NewConflict("sale is already fully paid")
+			return domainerr.Conflict("sale is already fully paid")
 		}
 		if in.Amount > pending {
-			return apperror.NewBusinessRule(fmt.Sprintf("payment exceeds pending balance %.2f", pending))
+			return domainerr.BusinessRule(fmt.Sprintf("payment exceeds pending balance %.2f", pending))
 		}
 		paymentID := uuid.New()
 		createdAt := time.Now().UTC()

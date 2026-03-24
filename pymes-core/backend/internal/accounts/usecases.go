@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	accountsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts/usecases/domain"
 )
 
@@ -34,22 +34,22 @@ func (u *Usecases) Movements(ctx context.Context, orgID, accountID uuid.UUID, li
 
 func (u *Usecases) CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error) {
 	if in.OrgID == uuid.Nil {
-		return accountsdomain.Account{}, apperror.NewBadInput("org_id is required")
+		return accountsdomain.Account{}, domainerr.Validation("org_id is required")
 	}
 	if strings.TrimSpace(in.Type) != "receivable" && strings.TrimSpace(in.Type) != "payable" {
-		return accountsdomain.Account{}, apperror.NewBadInput("invalid type")
+		return accountsdomain.Account{}, domainerr.Validation("invalid type")
 	}
 	if strings.TrimSpace(in.EntityType) != "customer" && strings.TrimSpace(in.EntityType) != "supplier" {
-		return accountsdomain.Account{}, apperror.NewBadInput("invalid entity_type")
+		return accountsdomain.Account{}, domainerr.Validation("invalid entity_type")
 	}
 	if in.EntityID == uuid.Nil {
-		return accountsdomain.Account{}, apperror.NewBadInput("entity_id is required")
+		return accountsdomain.Account{}, domainerr.Validation("entity_id is required")
 	}
 	if strings.TrimSpace(in.EntityName) == "" {
-		return accountsdomain.Account{}, apperror.NewBadInput("entity_name is required")
+		return accountsdomain.Account{}, domainerr.Validation("entity_name is required")
 	}
 	if amount <= 0 {
-		return accountsdomain.Account{}, apperror.NewBadInput("amount must be > 0")
+		return accountsdomain.Account{}, domainerr.Validation("amount must be > 0")
 	}
 	return u.repo.CreateOrAdjust(ctx, in, amount, description, actor)
 }

@@ -2,10 +2,9 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/devpablocristo/core/backend/go/canonicaljson"
 	"github.com/devpablocristo/core/backend/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
 	"github.com/google/uuid"
@@ -20,7 +19,7 @@ func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 	if len(m.entries) > 0 {
 		prevHash = m.entries[len(m.entries)-1].Hash
 	}
-	canonical, _ := canonicaljson.CanonicalJSON(in.Payload)
+	canonical, _ := json.Marshal(in.Payload)
 	hash := hashutil.SHA256Hex(prevHash + string(canonical))
 
 	entry := domain.Entry{

@@ -1,16 +1,16 @@
 package gateway
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/devpablocristo/core/backend/go/httpclient"
 )
 
 type OAuthTokens struct {
@@ -47,14 +47,15 @@ type PaymentDetail struct {
 }
 
 type MercadoPagoGateway struct {
-	httpClient *http.Client
-	baseURL    string
+	caller *httpclient.Caller
 }
 
 func NewMercadoPagoGateway() *MercadoPagoGateway {
 	return &MercadoPagoGateway{
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-		baseURL:    "https://api.mercadopago.com",
+		caller: &httpclient.Caller{
+			BaseURL: "https://api.mercadopago.com",
+			HTTP:    &http.Client{Timeout: 10 * time.Second},
+		},
 	}
 }
 
@@ -78,21 +79,12 @@ func (g *MercadoPagoGateway) RefreshToken(ctx context.Context, clientID, clientS
 }
 
 func (g *MercadoPagoGateway) oauthToken(ctx context.Context, form url.Values) (OAuthTokens, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.baseURL+"/oauth/token", strings.NewReader(form.Encode()))
+	st, body, err := g.caller.DoForm(ctx, "/oauth/token", form.Encode())
 	if err != nil {
 		return OAuthTokens{}, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return OAuthTokens{}, err
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return OAuthTokens{}, fmt.Errorf("mercadopago oauth error: status=%d body=%s", resp.StatusCode, string(body))
+	if st < 200 || st >= 300 {
+		return OAuthTokens{}, fmt.Errorf("mercadopago oauth error: status=%d body=%s", st, string(body))
 	}
 
 	var out struct {
@@ -115,41 +107,26 @@ func (g *MercadoPagoGateway) oauthToken(ctx context.Context, form url.Values) (O
 
 func (g *MercadoPagoGateway) CreatePreference(ctx context.Context, accessToken string, in PreferenceInput) (PreferenceOutput, error) {
 	payload := map[string]any{
-		"items": []map[string]any{
-			{
-				"title":       in.Title,
-				"quantity":    1,
-				"unit_price":  in.Amount,
-				"currency_id": coalesce(in.CurrencyID, "ARS"),
-			},
-		},
+		"items": []map[string]any{{
+			"title": in.Title, "quantity": 1, "unit_price": in.Amount, "currency_id": coalesce(in.CurrencyID, "ARS"),
+		}},
 		"external_reference": in.ExternalRef,
 		"notification_url":   in.NotificationURL,
 		"auto_return":        "approved",
 		"expiration_date_to": in.ExpirationDateTo.UTC().Format(time.RFC3339),
 		"back_urls": map[string]string{
-			"success": in.SuccessURL,
-			"failure": in.FailureURL,
-			"pending": in.PendingURL,
+			"success": in.SuccessURL, "failure": in.FailureURL, "pending": in.PendingURL,
 		},
 	}
-	buf, _ := json.Marshal(payload)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.baseURL+"/checkout/preferences", bytes.NewReader(buf))
+	st, body, err := g.caller.DoJSON(ctx, http.MethodPost, "/checkout/preferences", payload,
+		httpclient.WithHeader("Authorization", "Bearer "+strings.TrimSpace(accessToken)),
+	)
 	if err != nil {
 		return PreferenceOutput{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return PreferenceOutput{}, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return PreferenceOutput{}, fmt.Errorf("mercadopago preference error: status=%d body=%s", resp.StatusCode, string(body))
+	if st < 200 || st >= 300 {
+		return PreferenceOutput{}, fmt.Errorf("mercadopago preference error: status=%d body=%s", st, string(body))
 	}
 
 	var out struct {
@@ -173,28 +150,22 @@ func (g *MercadoPagoGateway) CreatePreference(ctx context.Context, accessToken s
 }
 
 func (g *MercadoPagoGateway) GetPaymentDetail(ctx context.Context, accessToken, paymentID string) (PaymentDetail, error) {
-	url := fmt.Sprintf("%s/v1/payments/%s", g.baseURL, strings.TrimSpace(paymentID))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	path := "/v1/payments/" + strings.TrimSpace(paymentID)
+	st, body, err := g.caller.DoJSON(ctx, http.MethodGet, path, nil,
+		httpclient.WithHeader("Authorization", "Bearer "+strings.TrimSpace(accessToken)),
+	)
 	if err != nil {
 		return PaymentDetail{}, err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-
-	resp, err := g.httpClient.Do(req)
-	if err != nil {
-		return PaymentDetail{}, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return PaymentDetail{}, fmt.Errorf("mercadopago payment detail error: status=%d body=%s", resp.StatusCode, string(body))
+	if st < 200 || st >= 300 {
+		return PaymentDetail{}, fmt.Errorf("mercadopago payment detail error: status=%d body=%s", st, string(body))
 	}
 
 	var out struct {
-		ID                any    `json:"id"`
-		Status            string `json:"status"`
+		ID                any     `json:"id"`
+		Status            string  `json:"status"`
 		TransactionAmount float64 `json:"transaction_amount"`
-		ExternalReference string `json:"external_reference"`
+		ExternalReference string  `json:"external_reference"`
 		Payer             struct {
 			Email string `json:"email"`
 		} `json:"payer"`

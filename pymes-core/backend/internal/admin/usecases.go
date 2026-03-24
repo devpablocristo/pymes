@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
@@ -48,7 +48,7 @@ func (u *Usecases) GetTenantSettings(ctx context.Context, orgID string) (domain.
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, apperror.NewBadInput("invalid org_id")
+		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
 	return u.repo.GetTenantSettings(id), nil
 }
@@ -57,18 +57,18 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return domain.TenantSettings{}, apperror.NewBadInput("invalid org_id")
+		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
 	if patch.AppointmentReminderHours != nil && *patch.AppointmentReminderHours < 0 {
-		return domain.TenantSettings{}, apperror.NewBadInput("appointment_reminder_hours must be >= 0")
+		return domain.TenantSettings{}, domainerr.Validation("appointment_reminder_hours must be >= 0")
 	}
 	if patch.TaxRate != nil && *patch.TaxRate < 0 {
-		return domain.TenantSettings{}, apperror.NewBadInput("tax_rate must be >= 0")
+		return domain.TenantSettings{}, domainerr.Validation("tax_rate must be >= 0")
 	}
 	if patch.SupportedCurrencies != nil {
 		norm, err := domain.NormalizeSupportedCurrencies(*patch.SupportedCurrencies)
 		if err != nil {
-			return domain.TenantSettings{}, apperror.NewBadInput(err.Error())
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
 		}
 		patch.SupportedCurrencies = &norm
 	}
@@ -79,7 +79,7 @@ func (u *Usecases) ListActivity(ctx context.Context, orgID string, limit int) ([
 	_ = ctx
 	id, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid org_id: %w", apperror.NewBadInput("invalid org_id"))
+		return nil, fmt.Errorf("invalid org_id: %w", domainerr.Validation("invalid org_id"))
 	}
 	return u.repo.ListActivity(id, limit), nil
 }

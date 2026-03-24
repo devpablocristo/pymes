@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	pricelistdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/pricelists/usecases/domain"
 )
 
@@ -30,7 +30,7 @@ func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, l
 
 func (u *Usecases) Create(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error) {
 	if strings.TrimSpace(in.Name) == "" {
-		return pricelistdomain.PriceList{}, apperror.NewBadInput("name is required")
+		return pricelistdomain.PriceList{}, domainerr.Validation("name is required")
 	}
 	if in.ID == uuid.Nil {
 		in.ID = uuid.New()
@@ -42,7 +42,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistd
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return pricelistdomain.PriceList{}, apperror.NewNotFound("price_list", id.String())
+			return pricelistdomain.PriceList{}, domainerr.NotFoundf("price_list", id.String())
 		}
 		return pricelistdomain.PriceList{}, err
 	}
@@ -51,7 +51,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistd
 
 func (u *Usecases) Update(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error) {
 	if strings.TrimSpace(in.Name) == "" {
-		return pricelistdomain.PriceList{}, apperror.NewBadInput("name is required")
+		return pricelistdomain.PriceList{}, domainerr.Validation("name is required")
 	}
 	return u.repo.Update(ctx, in)
 }

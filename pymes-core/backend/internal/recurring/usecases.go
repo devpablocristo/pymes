@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
 )
 
@@ -61,7 +61,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (recurringd
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return recurringdomain.RecurringExpense{}, apperror.NewNotFound("recurring_expense", id.String())
+			return recurringdomain.RecurringExpense{}, domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -72,7 +72,7 @@ func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpen
 	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return recurringdomain.RecurringExpense{}, apperror.NewNotFound("recurring_expense", in.ID.String())
+			return recurringdomain.RecurringExpense{}, domainerr.NotFoundf("recurring_expense", in.ID.String())
 		}
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -94,7 +94,7 @@ func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpen
 func (u *Usecases) Deactivate(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Deactivate(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.NewNotFound("recurring_expense", id.String())
+			return domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return err
 	}
@@ -110,20 +110,20 @@ var allowedFrequencies = map[string]struct{}{
 
 func prepareRecurring(in recurringdomain.RecurringExpense, creating bool, defaultCurrency string) (recurringdomain.RecurringExpense, error) {
 	if creating && in.OrgID == uuid.Nil {
-		return recurringdomain.RecurringExpense{}, apperror.NewBadInput("org_id is required")
+		return recurringdomain.RecurringExpense{}, domainerr.Validation("org_id is required")
 	}
 	if strings.TrimSpace(in.Description) == "" {
-		return recurringdomain.RecurringExpense{}, apperror.NewBadInput("description is required")
+		return recurringdomain.RecurringExpense{}, domainerr.Validation("description is required")
 	}
 	if in.Amount <= 0 {
-		return recurringdomain.RecurringExpense{}, apperror.NewBadInput("amount must be > 0")
+		return recurringdomain.RecurringExpense{}, domainerr.Validation("amount must be > 0")
 	}
 	in.Currency = defaultString(in.Currency, defaultCurrency)
 	in.Category = defaultString(in.Category, "other")
 	in.PaymentMethod = defaultString(in.PaymentMethod, "transfer")
 	in.Frequency = defaultString(strings.ToLower(in.Frequency), "monthly")
 	if _, ok := allowedFrequencies[in.Frequency]; !ok {
-		return recurringdomain.RecurringExpense{}, apperror.NewBadInput("invalid frequency")
+		return recurringdomain.RecurringExpense{}, domainerr.Validation("invalid frequency")
 	}
 	if in.DayOfMonth <= 0 {
 		in.DayOfMonth = 1

@@ -17,7 +17,15 @@
       "Bash(find /home/pablo/Projects/Pablo/pymes/.cursor/rules -name *.mdc -exec grep -l control-plane {})",
       "Bash(ls /home/pablo/Projects/Pablo/pymes/ai/src/agents/review*)",
       "Bash(ls /home/pablo/Projects/Pablo/pymes/ai/src/tools/review*)",
-      "Bash(ls /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Auto* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Approval* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Watcher*)"
+      "Bash(ls /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Auto* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Approval* /home/pablo/Projects/Pablo/pymes/frontend/src/pages/Watcher*)",
+      "Bash(find /home/pablo/Projects/Pablo/pymes -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/gin/go\" {})",
+      "Bash(find /home/pablo/Projects/Pablo/pymes -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/go/contextkeys\" {})",
+      "Bash(find /home/pablo/Projects/Pablo/pymes -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/go/httpjson\" {})",
+      "Bash(find /home/pablo/Projects/Pablo/nexus/v3/companion -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/go/apikey\" {})",
+      "Bash(find /home/pablo/Projects/Pablo -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/go/fsm\" {})",
+      "Bash(find /home/pablo/Projects/Pablo -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/saas/go\" {})",
+      "Bash(rm /home/pablo/Projects/Pablo/core/backend/go/validation/validation_test.go)",
+      "Bash(rmdir /home/pablo/Projects/Pablo/core/backend/go/validation/)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",
@@ -25,7 +33,9 @@
       "/home/pablo/Projects/Pablo/saas-core/billing",
       "/home/pablo/Projects/Pablo/saas-core/admin",
       "/home/pablo/Projects/Pablo/nexus/v3/companion",
-      "/home/pablo/Projects/Pablo/core/ai/python/src/core_ai"
+      "/home/pablo/Projects/Pablo/core/ai/python/src/core_ai",
+      "/home/pablo/Projects/Pablo/core/backend/gin/go",
+      "/home/pablo/Projects/Pablo/core/backend/go/validate"
     ]
   }
 }

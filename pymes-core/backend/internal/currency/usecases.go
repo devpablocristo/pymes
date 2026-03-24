@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	currencydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/currency/usecases/domain"
 )
 
@@ -28,13 +28,13 @@ func (u *Usecases) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency
 
 func (u *Usecases) Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error) {
 	if strings.TrimSpace(in.FromCurrency) == "" || strings.TrimSpace(in.ToCurrency) == "" {
-		return currencydomain.ExchangeRate{}, apperror.NewBadInput("from_currency and to_currency are required")
+		return currencydomain.ExchangeRate{}, domainerr.Validation("from_currency and to_currency are required")
 	}
 	if strings.TrimSpace(in.RateType) == "" {
-		return currencydomain.ExchangeRate{}, apperror.NewBadInput("rate_type is required")
+		return currencydomain.ExchangeRate{}, domainerr.Validation("rate_type is required")
 	}
 	if in.BuyRate <= 0 || in.SellRate <= 0 {
-		return currencydomain.ExchangeRate{}, apperror.NewBadInput("buy_rate and sell_rate must be > 0")
+		return currencydomain.ExchangeRate{}, domainerr.Validation("buy_rate and sell_rate must be > 0")
 	}
 	if in.RateDate.IsZero() {
 		in.RateDate = time.Now().UTC()

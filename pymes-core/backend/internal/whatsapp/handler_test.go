@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
@@ -125,7 +125,7 @@ func (u *handlerUsecases) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUI
 func TestHandleWebhookRejectsInvalidSignature(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
-	uc := &handlerUsecases{validateErr: apperror.NewForbidden("invalid whatsapp webhook signature")}
+	uc := &handlerUsecases{validateErr: domainerr.Forbidden("invalid whatsapp webhook signature")}
 	handler := NewHandler(uc)
 
 	router := gin.New()

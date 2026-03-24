@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	paymentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/payments/usecases/domain"
 )
 
@@ -37,10 +37,10 @@ func (u *Usecases) ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID
 func (u *Usecases) CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error) {
 	method := strings.TrimSpace(strings.ToLower(in.Method))
 	if method != "cash" && method != "card" && method != "transfer" && method != "check" && method != "other" && method != "credit_note" && method != "mercadopago" {
-		return paymentsdomain.Payment{}, apperror.NewBadInput("invalid payment method")
+		return paymentsdomain.Payment{}, domainerr.Validation("invalid payment method")
 	}
 	if in.Amount <= 0 {
-		return paymentsdomain.Payment{}, apperror.NewBadInput("amount must be > 0")
+		return paymentsdomain.Payment{}, domainerr.Validation("amount must be > 0")
 	}
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now().UTC()

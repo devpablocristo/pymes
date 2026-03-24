@@ -44,6 +44,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
+
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
@@ -248,18 +250,9 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(handlers.NewCORSMiddleware(cfg.FrontendURL))
-	router.GET("/healthz", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-	router.GET("/readyz", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-		defer cancel()
-		if err := store.Ping(ctx, db); err != nil {
-			c.JSON(503, gin.H{"status": "not_ready", "error": "database unreachable"})
-			return
-		}
-		c.JSON(200, gin.H{"status": "ready"})
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error {
+		return store.Ping(ctx, db)
 	})
 
 	v1 := router.Group("/v1")
@@ -269,12 +262,12 @@ func InitializeApp() *app.App {
 	schedulerHandler.RegisterRoutes(v1)
 
 	internalGroup := v1.Group("/internal/v1")
-	internalGroup.Use(handlers.NewInternalServiceAuth(cfg.InternalServiceToken))
+	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
 	internalAPIHandler.RegisterRoutes(internalGroup)
 
 	public := v1.Group("/public/:org_id")
-	public.Use(handlers.NewPublicRateLimit(30))
-	public.Use(handlers.NewBodySizeLimit(64 << 10))
+	public.Use(ginmw.NewRateLimit(30))
+	public.Use(ginmw.NewBodySizeLimit(64 << 10))
 	publicAPIHandler.RegisterRoutes(public)
 	paymentGatewayHandler.RegisterExternalRoutes(public)
 

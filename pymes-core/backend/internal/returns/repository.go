@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/core/backend/go/pagination"
 	returnmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
@@ -130,7 +130,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			return err
 		}
 		if len(in.Items) == 0 {
-			return apperror.NewBadInput("items are required")
+			return domainerr.Validation("items are required")
 		}
 
 		var settings struct {
@@ -170,7 +170,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			}
 			available := saleItem.Quantity - alreadyReturned
 			if item.Quantity <= 0 || item.Quantity > available {
-				return apperror.NewBusinessRule(fmt.Sprintf("return quantity exceeds sold quantity for item %s", saleItem.Description))
+				return domainerr.BusinessRule(fmt.Sprintf("return quantity exceeds sold quantity for item %s", saleItem.Description))
 			}
 			lineSubtotal := item.Quantity * saleItem.UnitPrice
 			subtotal += lineSubtotal
@@ -347,7 +347,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 			return err
 		}
 		if note.Status != "active" {
-			return apperror.NewBusinessRule("credit note is not active")
+			return domainerr.BusinessRule("credit note is not active")
 		}
 		var sale struct {
 			Total      float64
@@ -358,7 +358,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 			return err
 		}
 		if sale.PartyID == nil || *sale.PartyID != note.PartyID {
-			return apperror.NewBusinessRule("credit note does not belong to sale party")
+			return domainerr.BusinessRule("credit note does not belong to sale party")
 		}
 		pending := sale.Total - sale.AmountPaid
 		amount := in.Amount
@@ -366,7 +366,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 			amount = minFloat(note.Balance, pending)
 		}
 		if amount <= 0 {
-			return apperror.NewBusinessRule("no pending balance to apply")
+			return domainerr.BusinessRule("no pending balance to apply")
 		}
 		if err := tx.Exec(`INSERT INTO payments (id, org_id, reference_type, reference_id, method, amount, notes, received_at, created_by, created_at) VALUES (?, ?, 'sale', ?, 'credit_note', ?, ?, now(), ?, now())`, uuid.New(), in.OrgID, in.SaleID, amount, "credit note applied", in.Actor).Error; err != nil {
 			return err

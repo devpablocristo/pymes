@@ -2,34 +2,21 @@
 package verticalgin
 
 import (
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
 func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	authCtx := auth.GetAuthContext(c)
-	orgID, err := uuid.Parse(strings.TrimSpace(authCtx.OrgID))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return uuid.Nil, false
-	}
-	return orgID, true
+	return auth.ParseAuthOrgID(c)
 }
 
 func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool) {
-	value := strings.TrimSpace(c.Param(param))
-	id, err := uuid.Parse(value)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + field})
-		return uuid.Nil, false
-	}
-	return id, true
+	return ginmw.ParseUUIDParam(c, param)
 }
 
 func ParseAuthOrgAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
@@ -45,42 +32,33 @@ func ParseAuthOrgAndParamID(c *gin.Context, param string, field string) (uuid.UU
 }
 
 func ParseRFC3339(raw string) (time.Time, error) {
-	if strings.TrimSpace(raw) == "" {
-		return time.Time{}, nil
-	}
-	return time.Parse(time.RFC3339, strings.TrimSpace(raw))
+	return ginmw.ParseRFC3339(raw)
 }
 
 func ParseOptionalRFC3339(raw string) (*time.Time, error) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, nil
-	}
-	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(raw))
-	if err != nil {
-		return nil, err
-	}
-	return &parsed, nil
+	return ginmw.ParseOptionalRFC3339(raw)
 }
 
 func ParseOptionalRFC3339Ptr(raw *string) (*time.Time, error) {
-	if raw == nil {
-		return nil, nil
-	}
-	return ParseOptionalRFC3339(*raw)
+	return ginmw.ParseOptionalRFC3339Ptr(raw)
 }
 
 func ParseNullableRFC3339Ptr(raw *string) (**time.Time, error) {
 	if raw == nil {
 		return nil, nil
 	}
-	if strings.TrimSpace(*raw) == "" {
-		var value *time.Time
-		return &value, nil
-	}
-	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*raw))
+	t, err := ginmw.ParseOptionalRFC3339(*raw)
 	if err != nil {
 		return nil, err
 	}
-	value := &parsed
-	return &value, nil
+	if t == nil {
+		var value *time.Time
+		return &value, nil
+	}
+	return &t, nil
+}
+
+// ParseOptionalInt64Query parsea un int64 opcional de un query parameter. Delega a core.
+func ParseOptionalInt64Query(c *gin.Context, param string) (*int64, error) {
+	return ginmw.ParseOptionalInt64Query(c, param)
 }

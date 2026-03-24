@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
 )
 
@@ -106,7 +106,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesd
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return purchasesdomain.Purchase{}, apperror.NewNotFound("purchase", id.String())
+			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
 		}
 		return purchasesdomain.Purchase{}, err
 	}
@@ -117,12 +117,12 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return purchasesdomain.Purchase{}, apperror.NewNotFound("purchase", in.ID.String())
+			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
 		}
 		return purchasesdomain.Purchase{}, err
 	}
 	if current.Status != "draft" {
-		return purchasesdomain.Purchase{}, apperror.NewBusinessRule("only draft purchases can be updated")
+		return purchasesdomain.Purchase{}, domainerr.BusinessRule("only draft purchases can be updated")
 	}
 	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
 	if err != nil {
@@ -146,10 +146,10 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 
 func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInput, error) {
 	if in.OrgID == uuid.Nil {
-		return CreateInput{}, apperror.NewBadInput("org_id is required")
+		return CreateInput{}, domainerr.Validation("org_id is required")
 	}
 	if len(in.Items) == 0 {
-		return CreateInput{}, apperror.NewBadInput("items are required")
+		return CreateInput{}, domainerr.Validation("items are required")
 	}
 	if in.SupplierID != nil && *in.SupplierID != uuid.Nil && strings.TrimSpace(in.SupplierName) == "" {
 		if name, err := u.repo.GetSupplierName(ctx, in.OrgID, *in.SupplierID); err == nil && strings.TrimSpace(name) != "" {
@@ -161,7 +161,7 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 	}
 	in.Status = defaultString(strings.ToLower(in.Status), "draft")
 	if in.Status != "draft" && in.Status != "received" && in.Status != "partial" && in.Status != "voided" {
-		return CreateInput{}, apperror.NewBadInput("invalid status")
+		return CreateInput{}, domainerr.Validation("invalid status")
 	}
 	in.PaymentStatus = defaultString(strings.ToLower(in.PaymentStatus), "pending")
 	currency := u.repo.GetCurrency(ctx, in.OrgID)
@@ -169,7 +169,7 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 	items := make([]purchasesdomain.PurchaseItem, 0, len(in.Items))
 	for idx, item := range in.Items {
 		if item.Quantity <= 0 || item.UnitCost < 0 {
-			return CreateInput{}, apperror.NewBadInput("invalid purchase item")
+			return CreateInput{}, domainerr.Validation("invalid purchase item")
 		}
 		taxRate := item.TaxRate
 		if taxRate <= 0 {

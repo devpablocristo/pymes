@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 func (u *Usecases) savePreview(job previewJob) (string, error) {
@@ -33,13 +33,13 @@ func (u *Usecases) loadPreview(previewID string) (previewJob, error) {
 	payload, err := os.ReadFile(filepath.Join(u.tempDir, previewID+".json"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return previewJob{}, apperror.NewNotFound("preview", previewID)
+			return previewJob{}, domainerr.NotFoundf("preview", previewID)
 		}
 		return previewJob{}, err
 	}
 	var job previewJob
 	if err := json.Unmarshal(payload, &job); err != nil {
-		return previewJob{}, apperror.NewBadInput("invalid preview payload")
+		return previewJob{}, domainerr.Validation("invalid preview payload")
 	}
 	return job, nil
 }

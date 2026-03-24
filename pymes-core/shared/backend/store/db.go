@@ -1,18 +1,19 @@
 // Package store provides shared database initialization and readiness helpers.
+// Delega a core/databases/gorm/go para la primitiva de conexión.
 package store
 
 import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/rs/zerolog"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+
+	gormdb "github.com/devpablocristo/core/databases/gorm/go"
 )
 
+// NewDB abre una conexión GORM a PostgreSQL con configuración por defecto.
 func NewDB(databaseURL string, log zerolog.Logger) (*gorm.DB, error) {
 	if databaseURL == "" {
 		databaseURL = os.Getenv("DATABASE_URL")
@@ -20,37 +21,15 @@ func NewDB(databaseURL string, log zerolog.Logger) (*gorm.DB, error) {
 	if databaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
-
-	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
+	db, err := gormdb.Open(databaseURL, gormdb.DefaultConfig())
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, err
 	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("get sql.DB: %w", err)
-	}
-	sqlDB.SetMaxOpenConns(10)
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
-
 	log.Info().Msg("connected to PostgreSQL")
 	return db, nil
 }
 
+// Ping verifica que la conexión esté activa.
 func Ping(ctx context.Context, db *gorm.DB) error {
-	if db == nil {
-		return fmt.Errorf("database is nil")
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return fmt.Errorf("get sql.DB: %w", err)
-	}
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("ping database: %w", err)
-	}
-	return nil
+	return gormdb.Ping(ctx, db)
 }

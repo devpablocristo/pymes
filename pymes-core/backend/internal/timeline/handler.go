@@ -11,7 +11,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	timelinedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline/usecases/domain"
-	apperror "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type usecasesPort interface {
@@ -36,7 +36,7 @@ func (h *Handler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	items, err := h.uc.List(c.Request.Context(), orgID, entity, entityID, limit)
 	if err != nil {
-		apperror.Respond(c, err)
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
@@ -71,7 +71,7 @@ func (h *Handler) AddNote(c *gin.Context) {
 		Metadata:    map[string]any{"manual": true},
 	})
 	if err != nil {
-		apperror.Respond(c, err)
+		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, entry)

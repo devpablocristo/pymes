@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	apperror "github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
@@ -132,7 +132,7 @@ func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string
 func (u *Usecases) AddRole(ctx context.Context, orgID, partyID uuid.UUID, role string, priceListID *uuid.UUID, metadata map[string]any, actor string) (partydomain.PartyRole, error) {
 	role = strings.TrimSpace(role)
 	if role == "" {
-		return partydomain.PartyRole{}, apperror.NewBadInput("role is required")
+		return partydomain.PartyRole{}, domainerr.Validation("role is required")
 	}
 	out, err := u.repo.AddRole(ctx, orgID, partyID, partydomain.PartyRole{Role: role, IsActive: true, PriceListID: priceListID, Metadata: metadata})
 	if err != nil {
@@ -170,10 +170,10 @@ func (u *Usecases) ListRelationships(ctx context.Context, orgID, partyID uuid.UU
 
 func (u *Usecases) CreateRelationship(ctx context.Context, in partydomain.PartyRelationship, actor string) (partydomain.PartyRelationship, error) {
 	if in.FromPartyID == uuid.Nil || in.ToPartyID == uuid.Nil {
-		return partydomain.PartyRelationship{}, apperror.NewBadInput("from_party_id and to_party_id are required")
+		return partydomain.PartyRelationship{}, domainerr.Validation("from_party_id and to_party_id are required")
 	}
 	if strings.TrimSpace(in.RelationshipType) == "" {
-		return partydomain.PartyRelationship{}, apperror.NewBadInput("relationship_type is required")
+		return partydomain.PartyRelationship{}, domainerr.Validation("relationship_type is required")
 	}
 	if in.FromDate.IsZero() {
 		in.FromDate = time.Now().UTC()
@@ -193,15 +193,15 @@ func (u *Usecases) CreateRelationship(ctx context.Context, in partydomain.PartyR
 
 func validateParty(in partydomain.Party) error {
 	if in.OrgID == uuid.Nil {
-		return apperror.NewBadInput("org_id is required")
+		return domainerr.Validation("org_id is required")
 	}
 	if len(strings.TrimSpace(in.DisplayName)) < 2 {
-		return apperror.NewBadInput("display_name must be at least 2 characters")
+		return domainerr.Validation("display_name must be at least 2 characters")
 	}
 	switch strings.TrimSpace(in.PartyType) {
 	case "person", "organization", "automated_agent":
 	default:
-		return apperror.NewBadInput("invalid party_type")
+		return domainerr.Validation("invalid party_type")
 	}
 	return nil
 }
@@ -222,15 +222,15 @@ func translateRepoErr(err error) error {
 	if err == nil {
 		return nil
 	}
-	var appErr *apperror.Error
-	if errors.As(err, &appErr) {
+	var de domainerr.Error
+	if errors.As(err, &de) {
 		return err
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return apperror.NewNotFound("party", "")
+		return domainerr.NotFoundf("party", "")
 	}
 	if httperrors.IsUniqueViolation(err) {
-		return apperror.NewConflict("resource already exists")
+		return domainerr.Conflict("resource already exists")
 	}
 	return fmt.Errorf("party: %w", err)
 }

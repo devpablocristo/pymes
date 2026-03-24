@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	appointmentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments/usecases/domain"
 )
 
@@ -85,7 +85,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (appointmen
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return appointmentsdomain.Appointment{}, apperror.NewNotFound("appointment", id.String())
+			return appointmentsdomain.Appointment{}, domainerr.NotFoundf("appointment", id.String())
 		}
 		return appointmentsdomain.Appointment{}, err
 	}
@@ -96,7 +96,7 @@ func (u *Usecases) Update(ctx context.Context, in appointmentsdomain.Appointment
 	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return appointmentsdomain.Appointment{}, apperror.NewNotFound("appointment", in.ID.String())
+			return appointmentsdomain.Appointment{}, domainerr.NotFoundf("appointment", in.ID.String())
 		}
 		return appointmentsdomain.Appointment{}, err
 	}
@@ -124,7 +124,7 @@ func (u *Usecases) Update(ctx context.Context, in appointmentsdomain.Appointment
 func (u *Usecases) Cancel(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Cancel(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.NewNotFound("appointment", id.String())
+			return domainerr.NotFoundf("appointment", id.String())
 		}
 		return err
 	}
@@ -139,17 +139,17 @@ func (u *Usecases) Cancel(ctx context.Context, orgID, id uuid.UUID, actor string
 
 func prepareAppointment(in appointmentsdomain.Appointment, creating bool) (appointmentsdomain.Appointment, error) {
 	if creating && in.OrgID == uuid.Nil {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("org_id is required")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("org_id is required")
 	}
 	if strings.TrimSpace(in.CustomerName) == "" {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("customer_name is required")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("customer_name is required")
 	}
 	if strings.TrimSpace(in.Title) == "" {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("title is required")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("title is required")
 	}
 	in.Status = normalizeStatus(in.Status)
 	if in.StartAt.IsZero() {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("start_at is required")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("start_at is required")
 	}
 	if in.Duration <= 0 && !in.EndAt.IsZero() {
 		in.Duration = int(in.EndAt.Sub(in.StartAt).Minutes())
@@ -158,17 +158,17 @@ func prepareAppointment(in appointmentsdomain.Appointment, creating bool) (appoi
 		in.Duration = 60
 	}
 	if in.Duration > 720 {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("duration must be <= 720")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("duration must be <= 720")
 	}
 	endAt := in.EndAt
 	if endAt.IsZero() {
 		endAt = in.StartAt.Add(time.Duration(in.Duration) * time.Minute)
 	}
 	if !endAt.After(in.StartAt) {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("end_at must be after start_at")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("end_at must be after start_at")
 	}
 	if _, ok := allowedStatuses[normalizeStatus(in.Status)]; !ok {
-		return appointmentsdomain.Appointment{}, apperror.NewBadInput("invalid status")
+		return appointmentsdomain.Appointment{}, domainerr.Validation("invalid status")
 	}
 	in.StartAt = in.StartAt.UTC()
 	in.EndAt = endAt.UTC()

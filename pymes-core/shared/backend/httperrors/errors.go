@@ -1,26 +1,30 @@
+// Package httperrors wrapper thin de core/backend/gin/go para Gin.
+// Mantiene compatibilidad con los 87+ archivos que importan este paquete.
+// Los sentinels, Respond y Write delegan a core.
 package httperrors
 
 import (
-	"errors"
-	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
+// Sentinel errors — domainerr.Error, soportan errors.Is por Kind.
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrConflict  = errors.New("conflict")
-	ErrForbidden = errors.New("forbidden")
-	ErrBadInput  = errors.New("bad input")
-	ErrNotDraft  = errors.New("resource is not in draft status")
+	ErrNotFound  = domainerr.NotFound("not found")
+	ErrConflict  = domainerr.Conflict("conflict")
+	ErrForbidden = domainerr.Forbidden("forbidden")
+	ErrBadInput  = domainerr.Validation("bad input")
+	ErrNotDraft  = domainerr.Conflict("resource is not in draft status")
 )
 
-// IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL
-// sin depender de string matching fragil sobre err.Error().
+// ErrorResponse re-exporta el tipo de core para compatibilidad.
+type ErrorResponse = ginmw.ErrorResponse
+
+// IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL.
 func IsUniqueViolation(err error) bool {
 	if err == nil {
 		return false
@@ -31,37 +35,12 @@ func IsUniqueViolation(err error) bool {
 		strings.Contains(msg, "duplicate")
 }
 
-type ErrorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Meta    any    `json:"meta,omitempty"`
-}
-
+// Write escribe un error HTTP a Gin. Delega a ginmw.WriteError.
 func Write(c *gin.Context, status int, code, message string) {
-	c.JSON(status, ErrorResponse{Code: code, Message: message})
+	ginmw.WriteError(c, status, code, message)
 }
 
+// Respond mapea un error a respuesta HTTP en Gin. Delega a ginmw.Respond.
 func Respond(c *gin.Context, err error) {
-	var appErr *apperror.Error
-	if errors.As(err, &appErr) {
-		c.JSON(appErr.HTTPStatus, ErrorResponse{
-			Code:    appErr.Code,
-			Message: appErr.Message,
-			Meta:    appErr.Meta,
-		})
-		return
-	}
-	switch {
-	case errors.Is(err, ErrNotFound):
-		c.JSON(http.StatusNotFound, ErrorResponse{Code: "not_found", Message: "resource not found"})
-	case errors.Is(err, ErrConflict):
-		c.JSON(http.StatusConflict, ErrorResponse{Code: "conflict", Message: "resource conflict"})
-	case errors.Is(err, ErrForbidden):
-		c.JSON(http.StatusForbidden, ErrorResponse{Code: "forbidden", Message: "access denied"})
-	case errors.Is(err, ErrNotDraft):
-		c.JSON(http.StatusConflict, ErrorResponse{Code: "not_draft", Message: "resource is not in draft status"})
-	default:
-		slog.Error("unhandled error in http response", "error", err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Code: "internal_error", Message: "unexpected error"})
-	}
+	ginmw.Respond(c, err)
 }

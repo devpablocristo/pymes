@@ -14,7 +14,7 @@ import (
 	govdecision "github.com/devpablocristo/core/governance/go/decision"
 	kerneldomain "github.com/devpablocristo/core/governance/go/kernel/usecases/domain"
 	"github.com/devpablocristo/core/governance/go/risk"
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
@@ -93,14 +93,14 @@ type CreateInput struct {
 
 func (u *Usecases) Create(ctx context.Context, in CreateInput) (domain.ProcurementRequest, error) {
 	if strings.TrimSpace(in.Title) == "" {
-		return domain.ProcurementRequest{}, apperror.NewBadInput("title is required")
+		return domain.ProcurementRequest{}, domainerr.Validation("title is required")
 	}
 	if in.OrgID == uuid.Nil {
-		return domain.ProcurementRequest{}, apperror.NewBadInput("org_id is required")
+		return domain.ProcurementRequest{}, domainerr.Validation("org_id is required")
 	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
-		return domain.ProcurementRequest{}, apperror.NewBadInput("actor is required")
+		return domain.ProcurementRequest{}, domainerr.Validation("actor is required")
 	}
 	now := time.Now()
 	total := in.EstimatedTotal
@@ -150,15 +150,15 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (domain.Procureme
 	cur, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", in.ID.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", in.ID.String())
 		}
 		return domain.ProcurementRequest{}, err
 	}
 	if cur.Status != domain.StatusDraft {
-		return domain.ProcurementRequest{}, apperror.NewBusinessRule("only draft procurement requests can be updated")
+		return domain.ProcurementRequest{}, domainerr.BusinessRule("only draft procurement requests can be updated")
 	}
 	if strings.TrimSpace(in.Title) == "" {
-		return domain.ProcurementRequest{}, apperror.NewBadInput("title is required")
+		return domain.ProcurementRequest{}, domainerr.Validation("title is required")
 	}
 	total := in.EstimatedTotal
 	lines := normalizeLines(in.Lines, in.ID)
@@ -175,10 +175,10 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (domain.Procureme
 	out, err := u.repo.Update(ctx, cur)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", in.ID.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", in.ID.String())
 		}
 		if errors.Is(err, ErrArchived) {
-			return domain.ProcurementRequest{}, apperror.NewBusinessRule("procurement request is archived")
+			return domain.ProcurementRequest{}, domainerr.BusinessRule("procurement request is archived")
 		}
 		return domain.ProcurementRequest{}, err
 	}
@@ -194,7 +194,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Pro
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", id.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return domain.ProcurementRequest{}, err
 	}
@@ -208,7 +208,7 @@ func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, archived bool, lim
 func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Delete(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return apperror.NewNotFound("procurement_request", id.String())
+			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
@@ -220,7 +220,7 @@ func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string
 func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Archive(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return apperror.NewNotFound("procurement_request", id.String())
+			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
@@ -232,7 +232,7 @@ func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor strin
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return apperror.NewNotFound("procurement_request", id.String())
+			return domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return err
 	}
@@ -245,12 +245,12 @@ func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", id.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return domain.ProcurementRequest{}, err
 	}
 	if req.Status != domain.StatusDraft {
-		return domain.ProcurementRequest{}, apperror.NewBusinessRule("only draft requests can be submitted")
+		return domain.ProcurementRequest{}, domainerr.BusinessRule("only draft requests can be submitted")
 	}
 	total := req.EstimatedTotal
 	if len(req.Lines) > 0 {
@@ -339,12 +339,12 @@ func (u *Usecases) Approve(ctx context.Context, orgID, id uuid.UUID, actor strin
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", id.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return domain.ProcurementRequest{}, err
 	}
 	if req.Status != domain.StatusPendingApproval {
-		return domain.ProcurementRequest{}, apperror.NewBusinessRule("only pending requests can be approved")
+		return domain.ProcurementRequest{}, domainerr.BusinessRule("only pending requests can be approved")
 	}
 	req.Status = domain.StatusApproved
 	req.UpdatedAt = time.Now()
@@ -377,12 +377,12 @@ func (u *Usecases) Reject(ctx context.Context, orgID, id uuid.UUID, actor string
 	req, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementRequest{}, apperror.NewNotFound("procurement_request", id.String())
+			return domain.ProcurementRequest{}, domainerr.NotFoundf("procurement_request", id.String())
 		}
 		return domain.ProcurementRequest{}, err
 	}
 	if req.Status != domain.StatusPendingApproval {
-		return domain.ProcurementRequest{}, apperror.NewBusinessRule("only pending requests can be rejected")
+		return domain.ProcurementRequest{}, domainerr.BusinessRule("only pending requests can be rejected")
 	}
 	req.Status = domain.StatusRejected
 	req.UpdatedAt = time.Now()
@@ -401,7 +401,7 @@ func (u *Usecases) Reject(ctx context.Context, orgID, id uuid.UUID, actor string
 func (u *Usecases) createPurchaseFromRequest(ctx context.Context, req domain.ProcurementRequest, actor string) (purchasesdomain.Purchase, error) {
 	items := buildPurchaseItems(req)
 	if len(items) == 0 {
-		return purchasesdomain.Purchase{}, apperror.NewBusinessRule("procurement request has no lines for purchase")
+		return purchasesdomain.Purchase{}, domainerr.BusinessRule("procurement request has no lines for purchase")
 	}
 	notes := fmt.Sprintf("Generado desde solicitud interna %s", req.ID.String())
 	return u.purchases.Create(ctx, purchases.CreateInput{

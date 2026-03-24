@@ -1,16 +1,16 @@
 # Re-export desde ai_core — la implementacion real vive en core/ai/python.
 # Este modulo existe para mantener backward compatibility con imports existentes.
-from ai_core.auth import AuthMiddleware
-from ai_core.contexts import AuthContext
-from ai_core.errors import AppError, error_payload
-from ai_core.fastapi import apply_permissive_cors, install_request_context_middleware, register_common_exception_handlers
-from ai_core.gemini import GeminiProvider
-from ai_core.logging import bind_request_context, clear_request_context, configure_logging, get_logger, get_request_id, update_request_context
-from ai_core.orchestrator import OrchestratorLimits, orchestrate
-from ai_core.provider_factory import create_provider
-from ai_core.rate_limit import RateLimitMiddleware
-from ai_core.resilience import CircuitBreaker, CircuitBreakerOpenError
-from ai_core.types import ChatChunk, EchoProvider, LLMProvider, Message, ToolDeclaration
+from core_ai.auth import AuthMiddleware
+from core_ai.contexts import AuthContext
+from core_ai.errors import AppError, error_payload
+from core_ai.fastapi import apply_permissive_cors, install_request_context_middleware, register_common_exception_handlers
+from core_ai.providers.gemini import GeminiProvider
+from core_ai.logging import bind_request_context, clear_request_context, configure_logging, get_logger, get_request_id, update_request_context
+from core_ai.orchestrator import OrchestratorLimits, orchestrate
+from core_ai.provider_factory import create_provider
+from core_ai.rate_limit import RateLimitMiddleware
+from core_ai.resilience import CircuitBreaker, CircuitBreakerOpenError
+from core_ai.types import ChatChunk, EchoProvider, LLMProvider, Message, ToolDeclaration
 
 __all__ = [
     "AppError",

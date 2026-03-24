@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
@@ -123,14 +123,14 @@ func (u *Usecases) QuoteLink(ctx context.Context, orgID, quoteID uuid.UUID, acto
 		return Result{}, err
 	}
 	if quote.PartyID == nil || *quote.PartyID == uuid.Nil {
-		return Result{}, apperror.NewBadInput("quote has no party")
+		return Result{}, domainerr.Validation("quote has no party")
 	}
 	phone, _, err := u.repo.GetPartyPhone(ctx, orgID, *quote.PartyID)
 	if err != nil {
 		return Result{}, err
 	}
 	if strings.TrimSpace(phone) == "" {
-		return Result{}, apperror.NewBusinessRule("party has no phone")
+		return Result{}, domainerr.BusinessRule("party has no phone")
 	}
 	message := render(defaultString(templates.QuoteTemplate, "Hola {customer_name}, te enviamos el presupuesto {number} por {total}."), map[string]string{"customer_name": quote.CustomerName, "number": quote.Number, "total": formatAmount(quote.Total), "url": u.frontendURL + "/quotes/" + quoteID.String()})
 	result := Result{WhatsAppURL: buildWhatsAppURL(phone, templates.DefaultCountryCode, message), Phone: normalizePhone(phone, templates.DefaultCountryCode), Message: message}
@@ -150,14 +150,14 @@ func (u *Usecases) SaleReceiptLink(ctx context.Context, orgID, saleID uuid.UUID,
 		return Result{}, err
 	}
 	if sale.PartyID == nil || *sale.PartyID == uuid.Nil {
-		return Result{}, apperror.NewBadInput("sale has no party")
+		return Result{}, domainerr.Validation("sale has no party")
 	}
 	phone, _, err := u.repo.GetPartyPhone(ctx, orgID, *sale.PartyID)
 	if err != nil {
 		return Result{}, err
 	}
 	if strings.TrimSpace(phone) == "" {
-		return Result{}, apperror.NewBusinessRule("party has no phone")
+		return Result{}, domainerr.BusinessRule("party has no phone")
 	}
 	message := render(defaultString(templates.ReceiptTemplate, "Hola {customer_name}, tu comprobante de compra {number} por {total}. Gracias por tu compra!"), map[string]string{"customer_name": sale.CustomerName, "number": sale.Number, "total": formatAmount(sale.Total), "url": u.frontendURL + "/sales/" + saleID.String()})
 	result := Result{WhatsAppURL: buildWhatsAppURL(phone, templates.DefaultCountryCode, message), Phone: normalizePhone(phone, templates.DefaultCountryCode), Message: message}
@@ -177,11 +177,11 @@ func (u *Usecases) CustomerMessage(ctx context.Context, orgID, partyID uuid.UUID
 		return Result{}, err
 	}
 	if strings.TrimSpace(phone) == "" {
-		return Result{}, apperror.NewBusinessRule("party has no phone")
+		return Result{}, domainerr.BusinessRule("party has no phone")
 	}
 	message = strings.TrimSpace(message)
 	if message == "" {
-		return Result{}, apperror.NewBadInput("message is required")
+		return Result{}, domainerr.Validation("message is required")
 	}
 	result := Result{WhatsAppURL: buildWhatsAppURL(phone, templates.DefaultCountryCode, message), Phone: normalizePhone(phone, templates.DefaultCountryCode), Message: message}
 	if name != "" && !strings.Contains(strings.ToLower(message), strings.ToLower(name)) {
@@ -195,20 +195,20 @@ func (u *Usecases) CustomerMessage(ctx context.Context, orgID, partyID uuid.UUID
 
 func (u *Usecases) Connect(ctx context.Context, orgID uuid.UUID, phoneNumberID, wabaID, accessToken, displayPhone, verifiedName string) (domain.Connection, error) {
 	if strings.TrimSpace(phoneNumberID) == "" {
-		return domain.Connection{}, apperror.NewBadInput("phone_number_id is required")
+		return domain.Connection{}, domainerr.Validation("phone_number_id is required")
 	}
 	if strings.TrimSpace(wabaID) == "" {
-		return domain.Connection{}, apperror.NewBadInput("waba_id is required")
+		return domain.Connection{}, domainerr.Validation("waba_id is required")
 	}
 	if strings.TrimSpace(accessToken) == "" {
-		return domain.Connection{}, apperror.NewBadInput("access_token is required")
+		return domain.Connection{}, domainerr.Validation("access_token is required")
 	}
 
 	encryptedToken := strings.TrimSpace(accessToken)
 	if u.tokenCrypto != nil {
 		encrypted, err := u.tokenCrypto.Encrypt(strings.TrimSpace(accessToken))
 		if err != nil {
-			return domain.Connection{}, apperror.New("encryption_error", "failed to encrypt access token", 500)
+			return domain.Connection{}, domainerr.Internal("failed to encrypt access token")
 		}
 		encryptedToken = encrypted
 	}
@@ -271,12 +271,12 @@ func (u *Usecases) SendText(ctx context.Context, req domain.SendTextRequest) (do
 		return domain.Message{}, err
 	}
 	if strings.TrimSpace(req.Body) == "" {
-		return domain.Message{}, apperror.NewBadInput("message body is required")
+		return domain.Message{}, domainerr.Validation("message body is required")
 	}
 
 	waMessageID, err := u.meta.SendTextMessage(ctx, conn.PhoneNumberID, accessToken, phone, req.Body)
 	if err != nil {
-		return domain.Message{}, apperror.New("send_error", "failed to send whatsapp text message", 502)
+		return domain.Message{}, domainerr.UpstreamError("failed to send whatsapp text message")
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, domain.TypeText, req.Body, waMessageID)
@@ -297,7 +297,7 @@ func (u *Usecases) SendTemplate(ctx context.Context, req domain.SendTemplateRequ
 		return domain.Message{}, err
 	}
 	if strings.TrimSpace(req.TemplateName) == "" {
-		return domain.Message{}, apperror.NewBadInput("template_name is required")
+		return domain.Message{}, domainerr.Validation("template_name is required")
 	}
 
 	lang := req.Language
@@ -307,7 +307,7 @@ func (u *Usecases) SendTemplate(ctx context.Context, req domain.SendTemplateRequ
 
 	waMessageID, err := u.meta.SendTemplateMessage(ctx, conn.PhoneNumberID, accessToken, phone, req.TemplateName, lang, req.Params)
 	if err != nil {
-		return domain.Message{}, apperror.New("send_error", "failed to send whatsapp template message", 502)
+		return domain.Message{}, domainerr.UpstreamError("failed to send whatsapp template message")
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, domain.TypeTemplate, "", waMessageID)
@@ -331,12 +331,12 @@ func (u *Usecases) SendMedia(ctx context.Context, req domain.SendMediaRequest) (
 		return domain.Message{}, err
 	}
 	if strings.TrimSpace(req.MediaURL) == "" {
-		return domain.Message{}, apperror.NewBadInput("media_url is required")
+		return domain.Message{}, domainerr.Validation("media_url is required")
 	}
 
 	waMessageID, err := u.meta.SendMediaMessage(ctx, conn.PhoneNumberID, accessToken, phone, string(req.MediaType), req.MediaURL, req.Caption)
 	if err != nil {
-		return domain.Message{}, apperror.New("send_error", "failed to send whatsapp media message", 502)
+		return domain.Message{}, domainerr.UpstreamError("failed to send whatsapp media message")
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, req.MediaType, "", waMessageID)
@@ -354,7 +354,7 @@ func (u *Usecases) SendInteractive(ctx context.Context, req domain.SendInteracti
 		return domain.Message{}, err
 	}
 	if len(req.Buttons) == 0 || len(req.Buttons) > 3 {
-		return domain.Message{}, apperror.NewBadInput("interactive messages require 1-3 buttons")
+		return domain.Message{}, domainerr.Validation("interactive messages require 1-3 buttons")
 	}
 
 	buttons := make([]InteractiveButtonPayload, 0, len(req.Buttons))
@@ -364,7 +364,7 @@ func (u *Usecases) SendInteractive(ctx context.Context, req domain.SendInteracti
 
 	waMessageID, err := u.meta.SendInteractiveButtons(ctx, conn.PhoneNumberID, accessToken, phone, req.Body, buttons)
 	if err != nil {
-		return domain.Message{}, apperror.New("send_error", "failed to send whatsapp interactive message", 502)
+		return domain.Message{}, domainerr.UpstreamError("failed to send whatsapp interactive message")
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, domain.TypeInteractive, req.Body, waMessageID)
@@ -393,10 +393,10 @@ func (u *Usecases) HandleStatusUpdate(ctx context.Context, update domain.StatusU
 
 func (u *Usecases) CreateTemplate(ctx context.Context, orgID uuid.UUID, tpl domain.Template) (domain.Template, error) {
 	if strings.TrimSpace(tpl.Name) == "" {
-		return domain.Template{}, apperror.NewBadInput("template name is required")
+		return domain.Template{}, domainerr.Validation("template name is required")
 	}
 	if strings.TrimSpace(tpl.BodyText) == "" {
-		return domain.Template{}, apperror.NewBadInput("template body_text is required")
+		return domain.Template{}, domainerr.Validation("template body_text is required")
 	}
 	tpl.ID = uuid.New()
 	tpl.OrgID = orgID
@@ -431,7 +431,7 @@ func (u *Usecases) DeleteTemplate(ctx context.Context, orgID, templateID uuid.UU
 
 func (u *Usecases) RegisterOptIn(ctx context.Context, orgID, partyID uuid.UUID, phone string, source domain.OptInSource) (domain.OptIn, error) {
 	if strings.TrimSpace(phone) == "" {
-		return domain.OptIn{}, apperror.NewBadInput("phone is required for opt-in")
+		return domain.OptIn{}, domainerr.Validation("phone is required for opt-in")
 	}
 
 	optIn := domain.OptIn{
@@ -467,15 +467,15 @@ func (u *Usecases) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (boo
 func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.UUID) (domain.Connection, string, string, string, error) {
 	conn, err := u.repo.GetConnection(ctx, orgID)
 	if err != nil {
-		return domain.Connection{}, "", "", "", apperror.New("not_connected", "whatsapp is not connected for this organization", 422)
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp is not connected for this organization")
 	}
 	if !conn.IsActive {
-		return domain.Connection{}, "", "", "", apperror.New("not_connected", "whatsapp connection is inactive", 422)
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp connection is inactive")
 	}
 
 	accessToken, err := u.resolveAccessToken(conn.AccessToken)
 	if err != nil {
-		return domain.Connection{}, "", "", "", apperror.New("token_error", "failed to decrypt whatsapp access token", 500)
+		return domain.Connection{}, "", "", "", domainerr.Internal("failed to decrypt whatsapp access token")
 	}
 
 	phone, name, err := u.repo.GetPartyPhone(ctx, orgID, partyID)
@@ -483,7 +483,7 @@ func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.
 		return domain.Connection{}, "", "", "", err
 	}
 	if strings.TrimSpace(phone) == "" {
-		return domain.Connection{}, "", "", "", apperror.NewBusinessRule("party has no phone number")
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("party has no phone number")
 	}
 
 	optedIn, err := u.repo.IsOptedIn(ctx, orgID, partyID)
@@ -491,7 +491,7 @@ func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.
 		return domain.Connection{}, "", "", "", fmt.Errorf("check whatsapp opt-in: %w", err)
 	}
 	if !optedIn {
-		return domain.Connection{}, "", "", "", apperror.NewBusinessRule("whatsapp opt-in required for this contact")
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp opt-in required for this contact")
 	}
 
 	templates, err := u.repo.GetTemplates(ctx, orgID)

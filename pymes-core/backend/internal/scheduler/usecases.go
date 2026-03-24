@@ -10,7 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/backend/go/httpclient"
 	"github.com/devpablocristo/core/backend/go/resilience"
 	schedulerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler/usecases/domain"
 )
@@ -35,7 +36,7 @@ type PaymentGatewayTaskPort interface {
 type Usecases struct {
 	repo            RepositoryPort
 	provider        string
-	client          *http.Client
+	caller          *httpclient.Caller
 	webhooks        WebhookTaskPort
 	paymentGateways PaymentGatewayTaskPort
 }
@@ -57,7 +58,9 @@ func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort,
 	return &Usecases{
 		repo:            repo,
 		provider:        strings.ToLower(strings.TrimSpace(provider)),
-		client:          &http.Client{Timeout: 10 * time.Second},
+		caller: &httpclient.Caller{
+			HTTP: &http.Client{Timeout: 10 * time.Second},
+		},
 		webhooks:        webhooks,
 		paymentGateways: paymentGateways,
 	}
@@ -69,7 +72,7 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		task = "all"
 	}
 	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" {
-		return schedulerdomain.RunResult{}, apperror.NewBadInput("invalid task")
+		return schedulerdomain.RunResult{}, domainerr.Validation("invalid task")
 	}
 	result := schedulerdomain.RunResult{Task: task, Metadata: map[string]any{}}
 	if task == "all" || task == "exchange_rates" {
@@ -187,19 +190,14 @@ func (u *Usecases) fetchRates(ctx context.Context) ([]remoteRate, error) {
 		InitialDelay: 250 * time.Millisecond,
 		MaxDelay:     1 * time.Second,
 	}, func(ctx context.Context) error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://dolarapi.com/v1/dolares", nil)
+		st, raw, err := u.caller.DoJSON(ctx, http.MethodGet, "https://dolarapi.com/v1/dolares", nil)
 		if err != nil {
 			return err
 		}
-		res, err := u.client.Do(req)
-		if err != nil {
-			return err
+		if st >= 300 {
+			return fmt.Errorf("exchange rate provider returned %d", st)
 		}
-		defer res.Body.Close()
-		if res.StatusCode >= 300 {
-			return fmt.Errorf("exchange rate provider returned %d", res.StatusCode)
-		}
-		return json.NewDecoder(res.Body).Decode(&payload)
+		return json.Unmarshal(raw, &payload)
 	})
 	if err != nil {
 		return nil, err

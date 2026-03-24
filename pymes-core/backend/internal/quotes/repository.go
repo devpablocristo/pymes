@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -16,7 +17,7 @@ import (
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 )
 
-var ErrQuoteNotDraft = errors.New("quote is not in draft status")
+var ErrQuoteNotDraft = domainerr.Conflict("quote is not in draft status")
 
 type Repository struct {
 	db *gorm.DB

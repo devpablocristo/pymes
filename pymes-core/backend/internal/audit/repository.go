@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/canonicaljson"
 	"github.com/devpablocristo/core/backend/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
@@ -30,7 +29,7 @@ func (r *Repository) Add(in domain.LogInput) domain.Entry {
 		prevHash = lastEntry.Hash
 	}
 
-	canonicalPayload, _ := canonicaljson.CanonicalJSON(in.Payload)
+	canonicalPayload, _ := json.Marshal(in.Payload)
 	hash := hashutil.SHA256Hex(prevHash + string(canonicalPayload))
 
 	payloadJSON, _ := json.Marshal(in.Payload)

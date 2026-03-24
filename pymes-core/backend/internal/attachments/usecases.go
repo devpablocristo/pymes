@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	attachmentdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/usecases/domain"
 )
 
@@ -38,7 +38,7 @@ func NewUsecases(repo RepositoryPort, rootPath string) *Usecases {
 
 func (u *Usecases) RequestUpload(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, fileName, contentType string, sizeBytes int64) (attachmentdomain.UploadRequest, error) {
 	if orgID == uuid.Nil || entityID == uuid.Nil || strings.TrimSpace(entityType) == "" {
-		return attachmentdomain.UploadRequest{}, apperror.NewBadInput("org_id, entity_type and entity_id are required")
+		return attachmentdomain.UploadRequest{}, domainerr.Validation("org_id, entity_type and entity_id are required")
 	}
 	storageKey := filepath.Join(orgID.String(), strings.TrimSpace(entityType), entityID.String(), uuid.NewString()+"-"+sanitizeFileName(fileName))
 	if err := os.MkdirAll(filepath.Dir(u.absolutePath(storageKey)), 0o755); err != nil {
@@ -89,7 +89,7 @@ func (u *Usecases) GetDownloadLink(ctx context.Context, orgID, id uuid.UUID) (at
 	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, apperror.NewNotFound("attachment", id.String())
+			return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, domainerr.NotFoundf("attachment", id.String())
 		}
 		return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, err
 	}
@@ -113,7 +113,7 @@ func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.NewNotFound("attachment", id.String())
+			return domainerr.NotFoundf("attachment", id.String())
 		}
 		return err
 	}

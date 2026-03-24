@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	ginmw "github.com/devpablocristo/core/backend/gin/go"
+
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/handler/dto"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
@@ -62,8 +64,8 @@ func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
 	v1.GET("/payment-gateway/callback", h.Callback)
 	v1.POST(
 		"/webhooks/mercadopago",
-		handlers.NewPublicRateLimit(240),
-		handlers.NewBodySizeLimit(256<<10),
+		ginmw.NewRateLimit(240),
+		ginmw.NewBodySizeLimit(256<<10),
 		h.MercadoPagoWebhook,
 	)
 }
@@ -307,7 +309,7 @@ func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
-		if handlers.IsBodyTooLarge(err) {
+		if ginmw.IsBodyTooLarge(err) {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
 			return
 		}

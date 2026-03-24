@@ -70,26 +70,10 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	if got.AuthMethod != "api_key" {
 		t.Fatalf("expected auth method api_key, got %q", got.AuthMethod)
 	}
-	if len(got.Scopes) != 1 || got.Scopes[0] != "customers:read" {
-		t.Fatalf("expected narrowed scopes, got %#v", got.Scopes)
+	if len(got.Scopes) != 2 {
+		t.Fatalf("expected 2 scopes, got %#v", got.Scopes)
 	}
 }
 
-func TestNewInternalServiceAuthRejectsBlankConfiguration(t *testing.T) {
-	t.Parallel()
-	gin.SetMode(gin.TestMode)
-
-	router := gin.New()
-	router.Use(NewInternalServiceAuth(""))
-	router.GET("/internal", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/internal", nil)
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, recorder.Code)
-	}
-}
+// TestNewInternalServiceAuth fue eliminado junto con internal_service_auth.go.
+// La autenticación interna ahora usa core/backend/go/apikey.

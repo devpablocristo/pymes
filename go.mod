@@ -8,14 +8,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.12
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
-	github.com/devpablocristo/core/authn/go v0.1.0
+	github.com/devpablocristo/core/authn/go v0.2.1
+	github.com/devpablocristo/core/backend/gin/go v0.0.0
+	github.com/devpablocristo/core/databases/gorm/go v0.0.0
 	github.com/devpablocristo/core/governance/go v0.1.0
 	github.com/devpablocristo/core/saas/go v0.1.0
-	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.11.2
 	github.com/rs/zerolog v1.34.0
@@ -23,7 +23,6 @@ require (
 	github.com/xuri/excelize/v2 v2.10.1
 	golang.org/x/text v0.34.0
 	gorm.io/datatypes v1.2.7
-	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -31,11 +30,16 @@ require (
 	cel.dev/expr v0.24.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/devpablocristo/core/authz/go v0.1.0 // indirect
+	github.com/gin-contrib/cors v1.7.6 // indirect
+	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
+	gorm.io/driver/postgres v1.6.0 // indirect
+	gorm.io/driver/sqlite v1.6.0 // indirect
 )
 
 require (
@@ -100,8 +104,10 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	gorm.io/driver/mysql v1.5.6 // indirect
+	gorm.io/driver/mysql v1.6.0 // indirect
 )
+
+replace github.com/devpablocristo/core/databases/gorm/go => ../core/databases/gorm/go
 
 replace github.com/devpablocristo/core/saas/go => ../core/saas/go
 
@@ -114,3 +120,5 @@ replace github.com/devpablocristo/core/authz/go => ../core/authz/go
 replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go
 
 replace github.com/devpablocristo/core/governance/go => ../core/governance/go
+
+replace github.com/devpablocristo/core/backend/gin/go => ../core/backend/gin/go

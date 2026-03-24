@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	kerneldomain "github.com/devpablocristo/core/governance/go/kernel/usecases/domain"
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
@@ -60,7 +60,7 @@ func (u *Usecases) GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.P
 	p, err := u.repo.GetPolicyByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementPolicy{}, apperror.NewNotFound("procurement_policy", id.String())
+			return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", id.String())
 		}
 		return domain.ProcurementPolicy{}, err
 	}
@@ -69,11 +69,11 @@ func (u *Usecases) GetPolicy(ctx context.Context, orgID, id uuid.UUID) (domain.P
 
 func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error) {
 	if in.OrgID == uuid.Nil {
-		return domain.ProcurementPolicy{}, apperror.NewBadInput("org_id is required")
+		return domain.ProcurementPolicy{}, domainerr.Validation("org_id is required")
 	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
-		return domain.ProcurementPolicy{}, apperror.NewBadInput("actor is required")
+		return domain.ProcurementPolicy{}, domainerr.Validation("actor is required")
 	}
 	mode := strings.TrimSpace(in.Mode)
 	if mode == "" {
@@ -113,13 +113,13 @@ func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (doma
 	cur, err := u.repo.GetPolicyByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return domain.ProcurementPolicy{}, apperror.NewNotFound("procurement_policy", in.ID.String())
+			return domain.ProcurementPolicy{}, domainerr.NotFoundf("procurement_policy", in.ID.String())
 		}
 		return domain.ProcurementPolicy{}, err
 	}
 	actor := strings.TrimSpace(in.Actor)
 	if actor == "" {
-		return domain.ProcurementPolicy{}, apperror.NewBadInput("actor is required")
+		return domain.ProcurementPolicy{}, domainerr.Validation("actor is required")
 	}
 	mode := strings.TrimSpace(in.Mode)
 	if mode == "" {
@@ -151,11 +151,11 @@ func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (doma
 
 func (u *Usecases) DeletePolicy(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if strings.TrimSpace(actor) == "" {
-		return apperror.NewBadInput("actor is required")
+		return domainerr.Validation("actor is required")
 	}
 	if err := u.repo.DeletePolicy(ctx, orgID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return apperror.NewNotFound("procurement_policy", id.String())
+			return domainerr.NotFoundf("procurement_policy", id.String())
 		}
 		return err
 	}
@@ -166,22 +166,22 @@ func (u *Usecases) DeletePolicy(ctx context.Context, orgID, id uuid.UUID, actor 
 
 func validatePolicyFields(name, expression, effect, mode string) error {
 	if strings.TrimSpace(name) == "" {
-		return apperror.NewBadInput("name is required")
+		return domainerr.Validation("name is required")
 	}
 	if strings.TrimSpace(expression) == "" {
-		return apperror.NewBadInput("expression is required")
+		return domainerr.Validation("expression is required")
 	}
 	e := strings.TrimSpace(effect)
 	switch kerneldomain.Decision(e) {
 	case kerneldomain.DecisionAllow, kerneldomain.DecisionDeny, kerneldomain.DecisionRequireApproval:
 	default:
-		return apperror.NewBadInput("invalid effect")
+		return domainerr.Validation("invalid effect")
 	}
 	m := strings.TrimSpace(mode)
 	switch kerneldomain.PolicyMode(m) {
 	case kerneldomain.PolicyModeEnforce, kerneldomain.PolicyModeShadow:
 	default:
-		return apperror.NewBadInput("invalid mode")
+		return domainerr.Validation("invalid mode")
 	}
 	return nil
 }

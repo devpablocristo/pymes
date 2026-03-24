@@ -16,7 +16,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/text/encoding/charmap"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 )
 
 const maxImportRows = 10000
@@ -86,18 +86,18 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 func (u *Usecases) Preview(ctx context.Context, entity, filename string, fileData []byte) (Preview, error) {
 	entity = normalizeEntity(entity)
 	if !supportsImport(entity) {
-		return Preview{}, apperror.NewBadInput("unsupported import entity")
+		return Preview{}, domainerr.Validation("unsupported import entity")
 	}
 	format := detectFormat(filename)
 	if format == "" {
-		return Preview{}, apperror.NewBadInput("unsupported file format")
+		return Preview{}, domainerr.Validation("unsupported file format")
 	}
 	rows, columns, err := parseRows(format, fileData)
 	if err != nil {
 		return Preview{}, err
 	}
 	if len(rows) > maxImportRows {
-		return Preview{}, apperror.NewBadInput("file exceeds 10000 rows")
+		return Preview{}, domainerr.Validation("file exceeds 10000 rows")
 	}
 
 	preview := Preview{
@@ -132,14 +132,14 @@ func (u *Usecases) Preview(ctx context.Context, entity, filename string, fileDat
 func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.UUID, previewID, mode, actor string) (ImportResult, error) {
 	entity = normalizeEntity(entity)
 	if previewID == "" {
-		return ImportResult{}, apperror.NewBadInput("preview_id is required")
+		return ImportResult{}, domainerr.Validation("preview_id is required")
 	}
 	job, err := u.loadPreview(previewID)
 	if err != nil {
 		return ImportResult{}, err
 	}
 	if job.Entity != entity {
-		return ImportResult{}, apperror.NewBadInput("preview entity mismatch")
+		return ImportResult{}, domainerr.Validation("preview entity mismatch")
 	}
 	mode = normalizeMode(mode)
 	var result ImportResult
@@ -151,7 +151,7 @@ func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.
 	case "suppliers":
 		result, err = u.repo.ImportSuppliers(ctx, orgID, job.Rows, mode)
 	default:
-		return ImportResult{}, apperror.NewBadInput("unsupported import entity")
+		return ImportResult{}, domainerr.Validation("unsupported import entity")
 	}
 	if err != nil {
 		return ImportResult{}, err
@@ -202,7 +202,7 @@ func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, f
 		format = "csv"
 	}
 	if (entity == "sales" || entity == "cashflow") && (from == nil || to == nil) {
-		return nil, "", "", apperror.NewBadInput("from and to are required for this export")
+		return nil, "", "", domainerr.Validation("from and to are required for this export")
 	}
 
 	var headers []string
@@ -220,7 +220,7 @@ func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, f
 	case "cashflow":
 		headers, rows, err = u.repo.ExportCashflow(ctx, orgID, from, to)
 	default:
-		return nil, "", "", apperror.NewBadInput("unsupported export entity")
+		return nil, "", "", domainerr.Validation("unsupported export entity")
 	}
 	if err != nil {
 		return nil, "", "", err
@@ -248,7 +248,7 @@ func parseRows(format string, fileData []byte) ([]map[string]string, []string, e
 	case "xlsx":
 		return parseXLSX(fileData)
 	default:
-		return nil, nil, apperror.NewBadInput("unsupported file format")
+		return nil, nil, domainerr.Validation("unsupported file format")
 	}
 }
 
@@ -264,7 +264,7 @@ func parseCSV(fileData []byte) ([]map[string]string, []string, error) {
 	reader.FieldsPerRecord = -1
 	records, err := reader.ReadAll()
 	if err != nil {
-		return nil, nil, apperror.NewBadInput("invalid csv")
+		return nil, nil, domainerr.Validation("invalid csv")
 	}
 	return recordsToMaps(records)
 }
@@ -272,27 +272,27 @@ func parseCSV(fileData []byte) ([]map[string]string, []string, error) {
 func parseXLSX(fileData []byte) ([]map[string]string, []string, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(fileData))
 	if err != nil {
-		return nil, nil, apperror.NewBadInput("invalid xlsx")
+		return nil, nil, domainerr.Validation("invalid xlsx")
 	}
 	defer f.Close()
 	sheets := f.GetSheetList()
 	if len(sheets) == 0 {
-		return nil, nil, apperror.NewBadInput("empty xlsx")
+		return nil, nil, domainerr.Validation("empty xlsx")
 	}
 	records, err := f.GetRows(sheets[0])
 	if err != nil {
-		return nil, nil, apperror.NewBadInput("invalid xlsx rows")
+		return nil, nil, domainerr.Validation("invalid xlsx rows")
 	}
 	return recordsToMaps(records)
 }
 
 func recordsToMaps(records [][]string) ([]map[string]string, []string, error) {
 	if len(records) == 0 {
-		return nil, nil, apperror.NewBadInput("empty file")
+		return nil, nil, domainerr.Validation("empty file")
 	}
 	headers := normalizeHeaders(records[0])
 	if len(headers) == 0 {
-		return nil, nil, apperror.NewBadInput("missing headers")
+		return nil, nil, domainerr.Validation("missing headers")
 	}
 	rows := make([]map[string]string, 0, max(0, len(records)-1))
 	for _, record := range records[1:] {
@@ -381,7 +381,7 @@ func templateDefinition(entity string) ([]string, []string, error) {
 	case "suppliers":
 		return []string{"name", "email", "phone", "tax_id", "contact_name", "address_street", "address_city", "address_state", "address_zip_code", "address_country", "notes", "tags"}, []string{"Distribuidora Norte", "ventas@norte.com", "+5493814440000", "30711222334", "Laura Diaz", "Ruta 9 km 12", "Tafi Viejo", "Tucuman", "4103", "AR", "Entrega semanal", "insumos,prioritario"}, nil
 	default:
-		return nil, nil, apperror.NewBadInput("unsupported template entity")
+		return nil, nil, domainerr.Validation("unsupported template entity")
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	timelinedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline/usecases/domain"
 )
 
@@ -22,20 +22,20 @@ func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error) {
 	if orgID == uuid.Nil || entityID == uuid.Nil || strings.TrimSpace(entityType) == "" {
-		return nil, apperror.NewBadInput("org_id, entity_type and entity_id are required")
+		return nil, domainerr.Validation("org_id, entity_type and entity_id are required")
 	}
 	return u.repo.List(ctx, orgID, strings.TrimSpace(entityType), entityID, limit)
 }
 
 func (u *Usecases) Record(ctx context.Context, in timelinedomain.Entry) (timelinedomain.Entry, error) {
 	if in.OrgID == uuid.Nil || in.EntityID == uuid.Nil || strings.TrimSpace(in.EntityType) == "" {
-		return timelinedomain.Entry{}, apperror.NewBadInput("org_id, entity_type and entity_id are required")
+		return timelinedomain.Entry{}, domainerr.Validation("org_id, entity_type and entity_id are required")
 	}
 	if strings.TrimSpace(in.EventType) == "" {
-		return timelinedomain.Entry{}, apperror.NewBadInput("event_type is required")
+		return timelinedomain.Entry{}, domainerr.Validation("event_type is required")
 	}
 	if strings.TrimSpace(in.Title) == "" {
-		return timelinedomain.Entry{}, apperror.NewBadInput("title is required")
+		return timelinedomain.Entry{}, domainerr.Validation("title is required")
 	}
 	in.EntityType = strings.TrimSpace(in.EntityType)
 	in.EventType = strings.TrimSpace(in.EventType)

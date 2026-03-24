@@ -1,7 +1,6 @@
 package outwebhooks
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -9,18 +8,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+
+	"github.com/devpablocristo/core/backend/go/httpclient"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	webhookmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/usecases/domain"
 )
@@ -50,14 +50,17 @@ type ipResolver interface {
 
 type Usecases struct {
 	repo     RepositoryPort
-	client   *http.Client
+	caller   *httpclient.Caller
 	resolver ipResolver
 }
 
 func NewUsecases(repo RepositoryPort) *Usecases {
 	return &Usecases{
-		repo:     repo,
-		client:   &http.Client{Timeout: 5 * time.Second},
+		repo: repo,
+		caller: &httpclient.Caller{
+			HTTP:        &http.Client{Timeout: 5 * time.Second},
+			MaxBodySize: 4096,
+		},
 		resolver: net.DefaultResolver,
 	}
 }
@@ -71,7 +74,7 @@ func (u *Usecases) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 		return webhookdomain.Endpoint{}, err
 	}
 	if in.OrgID == uuid.Nil {
-		return webhookdomain.Endpoint{}, apperror.NewBadInput("org_id is required")
+		return webhookdomain.Endpoint{}, domainerr.Validation("org_id is required")
 	}
 	if len(in.Events) == 0 {
 		in.Events = []string{"*"}
@@ -92,7 +95,7 @@ func (u *Usecases) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 func (u *Usecases) GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error) {
 	out, err := u.repo.GetEndpoint(ctx, orgID, id)
 	if err != nil && gorm.ErrRecordNotFound == err {
-		return webhookdomain.Endpoint{}, apperror.NewNotFound("webhook_endpoint", id.String())
+		return webhookdomain.Endpoint{}, domainerr.NotFoundf("webhook_endpoint", id.String())
 	}
 	return out, err
 }
@@ -102,12 +105,12 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 		return webhookdomain.Endpoint{}, err
 	}
 	if in.OrgID == uuid.Nil || in.ID == uuid.Nil {
-		return webhookdomain.Endpoint{}, apperror.NewBadInput("org_id and id are required")
+		return webhookdomain.Endpoint{}, domainerr.Validation("org_id and id are required")
 	}
 	current, err := u.repo.GetEndpoint(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return webhookdomain.Endpoint{}, apperror.NewNotFound("webhook_endpoint", in.ID.String())
+			return webhookdomain.Endpoint{}, domainerr.NotFoundf("webhook_endpoint", in.ID.String())
 		}
 		return webhookdomain.Endpoint{}, err
 	}
@@ -126,7 +129,7 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 func (u *Usecases) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error {
 	if err := u.repo.DeleteEndpoint(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.NewNotFound("webhook_endpoint", id.String())
+			return domainerr.NotFoundf("webhook_endpoint", id.String())
 		}
 		return err
 	}
@@ -139,7 +142,7 @@ func (u *Usecases) ListDeliveries(ctx context.Context, orgID, endpointID uuid.UU
 
 func (u *Usecases) Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error {
 	if orgID == uuid.Nil || strings.TrimSpace(eventType) == "" {
-		return apperror.NewBadInput("org_id and event_type are required")
+		return domainerr.Validation("org_id and event_type are required")
 	}
 	return u.repo.CreateOutbox(ctx, orgID, strings.TrimSpace(eventType), payload)
 }
@@ -159,7 +162,7 @@ func (u *Usecases) ReplayDelivery(ctx context.Context, deliveryID uuid.UUID) err
 	delivery, err := u.repo.GetDelivery(ctx, deliveryID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.NewNotFound("webhook_delivery", deliveryID.String())
+			return domainerr.NotFoundf("webhook_delivery", deliveryID.String())
 		}
 		return err
 	}
@@ -238,23 +241,18 @@ func (u *Usecases) deliver(ctx context.Context, endpoint webhookdomain.Endpoint,
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 	webhookID := uuid.NewString()
 	sig := sign(endpoint.Secret, webhookID, timestamp, body)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.URL, bytes.NewReader(body))
+
+	// URL absoluta del endpoint del cliente — Caller la soporta
+	statusCode, respBytes, err := u.caller.DoRaw(ctx, http.MethodPost, endpoint.URL, body, "application/json",
+		httpclient.WithHeader("X-Webhook-ID", webhookID),
+		httpclient.WithHeader("X-Webhook-Event", eventType),
+		httpclient.WithHeader("X-Webhook-Timestamp", timestamp),
+		httpclient.WithHeader("X-Webhook-Signature", sig),
+	)
 	if err != nil {
 		return nil, err.Error(), nil, nextRetryForAttempt(attempts)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Webhook-ID", webhookID)
-	req.Header.Set("X-Webhook-Event", eventType)
-	req.Header.Set("X-Webhook-Timestamp", timestamp)
-	req.Header.Set("X-Webhook-Signature", sig)
-	res, err := u.client.Do(req)
-	if err != nil {
-		return nil, err.Error(), nil, nextRetryForAttempt(attempts)
-	}
-	defer res.Body.Close()
-	respBytes, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-	statusCode := res.StatusCode
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
+	if statusCode >= 200 && statusCode < 300 {
 		now := time.Now().UTC()
 		return &statusCode, string(respBytes), &now, nil
 	}
@@ -264,14 +262,14 @@ func (u *Usecases) deliver(ctx context.Context, endpoint webhookdomain.Endpoint,
 func (u *Usecases) validateURL(ctx context.Context, raw string) error {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed == nil || !strings.EqualFold(parsed.Scheme, "https") || parsed.Host == "" {
-		return apperror.NewBadInput("invalid webhook url")
+		return domainerr.Validation("invalid webhook url")
 	}
 	host := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parsed.Hostname())), ".")
 	if host == "" {
-		return apperror.NewBadInput("invalid webhook url")
+		return domainerr.Validation("invalid webhook url")
 	}
 	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-		return apperror.NewBadInput("webhook url cannot target localhost")
+		return domainerr.Validation("webhook url cannot target localhost")
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if err := validateResolvedIP(ip); err != nil {
@@ -288,7 +286,7 @@ func (u *Usecases) validateURL(ctx context.Context, raw string) error {
 
 	addrs, err := u.resolver.LookupIPAddr(lookupCtx, host)
 	if err != nil || len(addrs) == 0 {
-		return apperror.NewBadInput("webhook host cannot be resolved")
+		return domainerr.Validation("webhook host cannot be resolved")
 	}
 	for _, addr := range addrs {
 		if err := validateResolvedIP(addr.IP); err != nil {
@@ -301,13 +299,13 @@ func (u *Usecases) validateURL(ctx context.Context, raw string) error {
 func validateResolvedIP(ip net.IP) error {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
-		return apperror.NewBadInput("webhook host resolved to invalid ip")
+		return domainerr.Validation("webhook host resolved to invalid ip")
 	}
 	if addr.IsLoopback() {
-		return apperror.NewBadInput("webhook url cannot target localhost")
+		return domainerr.Validation("webhook url cannot target localhost")
 	}
 	if addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsMulticast() || addr.IsUnspecified() {
-		return apperror.NewBadInput("webhook url cannot target private network")
+		return domainerr.Validation("webhook url cannot target private network")
 	}
 	return nil
 }

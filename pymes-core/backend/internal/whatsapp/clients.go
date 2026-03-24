@@ -1,26 +1,23 @@
 package whatsapp
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/devpablocristo/core/backend/go/httpclient"
 )
 
 type AIClient struct {
-	baseURL       string
-	internalToken string
-	client        *http.Client
+	caller *httpclient.Caller
 }
 
 type MetaClient struct {
-	baseURL string
-	client  *http.Client
+	caller *httpclient.Caller
 }
 
 type AIMessageRequest struct {
@@ -39,7 +36,6 @@ type AIMessageResponse struct {
 	ToolCalls      []string `json:"tool_calls"`
 }
 
-// metaSendResponse es la respuesta de Meta Graph API al enviar un mensaje o actualizar estado (p. ej. read).
 type metaSendResponse struct {
 	Messages []struct {
 		ID string `json:"id"`
@@ -48,10 +44,17 @@ type metaSendResponse struct {
 }
 
 func NewAIClient(baseURL, internalToken string) *AIClient {
+	h := make(http.Header)
+	if t := strings.TrimSpace(internalToken); t != "" {
+		h.Set("X-Internal-Service-Token", t)
+	}
 	return &AIClient{
-		baseURL:       strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		internalToken: strings.TrimSpace(internalToken),
-		client:        &http.Client{Timeout: 15 * time.Second},
+		caller: &httpclient.Caller{
+			BaseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+			Header:      h,
+			HTTP:        &http.Client{Timeout: 15 * time.Second},
+			MaxBodySize: 32 * 1024,
+		},
 	}
 }
 
@@ -61,49 +64,35 @@ func NewMetaClient(baseURL string) *MetaClient {
 		base = "https://graph.facebook.com/v23.0"
 	}
 	return &MetaClient{
-		baseURL: base,
-		client:  &http.Client{Timeout: 15 * time.Second},
+		caller: &httpclient.Caller{
+			BaseURL:     base,
+			HTTP:        &http.Client{Timeout: 15 * time.Second},
+			MaxBodySize: 32 * 1024,
+		},
 	}
 }
 
 func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIMessageResponse, error) {
-	if c == nil || c.baseURL == "" {
+	if c == nil || c.caller.BaseURL == "" {
 		return AIMessageResponse{}, fmt.Errorf("ai service url not configured")
 	}
-	payload, err := json.Marshal(AIMessageRequest{
+	body := AIMessageRequest{
 		OrgID:         req.OrgID.String(),
 		PhoneNumberID: req.PhoneNumberID,
 		FromPhone:     req.FromPhone,
 		Message:       req.Text,
 		MessageID:     req.MessageID,
 		ProfileName:   req.ProfileName,
-	})
+	}
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/whatsapp/message", body)
 	if err != nil {
 		return AIMessageResponse{}, err
 	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/internal/whatsapp/message", bytes.NewReader(payload))
-	if err != nil {
-		return AIMessageResponse{}, err
+	if st >= http.StatusMultipleChoices {
+		return AIMessageResponse{}, fmt.Errorf("ai service returned %d: %s", st, strings.TrimSpace(string(raw)))
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.internalToken != "" {
-		httpReq.Header.Set("X-Internal-Service-Token", c.internalToken)
-	}
-
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return AIMessageResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
-	if resp.StatusCode >= http.StatusMultipleChoices {
-		return AIMessageResponse{}, fmt.Errorf("ai service returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
 	var out AIMessageResponse
-	if err := json.Unmarshal(body, &out); err != nil {
+	if err := json.Unmarshal(raw, &out); err != nil {
 		return AIMessageResponse{}, err
 	}
 	return out, nil
@@ -111,49 +100,35 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIM
 
 // sendMessage envía un payload genérico a Meta Graph API y retorna el wa_message_id.
 func (c *MetaClient) sendMessage(ctx context.Context, phoneNumberID, accessToken string, payload any) (string, error) {
-	if c == nil || c.baseURL == "" {
+	if c == nil || c.caller.BaseURL == "" {
 		return "", fmt.Errorf("whatsapp graph api base url not configured")
 	}
 	if strings.TrimSpace(accessToken) == "" {
 		return "", fmt.Errorf("whatsapp access token is required")
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("marshal whatsapp payload: %w", err)
-	}
-
-	endpoint := c.baseURL + "/" + url.PathEscape(strings.TrimSpace(phoneNumberID)) + "/messages"
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("create whatsapp request: %w", err)
-	}
-	httpReq.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.client.Do(httpReq)
+	path := "/" + url.PathEscape(strings.TrimSpace(phoneNumberID)) + "/messages"
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, path, payload,
+		httpclient.WithHeader("Authorization", "Bearer "+strings.TrimSpace(accessToken)),
+	)
 	if err != nil {
 		return "", fmt.Errorf("whatsapp api request: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
-	if resp.StatusCode >= http.StatusMultipleChoices {
-		return "", fmt.Errorf("meta graph api returned %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	if st >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("meta graph api returned %d: %s", st, strings.TrimSpace(string(raw)))
 	}
 
 	var sendResp metaSendResponse
-	if err := json.Unmarshal(respBody, &sendResp); err != nil {
+	if err := json.Unmarshal(raw, &sendResp); err != nil {
 		return "", fmt.Errorf("decode whatsapp send response: %w", err)
 	}
 	if len(sendResp.Messages) > 0 && strings.TrimSpace(sendResp.Messages[0].ID) != "" {
 		return sendResp.Messages[0].ID, nil
 	}
-	// Marcar como leído u otras operaciones devuelven {"success": true} sin messages[].
 	if sendResp.Success {
 		return "", nil
 	}
-	return "", fmt.Errorf("meta graph api returned success without message id: %s", strings.TrimSpace(string(respBody)))
+	return "", fmt.Errorf("meta graph api returned success without message id: %s", strings.TrimSpace(string(raw)))
 }
 
 // SendTextMessage envía un mensaje de texto simple.
@@ -176,32 +151,22 @@ func (c *MetaClient) SendTemplateMessage(ctx context.Context, phoneNumberID, acc
 	if len(params) > 0 {
 		parameters := make([]map[string]any, 0, len(params))
 		for _, p := range params {
-			parameters = append(parameters, map[string]any{
-				"type": "text",
-				"text": p,
-			})
+			parameters = append(parameters, map[string]any{"type": "text", "text": p})
 		}
-		components = append(components, map[string]any{
-			"type":       "body",
-			"parameters": parameters,
-		})
+		components = append(components, map[string]any{"type": "body", "parameters": parameters})
 	}
-
 	lang := strings.TrimSpace(language)
 	if lang == "" {
 		lang = "es"
 	}
-
 	return c.sendMessage(ctx, phoneNumberID, accessToken, map[string]any{
 		"messaging_product": "whatsapp",
 		"recipient_type":    "individual",
 		"to":                strings.TrimSpace(to),
 		"type":              "template",
 		"template": map[string]any{
-			"name": strings.TrimSpace(templateName),
-			"language": map[string]any{
-				"code": lang,
-			},
+			"name":       strings.TrimSpace(templateName),
+			"language":   map[string]any{"code": lang},
 			"components": components,
 		},
 	})
@@ -210,13 +175,10 @@ func (c *MetaClient) SendTemplateMessage(ctx context.Context, phoneNumberID, acc
 // SendMediaMessage envía un mensaje con imagen, documento, audio o video.
 func (c *MetaClient) SendMediaMessage(ctx context.Context, phoneNumberID, accessToken, to, mediaType, mediaURL, caption string) (string, error) {
 	mt := strings.TrimSpace(strings.ToLower(mediaType))
-	mediaPayload := map[string]any{
-		"link": strings.TrimSpace(mediaURL),
-	}
+	mediaPayload := map[string]any{"link": strings.TrimSpace(mediaURL)}
 	if strings.TrimSpace(caption) != "" {
 		mediaPayload["caption"] = strings.TrimSpace(caption)
 	}
-
 	return c.sendMessage(ctx, phoneNumberID, accessToken, map[string]any{
 		"messaging_product": "whatsapp",
 		"recipient_type":    "individual",
@@ -231,27 +193,19 @@ func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, 
 	actionButtons := make([]map[string]any, 0, len(buttons))
 	for _, b := range buttons {
 		actionButtons = append(actionButtons, map[string]any{
-			"type": "reply",
-			"reply": map[string]any{
-				"id":    strings.TrimSpace(b.ID),
-				"title": strings.TrimSpace(b.Title),
-			},
+			"type":  "reply",
+			"reply": map[string]any{"id": strings.TrimSpace(b.ID), "title": strings.TrimSpace(b.Title)},
 		})
 	}
-
 	return c.sendMessage(ctx, phoneNumberID, accessToken, map[string]any{
 		"messaging_product": "whatsapp",
 		"recipient_type":    "individual",
 		"to":                strings.TrimSpace(to),
 		"type":              "interactive",
 		"interactive": map[string]any{
-			"type": "button",
-			"body": map[string]any{
-				"text": strings.TrimSpace(body),
-			},
-			"action": map[string]any{
-				"buttons": actionButtons,
-			},
+			"type":   "button",
+			"body":   map[string]any{"text": strings.TrimSpace(body)},
+			"action": map[string]any{"buttons": actionButtons},
 		},
 	})
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/apperror"
+	"github.com/devpablocristo/core/backend/go/domainerr"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )
 
@@ -54,7 +54,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndoma
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return returndomain.Return{}, apperror.NewNotFound("return", id.String())
+			return returndomain.Return{}, domainerr.NotFoundf("return", id.String())
 		}
 		return returndomain.Return{}, err
 	}
@@ -63,11 +63,11 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndoma
 
 func (u *Usecases) Create(ctx context.Context, in CreateReturnInput) (returndomain.Return, *returndomain.CreditNote, error) {
 	if in.OrgID == uuid.Nil || in.SaleID == uuid.Nil {
-		return returndomain.Return{}, nil, apperror.NewBadInput("org_id and sale_id are required")
+		return returndomain.Return{}, nil, domainerr.Validation("org_id and sale_id are required")
 	}
 	in.Reason = normalizeReason(in.Reason)
 	if !isValidRefundMethod(in.RefundMethod) {
-		return returndomain.Return{}, nil, apperror.NewBadInput("invalid refund_method")
+		return returndomain.Return{}, nil, domainerr.Validation("invalid refund_method")
 	}
 	out, credit, err := u.repo.Create(ctx, in)
 	if err != nil {
@@ -110,7 +110,7 @@ func (u *Usecases) GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (retu
 	out, err := u.repo.GetCreditNote(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return returndomain.CreditNote{}, apperror.NewNotFound("credit_note", id.String())
+			return returndomain.CreditNote{}, domainerr.NotFoundf("credit_note", id.String())
 		}
 		return returndomain.CreditNote{}, err
 	}
@@ -119,7 +119,7 @@ func (u *Usecases) GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (retu
 
 func (u *Usecases) ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error) {
 	if in.OrgID == uuid.Nil || in.SaleID == uuid.Nil || in.CreditNoteID == uuid.Nil {
-		return returndomain.CreditNote{}, apperror.NewBadInput("org_id, sale_id and credit_note_id are required")
+		return returndomain.CreditNote{}, domainerr.Validation("org_id, sale_id and credit_note_id are required")
 	}
 	out, err := u.repo.ApplyCredit(ctx, in)
 	if err != nil {
@@ -160,11 +160,12 @@ func translate(err error, kind, id string) error {
 	if err == nil {
 		return nil
 	}
-	if appErr, ok := err.(*apperror.Error); ok {
-		return appErr
+	var de domainerr.Error
+	if errors.As(err, &de) {
+		return err
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return apperror.NewNotFound(kind, id)
+		return domainerr.NotFoundf(kind, id)
 	}
 	return err
 }

@@ -6,12 +6,14 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from src.agents.review_gate import ReviewDecision, evaluate_action
 from src.api.chat_stream import estimate_tokens
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
 from pymes_core_shared.ai_runtime import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
+from src.review_client.client import ReviewClient
 from pymes_core_shared.ai_runtime import LLMProvider, Message
 from pymes_core_shared.ai_runtime import get_logger
 from src.tools.registry import build_external_tools
@@ -108,6 +110,43 @@ async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -
         )
 
 
+def _wrap_handlers_with_review_gate(
+    handlers: dict[str, Any],
+    review_client: ReviewClient | None,
+    org_id: str,
+) -> dict[str, Any]:
+    """Envuelve los tool handlers con el gate de Review.
+
+    Si review_client es None (Review deshabilitado), devuelve los handlers sin cambios.
+    Para tools de lectura, ejecuta directo. Para acciones gobernadas, consulta Review primero.
+    """
+    if review_client is None:
+        return handlers
+
+    wrapped: dict[str, Any] = {}
+    for tool_name, handler_fn in handlers.items():
+        async def _gated(args: dict[str, Any], *, _name: str = tool_name, _fn: Any = handler_fn) -> Any:
+            decision = await evaluate_action(
+                review_client=review_client,
+                tool_name=_name,
+                tool_args=args,
+                org_id=org_id,
+            )
+            if decision.allowed:
+                return await _fn(args)
+            if decision.decision == "deny":
+                return {"error": "Esta acción no está disponible por este canal."}
+            # require_approval — informar que se envió para revisión
+            return {
+                "pending_approval": True,
+                "message": "Tu solicitud fue enviada al equipo para aprobación.",
+                "review_request_id": decision.request_id,
+                "approval_id": decision.approval_id,
+            }
+        wrapped[tool_name] = _gated
+    return wrapped
+
+
 async def run_external_chat(
     *,
     repo: AIRepository,
@@ -120,6 +159,7 @@ async def run_external_chat(
     reuse_latest: bool = False,
     user_metadata: dict[str, Any] | None = None,
     assistant_metadata: dict[str, Any] | None = None,
+    review_client: ReviewClient | None = None,
 ) -> ExternalChatResult:
     conversation = await get_external_conversation(
         repo=repo,
@@ -131,6 +171,10 @@ async def run_external_chat(
     )
     dossier = await repo.get_or_create_dossier(org_id)
     declarations, handlers = build_external_tools(backend_client)
+
+    # Integrar gate de Review: envuelve handlers con evaluación de gobernanza
+    handlers = _wrap_handlers_with_review_gate(handlers, review_client, org_id)
+
     llm_messages: list[Message] = [
         Message(role="system", content=build_system_prompt("external", None, dossier)),
         Message(role="system", content=f"Dossier: {summarize_dossier_for_context(dossier)}"),
@@ -140,6 +184,7 @@ async def run_external_chat(
 
     assistant_parts: list[str] = []
     tool_calls: list[str] = []
+    pending_review: dict[str, Any] | None = None
     tokens_in = estimate_tokens("\n".join(m.content for m in llm_messages))
 
     try:
@@ -157,6 +202,11 @@ async def run_external_chat(
                 tool_name = str(chunk.tool_call.get("name", "")).strip()
                 if tool_name:
                     tool_calls.append(tool_name)
+            # Detectar si un tool devolvió pending_approval
+            if chunk.type == "tool_result" and chunk.tool_result:
+                result = chunk.tool_result
+                if isinstance(result, dict) and result.get("pending_approval"):
+                    pending_review = result
     except Exception as exc:
         logger.exception("chat_external_failed", org_id=org_id, external_contact=external_contact, error=str(exc))
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
@@ -165,11 +215,11 @@ async def run_external_chat(
     tokens_out = estimate_tokens(assistant_text)
     now = datetime.now(UTC).isoformat()
 
-    user_message = {"role": "user", "content": message.strip(), "ts": now}
+    user_message: dict[str, Any] = {"role": "user", "content": message.strip(), "ts": now}
     if user_metadata:
         user_message.update(user_metadata)
 
-    assistant_message = {
+    assistant_message: dict[str, Any] = {
         "role": "assistant",
         "content": assistant_text,
         "ts": now,
@@ -177,6 +227,18 @@ async def run_external_chat(
     }
     if assistant_metadata:
         assistant_message.update(assistant_metadata)
+
+    # Si hay acción pendiente de aprobación, guardar en la conversación
+    pending_action = None
+    review_request_id = None
+    if pending_review:
+        review_request_id = pending_review.get("review_request_id")
+        pending_action = {
+            "review_request_id": review_request_id,
+            "approval_id": pending_review.get("approval_id"),
+            "tool_calls": sorted(set(tool_calls)),
+            "awaiting": "review",
+        }
 
     await repo.append_messages(
         org_id=org_id,
@@ -187,6 +249,19 @@ async def run_external_chat(
         tokens_output=tokens_out,
     )
     await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+
+    # Persistir estado de review pendiente si aplica
+    if pending_action:
+        try:
+            await repo.update_review_state(
+                org_id=org_id,
+                conversation_id=conversation.id,
+                pending_action=pending_action,
+                review_request_id=review_request_id,
+                review_status="pending_approval",
+            )
+        except Exception:
+            logger.warning("failed_to_save_review_state", conversation_id=conversation.id)
 
     return ExternalChatResult(
         conversation_id=conversation.id,

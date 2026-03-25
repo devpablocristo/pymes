@@ -4,6 +4,10 @@ export const profileMessages: TranslationsByLanguage = {
   es: {
     'profile.page.title': 'Perfil',
     'profile.page.subtitle': 'Datos personales, idioma y facturación',
+    'profile.integrations.title': 'Integraciones (WhatsApp, pagos, etc.)',
+    'profile.integrations.body':
+      'Esta pantalla es para tu perfil, idioma y facturación. La conexión con Meta (WhatsApp Business) y la pasarela de pagos se configuran en Módulos → Integraciones, no aquí.',
+    'profile.integrations.linkWhatsApp': 'Abrir módulo WhatsApp (guía y conexión)',
     'profile.apiMode.title': 'Sesión en este entorno',
     'profile.apiMode.badge': 'Modo consola · clave API',
     'profile.apiMode.lead':
@@ -64,6 +68,10 @@ export const profileMessages: TranslationsByLanguage = {
   en: {
     'profile.page.title': 'Profile',
     'profile.page.subtitle': 'Personal details, language, and billing',
+    'profile.integrations.title': 'Integrations (WhatsApp, payments, etc.)',
+    'profile.integrations.body':
+      'This screen is for your profile, language, and billing. WhatsApp Business (Meta) and payment gateway setup live under Modules → Integrations, not here.',
+    'profile.integrations.linkWhatsApp': 'Open WhatsApp module (guide and connection)',
     'profile.apiMode.title': 'Session in this environment',
     'profile.apiMode.badge': 'Console mode · API key',
     'profile.apiMode.lead':

@@ -4,7 +4,6 @@ import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
 import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
 import {
   moduleCatalog,
-  moduleGroups,
   moduleList,
   resolveModuleDefault,
   type ModuleAction,
@@ -140,29 +139,78 @@ function stringifyValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function isScalarCell(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  const t = typeof value;
+  return t === 'string' || t === 'number' || t === 'boolean';
+}
+
+/** Columnas legibles: solo escalares por fila (evita columna `items` en devoluciones, etc.). */
+function tableColumnsForRows(rows: Array<Record<string, unknown>>, maxCols: number): string[] {
+  const allKeys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const scalarKeys = allKeys.filter((key) => rows.every((row) => isScalarCell(row[key])));
+  const ordered = scalarKeys.length > 0 ? scalarKeys : allKeys;
+  const priority = (k: string): number => {
+    if (k === 'id') {
+      return 0;
+    }
+    if (k.endsWith('_id') || k.endsWith('Id')) {
+      return 1;
+    }
+    return 2;
+  };
+  ordered.sort((a, b) => {
+    const pa = priority(a);
+    const pb = priority(b);
+    if (pa !== pb) {
+      return pa - pb;
+    }
+    return a.localeCompare(b);
+  });
+  return ordered.slice(0, maxCols);
+}
+
 function extractRows(data: unknown): Array<Record<string, unknown>> | null {
   if (Array.isArray(data) && data.every((item) => item && typeof item === 'object')) {
     return data as Array<Record<string, unknown>>;
   }
-  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown[] }).items)) {
-    const items = (data as { items: unknown[] }).items;
-    if (items.every((item) => item && typeof item === 'object')) {
-      return items as Array<Record<string, unknown>>;
+  if (data && typeof data === 'object' && 'items' in data) {
+    const raw = (data as { items: unknown }).items;
+    if (raw == null) {
+      return [];
+    }
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    if (raw.length === 0) {
+      return [];
+    }
+    if (raw.every((item) => item && typeof item === 'object')) {
+      return raw as Array<Record<string, unknown>>;
     }
   }
   return null;
 }
 
 function ResultView({ data }: { data: unknown }) {
+  const { t } = useI18n();
+
   if (data === null || data === undefined) {
     return null;
   }
 
   const rows = extractRows(data);
-  if (rows && rows.length > 0) {
-    const columns = Array.from(
-      new Set(rows.flatMap((row) => Object.keys(row))),
-    ).slice(0, 8);
+  if (rows !== null) {
+    if (rows.length === 0) {
+      return (
+        <div className="empty-state module-result-empty">
+          <p>{t('module.result.emptyList')}</p>
+        </div>
+      );
+    }
+    const columns = tableColumnsForRows(rows, 8);
     return (
       <div className="table-wrap">
         <table>
@@ -389,7 +437,6 @@ function NotFoundState() {
         <div className="module-link-grid">
           {moduleList.map((module) => (
             <Link key={module.id} to={`/modules/${module.id}`} className="module-link-card">
-              <span className="sidebar-token">{module.icon}</span>
               <div>
                 <strong>{localizeUiText(module.title)}</strong>
                 <p>{localizeText(module.summary)}</p>
@@ -404,27 +451,27 @@ function NotFoundState() {
 
 function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: ModuleRuntimeContext }) {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
-  const groupLabel =
-    moduleGroups.find((group) => group.id === module.group)?.label ?? module.group;
+  const showExplorerChrome =
+    (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
+  const summaryText = localizeText(vocab(module.summary)).trim();
   return (
     <>
       <div className="page-header module-page-header">
         <div>
-          <div className="module-kicker">
-            <span className="sidebar-token">{module.icon}</span>
-            <span className="badge badge-neutral">{localizeUiText(module.badge ?? groupLabel)}</span>
-          </div>
           <h1>{localizeUiText(vocab(module.title))}</h1>
-          <p>{localizeText(vocab(module.summary))}</p>
+          {summaryText.length > 0 && <p>{summaryText}</p>}
           {module.helpIntro && <p className="module-help-intro">{localizeText(module.helpIntro)}</p>}
         </div>
-        <div className="module-runtime-card">
-          <span>{t('module.runtime.activeOrg')}</span>
-          <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
-          <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
-        </div>
+        {showExplorerChrome && (
+          <div className="module-runtime-card">
+            <span>{t('module.runtime.activeOrg')}</span>
+            <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
+            <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
+          </div>
+        )}
       </div>
 
+      {showExplorerChrome && (
       <div className="stats-grid compact-grid">
         {(module.datasets?.length ?? 0) > 0 && (
           <div className="stat-card">
@@ -441,6 +488,24 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
           <div className="stat-value stat-value-sm mono">/modules/{module.id}</div>
         </div>
       </div>
+      )}
+
+      {module.setupGuide && module.setupGuide.steps.length > 0 && (
+        <div className="card module-setup-guide">
+          <div className="card-header">
+            <h2>
+              {module.setupGuide.title
+                ? localizeUiText(module.setupGuide.title)
+                : sentenceCase(t('module.setupGuide.title'))}
+            </h2>
+          </div>
+          <ol className="module-setup-steps">
+            {module.setupGuide.steps.map((step, idx) => (
+              <li key={idx}>{localizeText(step)}</li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {module.notes && module.notes.length > 0 && (
         <div className="card module-notes-card">
@@ -463,6 +528,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   const module = useMemo(() => moduleCatalog[moduleId], [moduleId]);
   const [runtime, setRuntime] = useState<ModuleRuntimeContext>(() => currentRuntimeContext());
   const [bootstrapError, setBootstrapError] = useState('');
+  const [showAllOperations, setShowAllOperations] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -483,6 +549,21 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
       cancelled = true;
     };
   }, []);
+
+  const configGroupKeys = module?.explorerConfigGroupKeys;
+  const allActionGroups = useMemo(
+    () => (module ? groupedModuleActions(module) : []),
+    [module],
+  );
+  const visibleActionGroups = useMemo(() => {
+    if (!module || !configGroupKeys?.length || showAllOperations) {
+      return allActionGroups;
+    }
+    const allow = new Set(configGroupKeys);
+    return allActionGroups.filter((g) => allow.has(g.key));
+  }, [module, allActionGroups, configGroupKeys, showAllOperations]);
+  const configFocusActive = Boolean(module && configGroupKeys?.length && !showAllOperations);
+  const visibleActionCount = visibleActionGroups.reduce((n, g) => n + g.actions.length, 0);
 
   if (!module) {
     return <NotFoundState />;
@@ -510,11 +591,31 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
       {module.actions && module.actions.length > 0 && (
         <div className="module-section">
           <div className="section-title-row">
-            <h2>{sentenceCase(t('module.sections.actions'))}</h2>
-            <span className="badge badge-neutral">{module.actions.length}</span>
+            <h2>
+              {sentenceCase(
+                configFocusActive ? t('module.sections.config') : t('module.sections.actions'),
+              )}
+            </h2>
+            <span className="badge badge-neutral">
+              {configFocusActive ? visibleActionCount : module.actions.length}
+            </span>
+            {configGroupKeys && configGroupKeys.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm module-explorer-toggle"
+                onClick={() => setShowAllOperations((v) => !v)}
+              >
+                {showAllOperations
+                  ? t('module.explorer.backToConfigOnly')
+                  : t('module.explorer.showAllOperations')}
+              </button>
+            )}
           </div>
+          {configFocusActive && (
+            <p className="text-muted module-config-focus-hint">{t('module.explorer.configHint')}</p>
+          )}
           {(() => {
-            const actionGroups = groupedModuleActions(module);
+            const actionGroups = visibleActionGroups;
             const showGroupTitles =
               actionGroups.length > 1 || (actionGroups[0] !== undefined && actionGroups[0].key !== '_ungrouped');
             return actionGroups.map((section) => (

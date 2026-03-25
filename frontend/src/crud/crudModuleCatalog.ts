@@ -7,12 +7,22 @@ type CrudModuleId =
   | 'priceLists'
   | 'quotes'
   | 'sales'
+  | 'returns'
+  | 'creditNotes'
+  | 'cashflow'
+  | 'inventory'
+  | 'inventoryMovements'
+  | 'payments'
+  | 'attachments'
+  | 'audit'
+  | 'timeline'
   | 'purchases'
   | 'procurementRequests'
   | 'procurementPolicies'
   | 'accounts'
   | 'roles'
   | 'parties'
+  | 'employees'
   | 'appointments'
   | 'recurring'
   | 'webhooks'
@@ -44,6 +54,19 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   priceLists: { title: 'Listas de precios', navLabel: 'Listas de precios', labelPlural: 'listas de precios' },
   quotes: { title: 'Presupuestos', navLabel: 'Presupuestos', labelPlural: 'presupuestos' },
   sales: { title: 'Ventas', navLabel: 'Ventas', labelPlural: 'ventas' },
+  returns: { title: 'Devoluciones', navLabel: 'Devoluciones', labelPlural: 'devoluciones' },
+  creditNotes: { title: 'Notas de crédito', navLabel: 'Notas de crédito', labelPlural: 'notas de crédito' },
+  cashflow: { title: 'Caja', navLabel: 'Caja', labelPlural: 'movimientos de caja' },
+  inventory: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'líneas de stock' },
+  inventoryMovements: {
+    title: 'Movimientos de inventario',
+    navLabel: 'Mov. inventario',
+    labelPlural: 'movimientos de stock',
+  },
+  payments: { title: 'Pagos', navLabel: 'Pagos', labelPlural: 'pagos' },
+  attachments: { title: 'Adjuntos', navLabel: 'Adjuntos', labelPlural: 'adjuntos' },
+  audit: { title: 'Auditoría', navLabel: 'Auditoría', labelPlural: 'eventos de auditoría' },
+  timeline: { title: 'Historial', navLabel: 'Historial', labelPlural: 'entradas de timeline' },
   purchases: { title: 'Compras', navLabel: 'Compras', labelPlural: 'compras' },
   procurementRequests: {
     title: 'Solicitudes de compra internas',
@@ -58,6 +81,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   accounts: { title: 'Cuentas corrientes', navLabel: 'Cuentas corrientes', labelPlural: 'cuentas corrientes' },
   roles: { title: 'Roles', navLabel: 'Roles', labelPlural: 'roles' },
   parties: { title: 'Entidades', navLabel: 'Entidades', labelPlural: 'entidades' },
+  employees: { title: 'Empleados', navLabel: 'Empleados', labelPlural: 'empleados' },
   appointments: { title: 'Turnos', navLabel: 'Turnos', labelPlural: 'turnos' },
   recurring: { title: 'Gastos recurrentes', navLabel: 'Gastos recurrentes', labelPlural: 'gastos recurrentes' },
   webhooks: { title: 'Webhooks', navLabel: 'Webhooks', labelPlural: 'endpoints webhook' },
@@ -92,6 +116,12 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'PT',
     summary: 'Vista transversal de personas y organizaciones con roles y relaciones.',
   },
+  employees: {
+    group: 'commercial',
+    icon: 'EM',
+    summary:
+      'Entidades (parties) con rol empleado. El alta asigna automáticamente el rol «employee». Los usuarios miembros de la organización en la consola se administran aparte.',
+  },
   customers: {
     group: 'commercial',
     icon: 'CL',
@@ -121,6 +151,60 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'commercial',
     icon: 'VT',
     summary: 'Ventas, comprobantes, cobros y seguimiento de estado.',
+  },
+  returns: {
+    group: 'commercial',
+    icon: 'DV',
+    summary: 'Devoluciones registradas. La anulación marca la devolución y la nota de crédito asociada.',
+  },
+  creditNotes: {
+    group: 'commercial',
+    icon: 'NC',
+    summary: 'Notas de crédito emitidas y saldo disponible por documento.',
+  },
+  cashflow: {
+    group: 'operations',
+    icon: 'CJ',
+    summary: 'Movimientos de caja manuales (ingreso/egreso). Resúmenes agregados en reportes.',
+  },
+  inventory: {
+    group: 'operations',
+    icon: 'IN',
+    summary: 'Stock consolidado por producto. Ajustes manuales por fila (POST /v1/inventory/:product_id/adjust).',
+    notes: [
+      'Para kardex detallado usá «Mov. inventario». Alertas agregadas también en reportes de stock.',
+    ],
+  },
+  inventoryMovements: {
+    group: 'operations',
+    icon: 'KD',
+    summary: 'Movimientos de stock (kardex) recientes.',
+  },
+  payments: {
+    group: 'commercial',
+    icon: 'PG',
+    summary:
+      'Cobros de una venta. Usá ?sale_id=<UUID> en la URL o registrá cobros desde el listado de ventas.',
+    notes: [
+      'No existe listado global de pagos en el API; cada listado es GET /v1/sales/:id/payments.',
+    ],
+  },
+  attachments: {
+    group: 'integrations',
+    icon: 'AD',
+    summary:
+      'Archivos por entidad. Query: ?entity=sales|quotes|purchases|…&entity_id=<UUID> (mismo contrato que GET /v1/:entity/:id/attachments).',
+  },
+  audit: {
+    group: 'control',
+    icon: 'AU',
+    summary: 'Trazabilidad de actividad en la organización; exportación CSV desde la barra de herramientas.',
+  },
+  timeline: {
+    group: 'control',
+    icon: 'TL',
+    summary:
+      'Historial y notas manuales por entidad. Query: ?entity=sales|quotes|…&entity_id=<UUID>.',
   },
   purchases: {
     group: 'operations',

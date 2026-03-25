@@ -1,5 +1,12 @@
+import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import { CrudPage, type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
-import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
+import {
+  apiRequest,
+  createSalePayment,
+  downloadAPIFile,
+  listSalePayments,
+  type SalePaymentRow,
+} from '../lib/api';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
 import {
   addTeacherSessionNote,
@@ -108,6 +115,45 @@ type PriceList = {
   markup?: number;
   is_active: boolean;
   items?: Array<{ product_id: string; price: number }>;
+};
+
+type ReturnRow = {
+  id: string;
+  number: string;
+  sale_id: string;
+  party_name: string;
+  reason: string;
+  total: number;
+  refund_method: string;
+  status: string;
+  created_at: string;
+};
+
+type CreditNoteRow = {
+  id: string;
+  number: string;
+  party_id: string;
+  return_id: string;
+  amount: number;
+  used_amount: number;
+  balance: number;
+  status: string;
+  created_at: string;
+  expires_at?: string;
+};
+
+type CashMovementRow = {
+  id: string;
+  type: string;
+  amount: number;
+  currency: string;
+  category: string;
+  description: string;
+  payment_method: string;
+  reference_type: string;
+  reference_id?: string;
+  created_by: string;
+  created_at: string;
 };
 
 type Party = {
@@ -288,6 +334,73 @@ type Role = {
   created_at: string;
   updated_at: string;
 };
+
+type InventoryStockRow = {
+  id: string;
+  product_id: string;
+  org_id?: string;
+  product_name: string;
+  sku?: string;
+  quantity: number;
+  min_quantity: number;
+  track_stock: boolean;
+  is_low_stock: boolean;
+  updated_at: string;
+};
+
+type InventoryMovementRow = {
+  id: string;
+  org_id?: string;
+  product_id: string;
+  product_name: string;
+  type: string;
+  quantity: number;
+  reason: string;
+  reference_id?: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+};
+
+type AuditEntryRow = {
+  id: string;
+  org_id?: string;
+  actor?: string;
+  actor_type?: string;
+  actor_label?: string;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  created_at: string;
+};
+
+type TimelineEntryRow = {
+  id: string;
+  entity_type: string;
+  event_type: string;
+  title: string;
+  description: string;
+  actor: string;
+  created_at: string;
+};
+
+type AttachmentRow = {
+  id: string;
+  attachable_type: string;
+  attachable_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+};
+
+function searchParam(name: string): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const raw = new URLSearchParams(window.location.search).get(name);
+  const t = raw?.trim();
+  return t || undefined;
+}
 
 function asString(value: CrudFieldValue | undefined): string {
   if (typeof value === 'boolean') {
@@ -494,6 +607,40 @@ function openExternalURL(url?: string): void {
   if (!opened) {
     window.alert(`Abrir enlace manualmente:\n${url}`);
   }
+}
+
+function partyFormToBody(values: CrudFormValues): Record<string, unknown> {
+  return {
+    party_type: asString(values.party_type) || 'person',
+    display_name: asString(values.display_name),
+    email: asOptionalString(values.email),
+    phone: asOptionalString(values.phone),
+    tax_id: asOptionalString(values.tax_id),
+    notes: asOptionalString(values.notes),
+    tags: parseCSV(values.tags),
+    address: {},
+    person: (asString(values.party_type) || 'person') === 'person'
+      ? {
+          first_name: asOptionalString(values.person_first_name) ?? '',
+          last_name: asOptionalString(values.person_last_name) ?? '',
+        }
+      : undefined,
+    organization: (asString(values.party_type) || 'person') === 'organization'
+      ? {
+          legal_name: asOptionalString(values.org_legal_name) ?? asString(values.display_name),
+          trade_name: asOptionalString(values.org_trade_name) ?? asString(values.display_name),
+          tax_condition: asOptionalString(values.org_tax_condition) ?? '',
+        }
+      : undefined,
+    agent: (asString(values.party_type) || 'person') === 'automated_agent'
+      ? {
+          agent_kind: 'system',
+          provider: 'internal',
+          config: {},
+          is_active: true,
+        }
+      : undefined,
+  };
 }
 
 const customerLabel = vocab('cliente');
@@ -1498,38 +1645,660 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       org_tax_condition: row.organization?.tax_condition ?? '',
       notes: row.notes ?? '',
     }),
+    toBody: partyFormToBody,
+    isValid: (values) => asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
+  },
+  employees: {
+    basePath: '/v1/parties',
+    listQuery: 'role=employee',
+    label: 'empleado',
+    labelPlural: 'empleados',
+    labelPluralCap: 'Empleados',
+    createLabel: '+ Nuevo empleado',
+    searchPlaceholder: 'Buscar empleados por nombre, email o roles...',
+    emptyState:
+      'No hay entidades con rol empleado. El alta crea una party en /v1/parties con rol employee. Los usuarios con acceso a la consola (miembros de org) se administran aparte.',
+    columns: [
+      {
+        key: 'display_name',
+        header: 'Empleado',
+        className: 'cell-name',
+        render: (_value, row: Party) => (
+          <>
+            <strong>{row.display_name}</strong>
+            <div className="text-secondary">{row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}</div>
+          </>
+        ),
+      },
+      {
+        key: 'email',
+        header: 'Contacto',
+        render: (_value, row: Party) => (
+          <>
+            <div>{row.email || '---'}</div>
+            <div className="text-secondary">{row.phone || '---'}</div>
+          </>
+        ),
+      },
+      {
+        key: 'roles',
+        header: 'Roles',
+        render: (_value, row: Party) => row.roles?.filter((role) => role.is_active).map((role) => role.role).join(', ') || '---',
+      },
+      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+    ],
+    formFields: [
+      {
+        key: 'party_type',
+        label: 'Tipo',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Persona', value: 'person' },
+          { label: 'Organizacion', value: 'organization' },
+          { label: 'Agente automatizado', value: 'automated_agent' },
+        ],
+      },
+      { key: 'display_name', label: 'Nombre visible', required: true, placeholder: 'Nombre principal' },
+      { key: 'email', label: 'Email', type: 'email' },
+      { key: 'phone', label: 'Telefono', type: 'tel' },
+      { key: 'tax_id', label: 'CUIT / CUIL' },
+      { key: 'tags', label: 'Tags', placeholder: 'operaciones, campo' },
+      { key: 'person_first_name', label: 'Nombre persona' },
+      { key: 'person_last_name', label: 'Apellido persona' },
+      { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
+      { key: 'org_trade_name', label: 'Nombre comercial' },
+      { key: 'org_tax_condition', label: 'Condicion fiscal' },
+      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+    ],
+    searchText: (row: Party) =>
+      [
+        row.display_name,
+        row.email,
+        row.phone,
+        row.tax_id,
+        row.notes,
+        tagsToText(row.tags),
+        row.roles?.map((role) => role.role).join(', '),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    toFormValues: (row: Party) => ({
+      party_type: row.party_type ?? 'person',
+      display_name: row.display_name ?? '',
+      email: row.email ?? '',
+      phone: row.phone ?? '',
+      tax_id: row.tax_id ?? '',
+      tags: tagsToText(row.tags),
+      person_first_name: row.person?.first_name ?? '',
+      person_last_name: row.person?.last_name ?? '',
+      org_legal_name: row.organization?.legal_name ?? '',
+      org_trade_name: row.organization?.trade_name ?? '',
+      org_tax_condition: row.organization?.tax_condition ?? '',
+      notes: row.notes ?? '',
+    }),
     toBody: (values) => ({
-      party_type: asString(values.party_type) || 'person',
-      display_name: asString(values.display_name),
-      email: asOptionalString(values.email),
-      phone: asOptionalString(values.phone),
-      tax_id: asOptionalString(values.tax_id),
-      notes: asOptionalString(values.notes),
-      tags: parseCSV(values.tags),
-      address: {},
-      person: (asString(values.party_type) || 'person') === 'person'
-        ? {
-            first_name: asOptionalString(values.person_first_name) ?? '',
-            last_name: asOptionalString(values.person_last_name) ?? '',
-          }
-        : undefined,
-      organization: (asString(values.party_type) || 'person') === 'organization'
-        ? {
-            legal_name: asOptionalString(values.org_legal_name) ?? asString(values.display_name),
-            trade_name: asOptionalString(values.org_trade_name) ?? asString(values.display_name),
-            tax_condition: asOptionalString(values.org_tax_condition) ?? '',
-          }
-        : undefined,
-      agent: (asString(values.party_type) || 'person') === 'automated_agent'
-        ? {
-            agent_kind: 'system',
-            provider: 'internal',
-            config: {},
-            is_active: true,
-          }
-        : undefined,
+      ...partyFormToBody(values),
+      roles: [{ role: 'employee' }],
     }),
     isValid: (values) => asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
+  },
+  returns: {
+    label: 'devolución',
+    labelPlural: 'devoluciones',
+    labelPluralCap: 'Devoluciones',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    searchPlaceholder: 'Buscar por número, venta, cliente o estado...',
+    emptyState: 'No hay devoluciones. Las altas se registran desde la venta (API POST /v1/sales/:id/return).',
+    columns: [
+      {
+        key: 'number',
+        header: 'Devolución',
+        className: 'cell-name',
+        render: (_value, row: ReturnRow) => (
+          <>
+            <strong>{row.number}</strong>
+            <div className="text-secondary">{row.status} · venta {row.sale_id.slice(0, 8)}…</div>
+          </>
+        ),
+      },
+      {
+        key: 'party_name',
+        header: 'Cliente',
+        render: (_value, row: ReturnRow) => row.party_name || '---',
+      },
+      { key: 'total', header: 'Total', render: (value) => String(value ?? '') },
+      { key: 'refund_method', header: 'Medio', render: (_v, row: ReturnRow) => row.refund_method || '---' },
+      { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
+    ],
+    formFields: [],
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items?: ReturnRow[] | null }>('/v1/returns');
+        return parseListItemsFromResponse(data);
+      },
+    },
+    searchText: (row: ReturnRow) =>
+      [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+    rowActions: [
+      {
+        id: 'void',
+        label: 'Anular',
+        kind: 'danger',
+        isVisible: (row) => row.status !== 'voided',
+        onClick: async (row, helpers) => {
+          await apiRequest(`/v1/returns/${row.id}/void`, { method: 'POST', body: {} });
+          await helpers.reload();
+        },
+      },
+    ],
+  },
+  creditNotes: {
+    label: 'nota de crédito',
+    labelPlural: 'notas de crédito',
+    labelPluralCap: 'Notas de crédito',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    searchPlaceholder: 'Buscar por número, party o estado...',
+    emptyState: 'No hay notas de crédito emitidas.',
+    columns: [
+      {
+        key: 'number',
+        header: 'Documento',
+        className: 'cell-name',
+        render: (_value, row: CreditNoteRow) => (
+          <>
+            <strong>{row.number}</strong>
+            <div className="text-secondary">{row.status}</div>
+          </>
+        ),
+      },
+      { key: 'balance', header: 'Saldo', render: (value) => String(value ?? '') },
+      { key: 'amount', header: 'Monto', render: (value) => String(value ?? '') },
+      { key: 'used_amount', header: 'Usado', render: (value) => String(value ?? '') },
+      { key: 'return_id', header: 'Devolución', render: (value) => String(value ?? '').slice(0, 8) + '…' },
+      { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
+    ],
+    formFields: [],
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items?: CreditNoteRow[] | null }>('/v1/credit-notes');
+        return parseListItemsFromResponse(data);
+      },
+    },
+    searchText: (row: CreditNoteRow) =>
+      [row.number, row.party_id, row.return_id, row.status, String(row.amount), String(row.balance)].join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+  },
+  cashflow: {
+    basePath: '/v1/cashflow',
+    label: 'movimiento',
+    labelPlural: 'movimientos',
+    labelPluralCap: 'Movimientos de caja',
+    allowEdit: false,
+    allowDelete: false,
+    createLabel: '+ Registrar movimiento',
+    searchPlaceholder: 'Buscar por tipo, categoría, descripción o importe...',
+    emptyState: 'No hay movimientos en el rango consultado.',
+    columns: [
+      {
+        key: 'type',
+        header: 'Movimiento',
+        className: 'cell-name',
+        render: (_value, row: CashMovementRow) => (
+          <>
+            <strong>{row.type}</strong>
+            <div className="text-secondary">{row.category} · {row.payment_method}</div>
+          </>
+        ),
+      },
+      { key: 'amount', header: 'Importe', render: (value, row: CashMovementRow) => `${row.currency} ${Number(value ?? 0).toFixed(2)}` },
+      { key: 'description', header: 'Descripción', className: 'cell-notes' },
+      { key: 'reference_type', header: 'Origen', render: (_v, row: CashMovementRow) => row.reference_type || '---' },
+      { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
+    ],
+    formFields: [
+      {
+        key: 'type',
+        label: 'Tipo',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Ingreso', value: 'income' },
+          { label: 'Egreso', value: 'expense' },
+        ],
+      },
+      { key: 'amount', label: 'Importe', type: 'number', required: true, placeholder: '0.00' },
+      { key: 'category', label: 'Categoría', placeholder: 'other, payroll, supplier…' },
+      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
+      { key: 'payment_method', label: 'Medio de pago', placeholder: 'cash, transfer, card…' },
+      { key: 'reference_type', label: 'Tipo referencia', placeholder: 'manual (default)' },
+      { key: 'reference_id', label: 'ID referencia (UUID)', placeholder: 'opcional' },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS (default org)' },
+    ],
+    searchText: (row: CashMovementRow) =>
+      [row.type, row.category, row.description, row.payment_method, row.reference_type, String(row.amount), row.currency].filter(Boolean).join(' '),
+    toFormValues: (row: CashMovementRow) => ({
+      type: row.type ?? 'expense',
+      amount: row.amount != null ? String(row.amount) : '',
+      category: row.category ?? '',
+      description: row.description ?? '',
+      payment_method: row.payment_method ?? '',
+      reference_type: row.reference_type ?? '',
+      reference_id: row.reference_id ?? '',
+      currency: row.currency ?? '',
+    }),
+    toBody: (values) => ({
+      type: asString(values.type),
+      amount: asNumber(values.amount),
+      category: asOptionalString(values.category) ?? undefined,
+      description: asOptionalString(values.description) ?? undefined,
+      payment_method: asOptionalString(values.payment_method) ?? undefined,
+      reference_type: asOptionalString(values.reference_type) || undefined,
+      reference_id: asOptionalString(values.reference_id) || undefined,
+      currency: asOptionalString(values.currency) || undefined,
+    }),
+    isValid: (values) => {
+      const ty = asString(values.type);
+      return (ty === 'income' || ty === 'expense') && asNumber(values.amount) > 0;
+    },
+  },
+  inventory: {
+    label: 'producto',
+    labelPlural: 'líneas de stock',
+    labelPluralCap: 'Inventario',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    searchPlaceholder: 'Buscar por nombre, SKU o cantidad…',
+    emptyState: 'No hay stock listado o no tenés permiso inventory:read.',
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items?: InventoryStockRow[] | null }>('/v1/inventory?limit=200');
+        const items = parseListItemsFromResponse(data);
+        return items.map((row) => ({
+          ...row,
+          id: String(row.product_id),
+        }));
+      },
+    },
+    columns: [
+      {
+        key: 'product_name',
+        header: 'Producto',
+        className: 'cell-name',
+        render: (_v, row: InventoryStockRow) => (
+          <>
+            <strong>{row.product_name}</strong>
+            <div className="text-secondary">
+              {row.sku || 'sin SKU'} · {row.track_stock ? 'stock' : 'sin tracking'}
+              {row.is_low_stock ? ' · bajo mínimo' : ''}
+            </div>
+          </>
+        ),
+      },
+      { key: 'quantity', header: 'Cant.', render: (v) => String(v ?? '') },
+      { key: 'min_quantity', header: 'Mín.', render: (v) => String(v ?? '') },
+      { key: 'updated_at', header: 'Actualizado', render: (v) => formatDate(String(v ?? '')) },
+    ],
+    formFields: [],
+    rowActions: [
+      {
+        id: 'adjust',
+        label: 'Ajustar stock',
+        kind: 'primary',
+        onClick: async (row: InventoryStockRow, helpers) => {
+          const qtyRaw = window.prompt('Cantidad (delta según motor de inventario):', '0');
+          if (qtyRaw === null) return;
+          const quantity = Number(String(qtyRaw).replace(',', '.'));
+          if (!Number.isFinite(quantity)) {
+            helpers.setError('Cantidad inválida.');
+            return;
+          }
+          const notes = window.prompt('Motivo / notas (obligatorio):', '');
+          if (notes === null) return;
+          const trimmed = notes.trim();
+          if (!trimmed) {
+            helpers.setError('Las notas son obligatorias para ajustar.');
+            return;
+          }
+          try {
+            await apiRequest(`/v1/inventory/${row.product_id}/adjust`, {
+              method: 'POST',
+              body: { quantity, notes: trimmed },
+            });
+            await helpers.reload();
+          } catch (e) {
+            helpers.setError(e instanceof Error ? e.message : 'No se pudo ajustar el stock.');
+          }
+        },
+      },
+    ],
+    searchText: (row: InventoryStockRow) =>
+      [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+  },
+  inventoryMovements: {
+    label: 'movimiento',
+    labelPlural: 'movimientos',
+    labelPluralCap: 'Movimientos de inventario',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    searchPlaceholder: 'Buscar por producto, tipo o notas…',
+    emptyState: 'No hay movimientos o no tenés permiso inventory:read.',
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items?: InventoryMovementRow[] | null }>('/v1/inventory/movements?limit=200');
+        return parseListItemsFromResponse(data).map((row) => ({
+          ...row,
+          id: String(row.id),
+        }));
+      },
+    },
+    columns: [
+      {
+        key: 'product_name',
+        header: 'Producto',
+        className: 'cell-name',
+        render: (_v, row: InventoryMovementRow) => (
+          <>
+            <strong>{row.product_name}</strong>
+            <div className="text-secondary">{row.type}</div>
+          </>
+        ),
+      },
+      { key: 'quantity', header: 'Cant.', render: (v) => String(v ?? '') },
+      { key: 'reason', header: 'Motivo', className: 'cell-notes' },
+      { key: 'created_by', header: 'Usuario' },
+      { key: 'created_at', header: 'Fecha', render: (v) => formatDate(String(v ?? '')) },
+    ],
+    formFields: [],
+    searchText: (row: InventoryMovementRow) =>
+      [row.product_name, row.type, row.reason, row.notes, row.created_by, String(row.quantity)].filter(Boolean).join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+  },
+  payments: {
+    label: 'pago',
+    labelPlural: 'pagos',
+    labelPluralCap: 'Pagos',
+    allowEdit: false,
+    allowDelete: false,
+    allowCreate: true,
+    createLabel: '+ Registrar pago',
+    searchPlaceholder: 'Buscar por método, notas o importe…',
+    emptyState:
+      'Sin venta en contexto. Agregá ?sale_id=<UUID> a la URL o registrá cobros desde el listado de ventas.',
+    dataSource: {
+      list: async () => {
+        const sid = searchParam('sale_id');
+        if (!sid) return [];
+        const { items } = await listSalePayments(sid);
+        return items ?? [];
+      },
+      create: async (values) => {
+        const saleId = searchParam('sale_id')?.trim() || asString(values.sale_id).trim();
+        if (!saleId) {
+          throw new Error('Indicá la venta: ?sale_id= en la URL o el campo «Venta (UUID)».');
+        }
+        const method = asString(values.method).trim();
+        const amount = asNumber(values.amount);
+        if (!method || amount <= 0) {
+          throw new Error('Método e importe válidos son obligatorios.');
+        }
+        const receivedRaw = asString(values.received_at).trim();
+        await createSalePayment(saleId, {
+          method,
+          amount,
+          notes: asOptionalString(values.notes),
+          ...(receivedRaw ? { received_at: toRFC3339(values.received_at) } : {}),
+        });
+      },
+    },
+    columns: [
+      { key: 'method', header: 'Método', className: 'cell-name' },
+      { key: 'amount', header: 'Importe', render: (v) => String(v ?? '') },
+      { key: 'received_at', header: 'Recibido', render: (v) => formatDate(String(v ?? '')) },
+      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+    ],
+    formFields: [
+      {
+        key: 'sale_id',
+        label: 'Venta (UUID)',
+        createOnly: true,
+        placeholder: 'Opcional si ya hay ?sale_id= en la URL',
+      },
+      { key: 'method', label: 'Método', required: true, placeholder: 'efectivo, transferencia, tarjeta' },
+      { key: 'amount', label: 'Importe', type: 'number', required: true },
+      { key: 'received_at', label: 'Recibido', type: 'datetime-local' },
+      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+    ],
+    searchText: (row: SalePaymentRow) =>
+      [row.method, row.notes, String(row.amount), row.received_at, row.id].filter(Boolean).join(' '),
+    toFormValues: () =>
+      ({
+        sale_id: searchParam('sale_id') ?? '',
+        method: '',
+        amount: '',
+        received_at: '',
+        notes: '',
+      }) as CrudFormValues,
+    isValid: (values) => {
+      const saleOk = Boolean(searchParam('sale_id')?.trim() || asString(values.sale_id).trim());
+      return saleOk && asString(values.method).trim().length > 0 && asNumber(values.amount) > 0;
+    },
+  },
+  attachments: {
+    label: 'adjunto',
+    labelPlural: 'adjuntos',
+    labelPluralCap: 'Adjuntos',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: true,
+    searchPlaceholder: 'Buscar por archivo, tipo o MIME…',
+    emptyState:
+      'Indicá en la URL ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/attachments).',
+    dataSource: {
+      list: async () => {
+        const entity = searchParam('entity');
+        const entityId = searchParam('entity_id');
+        if (!entity || !entityId) return [];
+        const data = await apiRequest<{ items?: AttachmentRow[] | null }>(
+          `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/attachments?limit=200`,
+        );
+        return parseListItemsFromResponse(data).map((row) => ({
+          ...row,
+          id: String(row.id),
+        }));
+      },
+      deleteItem: async (row: AttachmentRow) => {
+        await apiRequest(`/v1/attachments/${row.id}`, { method: 'DELETE' });
+      },
+    },
+    columns: [
+      {
+        key: 'file_name',
+        header: 'Archivo',
+        className: 'cell-name',
+        render: (_v, row: AttachmentRow) => (
+          <>
+            <strong>{row.file_name}</strong>
+            <div className="text-secondary">{row.content_type}</div>
+          </>
+        ),
+      },
+      { key: 'size_bytes', header: 'Tamaño', render: (v) => String(v ?? '') },
+      { key: 'uploaded_by', header: 'Subido por' },
+      { key: 'created_at', header: 'Fecha', render: (v) => formatDate(String(v ?? '')) },
+    ],
+    formFields: [],
+    rowActions: [
+      {
+        id: 'signed-url',
+        label: 'Enlace firmado',
+        kind: 'secondary',
+        onClick: async (row: AttachmentRow, helpers) => {
+          try {
+            const link = await apiRequest<{ url: string }>(`/v1/attachments/${row.id}/url`);
+            if (link.url) {
+              window.open(link.url, '_blank', 'noopener,noreferrer');
+            }
+          } catch (e) {
+            helpers.setError(e instanceof Error ? e.message : 'No se pudo obtener el enlace.');
+          }
+        },
+      },
+      {
+        id: 'download',
+        label: 'Descargar',
+        kind: 'primary',
+        onClick: async (row: AttachmentRow, helpers) => {
+          try {
+            await downloadAPIFile(`/v1/attachments/${row.id}/download`);
+          } catch (e) {
+            helpers.setError(e instanceof Error ? e.message : 'No se pudo descargar.');
+          }
+        },
+      },
+    ],
+    searchText: (row: AttachmentRow) =>
+      [row.file_name, row.content_type, row.uploaded_by, String(row.size_bytes)].filter(Boolean).join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+  },
+  audit: {
+    label: 'evento',
+    labelPlural: 'eventos',
+    labelPluralCap: 'Auditoría',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    searchPlaceholder: 'Buscar por acción, recurso o actor…',
+    emptyState: 'No hay eventos de auditoría recientes.',
+    toolbarActions: [
+      {
+        id: 'export-csv',
+        label: 'Exportar CSV',
+        kind: 'secondary',
+        onClick: async ({ setError }) => {
+          try {
+            await downloadAPIFile('/v1/audit/export?format=csv');
+          } catch (e) {
+            setError(e instanceof Error ? e.message : 'No se pudo exportar.');
+          }
+        },
+      },
+    ],
+    dataSource: {
+      list: async () => {
+        const data = await apiRequest<{ items?: AuditEntryRow[] | null }>('/v1/audit');
+        return parseListItemsFromResponse(data).map((row) => ({
+          ...row,
+          id: String(row.id),
+        }));
+      },
+    },
+    columns: [
+      {
+        key: 'action',
+        header: 'Acción',
+        className: 'cell-name',
+        render: (_v, row: AuditEntryRow) => (
+          <>
+            <strong>{row.action}</strong>
+            <div className="text-secondary">{row.resource_type}</div>
+          </>
+        ),
+      },
+      { key: 'resource_id', header: 'Recurso', render: (v) => String(v ?? '—') },
+      { key: 'actor_label', header: 'Actor', render: (_v, row: AuditEntryRow) => row.actor_label || row.actor || '—' },
+      { key: 'created_at', header: 'Fecha', render: (v) => formatDate(String(v ?? '')) },
+    ],
+    formFields: [],
+    searchText: (row: AuditEntryRow) =>
+      [row.action, row.resource_type, row.resource_id, row.actor, row.actor_label].filter(Boolean).join(' '),
+    toFormValues: () => ({}) as CrudFormValues,
+    isValid: () => true,
+  },
+  timeline: {
+    label: 'entrada',
+    labelPlural: 'entradas',
+    labelPluralCap: 'Historial',
+    allowEdit: false,
+    allowDelete: false,
+    allowCreate: true,
+    createLabel: '+ Nota manual',
+    searchPlaceholder: 'Buscar en título, descripción o tipo…',
+    emptyState:
+      'Indicá ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/timeline).',
+    dataSource: {
+      list: async () => {
+        const entity = searchParam('entity');
+        const entityId = searchParam('entity_id');
+        if (!entity || !entityId) return [];
+        const data = await apiRequest<{ items?: TimelineEntryRow[] | null }>(
+          `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/timeline?limit=100`,
+        );
+        return parseListItemsFromResponse(data).map((row) => ({
+          ...row,
+          id: String(row.id),
+        }));
+      },
+      create: async (values) => {
+        const entity = searchParam('entity');
+        const entityId = searchParam('entity_id');
+        if (!entity || !entityId) {
+          throw new Error('Faltan entity y entity_id en la URL.');
+        }
+        const note = asString(values.note).trim();
+        if (!note) {
+          throw new Error('La nota es obligatoria.');
+        }
+        await apiRequest(`/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/notes`, {
+          method: 'POST',
+          body: {
+            title: asOptionalString(values.title) || undefined,
+            note,
+          },
+        });
+      },
+    },
+    columns: [
+      {
+        key: 'title',
+        header: 'Evento',
+        className: 'cell-name',
+        render: (_v, row: TimelineEntryRow) => (
+          <>
+            <strong>{row.title}</strong>
+            <div className="text-secondary">{row.event_type}</div>
+          </>
+        ),
+      },
+      { key: 'description', header: 'Detalle', className: 'cell-notes' },
+      { key: 'actor', header: 'Actor' },
+      { key: 'created_at', header: 'Fecha', render: (v) => formatDate(String(v ?? '')) },
+    ],
+    formFields: [
+      { key: 'title', label: 'Título', placeholder: 'Nota manual' },
+      { key: 'note', label: 'Nota', type: 'textarea', required: true, fullWidth: true },
+    ],
+    searchText: (row: TimelineEntryRow) =>
+      [row.title, row.description, row.event_type, row.actor, row.entity_type].filter(Boolean).join(' '),
+    toFormValues: () =>
+      ({
+        title: '',
+        note: '',
+      }) as CrudFormValues,
+    isValid: (values) => asString(values.note).trim().length > 0,
   },
   appointments: {
     basePath: '/v1/appointments',

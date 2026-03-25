@@ -53,4 +53,14 @@ export type ModuleDefinition = {
   actionGroupLabels?: Record<string, string>;
   notes?: string[];
   helpIntro?: string;
+  /** Pasos numerados para dueños (p. ej. Meta + esta consola). Se muestra como lista ordenada bajo el encabezado del módulo. */
+  setupGuide?: {
+    title?: string;
+    steps: string[];
+  };
+  /**
+   * Claves de grupo (`action.group`) que se muestran primero en el explorador.
+   * El usuario puede expandir para ver el resto de operaciones.
+   */
+  explorerConfigGroupKeys?: string[];
 };

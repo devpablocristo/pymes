@@ -40,6 +40,7 @@ export function getVisibleModuleIds(): Set<string> {
   if (sellsProducts || exploring) {
     visible.add('products');
     visible.add('inventory');
+    visible.add('inventoryMovements');
     visible.add('priceLists');
     visible.add('suppliers');
     visible.add('purchases');
@@ -65,6 +66,7 @@ export function getVisibleModuleIds(): Set<string> {
   if ((sellsProducts && profile.usesBilling) || exploring) {
     visible.add('suppliers');
     visible.add('returns');
+    visible.add('creditNotes');
     visible.add('recurring');
   }
 

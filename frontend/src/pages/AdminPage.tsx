@@ -615,60 +615,6 @@ export function AdminPage() {
               </div>
             </section>
 
-            <section className="admin-settings-section">
-              <h3>WhatsApp (plantillas)</h3>
-              <p className="admin-settings-hint">
-                Podés usar variables entre llaves según las que soporte el backend (ej. nombre de cliente, total).
-              </p>
-              <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Código país por defecto</label>
-                  <input
-                    type="text"
-                    value={form.wa_default_country_code}
-                    onChange={(e) => updateField('wa_default_country_code', e.target.value)}
-                    placeholder="54"
-                  />
-                </div>
-                <div className="form-group full-width">
-                  <label>Plantilla mensaje presupuesto</label>
-                  <textarea
-                    className="admin-textarea"
-                    rows={3}
-                    value={form.wa_quote_template}
-                    onChange={(e) => updateField('wa_quote_template', e.target.value)}
-                  />
-                </div>
-                <div className="form-group full-width">
-                  <label>Plantilla comprobante / recibo</label>
-                  <textarea
-                    className="admin-textarea"
-                    rows={3}
-                    value={form.wa_receipt_template}
-                    onChange={(e) => updateField('wa_receipt_template', e.target.value)}
-                  />
-                </div>
-                <div className="form-group full-width">
-                  <label>Plantilla pago</label>
-                  <textarea
-                    className="admin-textarea"
-                    rows={3}
-                    value={form.wa_payment_template}
-                    onChange={(e) => updateField('wa_payment_template', e.target.value)}
-                  />
-                </div>
-                <div className="form-group full-width">
-                  <label>Plantilla link de pago</label>
-                  <textarea
-                    className="admin-textarea"
-                    rows={3}
-                    value={form.wa_payment_link_template}
-                    onChange={(e) => updateField('wa_payment_link_template', e.target.value)}
-                  />
-                </div>
-              </div>
-            </section>
-
             <div className="admin-settings-toolbar admin-settings-toolbar-bottom">
               <button type="submit" className="btn-primary" disabled={saving}>
                 {saving ? 'Guardando…' : 'Guardar cambios'}

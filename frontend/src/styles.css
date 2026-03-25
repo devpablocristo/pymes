@@ -740,6 +740,12 @@ code {
   margin-top: 0.85rem;
 }
 
+/* Resultado vacío en tarjetas del explorador de módulos (GET listas) */
+.module-result-empty {
+  margin-top: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+}
+
 /* Texto introductorio bajo el título de sección (Administración, etc.) */
 .profile-section-lead {
   margin: 0 0 var(--space-3);
@@ -1345,11 +1351,29 @@ code {
   color: var(--color-text-secondary);
 }
 
-.module-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-bottom: 0.85rem;
+.module-setup-guide {
+  margin-bottom: 1rem;
+}
+
+.module-setup-steps {
+  margin: 0;
+  padding: 0.25rem 0.5rem 0.75rem 1.35rem;
+  display: grid;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+.module-setup-steps li::marker {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.module-setup-steps a {
+  color: var(--color-accent, var(--color-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .module-runtime-card {
@@ -1394,6 +1418,16 @@ code {
   font-size: 1rem;
   font-weight: 650;
   letter-spacing: -0.02em;
+}
+
+.module-explorer-toggle {
+  margin-left: auto;
+}
+
+.module-config-focus-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .module-grid {

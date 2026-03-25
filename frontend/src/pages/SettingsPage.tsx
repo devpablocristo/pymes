@@ -1,6 +1,6 @@
 import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
@@ -679,6 +679,17 @@ export function SettingsPage() {
       <div className="page-header">
         <h1>{t('profile.page.title')}</h1>
         <p>{t('profile.page.subtitle')}</p>
+      </div>
+      <div className="card profile-section-card profile-integrations-hint">
+        <div className="card-header">
+          <h2>{t('profile.integrations.title')}</h2>
+        </div>
+        <p className="text-muted">{t('profile.integrations.body')}</p>
+        <p className="profile-integrations-hint-actions">
+          <Link to="/modules/whatsapp" className="btn btn-secondary btn-sm">
+            {t('profile.integrations.linkWhatsApp')}
+          </Link>
+        </p>
       </div>
       <SettingsProfileBody clerkMode={clerkEnabled} />
     </div>

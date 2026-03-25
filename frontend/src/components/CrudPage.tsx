@@ -1,4 +1,5 @@
 import { FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { CrudPageShell, parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 
@@ -57,6 +58,8 @@ export type CrudRowAction<T extends { id: string }> = {
 
 export type CrudPageConfig<T extends { id: string }> = {
   basePath?: string;
+  /** Query string sin `?`, p. ej. `role=employee` para filtrar el listado GET. */
+  listQuery?: string;
   dataSource?: CrudDataSource<T>;
   supportsArchived?: boolean;
   allowCreate?: boolean;
@@ -81,10 +84,6 @@ export type CrudPageConfig<T extends { id: string }> = {
   rowActions?: CrudRowAction<T>[];
 };
 
-function parseListResponse<T>(data: { items?: T[] } | T[]): T[] {
-  return Array.isArray(data) ? data : (data.items ?? []);
-}
-
 function buttonClass(kind: 'primary' | 'secondary' | 'danger' | 'success' = 'secondary', small = true): string {
   const size = small ? 'btn-sm ' : '';
   switch (kind) {
@@ -106,6 +105,7 @@ function normalizeError(error: unknown): string {
 
 export function CrudPage<T extends { id: string }>({
   basePath,
+  listQuery,
   dataSource,
   supportsArchived = false,
   allowCreate,
@@ -177,9 +177,12 @@ export function CrudPage<T extends { id: string }>({
         setItems([]);
         return;
       }
-      const path = showArchived && supportsArchived ? `${basePath}/archived` : basePath;
-      const data = await apiRequest<{ items?: T[] } | T[]>(path);
-      setItems(parseListResponse(data));
+      let path = showArchived && supportsArchived ? `${basePath}/archived` : basePath;
+      if (listQuery && path) {
+        path = path.includes('?') ? `${path}&${listQuery}` : `${path}?${listQuery}`;
+      }
+      const data = await apiRequest<{ items?: T[] | null } | T[]>(path);
+      setItems(parseListItemsFromResponse(data));
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -336,38 +339,38 @@ export function CrudPage<T extends { id: string }>({
   });
 
   const visibleToolbarActions = toolbarActions.filter((action) => action.isVisible?.({ archived: showArchived, items }) ?? true);
+  const showHeaderActions = visibleToolbarActions.length > 0 || (!showArchived && canCreate);
 
   return (
-    <>
-      <div className="page-header">
-        <div>
-          <h1>{sentenceCase(showArchived ? t('crud.title.archived', { labelPluralCap: localizedLabelPluralCap }) : localizedLabelPluralCap)}</h1>
-          <p className="text-secondary">
-            {loading ? t('common.status.loading') : `${filtered.length} ${filtered.length === 1 ? localizedLabel : localizedLabelPlural}`}
-          </p>
-        </div>
-        <div className="actions-row">
-          {visibleToolbarActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className={buttonClass(action.kind, false)}
-              onClick={() => { void runToolbarAction(action); }}
-            >
-              {localizeUiText(action.label)}
-            </button>
-          ))}
-          {!showArchived && canCreate && (
-            <button type="button" className="btn-primary" onClick={openCreate}>
-              {createLabel ? localizeUiText(createLabel) : sentenceCase(t('crud.button.new', { label: localizedLabel }))}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && !showArchived && (
+    <CrudPageShell
+      title={sentenceCase(showArchived ? t('crud.title.archived', { labelPluralCap: localizedLabelPluralCap }) : localizedLabelPluralCap)}
+      subtitle={
+        loading ? t('common.status.loading') : `${filtered.length} ${filtered.length === 1 ? localizedLabel : localizedLabelPlural}`
+      }
+      headerActions={
+        showHeaderActions ? (
+          <>
+            {visibleToolbarActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={buttonClass(action.kind, false)}
+                onClick={() => { void runToolbarAction(action); }}
+              >
+                {localizeUiText(action.label)}
+              </button>
+            ))}
+            {!showArchived && canCreate && (
+              <button type="button" className="btn-primary" onClick={openCreate}>
+                {createLabel ? localizeUiText(createLabel) : sentenceCase(t('crud.button.new', { label: localizedLabel }))}
+              </button>
+            )}
+          </>
+        ) : undefined
+      }
+      error={error ? <div className="alert alert-error">{error}</div> : undefined}
+      form={
+        showForm && !showArchived ? (
         <div className="card crud-form-card">
           <div className="card-header">
             <h2>{sentenceCase(editing ? t('crud.form.edit', { label: localizedLabel }) : t('crud.form.create', { label: localizedLabel }))}</h2>
@@ -433,31 +436,33 @@ export function CrudPage<T extends { id: string }>({
             </div>
           </form>
         </div>
-      )}
-
-      <div className="crud-toolbar">
-        <input
-          type="text"
-          className="crud-search"
-          placeholder={searchPlaceholder ? localizeText(searchPlaceholder) : t('crud.search.placeholder', { labelPlural: localizedLabelPlural })}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        {supportsArchived && (
-          <button
-            type="button"
-            className={`btn-sm ${showArchived ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => {
-              closeForm();
-              cancelHardDelete();
-              setShowArchived((current) => !current);
-            }}
-          >
-            {showArchived ? t('crud.toggle.showActive') : t('crud.toggle.showArchived')}
-          </button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+      toolbar={
+        <div className="crud-toolbar">
+          <input
+            type="text"
+            className="crud-search"
+            placeholder={searchPlaceholder ? localizeText(searchPlaceholder) : t('crud.search.placeholder', { labelPlural: localizedLabelPlural })}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {supportsArchived && (
+            <button
+              type="button"
+              className={`btn-sm ${showArchived ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => {
+                closeForm();
+                cancelHardDelete();
+                setShowArchived((current) => !current);
+              }}
+            >
+              {showArchived ? t('crud.toggle.showActive') : t('crud.toggle.showArchived')}
+            </button>
+          )}
+        </div>
+      }
+    >
       {loading ? (
         <div className="spinner" />
       ) : filtered.length === 0 ? (
@@ -586,6 +591,6 @@ export function CrudPage<T extends { id: string }>({
           </table>
         </div>
       )}
-    </>
+    </CrudPageShell>
   );
 }

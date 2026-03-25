@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listPolicies, createPolicy, deletePolicy, type PolicyResponse } from '../lib/reviewApi';
+import { useI18n } from '../lib/i18n';
 import './AutomationRulesPage.css';
 
 type Effect = 'allow' | 'deny' | 'require_approval';
@@ -25,7 +26,7 @@ const RULE_TEMPLATES: RuleTemplate[] = [
   { actionType: 'refund.create', displayName: 'Reembolso', category: 'Pagos', riskClass: 'high', hasThreshold: false },
   { actionType: 'sale.create', displayName: 'Crear venta', category: 'Ventas', riskClass: 'medium', hasThreshold: false },
   { actionType: 'quote.create', displayName: 'Crear presupuesto', category: 'Ventas', riskClass: 'low', hasThreshold: false },
-  { actionType: 'notification.bulk_send', displayName: 'Envio masivo', category: 'Notificaciones', riskClass: 'medium', hasThreshold: false },
+  { actionType: 'notification.bulk_send', displayName: 'Envío masivo', category: 'Notificaciones', riskClass: 'medium', hasThreshold: false },
 ];
 
 interface RuleState {
@@ -35,7 +36,7 @@ interface RuleState {
 }
 
 const EFFECT_LABELS: Record<Effect, string> = {
-  allow: 'Automatico',
+  allow: 'Automático',
   require_approval: 'Pedirme',
   deny: 'No permitir',
 };
@@ -53,6 +54,7 @@ const DEFAULT_EFFECTS: Record<string, Effect> = {
 };
 
 export default function AutomationRulesPage() {
+  const { t } = useI18n();
   const [rules, setRules] = useState<Record<string, RuleState>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -160,80 +162,99 @@ export default function AutomationRulesPage() {
   };
 
   if (loading) {
-    return <div className="automation-rules-page"><div className="loading">Cargando reglas...</div></div>;
+    return (
+      <>
+        <div className="page-header">
+          <h1>{t('shell.nav.automationRules')}</h1>
+          <p>{t('shell.page.automationRules.subtitle')}</p>
+        </div>
+        <div className="automation-rules-page">
+          <div className="loading-wrap">Cargando reglas…</div>
+        </div>
+      </>
+    );
   }
 
-  const categories = [...new Set(RULE_TEMPLATES.map((t) => t.category))];
+  const categories = [...new Set(RULE_TEMPLATES.map((tpl) => tpl.category))];
 
   return (
-    <div className="automation-rules-page">
-      <h1>Atencion automatica</h1>
-      <p className="subtitle">
-        Configura que puede hacer el asistente sin consultarte
-      </p>
-
-      {categories.map((cat) => (
-        <div key={cat} className="rules-category">
-          <h2>{cat}</h2>
-          {RULE_TEMPLATES.filter((t) => t.category === cat).map((tpl) => {
-            const rule = rules[tpl.actionType];
-            if (!rule) return null;
-            const effectClass =
-              rule.effect === 'allow'
-                ? 'effect-allow'
-                : rule.effect === 'require_approval'
-                  ? 'effect-require'
-                  : 'effect-deny';
-            return (
-              <div key={tpl.actionType} className="rule-card">
-                <div className="rule-info">
-                  <div className="rule-name">{tpl.displayName}</div>
-                  <div className="rule-risk">Riesgo: {tpl.riskClass}</div>
-                </div>
-                <div className="rule-controls">
-                  {tpl.hasThreshold && rule.effect === 'allow' && (
-                    <div className="threshold-input">
-                      <span>{'<='}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={rule.threshold}
-                        onChange={(e) =>
-                          handleThresholdChange(tpl.actionType, Number(e.target.value))
-                        }
-                      />
-                      <span>{tpl.thresholdLabel}</span>
-                    </div>
-                  )}
-                  <select
-                    className={effectClass}
-                    value={rule.effect}
-                    onChange={(e) =>
-                      handleEffectChange(tpl.actionType, e.target.value as Effect)
-                    }
-                  >
-                    {Object.entries(EFFECT_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-
-      <div className="save-bar">
-        <button className="save-btn" onClick={handleSave} disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar cambios'}
-        </button>
+    <>
+      <div className="page-header">
+        <h1>{t('shell.nav.automationRules')}</h1>
+        <p>{t('shell.page.automationRules.subtitle')}</p>
       </div>
 
-      {statusMsg && (
-        <p className={`status-msg ${statusMsg.type}`}>{statusMsg.text}</p>
-      )}
-    </div>
+      <div className="automation-rules-page">
+        <div className="rules-stack">
+          {categories.map((cat) => (
+            <div key={cat} className="rules-category">
+              <h2>{cat}</h2>
+              {RULE_TEMPLATES.filter((t) => t.category === cat).map((tpl) => {
+                const rule = rules[tpl.actionType];
+                if (!rule) return null;
+                const effectClass =
+                  rule.effect === 'allow'
+                    ? 'effect-allow'
+                    : rule.effect === 'require_approval'
+                      ? 'effect-require'
+                      : 'effect-deny';
+                return (
+                  <div key={tpl.actionType} className="rule-card">
+                    <div className="rule-info">
+                      <div className="rule-name">{tpl.displayName}</div>
+                      <div className="rule-risk">Riesgo: {tpl.riskClass}</div>
+                    </div>
+                    <div className="rule-controls">
+                      {tpl.hasThreshold && rule.effect === 'allow' && (
+                        <div className="threshold-input">
+                          <span>{'<='}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={rule.threshold}
+                            onChange={(e) =>
+                              handleThresholdChange(tpl.actionType, Number(e.target.value))
+                            }
+                          />
+                          <span>{tpl.thresholdLabel}</span>
+                        </div>
+                      )}
+                      <select
+                        className={effectClass}
+                        value={rule.effect}
+                        onChange={(e) =>
+                          handleEffectChange(tpl.actionType, e.target.value as Effect)
+                        }
+                      >
+                        {Object.entries(EFFECT_LABELS).map(([val, label]) => (
+                          <option key={val} value={val}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div className="save-bar">
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+
+        {statusMsg && (
+          <div
+            className={`automation-status alert ${statusMsg.type === 'success' ? 'alert-success' : 'alert-error'}`}
+            role="status"
+          >
+            {statusMsg.text}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

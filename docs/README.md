@@ -9,6 +9,7 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Ownership, shared, bordes HTTP entre bounded contexts |
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
+| [WHATSAPP_SETUP.md](./WHATSAPP_SETUP.md) | WhatsApp + Meta: env, webhook, conexión por org, opt-in; qué ya está y qué falta |
 | [CONTROL_PLANE.md](./CONTROL_PLANE.md) | Control plane, seguridad interna, comandos de validación |
 | [AUTH.md](./AUTH.md) | Identidad (Clerk vs API key), rutas, org en consola; puntero a checklist local |
 | [CLERK_LOCAL.md](./CLERK_LOCAL.md) | Clerk en Docker: `.env`, JWKS, token de sesión, onboarding/org, troubleshooting `invalid org` |

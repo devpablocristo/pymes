@@ -1,3 +1,3 @@
-from pymes_core_shared.ai_runtime import AuthContext
+from core_ai.contexts import AuthContext
 
 __all__ = ["AuthContext"]

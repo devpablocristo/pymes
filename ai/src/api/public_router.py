@@ -14,7 +14,7 @@ from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
-from pymes_core_shared.ai_runtime import get_logger, update_request_context
+from core_ai.logging import get_logger, update_request_context
 from src.tools.registry import build_external_tools
 
 router = APIRouter(prefix="/v1/public", tags=["public-chat"])

@@ -25,10 +25,10 @@ from src.api.external_chat_support import get_external_conversation, history_to_
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
-from pymes_core_shared.ai_runtime import OrchestratorLimits, orchestrate
+from core_ai.orchestrator import OrchestratorLimits, orchestrate
 from src.db.repository import AIRepository
-from pymes_core_shared.ai_runtime import LLMProvider, Message
-from pymes_core_shared.ai_runtime import get_logger
+from core_ai.types import LLMProvider, Message
+from core_ai.logging import get_logger
 from src.tools import appointments, payments
 
 logger = get_logger(__name__)

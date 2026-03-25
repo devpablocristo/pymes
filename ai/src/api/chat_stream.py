@@ -4,7 +4,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from pymes_core_shared.ai_runtime import LLMProvider, Message, ToolDeclaration, get_logger, orchestrate
+from core_ai.types import LLMProvider, Message, ToolDeclaration
+from core_ai.logging import get_logger
+from core_ai.orchestrator import orchestrate
 
 logger = get_logger(__name__)
 

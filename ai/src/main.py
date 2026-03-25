@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from pymes_core_shared.ai_runtime import (
+from core_ai.fastapi import (
     apply_permissive_cors,
     install_request_context_middleware,
     register_common_exception_handlers,
@@ -23,10 +23,10 @@ from src.domains.professionals.teachers.public_router import router as teachers_
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 from src.domains.workshops.auto_repair.internal_router import router as auto_repair_chat_router
 from src.domains.workshops.auto_repair.public_router import router as auto_repair_public_router
-from pymes_core_shared.ai_runtime import create_provider
-from pymes_core_shared.ai_runtime import AuthMiddleware
-from pymes_core_shared.ai_runtime import RateLimitMiddleware
-from pymes_core_shared.ai_runtime import bind_request_context, clear_request_context, configure_logging, get_logger
+from core_ai.provider_factory import create_provider
+from core_ai.auth import AuthMiddleware, AuthSettings
+from core_ai.rate_limit import RateLimitMiddleware, RateLimitSettings
+from core_ai.logging import bind_request_context, clear_request_context, configure_logging, get_logger
 from src.api.review_callback import router as review_callback_router
 from src.observability.otel import configure_opentelemetry
 from src.review_client.client import ReviewClient
@@ -84,8 +84,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="pymes-ai", version="0.1.0", lifespan=lifespan)
 
 apply_permissive_cors(app)
-app.add_middleware(RateLimitMiddleware, settings=settings)
-app.add_middleware(AuthMiddleware, settings=settings)
+app.add_middleware(
+    RateLimitMiddleware,
+    settings=RateLimitSettings(
+        external_rpm=settings.ai_external_rpm,
+        internal_rpm=settings.ai_internal_rpm,
+    ),
+)
+app.add_middleware(
+    AuthMiddleware,
+    settings=AuthSettings(allow_api_key=settings.auth_allow_api_key),
+)
 install_request_context_middleware(app, bind_request_context, clear_request_context)
 
 

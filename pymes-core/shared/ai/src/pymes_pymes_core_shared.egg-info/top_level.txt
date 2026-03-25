@@ -1,1 +1,0 @@
-pymes_core_shared

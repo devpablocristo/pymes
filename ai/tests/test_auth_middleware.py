@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from pymes_core_shared.ai_runtime import AuthMiddleware
+from core_ai.auth import AuthMiddleware
 
 
 class Settings:

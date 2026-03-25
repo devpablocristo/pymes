@@ -16,7 +16,7 @@ from src.core.system_prompt import build_system_prompt
 from src.core.dossier import summarize_dossier_for_context
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from src.db.repository import AIRepository
-from pymes_core_shared.ai_runtime import get_logger
+from core_ai.logging import get_logger
 from src.tools.registry import build_internal_tools
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])

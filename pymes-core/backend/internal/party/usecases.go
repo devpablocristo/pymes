@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )

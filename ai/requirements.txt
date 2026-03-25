@@ -1,3 +1,4 @@
+-e /workspace/core/backend/python
 -e /workspace/core/ai/python
 -e ../pymes-core/shared/ai
 fastapi>=0.115.0

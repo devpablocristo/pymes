@@ -68,7 +68,7 @@ build:
 	cd beauty/backend && $(GO_PRIVATE) go build ./...
 	cd restaurants/backend && $(GO_PRIVATE) go build ./...
 	cd frontend && npm run build
-	cd ai && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src)
+	cd ai && _pc=$$(mktemp -d) && export PYTHONPYCACHEPREFIX=$$_pc && (test -x .venv/bin/python && .venv/bin/python -m compileall -q src || python3 -m compileall -q src); _e=$$?; rm -rf $$_pc; exit $$_e
 
 # Tests (Go en pymes-core + professionals + workshops + beauty + restaurants + frontend + AI)
 test:

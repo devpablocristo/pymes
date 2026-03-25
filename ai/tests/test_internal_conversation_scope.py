@@ -30,7 +30,7 @@ class FakeRepo:
 
 def _auth(*, actor: str) -> AuthContext:
     return AuthContext(
-        org_id="11111111-1111-1111-1111-111111111111",
+        tenant_id="11111111-1111-1111-1111-111111111111",
         actor=actor,
         role="service" if actor.startswith("api_key:") else "member",
         scopes=[],

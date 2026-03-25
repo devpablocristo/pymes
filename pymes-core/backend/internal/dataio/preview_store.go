@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 func (u *Usecases) savePreview(job previewJob) (string, error) {

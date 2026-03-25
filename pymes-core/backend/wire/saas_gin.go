@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	ctxkeys "github.com/devpablocristo/core/backend/go/contextkeys"
+	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 // GinSaaSAuthMiddleware runs core/saas/go net/http auth and copies principal into Gin context

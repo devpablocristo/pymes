@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/backend/go/envconfig"
+	"github.com/devpablocristo/core/config/go/envconfig"
 )
 
 const localInternalServiceToken = "local-internal-token"

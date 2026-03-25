@@ -9,10 +9,15 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/devpablocristo/core/authn/go v0.2.1
-	github.com/devpablocristo/core/backend/gin/go v0.0.0
+	github.com/devpablocristo/core/config/go v0.0.0
 	github.com/devpablocristo/core/databases/gorm/go v0.0.0
+	github.com/devpablocristo/core/errors/go v0.0.0
 	github.com/devpablocristo/core/governance/go v0.1.0
+	github.com/devpablocristo/core/http/go v0.0.0
+	github.com/devpablocristo/core/http/go/gin v0.0.0
 	github.com/devpablocristo/core/saas/go v0.1.0
+	github.com/devpablocristo/core/security/go v0.0.0
+	github.com/devpablocristo/core/utils/go v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -63,7 +68,6 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/devpablocristo/core/backend/go v0.1.0
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -111,8 +115,6 @@ replace github.com/devpablocristo/core/databases/gorm/go => ../core/databases/go
 
 replace github.com/devpablocristo/core/saas/go => ../core/saas/go
 
-replace github.com/devpablocristo/core/backend/go => ../core/backend/go
-
 replace github.com/devpablocristo/core/authn/go => ../core/authn/go
 
 replace github.com/devpablocristo/core/authz/go => ../core/authz/go
@@ -121,4 +123,14 @@ replace github.com/devpablocristo/core/notifications/go => ../core/notifications
 
 replace github.com/devpablocristo/core/governance/go => ../core/governance/go
 
-replace github.com/devpablocristo/core/backend/gin/go => ../core/backend/gin/go
+replace github.com/devpablocristo/core/errors/go => ../core/errors/go
+
+replace github.com/devpablocristo/core/http/go => ../core/http/go
+
+replace github.com/devpablocristo/core/http/go/gin => ../core/http/go/gin
+
+replace github.com/devpablocristo/core/config/go => ../core/config/go
+
+replace github.com/devpablocristo/core/security/go => ../core/security/go
+
+replace github.com/devpablocristo/core/utils/go => ../core/utils/go

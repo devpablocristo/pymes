@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
-	"github.com/devpablocristo/core/backend/go/httpclient"
-	"github.com/devpablocristo/core/backend/go/resilience"
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/devpablocristo/core/http/go/httpclient"
+	"github.com/devpablocristo/core/utils/go/resilience"
 	schedulerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler/usecases/domain"
 )
 

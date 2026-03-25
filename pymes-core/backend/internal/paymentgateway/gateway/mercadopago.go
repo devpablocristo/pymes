@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/backend/go/httpclient"
+	"github.com/devpablocristo/core/http/go/httpclient"
 )
 
 type OAuthTokens struct {

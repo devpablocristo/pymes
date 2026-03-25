@@ -76,4 +76,4 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 }
 
 // TestNewInternalServiceAuth fue eliminado junto con internal_service_auth.go.
-// La autenticación interna ahora usa core/backend/go/apikey.
+// La autenticación interna ahora usa core/security/go/apikey.

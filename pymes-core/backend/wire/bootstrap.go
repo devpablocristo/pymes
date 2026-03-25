@@ -44,7 +44,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"

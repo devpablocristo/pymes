@@ -5,7 +5,8 @@ from typing import TypeVar, cast
 from fastapi import HTTPException, Request, status
 
 from src.config import Settings, get_settings
-from core_ai.contexts import AuthContext, LLMProvider
+from core_ai.contexts import AuthContext
+from core_ai.types import LLMProvider
 
 T = TypeVar("T")
 

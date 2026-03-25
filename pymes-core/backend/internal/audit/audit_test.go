@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"github.com/devpablocristo/core/backend/go/hashutil"
+	"github.com/devpablocristo/core/security/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
 	"github.com/google/uuid"
 )

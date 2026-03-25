@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	authn "github.com/devpablocristo/core/authn/go"
-	"github.com/devpablocristo/core/backend/go/httperr"
+	"github.com/devpablocristo/core/http/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
 	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"

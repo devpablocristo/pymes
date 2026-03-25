@@ -4,6 +4,7 @@ WORKDIR /workspace/ai
 
 COPY pymes/ai/requirements.txt ./
 COPY pymes/pymes-core/shared/ai /workspace/pymes-core/shared/ai
+COPY core/backend/python /workspace/core/backend/python
 COPY core/ai/python /workspace/core/ai/python
 
 RUN pip install --no-cache-dir -r requirements.txt

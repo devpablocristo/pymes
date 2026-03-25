@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from core_ai.fastapi import (
+from core_httpserver.fastapi_bootstrap import (
     apply_permissive_cors,
     install_request_context_middleware,
     register_common_exception_handlers,

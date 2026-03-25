@@ -1,4 +1,4 @@
-// Package httperrors wrapper thin de core/backend/gin/go para Gin.
+// Package httperrors wrapper thin de core/http/go/gin para Gin.
 // Mantiene compatibilidad con los 87+ archivos que importan este paquete.
 // Los sentinels, Respond y Write delegan a core.
 package httperrors
@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 // Sentinel errors — domainerr.Error, soportan errors.Is por Kind.

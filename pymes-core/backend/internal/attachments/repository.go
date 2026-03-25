@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/pagination"
+	"github.com/devpablocristo/core/utils/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/repository/models"
 	attachmentdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments/usecases/domain"
 )

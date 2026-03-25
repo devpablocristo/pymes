@@ -3,20 +3,19 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from core_ai.auth import AuthMiddleware
+from core_ai.auth import AuthMiddleware, AuthSettings
+from core_ai.contexts import AuthContext
 
 
-class Settings:
-    backend_url = "http://cp-backend:8080"
-    internal_service_token = "local-internal-token"
-    auth_allow_api_key = True
-    jwks_url = ""
-    jwt_issuer = ""
-
-
-def create_app() -> FastAPI:
+def create_app(*, api_key_verifier: object | None, protected: tuple[str, ...], public: tuple[str, ...]) -> FastAPI:
     app = FastAPI()
-    app.add_middleware(AuthMiddleware, settings=Settings())
+    app.add_middleware(
+        AuthMiddleware,
+        settings=AuthSettings(allow_api_key=True),
+        api_key_verifier=api_key_verifier,
+        protected_prefixes=protected,
+        public_prefixes=public,
+    )
 
     @app.get("/v1/professionals/teachers/chat")
     async def teachers_chat(request: Request) -> dict[str, object]:
@@ -45,16 +44,26 @@ def create_app() -> FastAPI:
     return app
 
 
-def test_professionals_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
-    async def fake_resolve(_self: AuthMiddleware, _api_key: str, _request_id: str) -> dict[str, object]:
-        return {
-            "id": "key-123",
-            "org_id": "org-123",
-            "scopes": ["customers:read", "customers:write"],
-        }
+class ProfessionalsVerifier:
+    async def verify_api_key(self, key: str) -> AuthContext | None:
+        del key
+        return AuthContext(
+            tenant_id="org-123",
+            actor="api_key:key-123",
+            role="service",
+            scopes=["customers:write"],
+            mode="internal",
+        )
 
-    monkeypatch.setattr(AuthMiddleware, "_resolve_api_key", fake_resolve)
-    client = TestClient(create_app())
+
+def test_professionals_chat_api_key_uses_resolved_identity() -> None:
+    client = TestClient(
+        create_app(
+            api_key_verifier=ProfessionalsVerifier(),
+            protected=("/v1/professionals/teachers/chat",),
+            public=("/v1/workshops/auto-repair/public/",),
+        )
+    )
 
     response = client.get(
         "/v1/professionals/teachers/chat",
@@ -76,30 +85,48 @@ def test_professionals_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
     }
 
 
-def test_professionals_chat_rejects_unknown_api_key(monkeypatch) -> None:
-    async def fake_resolve(_self: AuthMiddleware, _api_key: str, _request_id: str) -> None:
+class RejectVerifier:
+    async def verify_api_key(self, key: str) -> AuthContext | None:
+        del key
         return None
 
-    monkeypatch.setattr(AuthMiddleware, "_resolve_api_key", fake_resolve)
-    client = TestClient(create_app())
+
+def test_professionals_chat_rejects_unknown_api_key() -> None:
+    client = TestClient(
+        create_app(
+            api_key_verifier=RejectVerifier(),
+            protected=("/v1/professionals/teachers/chat",),
+            public=("/v1/workshops/auto-repair/public/",),
+        )
+    )
 
     response = client.get("/v1/professionals/teachers/chat", headers={"X-API-KEY": "psk_invalid"})
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
-    assert response.json()["error"]["message"] == "invalid api key"
+    assert response.json()["error"]["message"] == "unauthorized"
 
 
-def test_workshops_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
-    async def fake_resolve(_self: AuthMiddleware, _api_key: str, _request_id: str) -> dict[str, object]:
-        return {
-            "id": "key-456",
-            "org_id": "org-456",
-            "scopes": ["work_orders:read", "work_orders:write"],
-        }
+class WorkshopsVerifier:
+    async def verify_api_key(self, key: str) -> AuthContext | None:
+        del key
+        return AuthContext(
+            tenant_id="org-456",
+            actor="api_key:key-456",
+            role="service",
+            scopes=["work_orders:read"],
+            mode="internal",
+        )
 
-    monkeypatch.setattr(AuthMiddleware, "_resolve_api_key", fake_resolve)
-    client = TestClient(create_app())
+
+def test_workshops_chat_api_key_uses_resolved_identity() -> None:
+    client = TestClient(
+        create_app(
+            api_key_verifier=WorkshopsVerifier(),
+            protected=("/v1/workshops/auto-repair/chat",),
+            public=("/v1/workshops/auto-repair/public/",),
+        )
+    )
 
     response = client.get(
         "/v1/workshops/auto-repair/chat",
@@ -120,7 +147,13 @@ def test_workshops_chat_api_key_uses_resolved_identity(monkeypatch) -> None:
 
 
 def test_workshops_public_chat_is_not_authenticated() -> None:
-    client = TestClient(create_app())
+    client = TestClient(
+        create_app(
+            api_key_verifier=RejectVerifier(),
+            protected=("/v1/workshops/auto-repair/chat",),
+            public=("/v1/workshops/auto-repair/public/",),
+        )
+    )
 
     response = client.get("/v1/workshops/auto-repair/public/demo/chat")
 

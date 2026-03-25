@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/handler/dto"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"

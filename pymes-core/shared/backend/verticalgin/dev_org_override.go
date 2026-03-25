@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	types "github.com/devpablocristo/core/backend/go/contextkeys"
+	types "github.com/devpablocristo/core/security/go/contextkeys"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalconfig"
 )
 

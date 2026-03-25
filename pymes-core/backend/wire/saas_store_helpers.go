@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	utils "github.com/devpablocristo/core/backend/go/hashutil"
+	utils "github.com/devpablocristo/core/security/go/hashutil"
 	saasadmindomain "github.com/devpablocristo/core/saas/go/admin/usecases/domain"
 	saasbillingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
 	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"

@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/pagination"
+	"github.com/devpablocristo/core/utils/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/repository/models"
 	webhookdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks/usecases/domain"
 )

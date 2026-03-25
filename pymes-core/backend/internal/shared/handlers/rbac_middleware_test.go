@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	types "github.com/devpablocristo/core/backend/go/contextkeys"
+	types "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 type fakeChecker struct {

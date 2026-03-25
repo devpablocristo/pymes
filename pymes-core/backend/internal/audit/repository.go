@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/hashutil"
+	"github.com/devpablocristo/core/security/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
 )

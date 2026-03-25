@@ -27,7 +27,12 @@ dependencies = [
 dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0", "ruff>=0.9.0"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "../pymes-core/shared/ai/src", "../../core/ai/python/src"]
+pythonpath = [
+    "src",
+    "../pymes-core/shared/ai/src",
+    "../../core/backend/python/src",
+    "../../core/ai/python/src",
+]
 
 [tool.ruff]
 target-version = "py312"

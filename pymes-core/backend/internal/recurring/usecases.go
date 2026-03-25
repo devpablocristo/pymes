@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
 )
 

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	kerneldomain "github.com/devpablocristo/core/governance/go/kernel/usecases/domain"
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"

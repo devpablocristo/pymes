@@ -16,7 +16,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"golang.org/x/text/encoding/charmap"
 
-	"github.com/devpablocristo/core/backend/go/domainerr"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 
 const maxImportRows = 10000

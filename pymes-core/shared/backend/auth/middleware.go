@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	authn "github.com/devpablocristo/core/authn/go"
-	ginmw "github.com/devpablocristo/core/backend/gin/go"
+	ginmw "github.com/devpablocristo/core/http/go/gin"
 )
 
 // AuthMiddleware re-exporta el tipo de core.

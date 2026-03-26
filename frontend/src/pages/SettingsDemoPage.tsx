@@ -1,7 +1,8 @@
 /**
  * Ajustes unificados — todos los settings de la plataforma en tabs.
  */
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { IconEdit, IconTrash, IconUsers, IconDollar, IconAlert, IconBell, IconPalette, IconGlobe, IconCreditCard, IconSettings, IconBuilding } from '../components/Icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
 import { LanguageSelector } from '../components/LanguageSelector';
@@ -11,9 +12,10 @@ const AdminPage = lazy(() => import('./AdminPage').then((m) => ({ default: m.Adm
 const BillingSection = lazy(() => import('./SettingsPage').then((m) => ({ default: m.BillingSettingsSection })));
 const ProfilePage = lazy(() => import('./SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const NotificationPreferencesPage = lazy(() => import('./NotificationPreferencesPage').then((m) => ({ default: m.NotificationPreferencesPage })));
+const NotificationsCenterPage = lazy(() => import('./NotificationsCenterPage').then((m) => ({ default: m.NotificationsCenterPage })));
 
 type Section =
-  | null | 'profile' | 'notifications' | 'company' | 'firebaseNotif'
+  | null | 'profile' | 'notifications' | 'automation' | 'company' | 'firebaseNotif'
   | 'currencies' | 'gateway'
   | 'appearance' | 'language'
   | 'workspace';
@@ -23,12 +25,65 @@ const SECTIONS: { id: Exclude<Section, null>; label: string; desc: string; icon:
   { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: <IconBuilding /> },
   { id: 'appearance', label: 'Apariencia', desc: 'Tema, skin, logos y colores', icon: <IconPalette /> },
   { id: 'language', label: 'Idioma', desc: 'Idioma de la plataforma', icon: <IconGlobe /> },
-  { id: 'notifications', label: 'Notificaciones', desc: 'Preferencias y canales de alerta', icon: <IconBell /> },
+  { id: 'notifications', label: 'Notificaciones', desc: 'Avisos, aprobaciones pendientes, correo y canales', icon: <IconBell /> },
+  { id: 'automation', label: 'Automatización', desc: 'Reglas del asistente y tareas proactivas', icon: <IconAlert /> },
   { id: 'gateway', label: 'Pagos y facturación', desc: 'Plan, pasarelas y métodos de cobro', icon: <IconCreditCard /> },
   { id: 'currencies', label: 'Monedas', desc: 'Monedas habilitadas', icon: <IconDollar /> },
   { id: 'company', label: 'Empresa', desc: 'Datos de contacto y dirección', icon: <IconBuilding /> },
   { id: 'firebaseNotif', label: 'Firebase', desc: 'Configuración push notifications', icon: <IconSettings /> },
 ];
+
+// ─── Automatización (enlaces a pantallas existentes) ───
+
+function AutomationHubTab() {
+  return (
+    <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="card-header">
+        <h2>Automatización</h2>
+      </div>
+      <p className="text-secondary" style={{ margin: '0 0 var(--space-4)', fontSize: '0.88rem' }}>
+        Configurá qué puede hacer el asistente sin consultarte y los monitores proactivos. Abrís cada módulo en su
+        pantalla dedicada.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <Link
+          to="/automation-rules"
+          className="card"
+          style={{
+            margin: 0,
+            padding: '1rem',
+            textDecoration: 'none',
+            color: 'inherit',
+            display: 'block',
+            border: '1px solid var(--color-border, #e5e7eb)',
+          }}
+        >
+          <strong>Atención automática</strong>
+          <p className="text-secondary" style={{ margin: '0.35rem 0 0', fontSize: '0.88rem' }}>
+            Políticas y reglas de revisión del asistente.
+          </p>
+        </Link>
+        <Link
+          to="/watcher-config"
+          className="card"
+          style={{
+            margin: 0,
+            padding: '1rem',
+            textDecoration: 'none',
+            color: 'inherit',
+            display: 'block',
+            border: '1px solid var(--color-border, #e5e7eb)',
+          }}
+        >
+          <strong>Asistente proactivo</strong>
+          <p className="text-secondary" style={{ margin: '0.35rem 0 0', fontSize: '0.88rem' }}>
+            Monitores y tareas programadas sugeridas por el sistema.
+          </p>
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 // ─── Toggle ───
 
@@ -326,6 +381,23 @@ function GatewayTab() {
 
 export function SettingsDemoPage() {
   const [section, setSection] = useState<Section>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const s = searchParams.get('section');
+    if (s === 'notifications') {
+      setSection('notifications');
+    } else if (s === 'automation') {
+      setSection('automation');
+    }
+  }, [searchParams]);
+
+  function goBackToGrid(): void {
+    setSection(null);
+    if (searchParams.get('section')) {
+      setSearchParams({}, { replace: true });
+    }
+  }
 
   return (
     <div className="stg">
@@ -355,17 +427,23 @@ export function SettingsDemoPage() {
         </div>
       ) : (
         <>
-          <button type="button" className="stg__back" onClick={() => setSection(null)}>
+          <button type="button" className="stg__back" onClick={goBackToGrid}>
             ← Volver a Ajustes
           </button>
 
           {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage /></Suspense>}
           {section === 'notifications' && (
             <>
-              <Suspense fallback={<div className="spinner" />}><NotificationPreferencesPage /></Suspense>
+              <Suspense fallback={<div className="spinner" />}>
+                <NotificationsCenterPage embedded />
+              </Suspense>
+              <Suspense fallback={<div className="spinner" />}>
+                <NotificationPreferencesPage embedded />
+              </Suspense>
               <AlertChannelsTab />
             </>
           )}
+          {section === 'automation' && <AutomationHubTab />}
           {section === 'company' && <CompanyTab />}
           {section === 'firebaseNotif' && <FirebaseNotifTab />}
           {section === 'currencies' && <CurrenciesTab />}

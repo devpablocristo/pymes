@@ -22,13 +22,14 @@ const WorkOrdersEditorPage = lazy(() =>
 );
 const BeautySalonServicesPage = lazy(() => import('../pages/BeautySalonServicesPage').then((mod) => ({ default: mod.BeautySalonServicesPage })));
 const BeautyStaffPage = lazy(() => import('../pages/BeautyStaffPage').then((mod) => ({ default: mod.BeautyStaffPage })));
-const CommercialAssistantPage = lazy(() => import('../pages/CommercialAssistantPage').then((mod) => ({ default: mod.CommercialAssistantPage })));
+const UnifiedChatPage = lazy(() =>
+  import('../pages/UnifiedChatPage').then((mod) => ({ default: mod.UnifiedChatPage })),
+);
 const CustomersPage = lazy(() => import('../pages/CustomersPage').then((mod) => ({ default: mod.CustomersPage })));
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })));
 const IntakesPage = lazy(() => import('../pages/IntakesPage').then((mod) => ({ default: mod.IntakesPage })));
 const LoginPage = lazy(() => import('../pages/LoginPage').then((mod) => ({ default: mod.LoginPage })));
 const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) => ({ default: mod.ModulePage })));
-const NotificationPreferencesPage = lazy(() => import('../pages/NotificationPreferencesPage').then((mod) => ({ default: mod.NotificationPreferencesPage })));
 const OnboardingPage = lazy(() => import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })));
 const PublicPreviewPage = lazy(() => import('../pages/PublicPreviewPage').then((mod) => ({ default: mod.PublicPreviewPage })));
 const PurchasesPage = lazy(() => import('../pages/PurchasesPage').then((mod) => ({ default: mod.PurchasesPage })));
@@ -41,16 +42,12 @@ const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ def
 const SpecialtiesPage = lazy(() => import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })));
 const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({ default: mod.TeachersPage })));
 const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
-const ApprovalInboxPage = lazy(() => import('../pages/ApprovalInboxPage'));
 const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 const CalendarPage = lazy(() =>
   import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })),
 );
 const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
-);
-const KanbanDemoPage = lazy(() =>
-  import('../pages/KanbanDemoPage').then((mod) => ({ default: mod.KanbanDemoPage })),
 );
 const InvoiceDemoPage = lazy(() =>
   import('../pages/InvoiceDemoPage').then((mod) => ({ default: mod.InvoiceDemoPage })),
@@ -62,7 +59,6 @@ const UIElementsDemoPage = lazy(() =>
   import('../pages/UIElementsDemoPage').then((mod) => ({ default: mod.UIElementsDemoPage })),
 );
 const EmailDemoPage = lazy(() => import('../pages/EmailDemoPage').then((m) => ({ default: m.EmailDemoPage })));
-const ChatDemoPage = lazy(() => import('../pages/ChatDemoPage').then((m) => ({ default: m.ChatDemoPage })));
 const CryptoDemoPage = lazy(() => import('../pages/CryptoDemoPage').then((m) => ({ default: m.CryptoDemoPage })));
 
 function Suspended({ children }: { children: ReactNode }) {
@@ -130,7 +126,13 @@ export function App() {
                     <Shell>
                       <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
+                      <Route
+                        path="/notifications"
+                        element={<Navigate to="/settings?section=notifications" replace />}
+                      />
+                      <Route path="/chat" element={<UnifiedChatPage />} />
+                      <Route path="/assistant/commercial" element={<Navigate to="/chat" replace />} />
+                      <Route path="/wowdash/chat" element={<Navigate to="/chat" replace />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
                       <Route path="/modules/customers" element={<CustomersPage />} />
@@ -147,7 +149,7 @@ export function App() {
                       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
                       <Route
                         path="/settings/notifications"
-                        element={<NotificationPreferencesPage />}
+                        element={<Navigate to="/settings?section=notifications" replace />}
                       />
                       <Route path="/professionals/teachers" element={<TeachersPage />} />
                       <Route path="/professionals/teachers/specialties" element={<SpecialtiesPage />} />
@@ -166,17 +168,19 @@ export function App() {
                       <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
                       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
                       <Route path="/automation-rules" element={<AutomationRulesPage />} />
-                      <Route path="/approvals" element={<ApprovalInboxPage />} />
+                      <Route
+                        path="/approvals"
+                        element={<Navigate to="/settings?section=notifications" replace />}
+                      />
                       <Route path="/watcher-config" element={<WatcherConfigPage />} />
                       <Route path="/audit" element={<Suspended><AdminPage section="audit" /></Suspended>} />
                       <Route path="/roles" element={<Suspended><AdminPage section="rbac" /></Suspended>} />
                       <Route path="/dashboard" element={<DashboardVisualPage />} />
                       <Route path="/calendar" element={<CalendarPage />} />
-                      <Route path="/wowdash/kanban" element={<KanbanDemoPage />} />
+                      <Route path="/wowdash/kanban" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/wowdash/invoices" element={<InvoiceDemoPage />} />
                       <Route path="/wowdash/ui" element={<UIElementsDemoPage />} />
                       <Route path="/wowdash/email" element={<EmailDemoPage />} />
-                      <Route path="/wowdash/chat" element={<ChatDemoPage />} />
                       <Route path="/wowdash/crypto" element={<CryptoDemoPage />} />
                       </Routes>
                     </Shell>

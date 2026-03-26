@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	ginmw "github.com/devpablocristo/core/http/go/gin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments"
@@ -23,6 +24,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/notifications"
@@ -44,13 +46,12 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
-	ginmw "github.com/devpablocristo/core/http/go/gin"
 
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/backend/seeds"
@@ -114,6 +115,7 @@ func InitializeApp() *app.App {
 	adminRepo := admin.NewRepository(db)
 	attachmentsRepo := attachments.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
+	inAppNotifRepo := inappnotifications.NewRepository(db)
 	outwebhooksRepo := outwebhooks.NewRepository(db)
 	partyRepo := party.NewRepository(db)
 	customersRepo := customers.NewRepository(db)
@@ -206,6 +208,7 @@ func InitializeApp() *app.App {
 		emailSender = notifications.NewNoopSender(logger)
 	}
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
+	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
@@ -235,6 +238,7 @@ func InitializeApp() *app.App {
 	schedulerHandler := scheduler.NewHandler(schedulerUC, cfg.SchedulerSecret)
 	paymentGatewayHandler := paymentgateway.NewHandler(paymentGatewayUC)
 	notificationHandler := notifications.NewHandler(notificationUC)
+	inAppNotifHandler := inappnotifications.NewHandler(inAppNotifUC)
 	outwebhooksHandler := outwebhooks.NewHandler(outwebhooksUC)
 	partyHandler := party.NewHandler(partyUC)
 	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
@@ -283,6 +287,7 @@ func InitializeApp() *app.App {
 	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	whatsappHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
+	inAppNotifHandler.RegisterRoutes(authGroup)
 	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)

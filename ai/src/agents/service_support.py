@@ -55,6 +55,7 @@ class CommercialChatResult:
     tokens_output: int
     tool_calls: list[str]
     pending_confirmations: list[str]
+    routed_mode: str | None = None
 
     @property
     def tokens_used(self) -> int:

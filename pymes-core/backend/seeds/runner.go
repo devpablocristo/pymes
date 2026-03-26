@@ -36,6 +36,7 @@ var legacyFileOrder = []string{
 	"02_core_business.sql",
 	"03_rbac.sql",
 	"04_transversal_modules_demo.sql",
+	"05_in_app_notifications_demo.sql",
 }
 
 var clerkFileOrder = []string{
@@ -43,6 +44,7 @@ var clerkFileOrder = []string{
 	"02_core_business.sql",
 	"03_rbac.sql",
 	"04_transversal_modules_demo.sql",
+	"05_in_app_notifications_demo.sql",
 }
 
 // Run ejecuta los scripts en orden. Idempotente vía ON CONFLICT en el SQL.

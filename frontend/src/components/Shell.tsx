@@ -32,7 +32,7 @@ const dashboardIcon = (
   </svg>
 );
 
-const assistantCommercialIcon = (
+const chatIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
@@ -186,11 +186,7 @@ export function Shell({ children }: { children: ReactNode }) {
     const items: AppShellNavItem[] = [
       { to: '/dashboard', label: 'Dashboard', icon: chartIcon },
       { to: '/calendar', label: 'Calendario', icon: calendarIconBase },
-      {
-        to: '/assistant/commercial',
-        label: t('shell.nav.assistantCommercial'),
-        icon: assistantCommercialIcon,
-      },
+      { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
       { to: '/settings', label: 'Ajustes', icon: adminIcon },
     ];
     return items;
@@ -232,14 +228,6 @@ export function Shell({ children }: { children: ReactNode }) {
     [t],
   );
 
-  const kanbanIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="5" height="18" rx="1" />
-      <rect x="10" y="3" width="5" height="12" rx="1" />
-      <rect x="17" y="3" width="5" height="15" rx="1" />
-    </svg>
-  );
-
   const invoiceIcon = (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -251,26 +239,13 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const wowdashNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/wowdash/kanban', label: 'Kanban', icon: kanbanIcon },
       { to: '/wowdash/invoices', label: 'Facturación', icon: invoiceIcon },
       { to: '/wowdash/email', label: 'Email', icon: bellIcon },
-      { to: '/wowdash/chat', label: 'Chat', icon: assistantCommercialIcon },
       { to: '/wowdash/crypto', label: 'Crypto', icon: globeIcon },
       { to: '/wowdash/ui', label: 'Componentes UI', icon: dashboardIcon },
     ],
     [],
   );
-
-  const automationNav = useMemo<AppShellNavItem[]>(
-    () => [
-      { to: '/automation-rules', label: t('shell.nav.automationRules'), icon: adminIcon },
-      { to: '/approvals', label: t('shell.nav.approvals'), icon: bellIcon },
-      { to: '/watcher-config', label: t('shell.nav.watcherConfig'), icon: clockIcon },
-    ],
-    [t],
-  );
-
-
 
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
@@ -306,9 +281,8 @@ export function Shell({ children }: { children: ReactNode }) {
     }
     result.push(...moduleNav);
     result.push({ label: 'Wowdash', items: wowdashNav });
-    result.push({ label: sentenceCase(t('shell.sections.automation')), items: automationNav });
     return result;
-  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, t, workshopsNav, wowdashNav]);
+  }, [beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, t, workshopsNav, wowdashNav]);
 
   return (
     <AppShell

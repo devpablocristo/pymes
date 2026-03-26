@@ -23,6 +23,21 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # LLM local (OpenAI-compatible API en :11434). Modelos: `docker compose exec ollama ollama pull <modelo>`.
+  ollama:
+    restart: unless-stopped
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   cp-backend:
     restart: unless-stopped
     build:
@@ -114,9 +129,15 @@ services:
       BEAUTY_BACKEND_URL: http://beauty-backend:8083
       RESTAURANTS_BACKEND_URL: http://restaurants-backend:8084
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+      # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     depends_on:
-      - cp-backend
-      - work-backend
+      cp-backend:
+        condition: service_started
+      work-backend:
+        condition: service_started
+      ollama:
+        condition: service_healthy
 
   # ── Professionals Vertical ──
 
@@ -243,6 +264,7 @@ services:
         condition: service_healthy
 
 volumes:
+  ollama_data:
   pgdata:
   cp_backend_go_mod:
   cp_backend_go_build:

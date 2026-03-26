@@ -72,8 +72,6 @@ const ROWS: [string, string, string][] = [
   ['chat-profile', 'Aplicación', 'Chat / perfil'],
   ['calendar-main', 'Aplicación', 'Calendario principal'],
   ['calendar', 'Aplicación', 'Calendario (alias)'],
-  ['kanban', 'Aplicación', 'Tablero Kanban'],
-
   ['invoice-list', 'Facturas', 'Listado de facturas'],
   ['invoice-preview', 'Facturas', 'Vista previa de factura'],
   ['invoice-add', 'Facturas', 'Alta de factura'],

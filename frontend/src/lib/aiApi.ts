@@ -42,3 +42,12 @@ export async function commercialChatSales(payload: CommercialChatRequest): Promi
 export async function commercialChatProcurement(payload: CommercialChatRequest): Promise<CommercialChatResponse> {
   return request('/v1/chat/commercial/procurement', aiOptions({ method: 'POST', body: payload }));
 }
+
+export type PymesAssistantChatResponse = CommercialChatResponse & {
+  routed_mode: string;
+};
+
+/** Asistente Pymes — orquestador (ventas vs compras internas) en un solo chat. */
+export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
+  return request('/v1/chat/pymes/', aiOptions({ method: 'POST', body: payload }));
+}

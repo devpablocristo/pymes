@@ -56,6 +56,29 @@ export async function deleteAPIKey(orgID: string, keyID: string): Promise<void> 
   await request(`/v1/orgs/${orgID}/api-keys/${keyID}`, { method: 'DELETE' });
 }
 
+export type InAppNotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  kind: string;
+  entity_type: string;
+  entity_id: string;
+  chat_context: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+};
+
+export async function listInAppNotifications(): Promise<{
+  items: InAppNotificationItem[];
+  unread_count: number;
+}> {
+  return request('/v1/in-app-notifications');
+}
+
+export async function markInAppNotificationRead(id: string): Promise<{ id: string; read_at: string }> {
+  return request(`/v1/in-app-notifications/${id}`, { method: 'PATCH', body: { read: true } });
+}
+
 export async function getNotificationPreferences(): Promise<{ items: NotificationPreference[] }> {
   return request('/v1/notifications/preferences');
 }

@@ -382,18 +382,10 @@ a {
   justify-content: flex-end;
 }
 
-.page-header h1 {
-  font-size: 1.55rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--color-text);
-  line-height: 1.2;
-}
-
+/* Sin título ni subtítulo en cabeceras de página (todas las pantallas / features). */
+.page-header h1,
 .page-header p {
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-  margin-top: 0.3rem;
+  display: none !important;
 }
 
 /* ── Cards ── */
@@ -429,6 +421,17 @@ a {
   font-weight: 600;
 }
 
+.card-header h1,
+.card-header h2,
+.card-header h3 {
+  display: none !important;
+}
+
+/* Lead inmediatamente bajo la cabecera de card (subtítulo de sección). */
+.card > .card-header + p.text-secondary {
+  display: none !important;
+}
+
 /* ── Stat cards ── */
 .stats-grid {
   display: grid;
@@ -460,6 +463,47 @@ a {
   letter-spacing: -0.03em;
   margin-top: 0.25rem;
   font-family: var(--font-mono);
+}
+
+.stat-card .stat-label {
+  display: none !important;
+}
+
+.stat-card .stat-value {
+  margin-top: 0;
+}
+
+/* Dashboard visual y bloques que reutilizan .dash__chart-title (p. ej. ajustes demo). */
+.dash__stat-label,
+.dash__stat-trend,
+.dash__chart-title {
+  display: none !important;
+}
+
+.card-header p.text-secondary,
+.card-header .text-secondary {
+  display: none !important;
+}
+
+.dashboard-widget-header h3,
+.dashboard-widget-header p {
+  display: none !important;
+}
+
+.section-title-row h2 {
+  display: none !important;
+}
+
+.gcal__title {
+  display: none !important;
+}
+
+.ui-demo__section-title {
+  display: none !important;
+}
+
+.profile-subsection-title {
+  display: none !important;
 }
 
 /* ── Tables ── */

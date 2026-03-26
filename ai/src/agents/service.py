@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
 
 from src.agents.audit import has_processed_request, record_agent_event
+from src.agents.orchestrator_router import route_internal_pymes
 from src.agents.contracts import CommercialContractEnvelope
 from src.agents.policy import build_external_sales_policy, build_internal_procurement_policy, build_internal_sales_policy
 from src.agents.service_support import (
@@ -32,6 +34,42 @@ from runtime.logging import get_logger
 from src.tools import appointments, payments
 
 logger = get_logger(__name__)
+
+
+async def run_internal_orchestrated_chat(
+    *,
+    repo: AIRepository,
+    llm: LLMProvider,
+    backend_client: BackendClient,
+    org_id: str,
+    message: str,
+    conversation_id: str | None,
+    auth: AuthContext,
+    confirmed_actions: list[str] | None = None,
+) -> CommercialChatResult:
+    """Un solo punto de entrada consola: enruta a ventas o compras internas y reutiliza run_commercial_chat."""
+    sanitized_message = sanitize_message(message)
+    conversation = await _load_internal_conversation(repo, auth, conversation_id, sanitized_message)
+    routed = route_internal_pymes(sanitized_message, list(conversation.messages))
+    logger.info(
+        "internal_orchestrator_route",
+        org_id=org_id,
+        conversation_id=conversation.id,
+        routed_mode=routed,
+    )
+    result = await run_commercial_chat(
+        repo=repo,
+        llm=llm,
+        backend_client=backend_client,
+        org_id=org_id,
+        message=message,
+        agent_mode=routed,
+        channel="internal_ui",
+        conversation_id=conversation.id,
+        auth=auth,
+        confirmed_actions=confirmed_actions,
+    )
+    return replace(result, routed_mode=routed)
 
 
 async def run_commercial_chat(

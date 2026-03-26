@@ -4,7 +4,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient
-from runtime.contexts import AuthContext, ToolDeclaration
+from runtime.contexts import AuthContext
+from runtime.types import ToolDeclaration
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 

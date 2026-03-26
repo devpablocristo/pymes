@@ -21,7 +21,12 @@ function labelForChannel(code: string): string {
   return CHANNEL_LABELS[code] ?? code;
 }
 
-export function NotificationPreferencesPage() {
+type NotificationPreferencesPageProps = {
+  /** Dentro de Ajustes: oculta el encabezado principal duplicado. */
+  embedded?: boolean;
+};
+
+export function NotificationPreferencesPage({ embedded = false }: NotificationPreferencesPageProps) {
   const [items, setItems] = useState<NotificationPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,10 +63,21 @@ export function NotificationPreferencesPage() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>Notificaciones</h1>
-        <p>Configura como y donde recibis alertas</p>
-      </div>
+      {!embedded ? (
+        <div className="page-header">
+          <h1>Notificaciones</h1>
+          <p>Configura como y donde recibis alertas</p>
+        </div>
+      ) : (
+        <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="card-header">
+            <h2>Preferencias por correo</h2>
+          </div>
+          <p className="text-secondary" style={{ margin: 0, fontSize: '0.88rem' }}>
+            Tipos de aviso que podemos enviar por email según tu organización.
+          </p>
+        </div>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
 

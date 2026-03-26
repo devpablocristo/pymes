@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from core_ai.contexts import AuthContext
+from runtime.contexts import AuthContext
 from src.api.router import get_conversation, list_conversations
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 

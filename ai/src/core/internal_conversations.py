@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from core_ai.contexts import AuthContext
+from runtime.contexts import AuthContext
 
 
 def get_internal_conversation_user_id(auth: AuthContext) -> str | None:

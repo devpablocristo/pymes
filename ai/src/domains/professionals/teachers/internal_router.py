@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from core_ai.contexts import AuthContext, get_logger
+from runtime.contexts import AuthContext, get_logger
 from src.api.chat_stream import Message, stream_orchestrated_chat
 from src.api.sse import EventSourceResponse
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient

@@ -12,9 +12,9 @@ from src.agents.policy import CommercialPolicy
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
-from core_ai.types import ToolDeclaration
+from runtime.types import ToolDeclaration
 from src.db.repository import AIRepository
-from core_ai.logging import get_logger
+from runtime.logging import get_logger
 from src.tools import (
     accounts,
     appointments,

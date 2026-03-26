@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
-from core_ai.logging import get_logger, update_request_context
+from runtime.logging import get_logger, update_request_context
 from src.api.chat_stream import Message, stream_orchestrated_chat
 from src.api.sse import EventSourceResponse
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient

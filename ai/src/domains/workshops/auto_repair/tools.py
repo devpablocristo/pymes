@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from core_ai.contexts import AuthContext, ToolDeclaration
+from runtime.contexts import AuthContext, ToolDeclaration
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]

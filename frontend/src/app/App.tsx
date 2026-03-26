@@ -129,7 +129,7 @@ export function App() {
                   <Suspended>
                     <Shell>
                       <Routes>
-                      <Route path="/" element={<DashboardPage />} />
+                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />

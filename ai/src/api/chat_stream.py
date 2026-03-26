@@ -4,9 +4,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
-from core_ai.types import LLMProvider, Message, ToolDeclaration
-from core_ai.logging import get_logger
-from core_ai.orchestrator import orchestrate
+from runtime.types import LLMProvider, Message, ToolDeclaration
+from runtime.logging import get_logger
+from runtime.orchestrator import orchestrate
 
 logger = get_logger(__name__)
 

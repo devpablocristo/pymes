@@ -12,8 +12,8 @@ from src.api.router import check_quota
 from src.backend_client.client import BackendClient
 from src.config import Settings
 from src.db.repository import AIRepository
-from core_ai.types import LLMProvider
-from core_ai.logging import get_logger, update_request_context
+from runtime.types import LLMProvider
+from runtime.logging import get_logger, update_request_context
 
 router = APIRouter(prefix="/v1/internal", tags=["internal"])
 logger = get_logger(__name__)

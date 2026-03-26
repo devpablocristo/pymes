@@ -9,15 +9,15 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.60.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/devpablocristo/core/authn/go v0.2.1
+	github.com/devpablocristo/core/concurrency/go v0.0.0
 	github.com/devpablocristo/core/config/go v0.0.0
-	github.com/devpablocristo/core/databases/gorm/go v0.0.0
+	github.com/devpablocristo/core/databases/postgres/go v0.0.0
 	github.com/devpablocristo/core/errors/go v0.0.0
 	github.com/devpablocristo/core/governance/go v0.1.0
 	github.com/devpablocristo/core/http/go v0.0.0
 	github.com/devpablocristo/core/http/go/gin v0.0.0
 	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/devpablocristo/core/security/go v0.0.0
-	github.com/devpablocristo/core/statemachine/go v0.0.0
 	github.com/devpablocristo/core/utils/go v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
@@ -79,7 +79,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.6.0 // indirect
+	github.com/jackc/pgx/v5 v5.8.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -112,7 +112,7 @@ require (
 	gorm.io/driver/mysql v1.6.0 // indirect
 )
 
-replace github.com/devpablocristo/core/databases/gorm/go => ../core/databases/gorm/go
+replace github.com/devpablocristo/core/databases/postgres/go => ../core/databases/postgres/go
 
 replace github.com/devpablocristo/core/saas/go => ../core/saas/go
 
@@ -136,4 +136,4 @@ replace github.com/devpablocristo/core/security/go => ../core/security/go
 
 replace github.com/devpablocristo/core/utils/go => ../core/utils/go
 
-replace github.com/devpablocristo/core/statemachine/go => ../core/statemachine/go
+replace github.com/devpablocristo/core/concurrency/go => ../core/concurrency/go

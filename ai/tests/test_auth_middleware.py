@@ -3,8 +3,8 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from core_ai.auth import AuthMiddleware, AuthSettings
-from core_ai.contexts import AuthContext
+from runtime.auth import AuthMiddleware, AuthSettings
+from runtime.contexts import AuthContext
 
 
 def create_app(*, api_key_verifier: object | None, protected: tuple[str, ...], public: tuple[str, ...]) -> FastAPI:

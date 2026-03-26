@@ -1,3 +1,3 @@
-from core_ai.observability.otel import configure_opentelemetry
+from runtime.observability.otel import configure_opentelemetry
 
 __all__ = ["configure_opentelemetry"]

@@ -5,7 +5,7 @@ import re
 import logging
 from typing import Any
 
-from core_ai.types import ToolDeclaration
+from runtime.types import ToolDeclaration
 from src.review_client.client import ReviewClient
 
 logger = logging.getLogger(__name__)

@@ -10,12 +10,12 @@ from src.agents.review_gate import evaluate_action
 from src.api.chat_stream import estimate_tokens
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
-from core_ai.orchestrator import orchestrate
+from runtime.orchestrator import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
 from src.review_client.client import ReviewClient
-from core_ai.types import LLMProvider, Message
-from core_ai.logging import get_logger
+from runtime.types import LLMProvider, Message
+from runtime.logging import get_logger
 from src.tools.registry import build_external_tools
 
 logger = get_logger(__name__)

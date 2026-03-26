@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/devpablocristo/core/statemachine/go"
+	"github.com/devpablocristo/core/concurrency/go/fsm"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
@@ -45,12 +45,12 @@ func normalizeWorkOrderStatus(raw string) string {
 // invoiced solo desde subconjunto explícito; cancelación desde cualquier no terminal.
 var workOrderStatusSM = newWorkOrderStatusMachine()
 
-func newWorkOrderStatusMachine() *statemachine.Machine {
+func newWorkOrderStatusMachine() *fsm.StringMachine {
 	kanbanOpen := []string{
 		"received", "diagnosing", "quote_pending", "awaiting_parts",
 		"in_progress", "quality_check", "ready_for_pickup", "delivered", "on_hold",
 	}
-	return statemachine.New().
+	return fsm.NewBuilder().
 		Terminal("invoiced", "cancelled").
 		FreeTransitionsAmong(kanbanOpen...).
 		AllowFromStatesTo("invoiced", "delivered", "ready_for_pickup", "in_progress", "quality_check", "quote_pending").
@@ -65,10 +65,10 @@ func validateWorkOrderStatusTransition(fromRaw, toRaw string) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, statemachine.ErrTerminal) {
+	if errors.Is(err, fsm.ErrTerminal) {
 		return fmt.Errorf("work order status is terminal (%s): %w", from, httperrors.ErrConflict)
 	}
-	if errors.Is(err, statemachine.ErrInvalidTransition) {
+	if errors.Is(err, fsm.ErrInvalidTransition) {
 		return fmt.Errorf("invalid work order status transition from %q to %q: %w", from, to, httperrors.ErrBadInput)
 	}
 	return err

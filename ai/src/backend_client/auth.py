@@ -1,3 +1,3 @@
-from core_ai.contexts import AuthContext
+from runtime.contexts import AuthContext
 
 __all__ = ["AuthContext"]

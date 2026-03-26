@@ -163,15 +163,9 @@ export default function AutomationRulesPage() {
 
   if (loading) {
     return (
-      <>
-        <div className="page-header">
-          <h1>{t('shell.nav.automationRules')}</h1>
-          <p>{t('shell.page.automationRules.subtitle')}</p>
-        </div>
-        <div className="automation-rules-page">
-          <div className="loading-wrap">Cargando reglas…</div>
-        </div>
-      </>
+      <div className="automation-rules-page">
+        <div className="loading-wrap">Cargando reglas…</div>
+      </div>
     );
   }
 
@@ -179,16 +173,10 @@ export default function AutomationRulesPage() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>{t('shell.nav.automationRules')}</h1>
-        <p>{t('shell.page.automationRules.subtitle')}</p>
-      </div>
-
       <div className="automation-rules-page">
         <div className="rules-stack">
           {categories.map((cat) => (
             <div key={cat} className="rules-category">
-              <h2>{cat}</h2>
               {RULE_TEMPLATES.filter((t) => t.category === cat).map((tpl) => {
                 const rule = rules[tpl.actionType];
                 if (!rule) return null;

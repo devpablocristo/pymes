@@ -1767,7 +1767,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: ReturnRow) => (
           <>
             <strong>{row.number}</strong>
-            <div className="text-secondary">{row.status} · venta {row.sale_id.slice(0, 8)}…</div>
+            <div className="text-secondary">{row.status}{row.sale_id ? ` · venta ${row.sale_id.slice(0, 8)}…` : ''}</div>
           </>
         ),
       },

@@ -1,7 +1,7 @@
 import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-crud';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CrudHelpers } from '../components/CrudPage';
 import { workOrdersCrudPageConfig } from '../crud/resourceConfigs';
 import { CreatedByPillsBar } from '../components/CreatedByPillsBar';
@@ -164,13 +164,13 @@ const listPath = '/modules/workOrders/list';
 function workOrderKanbanToolbarBtnClass(kind?: 'primary' | 'secondary' | 'danger' | 'success'): string {
   switch (kind) {
     case 'primary':
-      return 'btn-primary';
+      return 'btn-sm btn-primary';
     case 'danger':
-      return 'btn-danger';
+      return 'btn-sm btn-danger';
     case 'success':
-      return 'btn-success';
+      return 'btn-sm btn-success';
     default:
-      return 'btn-secondary';
+      return 'btn-sm btn-secondary';
   }
 }
 
@@ -178,6 +178,7 @@ export function WorkOrdersKanbanPanel() {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
   const { t, localizeText: formatFieldText } = useI18n();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchived = searchParams.get('archived') === '1';
 
@@ -271,25 +272,10 @@ export function WorkOrdersKanbanPanel() {
   }, []);
 
   const statsLine = useCallback(
-    (visible: number, nBoard: number) => {
-      const orgTotal = items.length;
-      const base = showArchived
-        ? `${visible} orden${visible === 1 ? '' : 'es'} archivada${visible === 1 ? '' : 's'}`
-        : `${visible} orden${visible === 1 ? '' : 'es'} en tablero`;
-      let s = base;
-      if (visible < nBoard) {
-        s += ' · coinciden con la búsqueda';
-      }
-      if (nBoard < orgTotal) {
-        s += ` · ${nBoard} de ${orgTotal} por responsable`;
-      }
-      if (orgTotal === 0 && !showArchived) {
-        s += ' · Si tu org es nueva, creá OT desde la lista o revisá el API de talleres.';
-      }
-      if (orgTotal === 0 && showArchived) {
-        s += ' · No hay órdenes archivadas.';
-      }
-      return s;
+    (visible: number, _nBoard: number) => {
+      return visible === 1
+        ? `${visible} orden de trabajo${showArchived ? ' archivada' : ''}`
+        : `${visible} órdenes de trabajo${showArchived ? ' archivadas' : ''}`;
     },
     [items.length, showArchived],
   );
@@ -334,9 +320,9 @@ export function WorkOrdersKanbanPanel() {
           </button>
         ))}
         {canCreate ? (
-          <Link className="btn-primary" to={listPath} draggable={false}>
+          <button type="button" className="btn-sm btn-primary" onClick={() => navigate(listPath)}>
             {cfg.createLabel ? formatFieldText(cfg.createLabel) : '+ Nueva orden'}
-          </Link>
+          </button>
         ) : null}
         {cfg.supportsArchived ? (
           <button
@@ -359,7 +345,7 @@ export function WorkOrdersKanbanPanel() {
         ) : null}
       </>
     );
-  }, [items, load, formatFieldText, t, showArchived, setSearchParams]);
+  }, [items, load, formatFieldText, t, showArchived, setSearchParams, navigate]);
 
   return (
     <>

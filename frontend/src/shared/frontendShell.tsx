@@ -142,6 +142,8 @@ export type AppShellNavItem = {
   label: string;
   icon: ReactNode;
   end?: boolean;
+  /** Si se define, reemplaza el criterio por defecto de NavLink (p. ej. Ajustes vs Notificaciones en /settings). */
+  isActive?: (pathname: string, search: string) => boolean;
 };
 
 export type AppShellNavSection = {
@@ -195,6 +197,7 @@ export function AppShell({
 
 function NavSection({ label, items }: AppShellNavSection) {
   const { sentenceCase } = useI18n();
+  const location = useLocation();
 
   return (
     <>
@@ -204,7 +207,12 @@ function NavSection({ label, items }: AppShellNavSection) {
           key={item.to}
           to={item.to}
           end={item.end}
-          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+          className={({ isActive: navLinkActive }) => {
+            const active = item.isActive
+              ? item.isActive(location.pathname, location.search)
+              : navLinkActive;
+            return `sidebar-link${active ? ' active' : ''}`;
+          }}
         >
           {item.icon}
           <span>{sentenceCase(item.label)}</span>

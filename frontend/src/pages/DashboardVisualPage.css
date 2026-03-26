@@ -1,4 +1,4 @@
-/* Dashboard demo — tokens nativos */
+/* Dashboard visual — tokens nativos */
 
 .dash {
   display: flex;
@@ -46,44 +46,27 @@
 }
 
 .dash__stat-icon--green {
-  background: #ecfdf5;
+  background: var(--color-success-subtle);
   color: var(--color-success);
 }
 
 .dash__stat-icon--amber {
-  background: #fffbeb;
+  background: var(--color-warning-subtle);
   color: var(--color-warning);
 }
 
 .dash__stat-icon--red {
-  background: #fef2f2;
+  background: var(--color-danger-subtle);
   color: var(--color-danger);
 }
 
 .dash__stat-icon--purple {
-  background: #f5f3ff;
-  color: #8b5cf6;
+  background: var(--color-purple-subtle, #f5f3ff);
+  color: var(--color-purple, #8b5cf6);
 }
 
-[data-theme='dark'] .dash__stat-icon--blue {
-  background: rgba(59, 130, 246, 0.15);
-}
-
-[data-theme='dark'] .dash__stat-icon--green {
-  background: rgba(16, 185, 129, 0.15);
-}
-
-[data-theme='dark'] .dash__stat-icon--amber {
-  background: rgba(245, 158, 11, 0.15);
-}
-
-[data-theme='dark'] .dash__stat-icon--red {
-  background: rgba(239, 68, 68, 0.15);
-}
-
-[data-theme='dark'] .dash__stat-icon--purple {
-  background: rgba(139, 92, 246, 0.15);
-}
+/* Dark mode: los tokens var(--color-*-subtle) ya se redefinen en
+   [data-theme='dark'], no hace falta override por icon tone. */
 
 .dash__stat-info {
   flex: 1;

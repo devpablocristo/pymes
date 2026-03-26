@@ -5,14 +5,14 @@
 }
 
 .watcher-config-page h1 {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   font-weight: 600;
   margin-bottom: 4px;
 }
 
 .watcher-config-page .subtitle {
   color: #6b7280;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-bottom: 24px;
 }
 
@@ -41,11 +41,11 @@
 
 .watcher-card .watcher-name {
   font-weight: 500;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
 }
 
 .watcher-card .watcher-desc {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: #6b7280;
   margin-top: 2px;
 }
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: #6b7280;
 }
 
@@ -65,11 +65,11 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .watcher-card .watcher-last-run {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: #9ca3af;
   margin-top: 4px;
 }
@@ -92,7 +92,7 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
 }
@@ -107,7 +107,7 @@
 }
 
 .watcher-config-page .status-msg {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-top: 8px;
   text-align: right;
 }

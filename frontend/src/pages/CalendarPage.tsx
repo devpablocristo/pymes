@@ -330,9 +330,7 @@ export function CalendarPage() {
         <div className="gcal__toolbar-left">
           <button type="button" className="gcal__today-btn" onClick={() => nav('today')}>Hoy</button>
           <button type="button" className="gcal__nav-btn" onClick={() => nav('prev')}>‹</button>
-          <button type="button" className="gcal__nav-btn" onClick={() => nav('next')}>›</button>
-          <h2 className="gcal__title">{titleText}</h2>
-        </div>
+          <button type="button" className="gcal__nav-btn" onClick={() => nav('next')}>›</button>        </div>
         <div className="gcal__toolbar-right">
           <div className="gcal__view-group">
             {([['timeGridDay', 'Día'], ['timeGridWeek', 'Semana'], ['dayGridMonth', 'Mes']] as const).map(([v, label]) => (

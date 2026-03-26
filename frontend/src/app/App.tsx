@@ -25,6 +25,9 @@ const BeautyStaffPage = lazy(() => import('../pages/BeautyStaffPage').then((mod)
 const UnifiedChatPage = lazy(() =>
   import('../pages/UnifiedChatPage').then((mod) => ({ default: mod.UnifiedChatPage })),
 );
+const NotificationsCenterPage = lazy(() =>
+  import('../pages/NotificationsCenterPage').then((mod) => ({ default: mod.NotificationsCenterPage })),
+);
 const CustomersPage = lazy(() => import('../pages/CustomersPage').then((mod) => ({ default: mod.CustomersPage })));
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })));
 const IntakesPage = lazy(() => import('../pages/IntakesPage').then((mod) => ({ default: mod.IntakesPage })));
@@ -37,7 +40,6 @@ const RestaurantDiningAreasPage = lazy(() => import('../pages/RestaurantDiningAr
 const RestaurantDiningTablesPage = lazy(() => import('../pages/RestaurantDiningTablesPage').then((mod) => ({ default: mod.RestaurantDiningTablesPage })));
 const RestaurantTableSessionsPage = lazy(() => import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })));
 const SessionsPage = lazy(() => import('../pages/SessionsPage').then((mod) => ({ default: mod.SessionsPage })));
-const SettingsPage = lazy(() => import('../pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })));
 const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
 const SpecialtiesPage = lazy(() => import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })));
 const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({ default: mod.TeachersPage })));
@@ -49,17 +51,16 @@ const CalendarPage = lazy(() =>
 const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
 );
-const InvoiceDemoPage = lazy(() =>
-  import('../pages/InvoiceDemoPage').then((mod) => ({ default: mod.InvoiceDemoPage })),
+const InvoicesPage = lazy(() =>
+  import('../pages/InvoicesPage').then((mod) => ({ default: mod.InvoicesPage })),
 );
-const SettingsDemoPage = lazy(() =>
-  import('../pages/SettingsDemoPage').then((mod) => ({ default: mod.SettingsDemoPage })),
+const SettingsHubPage = lazy(() =>
+  import('../pages/SettingsHubPage').then((mod) => ({ default: mod.SettingsHubPage })),
 );
-const UIElementsDemoPage = lazy(() =>
-  import('../pages/UIElementsDemoPage').then((mod) => ({ default: mod.UIElementsDemoPage })),
+const UIComponentsPage = lazy(() =>
+  import('../pages/UIComponentsPage').then((mod) => ({ default: mod.UIComponentsPage })),
 );
-const EmailDemoPage = lazy(() => import('../pages/EmailDemoPage').then((m) => ({ default: m.EmailDemoPage })));
-const CryptoDemoPage = lazy(() => import('../pages/CryptoDemoPage').then((m) => ({ default: m.CryptoDemoPage })));
+const CryptoPage = lazy(() => import('../pages/CryptoPage').then((m) => ({ default: m.CryptoPage })));
 
 function Suspended({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="card"><p>Cargando…</p></div>}>{children}</Suspense>;
@@ -72,7 +73,7 @@ function RequireOnboarding({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** Fuera de StrictMode el laboratorio Wowdash (ApexCharts no tolera el doble efecto de dev). */
+/** En desarrollo mantenemos StrictMode sobre toda la consola protegida. */
 function StrictDevShell({ children }: { children: ReactNode }) {
   return <StrictMode>{children}</StrictMode>;
 }
@@ -126,15 +127,14 @@ export function App() {
                     <Shell>
                       <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                      <Route
-                        path="/notifications"
-                        element={<Navigate to="/settings?section=notifications" replace />}
-                      />
+                      <Route path="/notifications" element={<NotificationsCenterPage />} />
                       <Route path="/chat" element={<UnifiedChatPage />} />
                       <Route path="/assistant/commercial" element={<Navigate to="/chat" replace />} />
-                      <Route path="/wowdash/chat" element={<Navigate to="/chat" replace />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/billing" element={<Navigate to="/settings#facturacion" replace />} />
+                      <Route path="/invoices" element={<InvoicesPage />} />
+                      <Route path="/crypto" element={<CryptoPage />} />
+                      <Route path="/ui" element={<UIComponentsPage />} />
                       <Route path="/modules/customers" element={<CustomersPage />} />
                       <Route path="/modules/purchases" element={<PurchasesPage />} />
                       <Route path="/compras" element={<PurchasesPage />} />
@@ -145,7 +145,7 @@ export function App() {
                         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
                       </Route>
                       <Route path="/modules/:moduleId" element={<ModulePage />} />
-                      <Route path="/settings" element={<SettingsDemoPage />} />
+                      <Route path="/settings" element={<SettingsHubPage />} />
                       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
                       <Route
                         path="/settings/notifications"
@@ -168,20 +168,12 @@ export function App() {
                       <Route path="/restaurants/dining/tables" element={<RestaurantDiningTablesPage />} />
                       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
                       <Route path="/automation-rules" element={<AutomationRulesPage />} />
-                      <Route
-                        path="/approvals"
-                        element={<Navigate to="/settings?section=notifications" replace />}
-                      />
+                      <Route path="/approvals" element={<Navigate to="/notifications" replace />} />
                       <Route path="/watcher-config" element={<WatcherConfigPage />} />
                       <Route path="/audit" element={<Suspended><AdminPage section="audit" /></Suspended>} />
                       <Route path="/roles" element={<Suspended><AdminPage section="rbac" /></Suspended>} />
                       <Route path="/dashboard" element={<DashboardVisualPage />} />
                       <Route path="/calendar" element={<CalendarPage />} />
-                      <Route path="/wowdash/kanban" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/wowdash/invoices" element={<InvoiceDemoPage />} />
-                      <Route path="/wowdash/ui" element={<UIElementsDemoPage />} />
-                      <Route path="/wowdash/email" element={<EmailDemoPage />} />
-                      <Route path="/wowdash/crypto" element={<CryptoDemoPage />} />
                       </Routes>
                     </Shell>
                   </Suspended>

@@ -19,5 +19,5 @@
 .wo-modal__textarea--items {
   min-height: 10rem;
   font-family: ui-monospace, monospace;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }

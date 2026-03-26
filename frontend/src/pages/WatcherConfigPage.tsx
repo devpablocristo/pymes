@@ -163,9 +163,6 @@ export default function WatcherConfigPage() {
 
   return (
     <div className="watcher-config-page">
-      <h1>Asistente proactivo</h1>
-      <p className="subtitle">Configura alertas y acciones automaticas</p>
-
       {WATCHER_TEMPLATES.map((tpl) => {
         const state = watchers[tpl.watcherType];
         if (!state) return null;

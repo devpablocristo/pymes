@@ -1,5 +1,5 @@
 /**
- * Iconos SVG inline reutilizables — reemplazan emojis en las páginas demo.
+ * Iconos SVG inline reutilizables — reemplazan emojis en distintas pantallas de la consola.
  * Cada icono es un componente ligero que hereda color y font-size del padre.
  */
 

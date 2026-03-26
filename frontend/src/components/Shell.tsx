@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
-import { getSession } from '../lib/api';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
-import type { ProductRole } from '../lib/types';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
@@ -120,30 +118,10 @@ const bellIcon = (
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
-  const [productRole, setProductRole] = useState<ProductRole | null>(null);
   const [catalog, setCatalog] = useState<{ groups: ModuleGroup[]; modules: ModuleListItem[] }>({
     groups: [],
     modules: [],
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const session = await getSession();
-        if (!cancelled) {
-          setProductRole(session.auth.product_role);
-        }
-      } catch {
-        if (!cancelled) {
-          setProductRole(null);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +165,10 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: '/dashboard', label: 'Dashboard', icon: chartIcon },
       { to: '/calendar', label: 'Calendario', icon: calendarIconBase },
       { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
+      { to: '/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
+      { to: '/invoices', label: t('shell.nav.invoices'), icon: documentIcon },
+      { to: '/crypto', label: t('shell.nav.crypto'), icon: chartIcon },
+      { to: '/ui', label: t('shell.nav.uiComponents'), icon: dashboardIcon },
       { to: '/settings', label: 'Ajustes', icon: adminIcon },
     ];
     return items;
@@ -228,25 +210,6 @@ export function Shell({ children }: { children: ReactNode }) {
     [t],
   );
 
-  const invoiceIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  );
-
-  const wowdashNav = useMemo<AppShellNavItem[]>(
-    () => [
-      { to: '/wowdash/invoices', label: 'Facturación', icon: invoiceIcon },
-      { to: '/wowdash/email', label: 'Email', icon: bellIcon },
-      { to: '/wowdash/crypto', label: 'Crypto', icon: globeIcon },
-      { to: '/wowdash/ui', label: 'Componentes UI', icon: dashboardIcon },
-    ],
-    [],
-  );
-
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
     const profile = getTenantProfile();
@@ -280,9 +243,19 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     result.push(...moduleNav);
-    result.push({ label: 'Wowdash', items: wowdashNav });
     return result;
-  }, [beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, t, workshopsNav, wowdashNav]);
+  }, [
+    beautyNav,
+    catalog.groups,
+    catalog.modules,
+    localizeUiText,
+    mainNav,
+    professionalsNav,
+    restaurantsNav,
+    sentenceCase,
+    t,
+    workshopsNav,
+  ]);
 
   return (
     <AppShell

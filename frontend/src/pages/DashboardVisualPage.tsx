@@ -110,9 +110,7 @@ function CashflowChart() {
   return (
     <div className="card">
       <div className="dash__chart-header">
-        <div>
-          <h3 className="dash__chart-title">Flujo de caja</h3>
-          <div className="dash__chart-metric">{fmtMoney(balance)}</div>
+        <div>          <div className="dash__chart-metric">{fmtMoney(balance)}</div>
           <span className={`dash__stat-trend ${balance >= 0 ? 'dash__stat-trend--up' : 'dash__stat-trend--down'}`}>
             {balance >= 0 ? <IconArrowUp /> : <IconArrowDown />} Balance {data.period}
           </span>
@@ -156,9 +154,7 @@ function QuotesPipeline() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Presupuestos</h3>
-      </div>
+      <div className="dash__chart-header">      </div>
       <div className="dash__donut-wrap">
         <div className="dash__donut" style={{ background: gradientParts.length ? `conic-gradient(${gradientParts.join(', ')})` : 'var(--color-border)' }}>
           <div className="dash__donut-center">{data.pending_total}</div>
@@ -185,9 +181,7 @@ function RecentSales() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Ventas recientes</h3>
-      </div>
+      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin ventas recientes</p>
       ) : (
@@ -222,9 +216,7 @@ function TopProducts() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Productos más vendidos</h3>
-      </div>
+      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin datos de productos</p>
       ) : (
@@ -260,9 +252,7 @@ function AuditActivity() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Actividad reciente</h3>
-      </div>
+      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin actividad reciente</p>
       ) : (
@@ -317,9 +307,7 @@ function TodayAppointments() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Turnos de hoy</h3>
-        <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-primary)' }}>
+      <div className="dash__chart-header">        <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-primary)' }}>
           {isLoading ? '…' : items.length}
         </span>
       </div>
@@ -371,9 +359,7 @@ function LowStockAlerts() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Stock bajo</h3>
-        {!isLoading && items.length > 0 && (
+      <div className="dash__chart-header">        {!isLoading && items.length > 0 && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--color-warning)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
             <IconAlert /> {items.length}
           </span>
@@ -423,9 +409,7 @@ function Debtors() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">
-        <h3 className="dash__chart-title">Deudores</h3>
-        {!isLoading && items.length > 0 && (
+      <div className="dash__chart-header">        {!isLoading && items.length > 0 && (
           <span style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }}>
             {fmtMoney(items.reduce((s, d) => s + d.total_debt, 0))}
           </span>
@@ -461,13 +445,6 @@ function Debtors() {
 export function DashboardVisualPage() {
   return (
     <div className="dash">
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: 'var(--text-base)' }}>
-          Resumen general del negocio
-        </p>
-      </div>
-
       <StatCards />
 
       <div className="dash__grid--3">

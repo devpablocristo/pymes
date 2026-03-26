@@ -63,29 +63,11 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
 
   return (
     <>
-      {!embedded ? (
-        <div className="page-header">
-          <h1>Notificaciones</h1>
-          <p>Configura como y donde recibis alertas</p>
-        </div>
-      ) : (
-        <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-          <div className="card-header">
-            <h2>Preferencias por correo</h2>
-          </div>
-          <p className="text-secondary" style={{ margin: 0, fontSize: '0.88rem' }}>
-            Tipos de aviso que podemos enviar por email según tu organización.
-          </p>
-        </div>
-      )}
+      {/* Sin cabecera — el contexto viene del sidebar */}
 
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
-        <div className="card-header">
-          <h2>Preferencias</h2>
-          <span className="badge badge-neutral">{items.length} reglas</span>
-        </div>
         {loading ? (
           <div className="empty-state">
             <p>Cargando…</p>

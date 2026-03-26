@@ -5,7 +5,7 @@
 }
 
 .approval-inbox-page h1 {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -20,7 +20,7 @@
   border-radius: 12px;
   background: #ef4444;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   margin-left: 8px;
   vertical-align: middle;
@@ -28,7 +28,7 @@
 
 .approval-inbox-page .subtitle {
   color: #6b7280;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-bottom: 24px;
 }
 
@@ -49,14 +49,14 @@
 
 .approval-card .approval-title {
   font-weight: 500;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
 }
 
 .approval-card .risk-badge {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -77,19 +77,19 @@
 }
 
 .approval-card .approval-reason {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: #374151;
   margin-bottom: 4px;
 }
 
 .approval-card .approval-time {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: #9ca3af;
   margin-bottom: 8px;
 }
 
 .approval-card .approval-summary {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: #6b7280;
   font-style: italic;
   margin-bottom: 12px;
@@ -109,7 +109,7 @@
   padding: 6px 10px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .approval-card .btn-approve {
@@ -118,7 +118,7 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -132,7 +132,7 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 

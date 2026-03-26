@@ -154,29 +154,8 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     }
   }
 
-  const header = embedded ? (
-    <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-      <div className="card-header">
-        <h2>Centro de avisos</h2>
-        <span className="badge badge-neutral">{summaryBadge}</span>
-      </div>
-      <p className="text-secondary" style={{ margin: 0, fontSize: '0.88rem' }}>
-        Avisos in-app, solicitudes que requieren aprobar o rechazar, «Más información» para el asistente y «Compartir» para
-        reenviar el resumen por WhatsApp (elegís el contacto en la app).
-      </p>
-    </div>
-  ) : (
-    <div className="page-header">
-      <h1>Notificaciones</h1>
-      <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.88rem' }}>
-        {summaryBadge}
-      </p>
-    </div>
-  );
-
   return (
     <>
-      {header}
       {inAppError ? <p className="form-error">{inAppError}</p> : null}
       {loading ? (
         <div className="card">

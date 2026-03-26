@@ -7,7 +7,7 @@ import {
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
-import './ChatDemoPage.css';
+import './UnifiedChatPage.css';
 
 type ContactKind = 'human' | 'ai_pymes';
 
@@ -278,13 +278,6 @@ export function UnifiedChatPage() {
 
   return (
     <div className="cht">
-      <div className="page-header">
-        <h1>Chat</h1>
-        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.88rem' }}>
-          Personas y <strong>Asistente Pymes</strong> (orquestador: ventas y compras internas). Más agentes se sumarán
-          aquí.
-        </p>
-      </div>
       <div className="cht__layout">
         <div className="cht__contacts">
           <div className="cht__contacts-header">

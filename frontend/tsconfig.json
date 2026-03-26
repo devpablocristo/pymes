@@ -35,6 +35,5 @@
       "@devpablocristo/modules-crud/*": ["./.deps/modules/crud/ts/src/*", "../../modules/crud/ts/src/*"]
     }
   },
-  "include": ["src"],
-  "exclude": ["src/wowdash-port"]
+  "include": ["src"]
 }

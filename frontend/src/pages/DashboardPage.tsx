@@ -14,7 +14,6 @@ import { clerkEnabled } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { greetingDisplayName } from '../lib/profileDisplay';
 import { getTenantProfile } from '../lib/tenantProfile';
-import { WeeklyCalendar } from '../components/WeeklyCalendar';
 import type { MeProfileResponse } from '../lib/types';
 import {
   type DashboardContext,
@@ -218,11 +217,9 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      {profile?.usesScheduling && <WeeklyCalendar />}
-
       {busy ? (
         <div className="spinner" />
-      ) : dashboardQuery.data && (!profile?.usesScheduling || editing) ? (
+      ) : dashboardQuery.data ? (
         <DashboardBoard
           context={selectedContext}
           items={normalizedDraft}

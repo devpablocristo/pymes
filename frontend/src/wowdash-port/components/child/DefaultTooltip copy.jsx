@@ -1,16 +1,18 @@
 import React, { useEffect } from 'react'
-import Tooltip from 'bootstrap/js/dist/tooltip';
 
 const DefaultTooltip = () => {
     useEffect(() => {
-        // Select all elements with data-bs-toggle="DefaultTooltip"
-        const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="DefaultTooltip"]');
+        let tooltipList = [];
+        import('bootstrap/js/dist/tooltip').then((mod) => {
+            const Tooltip = mod.default;
+            // Select all elements with data-bs-toggle="DefaultTooltip"
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="DefaultTooltip"]');
 
-        // Initialize tooltips
-        const tooltipList = Array.from(tooltipTriggerList).map(
-            (tooltipTriggerEl) => new Tooltip(tooltipTriggerEl)
-        );
-
+            // Initialize tooltips
+            tooltipList = Array.from(tooltipTriggerList).map(
+                (tooltipTriggerEl) => new Tooltip(tooltipTriggerEl)
+            );
+        });
 
         // Cleanup on unmount
         return () => {

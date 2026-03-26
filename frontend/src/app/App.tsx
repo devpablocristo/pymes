@@ -1,11 +1,10 @@
 import { StrictMode, Suspense, lazy, type ReactNode } from 'react';
-import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
 import { hasCompletedOnboarding } from '../lib/tenantProfile';
-import { wowdashOpenInDev } from '../lib/wowdashDevAccess';
 
 const Shell = lazy(() => import('../components/Shell').then((mod) => ({ default: mod.Shell })));
 const AdminPage = lazy(() => import('../pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
@@ -44,9 +43,27 @@ const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({
 const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 const ApprovalInboxPage = lazy(() => import('../pages/ApprovalInboxPage'));
 const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
-const WowdashTemplateLabsPage = lazy(() =>
-  import('../pages/WowdashTemplateLabsPage').then((mod) => ({ default: mod.WowdashTemplateLabsPage })),
+const KanbanDemoPage = lazy(() =>
+  import('../pages/KanbanDemoPage').then((mod) => ({ default: mod.KanbanDemoPage })),
 );
+const CalendarDemoPage = lazy(() =>
+  import('../pages/CalendarDemoPage').then((mod) => ({ default: mod.CalendarDemoPage })),
+);
+const InvoiceDemoPage = lazy(() =>
+  import('../pages/InvoiceDemoPage').then((mod) => ({ default: mod.InvoiceDemoPage })),
+);
+const DashboardDemoPage = lazy(() =>
+  import('../pages/DashboardDemoPage').then((mod) => ({ default: mod.DashboardDemoPage })),
+);
+const SettingsDemoPage = lazy(() =>
+  import('../pages/SettingsDemoPage').then((mod) => ({ default: mod.SettingsDemoPage })),
+);
+const UIElementsDemoPage = lazy(() =>
+  import('../pages/UIElementsDemoPage').then((mod) => ({ default: mod.UIElementsDemoPage })),
+);
+const EmailDemoPage = lazy(() => import('../pages/EmailDemoPage').then((m) => ({ default: m.EmailDemoPage })));
+const ChatDemoPage = lazy(() => import('../pages/ChatDemoPage').then((m) => ({ default: m.ChatDemoPage })));
+const CryptoDemoPage = lazy(() => import('../pages/CryptoDemoPage').then((m) => ({ default: m.CryptoDemoPage })));
 
 function Suspended({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="card"><p>Cargando…</p></div>}>{children}</Suspense>;
@@ -64,29 +81,13 @@ function StrictDevShell({ children }: { children: ReactNode }) {
   return <StrictMode>{children}</StrictMode>;
 }
 
-/** Ruta canónica del template: `/console/wowdash/*` (misma sesión que el panel). */
-function LabsWowdashRedirect() {
-  const { pathname, search, hash } = useLocation();
-  const to = `${pathname.replace(/^\/labs\/wowdash/, '/console/wowdash')}${search}${hash}`;
-  return <Navigate to={to} replace />;
-}
-
-function WowdashConsoleEntry() {
-  return (
-    <Suspended>
-      <WowdashTemplateLabsPage />
-    </Suspended>
-  );
-}
 
 export function App() {
-  const wowdashDev = wowdashOpenInDev();
   return (
     <>
       <AuthTokenBridge />
       {clerkEnabled && <ClerkSessionOrgSync />}
       <Routes>
-        {/* Clerk (path routing) usa subrutas: /login/tasks/choose-organization, etc. */}
         <Route
           path="/login/*"
           element={
@@ -117,34 +118,6 @@ export function App() {
                 </Suspended>
               </ProtectedRoute>
             </StrictDevShell>
-          }
-        />
-        <Route
-          path="/labs/wowdash/*"
-          element={
-            wowdashDev ? (
-              <LabsWowdashRedirect />
-            ) : (
-              <ProtectedRoute>
-                <RequireOnboarding>
-                  <LabsWowdashRedirect />
-                </RequireOnboarding>
-              </ProtectedRoute>
-            )
-          }
-        />
-        <Route
-          path="/console/wowdash/*"
-          element={
-            wowdashDev ? (
-              <WowdashConsoleEntry />
-            ) : (
-              <ProtectedRoute>
-                <RequireOnboarding>
-                  <WowdashConsoleEntry />
-                </RequireOnboarding>
-              </ProtectedRoute>
-            )
           }
         />
         <Route
@@ -195,6 +168,15 @@ export function App() {
                       <Route path="/automation-rules" element={<AutomationRulesPage />} />
                       <Route path="/approvals" element={<ApprovalInboxPage />} />
                       <Route path="/watcher-config" element={<WatcherConfigPage />} />
+                      <Route path="/wowdash/kanban" element={<KanbanDemoPage />} />
+                      <Route path="/wowdash/calendar" element={<CalendarDemoPage />} />
+                      <Route path="/wowdash/invoices" element={<InvoiceDemoPage />} />
+                      <Route path="/wowdash/dashboard" element={<DashboardDemoPage />} />
+                      <Route path="/wowdash/settings" element={<SettingsDemoPage />} />
+                      <Route path="/wowdash/ui" element={<UIElementsDemoPage />} />
+                      <Route path="/wowdash/email" element={<EmailDemoPage />} />
+                      <Route path="/wowdash/chat" element={<ChatDemoPage />} />
+                      <Route path="/wowdash/crypto" element={<CryptoDemoPage />} />
                       </Routes>
                     </Shell>
                   </Suspended>

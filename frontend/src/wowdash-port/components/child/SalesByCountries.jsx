@@ -1,74 +1,80 @@
 import React, { useEffect } from "react";
-import jsVectorMap from "jsvectormap";
-import "jsvectormap/dist/maps/world.js";
+
 const SalesByCountries = () => {
   useEffect(() => {
-    const map = new jsVectorMap({
-      selector: "#map",
-      map: "world", // Use the map name you installed
-      backgroundColor: "transparent",
-      borderColor: "#fff",
-      borderOpacity: 0.25,
-      borderWidth: 0,
-      color: "#000000",
-      regionStyle: {
-        initial: {
-          fill: "#D1D5DB",
-        },
-      },
-      markerStyle: {
-        initial: {
-          r: 5,
-          fill: "#fff",
-          "fill-opacity": 1,
-          stroke: "#000",
-          "stroke-width": 1,
-          "stroke-opacity": 0.4,
-        },
-      },
-      markers: [
-        { coords: [35.8617, 104.1954], name: "China : 250" },
-        { coords: [25.2744, 133.7751], name: "Australia : 250" },
-        { coords: [36.77, -119.41], name: "USA : 82%" },
-        { coords: [55.37, -3.41], name: "UK : 250" },
-        { coords: [25.2, 55.27], name: "UAE : 250" },
-      ],
-      series: {
-        regions: [
-          {
-            attribute: "fill",
-
-            scale: {
-              US: "#487FFF ",
-              SA: "#487FFF",
-              AU: "#487FFF",
-              CN: "#487FFF",
-              GB: "#487FFF",
-            },
-            values: {
-              // But when dealing with regions's series you should specify the region key.
-              US: "US",
-              SA: "SA",
-              AU: "AU",
-              CN: "CN",
-              GB: "GB",
-            },
+    let map;
+    Promise.all([
+      import('jsvectormap'),
+      import('jsvectormap/dist/maps/world.js'),
+    ]).then(([mod]) => {
+      const jsVectorMap = mod.default;
+      map = new jsVectorMap({
+        selector: "#map",
+        map: "world", // Use the map name you installed
+        backgroundColor: "transparent",
+        borderColor: "#fff",
+        borderOpacity: 0.25,
+        borderWidth: 0,
+        color: "#000000",
+        regionStyle: {
+          initial: {
+            fill: "#D1D5DB",
           },
+        },
+        markerStyle: {
+          initial: {
+            r: 5,
+            fill: "#fff",
+            "fill-opacity": 1,
+            stroke: "#000",
+            "stroke-width": 1,
+            "stroke-opacity": 0.4,
+          },
+        },
+        markers: [
+          { coords: [35.8617, 104.1954], name: "China : 250" },
+          { coords: [25.2744, 133.7751], name: "Australia : 250" },
+          { coords: [36.77, -119.41], name: "USA : 82%" },
+          { coords: [55.37, -3.41], name: "UK : 250" },
+          { coords: [25.2, 55.27], name: "UAE : 250" },
         ],
-      },
-      hoverOpacity: null,
-      normalizeFunction: "linear",
-      zoomOnScroll: false,
-      scaleColors: ["#000000", "#000000"],
-      selectedColor: "#000000",
-      selectedRegions: [],
-      enableZoom: false,
-      hoverColor: "#fff",
+        series: {
+          regions: [
+            {
+              attribute: "fill",
+
+              scale: {
+                US: "#487FFF ",
+                SA: "#487FFF",
+                AU: "#487FFF",
+                CN: "#487FFF",
+                GB: "#487FFF",
+              },
+              values: {
+                // But when dealing with regions's series you should specify the region key.
+                US: "US",
+                SA: "SA",
+                AU: "AU",
+                CN: "CN",
+                GB: "GB",
+              },
+            },
+          ],
+        },
+        hoverOpacity: null,
+        normalizeFunction: "linear",
+        zoomOnScroll: false,
+        scaleColors: ["#000000", "#000000"],
+        selectedColor: "#000000",
+        selectedRegions: [],
+        enableZoom: false,
+        hoverColor: "#fff",
+      });
     });
 
     // Cleanup the map instance when the component unmounts
     return () => {
-      map && map.destroy();
+      if (map) map.destroy();
     };
   }, []);
   return (

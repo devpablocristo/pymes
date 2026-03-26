@@ -1,15 +1,16 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
-
-// Código del template en JSX (sin tsc estricto); el bundle se separa en `wowdash-template`.
-const WowdashApp = lazy(() => import('#wowdash/App'));
 
 const LAB_HEAD_ATTR = 'data-pymes-wowdash-lab';
 
 /**
- * Plantilla Wowdash completa bajo `/console/wowdash/*` (canónico). `/labs/wowdash/*` redirige aquí.
- * El CSS se sirve encapsulado en `#wowdash-template-root` vía `wowdash-assets/css/pymes-scoped.css`.
- * Quill/KaTeX del editor van en ese bundle (no import global de react-quill).
+ * Layout del laboratorio Wowdash bajo `/console/wowdash` + hijo `path="*"`.
+ * Comentario: con `BrowserRouter future.v7_relativeSplatPath`, un único `path="/console/wowdash/*"`
+ * rompía el matching de rutas relativas del `<Routes>` del port (solo el index matcheaba).
+ * El árbol correcto es `path="/console/wowdash"` → `path="*"` → `#wowdash/App`.
+ *
+ * CSS encapsulado en `#wowdash-template-root` vía `wowdash-assets/css/pymes-scoped.css`.
  */
 export function WowdashTemplateLabsPage() {
   useEffect(() => {
@@ -65,15 +66,7 @@ export function WowdashTemplateLabsPage() {
 
   return (
     <div id="wowdash-template-root" className="wowdash-template-root">
-      <Suspense
-        fallback={
-          <div style={{ padding: '2rem', fontFamily: 'system-ui' }} role="status">
-            Cargando plantilla Wowdash…
-          </div>
-        }
-      >
-        <WowdashApp />
-      </Suspense>
+      <Outlet />
       <ToastContainer position="top-right" autoClose={5000} theme="light" />
     </div>
   );

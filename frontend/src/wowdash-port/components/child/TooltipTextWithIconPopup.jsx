@@ -1,21 +1,24 @@
 import React, { useEffect } from 'react'
-import Tooltip from 'bootstrap/js/dist/tooltip';
 import { Icon } from '@iconify/react/dist/iconify.js';
 
 const TooltipTextWithIconPopup = () => {
     useEffect(() => {
-        // Select all elements with the class 'tooltip-buttonThree '
-        const tooltipButtons = document.querySelectorAll('.tooltip-buttonThree');
+        let tooltipInstances = [];
+        import('bootstrap/js/dist/tooltip').then((mod) => {
+            const Tooltip = mod.default;
+            // Select all elements with the class 'tooltip-buttonThree '
+            const tooltipButtons = document.querySelectorAll('.tooltip-buttonThree');
 
-        // Initialize a tooltip for each button
-        const tooltipInstances = Array.from(tooltipButtons).map((tooltipButton) => {
-            const tooltipContent = tooltipButton.nextElementSibling.innerHTML;
+            // Initialize a tooltip for each button
+            tooltipInstances = Array.from(tooltipButtons).map((tooltipButton) => {
+                const tooltipContent = tooltipButton.nextElementSibling.innerHTML;
 
-            return new Tooltip(tooltipButton, {
-                title: tooltipContent,
-                trigger: 'hover',
-                html: true,
-                customClass: tooltipButton.getAttribute('data-bs-custom-class') || '',
+                return new Tooltip(tooltipButton, {
+                    title: tooltipContent,
+                    trigger: 'hover',
+                    html: true,
+                    customClass: tooltipButton.getAttribute('data-bs-custom-class') || '',
+                });
             });
         });
 

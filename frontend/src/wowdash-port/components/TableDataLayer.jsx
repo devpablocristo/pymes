@@ -1,16 +1,18 @@
 import React, { useEffect } from 'react'
 import $ from 'jquery';
-import 'datatables.net-dt/js/dataTables.dataTables.js';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import { Link } from 'react-router-dom';
 
 const TableDataLayer = () => {
     useEffect(() => {
-        const table = $('#dataTable').DataTable({
-            pageLength: 10,
+        let table;
+        import('datatables.net-dt').then(() => {
+            table = $('#dataTable').DataTable({
+                pageLength: 10,
+            });
         });
         return () => {
-            table.destroy(true);
+            if (table) table.destroy(true);
         };
     }, []);
     return (

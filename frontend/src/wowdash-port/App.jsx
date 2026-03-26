@@ -1,223 +1,189 @@
+import React, { lazy, Suspense, Component } from "react";
 import { Route, Routes } from "react-router-dom";
-import HomePageOne from "./pages/HomePageOne";
-import HomePageTwo from "./pages/HomePageTwo";
-import HomePageThree from "./pages/HomePageThree";
-import HomePageFour from "./pages/HomePageFour";
-import HomePageFive from "./pages/HomePageFive";
-import HomePageSix from "./pages/HomePageSix";
-import HomePageSeven from "./pages/HomePageSeven";
-import EmailPage from "./pages/EmailPage";
-import AddUserPage from "./pages/AddUserPage";
-import AlertPage from "./pages/AlertPage";
-import AssignRolePage from "./pages/AssignRolePage";
-import AvatarPage from "./pages/AvatarPage";
-import BadgesPage from "./pages/BadgesPage";
-import ButtonPage from "./pages/ButtonPage";
-import CalendarMainPage from "./pages/CalendarMainPage";
-import CardPage from "./pages/CardPage";
-import CarouselPage from "./pages/CarouselPage";
-import ChatEmptyPage from "./pages/ChatEmptyPage";
-import ChatMessagePage from "./pages/ChatMessagePage";
-import ChatProfilePage from "./pages/ChatProfilePage";
-import CodeGeneratorNewPage from "./pages/CodeGeneratorNewPage";
-import CodeGeneratorPage from "./pages/CodeGeneratorPage";
-import ColorsPage from "./pages/ColorsPage";
-import ColumnChartPage from "./pages/ColumnChartPage";
-import CompanyPage from "./pages/CompanyPage";
-import CurrenciesPage from "./pages/CurrenciesPage";
-import DropdownPage from "./pages/DropdownPage";
-import ErrorPage from "./pages/ErrorPage";
-import FaqPage from "./pages/FaqPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import FormLayoutPage from "./pages/FormLayoutPage";
-import FormValidationPage from "./pages/FormValidationPage";
-import FormPage from "./pages/FormPage";
-import GalleryPage from "./pages/GalleryPage";
-import ImageGeneratorPage from "./pages/ImageGeneratorPage";
-import ImageUploadPage from "./pages/ImageUploadPage";
-import InvoiceAddPage from "./pages/InvoiceAddPage";
-import InvoiceEditPage from "./pages/InvoiceEditPage";
-import InvoiceListPage from "./pages/InvoiceListPage";
-import InvoicePreviewPage from "./pages/InvoicePreviewPage";
-import KanbanPage from "./pages/KanbanPage";
-import LanguagePage from "./pages/LanguagePage";
-import LineChartPage from "./pages/LineChartPage";
-import ListPage from "./pages/ListPage";
-import MarketplaceDetailsPage from "./pages/MarketplaceDetailsPage";
-import MarketplacePage from "./pages/MarketplacePage";
-import NotificationAlertPage from "./pages/NotificationAlertPage";
-import NotificationPage from "./pages/NotificationPage";
-import PaginationPage from "./pages/PaginationPage";
-import PaymentGatewayPage from "./pages/PaymentGatewayPage";
-import PieChartPage from "./pages/PieChartPage";
-import PortfolioPage from "./pages/PortfolioPage";
-import PricingPage from "./pages/PricingPage";
-import ProgressPage from "./pages/ProgressPage";
-import RadioPage from "./pages/RadioPage";
-import RoleAccessPage from "./pages/RoleAccessPage";
-import SignInPage from "./pages/SignInPage";
-import SignUpPage from "./pages/SignUpPage";
-import StarRatingPage from "./pages/StarRatingPage";
-import StarredPage from "./pages/StarredPage";
-import SwitchPage from "./pages/SwitchPage";
-import TableBasicPage from "./pages/TableBasicPage";
-import TableDataPage from "./pages/TableDataPage";
-import TabsPage from "./pages/TabsPage";
-import TagsPage from "./pages/TagsPage";
-import TermsConditionPage from "./pages/TermsConditionPage";
-import TextGeneratorPage from "./pages/TextGeneratorPage";
-import ThemePage from "./pages/ThemePage";
-import TooltipPage from "./pages/TooltipPage";
-import TypographyPage from "./pages/TypographyPage";
-import UsersGridPage from "./pages/UsersGridPage";
-import UsersListPage from "./pages/UsersListPage";
-import ViewDetailsPage from "./pages/ViewDetailsPage";
-import VideoGeneratorPage from "./pages/VideoGeneratorPage";
-import VideosPage from "./pages/VideosPage";
-import ViewProfilePage from "./pages/ViewProfilePage";
-import VoiceGeneratorPage from "./pages/VoiceGeneratorPage";
-import WalletPage from "./pages/WalletPage";
-import WidgetsPage from "./pages/WidgetsPage";
-import WizardPage from "./pages/WizardPage";
 import RouteScrollToTop from "./helper/RouteScrollToTop";
-import TextGeneratorNewPage from "./pages/TextGeneratorNewPage";
-import HomePageEight from "./pages/HomePageEight";
-import HomePageNine from "./pages/HomePageNine";
-import HomePageTen from "./pages/HomePageTen";
-import HomePageEleven from "./pages/HomePageEleven";
-import GalleryGridPage from "./pages/GalleryGridPage";
-import GalleryMasonryPage from "./pages/GalleryMasonryPage";
-import GalleryHoverPage from "./pages/GalleryHoverPage";
-import BlogPage from "./pages/BlogPage";
-import BlogDetailsPage from "./pages/BlogDetailsPage";
-import AddBlogPage from "./pages/AddBlogPage";
-import TestimonialsPage from "./pages/TestimonialsPage";
-import ComingSoonPage from "./pages/ComingSoonPage";
-import AccessDeniedPage from "./pages/AccessDeniedPage";
-import MaintenancePage from "./pages/MaintenancePage";
-import BlankPagePage from "./pages/BlankPagePage";
+
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '2rem', fontFamily: 'system-ui' }}>
+          <h2 style={{ color: '#ef4444' }}>Error en esta página</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', color: '#f87171', fontSize: '0.82rem', margin: '1rem 0', maxHeight: '200px', overflow: 'auto', background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
+            {this.state.error.message}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          >
+            Reintentar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const Loader = <div style={{ padding: '2rem' }}>Cargando…</div>;
+
+function W({ C }) {
+  return (
+    <PageErrorBoundary>
+      <Suspense fallback={Loader}>
+        <C />
+      </Suspense>
+    </PageErrorBoundary>
+  );
+}
+
+// Lazy imports explícitos
+
+const AddUserPage = lazy(() => import("./pages/AddUserPage"));
+const UsersListPage = lazy(() => import("./pages/UsersListPage"));
+const UsersGridPage = lazy(() => import("./pages/UsersGridPage"));
+const ViewProfilePage = lazy(() => import("./pages/ViewProfilePage"));
+const AssignRolePage = lazy(() => import("./pages/AssignRolePage"));
+const RoleAccessPage = lazy(() => import("./pages/RoleAccessPage"));
+
+
+const FormPage = lazy(() => import("./pages/FormPage"));
+const FormLayoutPage = lazy(() => import("./pages/FormLayoutPage"));
+const FormValidationPage = lazy(() => import("./pages/FormValidationPage"));
+const WizardPage = lazy(() => import("./pages/WizardPage"));
+const ImageUploadPage = lazy(() => import("./pages/ImageUploadPage"));
+
+const TableBasicPage = lazy(() => import("./pages/TableBasicPage"));
+const TableDataPage = lazy(() => import("./pages/TableDataPage"));
+
+const LineChartPage = lazy(() => import("./pages/LineChartPage"));
+const ColumnChartPage = lazy(() => import("./pages/ColumnChartPage"));
+const PieChartPage = lazy(() => import("./pages/PieChartPage"));
+const WidgetsPage = lazy(() => import("./pages/WidgetsPage"));
+
+const EmailPage = lazy(() => import("./pages/EmailPage"));
+const StarredPage = lazy(() => import("./pages/StarredPage"));
+const ChatEmptyPage = lazy(() => import("./pages/ChatEmptyPage"));
+const ChatMessagePage = lazy(() => import("./pages/ChatMessagePage"));
+const ChatProfilePage = lazy(() => import("./pages/ChatProfilePage"));
+
+
+const TextGeneratorPage = lazy(() => import("./pages/TextGeneratorPage"));
+const TextGeneratorNewPage = lazy(() => import("./pages/TextGeneratorNewPage"));
+const CodeGeneratorPage = lazy(() => import("./pages/CodeGeneratorPage"));
+const CodeGeneratorNewPage = lazy(() => import("./pages/CodeGeneratorNewPage"));
+const ImageGeneratorPage = lazy(() => import("./pages/ImageGeneratorPage"));
+const VoiceGeneratorPage = lazy(() => import("./pages/VoiceGeneratorPage"));
+const VideoGeneratorPage = lazy(() => import("./pages/VideoGeneratorPage"));
+
+const WalletPage = lazy(() => import("./pages/WalletPage"));
+const MarketplacePage = lazy(() => import("./pages/MarketplacePage"));
+const MarketplaceDetailsPage = lazy(() => import("./pages/MarketplaceDetailsPage"));
+const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
+
+const GalleryPage = lazy(() => import("./pages/GalleryPage"));
+const GalleryGridPage = lazy(() => import("./pages/GalleryGridPage"));
+const GalleryMasonryPage = lazy(() => import("./pages/GalleryMasonryPage"));
+const GalleryHoverPage = lazy(() => import("./pages/GalleryHoverPage"));
+const BlogPage = lazy(() => import("./pages/BlogPage"));
+const BlogDetailsPage = lazy(() => import("./pages/BlogDetailsPage"));
+const AddBlogPage = lazy(() => import("./pages/AddBlogPage"));
+
+const TestimonialsPage = lazy(() => import("./pages/TestimonialsPage"));
+const FaqPage = lazy(() => import("./pages/FaqPage"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
+const TermsConditionPage = lazy(() => import("./pages/TermsConditionPage"));
+const BlankPagePage = lazy(() => import("./pages/BlankPagePage"));
+const ViewDetailsPage = lazy(() => import("./pages/ViewDetailsPage"));
+
+const ComingSoonPage = lazy(() => import("./pages/ComingSoonPage"));
+const AccessDeniedPage = lazy(() => import("./pages/AccessDeniedPage"));
+const MaintenancePage = lazy(() => import("./pages/MaintenancePage"));
+const SignInPage = lazy(() => import("./pages/SignInPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+
+
+const ErrorPage = lazy(() => import("./pages/ErrorPage"));
 
 function App() {
   return (
     <>
       <RouteScrollToTop />
       <Routes>
-        <Route index element={<HomePageOne />} />
-        <Route path='index-2' element={<HomePageTwo />} />
-        <Route path='index-3' element={<HomePageThree />} />
-        <Route path='index-4' element={<HomePageFour />} />
-        <Route path='index-5' element={<HomePageFive />} />
-        <Route path='index-6' element={<HomePageSix />} />
-        <Route path='index-7' element={<HomePageSeven />} />
-        <Route path='index-8' element={<HomePageEight />} />
-        <Route path='index-9' element={<HomePageNine />} />
-        <Route path='index-10' element={<HomePageTen />} />
-        <Route path='index-11' element={<HomePageEleven />} />
 
-        {/* SL */}
-        <Route path='add-user' element={<AddUserPage />} />
-        <Route path='alert' element={<AlertPage />} />
-        <Route path='assign-role' element={<AssignRolePage />} />
-        <Route path='avatar' element={<AvatarPage />} />
-        <Route path='badges' element={<BadgesPage />} />
-        <Route path='button' element={<ButtonPage />} />
-        <Route path='calendar-main' element={<CalendarMainPage />} />
-        <Route path='calendar' element={<CalendarMainPage />} />
-        <Route path='card' element={<CardPage />} />
-        <Route path='carousel' element={<CarouselPage />} />
-        <Route path='chat-empty' element={<ChatEmptyPage />} />
-        <Route path='chat-message' element={<ChatMessagePage />} />
-        <Route path='chat-profile' element={<ChatProfilePage />} />
-        <Route path='code-generator' element={<CodeGeneratorPage />} />
-        <Route
-          path='code-generator-new'
-          element={<CodeGeneratorNewPage />}
-        />
-        <Route path='colors' element={<ColorsPage />} />
-        <Route path='column-chart' element={<ColumnChartPage />} />
-        <Route path='company' element={<CompanyPage />} />
-        <Route path='currencies' element={<CurrenciesPage />} />
-        <Route path='dropdown' element={<DropdownPage />} />
-        <Route path='email' element={<EmailPage />} />
-        <Route path='faq' element={<FaqPage />} />
-        <Route path='forgot-password' element={<ForgotPasswordPage />} />
-        <Route path='form-layout' element={<FormLayoutPage />} />
-        <Route path='form-validation' element={<FormValidationPage />} />
-        <Route path='form' element={<FormPage />} />
+        <Route path='add-user' element={<W C={AddUserPage} />} />
+        <Route path='users-list' element={<W C={UsersListPage} />} />
+        <Route path='users-grid' element={<W C={UsersGridPage} />} />
+        <Route path='view-profile' element={<W C={ViewProfilePage} />} />
+        <Route path='assign-role' element={<W C={AssignRolePage} />} />
+        <Route path='role-access' element={<W C={RoleAccessPage} />} />
 
-        <Route path='gallery' element={<GalleryPage />} />
-        <Route path='gallery-grid' element={<GalleryGridPage />} />
-        <Route path='gallery-masonry' element={<GalleryMasonryPage />} />
-        <Route path='gallery-hover' element={<GalleryHoverPage />} />
 
-        <Route path='blog' element={<BlogPage />} />
-        <Route path='blog-details' element={<BlogDetailsPage />} />
-        <Route path='add-blog' element={<AddBlogPage />} />
+        <Route path='form' element={<W C={FormPage} />} />
+        <Route path='form-layout' element={<W C={FormLayoutPage} />} />
+        <Route path='form-validation' element={<W C={FormValidationPage} />} />
+        <Route path='wizard' element={<W C={WizardPage} />} />
+        <Route path='image-upload' element={<W C={ImageUploadPage} />} />
 
-        <Route path='testimonials' element={<TestimonialsPage />} />
-        <Route path='coming-soon' element={<ComingSoonPage />} />
-        <Route path='access-denied' element={<AccessDeniedPage />} />
-        <Route path='maintenance' element={<MaintenancePage />} />
-        <Route path='blank-page' element={<BlankPagePage />} />
+        <Route path='table-basic' element={<W C={TableBasicPage} />} />
+        <Route path='table-data' element={<W C={TableDataPage} />} />
 
-        <Route path='image-generator' element={<ImageGeneratorPage />} />
-        <Route path='image-upload' element={<ImageUploadPage />} />
-        <Route path='invoice-add' element={<InvoiceAddPage />} />
-        <Route path='invoice-edit' element={<InvoiceEditPage />} />
-        <Route path='invoice-list' element={<InvoiceListPage />} />
-        <Route path='invoice-preview' element={<InvoicePreviewPage />} />
-        <Route path='kanban' element={<KanbanPage />} />
-        <Route path='language' element={<LanguagePage />} />
-        <Route path='line-chart' element={<LineChartPage />} />
-        <Route path='list' element={<ListPage />} />
-        <Route
-          path='marketplace-details'
-          element={<MarketplaceDetailsPage />}
-        />
-        <Route path='marketplace' element={<MarketplacePage />} />
-        <Route
-          path='notification-alert'
-          element={<NotificationAlertPage />}
-        />
-        <Route path='notification' element={<NotificationPage />} />
-        <Route path='pagination' element={<PaginationPage />} />
-        <Route path='payment-gateway' element={<PaymentGatewayPage />} />
-        <Route path='pie-chart' element={<PieChartPage />} />
-        <Route path='portfolio' element={<PortfolioPage />} />
-        <Route path='pricing' element={<PricingPage />} />
-        <Route path='progress' element={<ProgressPage />} />
-        <Route path='radio' element={<RadioPage />} />
-        <Route path='role-access' element={<RoleAccessPage />} />
-        <Route path='sign-in' element={<SignInPage />} />
-        <Route path='sign-up' element={<SignUpPage />} />
-        <Route path='star-rating' element={<StarRatingPage />} />
-        <Route path='starred' element={<StarredPage />} />
-        <Route path='switch' element={<SwitchPage />} />
-        <Route path='table-basic' element={<TableBasicPage />} />
-        <Route path='table-data' element={<TableDataPage />} />
-        <Route path='tabs' element={<TabsPage />} />
-        <Route path='tags' element={<TagsPage />} />
-        <Route path='terms-condition' element={<TermsConditionPage />} />
-        <Route
-          path='text-generator-new'
-          element={<TextGeneratorNewPage />}
-        />
-        <Route path='text-generator' element={<TextGeneratorPage />} />
-        <Route path='theme' element={<ThemePage />} />
-        <Route path='tooltip' element={<TooltipPage />} />
-        <Route path='typography' element={<TypographyPage />} />
-        <Route path='users-grid' element={<UsersGridPage />} />
-        <Route path='users-list' element={<UsersListPage />} />
-        <Route path='view-details' element={<ViewDetailsPage />} />
-        <Route path='video-generator' element={<VideoGeneratorPage />} />
-        <Route path='videos' element={<VideosPage />} />
-        <Route path='view-profile' element={<ViewProfilePage />} />
-        <Route path='voice-generator' element={<VoiceGeneratorPage />} />
-        <Route path='wallet' element={<WalletPage />} />
-        <Route path='widgets' element={<WidgetsPage />} />
-        <Route path='wizard' element={<WizardPage />} />
+        <Route path='line-chart' element={<W C={LineChartPage} />} />
+        <Route path='column-chart' element={<W C={ColumnChartPage} />} />
+        <Route path='pie-chart' element={<W C={PieChartPage} />} />
+        <Route path='widgets' element={<W C={WidgetsPage} />} />
 
-        <Route path='*' element={<ErrorPage />} />
+        <Route path='email' element={<W C={EmailPage} />} />
+        <Route path='starred' element={<W C={StarredPage} />} />
+        <Route path='chat-empty' element={<W C={ChatEmptyPage} />} />
+        <Route path='chat-message' element={<W C={ChatMessagePage} />} />
+        <Route path='chat-profile' element={<W C={ChatProfilePage} />} />
+
+
+        <Route path='text-generator' element={<W C={TextGeneratorPage} />} />
+        <Route path='text-generator-new' element={<W C={TextGeneratorNewPage} />} />
+        <Route path='code-generator' element={<W C={CodeGeneratorPage} />} />
+        <Route path='code-generator-new' element={<W C={CodeGeneratorNewPage} />} />
+        <Route path='image-generator' element={<W C={ImageGeneratorPage} />} />
+        <Route path='voice-generator' element={<W C={VoiceGeneratorPage} />} />
+        <Route path='video-generator' element={<W C={VideoGeneratorPage} />} />
+
+        <Route path='wallet' element={<W C={WalletPage} />} />
+        <Route path='marketplace' element={<W C={MarketplacePage} />} />
+        <Route path='marketplace-details' element={<W C={MarketplaceDetailsPage} />} />
+        <Route path='portfolio' element={<W C={PortfolioPage} />} />
+
+        <Route path='gallery' element={<W C={GalleryPage} />} />
+        <Route path='gallery-grid' element={<W C={GalleryGridPage} />} />
+        <Route path='gallery-masonry' element={<W C={GalleryMasonryPage} />} />
+        <Route path='gallery-hover' element={<W C={GalleryHoverPage} />} />
+        <Route path='blog' element={<W C={BlogPage} />} />
+        <Route path='blog-details' element={<W C={BlogDetailsPage} />} />
+        <Route path='add-blog' element={<W C={AddBlogPage} />} />
+
+        <Route path='testimonials' element={<W C={TestimonialsPage} />} />
+        <Route path='faq' element={<W C={FaqPage} />} />
+        <Route path='pricing' element={<W C={PricingPage} />} />
+        <Route path='terms-condition' element={<W C={TermsConditionPage} />} />
+        <Route path='blank-page' element={<W C={BlankPagePage} />} />
+        <Route path='view-details' element={<W C={ViewDetailsPage} />} />
+
+        <Route path='coming-soon' element={<W C={ComingSoonPage} />} />
+        <Route path='access-denied' element={<W C={AccessDeniedPage} />} />
+        <Route path='maintenance' element={<W C={MaintenancePage} />} />
+        <Route path='sign-in' element={<W C={SignInPage} />} />
+        <Route path='sign-up' element={<W C={SignUpPage} />} />
+        <Route path='forgot-password' element={<W C={ForgotPasswordPage} />} />
+
+
+        <Route path='*' element={<W C={ErrorPage} />} />
       </Routes>
     </>
   );

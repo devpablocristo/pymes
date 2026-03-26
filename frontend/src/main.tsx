@@ -11,7 +11,6 @@ import { LanguageProvider } from './lib/i18n';
 import { applyAdminSkin } from './lib/adminSkin';
 import { applyTheme } from './lib/theme';
 import './styles.css';
-import './styles/admin-skin-wowdash.css';
 
 applyTheme();
 applyAdminSkin();
@@ -45,8 +44,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 const queryClient = new QueryClient();
 
-// StrictMode vive en rutas concretas dentro de `App` (no en /labs/wowdash): ApexCharts del template
-// rompe al doble montaje/desmontaje de desarrollo y dispara el ErrorBoundary global.
 const app = (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>

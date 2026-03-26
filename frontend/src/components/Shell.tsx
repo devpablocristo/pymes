@@ -180,11 +180,6 @@ export function Shell({ children }: { children: ReactNode }) {
         icon: assistantCommercialIcon,
       },
     ];
-    items.push({
-      to: '/console/wowdash',
-      label: t('shell.nav.wowdashLabs'),
-      icon: dashboardIcon,
-    });
     return items;
   }, [t]);
 
@@ -222,6 +217,47 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: clockIcon },
     ],
     [t],
+  );
+
+  const kanbanIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="5" height="18" rx="1" />
+      <rect x="10" y="3" width="5" height="12" rx="1" />
+      <rect x="17" y="3" width="5" height="15" rx="1" />
+    </svg>
+  );
+
+  const calendarIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+
+  const invoiceIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+
+  const wowdashNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/wowdash/dashboard', label: 'Dashboard', icon: dashboardIcon },
+      { to: '/wowdash/kanban', label: 'Kanban', icon: kanbanIcon },
+      { to: '/wowdash/calendar', label: 'Calendario', icon: calendarIcon },
+      { to: '/wowdash/invoices', label: 'Facturación', icon: invoiceIcon },
+      { to: '/wowdash/email', label: 'Email', icon: bellIcon },
+      { to: '/wowdash/chat', label: 'Chat', icon: assistantCommercialIcon },
+      { to: '/wowdash/crypto', label: 'Crypto', icon: globeIcon },
+      { to: '/wowdash/ui', label: 'Componentes UI', icon: dashboardIcon },
+      { to: '/wowdash/settings', label: 'Ajustes', icon: adminIcon },
+    ],
+    [],
   );
 
   const automationNav = useMemo<AppShellNavItem[]>(
@@ -275,10 +311,11 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     result.push(...moduleNav);
+    result.push({ label: 'Wowdash', items: wowdashNav });
     result.push({ label: sentenceCase(t('shell.sections.automation')), items: automationNav });
     result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav]);
+  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav, wowdashNav]);
 
   const footerControls =
     productRole !== null ? (

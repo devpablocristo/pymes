@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { wowdashAssetsPlugin } from './vite-wowdash-assets-plugin';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const coreAuthCandidates = [
@@ -33,7 +32,7 @@ const modulesCrudKanbanSubpath = path.join(modulesCrudTsRoot, 'src', 'kanban');
 
 export default defineConfig({
   envDir: '..',
-  plugins: [react(), wowdashAssetsPlugin()],
+  plugins: [react()],
   build: {
     rollupOptions: {
       output: {
@@ -45,15 +44,8 @@ export default defineConfig({
             if (id.includes('react-router')) {
               return 'vendor-router';
             }
-            if (
-              id.includes('apexcharts') ||
-              id.includes('@fullcalendar') ||
-              id.includes('datatables') ||
-              id.includes('/jquery/') ||
-              id.includes('react-bootstrap') ||
-              id.includes('/bootstrap/')
-            ) {
-              return 'vendor-wowdash';
+            if (id.includes('@fullcalendar')) {
+              return 'vendor-calendar';
             }
             return 'vendor';
           }
@@ -63,9 +55,6 @@ export default defineConfig({
           if (id.includes('/src/shared/frontendShell') || id.includes('/src/components/Shell') || id.includes('/src/pages/DashboardPage')) {
             return 'app-shell';
           }
-          if (id.includes('/src/wowdash-port/')) {
-            return 'wowdash-template';
-          }
           return undefined;
         },
       },
@@ -73,7 +62,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '#wowdash/App': path.resolve(__dirname, 'src/wowdash-port/App.jsx'),
       '@devpablocristo/core-authn': coreAuthPath,
       '@devpablocristo/core-browser': coreBrowserPath,
       '@devpablocristo/core-http': coreHttpPath,
@@ -88,7 +76,6 @@ export default defineConfig({
     fs: {
       allow: [
         path.resolve(__dirname, '..'),
-        path.resolve(__dirname, 'wowdash-assets'),
         coreAuthPath,
         coreBrowserPath,
         coreHttpPath,

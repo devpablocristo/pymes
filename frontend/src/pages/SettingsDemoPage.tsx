@@ -1,21 +1,45 @@
 /**
- * Settings demo — 7 tabs unificados desde el template Wowdash.
- * Company, Notifications, Notification Alerts, Theme, Currencies, Languages, Payment Gateway.
+ * Ajustes unificados — todos los settings de la plataforma en tabs.
  */
-import { useState, useCallback } from 'react';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { IconEdit, IconTrash, IconUsers, IconDollar, IconAlert, IconBell, IconPalette, IconGlobe, IconCreditCard, IconSettings, IconBuilding } from '../components/Icons';
+import { AdminSkinSelector } from '../components/AdminSkinSelector';
+import { LanguageSelector } from '../components/LanguageSelector';
 import './SettingsDemoPage.css';
 
-type Tab = 'company' | 'notifications' | 'alerts' | 'theme' | 'currencies' | 'languages' | 'gateway';
+const AdminPage = lazy(() => import('./AdminPage').then((m) => ({ default: m.AdminPage })));
+const BillingSection = lazy(() => import('./SettingsPage').then((m) => ({ default: m.BillingSettingsSection })));
+const ProfilePage = lazy(() => import('./SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const NotificationPreferencesPage = lazy(() => import('./NotificationPreferencesPage').then((m) => ({ default: m.NotificationPreferencesPage })));
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'company', label: 'Empresa' },
-  { id: 'notifications', label: 'Notificaciones' },
-  { id: 'alerts', label: 'Alertas' },
-  { id: 'theme', label: 'Tema' },
-  { id: 'currencies', label: 'Monedas' },
-  { id: 'languages', label: 'Idiomas' },
-  { id: 'gateway', label: 'Pasarela de pago' },
+type Section =
+  | null | 'profile' | 'notifications' | 'company' | 'firebaseNotif'
+  | 'currencies' | 'gateway'
+  | 'appearance' | 'language'
+  | 'workspace';
+
+const SECTIONS: { id: Exclude<Section, null>; label: string; desc: string; icon: ReactNode }[] = [
+  { id: 'profile', label: 'Perfil', desc: 'Datos personales y cuenta', icon: <IconUsers /> },
+  { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: <IconBuilding /> },
+  { id: 'appearance', label: 'Apariencia', desc: 'Tema, skin, logos y colores', icon: <IconPalette /> },
+  { id: 'language', label: 'Idioma', desc: 'Idioma de la plataforma', icon: <IconGlobe /> },
+  { id: 'notifications', label: 'Notificaciones', desc: 'Preferencias y canales de alerta', icon: <IconBell /> },
+  { id: 'gateway', label: 'Pagos y facturación', desc: 'Plan, pasarelas y métodos de cobro', icon: <IconCreditCard /> },
+  { id: 'currencies', label: 'Monedas', desc: 'Monedas habilitadas', icon: <IconDollar /> },
+  { id: 'company', label: 'Empresa', desc: 'Datos de contacto y dirección', icon: <IconBuilding /> },
+  { id: 'firebaseNotif', label: 'Firebase', desc: 'Configuración push notifications', icon: <IconSettings /> },
 ];
+
+// ─── Toggle ───
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="stg__switch">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="stg__switch-slider" />
+    </label>
+  );
+}
 
 // ─── Company ───
 
@@ -50,9 +74,9 @@ function CompanyTab() {
   );
 }
 
-// ─── Notifications ───
+// ─── Firebase Notifications ───
 
-function NotificationsTab() {
+function FirebaseNotifTab() {
   const fields = [
     { label: 'Secret Key', placeholder: 'AAAA...' },
     { label: 'VAPID Key', placeholder: 'BKagO...' },
@@ -79,18 +103,9 @@ function NotificationsTab() {
   );
 }
 
-// ─── Notification Alerts ───
+// ─── Alert Channels ───
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="stg__switch">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="stg__switch-slider" />
-    </label>
-  );
-}
-
-function AlertsTab() {
+function AlertChannelsTab() {
   const [channels, setChannels] = useState([
     { id: 'mail', label: 'Email', desc: 'Notificaciones por correo electrónico', enabled: true, text: 'Se envió un nuevo mensaje a tu bandeja.' },
     { id: 'sms', label: 'SMS', desc: 'Notificaciones por mensaje de texto', enabled: false, text: '' },
@@ -209,13 +224,11 @@ function CurrenciesTab() {
               <td>{c.symbol}</td>
               <td>{c.code}</td>
               <td>{c.crypto ? <span className="badge badge-neutral">Sí</span> : '—'}</td>
-              <td>
-                <Toggle checked={c.active} onChange={() => toggleActive(c.id)} />
-              </td>
+              <td><Toggle checked={c.active} onChange={() => toggleActive(c.id)} /></td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar">✏️</button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(c.id)}>🗑️</button>
+                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar"><IconEdit /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(c.id)}><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -257,8 +270,8 @@ function LanguagesTab() {
               <td><Toggle checked={l.active} onChange={() => toggle(l.id)} /></td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar">✏️</button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(l.id)}>🗑️</button>
+                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar"><IconEdit /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(l.id)}><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -312,37 +325,72 @@ function GatewayTab() {
 // ─── Página principal ───
 
 export function SettingsDemoPage() {
-  const [tab, setTab] = useState<Tab>('company');
+  const [section, setSection] = useState<Section>(null);
 
   return (
     <div className="stg">
       <div className="page-header">
         <h1>Ajustes</h1>
-        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: '0.88rem' }}>
+        <p style={{ color: 'var(--color-text-secondary)', margin: 0, fontSize: 'var(--text-base)' }}>
           Configuración general de la plataforma
         </p>
       </div>
 
-      <div className="stg__tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`stg__tab ${tab === t.id ? 'stg__tab--active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
+      {section === null ? (
+        <div className="stg__nav-grid">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="stg__nav-card"
+              onClick={() => setSection(s.id)}
+            >
+              <div className="stg__nav-icon">{s.icon}</div>
+              <div className="stg__nav-info">
+                <div className="stg__nav-title">{s.label}</div>
+                <div className="stg__nav-desc">{s.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <button type="button" className="stg__back" onClick={() => setSection(null)}>
+            ← Volver a Ajustes
           </button>
-        ))}
-      </div>
 
-      {tab === 'company' && <CompanyTab />}
-      {tab === 'notifications' && <NotificationsTab />}
-      {tab === 'alerts' && <AlertsTab />}
-      {tab === 'theme' && <ThemeTab />}
-      {tab === 'currencies' && <CurrenciesTab />}
-      {tab === 'languages' && <LanguagesTab />}
-      {tab === 'gateway' && <GatewayTab />}
+          {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage /></Suspense>}
+          {section === 'notifications' && (
+            <>
+              <Suspense fallback={<div className="spinner" />}><NotificationPreferencesPage /></Suspense>
+              <AlertChannelsTab />
+            </>
+          )}
+          {section === 'company' && <CompanyTab />}
+          {section === 'firebaseNotif' && <FirebaseNotifTab />}
+          {section === 'currencies' && <CurrenciesTab />}
+          {section === 'gateway' && (
+            <>
+              <Suspense fallback={<div className="spinner" />}><BillingSection /></Suspense>
+              <GatewayTab />
+            </>
+          )}
+          {section === 'appearance' && (
+            <>
+              <Suspense fallback={<div className="spinner" />}><AdminPage section="appearance" /></Suspense>
+              <div className="card"><div className="card-header"><h2>Skin de consola</h2></div><AdminSkinSelector /></div>
+              <ThemeTab />
+            </>
+          )}
+          {section === 'language' && (
+            <>
+              <div className="card"><LanguageSelector /></div>
+              <LanguagesTab />
+            </>
+          )}
+          {section === 'workspace' && <Suspense fallback={<div className="spinner" />}><AdminPage section="workspace" /></Suspense>}
+        </>
+      )}
     </div>
   );
 }

@@ -154,7 +154,9 @@ function settingsToForm(s: TenantSettings): TenantFormState {
   };
 }
 
-export function AdminPage() {
+export type AdminSection = 'all' | 'appearance' | 'workspace' | 'rbac' | 'audit';
+
+export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) {
   const { t } = useI18n();
   const [uiTheme, setUiTheme] = useState(getTheme);
   const [settings, setSettings] = useState<TenantSettings | null>(null);
@@ -277,14 +279,18 @@ export function AdminPage() {
     setError('');
   }
 
+  const showAll = section === 'all';
+
   return (
     <>
-      <div className="page-header">
-        <h1>Administración</h1>
-        <p>Configuración del espacio y registro de actividad</p>
-      </div>
+      {showAll && (
+        <div className="page-header">
+          <h1>Administración</h1>
+          <p>Configuración del espacio y registro de actividad</p>
+        </div>
+      )}
 
-      <div className="card">
+      {(showAll || section === 'appearance') && <div className="card">
         <div className="card-header">
           <h2>{t('profile.admin.appearanceTitle')}</h2>
         </div>
@@ -299,11 +305,11 @@ export function AdminPage() {
             {uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
           </button>
         </div>
-      </div>
+      </div>}
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="card">
+      {(showAll || section === 'workspace') && <div className="card">
         <div className="card-header">
           <h2>Configuración del espacio</h2>
         </div>
@@ -625,11 +631,11 @@ export function AdminPage() {
             </div>
           </form>
         )}
-      </div>
+      </div>}
 
-      {isConsoleAdmin && sessionOrgId ? <AdminRbacSection orgId={sessionOrgId} /> : null}
+      {(showAll || section === 'rbac') && isConsoleAdmin && sessionOrgId ? <AdminRbacSection orgId={sessionOrgId} /> : null}
 
-      <div className="card">
+      {(showAll || section === 'audit') && <div className="card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
           <h2>Registro de auditoría</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -678,7 +684,7 @@ export function AdminPage() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </>
   );
 }

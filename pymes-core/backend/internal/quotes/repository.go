@@ -179,7 +179,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 		limit = 100
 	}
 
-	q := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if s := strings.TrimSpace(p.Status); s != "" {
 		q = q.Where("status = ?", s)
 	}
@@ -339,6 +339,52 @@ func (r *Repository) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) 
 	return nil
 }
 
+func (r *Repository) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, quoteID).
+		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, quoteID).
+		Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Solo se permite hard delete de presupuestos archivados.
+		var count int64
+		if err := tx.Model(&models.QuoteModel{}).
+			Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, quoteID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		// Eliminar items asociados.
+		if err := tx.Where("quote_id = ?", quoteID).Delete(&models.QuoteItemModel{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("org_id = ? AND id = ?", orgID, quoteID).Delete(&models.QuoteModel{}).Error
+	})
+}
+
 func (r *Repository) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
 	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
 		Where("org_id = ? AND id = ?", orgID, quoteID).
@@ -474,6 +520,7 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 		CreatedBy:    quoteRow.CreatedBy,
 		CreatedAt:    quoteRow.CreatedAt,
 		UpdatedAt:    quoteRow.UpdatedAt,
+		ArchivedAt:   quoteRow.ArchivedAt,
 	}
 }
 

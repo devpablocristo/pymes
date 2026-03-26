@@ -22,6 +22,9 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error)
 	DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error
+	Archive(ctx context.Context, orgID, quoteID uuid.UUID) error
+	Restore(ctx context.Context, orgID, quoteID uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error
 	SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
@@ -213,18 +216,41 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quote
 	return out, nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
-	if err := u.repo.DeleteDraft(ctx, orgID, quoteID); err != nil {
-		if errors.Is(err, ErrQuoteNotDraft) {
-			return fmt.Errorf("quote is not in draft status: %w", httperrors.ErrNotDraft)
-		}
+func (u *Usecases) Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.deleted", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "quote.archived", "quote", quoteID.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, quoteID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "quote.restored", "quote", quoteID.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, quoteID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "quote.hard_deleted", "quote", quoteID.String(), map[string]any{})
 	}
 	return nil
 }

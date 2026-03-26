@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { IconCalendar, IconEdit, IconTrash, IconClose } from '../components/Icons';
 import './KanbanDemoPage.css';
 
 // ─── Tipos ───
@@ -123,7 +124,7 @@ function TaskCard({
       <span className="kd__card-tag">{task.tag}</span>
       <div className="kd__card-footer">
         <span className="kd__card-date">
-          📅{' '}
+          <IconCalendar />{' '}
           {new Date(task.date).toLocaleDateString('es-AR', {
             day: '2-digit',
             month: 'short',
@@ -132,10 +133,10 @@ function TaskCard({
         </span>
         <div className="kd__card-actions">
           <button type="button" className="kd__card-action kd__card-action--edit" onClick={onEdit} title="Editar">
-            ✏️
+            <IconEdit />
           </button>
           <button type="button" className="kd__card-action kd__card-action--delete" onClick={onDelete} title="Eliminar">
-            🗑️
+            <IconTrash />
           </button>
         </div>
       </div>
@@ -198,7 +199,7 @@ function TaskModal({
         <div className="kd__modal-header">
           <h3 className="kd__modal-title">{isEdit ? 'Editar tarea' : 'Nueva tarea'}</h3>
           <button type="button" className="kd__modal-close" onClick={onClose}>
-            ✕
+            <IconClose />
           </button>
         </div>
         <div className="kd__modal-body">

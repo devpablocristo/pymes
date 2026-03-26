@@ -43,17 +43,17 @@ const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({
 const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 const ApprovalInboxPage = lazy(() => import('../pages/ApprovalInboxPage'));
 const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
+const CalendarPage = lazy(() =>
+  import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })),
+);
+const DashboardVisualPage = lazy(() =>
+  import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
+);
 const KanbanDemoPage = lazy(() =>
   import('../pages/KanbanDemoPage').then((mod) => ({ default: mod.KanbanDemoPage })),
 );
-const CalendarDemoPage = lazy(() =>
-  import('../pages/CalendarDemoPage').then((mod) => ({ default: mod.CalendarDemoPage })),
-);
 const InvoiceDemoPage = lazy(() =>
   import('../pages/InvoiceDemoPage').then((mod) => ({ default: mod.InvoiceDemoPage })),
-);
-const DashboardDemoPage = lazy(() =>
-  import('../pages/DashboardDemoPage').then((mod) => ({ default: mod.DashboardDemoPage })),
 );
 const SettingsDemoPage = lazy(() =>
   import('../pages/SettingsDemoPage').then((mod) => ({ default: mod.SettingsDemoPage })),
@@ -143,7 +143,7 @@ export function App() {
                         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
                       </Route>
                       <Route path="/modules/:moduleId" element={<ModulePage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/settings" element={<SettingsDemoPage />} />
                       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
                       <Route
                         path="/settings/notifications"
@@ -168,11 +168,12 @@ export function App() {
                       <Route path="/automation-rules" element={<AutomationRulesPage />} />
                       <Route path="/approvals" element={<ApprovalInboxPage />} />
                       <Route path="/watcher-config" element={<WatcherConfigPage />} />
+                      <Route path="/audit" element={<Suspended><AdminPage section="audit" /></Suspended>} />
+                      <Route path="/roles" element={<Suspended><AdminPage section="rbac" /></Suspended>} />
+                      <Route path="/dashboard" element={<DashboardVisualPage />} />
+                      <Route path="/calendar" element={<CalendarPage />} />
                       <Route path="/wowdash/kanban" element={<KanbanDemoPage />} />
-                      <Route path="/wowdash/calendar" element={<CalendarDemoPage />} />
                       <Route path="/wowdash/invoices" element={<InvoiceDemoPage />} />
-                      <Route path="/wowdash/dashboard" element={<DashboardDemoPage />} />
-                      <Route path="/wowdash/settings" element={<SettingsDemoPage />} />
                       <Route path="/wowdash/ui" element={<UIElementsDemoPage />} />
                       <Route path="/wowdash/email" element={<EmailDemoPage />} />
                       <Route path="/wowdash/chat" element={<ChatDemoPage />} />

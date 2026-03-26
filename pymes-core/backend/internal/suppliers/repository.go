@@ -226,6 +226,69 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplierdomain.Supplier, error) {
+	var rows []supplierPartyRow
+	err := r.db.WithContext(ctx).
+		Table("parties p").
+		Select("p.*, COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name").
+		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier'").
+		Where("p.org_id = ? AND p.deleted_at IS NOT NULL", orgID).
+		Order("p.updated_at DESC").
+		Limit(200).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]supplierdomain.Supplier, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, supplierFromPartyRow(row))
+	}
+	return out, nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Table("parties").
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+			Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verificar que está archivado antes de eliminar permanentemente.
+		var count int64
+		if err := tx.Table("parties").
+			Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		// Eliminar roles y extensiones del party.
+		if err := tx.Exec("DELETE FROM party_roles WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("DELETE FROM party_organizations WHERE party_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		// Eliminar el party.
+		return tx.Table("parties").
+			Where("org_id = ? AND id = ?", orgID, id).
+			Delete(nil).Error
+	})
+}
+
 func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("parties p").

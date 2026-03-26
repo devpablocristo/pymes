@@ -20,9 +20,14 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error) {
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int, archived bool) ([]appointmentsdomain.Appointment, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 200})
 	q := r.db.WithContext(ctx).Model(&models.AppointmentModel{}).Where("org_id = ?", orgID)
+	if archived {
+		q = q.Where("archived_at IS NOT NULL")
+	} else {
+		q = q.Where("archived_at IS NULL")
+	}
 	if from != nil {
 		q = q.Where("start_at >= ?", from.UTC())
 	}
@@ -123,6 +128,45 @@ func (r *Repository) Cancel(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.AppointmentModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Updates(map[string]any{"archived_at": time.Now().UTC(), "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.AppointmentModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"archived_at": nil, "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Delete(&models.AppointmentModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func toDomain(row models.AppointmentModel) appointmentsdomain.Appointment {
 	var metadata map[string]any
 	if len(row.Metadata) > 0 {
@@ -148,6 +192,7 @@ func toDomain(row models.AppointmentModel) appointmentsdomain.Appointment {
 		CreatedBy:     row.CreatedBy,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
+		ArchivedAt:    row.ArchivedAt,
 	}
 }
 

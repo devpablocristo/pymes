@@ -166,6 +166,52 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error) {
+	var rows []models.ProductModel
+	err := r.db.WithContext(ctx).
+		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
+		Order("updated_at DESC").
+		Limit(200).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]productdomain.Product, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomain(row))
+	}
+	return out, nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	// Verificar que esté archivado antes de eliminar permanentemente.
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&models.ProductModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ?", orgID, id).
+		Delete(&models.ProductModel{}).Error
+}
+
 func toDomain(row models.ProductModel) productdomain.Product {
 	meta := map[string]any{}
 	if len(row.Metadata) > 0 {

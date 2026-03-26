@@ -21,7 +21,7 @@ export function setAdminSkin(skin: AdminSkinId): void {
   applyAdminSkin(skin);
 }
 
-/** Sincroniza `<html data-admin-skin="...">` para que los tokens en `admin-skin-wowdash.css` apliquen. */
+/** Sincroniza `<html data-admin-skin="...">` para que los tokens CSS de la skin activa apliquen. */
 export function applyAdminSkin(skin?: AdminSkinId): void {
   const id = skin ?? getAdminSkin();
   document.documentElement.setAttribute('data-admin-skin', id);

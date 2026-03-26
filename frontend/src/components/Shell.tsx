@@ -117,12 +117,6 @@ const bellIcon = (
   </svg>
 );
 
-const profileIcon = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
@@ -171,14 +165,33 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const chartIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+
+  const calendarIconBase = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+
   const mainNav = useMemo<AppShellNavItem[]>(() => {
     const items: AppShellNavItem[] = [
-      { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
+      { to: '/dashboard', label: 'Dashboard', icon: chartIcon },
+      { to: '/calendar', label: 'Calendario', icon: calendarIconBase },
       {
         to: '/assistant/commercial',
         label: t('shell.nav.assistantCommercial'),
         icon: assistantCommercialIcon,
       },
+      { to: '/settings', label: 'Ajustes', icon: adminIcon },
     ];
     return items;
   }, [t]);
@@ -227,15 +240,6 @@ export function Shell({ children }: { children: ReactNode }) {
     </svg>
   );
 
-  const calendarIcon = (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-
   const invoiceIcon = (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -247,15 +251,12 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const wowdashNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/wowdash/dashboard', label: 'Dashboard', icon: dashboardIcon },
       { to: '/wowdash/kanban', label: 'Kanban', icon: kanbanIcon },
-      { to: '/wowdash/calendar', label: 'Calendario', icon: calendarIcon },
       { to: '/wowdash/invoices', label: 'Facturación', icon: invoiceIcon },
       { to: '/wowdash/email', label: 'Email', icon: bellIcon },
       { to: '/wowdash/chat', label: 'Chat', icon: assistantCommercialIcon },
       { to: '/wowdash/crypto', label: 'Crypto', icon: globeIcon },
       { to: '/wowdash/ui', label: 'Componentes UI', icon: dashboardIcon },
-      { to: '/wowdash/settings', label: 'Ajustes', icon: adminIcon },
     ],
     [],
   );
@@ -269,14 +270,7 @@ export function Shell({ children }: { children: ReactNode }) {
     [t],
   );
 
-  const settingsNav = useMemo<AppShellNavItem[]>(
-    () => [
-      { to: '/settings', label: t('shell.nav.profile'), end: true, icon: profileIcon },
-      { to: '/settings/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
-      { to: '/admin', label: t('shell.nav.admin'), icon: adminIcon },
-    ],
-    [t],
-  );
+
 
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
@@ -313,25 +307,14 @@ export function Shell({ children }: { children: ReactNode }) {
     result.push(...moduleNav);
     result.push({ label: 'Wowdash', items: wowdashNav });
     result.push({ label: sentenceCase(t('shell.sections.automation')), items: automationNav });
-    result.push({ label: sentenceCase(t('shell.sections.settings')), items: settingsNav });
     return result;
-  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, settingsNav, t, workshopsNav, wowdashNav]);
-
-  const footerControls =
-    productRole !== null ? (
-      <div className="sidebar-footer-controls">
-        <span className="badge badge-neutral shell-product-role" title={t('shell.role.hint')}>
-          {productRole === 'admin' ? t('shell.role.admin') : t('shell.role.user')}
-        </span>
-      </div>
-    ) : null;
+  }, [automationNav, beautyNav, catalog.groups, catalog.modules, localizeUiText, mainNav, professionalsNav, restaurantsNav, sentenceCase, t, workshopsNav, wowdashNav]);
 
   return (
     <AppShell
       brandTitle="Pymes SaaS"
       brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
       sections={sections}
-      footerContent={footerControls}
     >
       {children}
     </AppShell>

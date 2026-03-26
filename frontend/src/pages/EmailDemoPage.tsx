@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { IconInbox, IconStar, IconSend, IconDraft, IconAlert, IconTrash } from '../components/Icons';
 import './EmailDemoPage.css';
 
 type Folder = 'inbox' | 'starred' | 'sent' | 'drafts' | 'spam' | 'trash';
@@ -16,10 +17,10 @@ const EMAILS: Email[] = [
   { id: '9', from: 'Newsletter', subject: 'Ofertas de la semana', preview: 'No te pierdas las ofertas exclusivas…', date: '19 Mar', unread: true, starred: false, folder: 'spam' },
 ];
 
-const FOLDERS: { id: Folder; label: string; icon: string }[] = [
-  { id: 'inbox', label: 'Bandeja', icon: '📥' }, { id: 'starred', label: 'Destacados', icon: '⭐' },
-  { id: 'sent', label: 'Enviados', icon: '📤' }, { id: 'drafts', label: 'Borradores', icon: '📝' },
-  { id: 'spam', label: 'Spam', icon: '⚠️' }, { id: 'trash', label: 'Papelera', icon: '🗑️' },
+const FOLDERS: { id: Folder; label: string; icon: ReactNode }[] = [
+  { id: 'inbox', label: 'Bandeja', icon: <IconInbox /> }, { id: 'starred', label: 'Destacados', icon: <IconStar filled /> },
+  { id: 'sent', label: 'Enviados', icon: <IconSend /> }, { id: 'drafts', label: 'Borradores', icon: <IconDraft /> },
+  { id: 'spam', label: 'Spam', icon: <IconAlert /> }, { id: 'trash', label: 'Papelera', icon: <IconTrash /> },
 ];
 
 export function EmailDemoPage() {
@@ -62,7 +63,7 @@ export function EmailDemoPage() {
             {filtered.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Sin mensajes</div>}
             {filtered.map(e => (
               <div key={e.id} className={`eml__item ${e.unread ? 'eml__item--unread' : ''}`}>
-                <span className={`eml__item-star ${e.starred ? 'eml__item-star--active' : ''}`} onClick={() => toggleStar(e.id)}>★</span>
+                <span className={`eml__item-star ${e.starred ? 'eml__item-star--active' : ''}`} onClick={() => toggleStar(e.id)}><IconStar filled={e.starred} /></span>
                 <span className="eml__item-from">{e.from}</span>
                 <span className="eml__item-subject">{e.subject} — <span style={{ fontWeight: 400 }}>{e.preview}</span></span>
                 <span className="eml__item-date">{e.date}</span>

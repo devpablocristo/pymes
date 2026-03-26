@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IconStar } from '../components/Icons';
 import './CryptoDemoPage.css';
 
 type CryptoTab = 'wallet' | 'marketplace' | 'portfolio';
@@ -69,7 +70,7 @@ function MarketView({ coins }: { coins: Coin[] }) {
               <td>{c.supply}</td>
               <td>{c.marketCap}</td>
               <td><Sparkline data={c.spark} color={c.change >= 0 ? '#10b981' : '#ef4444'} /></td>
-              <td><button type="button" onClick={() => toggleWatch(c.id)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.1rem', color: watched.has(c.id) ? '#f59e0b' : 'var(--color-border)' }}>★</button></td>
+              <td><button type="button" onClick={() => toggleWatch(c.id)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.1rem', color: watched.has(c.id) ? '#f59e0b' : 'var(--color-border)' }}><IconStar filled={watched.has(c.id)} /></button></td>
             </tr>
           ))}
         </tbody>

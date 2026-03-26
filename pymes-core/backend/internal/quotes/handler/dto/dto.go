@@ -59,6 +59,7 @@ type QuoteResponse struct {
 	CreatedBy    string              `json:"created_by"`
 	CreatedAt    string              `json:"created_at"`
 	UpdatedAt    string              `json:"updated_at"`
+	ArchivedAt   string              `json:"archived_at,omitempty"`
 }
 
 type ListQuotesResponse struct {

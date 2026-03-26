@@ -756,6 +756,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
   suppliers: {
     basePath: '/v1/suppliers',
+    supportsArchived: true,
     label: 'proveedor',
     labelPlural: 'proveedores',
     labelPluralCap: 'Proveedores',
@@ -824,6 +825,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
   products: {
     basePath: '/v1/products',
+    supportsArchived: true,
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
@@ -969,6 +971,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
   quotes: {
     basePath: '/v1/quotes',
+    supportsArchived: true,
     label: 'presupuesto',
     labelPlural: 'presupuestos',
     labelPluralCap: 'Presupuestos',
@@ -1747,6 +1750,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     isValid: (values) => asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
   returns: {
+    basePath: '/v1/returns',
     label: 'devolución',
     labelPlural: 'devoluciones',
     labelPluralCap: 'Devoluciones',
@@ -1777,12 +1781,6 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [],
-    dataSource: {
-      list: async () => {
-        const data = await apiRequest<{ items?: ReturnRow[] | null }>('/v1/returns');
-        return parseListItemsFromResponse(data);
-      },
-    },
     searchText: (row: ReturnRow) =>
       [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
     toFormValues: () => ({}) as CrudFormValues,
@@ -2305,6 +2303,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
   appointments: {
     basePath: '/v1/appointments',
+    supportsArchived: true,
     label: 'turno',
     labelPlural: 'turnos',
     labelPluralCap: 'Turnos',

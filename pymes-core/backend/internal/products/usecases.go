@@ -15,10 +15,13 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error)
 	Create(ctx context.Context, in productdomain.Product) (productdomain.Product, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 	Update(ctx context.Context, in productdomain.Product) (productdomain.Product, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type InventoryPort interface {
@@ -176,6 +179,36 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "product.deleted", "product", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error) {
+	return u.repo.ListArchived(ctx, orgID)
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "product.restored", "product", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "product.hard_deleted", "product", id.String(), map[string]any{})
 	}
 	return nil
 }

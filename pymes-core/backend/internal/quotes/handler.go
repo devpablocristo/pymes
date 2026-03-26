@@ -25,7 +25,9 @@ type usecasesPort interface {
 	Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error)
-	Delete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
 	Send(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
 	Accept(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
 	Reject(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
@@ -44,6 +46,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/quotes/:id", rbac.RequirePermission("quotes", "read"), h.Get)
 	auth.PUT("/quotes/:id", rbac.RequirePermission("quotes", "update"), h.Update)
 	auth.DELETE("/quotes/:id", rbac.RequirePermission("quotes", "delete"), h.Delete)
+	auth.POST("/quotes/:id/restore", rbac.RequirePermission("quotes", "delete"), h.Restore)
+	auth.DELETE("/quotes/:id/hard", rbac.RequirePermission("quotes", "delete"), h.HardDelete)
 	auth.POST("/quotes/:id/send", rbac.RequirePermission("quotes", "update"), h.Send)
 	auth.POST("/quotes/:id/accept", rbac.RequirePermission("quotes", "update"), h.Accept)
 	auth.POST("/quotes/:id/reject", rbac.RequirePermission("quotes", "update"), h.Reject)
@@ -257,7 +261,45 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.uc.Delete(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	quoteID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	quoteID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -357,6 +399,9 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 	}
 	if in.ValidUntil != nil {
 		resp.ValidUntil = in.ValidUntil.UTC().Format(time.RFC3339)
+	}
+	if in.ArchivedAt != nil {
+		resp.ArchivedAt = in.ArchivedAt.UTC().Format(time.RFC3339)
 	}
 	for _, item := range in.Items {
 		out := dto.QuoteItemResponse{

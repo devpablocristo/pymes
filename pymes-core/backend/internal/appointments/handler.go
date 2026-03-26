@@ -17,11 +17,14 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error)
+	List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int, archived bool) ([]appointmentsdomain.Appointment, error)
 	Create(ctx context.Context, in appointmentsdomain.Appointment) (appointmentsdomain.Appointment, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (appointmentsdomain.Appointment, error)
 	Update(ctx context.Context, in appointmentsdomain.Appointment, actor string) (appointmentsdomain.Appointment, error)
 	Cancel(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -35,7 +38,9 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/appointments", rbac.RequirePermission("appointments", "create"), h.Create)
 	auth.GET("/appointments/:id", rbac.RequirePermission("appointments", "read"), h.Get)
 	auth.PUT("/appointments/:id", rbac.RequirePermission("appointments", "update"), h.Update)
-	auth.DELETE("/appointments/:id", rbac.RequirePermission("appointments", "delete"), h.Delete)
+	auth.DELETE("/appointments/:id", rbac.RequirePermission("appointments", "delete"), h.Archive)
+	auth.POST("/appointments/:id/restore", rbac.RequirePermission("appointments", "delete"), h.Restore)
+	auth.DELETE("/appointments/:id/hard", rbac.RequirePermission("appointments", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -54,7 +59,8 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
 		return
 	}
-	items, err := h.uc.List(c.Request.Context(), orgID, from, to, c.Query("status"), c.Query("assigned_to"), limit)
+	archived := strings.ToLower(strings.TrimSpace(c.Query("archived"))) == "true"
+	items, err := h.uc.List(c.Request.Context(), orgID, from, to, c.Query("status"), c.Query("assigned_to"), limit, archived)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -130,13 +136,39 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func (h *Handler) Delete(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, id, ok := authOrgAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Cancel(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := authOrgAndID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := authOrgAndID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

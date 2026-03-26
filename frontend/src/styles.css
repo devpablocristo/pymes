@@ -2,7 +2,7 @@
 
 /* ── Design tokens ── */
 :root {
-  /* Ancho sidebar + offset del main; la skin Wowdash puede ampliarlo vía `admin-skin-wowdash.css`. */
+  /* Ancho sidebar + offset del main */
   --shell-sidebar-width: 240px;
 
   --font-body: 'DM Sans', system-ui, sans-serif;
@@ -59,6 +59,23 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
   --space-8: 2.5rem;
+
+  /* Escala tipográfica unificada */
+  --text-2xs: 0.65rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.8rem;
+  --text-base: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.65rem;
+
+  /* Z-index */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-toast: 1100;
 }
 
 /* ── Dark theme ── */

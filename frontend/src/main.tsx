@@ -32,6 +32,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
         <div className="error-boundary-fallback">
           <h1>Something went wrong</h1>
           <p className="text-secondary u-mb-md">Please reload the page. If the problem persists, contact support.</p>
+          {import.meta.env.DEV && (
+            <pre style={{ whiteSpace: 'pre-wrap', color: '#f87171', fontSize: '0.82rem', margin: '1rem 0', maxHeight: '250px', overflow: 'auto', background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
+              {this.state.error.message}
+            </pre>
+          )}
           <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
             Reload
           </button>

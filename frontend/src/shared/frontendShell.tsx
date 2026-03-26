@@ -184,14 +184,7 @@ export function AppShell({
         </nav>
 
         <div className="sidebar-footer">
-          {footerContent ??
-            (clerkEnabled ? (
-              <div className="shell-clerk-auth">
-                <UserButton />
-              </div>
-            ) : (
-              <span className="shell-footer-caption">{t('shell.footer.localDev')}</span>
-            ))}
+          {footerContent ?? null}
         </div>
       </aside>
 

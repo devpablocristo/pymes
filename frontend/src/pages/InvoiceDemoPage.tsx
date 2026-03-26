@@ -3,6 +3,7 @@
  * con navegación por estado interno. Inspirado en el template Wowdash.
  */
 import { useState, useCallback, useMemo } from 'react';
+import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
 import './InvoiceDemoPage.css';
 
 // ─── Tipos ───
@@ -157,9 +158,9 @@ function InvoiceList({
               <td><span className={`badge ${STATUS_CLASSES[inv.status]}`}>{STATUS_LABELS[inv.status]}</span></td>
               <td>
                 <div className="inv__actions">
-                  <button type="button" className="inv__action inv__action--view" onClick={() => onView(inv.id)} title="Ver">👁</button>
-                  <button type="button" className="inv__action inv__action--edit" onClick={() => onEdit(inv.id)} title="Editar">✏️</button>
-                  <button type="button" className="inv__action inv__action--delete" onClick={() => onDelete(inv.id)} title="Eliminar">🗑️</button>
+                  <button type="button" className="inv__action inv__action--view" onClick={() => onView(inv.id)} title="Ver"><IconEye /></button>
+                  <button type="button" className="inv__action inv__action--edit" onClick={() => onEdit(inv.id)} title="Editar"><IconEdit /></button>
+                  <button type="button" className="inv__action inv__action--delete" onClick={() => onDelete(inv.id)} title="Eliminar"><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -383,7 +384,7 @@ function InvoiceForm({
               <div className="form-group" style={{ maxWidth: 120 }}>
                 <input type="number" min={0} placeholder="Precio" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', Number(e.target.value))} />
               </div>
-              <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} title="Quitar">✕</button>
+              <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} title="Quitar"><IconClose /></button>
             </div>
           ))}
           <button type="button" className="btn-secondary btn-sm inv__add-line" onClick={addItem}>+ Agregar ítem</button>

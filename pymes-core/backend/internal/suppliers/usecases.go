@@ -19,6 +19,9 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (supplierdomain.Supplier, error)
 	Update(ctx context.Context, in supplierdomain.Supplier) (supplierdomain.Supplier, error)
 	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplierdomain.Supplier, error)
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -136,6 +139,36 @@ func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "supplier.deleted", "supplier", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplierdomain.Supplier, error) {
+	return u.repo.ListArchived(ctx, orgID)
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "supplier.restored", "supplier", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "supplier.hard_deleted", "supplier", id.String(), map[string]any{})
 	}
 	return nil
 }

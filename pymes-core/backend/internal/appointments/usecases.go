@@ -14,11 +14,14 @@ import (
 )
 
 type RepositoryPort interface {
-	List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error)
+	List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int, archived bool) ([]appointmentsdomain.Appointment, error)
 	Create(ctx context.Context, in appointmentsdomain.Appointment) (appointmentsdomain.Appointment, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (appointmentsdomain.Appointment, error)
 	Update(ctx context.Context, in appointmentsdomain.Appointment) (appointmentsdomain.Appointment, error)
 	Cancel(ctx context.Context, orgID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -53,8 +56,8 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases
 	return uc
 }
 
-func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int) ([]appointmentsdomain.Appointment, error) {
-	return u.repo.List(ctx, orgID, from, to, status, assigned, limit)
+func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int, archived bool) ([]appointmentsdomain.Appointment, error) {
+	return u.repo.List(ctx, orgID, from, to, status, assigned, limit, archived)
 }
 
 func (u *Usecases) Create(ctx context.Context, in appointmentsdomain.Appointment) (appointmentsdomain.Appointment, error) {
@@ -133,6 +136,45 @@ func (u *Usecases) Cancel(ctx context.Context, orgID, id uuid.UUID, actor string
 	}
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, orgID, "appointment.cancelled", map[string]any{"appointment_id": id.String()})
+	}
+	return nil
+}
+
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("appointment", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "appointment.archived", "appointment", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("appointment", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "appointment.restored", "appointment", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("appointment", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "appointment.hard_deleted", "appointment", id.String(), nil)
 	}
 	return nil
 }

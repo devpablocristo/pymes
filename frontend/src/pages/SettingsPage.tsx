@@ -1,9 +1,7 @@
 import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
-import { AdminSkinSelector } from '../components/AdminSkinSelector';
-import { LanguageSelector } from '../components/LanguageSelector';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
 import { clearTenantProfile } from '../lib/tenantProfile';
@@ -652,28 +650,6 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
             </div>
           )}
 
-          <div className="card profile-section-card">
-            <div className="card-header">
-              <h2>{t('profile.section.consoleLook')}</h2>
-            </div>
-            <AdminSkinSelector />
-          </div>
-
-          <div className="card profile-section-card">
-            <div className="card-header">
-              <h2>{t('profile.section.language')}</h2>
-            </div>
-            <LanguageSelector className="profile-language-selector" />
-          </div>
-
-          {session && (
-            <div className="card profile-section-card" id="facturacion">
-              <div className="card-header">
-                <h2>{t('profile.section.billing')}</h2>
-              </div>
-              <AccountPlanSection session={session} />
-            </div>
-          )}
         </>
       )}
     </>
@@ -688,18 +664,17 @@ export function SettingsPage() {
         <h1>{t('profile.page.title')}</h1>
         <p>{t('profile.page.subtitle')}</p>
       </div>
-      <div className="card profile-section-card profile-integrations-hint">
-        <div className="card-header">
-          <h2>{t('profile.integrations.title')}</h2>
-        </div>
-        <p className="text-muted">{t('profile.integrations.body')}</p>
-        <p className="profile-integrations-hint-actions">
-          <Link to="/modules/whatsapp" className="btn btn-secondary btn-sm">
-            {t('profile.integrations.linkWhatsApp')}
-          </Link>
-        </p>
-      </div>
       <SettingsProfileBody clerkMode={clerkEnabled} />
     </div>
   );
+}
+
+/** Sección de facturación standalone para usar en tabs de ajustes. */
+export function BillingSettingsSection() {
+  const [session, setSession] = useState<SessionResponse | null>(null);
+  useEffect(() => {
+    void getSession().then(setSession).catch(() => {});
+  }, []);
+  if (!session) return <div className="spinner" />;
+  return <AccountPlanSection session={session} />;
 }

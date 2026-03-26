@@ -26,6 +26,7 @@ type AppointmentModel struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	ArchivedAt    *time.Time
 }
 
 func (AppointmentModel) TableName() string { return "appointments" }

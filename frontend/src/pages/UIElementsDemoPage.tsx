@@ -3,6 +3,7 @@
  * Recreación nativa de los componentes del template Wowdash.
  */
 import { useState } from 'react';
+import { IconStar } from '../components/Icons';
 import './UIElementsDemoPage.css';
 
 type Tab = 'alerts' | 'avatars' | 'badges' | 'buttons' | 'cards' | 'carousel' | 'colors' | 'dropdowns' | 'pagination' | 'progress' | 'radio' | 'rating' | 'switches' | 'tabs' | 'tags' | 'tooltips' | 'typography' | 'lists' | 'videos';
@@ -233,7 +234,7 @@ function RatingSection() {
       <h3 className="ui-demo__section-title">Valoración con estrellas</h3>
       <div className="ui-demo__stars">
         {[1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className={`ui-demo__star ${i <= rating ? 'ui-demo__star--filled' : ''}`} onClick={() => setRating(i)}>★</span>
+          <span key={i} className={`ui-demo__star ${i <= rating ? 'ui-demo__star--filled' : ''}`} onClick={() => setRating(i)}><IconStar filled={i <= rating} /></span>
         ))}
       </div>
       <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>Seleccionado: {rating}/5</p>

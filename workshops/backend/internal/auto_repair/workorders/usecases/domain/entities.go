@@ -33,6 +33,7 @@ type WorkOrder struct {
 	DeliveredAt           *time.Time
 	ReadyPickupNotifiedAt *time.Time
 	CreatedBy             string
+	ArchivedAt            *time.Time
 	CreatedAt             time.Time
 	UpdatedAt        time.Time
 	Items            []WorkOrderItem

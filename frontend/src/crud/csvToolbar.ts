@@ -7,7 +7,6 @@ type CSVMode = 'client' | 'server';
 export type CSVToolbarOptions<T extends { id: string }> = {
   mode?: CSVMode;
   entity?: string;
-  allowTemplate?: boolean;
   allowImport?: boolean;
   allowExport?: boolean;
   importMode?: 'create_only' | 'upsert';
@@ -34,10 +33,6 @@ function valuesFromRow<T extends { id: string }>(config: CrudPageConfig<T>, row:
     accumulator[column.key] = typeof rawValue === 'boolean' ? (rawValue ? 'true' : 'false') : String(rawValue ?? '');
     return accumulator;
   }, {});
-}
-
-function buildClientTemplate(columns: CSVColumn[]): string {
-  return buildCSV(columns, []);
 }
 
 async function createFromValues<T extends { id: string }>(config: CrudPageConfig<T>, values: CrudFormValues): Promise<void> {
@@ -141,28 +136,11 @@ export function withCSVToolbar<T extends { id: string }>(
   const columns = options.columns ?? defaultColumns(config);
   const toolbarActions = [...(config.toolbarActions ?? [])];
 
-  if (options.allowTemplate ?? true) {
-    toolbarActions.unshift({
-      id: 'csv-template',
-      label: 'Template CSV',
-      kind: 'secondary',
-      isVisible: ({ archived }) => !archived,
-      onClick: async () => {
-        if (mode === 'server') {
-          await downloadAPIFile(`/v1/import/templates/${entity}?format=csv`);
-          return;
-        }
-        downloadCSVFile(`${entity}_template.csv`, buildClientTemplate(columns));
-      },
-    });
-  }
-
   if (options.allowImport ?? Boolean(config.dataSource?.create || config.basePath)) {
     toolbarActions.unshift({
       id: 'csv-import',
       label: 'Importar CSV',
       kind: 'secondary',
-      isVisible: ({ archived }) => !archived,
       onClick: async ({ reload }) => {
         if (mode === 'server') {
           const result = await importServerCSV(entity, options.importMode ?? 'upsert');
@@ -182,7 +160,6 @@ export function withCSVToolbar<T extends { id: string }>(
       id: 'csv-export',
       label: 'Exportar CSV',
       kind: 'secondary',
-      isVisible: ({ archived }) => !archived,
       onClick: async ({ items }) => {
         if (mode === 'server') {
           await downloadAPIFile(`/v1/export/${entity}?format=csv`);

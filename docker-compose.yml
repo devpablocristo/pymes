@@ -77,6 +77,7 @@ services:
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
       - ${CORE_REPO_PATH:-../core}:/workspace/frontend/.deps/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/frontend/.deps/modules
     env_file:
       - .env
     environment:
@@ -100,7 +101,6 @@ services:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
-      - ./pymes-core/shared/ai:/workspace/pymes-core/shared/ai
       - ${CORE_REPO_PATH:-../core}:/workspace/core
 
     env_file:

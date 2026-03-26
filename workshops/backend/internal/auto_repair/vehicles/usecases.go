@@ -36,9 +36,13 @@ type UpdateInput struct {
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Vehicle, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error)
 	Create(ctx context.Context, in domain.Vehicle) (domain.Vehicle, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Vehicle, error)
 	Update(ctx context.Context, in domain.Vehicle) (domain.Vehicle, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -62,6 +66,10 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, cp controlPlanePort) *Use
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.Vehicle, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error) {
+	return u.repo.ListArchived(ctx, orgID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Vehicle, actor string) (domain.Vehicle, error) {
@@ -99,6 +107,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return domain.Vehicle{}, fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Vehicle{}, err
+	}
+	if current.ArchivedAt != nil {
+		return domain.Vehicle{}, fmt.Errorf("vehicle is archived: %w", httperrors.ErrBadInput)
 	}
 	if in.CustomerID != nil {
 		current.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -147,6 +158,48 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "vehicle.updated", "vehicle", out.ID.String(), map[string]any{"license_plate": out.LicensePlate})
 	}
 	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "vehicle.archived", "vehicle", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "vehicle.restored", "vehicle", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("vehicle not found: %w", httperrors.ErrNotFound)
+		}
+		if errors.Is(err, ErrVehicleHasWorkOrders) {
+			return fmt.Errorf("vehicle has work orders: %w", httperrors.ErrConflict)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "vehicle.hard_deleted", "vehicle", id.String(), nil)
+	}
+	return nil
 }
 
 func (u *Usecases) enrichCustomer(ctx context.Context, in *domain.Vehicle) error {

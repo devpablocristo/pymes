@@ -2,7 +2,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { wowdashAssetsPlugin } from './vite-wowdash-assets-plugin';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const coreAuthCandidates = [
@@ -20,10 +22,18 @@ const coreHttpCandidates = [
   path.resolve(__dirname, '../../core/http/ts/src'),
 ];
 const coreHttpPath = coreHttpCandidates.find((candidate) => fs.existsSync(candidate)) ?? coreHttpCandidates[0];
+const modulesCrudTsCandidates = [
+  path.resolve(__dirname, '.deps/modules/crud/ts'),
+  path.resolve(__dirname, '../../modules/crud/ts'),
+];
+const modulesCrudTsRoot =
+  modulesCrudTsCandidates.find((candidate) => fs.existsSync(candidate)) ?? modulesCrudTsCandidates[1];
+const modulesCrudCrudSubpath = path.join(modulesCrudTsRoot, 'src', 'crud');
+const modulesCrudKanbanSubpath = path.join(modulesCrudTsRoot, 'src', 'kanban');
 
 export default defineConfig({
   envDir: '..',
-  plugins: [react()],
+  plugins: [react(), wowdashAssetsPlugin()],
   build: {
     rollupOptions: {
       output: {
@@ -35,6 +45,16 @@ export default defineConfig({
             if (id.includes('react-router')) {
               return 'vendor-router';
             }
+            if (
+              id.includes('apexcharts') ||
+              id.includes('@fullcalendar') ||
+              id.includes('datatables') ||
+              id.includes('/jquery/') ||
+              id.includes('react-bootstrap') ||
+              id.includes('/bootstrap/')
+            ) {
+              return 'vendor-wowdash';
+            }
             return 'vendor';
           }
           if (id.includes('/src/crud/') || id.includes('/src/pages/ModulePage')) {
@@ -43,6 +63,9 @@ export default defineConfig({
           if (id.includes('/src/shared/frontendShell') || id.includes('/src/components/Shell') || id.includes('/src/pages/DashboardPage')) {
             return 'app-shell';
           }
+          if (id.includes('/src/wowdash-port/')) {
+            return 'wowdash-template';
+          }
           return undefined;
         },
       },
@@ -50,16 +73,28 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '#wowdash/App': path.resolve(__dirname, 'src/wowdash-port/App.jsx'),
       '@devpablocristo/core-authn': coreAuthPath,
       '@devpablocristo/core-browser': coreBrowserPath,
       '@devpablocristo/core-http': coreHttpPath,
+      '@devpablocristo/modules-crud/crud': modulesCrudCrudSubpath,
+      '@devpablocristo/modules-crud/kanban': modulesCrudKanbanSubpath,
+      '@devpablocristo/modules-crud': path.join(modulesCrudTsRoot, 'src'),
     },
   },
   server: {
     port: 5173,
     host: '0.0.0.0',
     fs: {
-      allow: [path.resolve(__dirname, '..'), coreAuthPath, coreBrowserPath, coreHttpPath],
+      allow: [
+        path.resolve(__dirname, '..'),
+        path.resolve(__dirname, 'wowdash-assets'),
+        coreAuthPath,
+        coreBrowserPath,
+        coreHttpPath,
+        modulesCrudTsRoot,
+        modulesCrudKanbanSubpath,
+      ],
     },
     watch: {
       usePolling: true,
@@ -68,5 +103,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    exclude: [...configDefaults.exclude, '**/e2e/**'],
   },
 });

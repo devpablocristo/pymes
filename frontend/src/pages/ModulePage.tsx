@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
 import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
 import {
@@ -655,6 +655,10 @@ export function ModulePage() {
       cancelled = true;
     };
   }, [moduleId]);
+
+  if (moduleId === 'workOrders') {
+    return <Navigate to="/modules/workOrders" replace />;
+  }
 
   if (isCrudModule == null) {
     return <div className="card"><p>Cargando modulo…</p></div>;

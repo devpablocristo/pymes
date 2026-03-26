@@ -19,9 +19,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Service, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Service, error)
 	Create(ctx context.Context, in domain.Service, actor string) (domain.Service, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Service, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Service, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -66,6 +70,20 @@ func (h *Handler) List(c *gin.Context) {
 	if next != nil {
 		resp.NextCursor = next.String()
 	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	resp := dto.ListServicesResponse{Items: toServiceItems(items), Total: int64(len(items)), HasMore: false}
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -146,6 +164,42 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, toServiceItem(out))
 }
 
+func (h *Handler) Delete(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func toServiceItems(items []domain.Service) []dto.ServiceItem {
 	out := make([]dto.ServiceItem, 0, len(items))
 	for _, item := range items {
@@ -173,6 +227,10 @@ func toServiceItem(item domain.Service) dto.ServiceItem {
 	if item.LinkedProductID != nil {
 		value := item.LinkedProductID.String()
 		result.LinkedProductID = &value
+	}
+	if item.ArchivedAt != nil {
+		s := item.ArchivedAt.UTC().Format(time.RFC3339)
+		result.ArchivedAt = &s
 	}
 	return result
 }

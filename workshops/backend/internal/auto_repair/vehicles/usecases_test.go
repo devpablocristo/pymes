@@ -21,6 +21,12 @@ func (f *fakeRepo) List(ctx context.Context, p ListParams) ([]domain.Vehicle, in
 	return nil, 0, false, nil, nil
 }
 
+func (f *fakeRepo) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error) {
+	_ = ctx
+	_ = orgID
+	return nil, nil
+}
+
 func (f *fakeRepo) Create(ctx context.Context, in domain.Vehicle) (domain.Vehicle, error) {
 	_ = ctx
 	f.created = in
@@ -38,6 +44,27 @@ func (f *fakeRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Veh
 func (f *fakeRepo) Update(ctx context.Context, in domain.Vehicle) (domain.Vehicle, error) {
 	_ = ctx
 	return in, nil
+}
+
+func (f *fakeRepo) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
+}
+
+func (f *fakeRepo) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
+}
+
+func (f *fakeRepo) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
 }
 
 type fakeCP struct {

@@ -1,6 +1,8 @@
 # Pymes — comandos frecuentes. Flujo local habitual: todo en contenedores (`make up`), no apps nativas en el host.
+# Verificación preferida: targets test-docker-* / build-docker-* (requieren `make up`).
+# build/test nativos abajo = respaldo/CI rápido en host si no hay Docker.
 # docker-compose.yml en la raíz de este directorio.
-.PHONY: up down build test logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all
+.PHONY: up down build test build-docker-frontend test-docker-frontend test-docker-core test-docker-workshops logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all modules-check cleanup-pablo
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
 
@@ -52,6 +54,15 @@ seed-docker-workshops:
 # Demo completo en Docker: core + talleres (un solo comando tras `docker compose up`).
 seed-docker-all: seed-docker-core seed-docker-workshops
 
+# Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
+# Simular: make cleanup-pablo DRY_RUN=1
+cleanup-pablo:
+	DRY_RUN=$(DRY_RUN) bash scripts/cleanup-pablo-tree.sh "$(CURDIR)/.."
+
+# Módulo CRUD en ../modules: typecheck + tests TS y go test, todo en imágenes Docker (sin npm/go en el host).
+modules-check:
+	docker compose -f ../modules/docker-compose.yml build crud-ts-check crud-go-check
+
 # Levanta stack local (Postgres, cp-backend, 4 verticales Go, frontend, AI)
 up:
 	docker compose up -d --build
@@ -60,7 +71,20 @@ up:
 down:
 	docker compose down
 
-# Compila backends Go + build del frontend + chequeo básico del servicio AI
+# --- Docker-first: requiere contenedores en marcha (`make up`) ---
+build-docker-frontend:
+	docker compose exec -T frontend npm run build
+
+test-docker-frontend:
+	docker compose exec -T frontend npm test
+
+test-docker-core:
+	docker compose exec -T cp-backend go test ./...
+
+test-docker-workshops:
+	docker compose exec -T work-backend go test ./...
+
+# Compila backends Go + build del frontend + chequeo básico del servicio AI (nativo en host)
 build:
 	cd pymes-core/backend && $(GO_PRIVATE) go build ./...
 	cd professionals/backend && $(GO_PRIVATE) go build ./...
@@ -80,6 +104,10 @@ test:
 	cd frontend && npm test
 	@$(MAKE) ruff
 	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
+
+# E2E frontend: recorre todas las rutas Wowdash (Chromium; build sin Clerk; ~3–4 min; requiere `npm run test:e2e:wowdash:install` una vez)
+test-frontend-e2e-wowdash:
+	cd frontend && npm run test:e2e:wowdash
 
 # Seguimiento de logs de todos los servicios
 logs:

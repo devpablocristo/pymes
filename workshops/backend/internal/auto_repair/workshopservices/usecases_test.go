@@ -38,6 +38,33 @@ func (f *fakeRepo) Update(ctx context.Context, in domain.Service) (domain.Servic
 	return in, nil
 }
 
+func (f *fakeRepo) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Service, error) {
+	_ = ctx
+	_ = orgID
+	return nil, nil
+}
+
+func (f *fakeRepo) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
+}
+
+func (f *fakeRepo) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
+}
+
+func (f *fakeRepo) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	_ = ctx
+	_ = orgID
+	_ = id
+	return nil
+}
+
 type fakeCP struct {
 	product map[string]any
 }

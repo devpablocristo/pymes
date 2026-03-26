@@ -1,5 +1,6 @@
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import { CrudPage, type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
+import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 import {
   apiRequest,
   createSalePayment,
@@ -34,11 +35,13 @@ import {
   createWorkshopService,
   createWorkshopVehicle,
   getAllWorkOrders,
-  getWorkshopServices,
-  getWorkshopVehicles,
+  getAutoRepairWorkOrdersArchived,
   updateWorkOrder,
   updateWorkshopService,
   updateWorkshopVehicle,
+  workshopServicesArchivedCrud,
+  workshopVehiclesArchivedCrud,
+  workshopWorkOrdersArchivedCrud,
 } from '../lib/autoRepairApi';
 import type { WorkOrder, WorkOrderItem, WorkshopService, WorkshopVehicle } from '../lib/autoRepairTypes';
 import {
@@ -2816,11 +2819,14 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     isValid: (values) => asString(values.appointment_id).trim().length > 0 && asString(values.profile_id).trim().length > 0 && Boolean(toRFC3339(values.started_at)),
   },
   workshopVehicles: {
-    label: 'vehiculo',
-    labelPlural: 'vehiculos',
-    labelPluralCap: 'Vehiculos',
+    supportsArchived: true,
+    label: 'vehículo',
+    labelPlural: 'vehículos',
+    labelPluralCap: 'Vehículos',
+    createLabel: '+ Nuevo vehículo',
+    searchPlaceholder: 'Buscar vehículos por patente, marca, dueño o notas...',
     dataSource: {
-      list: async () => (await getWorkshopVehicles()).items ?? [],
+      list: async (opts) => workshopVehiclesArchivedCrud.list<WorkshopVehicle>(opts),
       create: async (values) => {
         await createWorkshopVehicle({
           customer_id: asOptionalString(values.customer_id),
@@ -2849,11 +2855,14 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
           notes: asOptionalString(values.notes),
         });
       },
+      deleteItem: workshopVehiclesArchivedCrud.deleteItem,
+      restore: workshopVehiclesArchivedCrud.restore,
+      hardDelete: workshopVehiclesArchivedCrud.hardDelete,
     },
     columns: [
       {
         key: 'license_plate',
-        header: 'Vehiculo',
+        header: 'Vehículo',
         className: 'cell-name',
         render: (_value, row: WorkshopVehicle) => (
           <>
@@ -2874,7 +2883,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'make', label: 'Marca', required: true, placeholder: 'Toyota' },
       { key: 'model', label: 'Modelo', required: true, placeholder: 'Hilux' },
       { key: 'year', label: 'Año', type: 'number', placeholder: '2021' },
-      { key: 'kilometers', label: 'Kilometros', type: 'number', placeholder: '68000' },
+      { key: 'kilometers', label: 'Kilómetros', type: 'number', placeholder: '68000' },
       { key: 'color', label: 'Color' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
@@ -2904,11 +2913,14 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       asString(values.model).trim().length >= 1,
   },
   workshopServices: {
+    supportsArchived: true,
     label: 'servicio de taller',
     labelPlural: 'servicios de taller',
     labelPluralCap: 'Servicios de taller',
+    createLabel: '+ Nuevo servicio de taller',
+    searchPlaceholder: 'Buscar servicios de taller por código, nombre o categoría...',
     dataSource: {
-      list: async () => (await getWorkshopServices()).items ?? [],
+      list: async (opts) => workshopServicesArchivedCrud.list<WorkshopService>(opts),
       create: async (values) => {
         await createWorkshopService({
           code: asString(values.code),
@@ -2937,6 +2949,9 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
           is_active: asBoolean(values.is_active),
         });
       },
+      deleteItem: workshopServicesArchivedCrud.deleteItem,
+      restore: workshopServicesArchivedCrud.restore,
+      hardDelete: workshopServicesArchivedCrud.hardDelete,
     },
     columns: [
       {
@@ -3001,11 +3016,24 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
   },
   workOrders: {
+    supportsArchived: true,
+    /** Archivo / borrado duro solo en `WorkOrderEditor` (ruta o modal), no en filas del listado. */
+    allowDelete: false,
+    allowRestore: false,
+    allowHardDelete: false,
     label: 'orden de trabajo',
-    labelPlural: 'ordenes de trabajo',
-    labelPluralCap: 'Ordenes de trabajo',
+    labelPlural: 'órdenes de trabajo',
+    labelPluralCap: 'Órdenes de trabajo',
+    createLabel: '+ Nueva orden de trabajo',
+    searchPlaceholder: 'Buscar órdenes por número, patente, cliente o trabajo...',
     dataSource: {
-      list: async () => getAllWorkOrders(),
+      list: async ({ archived }) => {
+        if (archived) {
+          const data = await getAutoRepairWorkOrdersArchived();
+          return data.items ?? [];
+        }
+        return getAllWorkOrders();
+      },
       create: async (values) => {
         await createWorkOrder({
           number: asOptionalString(values.number),
@@ -3039,11 +3067,12 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
           internal_notes: asOptionalString(values.internal_notes),
           currency: asOptionalString(values.currency),
           promised_at: toRFC3339(values.promised_at),
-          ready_at: toRFC3339(values.ready_at),
-          delivered_at: toRFC3339(values.delivered_at),
           items: parseWorkOrderItems(values.items_json),
         });
       },
+      deleteItem: workshopWorkOrdersArchivedCrud.deleteItem,
+      restore: workshopWorkOrdersArchivedCrud.restore,
+      hardDelete: workshopWorkOrdersArchivedCrud.hardDelete,
     },
     columns: [
       {
@@ -3073,17 +3102,30 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],
+    /* Alta en lista; la edición usa el editor único (`WorkOrderEditor`) vía `onExternalEdit`. */
     formFields: [
-      { key: 'number', label: 'Numero OT', placeholder: 'Autogenerado si lo dejas vacio' },
-      { key: 'vehicle_id', label: 'Vehicle ID', required: true, placeholder: 'UUID del vehiculo' },
-      { key: 'vehicle_plate', label: 'Patente', placeholder: 'Se autocompleta si ya la conoces' },
-      { key: 'customer_id', label: 'Customer / Party ID', placeholder: 'UUID del dueño en el core' },
-      { key: 'customer_name', label: 'Cliente', placeholder: 'Se autocompleta si el ID existe' },
-      { key: 'appointment_id', label: 'Appointment ID' },
+      { key: 'number', label: 'Numero OT', placeholder: 'Autogenerado si lo dejas vacio', createOnly: true },
+      {
+        key: 'vehicle_id',
+        label: 'Vehicle ID',
+        required: true,
+        placeholder: 'UUID del vehiculo',
+        createOnly: true,
+      },
+      { key: 'vehicle_plate', label: 'Patente', placeholder: 'Se autocompleta si ya la conoces', createOnly: true },
+      {
+        key: 'customer_id',
+        label: 'Customer / Party ID',
+        placeholder: 'UUID del dueño en el core',
+        createOnly: true,
+      },
+      { key: 'customer_name', label: 'Cliente', placeholder: 'Se autocompleta si el ID existe', createOnly: true },
+      { key: 'appointment_id', label: 'Appointment ID', createOnly: true },
       {
         key: 'status',
         label: 'Estado',
         type: 'select',
+        createOnly: true,
         options: [
           { label: 'Recibido', value: 'received' },
           { label: 'Diagnostico', value: 'diagnosing' },
@@ -3098,21 +3140,20 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
           { label: 'Cancelado', value: 'cancelled' },
         ],
       },
-      { key: 'opened_at', label: 'Ingreso', type: 'datetime-local', required: true },
-      { key: 'promised_at', label: 'Prometido para', type: 'datetime-local' },
-      { key: 'ready_at', label: 'Listo en', type: 'datetime-local', editOnly: true },
-      { key: 'delivered_at', label: 'Entregado en', type: 'datetime-local', editOnly: true },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'requested_work', label: 'Trabajo solicitado', type: 'textarea', fullWidth: true },
-      { key: 'diagnosis', label: 'Diagnostico', type: 'textarea', fullWidth: true },
-      { key: 'notes', label: 'Notas para cliente', type: 'textarea', fullWidth: true },
-      { key: 'internal_notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
+      { key: 'opened_at', label: 'Ingreso', type: 'datetime-local', required: true, createOnly: true },
+      { key: 'promised_at', label: 'Prometido para', type: 'datetime-local', createOnly: true },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS', createOnly: true },
+      { key: 'requested_work', label: 'Trabajo solicitado', type: 'textarea', fullWidth: true, createOnly: true },
+      { key: 'diagnosis', label: 'Diagnostico', type: 'textarea', fullWidth: true, createOnly: true },
+      { key: 'notes', label: 'Notas para cliente', type: 'textarea', fullWidth: true, createOnly: true },
+      { key: 'internal_notes', label: 'Notas internas', type: 'textarea', fullWidth: true, createOnly: true },
       {
         key: 'items_json',
         label: 'Items JSON',
         type: 'textarea',
         required: true,
         fullWidth: true,
+        createOnly: true,
         placeholder: '[{"item_type":"service","description":"Cambio de aceite","quantity":1,"unit_price":45000,"tax_rate":21},{"item_type":"part","product_id":"uuid","description":"Filtro","quantity":1,"unit_price":12000,"tax_rate":21}]',
       },
     ],
@@ -3202,8 +3243,6 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
       status: row.status ?? 'received',
       opened_at: toDateTimeInput(row.opened_at),
       promised_at: toDateTimeInput(row.promised_at),
-      ready_at: toDateTimeInput(row.ready_at),
-      delivered_at: toDateTimeInput(row.delivered_at),
       currency: row.currency ?? 'ARS',
       requested_work: row.requested_work ?? '',
       diagnosis: row.diagnosis ?? '',
@@ -3523,12 +3562,23 @@ const resourceConfigs = Object.fromEntries(
   ]),
 ) as Record<string, CrudPageConfig<any>>;
 
+/** Misma config que `ConfiguredCrudPage resourceId="workOrders"` (CSV, alta, archivados). */
+export const workOrdersCrudPageConfig = resourceConfigs.workOrders as CrudPageConfig<WorkOrder>;
+
 export function hasCrudResource(resourceId: string): boolean {
   return resourceId in resourceConfigs;
 }
 
-export function ConfiguredCrudPage({ resourceId }: { resourceId: string }) {
+export function ConfiguredCrudPage({
+  resourceId,
+  mergeConfig,
+}: {
+  resourceId: string;
+  /** Props extra de `CrudPage` (p. ej. callbacks); el tipo es laxo para no forzar el genérico de cada recurso. */
+  mergeConfig?: Record<string, unknown>;
+}) {
   const config = resourceConfigs[resourceId];
+  const createdByMerge = useCrudListCreatedByMerge();
   if (!config) {
     return (
       <div className="empty-state">
@@ -3536,5 +3586,5 @@ export function ConfiguredCrudPage({ resourceId }: { resourceId: string }) {
       </div>
     );
   }
-  return <CrudPage {...config} />;
+  return <CrudPage {...config} {...createdByMerge} {...mergeConfig} />;
 }

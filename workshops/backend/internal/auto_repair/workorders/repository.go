@@ -15,6 +15,9 @@ import (
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 )
 
+// ErrWorkOrderHasIntegrations bloquea borrado en duro si hay presupuesto o venta vinculados en el core.
+var ErrWorkOrderHasIntegrations = errors.New("work order has quote or sale linked")
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -23,7 +26,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 250})
-	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -62,6 +65,28 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 		next = &value
 	}
 	return out, total, hasMore, next, nil
+}
+
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.WorkOrder, error) {
+	var rows []models.WorkOrderModel
+	err := r.db.WithContext(ctx).
+		Model(&models.WorkOrderModel{}).
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Order("updated_at DESC").
+		Limit(200).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.WorkOrder, 0, len(rows))
+	for _, row := range rows {
+		items, err := r.loadItems(ctx, row.OrgID, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, toDomain(row, items))
+	}
+	return out, nil
 }
 
 func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error) {
@@ -150,7 +175,7 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			"ready_pickup_notified_at":  in.ReadyPickupNotifiedAt,
 			"updated_at":                time.Now().UTC(),
 		}
-		res := tx.Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates)
+		res := tx.Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).Updates(updates)
 		if res.Error != nil {
 			return res.Error
 		}
@@ -176,7 +201,7 @@ func (r *Repository) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, 
 	if status != nil {
 		updates["status"] = *status
 	}
-	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ?", orgID, id).Updates(updates)
+	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).Updates(updates)
 	if res.Error != nil {
 		return domain.WorkOrder{}, res.Error
 	}
@@ -189,11 +214,63 @@ func (r *Repository) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, 
 // MarkReadyPickupNotified marca idempotencia del aviso WhatsApp de listo para retirar.
 func (r *Repository) MarkReadyPickupNotified(ctx context.Context, orgID, id uuid.UUID, at time.Time) error {
 	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
-		Where("org_id = ? AND id = ?", orgID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
 		Updates(map[string]any{
 			"ready_pickup_notified_at": at,
 			"updated_at":             time.Now().UTC(),
 		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+		Updates(map[string]any{"archived_at": now, "updated_at": now})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"archived_at": nil, "updated_at": now})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	var row models.WorkOrderModel
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return gorm.ErrRecordNotFound
+		}
+		return err
+	}
+	if row.ArchivedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	if row.QuoteID != nil || row.SaleID != nil {
+		return ErrWorkOrderHasIntegrations
+	}
+	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.WorkOrderModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -301,6 +378,7 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 		DeliveredAt:           row.DeliveredAt,
 		ReadyPickupNotifiedAt: row.ReadyPickupNotifiedAt,
 		CreatedBy:             row.CreatedBy,
+		ArchivedAt:            row.ArchivedAt,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
 		Items:            items,

@@ -1,0 +1,23 @@
+/* Editor OT embebido en página (misma caja visual que el modal) */
+
+.wo-editor-page {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 0 1.5rem;
+}
+
+.wo-editor-page__toolbar {
+  margin-bottom: 0.65rem;
+}
+
+.wo-modal--embedded {
+  max-height: none;
+  width: 100%;
+}
+
+.wo-modal__textarea--items {
+  min-height: 10rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+}

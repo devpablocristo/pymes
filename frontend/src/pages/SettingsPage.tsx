@@ -2,6 +2,7 @@ import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
+import { AdminSkinSelector } from '../components/AdminSkinSelector';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
@@ -650,6 +651,13 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
               )}
             </div>
           )}
+
+          <div className="card profile-section-card">
+            <div className="card-header">
+              <h2>{t('profile.section.consoleLook')}</h2>
+            </div>
+            <AdminSkinSelector />
+          </div>
 
           <div className="card profile-section-card">
             <div className="card-header">

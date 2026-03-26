@@ -19,9 +19,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Vehicle, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error)
 	Create(ctx context.Context, in domain.Vehicle, actor string) (domain.Vehicle, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Vehicle, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Vehicle, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -32,9 +36,13 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/vehicles", h.List)
+	authGroup.GET("/vehicles/archived", h.ListArchived)
 	authGroup.POST("/vehicles", h.Create)
 	authGroup.GET("/vehicles/:id", h.Get)
 	authGroup.PUT("/vehicles/:id", h.Update)
+	authGroup.DELETE("/vehicles/:id", h.Delete)
+	authGroup.POST("/vehicles/:id/restore", h.Restore)
+	authGroup.DELETE("/vehicles/:id/hard", h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -66,6 +74,20 @@ func (h *Handler) List(c *gin.Context) {
 	if next != nil {
 		resp.NextCursor = next.String()
 	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	resp := dto.ListVehiclesResponse{Items: toVehicleItems(items), Total: int64(len(items)), HasMore: false}
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -142,6 +164,42 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, toVehicleItem(out))
 }
 
+func (h *Handler) Delete(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func toVehicleItems(items []domain.Vehicle) []dto.VehicleItem {
 	out := make([]dto.VehicleItem, 0, len(items))
 	for _, item := range items {
@@ -169,6 +227,10 @@ func toVehicleItem(item domain.Vehicle) dto.VehicleItem {
 	if item.CustomerID != nil {
 		value := item.CustomerID.String()
 		result.CustomerID = &value
+	}
+	if item.ArchivedAt != nil {
+		s := item.ArchivedAt.UTC().Format(time.RFC3339)
+		result.ArchivedAt = &s
 	}
 	return result
 }

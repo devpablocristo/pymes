@@ -36,9 +36,13 @@ type UpdateInput struct {
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Service, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Service, error)
 	Create(ctx context.Context, in domain.Service) (domain.Service, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Service, error)
 	Update(ctx context.Context, in domain.Service) (domain.Service, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -61,6 +65,10 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, cp controlPlanePort) *Use
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.Service, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Service, error) {
+	return u.repo.ListArchived(ctx, orgID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Service, actor string) (domain.Service, error) {
@@ -98,6 +106,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return domain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.Service{}, err
+	}
+	if current.ArchivedAt != nil {
+		return domain.Service{}, fmt.Errorf("service is archived: %w", httperrors.ErrBadInput)
 	}
 	if in.Code != nil {
 		current.Code = strings.TrimSpace(*in.Code)
@@ -146,6 +157,48 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "workshop_service.updated", "workshop_service", out.ID.String(), map[string]any{"code": out.Code})
 	}
 	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "workshop_service.archived", "workshop_service", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "workshop_service.restored", "workshop_service", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
+		}
+		if errors.Is(err, ErrServiceReferencedInWorkOrders) {
+			return fmt.Errorf("service referenced in work orders: %w", httperrors.ErrConflict)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "workshop_service.hard_deleted", "workshop_service", id.String(), nil)
+	}
+	return nil
 }
 
 func validateService(in *domain.Service) error {

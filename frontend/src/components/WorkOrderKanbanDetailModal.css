@@ -30,8 +30,35 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
   padding: 1rem 1.1rem 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wo-modal__header-trailing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.wo-modal__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  max-width: min(100%, 28rem);
+}
+
+.wo-modal__btn--header {
+  padding: 0.38rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .wo-modal__title-block {
@@ -160,6 +187,47 @@
   padding-top: 0.25rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 0.25rem;
+}
+
+.wo-modal__footer--split {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.wo-modal__footer-start {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.wo-modal__footer-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.wo-modal__btn--danger {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.wo-modal__btn--danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.wo-modal__btn--restore {
+  background: rgba(87, 157, 255, 0.16);
+  color: #9dc7ff;
+  border: 1px solid rgba(87, 157, 255, 0.35);
+}
+
+.wo-modal__btn--restore:hover:not(:disabled) {
+  background: rgba(87, 157, 255, 0.26);
 }
 
 .wo-modal__btn {

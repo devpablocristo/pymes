@@ -8,10 +8,13 @@ import { clerkEnabled, clerkPublishableKey } from './lib/auth';
 import { clerkAppearance } from './lib/clerkAppearance';
 import { App } from './app/App';
 import { LanguageProvider } from './lib/i18n';
+import { applyAdminSkin } from './lib/adminSkin';
 import { applyTheme } from './lib/theme';
 import './styles.css';
+import './styles/admin-skin-wowdash.css';
 
 applyTheme();
+applyAdminSkin();
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -42,18 +45,18 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 const queryClient = new QueryClient();
 
+// StrictMode vive en rutas concretas dentro de `App` (no en /labs/wowdash): ApexCharts del template
+// rompe al doble montaje/desmontaje de desarrollo y dispara el ErrorBoundary global.
 const app = (
-  <React.StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <LanguageProvider>
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <App />
-          </BrowserRouter>
-        </LanguageProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  </React.StrictMode>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <App />
+        </BrowserRouter>
+      </LanguageProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

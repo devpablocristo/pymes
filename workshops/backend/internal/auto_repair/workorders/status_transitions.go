@@ -1,8 +1,11 @@
 package workorders
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/devpablocristo/core/statemachine/go"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
@@ -38,40 +41,35 @@ func normalizeWorkOrderStatus(raw string) string {
 	}
 }
 
-// isWorkOrderKanbanOpenStatus son columnas del tablero operativo (movimiento libre estilo Trello/Kanban).
-func isWorkOrderKanbanOpenStatus(s string) bool {
-	switch normalizeWorkOrderStatus(s) {
-	case "received", "diagnosing", "quote_pending", "awaiting_parts",
-		"in_progress", "quality_check", "ready_for_pickup", "delivered", "on_hold":
-		return true
-	default:
-		return false
+// workOrderStatusSM: Kanban entre columnas operativas; invoiced/cancelled terminales;
+// invoiced solo desde subconjunto explícito; cancelación desde cualquier no terminal.
+var workOrderStatusSM = newWorkOrderStatusMachine()
+
+func newWorkOrderStatusMachine() *statemachine.Machine {
+	kanbanOpen := []string{
+		"received", "diagnosing", "quote_pending", "awaiting_parts",
+		"in_progress", "quality_check", "ready_for_pickup", "delivered", "on_hold",
 	}
+	return statemachine.New().
+		Terminal("invoiced", "cancelled").
+		FreeTransitionsAmong(kanbanOpen...).
+		AllowFromStatesTo("invoiced", "delivered", "ready_for_pickup", "in_progress", "quality_check", "quote_pending").
+		AllowAnyTo("cancelled").
+		Build()
 }
 
 func validateWorkOrderStatusTransition(fromRaw, toRaw string) error {
 	from := normalizeWorkOrderStatus(fromRaw)
 	to := normalizeWorkOrderStatus(toRaw)
-	if from == to {
+	err := workOrderStatusSM.Validate(from, to)
+	if err == nil {
 		return nil
 	}
-	if from == "invoiced" || from == "cancelled" {
+	if errors.Is(err, statemachine.ErrTerminal) {
 		return fmt.Errorf("work order status is terminal (%s): %w", from, httperrors.ErrConflict)
 	}
-	// Kanban: cualquier salto entre columnas operativas (arrastre en UI).
-	if isWorkOrderKanbanOpenStatus(from) && isWorkOrderKanbanOpenStatus(to) {
-		return nil
-	}
-	if to == "cancelled" {
-		return nil
-	}
-	if to == "invoiced" {
-		for _, allowed := range []string{"delivered", "ready_for_pickup", "in_progress", "quality_check", "quote_pending"} {
-			if from == allowed {
-				return nil
-			}
-		}
+	if errors.Is(err, statemachine.ErrInvalidTransition) {
 		return fmt.Errorf("invalid work order status transition from %q to %q: %w", from, to, httperrors.ErrBadInput)
 	}
-	return fmt.Errorf("invalid work order status transition from %q to %q: %w", from, to, httperrors.ErrBadInput)
+	return err
 }

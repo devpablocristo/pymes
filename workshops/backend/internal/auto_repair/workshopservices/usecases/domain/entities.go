@@ -19,6 +19,7 @@ type Service struct {
 	TaxRate         float64
 	LinkedProductID *uuid.UUID
 	IsActive        bool
+	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

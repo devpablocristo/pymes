@@ -1,0 +1,96 @@
+/**
+ * Skin inspirada en Wowdash (palette primary #487fff, Inter, fondos neutros).
+ * Solo aplica con `data-admin-skin="wowdash"` en `<html>` (véase `lib/adminSkin.ts`).
+ * No importa el CSS del template CRA: son tokens mapeados a las variables que ya consume `styles.css`.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;700&display=swap');
+
+html[data-admin-skin='wowdash'][data-theme='light'] {
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --shell-sidebar-width: 17.5rem;
+
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8fafc;
+  --color-border: #e5e7eb;
+  --color-border-subtle: #f3f4f6;
+
+  --color-sidebar: #111827;
+  --color-sidebar-hover: #1f2937;
+  --color-sidebar-active: rgba(72, 127, 255, 0.18);
+  --color-sidebar-text: #9ca3af;
+  --color-sidebar-text-active: #f9fafb;
+
+  --color-text: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+
+  --color-primary: #487fff;
+  --color-primary-hover: #486cea;
+  --color-primary-subtle: #e4f1ff;
+
+  --color-success: #45b369;
+  --color-success-subtle: #ecfdf3;
+  --color-warning: #ff9f29;
+  --color-warning-subtle: #fff9e2;
+  --color-alert-warning-text: #92400e;
+  --color-alert-success-text: #065f46;
+  --color-danger: #ef4444;
+  --color-danger-subtle: #fef2f2;
+  --color-danger-hover: #dc2626;
+
+  --color-on-primary: #f8fafc;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 3px rgba(4, 6, 15, 0.06);
+  --shadow-md: 4px 12px 28px rgba(4, 6, 15, 0.08);
+  --shadow-lg: 0 20px 48px rgba(4, 6, 15, 0.1);
+}
+
+html[data-admin-skin='wowdash'][data-theme='dark'] {
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --shell-sidebar-width: 17.5rem;
+
+  --color-bg: #1b2431;
+  --color-surface: #273142;
+  --color-surface-hover: #323d4e;
+  --color-border: #323d4e;
+  --color-border-subtle: #273142;
+
+  --color-sidebar: #0f1419;
+  --color-sidebar-hover: #1b2431;
+  --color-sidebar-active: rgba(81, 159, 255, 0.2);
+  --color-sidebar-text: #9ca3af;
+  --color-sidebar-text-active: #f3f4f6;
+
+  --color-text: #f3f4f6;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+
+  --color-primary: #519fff;
+  --color-primary-hover: #6bb1ff;
+  --color-primary-subtle: rgba(72, 127, 255, 0.15);
+
+  --color-success: #4ade80;
+  --color-success-subtle: rgba(69, 179, 105, 0.15);
+  --color-warning: #fbbf24;
+  --color-warning-subtle: rgba(255, 159, 41, 0.12);
+  --color-alert-warning-text: #fcd34d;
+  --color-alert-success-text: #86efac;
+  --color-danger: #f87171;
+  --color-danger-subtle: rgba(239, 68, 68, 0.15);
+  --color-danger-hover: #ef4444;
+
+  --color-on-primary: #0f172a;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+html[data-admin-skin='wowdash'] .sidebar-link.active {
+  font-weight: 600;
+}

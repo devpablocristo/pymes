@@ -19,6 +19,7 @@ type VehicleModel struct {
 	Kilometers   int        `gorm:"not null;default:0"`
 	Color        string     `gorm:"not null;default:''"`
 	Notes        string     `gorm:"not null;default:''"`
+	ArchivedAt   *time.Time `gorm:"column:archived_at"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

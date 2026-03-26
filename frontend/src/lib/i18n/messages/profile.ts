@@ -15,6 +15,12 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.section.account': 'Cuenta',
     'profile.account.signOut': 'Cerrar sesión',
     'profile.section.personal': 'Datos personales',
+    'profile.section.consoleLook': 'Apariencia de la consola',
+    'profile.consoleSkin.label': 'Estilo visual',
+    'profile.consoleSkin.wowdash': 'Wowdash (azul, Inter)',
+    'profile.consoleSkin.classic': 'Clásico Pymes',
+    'profile.consoleSkin.hint':
+      'Solo afecta colores, tipografía y densidad del panel. Se guarda en este navegador. El tema claro/oscuro sigue en Administración.',
     'profile.section.language': 'Idioma',
     'profile.admin.appearanceTitle': 'Apariencia',
     'profile.admin.appearanceLead':
@@ -79,6 +85,12 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.section.account': 'Account',
     'profile.account.signOut': 'Sign out',
     'profile.section.personal': 'Personal details',
+    'profile.section.consoleLook': 'Console appearance',
+    'profile.consoleSkin.label': 'Visual style',
+    'profile.consoleSkin.wowdash': 'Wowdash (blue, Inter)',
+    'profile.consoleSkin.classic': 'Classic Pymes',
+    'profile.consoleSkin.hint':
+      'Only colors, typography and spacing. Stored in this browser. Light/dark theme remains under Admin.',
     'profile.section.language': 'Language',
     'profile.admin.appearanceTitle': 'Appearance',
     'profile.admin.appearanceLead':

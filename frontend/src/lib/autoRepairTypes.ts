@@ -11,6 +11,7 @@ export type AutoRepairVehicle = {
   kilometers: number;
   color: string;
   notes: string;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -28,6 +29,7 @@ export type AutoRepairService = {
   tax_rate: number;
   linked_product_id?: string;
   is_active: boolean;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -86,6 +88,7 @@ export type AutoRepairWorkOrder = {
   delivered_at?: string;
   ready_pickup_notified_at?: string;
   created_by: string;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   items: AutoRepairWorkOrderItem[];

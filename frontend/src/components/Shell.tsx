@@ -70,14 +70,6 @@ const documentIcon = (
   </svg>
 );
 
-const kanbanBoardIcon = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="5" height="16" rx="1" />
-    <rect x="10" y="7" width="5" height="13" rx="1" />
-    <rect x="17" y="10" width="4" height="10" rx="1" />
-  </svg>
-);
-
 const clockIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
@@ -179,14 +171,22 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const mainNav = useMemo<AppShellNavItem[]>(() => [
-    { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
-    {
-      to: '/assistant/commercial',
-      label: t('shell.nav.assistantCommercial'),
-      icon: assistantCommercialIcon,
-    },
-  ], [t]);
+  const mainNav = useMemo<AppShellNavItem[]>(() => {
+    const items: AppShellNavItem[] = [
+      { to: '/', label: t('shell.nav.dashboard'), end: true, icon: dashboardIcon },
+      {
+        to: '/assistant/commercial',
+        label: t('shell.nav.assistantCommercial'),
+        icon: assistantCommercialIcon,
+      },
+    ];
+    items.push({
+      to: '/console/wowdash',
+      label: t('shell.nav.wowdashLabs'),
+      icon: dashboardIcon,
+    });
+    return items;
+  }, [t]);
 
   const professionalsNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/professionals/teachers', label: t('shell.nav.teachers'), icon: teachersIcon },
@@ -199,8 +199,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const workshopsNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/workshops/auto-repair/vehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
     { to: '/workshops/auto-repair/services', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
-    { to: '/workshops/auto-repair/orders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
-    { to: '/workshops/auto-repair/orders/board', label: t('shell.nav.autoRepairOrdersBoard'), icon: kanbanBoardIcon },
+    { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
   ], [t]);
 
   const beautyIcon = (

@@ -14,7 +14,7 @@ alwaysApply: true
 
 ## Flujo
 - TLDR primero. Ideal primero. Esperar aprobación.
-- **Verificación obligatoria** (ver `verify-before-claim.mdc`): en este turno ejecutar `make build` + `make test` desde la raíz del monorepo cuando el cambio afecta entrega o varios paquetes; o el subconjunto equivalente. **Nunca** decir “listo” / “ya está” sin haber corrido comandos y visto salida OK.
+- **Verificación obligatoria** (ver `verify-before-claim.mdc` y `docker-first.mdc`): preferir **`docker compose`** / targets **`make test-docker-*` / `make build-docker-*`** con stack levantado; `make build` + `make test` en el host solo como respaldo si no hay Docker. **Nunca** decir “listo” / “ya está” sin haber corrido comandos y visto salida OK.
 
 ## Prohibiciones
 - NUNCA valores hardcodeados
@@ -24,6 +24,6 @@ alwaysApply: true
 - NUNCA repos in-memory como artefacto de producción
 - NUNCA sufijos en archivos si solo hay una implementación
 - NUNCA modificar migraciones existentes
-- NUNCA decir "listo", "ya está" o "funciona" sin haber ejecutado en **este turno** los comandos de verificación (`make build` / `make test` o equivalente según `verify-before-claim.mdc`) y haber obtenido salida exitosa
+- NUNCA decir "listo", "ya está" o "funciona" sin haber ejecutado en **este turno** los comandos de verificación (Docker-first según `verify-before-claim.mdc`, o `make build` / `make test` en host solo si aplica respaldo) y haber obtenido salida exitosa
 - NUNCA duplicar funcionalidad de pymes-core en una vertical
 - NUNCA importar dominio interno entre verticales — solo HTTP

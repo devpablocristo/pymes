@@ -14,13 +14,15 @@ No vale “en teoría”, “debería compilar” ni confiar en caché mental: *
 
 ## Qué ejecutar (mínimo según el cambio)
 
+**Preferencia del equipo: verificación en Docker**, no cadena nativa en el host. Ver `.cursor/rules/docker-first.mdc`.
+
 | Tipo de cambio | Comandos que tenés que haber corrido (y pasado) en este turno |
 |----------------|----------------------------------------------------------------|
-| Cualquier entrega que quieras dar por cerrada en el monorepo | Desde la raíz del repo: **`make build`** y **`make test`**. Si el alcance es solo un paquete, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend si aplica). |
-| Backend Go tocado | `go build ./...`, `go vet ./...`, `go test ./...` desde el directorio del backend (p. ej. `pymes-core/backend/`). |
-| Frontend tocado | `cd frontend && npm run build` y, si hay lógica/UI: `npm test`. |
-| **Dockerfile**, **entrypoint**, **docker-compose**, imagen reconstruida | **`docker compose build <servicio>`** (o `make build` si incluye la imagen), **`docker compose up -d`** del servicio afectado, y **comprobación HTTP** al puerto en host (p. ej. `curl` / script a `http://localhost:8100/healthz` para `cp-backend`). **`docker compose ps`** debe mostrar el servicio **Up**. |
-| Nueva dependencia npm en frontend usada en Docker | Además de `npm run build` en host: **`docker compose build frontend`** (la imagen instala deps al build). |
+| Cualquier entrega que quieras dar por cerrada en el monorepo | Con stack levantado (`make up`): **`docker compose build`** de los servicios tocados si cambió imagen/Dockerfile, **`docker compose ps`** (Up), y subset **`docker compose exec -T <svc> …`** o targets **`make test-docker-*` / `make build-docker-frontend`** según lo tocado. Si Docker no está disponible, recién ahí **`make build`** y **`make test`** en el host como respaldo (decirlo explícito). |
+| Backend Go tocado (workshops, core, etc.) | **`docker compose exec -T work-backend go test ./...`** (u otro servicio) con contenedor en marcha; o el target `make test-docker-*` que corresponda. |
+| Frontend tocado | **`make build-docker-frontend`** y, si aplica: **`make test-docker-frontend`** (dentro del contenedor `frontend`). |
+| **Dockerfile**, **entrypoint**, **docker-compose**, imagen reconstruida | **`docker compose build <servicio>`**, **`docker compose up -d`**, **HTTP** al puerto en host, **`docker compose ps`** = **Up**. |
+| Nueva dependencia npm en frontend usada en Docker | **`docker compose build frontend`** (o rebuild del servicio) para que la imagen instale deps. |
 
 Si falla algo: **corregir y volver a ejecutar** hasta que pase. **No** devolver la respuesta final al usuario hasta tener comandos OK.
 

@@ -23,7 +23,8 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Service, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ? AND segment = ?", p.OrgID, workshopshared.SegmentBikeShop)
+	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
+		Where("org_id = ? AND segment = ? AND archived_at IS NULL", p.OrgID, workshopshared.SegmentBikeShop)
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
 		q = q.Where("(code ILIKE ? OR name ILIKE ? OR description ILIKE ? OR category ILIKE ?)", like, like, like, like)
@@ -107,7 +108,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Service) (domain.Serv
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND segment = ?", in.OrgID, in.ID, workshopshared.SegmentBikeShop).
+		Where("org_id = ? AND id = ? AND segment = ? AND archived_at IS NULL", in.OrgID, in.ID, workshopshared.SegmentBikeShop).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Service{}, res.Error

@@ -13,6 +13,7 @@ type ServiceItem struct {
 	TaxRate         float64 `json:"tax_rate"`
 	LinkedProductID *string `json:"linked_product_id,omitempty"`
 	IsActive        bool    `json:"is_active"`
+	ArchivedAt      *string `json:"archived_at,omitempty"`
 	CreatedAt       string  `json:"created_at"`
 	UpdatedAt       string  `json:"updated_at"`
 }

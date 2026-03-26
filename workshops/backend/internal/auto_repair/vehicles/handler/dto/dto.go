@@ -13,6 +13,7 @@ type VehicleItem struct {
 	Kilometers   int     `json:"kilometers"`
 	Color        string  `json:"color"`
 	Notes        string  `json:"notes"`
+	ArchivedAt   *string `json:"archived_at,omitempty"`
 	CreatedAt    string  `json:"created_at"`
 	UpdatedAt    string  `json:"updated_at"`
 }

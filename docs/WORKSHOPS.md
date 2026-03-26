@@ -114,9 +114,9 @@ Rutas:
 
 - `/workshops/auto-repair/vehicles`
 - `/workshops/auto-repair/services`
-- `/workshops/auto-repair/orders`
+- Órdenes de trabajo: módulo `/modules/workOrders` (selector **Tablero / Lista**): Kanban desde `@devpablocristo/modules-crud` y lista CRUD. La ruta legacy `/workshops/auto-repair/orders/*` redirige al módulo.
 
-Las tres usan el blueprint comun `CrudPage`.
+Vehículos y servicios usan el blueprint comun `CrudPage`.
 
 Capacidades contextuales en OT:
 

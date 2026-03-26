@@ -10,7 +10,7 @@ AI_ROOT = TESTS_DIR.parent
 for path in (
     AI_ROOT,
     AI_ROOT / "../pymes-core/shared/ai/src",
-    AI_ROOT / "../../core/backend/python/src",
+    AI_ROOT / "../../core/http/python/src",
     AI_ROOT / "../../core/ai/python/src",
 ):
     resolved = path.resolve()

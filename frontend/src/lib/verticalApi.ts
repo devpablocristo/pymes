@@ -4,7 +4,29 @@ type VerticalRequestConfig = {
   envVar: string;
   fallbackPorts: number[];
   translateError?: (message: string) => string;
+  /** Límite de espera (ms). 0 = sin límite. Evita spinners infinitos si el vertical no responde. */
+  timeoutMs?: number;
+  timeoutMessage?: string;
 };
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  if (ms <= 0) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        window.clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
 
 function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): string[] {
   const candidates: string[] = [];
@@ -48,10 +70,23 @@ function normalizeErrorMessage(raw: string, translateError?: (message: string) =
 
 export function createVerticalRequest(config: VerticalRequestConfig) {
   const baseURLs = resolveVerticalBaseURLs(config.envVar, config.fallbackPorts);
+  const timeoutMs = config.timeoutMs ?? 0;
+  const timeoutMessage =
+    config.timeoutMessage ?? 'El servidor tardó demasiado en responder. Comprobá que el backend vertical esté en marcha y el puerto en VITE_*_API_URL.';
 
   return async function verticalRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const run = async (): Promise<T> => {
+      try {
+        return await request<T>(path, { ...options, baseURLs });
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new Error(normalizeErrorMessage(error.message, config.translateError));
+        }
+        throw error;
+      }
+    };
     try {
-      return await request<T>(path, { ...options, baseURLs });
+      return await withTimeout(run(), timeoutMs, timeoutMessage);
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(normalizeErrorMessage(error.message, config.translateError));

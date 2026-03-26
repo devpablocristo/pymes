@@ -43,11 +43,15 @@ type UpdateInput struct {
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error)
 	MarkReadyPickupNotified(ctx context.Context, orgID, id uuid.UUID, at time.Time) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -78,6 +82,10 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, cp controlPlanePort, wa w
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.WorkOrder, error) {
+	return u.repo.ListArchived(ctx, orgID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string) (domain.WorkOrder, error) {
@@ -124,6 +132,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return domain.WorkOrder{}, err
+	}
+	if current.ArchivedAt != nil {
+		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
 	}
 	prevCanon := normalizeWorkOrderStatus(current.Status)
 	if in.VehicleID != nil {
@@ -252,6 +263,16 @@ func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUI
 }
 
 func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error) {
+	current, err := u.repo.GetByID(ctx, orgID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
+		}
+		return domain.WorkOrder{}, err
+	}
+	if current.ArchivedAt != nil {
+		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
+	}
 	out, err := u.repo.SaveIntegrations(ctx, orgID, id, quoteID, saleID, status)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -263,6 +284,48 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.integration_updated", "work_order", out.ID.String(), map[string]any{"quote_id": quoteID, "sale_id": saleID, "status": status})
 	}
 	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "work_order.archived", "work_order", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "work_order.restored", "work_order", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
+		}
+		if errors.Is(err, ErrWorkOrderHasIntegrations) {
+			return fmt.Errorf("work order has quote or sale: %w", httperrors.ErrConflict)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "work_order.hard_deleted", "work_order", id.String(), nil)
+	}
+	return nil
 }
 
 func normalizeWorkOrder(in *domain.WorkOrder) error {

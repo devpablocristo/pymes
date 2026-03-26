@@ -51,6 +51,7 @@ type WorkOrderItem struct {
 	DeliveredAt           *string `json:"delivered_at,omitempty"`
 	ReadyPickupNotifiedAt *string `json:"ready_pickup_notified_at,omitempty"`
 	CreatedBy             string  `json:"created_by"`
+	ArchivedAt            *string `json:"archived_at,omitempty"`
 	CreatedAt             string  `json:"created_at"`
 	UpdatedAt             string  `json:"updated_at"`
 	Items            []WorkOrderLineItem `json:"items"`

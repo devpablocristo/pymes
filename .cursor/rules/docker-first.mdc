@@ -1,0 +1,13 @@
+---
+description: Ejecución y verificación siempre vía Docker — no flujo nativo en el host por defecto
+globs:
+alwaysApply: true
+---
+
+# Docker primero (no nativo en el host)
+
+- **Stack local y pruebas de integración:** levantar y probar con **`docker compose`** desde la raíz del monorepo (`make up`, `docker compose build`, `docker compose exec`, health HTTP a los puertos publicados). Ver `docker-compose.yml` y `Makefile`.
+- **Prohibido para el agente** usar como verificación por defecto **`go build` / `go test` / `npm run`** en el **host** cuando exista un servicio equivalente en compose. Excepción: el usuario pide explícitamente modo nativo, o el entorno no tiene Docker (decirlo en la respuesta).
+- **Evidencia de “funciona”** en cambios que tocan APIs o UI contra backends: contenedor **Up** (`docker compose ps`) y comprobación HTTP al puerto en host (p. ej. `curl` a `/healthz` o al endpoint tocado), preferentemente con el stack ya levantado.
+- **Tests/build dentro de imágenes:** usar targets `test-docker-*` / `build-docker-*` del `Makefile` o `docker compose exec -T <servicio> …` con el `WORKDIR` del contenedor (p. ej. `work-backend` ya está en `workshops/backend`).
+- **Módulos externos (`../modules`):** el repo ya expone `make modules-check` (compose del repo modules); preferir eso antes que `npm`/`tsc` nativos en carpetas sueltas.

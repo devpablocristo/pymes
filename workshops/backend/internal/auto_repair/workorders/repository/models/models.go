@@ -33,6 +33,7 @@ type WorkOrderModel struct {
 	DeliveredAt           *time.Time
 	ReadyPickupNotifiedAt *time.Time
 	CreatedBy             string     `gorm:"not null;default:''"`
+	ArchivedAt            *time.Time `gorm:"column:archived_at"`
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }

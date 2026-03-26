@@ -345,6 +345,12 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'WH',
     summary: 'Endpoints, entregas y replay de eventos outbound.',
   },
+  workOrders: {
+    group: 'operations',
+    icon: 'OT',
+    summary:
+      'Taller auto-repair: tablero por estado y lista administrativa en /modules/workOrders (selector Tablero / Lista).',
+  },
 };
 
 export const crudModuleCatalog: Record<string, ModuleDefinition> = Object.fromEntries(

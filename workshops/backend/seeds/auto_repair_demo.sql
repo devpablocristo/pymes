@@ -32,11 +32,12 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
     SELECT id INTO veh1 FROM workshops.vehicles WHERE org_id = v_org AND license_plate = 'AB 123 CD' LIMIT 1;
 
+    -- Índice único activo: (org_id, code, segment) WHERE archived_at IS NULL (migración 0006).
     INSERT INTO workshops.services (id, org_id, segment, code, name, description, category, estimated_hours, base_price, currency, tax_rate, linked_product_id, is_active)
     VALUES
         (srv1, v_org, 'auto_repair', 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estándar', 'mantenimiento', 0.5, 25000, 'ARS', 21, NULL, true),
         (srv2, v_org, 'auto_repair', 'SRV-BRAKE', 'Revisión de frenos', 'Inspección y ajuste', 'frenos', 1.5, 45000, 'ARS', 21, p1, true)
-    ON CONFLICT (org_id, segment, code) DO NOTHING;
+    ON CONFLICT (org_id, code, segment) WHERE archived_at IS NULL DO NOTHING;
     SELECT id INTO srv1 FROM workshops.services WHERE org_id = v_org AND segment = 'auto_repair' AND code = 'SRV-OIL' LIMIT 1;
     SELECT id INTO srv2 FROM workshops.services WHERE org_id = v_org AND segment = 'auto_repair' AND code = 'SRV-BRAKE' LIMIT 1;
 
@@ -44,6 +45,7 @@ BEGIN
         RAISE EXCEPTION 'workshops seed: missing vehicle or services for org %', v_org;
     END IF;
 
+    -- Índice único activo: (org_id, number) WHERE archived_at IS NULL (migración 0007).
     INSERT INTO workshops.work_orders (
         id, org_id, number, vehicle_id, vehicle_plate, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency,
@@ -54,7 +56,7 @@ BEGIN
         'Cambio de aceite y ruido al frenar', '', 'Orden abierta (semilla)', '', 'ARS',
         25000, 15000, 8400, 48400, 'seed'
     )
-    ON CONFLICT (org_id, number) DO NOTHING;
+    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
     SELECT id INTO wo1 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-001' LIMIT 1;
 
     INSERT INTO workshops.work_orders (
@@ -67,7 +69,7 @@ BEGIN
         'Service 20.000 km', 'Pastillas delanteras al límite', 'En taller', 'Prioridad media', 'ARS',
         45000, 0, 9450, 54450, 'seed'
     )
-    ON CONFLICT (org_id, number) DO NOTHING;
+    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
     SELECT id INTO wo2 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-002' LIMIT 1;
 
     IF wo1 IS NULL OR wo2 IS NULL THEN

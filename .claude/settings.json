@@ -25,7 +25,8 @@
       "Bash(find /home/pablo/Projects/Pablo -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/backend/go/fsm\" {})",
       "Bash(find /home/pablo/Projects/Pablo -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/saas/go\" {})",
       "Bash(rm /home/pablo/Projects/Pablo/core/backend/go/validation/validation_test.go)",
-      "Bash(rmdir /home/pablo/Projects/Pablo/core/backend/go/validation/)"
+      "Bash(rmdir /home/pablo/Projects/Pablo/core/backend/go/validation/)",
+      "Bash(make up:*)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",

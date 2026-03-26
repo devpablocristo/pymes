@@ -17,6 +17,7 @@ require (
 	github.com/devpablocristo/core/http/go/gin v0.0.0
 	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/devpablocristo/core/security/go v0.0.0
+	github.com/devpablocristo/core/statemachine/go v0.0.0
 	github.com/devpablocristo/core/utils/go v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
@@ -134,3 +135,5 @@ replace github.com/devpablocristo/core/config/go => ../core/config/go
 replace github.com/devpablocristo/core/security/go => ../core/security/go
 
 replace github.com/devpablocristo/core/utils/go => ../core/utils/go
+
+replace github.com/devpablocristo/core/statemachine/go => ../core/statemachine/go

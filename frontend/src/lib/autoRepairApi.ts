@@ -26,10 +26,62 @@ const autoRepairRequest = createVerticalRequest({
   envVar: 'VITE_WORKSHOPS_API_URL',
   fallbackPorts: [8282, 8082],
   translateError: translateAutoRepairError,
+  timeoutMs: 60_000,
+  timeoutMessage:
+    'El backend de talleres no respondió a tiempo. Levantá work-backend (puerto 8282), revisá VITE_WORKSHOPS_API_URL y que las migraciones estén aplicadas.',
 });
 
+/** Prefijo API auto-repair en el backend de talleres (contrato alineado al CRUD canónico / paridad consola). */
+const WORKSHOPS_AUTO_REPAIR_PREFIX = '/v1/auto-repair';
+
+/**
+ * Patrón único para recursos con archivo lógico + listado archivado (misma UX que clientes en modules-crud).
+ * entityPath: segmento bajo auto-repair, ej. "/vehicles" → GET .../vehicles, GET .../vehicles/archived, DELETE .../id, etc.
+ */
+export function workshopsArchivedCrudFragment(entityPath: string) {
+  const base = `${WORKSHOPS_AUTO_REPAIR_PREFIX}${entityPath}`;
+  return {
+    list: async <T>(params?: { archived?: boolean }): Promise<T[]> => {
+      const archived = params?.archived === true;
+      const url = archived ? `${base}/archived` : base;
+      const data = await autoRepairRequest<unknown>(url);
+      if (data == null || typeof data !== 'object') {
+        return [];
+      }
+      const items = (data as { items?: unknown }).items;
+      return Array.isArray(items) ? (items as T[]) : [];
+    },
+    deleteItem: async (row: { id: string }) => {
+      await autoRepairRequest(`${base}/${row.id}`, { method: 'DELETE' });
+    },
+    restore: async (row: { id: string }) => {
+      await autoRepairRequest(`${base}/${row.id}/restore`, { method: 'POST', body: {} });
+    },
+    hardDelete: async (row: { id: string }) => {
+      await autoRepairRequest(`${base}/${row.id}/hard`, { method: 'DELETE' });
+    },
+  };
+}
+
+/** Vehículos: usar este fragmento en resourceConfigs para no duplicar rutas. */
+export const workshopVehiclesArchivedCrud = workshopsArchivedCrudFragment('/vehicles');
+
+/** Servicios de taller (auto-repair): archivo / restaurar / borrado duro, misma UX que clientes. */
+export const workshopServicesArchivedCrud = workshopsArchivedCrudFragment('/workshop-services');
+
+/** Órdenes de trabajo: mismas rutas de archivo que vehículos/servicios. */
+export const workshopWorkOrdersArchivedCrud = workshopsArchivedCrudFragment('/work-orders');
+
+export async function getAutoRepairWorkOrdersArchived(): Promise<{ items: AutoRepairWorkOrder[] }> {
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/archived`);
+}
+
 export async function getAutoRepairVehicles(): Promise<{ items: AutoRepairVehicle[] }> {
-  return autoRepairRequest('/v1/auto-repair/vehicles');
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles`);
+}
+
+export async function getAutoRepairVehiclesArchived(): Promise<{ items: AutoRepairVehicle[] }> {
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/archived`);
 }
 
 export async function createAutoRepairVehicle(data: {
@@ -44,7 +96,19 @@ export async function createAutoRepairVehicle(data: {
   color?: string;
   notes?: string;
 }): Promise<AutoRepairVehicle> {
-  return autoRepairRequest('/v1/auto-repair/vehicles', { method: 'POST', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles`, { method: 'POST', body: data });
+}
+
+export async function archiveAutoRepairVehicle(id: string): Promise<void> {
+  await workshopVehiclesArchivedCrud.deleteItem({ id });
+}
+
+export async function restoreAutoRepairVehicle(id: string): Promise<void> {
+  await workshopVehiclesArchivedCrud.restore({ id });
+}
+
+export async function hardDeleteAutoRepairVehicle(id: string): Promise<void> {
+  await workshopVehiclesArchivedCrud.hardDelete({ id });
 }
 
 export async function updateAutoRepairVehicle(
@@ -62,11 +126,11 @@ export async function updateAutoRepairVehicle(
     notes: string;
   }>,
 ): Promise<AutoRepairVehicle> {
-  return autoRepairRequest(`/v1/auto-repair/vehicles/${id}`, { method: 'PUT', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/${id}`, { method: 'PUT', body: data });
 }
 
 export async function getAutoRepairServices(): Promise<{ items: AutoRepairService[] }> {
-  return autoRepairRequest('/v1/auto-repair/workshop-services');
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services`);
 }
 
 export async function createAutoRepairService(data: {
@@ -81,7 +145,7 @@ export async function createAutoRepairService(data: {
   linked_product_id?: string;
   is_active?: boolean;
 }): Promise<AutoRepairService> {
-  return autoRepairRequest('/v1/auto-repair/workshop-services', { method: 'POST', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services`, { method: 'POST', body: data });
 }
 
 export async function updateAutoRepairService(
@@ -99,11 +163,11 @@ export async function updateAutoRepairService(
     is_active: boolean;
   }>,
 ): Promise<AutoRepairService> {
-  return autoRepairRequest(`/v1/auto-repair/workshop-services/${id}`, { method: 'PUT', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services/${id}`, { method: 'PUT', body: data });
 }
 
 export async function getAutoRepairWorkOrder(id: string): Promise<AutoRepairWorkOrder> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`);
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}`);
 }
 
 export async function getAutoRepairWorkOrders(params?: {
@@ -118,7 +182,7 @@ export async function getAutoRepairWorkOrders(params?: {
   if (params?.status) q.set('status', params.status);
   if (params?.after) q.set('after', params.after);
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  return autoRepairRequest(`/v1/auto-repair/work-orders${suffix}`);
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders${suffix}`);
 }
 
 /** Todas las páginas (cursor), para tablero Kanban y listas completas. */
@@ -159,7 +223,7 @@ export async function createAutoRepairWorkOrder(data: {
   promised_at?: string;
   items: AutoRepairWorkOrder['items'];
 }): Promise<AutoRepairWorkOrder> {
-  return autoRepairRequest('/v1/auto-repair/work-orders', { method: 'POST', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders`, { method: 'POST', body: data });
 }
 
 export async function updateAutoRepairWorkOrder(
@@ -182,7 +246,7 @@ export async function updateAutoRepairWorkOrder(
     items: AutoRepairWorkOrder['items'];
   }>,
 ): Promise<AutoRepairWorkOrder> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`, { method: 'PUT', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}`, { method: 'PUT', body: data });
 }
 
 export async function patchAutoRepairWorkOrder(
@@ -193,7 +257,22 @@ export async function patchAutoRepairWorkOrder(
     promised_at: string;
   }>,
 ): Promise<AutoRepairWorkOrder> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}`, { method: 'PATCH', body: data });
+  return autoRepairRequest<AutoRepairWorkOrder>(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}`, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+export async function archiveAutoRepairWorkOrder(id: string): Promise<void> {
+  await workshopWorkOrdersArchivedCrud.deleteItem({ id });
+}
+
+export async function restoreAutoRepairWorkOrder(id: string): Promise<void> {
+  await workshopWorkOrdersArchivedCrud.restore({ id });
+}
+
+export async function hardDeleteAutoRepairWorkOrder(id: string): Promise<void> {
+  await workshopWorkOrdersArchivedCrud.hardDelete({ id });
 }
 
 export async function createAutoRepairAppointment(data: {
@@ -210,24 +289,28 @@ export async function createAutoRepairAppointment(data: {
   notes?: string;
   metadata?: Record<string, unknown>;
 }): Promise<AutoRepairAppointment> {
-  return autoRepairRequest('/v1/auto-repair/workshop-appointments', { method: 'POST', body: data });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-appointments`, { method: 'POST', body: data });
 }
 
 export async function createAutoRepairQuote(id: string): Promise<{ id: string }> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}/quote`, { method: 'POST', body: {} });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}/quote`, { method: 'POST', body: {} });
 }
 
 export async function createAutoRepairSale(id: string): Promise<{ id: string }> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}/sale`, { method: 'POST', body: {} });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}/sale`, { method: 'POST', body: {} });
 }
 
 export async function createAutoRepairPaymentLink(id: string): Promise<AutoRepairPaymentLink> {
-  return autoRepairRequest(`/v1/auto-repair/work-orders/${id}/payment-link`, { method: 'POST', body: {} });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}/payment-link`, { method: 'POST', body: {} });
 }
 
 export const getWorkshopVehicles = getAutoRepairVehicles;
+export const getWorkshopVehiclesArchived = getAutoRepairVehiclesArchived;
 export const createWorkshopVehicle = createAutoRepairVehicle;
 export const updateWorkshopVehicle = updateAutoRepairVehicle;
+export const archiveWorkshopVehicle = archiveAutoRepairVehicle;
+export const restoreWorkshopVehicle = restoreAutoRepairVehicle;
+export const hardDeleteWorkshopVehicle = hardDeleteAutoRepairVehicle;
 export const getWorkshopServices = getAutoRepairServices;
 export const createWorkshopService = createAutoRepairService;
 export const updateWorkshopService = updateAutoRepairService;
@@ -240,3 +323,6 @@ export const createWorkshopAppointment = createAutoRepairAppointment;
 export const createWorkOrderQuote = createAutoRepairQuote;
 export const createWorkOrderSale = createAutoRepairSale;
 export const createWorkOrderPaymentLink = createAutoRepairPaymentLink;
+export const archiveWorkOrder = archiveAutoRepairWorkOrder;
+export const restoreWorkOrder = restoreAutoRepairWorkOrder;
+export const hardDeleteWorkOrder = hardDeleteAutoRepairWorkOrder;

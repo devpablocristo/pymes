@@ -15,6 +15,9 @@ import (
 	workshopshared "github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
 )
 
+// ErrServiceReferencedInWorkOrders no se puede borrar en duro si hay ítems de OT que lo referencian.
+var ErrServiceReferencedInWorkOrders = errors.New("service referenced in work orders")
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -23,7 +26,8 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Service, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
+		Where("org_id = ? AND segment = ? AND archived_at IS NULL", p.OrgID, workshopshared.SegmentAutoRepair)
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
 		q = q.Where("(code ILIKE ? OR name ILIKE ? OR description ILIKE ? OR category ILIKE ?)", like, like, like, like)
@@ -55,6 +59,24 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Service, 
 		next = &value
 	}
 	return out, total, hasMore, next, nil
+}
+
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Service, error) {
+	var rows []models.ServiceModel
+	err := r.db.WithContext(ctx).
+		Model(&models.ServiceModel{}).
+		Where("org_id = ? AND segment = ? AND archived_at IS NOT NULL", orgID, workshopshared.SegmentAutoRepair).
+		Order("updated_at DESC").
+		Limit(200).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Service, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomain(row))
+	}
+	return out, nil
 }
 
 func (r *Repository) Create(ctx context.Context, in domain.Service) (domain.Service, error) {
@@ -107,7 +129,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Service) (domain.Serv
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND segment = ?", in.OrgID, in.ID, workshopshared.SegmentAutoRepair).
+		Where("org_id = ? AND id = ? AND segment = ? AND archived_at IS NULL", in.OrgID, in.ID, workshopshared.SegmentAutoRepair).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Service{}, res.Error
@@ -116,6 +138,68 @@ func (r *Repository) Update(ctx context.Context, in domain.Service) (domain.Serv
 		return domain.Service{}, gorm.ErrRecordNotFound
 	}
 	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
+		Where("org_id = ? AND id = ? AND segment = ? AND archived_at IS NULL", orgID, id, workshopshared.SegmentAutoRepair).
+		Updates(map[string]any{"archived_at": now, "updated_at": now})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
+		Where("org_id = ? AND id = ? AND segment = ? AND archived_at IS NOT NULL", orgID, id, workshopshared.SegmentAutoRepair).
+		Updates(map[string]any{"archived_at": nil, "updated_at": now})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	var count int64
+	if err := r.db.WithContext(ctx).Table("workshops.work_order_items").
+		Where("org_id = ? AND service_id = ?", orgID, id).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrServiceReferencedInWorkOrders
+	}
+	var row models.ServiceModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ? AND segment = ?", orgID, id, workshopshared.SegmentAutoRepair).
+		Take(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return gorm.ErrRecordNotFound
+		}
+		return err
+	}
+	if row.ArchivedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	res := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ? AND segment = ?", orgID, id, workshopshared.SegmentAutoRepair).
+		Delete(&models.ServiceModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func toDomain(row models.ServiceModel) domain.Service {
@@ -132,6 +216,7 @@ func toDomain(row models.ServiceModel) domain.Service {
 		TaxRate:         row.TaxRate,
 		LinkedProductID: row.LinkedProductID,
 		IsActive:        row.IsActive,
+		ArchivedAt:      row.ArchivedAt,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}

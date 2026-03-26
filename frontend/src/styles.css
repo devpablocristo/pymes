@@ -2,6 +2,9 @@
 
 /* ── Design tokens ── */
 :root {
+  /* Ancho sidebar + offset del main; la skin Wowdash puede ampliarlo vía `admin-skin-wowdash.css`. */
+  --shell-sidebar-width: 240px;
+
   --font-body: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
@@ -129,7 +132,7 @@ a {
 }
 
 .sidebar {
-  width: 240px;
+  width: var(--shell-sidebar-width);
   background: var(--color-sidebar);
   color: var(--color-sidebar-text);
   display: flex;
@@ -284,14 +287,82 @@ a {
 
 .main-content {
   flex: 1;
-  margin-left: 240px;
+  margin-left: var(--shell-sidebar-width);
   padding: 2rem 2.5rem;
-  max-width: calc(100% - 240px);
+  max-width: calc(100% - var(--shell-sidebar-width));
 }
 
 /* ── Page header ── */
 .page-header {
   margin-bottom: 1.75rem;
+}
+
+/* Cabecera CRUD (core CrudPageShell): título/subtítulo a la izquierda, acciones a la derecha */
+.page-header.crud-page-shell__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Bloque izquierdo: título + subtítulo + píldoras compactos (paridad con `m-kanban__toolbar-main`). */
+.page-header.crud-page-shell__header .crud-page-shell__header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.page-header.crud-page-shell__header .crud-page-shell__header-main > div:first-child h1 {
+  margin: 0;
+}
+
+.page-header.crud-page-shell__header .crud-page-shell__header-main > div:first-child p.text-secondary {
+  margin-top: 0.15rem;
+  margin-bottom: 0;
+}
+
+.page-header.crud-page-shell__header .crud-list-header-lead {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Columna derecha: búsqueda arriba, botones debajo (paridad con toolbar Kanban). */
+.page-header.crud-page-shell__header .crud-page-shell__header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Misma lógica de tamaño que `.m-kanban__toolbar-actions .m-kanban__search` (lista no importa CSS del tablero). */
+.page-header.crud-page-shell__header .crud-list-header-search {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
+}
+
+.page-header.crud-page-shell__header .crud-list-header-search .crud-search {
+  min-width: min(14rem, 100%);
+  flex: 1 1 14rem;
+  max-width: min(24rem, 100%);
+  box-sizing: border-box;
+  width: auto;
+}
+
+.page-header.crud-page-shell__header .crud-page-shell__header-actions > .actions-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .page-header h1 {
@@ -3007,14 +3078,20 @@ code {
 }
 
 .crud-table .col-actions {
-  width: 160px;
+  /* 1% + min-width: la columna crece con el contenido (varios botones en fila). */
+  width: 1%;
+  min-width: min(100%, 22rem);
   text-align: right;
+  vertical-align: top;
 }
 
-.crud-table td.col-actions {
+/* Flex en el interior del td evita romper el modelo de tabla (display:flex en td comprimía todo). */
+.crud-row-actions {
   display: flex;
-  gap: 0.4rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .confirm-delete-inline {
@@ -3315,4 +3392,16 @@ textarea.input-readonly {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* ── Laboratorio plantilla Wowdash (/labs/wowdash) ── */
+html.wowdash-lab-active,
+html.wowdash-lab-active body,
+html.wowdash-lab-active #root {
+  min-height: 100%;
+}
+
+.wowdash-template-root {
+  min-height: 100vh;
+  isolation: isolate;
 }

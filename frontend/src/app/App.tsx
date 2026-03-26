@@ -1,18 +1,25 @@
-import { Suspense, lazy, type ReactNode } from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import { StrictMode, Suspense, lazy, type ReactNode } from 'react';
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
 import { hasCompletedOnboarding } from '../lib/tenantProfile';
+import { wowdashOpenInDev } from '../lib/wowdashDevAccess';
 
 const Shell = lazy(() => import('../components/Shell').then((mod) => ({ default: mod.Shell })));
 const AdminPage = lazy(() => import('../pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
 const AutoRepairServicesPage = lazy(() => import('../pages/AutoRepairServicesPage').then((mod) => ({ default: mod.AutoRepairServicesPage })));
 const AutoRepairVehiclesPage = lazy(() => import('../pages/AutoRepairVehiclesPage').then((mod) => ({ default: mod.AutoRepairVehiclesPage })));
 const AutoRepairWorkOrdersPage = lazy(() => import('../pages/AutoRepairWorkOrdersPage').then((mod) => ({ default: mod.AutoRepairWorkOrdersPage })));
-const AutoRepairWorkOrdersKanbanPage = lazy(() =>
-  import('../pages/AutoRepairWorkOrdersKanbanPage').then((mod) => ({ default: mod.AutoRepairWorkOrdersKanbanPage })),
+const WorkOrdersModuleSection = lazy(() =>
+  import('../pages/WorkOrdersModuleSection').then((mod) => ({ default: mod.WorkOrdersModuleSection })),
+);
+const WorkOrdersKanbanPanel = lazy(() =>
+  import('../pages/WorkOrdersKanbanPanel').then((mod) => ({ default: mod.WorkOrdersKanbanPanel })),
+);
+const WorkOrdersEditorPage = lazy(() =>
+  import('../pages/WorkOrdersEditorPage').then((mod) => ({ default: mod.WorkOrdersEditorPage })),
 );
 const BeautySalonServicesPage = lazy(() => import('../pages/BeautySalonServicesPage').then((mod) => ({ default: mod.BeautySalonServicesPage })));
 const BeautyStaffPage = lazy(() => import('../pages/BeautyStaffPage').then((mod) => ({ default: mod.BeautyStaffPage })));
@@ -37,6 +44,9 @@ const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({
 const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 const ApprovalInboxPage = lazy(() => import('../pages/ApprovalInboxPage'));
 const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
+const WowdashTemplateLabsPage = lazy(() =>
+  import('../pages/WowdashTemplateLabsPage').then((mod) => ({ default: mod.WowdashTemplateLabsPage })),
+);
 
 function Suspended({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="card"><p>Cargando…</p></div>}>{children}</Suspense>;
@@ -49,33 +59,103 @@ function RequireOnboarding({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Fuera de StrictMode el laboratorio Wowdash (ApexCharts no tolera el doble efecto de dev). */
+function StrictDevShell({ children }: { children: ReactNode }) {
+  return <StrictMode>{children}</StrictMode>;
+}
+
+/** Ruta canónica del template: `/console/wowdash/*` (misma sesión que el panel). */
+function LabsWowdashRedirect() {
+  const { pathname, search, hash } = useLocation();
+  const to = `${pathname.replace(/^\/labs\/wowdash/, '/console/wowdash')}${search}${hash}`;
+  return <Navigate to={to} replace />;
+}
+
+function WowdashConsoleEntry() {
+  return (
+    <Suspended>
+      <WowdashTemplateLabsPage />
+    </Suspended>
+  );
+}
+
 export function App() {
+  const wowdashDev = wowdashOpenInDev();
   return (
     <>
       <AuthTokenBridge />
       {clerkEnabled && <ClerkSessionOrgSync />}
       <Routes>
         {/* Clerk (path routing) usa subrutas: /login/tasks/choose-organization, etc. */}
-        <Route path="/login/*" element={<Suspended><LoginPage /></Suspended>} />
-        <Route path="/signup/*" element={<Suspended><SignupPage /></Suspended>} />
+        <Route
+          path="/login/*"
+          element={
+            <StrictDevShell>
+              <Suspended>
+                <LoginPage />
+              </Suspended>
+            </StrictDevShell>
+          }
+        />
+        <Route
+          path="/signup/*"
+          element={
+            <StrictDevShell>
+              <Suspended>
+                <SignupPage />
+              </Suspended>
+            </StrictDevShell>
+          }
+        />
         <Route
           path="/onboarding"
           element={
-            <ProtectedRoute>
-              <Suspended>
-                <OnboardingPage />
-              </Suspended>
-            </ProtectedRoute>
+            <StrictDevShell>
+              <ProtectedRoute>
+                <Suspended>
+                  <OnboardingPage />
+                </Suspended>
+              </ProtectedRoute>
+            </StrictDevShell>
+          }
+        />
+        <Route
+          path="/labs/wowdash/*"
+          element={
+            wowdashDev ? (
+              <LabsWowdashRedirect />
+            ) : (
+              <ProtectedRoute>
+                <RequireOnboarding>
+                  <LabsWowdashRedirect />
+                </RequireOnboarding>
+              </ProtectedRoute>
+            )
+          }
+        />
+        <Route
+          path="/console/wowdash/*"
+          element={
+            wowdashDev ? (
+              <WowdashConsoleEntry />
+            ) : (
+              <ProtectedRoute>
+                <RequireOnboarding>
+                  <WowdashConsoleEntry />
+                </RequireOnboarding>
+              </ProtectedRoute>
+            )
           }
         />
         <Route
           path="*"
           element={
-            <ProtectedRoute>
-              <RequireOnboarding>
-                <Suspended>
-                  <Shell>
-                    <Routes>
+            <StrictDevShell>
+              <ProtectedRoute>
+                <RequireOnboarding>
+                  <Suspended>
+                    <Shell>
+                      <Routes>
                       <Route path="/" element={<DashboardPage />} />
                       <Route path="/assistant/commercial" element={<CommercialAssistantPage />} />
                       <Route path="/admin" element={<AdminPage />} />
@@ -83,6 +163,12 @@ export function App() {
                       <Route path="/modules/customers" element={<CustomersPage />} />
                       <Route path="/modules/purchases" element={<PurchasesPage />} />
                       <Route path="/compras" element={<PurchasesPage />} />
+                      <Route path="/modules/workOrders" element={<WorkOrdersModuleSection />}>
+                        <Route index element={<Navigate to="board" replace />} />
+                        <Route path="board" element={<WorkOrdersKanbanPanel />} />
+                        <Route path="list" element={<AutoRepairWorkOrdersPage />} />
+                        <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
+                      </Route>
                       <Route path="/modules/:moduleId" element={<ModulePage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
@@ -97,8 +183,10 @@ export function App() {
                       <Route path="/professionals/teachers/public" element={<PublicPreviewPage />} />
                       <Route path="/workshops/auto-repair/vehicles" element={<AutoRepairVehiclesPage />} />
                       <Route path="/workshops/auto-repair/services" element={<AutoRepairServicesPage />} />
-                      <Route path="/workshops/auto-repair/orders" element={<AutoRepairWorkOrdersPage />} />
-                      <Route path="/workshops/auto-repair/orders/board" element={<AutoRepairWorkOrdersKanbanPage />} />
+                      <Route
+                        path="/workshops/auto-repair/orders/*"
+                        element={<Navigate to="/modules/workOrders" replace />}
+                      />
                       <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
                       <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
                       <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
@@ -107,11 +195,12 @@ export function App() {
                       <Route path="/automation-rules" element={<AutomationRulesPage />} />
                       <Route path="/approvals" element={<ApprovalInboxPage />} />
                       <Route path="/watcher-config" element={<WatcherConfigPage />} />
-                    </Routes>
-                  </Shell>
-                </Suspended>
-              </RequireOnboarding>
-            </ProtectedRoute>
+                      </Routes>
+                    </Shell>
+                  </Suspended>
+                </RequireOnboarding>
+              </ProtectedRoute>
+            </StrictDevShell>
           }
         />
       </Routes>

@@ -11,16 +11,31 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"],
     "baseUrl": ".",
     "paths": {
+      "#wowdash/App": ["./src/wowdash-port/App.jsx"],
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
       "@devpablocristo/core-authn": ["./.deps/core/authn/ts/src/index.ts", "../../core/authn/ts/src/index.ts"],
       "@devpablocristo/core-authn/*": ["./.deps/core/authn/ts/src/*", "../../core/authn/ts/src/*"],
       "@devpablocristo/core-browser": ["./.deps/core/browser/ts/src/index.ts", "../../core/browser/ts/src/index.ts"],
       "@devpablocristo/core-browser/*": ["./.deps/core/browser/ts/src/*", "../../core/browser/ts/src/*"],
       "@devpablocristo/core-http": ["./.deps/core/http/ts/src/index.ts", "../../core/http/ts/src/index.ts"],
-      "@devpablocristo/core-http/*": ["./.deps/core/http/ts/src/*", "../../core/http/ts/src/*"]
+      "@devpablocristo/core-http/*": ["./.deps/core/http/ts/src/*", "../../core/http/ts/src/*"],
+      "@devpablocristo/modules-crud/crud": [
+        "./.deps/modules/crud/ts/src/crud/index.ts",
+        "../../modules/crud/ts/src/crud/index.ts"
+      ],
+      "@devpablocristo/modules-crud/crud/*": [
+        "./.deps/modules/crud/ts/src/crud/*",
+        "../../modules/crud/ts/src/crud/*"
+      ],
+      "@devpablocristo/modules-crud": ["./.deps/modules/crud/ts/src/index.ts", "../../modules/crud/ts/src/index.ts"],
+      "@devpablocristo/modules-crud/*": ["./.deps/modules/crud/ts/src/*", "../../modules/crud/ts/src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/wowdash-port"]
 }

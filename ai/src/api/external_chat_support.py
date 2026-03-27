@@ -193,13 +193,13 @@ async def run_external_chat(
             messages=llm_messages,
             tools=declarations,
             tool_handlers=handlers,
-            org_id=org_id,
+            context={"org_id": org_id},
         ):
             if chunk.type == "text" and chunk.text:
                 assistant_parts.append(chunk.text)
                 continue
             if chunk.type == "tool_call" and chunk.tool_call:
-                tool_name = str(chunk.tool_call.get("name", "")).strip()
+                tool_name = str(chunk.tool_call.name).strip()
                 if tool_name:
                     tool_calls.append(tool_name)
             # Detectar si un tool devolvió pending_approval

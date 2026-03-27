@@ -59,6 +59,7 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 ## Documentación
 
 - Índice: `docs/README.md`
+- Ownership IA del ecosistema: `docs/AI_OWNERSHIP.md`
 - Backend transversal y módulos: `docs/PYMES_CORE.md`
 - Librerías `core` vs producto: `docs/CORE_INTEGRATION.md`
 - Identidad, org en consola y puertos: `docs/AUTH.md` — Clerk en Docker y JWT: `docs/CLERK_LOCAL.md`
@@ -71,3 +72,4 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 - La lógica específica de verticales con tools propios vive en `ai/src/domains/<vertical>/<módulo>` — **hoy**: `professionals/teachers` y `workshops/auto_repair`
 - Chat comercial interno (ventas / procurement) contra el core: routers en `ai/src/api/commercial_router.py` (no bajo `domains/`)
 - **Beauty** y **restaurants** aún no tienen paquete dedicado bajo `ai/src/domains/`; cualquier asistente futuro debe seguir el mismo patrón (HTTP al vertical o core, sin importar dominio Go)
+- La taxonomía del ecosistema (`assistant`, `insight`, `copilot`, `companion`) y su ownership viven en `docs/AI_OWNERSHIP.md`; `pymes` conserva su inteligencia de producto y `nexus` conserva governance + companion

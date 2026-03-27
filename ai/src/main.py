@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+import httpx
 from httpserver.fastapi_bootstrap import (
     apply_permissive_cors,
     install_request_context_middleware,
@@ -25,7 +26,7 @@ from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendCl
 from src.domains.workshops.auto_repair.internal_router import router as auto_repair_chat_router
 from src.domains.workshops.auto_repair.public_router import router as auto_repair_public_router
 from runtime.provider_factory import create_provider
-from runtime.auth import AuthMiddleware, AuthSettings
+from runtime.auth import AuthMiddleware, AuthSettings, AuthContext
 from runtime.rate_limit import RateLimitMiddleware, RateLimitSettings
 from runtime.logging import bind_request_context, clear_request_context, configure_logging, get_logger
 from src.api.review_callback import router as review_callback_router
@@ -35,6 +36,54 @@ from src.review_client.client import ReviewClient
 settings = get_settings()
 configure_logging(settings.ai_log_level, json_logs=settings.ai_log_json)
 logger = get_logger(__name__)
+
+
+class LocalAPIKeyVerifier:
+    """Valida API keys locales contra pymes-core y conserva la key para downstream auth."""
+
+    def __init__(self, *, backend_url: str, internal_token: str) -> None:
+        self._backend_url = backend_url.rstrip("/")
+        self._internal_token = internal_token
+
+    async def _resolve_api_key(self, key: str) -> dict[str, object] | None:
+        async with httpx.AsyncClient(base_url=self._backend_url, timeout=10.0) as client:
+            response = await client.post(
+                "/v1/internal/v1/api-keys/resolve",
+                headers={"X-Internal-Service-Token": self._internal_token},
+                json={"api_key": key},
+            )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            return None
+        return payload
+
+    async def verify_api_key(self, key: str) -> AuthContext | None:
+        if not key.startswith("psk_"):
+            return None
+        payload = await self._resolve_api_key(key)
+        if payload is None:
+            return None
+        tenant = str(payload.get("org_id", "")).strip()
+        key_id = str(payload.get("id", "")).strip()
+        raw_scopes = payload.get("scopes", [])
+        scopes = [str(item).strip() for item in raw_scopes if str(item).strip()] if isinstance(raw_scopes, list) else []
+        scopes_csv = ",".join(scopes)
+        if not tenant:
+            return None
+        return AuthContext(
+            tenant_id=tenant,
+            actor=f"api_key:{key_id or tenant}",
+            role="service",
+            scopes=scopes,
+            mode="api_key",
+            api_key=key,
+            api_actor=f"api_key:{key_id or tenant}",
+            api_role="service",
+            api_scopes=scopes_csv or None,
+        )
 
 
 @asynccontextmanager
@@ -84,7 +133,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="pymes-ai", version="0.1.0", lifespan=lifespan)
 
-apply_permissive_cors(app)
+install_request_context_middleware(app, bind_request_context, clear_request_context)
+app.add_middleware(
+    AuthMiddleware,
+    settings=AuthSettings(allow_api_key=settings.auth_allow_api_key),
+    api_key_verifier=(
+        LocalAPIKeyVerifier(
+            backend_url=settings.backend_url,
+            internal_token=settings.internal_service_token,
+        )
+        if settings.is_local_environment
+        else None
+    ),
+)
 app.add_middleware(
     RateLimitMiddleware,
     settings=RateLimitSettings(
@@ -92,11 +153,7 @@ app.add_middleware(
         internal_rpm=settings.ai_internal_rpm,
     ),
 )
-app.add_middleware(
-    AuthMiddleware,
-    settings=AuthSettings(allow_api_key=settings.auth_allow_api_key),
-)
-install_request_context_middleware(app, bind_request_context, clear_request_context)
+apply_permissive_cors(app)
 
 
 app.include_router(chat_router)

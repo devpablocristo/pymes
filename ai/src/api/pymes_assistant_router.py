@@ -30,9 +30,13 @@ class PymesAssistantChatResponse(BaseModel):
     tokens_used: int
     tool_calls: list[str]
     pending_confirmations: list[str]
+    routed_agent: str = Field(
+        ...,
+        description="Sub-agente seleccionado para este turno: clientes | productos | ventas | cobros | compras | general",
+    )
     routed_mode: str = Field(
         ...,
-        description="Sub-agente usado en este turno: internal_sales | internal_procurement",
+        description="Alias legacy de `routed_agent` para compatibilidad hacia atrás.",
     )
 
 
@@ -60,7 +64,7 @@ async def chat_pymes_assistant(
         org_id=auth.org_id,
         actor=auth.actor,
         conversation_id=result.conversation_id,
-        routed_mode=result.routed_mode,
+        routed_agent=result.routed_agent,
         tool_calls=len(result.tool_calls),
     )
     return PymesAssistantChatResponse(
@@ -69,5 +73,6 @@ async def chat_pymes_assistant(
         tokens_used=result.tokens_used,
         tool_calls=result.tool_calls,
         pending_confirmations=result.pending_confirmations,
-        routed_mode=result.routed_mode,
+        routed_agent=result.routed_agent or "general",
+        routed_mode=result.routed_mode or "general",
     )

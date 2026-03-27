@@ -69,13 +69,19 @@ type Msg = {
 let nextMsgId = 100;
 
 function humanRoutedLabel(mode: string): string {
+  if (mode === 'clientes') return 'Clientes';
+  if (mode === 'productos') return 'Productos';
+  if (mode === 'ventas') return 'Ventas';
+  if (mode === 'cobros') return 'Cobros';
+  if (mode === 'compras') return 'Compras';
+  if (mode === 'general') return 'General';
   if (mode === 'internal_procurement') return 'Compras internas';
   if (mode === 'internal_sales') return 'Ventas';
-  return mode;
+  return mode || 'General';
 }
 
 function applyPymesReply(reply: PymesAssistantChatResponse): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel'>> {
-  const label = humanRoutedLabel(reply.routed_mode);
+  const label = humanRoutedLabel(reply.routed_agent || reply.routed_mode);
   const out: Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel'>> = [
     { text: reply.reply, fromMe: false, routedLabel: label },
   ];
@@ -102,6 +108,7 @@ export function UnifiedChatPage() {
     })),
   );
   const [conversationIds, setConversationIds] = useState<Record<string, string | undefined>>({});
+  const [pendingConfirmationsByContact, setPendingConfirmationsByContact] = useState<Record<string, string[]>>({});
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -112,6 +119,7 @@ export function UnifiedChatPage() {
 
   const activeDef = useMemo(() => CONTACT_DEFS.find((c) => c.id === active)!, [active]);
   const thread = useMemo(() => msgs.filter((m) => m.contactId === active), [msgs, active]);
+  const activePendingConfirmations = pendingConfirmationsByContact[active] ?? [];
 
   const contactsView = useMemo(() => {
     return CONTACT_DEFS.map((c) => {
@@ -180,6 +188,10 @@ export function UnifiedChatPage() {
           confirmed_actions: [],
         });
         setConversationIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.conversation_id }));
+        setPendingConfirmationsByContact((prev) => ({
+          ...prev,
+          [AI_PYMES_ID]: reply.pending_confirmations ?? [],
+        }));
         const additions = applyPymesReply(reply).map(
           (row): Msg => ({
             id: String(++nextMsgId),
@@ -216,39 +228,52 @@ export function UnifiedChatPage() {
       delete next[active];
       return next;
     });
+    setPendingConfirmationsByContact((prev) => {
+      const next = { ...prev };
+      delete next[active];
+      return next;
+    });
     setError('');
   }, [active]);
 
-  const send = useCallback(async () => {
-    const trimmed = input.trim();
+  const sendAssistantMessage = useCallback(async (
+    text: string,
+    options?: {
+      confirmedActions?: string[];
+      echoText?: string;
+      clearInput?: boolean;
+    },
+  ) => {
+    const trimmed = text.trim();
     if (!trimmed || busy) return;
 
     const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
     const userMsg: Msg = {
       id: String(++nextMsgId),
       contactId: active,
-      text: trimmed,
+      text: options?.echoText ?? trimmed,
       fromMe: true,
       time,
     };
     setMsgs((p) => [...p, userMsg]);
-    setInput('');
-
-    if (activeDef.kind === 'human') {
-      return;
+    if (options?.clearInput ?? true) {
+      setInput('');
     }
 
     setBusy(true);
     setError('');
     const conv = conversationIds[active];
-    const payload = {
-      message: trimmed,
-      conversation_id: conv ?? null,
-      confirmed_actions: [] as string[],
-    };
     try {
-      const reply = await pymesAssistantChat(payload);
+      const reply = await pymesAssistantChat({
+        message: trimmed,
+        conversation_id: conv ?? null,
+        confirmed_actions: options?.confirmedActions ?? [],
+      });
       setConversationIds((prev) => ({ ...prev, [active]: reply.conversation_id }));
+      setPendingConfirmationsByContact((prev) => ({
+        ...prev,
+        [active]: reply.pending_confirmations ?? [],
+      }));
       const additions = applyPymesReply(reply).map(
         (row): Msg => ({
           id: String(++nextMsgId),
@@ -270,7 +295,38 @@ export function UnifiedChatPage() {
     } finally {
       setBusy(false);
     }
-  }, [active, activeDef.kind, busy, conversationIds, input]);
+  }, [active, busy, conversationIds]);
+
+  const send = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || busy) return;
+
+    if (activeDef.kind === 'human') {
+      const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const userMsg: Msg = {
+        id: String(++nextMsgId),
+        contactId: active,
+        text: trimmed,
+        fromMe: true,
+        time,
+      };
+      setMsgs((p) => [...p, userMsg]);
+      setInput('');
+      return;
+    }
+    await sendAssistantMessage(trimmed, { clearInput: true });
+  }, [active, activeDef.kind, busy, input, sendAssistantMessage]);
+
+  const confirmPendingActions = useCallback(async () => {
+    if (activeDef.kind !== 'ai_pymes' || activePendingConfirmations.length === 0 || busy) {
+      return;
+    }
+    await sendAssistantMessage('Confirmo las acciones pendientes.', {
+      confirmedActions: activePendingConfirmations,
+      echoText: `Confirmo: ${activePendingConfirmations.join(', ')}`,
+      clearInput: false,
+    });
+  }, [activeDef.kind, activePendingConfirmations, busy, sendAssistantMessage]);
 
   const filteredContacts = contactsView.filter(
     (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
@@ -344,6 +400,14 @@ export function UnifiedChatPage() {
             ))}
             <div ref={endRef} />
           </div>
+          {activeDef.kind === 'ai_pymes' && activePendingConfirmations.length > 0 ? (
+            <div className="cht__pending-bar">
+              <span>Pendientes: {activePendingConfirmations.join(', ')}</span>
+              <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => void confirmPendingActions()}>
+                Confirmar acciones
+              </button>
+            </div>
+          ) : null}
           <div className="cht__input-bar">
             <input
               placeholder={

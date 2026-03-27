@@ -44,10 +44,11 @@ export async function commercialChatProcurement(payload: CommercialChatRequest):
 }
 
 export type PymesAssistantChatResponse = CommercialChatResponse & {
+  routed_agent: string;
   routed_mode: string;
 };
 
-/** Asistente Pymes — orquestador (ventas vs compras internas) en un solo chat. */
+/** Asistente Pymes — un solo chat interno con router LLM y sub-agentes especializados. */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
   return request('/v1/chat/pymes/', aiOptions({ method: 'POST', body: payload }));
 }

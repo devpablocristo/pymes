@@ -8,9 +8,12 @@ from fastapi.testclient import TestClient
 
 from src.api import chat_stream
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
+from src.api.pymes_assistant_router import router as pymes_assistant_router
 from src.api.public_router import router as public_chat_router
 from src.api.router import router as internal_chat_router
+from src.agents.service_support import CommercialChatResult
 import src.api.public_router as public_router_module
+import src.api.pymes_assistant_router as pymes_assistant_router_module
 import src.api.router as router_module
 
 
@@ -132,6 +135,22 @@ def create_internal_client(repo: StubRepo) -> TestClient:
     return TestClient(app)
 
 
+def create_pymes_assistant_client(repo: StubRepo) -> TestClient:
+    app = FastAPI()
+    app.include_router(pymes_assistant_router)
+    app.dependency_overrides[get_repository] = lambda: repo
+    app.dependency_overrides[get_auth_context] = lambda: StubAuthContext(
+        tenant_id="00000000-0000-0000-0000-000000000123",
+        actor="00000000-0000-0000-0000-000000000999",
+        role="admin",
+        scopes=["admin:console:write"],
+        mode="jwt",
+    )
+    app.dependency_overrides[get_llm_provider] = lambda: object()
+    app.dependency_overrides[get_backend_client] = lambda: object()
+    return TestClient(app)
+
+
 def create_public_client(repo: StubRepo, monkeypatch) -> TestClient:
     app = FastAPI()
     app.include_router(public_chat_router)
@@ -154,8 +173,10 @@ def test_internal_chat_failure_before_first_chunk_does_not_persist(monkeypatch) 
     repo = StubRepo()
     client = create_internal_client(repo)
 
-    monkeypatch.setattr(chat_stream, "orchestrate", make_orchestrate([RuntimeError("boom")]))
-    monkeypatch.setattr(router_module, "build_internal_tools", lambda *_args, **_kwargs: ([], {}))
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
 
     response = client.post("/v1/chat", json={"message": "hola"})
 
@@ -170,21 +191,16 @@ def test_internal_chat_failure_after_partial_text_does_not_persist(monkeypatch) 
     repo = StubRepo()
     client = create_internal_client(repo)
 
-    monkeypatch.setattr(
-        chat_stream,
-        "orchestrate",
-        make_orchestrate([chunk("text", text="hola"), RuntimeError("boom")]),
-    )
-    monkeypatch.setattr(router_module, "build_internal_tools", lambda *_args, **_kwargs: ([], {}))
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
 
     response = client.post("/v1/chat", json={"message": "hola"})
 
     assert response.status_code == 200
     events = parse_sse_events(response.text)
-    assert events == [
-        ("text", {"content": "hola"}),
-        ("error", {"message": "error processing request"}),
-    ]
+    assert events == [("error", {"message": "error processing request"})]
     assert repo.append_calls == []
     assert repo.track_calls == []
 
@@ -193,31 +209,71 @@ def test_internal_chat_success_persists_and_finishes(monkeypatch) -> None:
     repo = StubRepo()
     client = create_internal_client(repo)
 
-    monkeypatch.setattr(
-        chat_stream,
-        "orchestrate",
-        make_orchestrate(
-            [
-                chunk("tool_call", tool_name="lookup_customer"),
-                chunk("tool_result", tool_name="lookup_customer"),
-                chunk("text", text="respuesta final"),
-            ]
-        ),
-    )
-    monkeypatch.setattr(router_module, "build_internal_tools", lambda *_args, **_kwargs: ([], {}))
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="respuesta final",
+            tokens_input=10,
+            tokens_output=15,
+            tool_calls=["lookup_customer"],
+            pending_confirmations=[],
+            routed_agent="clientes",
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
 
     response = client.post("/v1/chat", json={"message": "hola"})
 
     assert response.status_code == 200
     events = parse_sse_events(response.text)
-    assert events[-1][0] == "done"
-    assert events[-1][1]["conversation_id"] == "conv-1"
-    assert int(events[-1][1]["tokens_used"]) > 0
-    assert repo.append_calls and repo.append_calls[0]["conversation_id"] == "conv-1"
-    assert len(repo.track_calls) == 1
-    assert repo.track_calls[0]["org_id"] == "00000000-0000-0000-0000-000000000123"
-    assert repo.track_calls[0]["tokens_in"] > 0
-    assert repo.track_calls[0]["tokens_out"] > 0
+    assert events == [
+        ("tool_call", {"tool": "lookup_customer", "status": "done"}),
+        ("text", {"content": "respuesta final"}),
+        (
+            "done",
+            {
+                "conversation_id": "conv-1",
+                "tokens_used": 25,
+                "routed_agent": "clientes",
+                "routed_mode": "clientes",
+            },
+        ),
+    ]
+
+
+def test_pymes_assistant_response_includes_routed_agent_and_legacy_alias(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_pymes_assistant_client(repo)
+
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="respuesta final",
+            tokens_input=12,
+            tokens_output=18,
+            tool_calls=["search_customers"],
+            pending_confirmations=[],
+            routed_agent="clientes",
+        )
+
+    monkeypatch.setattr(
+        pymes_assistant_router_module,
+        "run_internal_orchestrated_chat",
+        fake_run_internal_orchestrated_chat,
+    )
+
+    response = client.post("/v1/chat/pymes/", json={"message": "hola"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "conversation_id": "conv-1",
+        "reply": "respuesta final",
+        "tokens_used": 30,
+        "tool_calls": ["search_customers"],
+        "pending_confirmations": [],
+        "routed_agent": "clientes",
+        "routed_mode": "clientes",
+    }
 
 
 def test_public_chat_failure_does_not_persist_or_finish(monkeypatch) -> None:

@@ -1,4 +1,9 @@
-"""Enrutamiento interno: un solo asistente UI → sub-agentes comerciales existentes."""
+"""Router heurístico legacy para chat comercial.
+
+Se conserva como compatibilidad del flujo comercial `internal_sales` /
+`internal_procurement`. El assistant canónico `/v1/chat/pymes` usa el
+router por LLM del runtime multi-agente.
+"""
 
 from __future__ import annotations
 

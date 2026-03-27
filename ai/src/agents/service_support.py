@@ -55,11 +55,16 @@ class CommercialChatResult:
     tokens_output: int
     tool_calls: list[str]
     pending_confirmations: list[str]
-    routed_mode: str | None = None
+    routed_agent: str | None = None
 
     @property
     def tokens_used(self) -> int:
         return self.tokens_input + self.tokens_output
+
+    @property
+    def routed_mode(self) -> str | None:
+        """Alias legacy para compatibilidad con clientes existentes."""
+        return self.routed_agent
 
 
 def estimate_tokens(text: str) -> int:

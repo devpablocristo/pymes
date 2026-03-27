@@ -7,6 +7,7 @@
 | Documento | Contenido |
 |-----------|-----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Ownership, shared, bordes HTTP entre bounded contexts |
+| [AI_OWNERSHIP.md](./AI_OWNERSHIP.md) | Ownership IA del ecosistema: runtime compartido, assistant, insights, copilot, companion |
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [WHATSAPP_SETUP.md](./WHATSAPP_SETUP.md) | WhatsApp + Meta: env, webhook, conexión por org, opt-in; qué ya está y qué falta |
@@ -43,11 +44,12 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 
 1. [README.md](../README.md) (raíz)
 2. [ARCHITECTURE.md](./ARCHITECTURE.md)
-3. [PYMES_CORE.md](./PYMES_CORE.md)
-4. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
-5. [AUTH.md](./AUTH.md) y, si usás Clerk en local, [CLERK_LOCAL.md](./CLERK_LOCAL.md)
-6. [FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md) (auditoría / cobros / RBAC)
-7. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
+3. [AI_OWNERSHIP.md](./AI_OWNERSHIP.md)
+4. [PYMES_CORE.md](./PYMES_CORE.md)
+5. [CORE_INTEGRATION.md](./CORE_INTEGRATION.md)
+6. [AUTH.md](./AUTH.md) y, si usás Clerk en local, [CLERK_LOCAL.md](./CLERK_LOCAL.md)
+7. [FRAUD_PREVENTION.md](../pymes-core/docs/FRAUD_PREVENTION.md) (auditoría / cobros / RBAC)
+8. [PROFESSIONALS.md](./PROFESSIONALS.md) / [WORKSHOPS.md](./WORKSHOPS.md) / [BEAUTY.md](./BEAUTY.md) / [RESTAURANTS.md](./RESTAURANTS.md) según vertical
 
 ## Validación rápida
 

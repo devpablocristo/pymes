@@ -68,10 +68,12 @@ async def test_run_internal_orchestrated_chat_persists_routed_agent(monkeypatch)
 
     assert result.routed_agent == "clientes"
     assert result.tool_calls == ["search_customers"]
+    assert result.blocks == [{"type": "text", "text": "Encontré 3 clientes."}]
     assert repo.append_calls
     assistant_message = repo.append_calls[0]["new_messages"][1]
     assert assistant_message["routed_agent"] == "clientes"
     assert assistant_message["routed_mode"] == "clientes"
+    assert assistant_message["blocks"] == [{"type": "text", "text": "Encontré 3 clientes."}]
     assert repo.track_calls == [{"org_id": "org-123", "tokens_in": result.tokens_input, "tokens_out": result.tokens_output}]
     assert repo.agent_events[-1]["action"] == "chat.completed"
     assert repo.agent_events[-1]["agent_mode"] == "clientes"
@@ -110,6 +112,7 @@ async def test_run_internal_orchestrated_chat_uses_general_fallback(monkeypatch)
 
     assert result.routed_agent == "general"
     assert "clientes, productos, ventas, cobros y compras" in result.reply
+    assert result.blocks == [{"type": "text", "text": result.reply}]
 
 
 @pytest.mark.asyncio
@@ -157,6 +160,23 @@ async def test_run_internal_orchestrated_chat_requires_confirmation_for_sensitiv
 
     assert result.pending_confirmations == ["create_sale"]
     assert "confirmed_actions" in result.reply
+    assert result.blocks == [
+        {"type": "text", "text": result.reply},
+        {
+            "type": "actions",
+            "actions": [
+                {
+                    "id": "confirm_pending_actions",
+                    "label": "Confirmar acciones",
+                    "kind": "confirm_action",
+                    "message": "Confirmo las acciones pendientes.",
+                    "confirmed_actions": ["create_sale"],
+                    "style": "primary",
+                }
+            ],
+        },
+    ]
     assistant_message = repo.append_calls[0]["new_messages"][1]
     assert assistant_message["pending_confirmations"] == ["create_sale"]
+    assert assistant_message["blocks"] == result.blocks
     assert repo.agent_events[-1]["result"] == "confirmation_required"

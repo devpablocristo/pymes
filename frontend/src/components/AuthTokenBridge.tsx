@@ -1,4 +1,4 @@
-import { SharedAuthTokenBridge, type TokenProviderRegistrar } from '../shared/frontendShell';
+import { SharedAuthTokenBridge, type TokenProviderRegistrar } from '../shared/frontendAuth';
 import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
 import { registerTeachersTokenProvider } from '../lib/teachersApi';
 

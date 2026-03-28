@@ -217,6 +217,7 @@ def test_internal_chat_success_persists_and_finishes(monkeypatch) -> None:
             tokens_output=15,
             tool_calls=["lookup_customer"],
             pending_confirmations=[],
+            blocks=[{"type": "text", "text": "respuesta final"}],
             routed_agent="clientes",
         )
 
@@ -253,6 +254,7 @@ def test_pymes_assistant_response_includes_routed_agent_and_legacy_alias(monkeyp
             tokens_output=18,
             tool_calls=["search_customers"],
             pending_confirmations=[],
+            blocks=[{"type": "text", "text": "respuesta final"}],
             routed_agent="clientes",
         )
 
@@ -271,6 +273,7 @@ def test_pymes_assistant_response_includes_routed_agent_and_legacy_alias(monkeyp
         "tokens_used": 30,
         "tool_calls": ["search_customers"],
         "pending_confirmations": [],
+        "blocks": [{"type": "text", "text": "respuesta final"}],
         "routed_agent": "clientes",
         "routed_mode": "clientes",
     }

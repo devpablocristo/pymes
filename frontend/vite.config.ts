@@ -1,10 +1,31 @@
-import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+
+const calendarBoardEntry = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
+const calendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
+const calendarBoardRoot = fileURLToPath(new URL('../../modules/calendar/board/ts/src', import.meta.url));
+const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
+const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/daygrid', import.meta.url));
+const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
+const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/react', import.meta.url));
+const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
 
 export default defineConfig({
   envDir: '..',
   plugins: [react()],
+  resolve: {
+    alias: [
+      { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: calendarBoardStyles },
+      { find: '@devpablocristo/modules-calendar-board', replacement: calendarBoardEntry },
+      { find: '@fullcalendar/core', replacement: fullCalendarCore },
+      { find: '@fullcalendar/daygrid', replacement: fullCalendarDayGrid },
+      { find: '@fullcalendar/interaction', replacement: fullCalendarInteraction },
+      { find: '@fullcalendar/react', replacement: fullCalendarReact },
+      { find: '@fullcalendar/timegrid', replacement: fullCalendarTimeGrid },
+    ],
+  },
   build: {
     rollupOptions: {
       output: {
@@ -19,13 +40,22 @@ export default defineConfig({
             if (id.includes('@fullcalendar')) {
               return 'vendor-calendar';
             }
+            if (id.includes('@tanstack/react-query')) {
+              return 'vendor-query';
+            }
+            if (id.includes('@devpablocristo/modules-kanban-board') || id.includes('@hello-pangea/dnd') || id.includes('@dnd-kit/')) {
+              return 'vendor-kanban';
+            }
+            if (id.includes('@devpablocristo/modules-crud-ui')) {
+              return 'vendor-crud';
+            }
+            if (id.includes('@devpablocristo/core-authn')) {
+              return 'vendor-authn';
+            }
+            if (id.includes('@devpablocristo/core-browser') || id.includes('@devpablocristo/core-http')) {
+              return 'vendor-core';
+            }
             return 'vendor';
-          }
-          if (id.includes('/src/crud/') || id.includes('/src/pages/ModulePage')) {
-            return 'app-crud';
-          }
-          if (id.includes('/src/shared/frontendShell') || id.includes('/src/components/Shell') || id.includes('/src/pages/DashboardPage')) {
-            return 'app-shell';
           }
           return undefined;
         },
@@ -35,6 +65,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
+    fs: {
+      allow: [searchForWorkspaceRoot(process.cwd()), calendarBoardRoot],
+    },
     watch: {
       usePolling: true,
     },

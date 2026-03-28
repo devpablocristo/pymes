@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ConfiguredCrudPage } from '../crud/resourceConfigs';
+import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
 import type { WorkOrder } from '../lib/autoRepairTypes';
 
 export function AutoRepairWorkOrdersPage() {
@@ -11,5 +11,5 @@ export function AutoRepairWorkOrdersPage() {
     }),
     [navigate],
   );
-  return <ConfiguredCrudPage resourceId="workOrders" mergeConfig={mergeConfig} />;
+  return <LazyConfiguredCrudPage resourceId="workOrders" mergeConfig={mergeConfig} />;
 }

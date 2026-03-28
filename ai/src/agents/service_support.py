@@ -55,6 +55,7 @@ class CommercialChatResult:
     tokens_output: int
     tool_calls: list[str]
     pending_confirmations: list[str]
+    blocks: list[dict[str, Any]] = field(default_factory=list)
     routed_agent: str | None = None
 
     @property

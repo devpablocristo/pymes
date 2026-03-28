@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated, Literal
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -24,12 +26,50 @@ class PymesAssistantChatRequest(BaseModel):
     confirmed_actions: list[str] = Field(default_factory=list)
 
 
+class ChatTextBlock(BaseModel):
+    type: Literal["text"]
+    text: str = Field(min_length=1)
+
+
+class ChatAction(BaseModel):
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    kind: Literal["send_message", "open_url", "confirm_action"]
+    style: Literal["primary", "secondary", "ghost"] = "secondary"
+    message: str | None = None
+    url: str | None = None
+    confirmed_actions: list[str] = Field(default_factory=list)
+
+
+class ChatActionsBlock(BaseModel):
+    type: Literal["actions"]
+    actions: list[ChatAction] = Field(default_factory=list)
+
+
+class InsightCardHighlight(BaseModel):
+    label: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+
+
+class ChatInsightCardBlock(BaseModel):
+    type: Literal["insight_card"]
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    scope: str | None = None
+    highlights: list[InsightCardHighlight] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+
+
+ChatBlock = Annotated[ChatTextBlock | ChatActionsBlock | ChatInsightCardBlock, Field(discriminator="type")]
+
+
 class PymesAssistantChatResponse(BaseModel):
     conversation_id: str
     reply: str
     tokens_used: int
     tool_calls: list[str]
     pending_confirmations: list[str]
+    blocks: list[ChatBlock] = Field(default_factory=list)
     routed_agent: str = Field(
         ...,
         description="Sub-agente seleccionado para este turno: clientes | productos | ventas | cobros | compras | general",
@@ -73,6 +113,7 @@ async def chat_pymes_assistant(
         tokens_used=result.tokens_used,
         tool_calls=result.tool_calls,
         pending_confirmations=result.pending_confirmations,
+        blocks=result.blocks,
         routed_agent=result.routed_agent or "general",
         routed_mode=result.routed_mode or "general",
     )

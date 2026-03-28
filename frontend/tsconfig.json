@@ -13,11 +13,18 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@devpablocristo/modules-calendar-board": ["../../modules/calendar/board/ts/src/index.ts"],
+      "@devpablocristo/modules-calendar-board/styles.css": ["../../modules/calendar/board/ts/src/styles.css"],
+      "@fullcalendar/core": ["./node_modules/@fullcalendar/core"],
+      "@fullcalendar/daygrid": ["./node_modules/@fullcalendar/daygrid"],
+      "@fullcalendar/interaction": ["./node_modules/@fullcalendar/interaction"],
+      "@fullcalendar/react": ["./node_modules/@fullcalendar/react"],
+      "@fullcalendar/timegrid": ["./node_modules/@fullcalendar/timegrid"],
       "react": ["./node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
       "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],
       "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../../modules/calendar/board/ts/src"]
 }

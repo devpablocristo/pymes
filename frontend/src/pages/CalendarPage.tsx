@@ -6,12 +6,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { IconClose } from '../components/Icons';
 import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import { CalendarSurface, resolveInitialTimeGridScrollTime, type CalendarView } from '@devpablocristo/modules-calendar-board';
 import type { EventInput, DateSelectArg, EventClickArg, EventApi, EventDropArg } from '@fullcalendar/core';
 import type { EventResizeDoneArg } from '@fullcalendar/interaction';
 import { apiRequest } from '../lib/api';
+import '@devpablocristo/modules-calendar-board/styles.css';
 import './CalendarPage.css';
 
 // ─── Tipos API ───
@@ -162,10 +161,6 @@ function EventModal({
   );
 }
 
-// ─── Página ───
-
-type ViewType = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay';
-
 function toLocalDatetime(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -178,10 +173,25 @@ export function CalendarPage() {
   const calRef = useRef<FullCalendar>(null);
   const [modal, setModal] = useState<ModalState>(emptyModal);
   const [saving, setSaving] = useState(false);
-  const [view, setView] = useState<ViewType>('timeGridWeek');
+  const [view, setView] = useState<CalendarView>('timeGridWeek');
   const [titleText, setTitleText] = useState('');
   const [events, setEvents] = useState<EventInput[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  const scrollCalendarToRelevantTime = useCallback(() => {
+    const api = calRef.current?.getApi();
+    if (!api || !api.view.type.startsWith('timeGrid')) {
+      return;
+    }
+    api.scrollToTime(
+      resolveInitialTimeGridScrollTime({
+        events,
+        rangeStart: api.view.activeStart,
+        rangeEnd: api.view.activeEnd,
+        fallbackHour: 8,
+      }),
+    );
+  }, [events]);
 
   // Cargar eventos de la API
   const loadEvents = useCallback(async () => {
@@ -197,6 +207,12 @@ export function CalendarPage() {
   }, []);
 
   useEffect(() => { void loadEvents(); }, [loadEvents]);
+  useEffect(() => {
+    if (!loaded) {
+      return;
+    }
+    scrollCalendarToRelevantTime();
+  }, [loaded, scrollCalendarToRelevantTime]);
 
   // Toolbar custom
   const updateTitle = useCallback(() => {
@@ -211,19 +227,28 @@ export function CalendarPage() {
     if (!api) return;
     if (action === 'prev') api.prev();
     else if (action === 'next') api.next();
-    else api.today();
+    else {
+      api.today();
+      scrollCalendarToRelevantTime();
+      updateTitle();
+      return;
+    }
     updateTitle();
   };
 
-  const changeView = (v: ViewType) => {
+  const changeView = (v: CalendarView) => {
     const api = calRef.current?.getApi();
     if (!api) return;
     api.changeView(v);
     setView(v);
     updateTitle();
+    if (v.startsWith('timeGrid')) {
+      window.requestAnimationFrame(() => {
+        scrollCalendarToRelevantTime();
+      });
+    }
   };
 
-  // Crear evento al seleccionar rango
   const handleSelect = useCallback((info: DateSelectArg) => {
     info.view.calendar.unselect();
     setModal({
@@ -325,57 +350,36 @@ export function CalendarPage() {
 
   return (
     <div className="gcal">
-      {/* Toolbar estilo Google Calendar */}
-      <div className="gcal__toolbar">
-        <div className="gcal__toolbar-left">
-          <button type="button" className="gcal__today-btn" onClick={() => nav('today')}>Hoy</button>
-          <button type="button" className="gcal__nav-btn" onClick={() => nav('prev')}>‹</button>
-          <button type="button" className="gcal__nav-btn" onClick={() => nav('next')}>›</button>        </div>
-        <div className="gcal__toolbar-right">
-          <div className="gcal__view-group">
-            {([['timeGridDay', 'Día'], ['timeGridWeek', 'Semana'], ['dayGridMonth', 'Mes']] as const).map(([v, label]) => (
-              <button key={v} type="button" className={`gcal__view-btn ${view === v ? 'gcal__view-btn--active' : ''}`} onClick={() => changeView(v)}>
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Calendario */}
-      <div className="gcal__body">
-        {!loaded ? (
-          <div style={{ padding: '3rem', textAlign: 'center' }}><div className="spinner" /></div>
-        ) : (
-          <FullCalendar
-            ref={calRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={view}
-            headerToolbar={false}
-            editable
-            selectable
-            selectMirror
-            dayMaxEvents
-            weekends
-            events={events}
-            select={handleSelect}
-            eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventResize={handleEventResize}
-            datesSet={updateTitle}
-            locale="es"
-            height="100%"
-            slotMinTime="00:00:00"
-            slotMaxTime="24:00:00"
-            scrollTime="07:00:00"
-            allDayText=""
-            noEventsText=""
-            nowIndicator
-            slotDuration="00:30:00"
-            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-          />
-        )}
-      </div>
+      <CalendarSurface
+        calendarRef={calRef}
+        view={view}
+        title={titleText}
+        loaded={loaded}
+        onToday={() => nav('today')}
+        onPrev={() => nav('prev')}
+        onNext={() => nav('next')}
+        onViewChange={changeView}
+        slotMinTime="07:30:00"
+        scrollTime="07:30:00"
+        scrollTimeReset={false}
+        calendarOptions={{
+          allDaySlot: false,
+          editable: true,
+          selectable: true,
+          selectMirror: true,
+          dayMaxEvents: true,
+          weekends: true,
+          events,
+          select: handleSelect,
+          eventClick: handleEventClick,
+          eventDrop: handleEventDrop,
+          eventResize: handleEventResize,
+          datesSet: () => {
+            updateTitle();
+            scrollCalendarToRelevantTime();
+          },
+        }}
+      />
 
       {/* Modal */}
       {modal.open && (

@@ -35,6 +35,40 @@ export type CommercialChatResponse = {
   pending_confirmations: string[];
 };
 
+export type PymesAssistantAction = {
+  id: string;
+  label: string;
+  kind: 'send_message' | 'open_url' | 'confirm_action';
+  style?: 'primary' | 'secondary' | 'ghost';
+  message?: string | null;
+  url?: string | null;
+  confirmed_actions?: string[];
+};
+
+export type PymesAssistantChatTextBlock = {
+  type: 'text';
+  text: string;
+};
+
+export type PymesAssistantChatActionsBlock = {
+  type: 'actions';
+  actions: PymesAssistantAction[];
+};
+
+export type PymesAssistantChatInsightCardBlock = {
+  type: 'insight_card';
+  title: string;
+  summary: string;
+  scope?: string | null;
+  highlights?: Array<{ label: string; value: string }>;
+  recommendations?: string[];
+};
+
+export type PymesAssistantChatBlock =
+  | PymesAssistantChatTextBlock
+  | PymesAssistantChatActionsBlock
+  | PymesAssistantChatInsightCardBlock;
+
 export async function commercialChatSales(payload: CommercialChatRequest): Promise<CommercialChatResponse> {
   return request('/v1/chat/commercial/sales', aiOptions({ method: 'POST', body: payload }));
 }
@@ -44,6 +78,7 @@ export async function commercialChatProcurement(payload: CommercialChatRequest):
 }
 
 export type PymesAssistantChatResponse = CommercialChatResponse & {
+  blocks?: PymesAssistantChatBlock[];
   routed_agent: string;
   routed_mode: string;
 };

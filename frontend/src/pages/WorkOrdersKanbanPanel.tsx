@@ -2,8 +2,8 @@ import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import type { CrudHelpers } from '../components/CrudPage';
-import { workOrdersCrudPageConfig } from '../crud/resourceConfigs';
+import type { CrudHelpers, CrudPageConfig } from '../components/CrudPage';
+import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
 import { CreatedByPillsBar } from '../components/CreatedByPillsBar';
 import { WorkOrderKanbanDetailModal } from '../components/WorkOrderKanbanDetailModal';
 import {
@@ -183,6 +183,7 @@ export function WorkOrdersKanbanPanel() {
   const showArchived = searchParams.get('archived') === '1';
 
   const [items, setItems] = useState<AutoRepairWorkOrder[]>([]);
+  const [crudConfig, setCrudConfig] = useState<CrudPageConfig<AutoRepairWorkOrder> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
@@ -209,6 +210,18 @@ export function WorkOrdersKanbanPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadLazyCrudPageConfig<AutoRepairWorkOrder>('workOrders').then((config) => {
+      if (!cancelled) {
+        setCrudConfig(config);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const boardItems = useMemo(
     () =>
@@ -292,18 +305,17 @@ export function WorkOrdersKanbanPanel() {
   ) : null;
 
   const toolbarButtonRow = useMemo((): ReactElement => {
-    const cfg = workOrdersCrudPageConfig;
     const helpers: CrudHelpers<AutoRepairWorkOrder> = {
       items,
       reload: load,
       setError: (message: string) => setError(message),
     };
-    const toolbarActions = (cfg.toolbarActions ?? []).filter(
+    const toolbarActions = (crudConfig?.toolbarActions ?? []).filter(
       (action) => action.isVisible?.({ archived: showArchived, items }) ?? true,
     );
     const canCreate =
-      cfg.allowCreate ??
-      (cfg.formFields.length > 0 && Boolean(cfg.dataSource?.create || cfg.basePath));
+      crudConfig?.allowCreate ??
+      Boolean(crudConfig && crudConfig.formFields.length > 0 && (crudConfig.dataSource?.create || crudConfig.basePath));
 
     return (
       <>
@@ -321,10 +333,10 @@ export function WorkOrdersKanbanPanel() {
         ))}
         {canCreate ? (
           <button type="button" className="btn-sm btn-primary" onClick={() => navigate(listPath)}>
-            {cfg.createLabel ? formatFieldText(cfg.createLabel) : '+ Nueva orden'}
+            {crudConfig?.createLabel ? formatFieldText(crudConfig.createLabel) : '+ Nueva orden'}
           </button>
         ) : null}
-        {cfg.supportsArchived ? (
+        {crudConfig?.supportsArchived ? (
           <button
             type="button"
             className="btn-secondary btn-sm"
@@ -345,7 +357,7 @@ export function WorkOrdersKanbanPanel() {
         ) : null}
       </>
     );
-  }, [items, load, formatFieldText, t, showArchived, setSearchParams, navigate]);
+  }, [crudConfig, items, load, formatFieldText, t, showArchived, setSearchParams, navigate]);
 
   return (
     <>

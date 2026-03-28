@@ -1,1 +1,1 @@
-export { SharedLoginPage as LoginPage } from '../shared/frontendShell';
+export { SharedLoginPage as LoginPage } from '../shared/frontendAuth';

@@ -1,1 +1,1 @@
-export { SharedSignupPage as SignupPage } from '../shared/frontendShell';
+export { SharedSignupPage as SignupPage } from '../shared/frontendAuth';

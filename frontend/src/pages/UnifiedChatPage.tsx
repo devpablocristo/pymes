@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { pymesAssistantChat, type PymesAssistantChatResponse } from '../lib/aiApi';
+import {
+  pymesAssistantChat,
+  type PymesAssistantAction,
+  type PymesAssistantChatBlock,
+  type PymesAssistantChatResponse,
+} from '../lib/aiApi';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
@@ -62,6 +67,7 @@ type Msg = {
   text: string;
   fromMe: boolean;
   time: string;
+  blocks?: PymesAssistantChatBlock[];
   /** Sub-agente del orquestador (solo respuestas del Asistente Pymes). */
   routedLabel?: string;
 };
@@ -80,19 +86,22 @@ function humanRoutedLabel(mode: string): string {
   return mode || 'General';
 }
 
-function applyPymesReply(reply: PymesAssistantChatResponse): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel'>> {
+function buttonClassName(style?: PymesAssistantAction['style']): string {
+  if (style === 'primary') return 'btn-primary btn-sm';
+  if (style === 'ghost') return 'cht__block-action cht__block-action--ghost';
+  return 'btn-secondary btn-sm';
+}
+
+function applyPymesReply(reply: PymesAssistantChatResponse): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks'>> {
   const label = humanRoutedLabel(reply.routed_agent || reply.routed_mode);
-  const out: Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel'>> = [
-    { text: reply.reply, fromMe: false, routedLabel: label },
-  ];
-  if (reply.pending_confirmations?.length) {
-    out.push({
-      text: `Pendientes de confirmación: ${reply.pending_confirmations.join('; ')}`,
+  return [
+    {
+      text: reply.reply,
       fromMe: false,
       routedLabel: label,
-    });
-  }
-  return out;
+      blocks: reply.blocks ?? [],
+    },
+  ];
 }
 
 export function UnifiedChatPage() {
@@ -197,6 +206,7 @@ export function UnifiedChatPage() {
             id: String(++nextMsgId),
             contactId: AI_PYMES_ID,
             text: row.text,
+            blocks: row.blocks,
             fromMe: row.fromMe,
             time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
             routedLabel: row.routedLabel,
@@ -279,6 +289,7 @@ export function UnifiedChatPage() {
           id: String(++nextMsgId),
           contactId: active,
           text: row.text,
+          blocks: row.blocks,
           fromMe: row.fromMe,
           time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
           routedLabel: row.routedLabel,
@@ -327,6 +338,32 @@ export function UnifiedChatPage() {
       clearInput: false,
     });
   }, [activeDef.kind, activePendingConfirmations, busy, sendAssistantMessage]);
+
+  const handleAssistantBlockAction = useCallback(async (action: PymesAssistantAction) => {
+    if (busy) {
+      return;
+    }
+    if (action.kind === 'open_url' && action.url) {
+      window.location.assign(action.url);
+      return;
+    }
+    if (activeDef.kind !== 'ai_pymes') {
+      return;
+    }
+    if (action.kind === 'confirm_action') {
+      await sendAssistantMessage(action.message ?? 'Confirmo las acciones pendientes.', {
+        confirmedActions: action.confirmed_actions ?? [],
+        echoText: action.label,
+        clearInput: false,
+      });
+      return;
+    }
+    if (action.kind === 'send_message') {
+      await sendAssistantMessage(action.message ?? action.label, {
+        clearInput: false,
+      });
+    }
+  }, [activeDef.kind, busy, sendAssistantMessage]);
 
   const filteredContacts = contactsView.filter(
     (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
@@ -394,7 +431,67 @@ export function UnifiedChatPage() {
                     {m.routedLabel}
                   </div>
                 ) : null}
-                {m.text}
+                {m.blocks && m.blocks.length > 0 ? (
+                  <div className="cht__blocks">
+                    {m.blocks.map((block, index) => {
+                      if (block.type === 'text') {
+                        return (
+                          <div key={`${m.id}-block-${index}`} className="cht__block-text">
+                            {block.text}
+                          </div>
+                        );
+                      }
+                      if (block.type === 'actions') {
+                        return (
+                          <div key={`${m.id}-block-${index}`} className="cht__block-actions">
+                            {block.actions.map((action) => (
+                              <button
+                                key={action.id}
+                                type="button"
+                                className={buttonClassName(action.style)}
+                                disabled={busy}
+                                onClick={() => void handleAssistantBlockAction(action)}
+                              >
+                                {action.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      }
+                      if (block.type === 'insight_card') {
+                        return (
+                          <section key={`${m.id}-block-${index}`} className="cht__insight-card">
+                            <div className="cht__insight-title">{block.title}</div>
+                            {block.scope ? <div className="cht__insight-scope">{block.scope}</div> : null}
+                            <p className="cht__insight-summary">{block.summary}</p>
+                            {block.highlights?.length ? (
+                              <div className="cht__insight-highlights">
+                                {block.highlights.map((item) => (
+                                  <div key={`${item.label}-${item.value}`} className="cht__insight-highlight">
+                                    <span>{item.label}</span>
+                                    <strong>{item.value}</strong>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {block.recommendations?.length ? (
+                              <div className="cht__insight-recommendations">
+                                {block.recommendations.map((item) => (
+                                  <div key={item} className="cht__insight-recommendation">
+                                    {item}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </section>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                ) : (
+                  m.text
+                )}
                 <div className="cht__msg-time">{m.time}</div>
               </div>
             ))}

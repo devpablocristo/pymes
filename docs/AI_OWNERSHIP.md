@@ -67,7 +67,7 @@ Fuente de verdad del servicio: [`ai/src/main.py`](../ai/src/main.py).
 | Capacidad | Estado actual | Evidencia |
 |-----------|---------------|-----------|
 | `assistant` | Sí | endpoint canónico `POST /v1/chat/pymes/` en [`ai/src/api/pymes_assistant_router.py`](../ai/src/api/pymes_assistant_router.py) y sub-agentes en [`ai/src/agents/sub_agents/`](../ai/src/agents/sub_agents/) |
-| `insight` | No como producto separado | no hay endpoints ni pipeline dedicados en `ai/src/api/` |
+| `insight` | Sí, como backend de producto en evolución | endpoints `GET /v1/insights/sales-collections`, `inventory-profit` y `customers-retention` en [`ai/src/insights/router.py`](../ai/src/insights/router.py) y lógica en [`ai/src/insights/service.py`](../ai/src/insights/service.py) |
 | `copilot` | No como producto separado | no hay rutas `copilot/*` ni explainers dedicados |
 | integración con governance | Sí, opcional | `ReviewClient` + callback en [`ai/src/main.py`](../ai/src/main.py) y [`ai/src/api/review_callback.py`](../ai/src/api/review_callback.py) |
 
@@ -104,6 +104,7 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 
 - runtime multi-agente reusable en [`../../core/ai/python/src/runtime/`](../../core/ai/python/src/runtime/)
 - assistant de `pymes` en `ai/`
+- insights de `pymes` en [`ai/src/insights/`](../ai/src/insights/)
 - insights y copilot de `ponti` en `ponti-ai`
 - governance y companion en `nexus`
 - módulos reutilizables de app en `modules`
@@ -111,15 +112,16 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 ## Qué sigue ambiguo o transicional
 
 - `pymes` todavía mezcla varios entrypoints de chat (`/v1/chat`, `/v1/chat/commercial/*`, `/v1/chat/pymes/`) dentro de un mismo servicio AI.
-- `pymes` aún no separa `insight` ni `copilot` como capacidades producto independientes.
+- `pymes` ya separó `insight` como backend de producto, pero todavía no tiene superficie dedicada en frontend ni una capa `copilot` encima de esos insights.
 - `pymes` puede apoyarse en `Review`, pero todavía no está definido un catálogo final de acciones que obligan governance.
+- parte de la documentación todavía referencia `pymes-core/shared/ai`, pero la base reusable efectiva hoy está en [`../../core/ai/python/src/runtime/`](../../core/ai/python/src/runtime/).
 
 ## Decisión de ownership para seguir construyendo
 
 ### Lo próximo en `pymes`
 
 - estabilizar `assistant`
-- diseñar `insights` propios del negocio PyME
+- conectar `insights` a una superficie de producto en frontend
 - diseñar `copilot` propio encima de insights
 
 ### Lo próximo en `nexus`
@@ -136,7 +138,7 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 ## Roadmap recomendado
 
 1. estabilizar `assistant` de `pymes` sobre el runtime ya consolidado
-2. diseñar `insights` de `pymes` inspirado en Ponti
+2. consolidar `insights` de `pymes` como producto visible y persistente
 3. diseñar `copilot` de `pymes` encima de insights
 4. definir acciones sensibles que pasan por `Nexus Review`
 5. mantener `Companion` en `nexus` como agente transversal que consume productos, no como assistant de producto

@@ -1,1 +1,1 @@
-export { SharedProtectedRoute as ProtectedRoute } from '../shared/frontendShell';
+export { SharedProtectedRoute as ProtectedRoute } from '../shared/frontendAuth';

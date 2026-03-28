@@ -24,6 +24,7 @@ from src.agents.sub_agents import build_registry
 from src.api.external_chat_support import get_external_conversation, history_to_messages
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
+from src.chat_blocks import build_confirm_actions_block, build_text_block
 from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import OrchestratorLimits, orchestrate
@@ -73,6 +74,15 @@ def _build_internal_general_limits() -> OrchestratorLimits:
         max_tool_calls=0,
         total_timeout_seconds=max(30.0, float(settings.assistant_total_timeout_seconds)),
     )
+
+
+def _build_internal_blocks(reply: str, pending_confirmations: list[str]) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    if reply.strip():
+        blocks.append(build_text_block(reply))
+    if pending_confirmations:
+        blocks.append(build_confirm_actions_block(pending_confirmations))
+    return blocks
 
 
 def _looks_like_customer_summary_request(message: str) -> bool:
@@ -300,6 +310,7 @@ async def run_internal_orchestrated_chat(
             + ", ".join(pending_confirmations)
             + ". Reenviame la solicitud incluyendo esas acciones en confirmed_actions."
         )
+    blocks = _build_internal_blocks(reply, pending_confirmations)
     tokens_out = estimate_tokens(reply)
     now = datetime.now(UTC).isoformat()
     user_message = {"role": "user", "content": sanitized_message, "ts": now}
@@ -315,6 +326,7 @@ async def run_internal_orchestrated_chat(
         "agent_mode": routed_agent,
         "channel": _INTERNAL_ASSISTANT_CHANNEL,
         "pending_confirmations": list(pending_confirmations),
+        "blocks": copy.deepcopy(blocks),
     }
 
     await repo.append_messages(
@@ -353,6 +365,7 @@ async def run_internal_orchestrated_chat(
         tokens_output=tokens_out,
         tool_calls=sorted(set(tool_calls)),
         pending_confirmations=list(pending_confirmations),
+        blocks=blocks,
         routed_agent=routed_agent,
     )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	ginmw "github.com/devpablocristo/core/http/go/gin"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments"

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	saasjwks "github.com/devpablocristo/core/authn/go/jwks"
+	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	saasclerk "github.com/devpablocristo/core/saas/go/clerkwebhook"
 	saasidentity "github.com/devpablocristo/core/saas/go/identity"
@@ -68,7 +69,7 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 
 	store := newPymesSaaSStore(db, log, saasDefaultAPIKeyScopes())
 
-	var jwtVerifier saasmiddleware.PrincipalVerifier
+	var jwtVerifier saasidentity.PrincipalVerifier
 	if cfg.AuthEnableJWT && strings.TrimSpace(cfg.JWKSURL) != "" {
 		jwksVerifier := saasjwks.NewVerifier(strings.TrimSpace(cfg.JWKSURL))
 		identityUC := saasidentity.NewUsecasesWithOrgResolver(jwksVerifier, store, saasidentity.Config{
@@ -82,7 +83,7 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		jwtVerifier = &jwtPrincipalVerifier{uc: identityUC}
 	}
 
-	var apiKeyVerifier saasmiddleware.PrincipalVerifier
+	var apiKeyVerifier saasidentity.PrincipalVerifier
 	if cfg.AuthAllowAPIKey {
 		apiKeyVerifier = &apiKeyPrincipalVerifier{store: store}
 	}
@@ -135,12 +136,12 @@ type apiKeyPrincipalVerifier struct {
 	store *pymesSaaSStore
 }
 
-func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string) (saasmiddleware.Principal, error) {
+func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string) (kerneldomain.Principal, error) {
 	principal, _, err := v.store.FindPrincipalByAPIKeyHash(ctx, sha256Hex(strings.TrimSpace(credential)))
 	if err != nil {
-		return saasmiddleware.Principal{}, err
+		return kerneldomain.Principal{}, err
 	}
-	return saasmiddleware.Principal{
+	return kerneldomain.Principal{
 		TenantID:   principal.TenantID,
 		Actor:      "api_key:" + principal.TenantID,
 		Role:       "service",
@@ -153,12 +154,12 @@ type jwtPrincipalVerifier struct {
 	uc *saasidentity.UseCases
 }
 
-func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (saasmiddleware.Principal, error) {
+func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (kerneldomain.Principal, error) {
 	principal, err := v.uc.ResolvePrincipal(ctx, strings.TrimSpace(credential))
 	if err != nil {
-		return saasmiddleware.Principal{}, err
+		return kerneldomain.Principal{}, err
 	}
-	return saasmiddleware.Principal{
+	return kerneldomain.Principal{
 		TenantID:   principal.TenantID,
 		Actor:      principal.Actor,
 		Role:       principal.Role,

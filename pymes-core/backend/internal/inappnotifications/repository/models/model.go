@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// InAppNotificationModel fila GORM de in_app_notifications.
+// InAppNotificationModel fila GORM de la bandeja propia de Pymes.
 type InAppNotificationModel struct {
 	ID          uuid.UUID `gorm:"column:id;type:uuid;primaryKey"`
 	OrgID       uuid.UUID `gorm:"column:org_id;type:uuid;not null"`
@@ -22,5 +22,5 @@ type InAppNotificationModel struct {
 }
 
 func (InAppNotificationModel) TableName() string {
-	return "in_app_notifications"
+	return "pymes_in_app_notifications"
 }

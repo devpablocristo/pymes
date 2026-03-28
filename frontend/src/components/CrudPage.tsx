@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   CrudPage as ModulesCrudPage,
   type CrudPageConfig,
-} from '@devpablocristo/modules-crud/crud';
+} from '@devpablocristo/modules-crud-ui';
 import { apiRequest } from '../lib/api';
 import { buildPymesCrudStrings } from '../lib/crudModuleStrings';
 import { useI18n } from '../lib/i18n';
@@ -19,10 +19,10 @@ export type {
   CrudPageConfig,
   CrudRowAction,
   CrudToolbarAction,
-} from '@devpablocristo/modules-crud/crud';
+} from '@devpablocristo/modules-crud-ui';
 
 /**
- * CRUD de consola Pymes: motor en `@devpablocristo/modules-crud` (`modules/crud/ts`), textos vía i18n y API vía `apiRequest`.
+ * CRUD de consola Pymes: motor en `@devpablocristo/modules-crud-ui`, textos vía i18n y API vía `apiRequest`.
  */
 export function CrudPage<T extends { id: string }>(props: CrudPageConfig<T>) {
   const { localizeText, sentenceCase, language } = useI18n();

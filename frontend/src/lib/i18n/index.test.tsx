@@ -14,7 +14,7 @@ function Probe() {
 }
 
 describe('LanguageProvider', () => {
-  it('keeps Dashboard in English for Spanish users', () => {
+  it('traduce las etiquetas del shell en español', () => {
     const view = render(
       <LanguageProvider initialLanguage="es">
         <Probe />
@@ -22,11 +22,11 @@ describe('LanguageProvider', () => {
     );
     const scope = within(view.container);
 
-    expect(scope.getByTestId('dashboard')).toHaveTextContent('Dashboard');
-    expect(scope.getByTestId('admin')).toHaveTextContent('Consola');
+    expect(scope.getByTestId('dashboard')).toHaveTextContent('Inicio');
+    expect(scope.getByTestId('admin')).toHaveTextContent('Administración');
   });
 
-  it('switches shared labels to English without translating Dashboard', () => {
+  it('traduce las etiquetas del shell en inglés', () => {
     const view = render(
       <LanguageProvider initialLanguage="en">
         <Probe />
@@ -34,8 +34,8 @@ describe('LanguageProvider', () => {
     );
     const scope = within(view.container);
 
-    expect(scope.getByTestId('dashboard')).toHaveTextContent('Dashboard');
-    expect(scope.getByTestId('admin')).toHaveTextContent('Console');
+    expect(scope.getByTestId('dashboard')).toHaveTextContent('Home');
+    expect(scope.getByTestId('admin')).toHaveTextContent('Administration');
   });
 
   it('normalizes UI labels to sentence case while preserving acronyms and Dashboard', () => {

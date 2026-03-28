@@ -1,10 +1,10 @@
-import type { CrudStrings } from '@devpablocristo/modules-crud/crud';
+import type { CrudStrings } from '@devpablocristo/modules-crud-ui';
 import type { LanguageCode } from './i18n';
 import { commonMessages } from './i18n/messages/common';
 import { crudMessages } from './i18n/messages/crud';
 
 /**
- * Solo adaptador i18n → `CrudStrings`: el contrato y defaults viven en `@devpablocristo/modules-crud/crud`;
+ * Solo adaptador i18n → `CrudStrings`: el contrato y defaults viven en `@devpablocristo/modules-crud-ui`;
  * acá no se duplican textos del motor, solo se leen `common` + `crud` de Pymes.
  */
 export function buildPymesCrudStrings(language: LanguageCode): CrudStrings {

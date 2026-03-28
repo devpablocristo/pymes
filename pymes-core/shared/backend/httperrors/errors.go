@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/go/gin"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 )
 

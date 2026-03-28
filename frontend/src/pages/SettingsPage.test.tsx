@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
@@ -75,20 +75,15 @@ describe('SettingsPage (modo clave API)', () => {
     await waitFor(() => {
       expect(apiMocks.getSession).toHaveBeenCalled();
       expect(apiMocks.getMe).toHaveBeenCalled();
-      expect(apiMocks.getBillingStatus).toHaveBeenCalled();
     });
 
     expect(screen.getByText('Modo consola · clave API')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Sesión en este entorno' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Datos personales' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Idioma' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Facturación' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Seleccionar idioma' })).toBeInTheDocument();
-    const facturacionCard = screen.getByRole('heading', { level: 2, name: 'Facturación' }).closest('.card');
-    expect(facturacionCard).toBeTruthy();
-    expect(within(facturacionCard as HTMLElement).getByText('Tipo de plan')).toBeInTheDocument();
-    expect(within(facturacionCard as HTMLElement).getByText('Inicial')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Idioma' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Facturación' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Seleccionar idioma' })).not.toBeInTheDocument();
 
     expect(screen.getByText('Sin perfil de usuario en este modo')).toBeInTheDocument();
     expect(

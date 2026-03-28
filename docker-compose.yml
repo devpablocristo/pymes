@@ -48,7 +48,6 @@ services:
     volumes:
       - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -91,8 +90,6 @@ services:
       - ./frontend/index.html:/workspace/frontend/index.html
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
-      - ${CORE_REPO_PATH:-../core}:/workspace/frontend/.deps/core
-      - ${MODULES_REPO_PATH:-../modules}:/workspace/frontend/.deps/modules
     env_file:
       - .env
     environment:
@@ -116,7 +113,6 @@ services:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
 
     env_file:
       - .env
@@ -151,7 +147,6 @@ services:
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -181,7 +176,6 @@ services:
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
@@ -215,7 +209,6 @@ services:
     volumes:
       - ./beauty/backend:/workspace/pymes/beauty/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
@@ -245,7 +238,6 @@ services:
     volumes:
       - ./restaurants/backend:/workspace/pymes/restaurants/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ${CORE_REPO_PATH:-../core}:/workspace/core
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:

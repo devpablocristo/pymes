@@ -13,16 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - name: Link core for local replaces
-        run: ln -sfn "$PWD/.deps/core" ../core
+          go-version-file: go.mod
       - name: Verify pymes-core backend
         run: |
           go vet ./pymes-core/backend/...
@@ -33,16 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - name: Link core for local replaces
-        run: ln -sfn "$PWD/.deps/core" ../core
+          go-version-file: go.mod
       - name: Verify professionals backend
         run: |
           go vet ./professionals/backend/...
@@ -53,16 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - name: Link core for local replaces
-        run: ln -sfn "$PWD/.deps/core" ../core
+          go-version-file: go.mod
       - name: Verify workshops backend
         run: |
           go vet ./workshops/backend/...
@@ -73,16 +52,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - name: Link core for local replaces
-        run: ln -sfn "$PWD/.deps/core" ../core
+          go-version-file: go.mod
       - name: Verify beauty backend
         run: |
           go vet ./beauty/backend/...
@@ -93,16 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.0'
-      - name: Link core for local replaces
-        run: ln -sfn "$PWD/.deps/core" ../core
+          go-version-file: go.mod
       - name: Verify restaurants backend
         run: |
           go vet ./restaurants/backend/...
@@ -116,21 +81,11 @@ jobs:
         working-directory: ai
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: .deps/core
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: ai/requirements.txt
-      - name: Link core for editable installs
-        run: |
-          ln -sfn "$GITHUB_WORKSPACE/.deps/core" "$GITHUB_WORKSPACE/../core"
-          sudo mkdir -p /workspace
-          sudo ln -sfn "$GITHUB_WORKSPACE/.deps/core" /workspace/core
       - name: Install AI dependencies
         run: python -m pip install --upgrade pip && pip install -r requirements.txt
       - name: Verify AI service
@@ -146,16 +101,6 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: frontend/.deps/core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          token: ${{ secrets.CORE_REPO_READ_TOKEN }}
-          path: frontend/.deps/modules
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -11,7 +11,6 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GOPROXY=direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
-COPY core /workspace/core
 
 WORKDIR /workspace/pymes/workshops/backend
 

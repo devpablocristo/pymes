@@ -3,7 +3,7 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/go/gin"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
 // AuthMiddleware re-exporta el tipo de core.

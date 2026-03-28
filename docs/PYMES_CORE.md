@@ -32,6 +32,15 @@ El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, 
 
 Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-core/backend/docs/SAAS_CORE.md`**.
 
+### Ownership de notificaciones
+
+- `pymes-core/backend/internal/notifications`:
+  usa `pymes_notification_preferences` y `pymes_notification_log`.
+- `core/saas/go`:
+  usa `notification_preferences` y `notification_log`.
+
+No mezclar ambos contratos en repositorios, reportes ni migraciones nuevas. Si una feature pertenece al ERP de Pymes, debe vivir sobre tablas `pymes_*`; si pertenece al SaaS transversal, debe vivir sobre las tablas canónicas.
+
 ## Procurement (solicitudes internas + políticas)
 
 - **Solicitudes**: `/v1/procurement-requests` — CRUD canónico (incl. borrado duro, archivado/restauración), `submit`, `approve`, `reject` (RBAC `procurement_requests`).

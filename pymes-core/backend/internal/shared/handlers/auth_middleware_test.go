@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	authn "github.com/devpablocristo/core/authn/go"
-	ginmw "github.com/devpablocristo/core/http/go/gin"
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 )
 
 // stubAuthenticator implementa authn.Authenticator para tests.

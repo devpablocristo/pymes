@@ -1829,7 +1829,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: CreditNoteRow[] | null }>('/v1/credit-notes');
-        return parseListItemsFromResponse(data);
+        return parseListItemsFromResponse<CreditNoteRow>(data);
       },
     },
     searchText: (row: CreditNoteRow) =>
@@ -1922,7 +1922,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: InventoryStockRow[] | null }>('/v1/inventory?limit=200');
-        const items = parseListItemsFromResponse(data);
+        const items = parseListItemsFromResponse<InventoryStockRow>(data);
         return items.map((row) => ({
           ...row,
           id: String(row.product_id),
@@ -1998,7 +1998,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: InventoryMovementRow[] | null }>('/v1/inventory/movements?limit=200');
-        return parseListItemsFromResponse(data).map((row) => ({
+        return parseListItemsFromResponse<InventoryMovementRow>(data).map((row) => ({
           ...row,
           id: String(row.id),
         }));
@@ -2115,7 +2115,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         const data = await apiRequest<{ items?: AttachmentRow[] | null }>(
           `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/attachments?limit=200`,
         );
-        return parseListItemsFromResponse(data).map((row) => ({
+        return parseListItemsFromResponse<AttachmentRow>(data).map((row) => ({
           ...row,
           id: String(row.id),
         }));
@@ -2201,7 +2201,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: AuditEntryRow[] | null }>('/v1/audit');
-        return parseListItemsFromResponse(data).map((row) => ({
+        return parseListItemsFromResponse<AuditEntryRow>(data).map((row) => ({
           ...row,
           id: String(row.id),
         }));
@@ -2248,7 +2248,7 @@ const rawResourceConfigs: Record<string, CrudPageConfig<any>> = {
         const data = await apiRequest<{ items?: TimelineEntryRow[] | null }>(
           `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/timeline?limit=100`,
         );
-        return parseListItemsFromResponse(data).map((row) => ({
+        return parseListItemsFromResponse<TimelineEntryRow>(data).map((row) => ({
           ...row,
           id: String(row.id),
         }));

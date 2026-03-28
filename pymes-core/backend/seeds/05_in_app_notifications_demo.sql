@@ -1,7 +1,7 @@
 -- Demo: una notificación in-app para un miembro de la org sembrada (__SEED_ORG_ID__).
 -- Idempotente; el destinatario es el primer org_member por created_at.
 
-INSERT INTO in_app_notifications (id, org_id, user_id, title, body, kind, entity_type, entity_id, chat_context)
+INSERT INTO pymes_in_app_notifications (id, org_id, user_id, title, body, kind, entity_type, entity_id, chat_context)
 SELECT
     uuid_generate_v5('__SEED_ORG_ID__'::uuid, 'pymes-seed/v1/in-app-notif/demo-welcome'),
     '__SEED_ORG_ID__'::uuid,

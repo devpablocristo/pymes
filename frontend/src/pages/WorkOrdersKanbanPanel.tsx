@@ -1,5 +1,5 @@
 import { useUser } from '@clerk/react';
-import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-crud';
+import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CrudHelpers } from '../components/CrudPage';

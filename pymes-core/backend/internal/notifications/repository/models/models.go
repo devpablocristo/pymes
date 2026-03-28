@@ -16,7 +16,7 @@ type NotificationPreferenceModel struct {
 	UpdatedAt        time.Time
 }
 
-func (NotificationPreferenceModel) TableName() string { return "notification_preferences" }
+func (NotificationPreferenceModel) TableName() string { return "pymes_notification_preferences" }
 
 type NotificationLogModel struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -30,4 +30,4 @@ type NotificationLogModel struct {
 	CreatedAt         time.Time
 }
 
-func (NotificationLogModel) TableName() string { return "notification_log" }
+func (NotificationLogModel) TableName() string { return "pymes_notification_log" }

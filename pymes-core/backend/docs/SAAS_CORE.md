@@ -25,6 +25,20 @@ En `pymes`, la key inicial creada por `POST /orgs` y las keys creadas luego desd
 - `org_api_key_scopes.key_id` → `api_key_id`
 - Añade `hard_limits_json`, `status`, `deleted_at`, `past_due_since` en `tenant_settings` donde falten.
 
+## Ownership de tablas de notificaciones
+
+Desde la convivencia con `core/saas/go`, las tablas de notificaciones quedaron separadas por dominio:
+
+- `notification_preferences` y `notification_log`:
+  ownership de `core/saas/go`.
+  Se usan para billing / Clerk / flujos SaaS compartidos y siguen el esquema canónico de ese módulo.
+- `pymes_notification_preferences` y `pymes_notification_log`:
+  ownership de `pymes-core/backend/internal/notifications`.
+  Se usan para preferencias y log de emails funcionales del ERP de Pymes.
+
+Regla práctica: si el cambio nace en `internal/notifications`, debe leer y escribir solo tablas `pymes_*`.
+Si el cambio nace en `core/saas/go`, debe usar solo las tablas canónicas sin prefijo.
+
 ## Variables de entorno JWT (opcionales)
 
 Además de `JWKS_URL` y `JWT_ISSUER`:

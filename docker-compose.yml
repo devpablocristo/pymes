@@ -91,6 +91,7 @@ services:
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
       - ../modules/calendar/board/ts:/modules/calendar/board/ts
+      - ../modules/sidebar/ts:/modules/sidebar/ts
     env_file:
       - .env
     environment:

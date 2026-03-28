@@ -1,20 +1,10 @@
-import { useEffect, type PropsWithChildren, type ReactNode } from 'react';
+import { type PropsWithChildren, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { AppShell as ShellSidebar, type AppShellNavItem, type AppShellNavSection } from '@devpablocristo/modules-shell-sidebar';
+import '@devpablocristo/modules-shell-sidebar/styles.css';
 import { useI18n } from '../lib/i18n';
 
-export type AppShellNavItem = {
-  to: string;
-  label: string;
-  icon: ReactNode;
-  end?: boolean;
-  /** Si se define, reemplaza el criterio por defecto de NavLink (p. ej. Ajustes vs Notificaciones en /settings). */
-  isActive?: (pathname: string, search: string) => boolean;
-};
-
-export type AppShellNavSection = {
-  label: string;
-  items: AppShellNavItem[];
-};
+export type { AppShellNavItem, AppShellNavSection };
 
 export function AppShell({
   children,
@@ -29,45 +19,17 @@ export function AppShell({
   footerContent?: ReactNode;
 }>) {
   const location = useLocation();
-  const { t, sentenceCase } = useI18n();
-
-  useEffect(() => {
-    const main = document.querySelector<HTMLElement>('.main-content');
-    main?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [location.pathname]);
-
-  return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <h1>{brandTitle}</h1>
-          <small>{sentenceCase(brandSubtitle)}</small>
-        </div>
-
-        <nav className="sidebar-nav">
-          {sections.map((section) => (
-            <NavSection key={section.label} label={section.label} items={section.items} />
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          {footerContent ?? null}
-        </div>
-      </aside>
-
-      <main className="main-content">{children}</main>
-    </div>
-  );
-}
-
-function NavSection({ label, items }: AppShellNavSection) {
   const { sentenceCase } = useI18n();
-  const location = useLocation();
 
   return (
-    <>
-      <div className="sidebar-section-label">{sentenceCase(label)}</div>
-      {items.map((item) => (
+    <ShellSidebar
+      brandTitle={brandTitle}
+      brandSubtitle={brandSubtitle}
+      sections={sections}
+      footerContent={footerContent}
+      pathname={location.pathname}
+      formatLabel={sentenceCase}
+      renderLink={(item, className) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -76,13 +38,15 @@ function NavSection({ label, items }: AppShellNavSection) {
             const active = item.isActive
               ? item.isActive(location.pathname, location.search)
               : navLinkActive;
-            return `sidebar-link${active ? ' active' : ''}`;
+            return `${className}${active ? ' active' : ''}`;
           }}
         >
           {item.icon}
           <span>{sentenceCase(item.label)}</span>
         </NavLink>
-      ))}
-    </>
+      )}
+    >
+      {children}
+    </ShellSidebar>
   );
 }

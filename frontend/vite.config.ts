@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react';
 const calendarBoardEntry = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
 const calendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
 const calendarBoardRoot = fileURLToPath(new URL('../../modules/calendar/board/ts/src', import.meta.url));
+const shellSidebarEntry = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
+const shellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
+const shellSidebarRoot = fileURLToPath(new URL('../../modules/sidebar/ts/src', import.meta.url));
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
 const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/daygrid', import.meta.url));
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
@@ -17,6 +20,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      { find: '@devpablocristo/modules-shell-sidebar/styles.css', replacement: shellSidebarStyles },
+      { find: '@devpablocristo/modules-shell-sidebar', replacement: shellSidebarEntry },
       { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: calendarBoardStyles },
       { find: '@devpablocristo/modules-calendar-board', replacement: calendarBoardEntry },
       { find: '@fullcalendar/core', replacement: fullCalendarCore },
@@ -66,7 +71,7 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     fs: {
-      allow: [searchForWorkspaceRoot(process.cwd()), calendarBoardRoot],
+      allow: [searchForWorkspaceRoot(process.cwd()), calendarBoardRoot, shellSidebarRoot],
     },
     watch: {
       usePolling: true,

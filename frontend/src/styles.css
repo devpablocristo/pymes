@@ -149,107 +149,7 @@ a {
   text-decoration: none;
 }
 
-/* ── Layout ── */
-.app-layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.sidebar {
-  width: var(--shell-sidebar-width);
-  background: var(--color-sidebar);
-  color: var(--color-sidebar-text);
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 100;
-  overflow-y: auto;
-}
-
-.sidebar-brand {
-  padding: 1.5rem 1.25rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.sidebar-brand h1 {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--color-sidebar-text-active);
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.sidebar-brand small {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: 0.75rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sidebar-section-label {
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-text-muted);
-  padding: 1rem 0.5rem 0.4rem;
-  font-weight: 600;
-}
-
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--color-sidebar-text);
-  transition: all var(--transition);
-  cursor: pointer;
-}
-
-.sidebar-link:hover {
-  background: var(--color-sidebar-hover);
-  color: var(--color-sidebar-text-active);
-}
-
-.sidebar-link.active {
-  background: var(--color-sidebar-active);
-  color: var(--color-sidebar-text-active);
-  font-weight: 600;
-}
-
-.sidebar-link svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-.sidebar-link.active svg {
-  opacity: 1;
-}
-
-.sidebar-footer {
-  padding: 1rem 1.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
+/* ── Sidebar footer (pymes-specific) ── */
 .sidebar-footer-controls {
   display: flex;
   align-items: center;
@@ -307,13 +207,6 @@ a {
   outline: none;
   border-color: rgba(96, 165, 250, 0.65);
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
-}
-
-.main-content {
-  flex: 1;
-  margin-left: var(--shell-sidebar-width);
-  padding: 2rem 2.5rem;
-  max-width: calc(100% - var(--shell-sidebar-width));
 }
 
 /* ── Page header ── */
@@ -1705,37 +1598,8 @@ code {
   font-size: var(--text-sm);
 }
 
-/* ── Responsive ── */
+/* ── Responsive (pymes-specific) ── */
 @media (max-width: 768px) {
-  .sidebar {
-    width: 64px;
-  }
-
-  .sidebar-brand small,
-  .sidebar-link span,
-  .sidebar-section-label {
-    display: none;
-  }
-
-  .sidebar-brand h1 {
-    font-size: 0;
-  }
-
-  .sidebar-brand h1::first-letter {
-    font-size: var(--text-lg);
-  }
-
-  .sidebar-link {
-    justify-content: center;
-    padding: 0.65rem;
-  }
-
-  .main-content {
-    margin-left: 64px;
-    padding: 1.25rem;
-    max-width: calc(100% - 64px);
-  }
-
   .module-page-header {
     flex-direction: column;
   }

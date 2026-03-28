@@ -143,6 +143,10 @@
 
 /* ── Saving indicator ── */
 
+.gcal .modules-calendar {
+  height: calc(100vh - 48px);
+}
+
 .gcal__saving {
   position: fixed;
   bottom: var(--space-4);

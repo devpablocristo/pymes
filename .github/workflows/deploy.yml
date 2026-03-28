@@ -2,8 +2,10 @@ name: Stack Smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+
+concurrency:
+  group: pymes-stack-smoke-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   smoke-stack:

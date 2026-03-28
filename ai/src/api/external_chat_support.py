@@ -7,7 +7,6 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from src.agents.review_gate import evaluate_action
-from src.api.chat_stream import estimate_tokens
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import orchestrate
@@ -16,6 +15,7 @@ from src.db.repository import AIRepository
 from src.review_client.client import ReviewClient
 from runtime.types import LLMProvider, Message
 from runtime.logging import get_logger
+from runtime.text import estimate_tokens
 from src.tools.registry import build_external_tools
 
 logger = get_logger(__name__)

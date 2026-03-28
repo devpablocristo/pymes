@@ -66,13 +66,6 @@ class CommercialChatResult:
         """Alias legacy para compatibilidad con clientes existentes."""
         return self.routed_agent
 
-
-def estimate_tokens(text: str) -> int:
-    if not text:
-        return 0
-    return max(1, len(text) // 4)
-
-
 def sanitize_message(text: str, limit: int = 4000) -> str:
     cleaned = "".join(ch for ch in text if ch == "\n" or 32 <= ord(ch) <= 126 or ord(ch) >= 160)
     return cleaned.strip()[:limit]

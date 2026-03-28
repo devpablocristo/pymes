@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +13,7 @@ from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from src.db.repository import AIRepository
+from runtime.api.events import to_sse_event
 from runtime.logging import get_logger
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
@@ -77,11 +77,6 @@ async def check_quota(repo: AIRepository, org_id: str, mode: str) -> str:
 
     return plan
 
-
-def _to_sse_event(event: str, payload: dict[str, Any]) -> dict[str, str]:
-    return {"event": event, "data": json.dumps(payload, ensure_ascii=False)}
-
-
 @router.post("")
 async def chat_internal(
     req: ChatRequest,
@@ -122,13 +117,13 @@ async def chat_internal(
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("chat_internal_failed", org_id=auth.org_id, user_id=auth.actor, error=str(exc))
-            yield _to_sse_event("error", {"message": "error processing request"})
+            yield to_sse_event("error", {"message": "error processing request"})
             return
 
         for tool_name in result.tool_calls:
-            yield _to_sse_event("tool_call", {"tool": tool_name, "status": "done"})
+            yield to_sse_event("tool_call", {"tool": tool_name, "status": "done"})
         if result.reply:
-            yield _to_sse_event("text", {"content": result.reply})
+            yield to_sse_event("text", {"content": result.reply})
         logger.info(
             "chat_internal_completed",
             org_id=auth.org_id,
@@ -139,7 +134,7 @@ async def chat_internal(
             tokens_input=result.tokens_input,
             tokens_output=result.tokens_output,
         )
-        yield _to_sse_event(
+        yield to_sse_event(
             "done",
             {
                 "conversation_id": result.conversation_id,

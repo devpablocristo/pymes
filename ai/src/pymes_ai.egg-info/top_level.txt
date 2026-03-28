@@ -6,6 +6,7 @@ config
 core
 db
 domains
+insights
 llm
 main
 middleware

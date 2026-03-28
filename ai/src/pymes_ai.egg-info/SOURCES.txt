@@ -13,6 +13,7 @@ src/agents/service_support.py
 src/agents/sub_agents/__init__.py
 src/agents/sub_agents/clientes.py
 src/agents/sub_agents/cobros.py
+src/agents/sub_agents/common.py
 src/agents/sub_agents/compras.py
 src/agents/sub_agents/productos.py
 src/agents/sub_agents/ventas.py
@@ -58,6 +59,12 @@ src/domains/workshops/auto_repair/internal_router.py
 src/domains/workshops/auto_repair/public_router.py
 src/domains/workshops/auto_repair/system_prompt.py
 src/domains/workshops/auto_repair/tools.py
+src/insights/__init__.py
+src/insights/domain.py
+src/insights/repository.py
+src/insights/router.py
+src/insights/schemas.py
+src/insights/service.py
 src/llm/__init__.py
 src/middleware/__init__.py
 src/observability/__init__.py
@@ -91,6 +98,8 @@ src/tools/settings.py
 src/tools/suppliers.py
 tests/test_auth_middleware.py
 tests/test_config.py
+tests/test_insights_router.py
+tests/test_insights_service.py
 tests/test_internal_conversation_scope.py
 tests/test_orchestrator_router.py
 tests/test_pymes_assistant_service.py

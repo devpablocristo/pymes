@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
+from runtime.api.events import to_sse_event
+from runtime.text import estimate_tokens
 from runtime.types import LLMProvider, Message, ToolDeclaration
 from runtime.logging import get_logger
 from runtime.orchestrator import orchestrate
@@ -28,17 +29,6 @@ class StreamChatResult:
     @property
     def unique_tool_calls(self) -> list[str]:
         return sorted(set(self.tool_calls))
-
-
-def estimate_tokens(text: str) -> int:
-    if not text:
-        return 0
-    return max(1, len(text) // 4)
-
-
-def to_sse_event(event: str, payload: dict[str, Any]) -> dict[str, str]:
-    return {"event": event, "data": json.dumps(payload, ensure_ascii=False)}
-
 
 async def stream_orchestrated_chat(
     *,

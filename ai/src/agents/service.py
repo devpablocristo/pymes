@@ -18,19 +18,20 @@ from src.agents.service_support import (
     _build_quote_preview,
     _load_internal_conversation,
     build_commercial_prompt,
-    estimate_tokens,
     sanitize_message,
 )
 from src.agents.sub_agents import build_registry
 from src.api.external_chat_support import get_external_conversation, history_to_messages
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
+from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import OrchestratorLimits, orchestrate
 from runtime.services.multi_agent_orchestrator import run_routed_agent
 from src.db.repository import AIRepository
-from runtime.types import ChatChunk, LLMProvider, Message
+from runtime.types import LLMProvider, Message
 from runtime.logging import get_logger
+from runtime.text import estimate_tokens
 from src.tools import appointments, payments
 
 logger = get_logger(__name__)
@@ -45,6 +46,12 @@ _INTERNAL_SENSITIVE_TOOLS = {
     "send_payment_info",
 }
 
+_INTERNAL_GENERAL_SYSTEM_PROMPT = """\
+Sos el asistente general de una plataforma de gestión para PyMEs.
+Respondé saludos y preguntas generales de forma amable, clara y concisa.
+Si el usuario pide una acción concreta del negocio, indicá que puede pedírtela directamente y el sistema la va a enrutar.
+Respondé siempre en español."""
+
 
 def _default_internal_reply(routed_agent: str) -> str:
     if routed_agent == "general":
@@ -58,6 +65,14 @@ def _build_internal_pending_confirmation(tool_name: str) -> dict[str, Any]:
         "required_action": tool_name,
         "message": f"Necesito confirmación explícita para ejecutar {tool_name}. Reenviá la solicitud incluyendo esa acción en confirmed_actions.",
     }
+
+
+def _build_internal_general_limits() -> OrchestratorLimits:
+    settings = get_settings()
+    return OrchestratorLimits(
+        max_tool_calls=0,
+        total_timeout_seconds=max(30.0, float(settings.assistant_total_timeout_seconds)),
+    )
 
 
 def _looks_like_customer_summary_request(message: str) -> bool:
@@ -241,6 +256,8 @@ async def run_internal_orchestrated_chat(
             user_message=sanitized_message,
             history=history,
             context={"org_id": org_id},
+            general_system_prompt=_INTERNAL_GENERAL_SYSTEM_PROMPT,
+            general_limits=_build_internal_general_limits(),
         ):
             if chunk.type == "route" and chunk.text:
                 routed_agent = chunk.text

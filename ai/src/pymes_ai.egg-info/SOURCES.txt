@@ -5,7 +5,6 @@ src/main.py
 src/agents/__init__.py
 src/agents/audit.py
 src/agents/contracts.py
-src/agents/orchestrator_router.py
 src/agents/policy.py
 src/agents/review_gate.py
 src/agents/service.py
@@ -18,14 +17,14 @@ src/agents/sub_agents/compras.py
 src/agents/sub_agents/productos.py
 src/agents/sub_agents/ventas.py
 src/api/__init__.py
+src/api/chat_contract.py
 src/api/chat_stream.py
-src/api/commercial_router.py
 src/api/deps.py
 src/api/external_chat_support.py
 src/api/internal_router.py
+src/api/notifications_router.py
 src/api/public_router.py
 src/api/public_sales_router.py
-src/api/pymes_assistant_router.py
 src/api/review_callback.py
 src/api/router.py
 src/api/sse.py
@@ -62,7 +61,6 @@ src/domains/workshops/auto_repair/tools.py
 src/insights/__init__.py
 src/insights/domain.py
 src/insights/repository.py
-src/insights/router.py
 src/insights/schemas.py
 src/insights/service.py
 src/llm/__init__.py
@@ -101,6 +99,5 @@ tests/test_config.py
 tests/test_insights_router.py
 tests/test_insights_service.py
 tests/test_internal_conversation_scope.py
-tests/test_orchestrator_router.py
 tests/test_pymes_assistant_service.py
 tests/test_sse_chat_contract.py

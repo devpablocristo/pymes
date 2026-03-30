@@ -57,6 +57,7 @@ class CommercialChatResult:
     pending_confirmations: list[str]
     blocks: list[dict[str, Any]] = field(default_factory=list)
     routed_agent: str | None = None
+    routing_source: str | None = None
 
     @property
     def tokens_used(self) -> int:

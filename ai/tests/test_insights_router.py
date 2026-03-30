@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from runtime.contexts import AuthContext
 from src.api.deps import get_auth_context, get_repository
+from src.api.notifications_router import get_insights_service, router
+import src.api.notifications_router as notifications_router_module
 from src.insights.domain import (
     CustomersRetentionInsight,
     DebtorInsight,
@@ -21,7 +23,6 @@ from src.insights.domain import (
     StockAlertInsight,
     TopCustomerInsight,
 )
-from src.insights.router import get_insights_service, router
 
 
 class StubRepo:
@@ -199,61 +200,51 @@ def test_sales_collections_router_returns_response() -> None:
     service = StubInsightsService()
     repo = StubRepo()
     client = create_client(service, repo)
+    notifications_router_module.get_request_id = lambda: "req-notif-1"  # type: ignore[assignment]
 
-    response = client.get("/v1/insights/sales-collections?period=month&compare=true&top_limit=3")
+    response = client.post("/v1/notifications", json={"period": "month", "compare": True, "top_limit": 3})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["scope"] == "sales_collections"
-    assert payload["summary"] == "Resumen generado"
-    assert payload["kpis"][0]["delta_pct"] == 25.0
-    assert payload["top_customers"][0]["customer_name"] == "Acme"
+    assert payload["request_id"] == "req-notif-1"
+    assert payload["service_kind"] == "insight_service"
+    assert payload["output_kind"] == "insight_notification"
+    assert len(payload["items"]) == 3
+    assert payload["items"][0]["kind"] == "insight"
+    assert payload["items"][0]["entity_type"] == "insight"
+    assert payload["items"][0]["entity_id"] == "sales_collections"
+    assert payload["items"][0]["title"] == "Insight de ventas y cobranzas"
+    assert payload["items"][0]["body"] == "Resumen generado"
+    assert payload["items"][0]["chat_context"]["scope"] == "sales_collections"
+    assert payload["items"][0]["chat_context"]["routed_agent"] == "copilot"
     assert service.calls[0][0] == "sales_collections"
     assert service.calls[0][1].period == "month"
     assert service.calls[0][1].top_limit == 3
+    assert service.calls[1][0] == "inventory_profit"
+    assert service.calls[2][0] == "customers_retention"
     assert repo.tracked_usage == [(0, 0)]
 
 
-def test_sales_collections_router_validates_date_range() -> None:
+def test_notifications_router_validates_top_limit() -> None:
     service = StubInsightsService()
     client = create_client(service, StubRepo())
 
-    response = client.get("/v1/insights/sales-collections?from=2026-03-10")
+    response = client.post("/v1/notifications", json={"top_limit": 0})
 
     assert response.status_code == 422
 
 
-def test_inventory_profit_router_returns_response() -> None:
+def test_notifications_router_supports_period_and_compare() -> None:
     service = StubInsightsService()
     repo = StubRepo()
     client = create_client(service, repo)
+    notifications_router_module.get_request_id = lambda: "req-notif-2"  # type: ignore[assignment]
 
-    response = client.get("/v1/insights/inventory-profit?period=month&compare=true&top_limit=2")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["scope"] == "inventory_profit"
-    assert payload["summary"] == "Resumen de inventario"
-    assert payload["top_products"][0]["product_name"] == "Producto A"
-    assert payload["low_stock"][0]["deficit"] == 3.0
-    assert service.calls[0][0] == "inventory_profit"
-    assert service.calls[0][1].top_limit == 2
-    assert repo.tracked_usage == [(0, 0)]
-
-
-def test_customers_retention_router_returns_response() -> None:
-    service = StubInsightsService()
-    repo = StubRepo()
-    client = create_client(service, repo)
-
-    response = client.get("/v1/insights/customers-retention?period=month&compare=true&top_limit=4")
+    response = client.post("/v1/notifications", json={"period": "week", "compare": False, "top_limit": 2})
 
     assert response.status_code == 200
-    payload = response.json()
-    assert payload["scope"] == "customers_retention"
-    assert payload["summary"] == "Resumen de clientes"
-    assert payload["top_customers"][0]["customer_name"] == "Acme"
-    assert payload["kpis"][0]["value"] == 50.0
-    assert service.calls[0][0] == "customers_retention"
-    assert service.calls[0][1].top_limit == 4
+    assert response.json()["request_id"] == "req-notif-2"
+    assert [call[1].period for call in service.calls] == ["week", "week", "week"]
+    assert [call[1].compare for call in service.calls] == [False, False, False]
+    assert [call[1].top_limit for call in service.calls] == [2, 2, 2]
     assert repo.tracked_usage == [(0, 0)]

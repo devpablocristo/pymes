@@ -1,4 +1,10 @@
 import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import type {
+  CommercialChatRequest,
+  InsightNotificationItem,
+  InsightNotificationsResponse,
+  PymesAssistantChatResponse,
+} from '../types/aiChat';
 
 function resolveAiBaseURLs(): string[] {
   const env = import.meta.env as Record<string, string | undefined>;
@@ -21,69 +27,31 @@ function aiOptions(options: RequestOptions = {}): RequestOptions {
   return { ...options, baseURLs: aiBaseURLs };
 }
 
-export type CommercialChatRequest = {
-  conversation_id?: string | null;
-  message: string;
-  confirmed_actions?: string[];
-};
-
-export type CommercialChatResponse = {
-  conversation_id: string;
-  reply: string;
-  tokens_used: number;
-  tool_calls: string[];
-  pending_confirmations: string[];
-};
-
-export type PymesAssistantAction = {
-  id: string;
-  label: string;
-  kind: 'send_message' | 'open_url' | 'confirm_action';
-  style?: 'primary' | 'secondary' | 'ghost';
-  message?: string | null;
-  url?: string | null;
-  confirmed_actions?: string[];
-};
-
-export type PymesAssistantChatTextBlock = {
-  type: 'text';
-  text: string;
-};
-
-export type PymesAssistantChatActionsBlock = {
-  type: 'actions';
-  actions: PymesAssistantAction[];
-};
-
-export type PymesAssistantChatInsightCardBlock = {
-  type: 'insight_card';
-  title: string;
-  summary: string;
-  scope?: string | null;
-  highlights?: Array<{ label: string; value: string }>;
-  recommendations?: string[];
-};
-
-export type PymesAssistantChatBlock =
-  | PymesAssistantChatTextBlock
-  | PymesAssistantChatActionsBlock
-  | PymesAssistantChatInsightCardBlock;
-
-export async function commercialChatSales(payload: CommercialChatRequest): Promise<CommercialChatResponse> {
-  return request('/v1/chat/commercial/sales', aiOptions({ method: 'POST', body: payload }));
-}
-
-export async function commercialChatProcurement(payload: CommercialChatRequest): Promise<CommercialChatResponse> {
-  return request('/v1/chat/commercial/procurement', aiOptions({ method: 'POST', body: payload }));
-}
-
-export type PymesAssistantChatResponse = CommercialChatResponse & {
-  blocks?: PymesAssistantChatBlock[];
-  routed_agent: string;
-  routed_mode: string;
-};
+export type {
+  CommercialChatRequest,
+  InsightNotificationItem,
+  InsightNotificationsResponse,
+  PymesAssistantAction,
+  PymesAssistantChatBaseResponse,
+  PymesAssistantChatBlock,
+  PymesChatOutputKind,
+  PymesAssistantChatResponse,
+  PymesInsightOutputKind,
+  PymesInsightServiceKind,
+  PymesRoutedAgent,
+  PymesRoutingSource,
+} from '../types/aiChat';
 
 /** Asistente Pymes — un solo chat interno con router LLM y sub-agentes especializados. */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
-  return request('/v1/chat/pymes/', aiOptions({ method: 'POST', body: payload }));
+  return request('/v1/chat', aiOptions({ method: 'POST', body: payload }));
+}
+
+export async function createInsightNotifications(payload?: {
+  kind?: 'insight';
+  period?: 'today' | 'week' | 'month';
+  compare?: boolean;
+  top_limit?: number;
+}): Promise<InsightNotificationsResponse> {
+  return request('/v1/notifications', aiOptions({ method: 'POST', body: payload ?? {} }));
 }

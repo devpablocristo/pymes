@@ -9,7 +9,7 @@ Reglas madre del repo `pymes`.
 - `workshops/`: vertical umbrella; subdominio `auto_repair`
 - `beauty/`: vertical belleza / salón (equipo, servicios)
 - `restaurants/`: vertical bares / restaurantes (zonas, mesas, sesiones)
-- `pymes-core/shared/`: runtime compartido propio del producto (Go + AI)
+- `pymes-core/shared/`: código transversal propio del producto (principalmente backend/shared)
 - librería **`core`** (`github.com/devpablocristo/core/...`): primitivas agnósticas fuera de este repo (importadas por `go.mod`)
 
 ## Deployables reales
@@ -68,8 +68,8 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 ## Reglas de AI
 
 - `ai/` es el único deployable de inteligencia artificial
-- El código compartido de transporte y runtime vive en `ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db` y `pymes-core/shared/ai`
+- El runtime reusable efectivo vive en `../../core/ai/python/src/runtime/`; en `ai/` queda el código de integración del producto (`ai/src/backend_client`, `ai/src/api`, `ai/src/core`, `ai/src/db`)
 - La lógica específica de verticales con tools propios vive en `ai/src/domains/<vertical>/<módulo>` — **hoy**: `professionals/teachers` y `workshops/auto_repair`
-- Chat comercial interno (ventas / procurement) contra el core: routers en `ai/src/api/commercial_router.py` (no bajo `domains/`)
+- Chat interno canónico contra el core: router en `ai/src/api/router.py` (sin entrypoints internos paralelos por agente)
 - **Beauty** y **restaurants** aún no tienen paquete dedicado bajo `ai/src/domains/`; cualquier asistente futuro debe seguir el mismo patrón (HTTP al vertical o core, sin importar dominio Go)
-- La taxonomía del ecosistema (`assistant`, `insight`, `copilot`, `companion`) y su ownership viven en `docs/AI_OWNERSHIP.md`; `pymes` conserva su inteligencia de producto y `nexus` conserva governance + companion
+- La taxonomía del ecosistema (`Agent` / `Service`, con `ProductAgent`, `DomainAgent`, `CopilotAgent`, `InsightService`, `GovernanceService`) y su ownership viven en `docs/AI_OWNERSHIP.md`; `pymes` conserva su inteligencia de producto y `nexus` conserva governance + companion

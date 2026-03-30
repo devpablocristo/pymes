@@ -7,6 +7,18 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from src.agents.audit import has_processed_request, record_agent_event
+from src.agents.catalog import (
+    CLIENTES_DOMAIN_AGENT_NAME,
+    COPILOT_AGENT_NAME,
+    PRODUCTOS_DOMAIN_AGENT_NAME,
+    PRODUCT_AGENT_NAME,
+    ROUTING_SOURCE_COPILOT_AGENT,
+    ROUTING_SOURCE_ORCHESTRATOR,
+    ROUTING_SOURCE_READ_FALLBACK,
+    VENTAS_DOMAIN_AGENT_NAME,
+    normalize_routed_agent,
+)
+from src.agents.copilot_service import maybe_build_copilot_response
 from src.agents.contracts import CommercialContractEnvelope
 from src.agents.policy import build_external_sales_policy, build_internal_procurement_policy, build_internal_sales_policy
 from src.agents.service_support import (
@@ -24,7 +36,10 @@ from src.agents.sub_agents import build_registry
 from src.api.external_chat_support import get_external_conversation, history_to_messages
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.chat_blocks import build_confirm_actions_block, build_text_block
+from src.chat_blocks import (
+    build_confirm_actions_block,
+    build_text_block,
+)
 from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import OrchestratorLimits, orchestrate
@@ -53,9 +68,8 @@ Respondé saludos y preguntas generales de forma amable, clara y concisa.
 Si el usuario pide una acción concreta del negocio, indicá que puede pedírtela directamente y el sistema la va a enrutar.
 Respondé siempre en español."""
 
-
 def _default_internal_reply(routed_agent: str) -> str:
-    if routed_agent == "general":
+    if routed_agent == PRODUCT_AGENT_NAME:
         return "Hola. Puedo ayudarte con clientes, productos, ventas, cobros y compras. Decime qué necesitás."
     return "No pude generar una respuesta útil en este momento."
 
@@ -133,7 +147,7 @@ async def _run_internal_read_fallback(
     if agent is None:
         return None, []
 
-    if routed_agent == "clientes" and _looks_like_customer_summary_request(user_message):
+    if routed_agent == CLIENTES_DOMAIN_AGENT_NAME and _looks_like_customer_summary_request(user_message):
         handler = agent.tool_handlers.get("search_customers")
         if handler is None:
             return None, []
@@ -241,76 +255,104 @@ async def run_internal_orchestrated_chat(
     sanitized_message = sanitize_message(message)
     conversation = await _load_internal_conversation(repo, auth, conversation_id, sanitized_message)
     confirmed = {item.strip().lower() for item in (confirmed_actions or []) if item.strip()}
-
-    registry = build_registry(backend_client, auth)
-    _wrap_internal_registry_handlers(
-        registry=registry,
-        repo=repo,
-        org_id=org_id,
-        conversation_id=conversation.id,
-        auth=auth,
-        confirmed_actions=confirmed,
-    )
-    history = history_to_messages(list(conversation.messages))
+    tokens_in = estimate_tokens(sanitized_message)
 
     assistant_parts: list[str] = []
     tool_calls: list[str] = []
     pending_confirmations: list[str] = []
-    routed_agent = "general"
-    tokens_in = estimate_tokens(sanitized_message)
+    routed_agent = PRODUCT_AGENT_NAME
+    routing_source = ROUTING_SOURCE_ORCHESTRATOR
+    blocks: list[dict[str, Any]] = []
 
-    try:
-        async for chunk in run_routed_agent(
-            llm=llm,
+    copilot_response = await maybe_build_copilot_response(
+        backend_client=backend_client,
+        auth=auth,
+        user_message=sanitized_message,
+    )
+    if copilot_response is not None:
+        routed_agent = COPILOT_AGENT_NAME
+        routing_source = ROUTING_SOURCE_COPILOT_AGENT
+        reply = copilot_response.reply
+        blocks = copy.deepcopy(copilot_response.blocks)
+        logger.info(
+            "internal_copilot_routed",
+            org_id=org_id,
+            conversation_id=conversation.id,
+            routed_agent=routed_agent,
+        )
+    else:
+        registry = build_registry(backend_client, auth)
+        _wrap_internal_registry_handlers(
             registry=registry,
-            user_message=sanitized_message,
-            history=history,
-            context={"org_id": org_id},
-            general_system_prompt=_INTERNAL_GENERAL_SYSTEM_PROMPT,
-            general_limits=_build_internal_general_limits(),
-        ):
-            if chunk.type == "route" and chunk.text:
-                routed_agent = chunk.text
+            repo=repo,
+            org_id=org_id,
+            conversation_id=conversation.id,
+            auth=auth,
+            confirmed_actions=confirmed,
+        )
+        history = history_to_messages(list(conversation.messages))
+
+        try:
+            async for chunk in run_routed_agent(
+                llm=llm,
+                registry=registry,
+                user_message=sanitized_message,
+                history=history,
+                context={"org_id": org_id},
+                general_system_prompt=_INTERNAL_GENERAL_SYSTEM_PROMPT,
+                general_limits=_build_internal_general_limits(),
+            ):
+                if chunk.type == "route" and chunk.text:
+                    routed_agent = normalize_routed_agent(chunk.text)
+                    logger.info(
+                        "internal_assistant_routed",
+                        org_id=org_id,
+                        conversation_id=conversation.id,
+                        routed_agent=routed_agent,
+                    )
+                elif chunk.type == "text" and chunk.text:
+                    assistant_parts.append(chunk.text)
+                elif chunk.type == "tool_call" and chunk.tool_call:
+                    tool_name = str(chunk.tool_call.name).strip()
+                    if tool_name:
+                        tool_calls.append(tool_name)
+                elif chunk.type == "tool_result" and chunk.tool_call:
+                    result = chunk.tool_call.arguments
+                    if isinstance(result, dict) and result.get("pending_confirmation"):
+                        required_action = str(result.get("required_action", "")).strip()
+                        if required_action and required_action not in pending_confirmations:
+                            pending_confirmations.append(required_action)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("internal_assistant_failed", org_id=org_id, conversation_id=conversation.id, error=str(exc))
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
+
+        reply = "".join(assistant_parts).strip() or _default_internal_reply(routed_agent)
+        blocks = _build_internal_blocks(reply, pending_confirmations)
+        if not pending_confirmations and not tool_calls:
+            fallback_reply, fallback_tool_calls = await _run_internal_read_fallback(
+                registry=registry,
+                routed_agent=routed_agent,
+                org_id=org_id,
+                user_message=sanitized_message,
+            )
+            if fallback_reply:
+                reply = fallback_reply
+                routing_source = ROUTING_SOURCE_READ_FALLBACK
+                tool_calls.extend(fallback_tool_calls)
                 logger.info(
-                    "internal_assistant_routed",
+                    "internal_assistant_read_fallback_applied",
                     org_id=org_id,
                     conversation_id=conversation.id,
                     routed_agent=routed_agent,
                 )
-            elif chunk.type == "text" and chunk.text:
-                assistant_parts.append(chunk.text)
-            elif chunk.type == "tool_call" and chunk.tool_call:
-                tool_name = str(chunk.tool_call.name).strip()
-                if tool_name:
-                    tool_calls.append(tool_name)
-            elif chunk.type == "tool_result" and chunk.tool_call:
-                result = chunk.tool_call.arguments
-                if isinstance(result, dict) and result.get("pending_confirmation"):
-                    required_action = str(result.get("required_action", "")).strip()
-                    if required_action and required_action not in pending_confirmations:
-                        pending_confirmations.append(required_action)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("internal_assistant_failed", org_id=org_id, conversation_id=conversation.id, error=str(exc))
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
-
-    reply = "".join(assistant_parts).strip() or _default_internal_reply(routed_agent)
-    if not pending_confirmations and not tool_calls:
-        fallback_reply, fallback_tool_calls = await _run_internal_read_fallback(
-            registry=registry,
-            routed_agent=routed_agent,
-            org_id=org_id,
-            user_message=sanitized_message,
-        )
-        if fallback_reply:
-            reply = fallback_reply
-            tool_calls.extend(fallback_tool_calls)
+            blocks = _build_internal_blocks(reply, pending_confirmations)
     if pending_confirmations:
         reply = (
             "Necesito confirmación explícita para continuar con: "
             + ", ".join(pending_confirmations)
             + ". Reenviame la solicitud incluyendo esas acciones en confirmed_actions."
         )
-    blocks = _build_internal_blocks(reply, pending_confirmations)
+        blocks = _build_internal_blocks(reply, pending_confirmations)
     tokens_out = estimate_tokens(reply)
     now = datetime.now(UTC).isoformat()
     user_message = {"role": "user", "content": sanitized_message, "ts": now}
@@ -325,6 +367,7 @@ async def run_internal_orchestrated_chat(
         "routed_mode": routed_agent,
         "agent_mode": routed_agent,
         "channel": _INTERNAL_ASSISTANT_CHANNEL,
+        "routing_source": routing_source,
         "pending_confirmations": list(pending_confirmations),
         "blocks": copy.deepcopy(blocks),
     }
@@ -353,6 +396,7 @@ async def run_internal_orchestrated_chat(
         result="confirmation_required" if pending_confirmations else "success",
         confirmed=bool(confirmed),
         metadata={
+            "routing_source": routing_source,
             "tool_calls": sorted(set(tool_calls)),
             "pending_confirmations": list(pending_confirmations),
         },
@@ -367,6 +411,7 @@ async def run_internal_orchestrated_chat(
         pending_confirmations=list(pending_confirmations),
         blocks=blocks,
         routed_agent=routed_agent,
+        routing_source=routing_source,
     )
 
 

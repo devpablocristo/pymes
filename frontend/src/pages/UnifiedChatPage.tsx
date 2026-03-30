@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  pymesAssistantChat,
-  type PymesAssistantAction,
-  type PymesAssistantChatBlock,
-  type PymesAssistantChatResponse,
-} from '../lib/aiApi';
+import { pymesAssistantChat, type PymesAssistantAction } from '../lib/aiApi';
+import { humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
+import type { PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
 import './UnifiedChatPage.css';
 
 type ContactKind = 'human' | 'ai_pymes';
@@ -70,21 +67,10 @@ type Msg = {
   blocks?: PymesAssistantChatBlock[];
   /** Sub-agente del orquestador (solo respuestas del Asistente Pymes). */
   routedLabel?: string;
+  metaLabel?: string;
 };
 
 let nextMsgId = 100;
-
-function humanRoutedLabel(mode: string): string {
-  if (mode === 'clientes') return 'Clientes';
-  if (mode === 'productos') return 'Productos';
-  if (mode === 'ventas') return 'Ventas';
-  if (mode === 'cobros') return 'Cobros';
-  if (mode === 'compras') return 'Compras';
-  if (mode === 'general') return 'General';
-  if (mode === 'internal_procurement') return 'Compras internas';
-  if (mode === 'internal_sales') return 'Ventas';
-  return mode || 'General';
-}
 
 function buttonClassName(style?: PymesAssistantAction['style']): string {
   if (style === 'primary') return 'btn-primary btn-sm';
@@ -92,13 +78,44 @@ function buttonClassName(style?: PymesAssistantAction['style']): string {
   return 'btn-secondary btn-sm';
 }
 
-function applyPymesReply(reply: PymesAssistantChatResponse): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks'>> {
-  const label = humanRoutedLabel(reply.routed_agent || reply.routed_mode);
+function kpiTrendClassName(trend?: 'up' | 'down' | 'flat' | 'unknown' | null): string {
+  if (trend === 'up') return 'cht__kpi-item-trend cht__kpi-item-trend--up';
+  if (trend === 'down') return 'cht__kpi-item-trend cht__kpi-item-trend--down';
+  if (trend === 'flat') return 'cht__kpi-item-trend cht__kpi-item-trend--flat';
+  return 'cht__kpi-item-trend';
+}
+
+function buildAssistantMetaLabel(reply: PymesAssistantChatResponse): string {
+  const parts = [
+    `Req ${reply.request_id}`,
+    reply.output_kind,
+    humanRoutedLabel(reply.routed_agent || reply.routed_mode),
+    humanRoutingSourceLabel(reply.routing_source),
+  ];
+  return parts.join(' · ');
+}
+
+function buildNotificationHandoffMetaLabel(handoff: NotificationChatHandoff): string | null {
+  const parts = [`Aviso ${handoff.notificationId}`];
+  if (handoff.routedAgent) {
+    parts.push(`Agente ${humanRoutedLabel(handoff.routedAgent)}`);
+  }
+  if (handoff.scope) {
+    parts.push(`Scope ${handoff.scope}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function applyPymesReply(reply: PymesAssistantChatResponse): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel'>> {
+  const agentLabel = humanRoutedLabel(reply.routed_agent || reply.routed_mode);
+  const sourceLabel = humanRoutingSourceLabel(reply.routing_source);
+  const routedLabel = agentLabel === sourceLabel ? agentLabel : `${agentLabel} · ${sourceLabel}`;
   return [
     {
       text: reply.reply,
       fromMe: false,
-      routedLabel: label,
+      routedLabel,
+      metaLabel: buildAssistantMetaLabel(reply),
       blocks: reply.blocks ?? [],
     },
   ];
@@ -116,7 +133,7 @@ export function UnifiedChatPage() {
       time: m.time,
     })),
   );
-  const [conversationIds, setConversationIds] = useState<Record<string, string | undefined>>({});
+  const [chatIds, setChatIds] = useState<Record<string, string | undefined>>({});
   const [pendingConfirmationsByContact, setPendingConfirmationsByContact] = useState<Record<string, string[]>>({});
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -184,6 +201,7 @@ export function UnifiedChatPage() {
       text,
       fromMe: true,
       time,
+      metaLabel: buildNotificationHandoffMetaLabel(handoff) ?? undefined,
     };
     setMsgs((p) => [...p, userMsg]);
 
@@ -193,10 +211,10 @@ export function UnifiedChatPage() {
       try {
         const reply = await pymesAssistantChat({
           message: text,
-          conversation_id: null,
+          chat_id: null,
           confirmed_actions: [],
         });
-        setConversationIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.conversation_id }));
+        setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.chat_id }));
         setPendingConfirmationsByContact((prev) => ({
           ...prev,
           [AI_PYMES_ID]: reply.pending_confirmations ?? [],
@@ -233,7 +251,7 @@ export function UnifiedChatPage() {
 
   const clearAiThread = useCallback(() => {
     setMsgs((prev) => prev.filter((m) => m.contactId !== active));
-    setConversationIds((prev) => {
+    setChatIds((prev) => {
       const next = { ...prev };
       delete next[active];
       return next;
@@ -272,14 +290,14 @@ export function UnifiedChatPage() {
 
     setBusy(true);
     setError('');
-    const conv = conversationIds[active];
+    const chatId = chatIds[active];
     try {
       const reply = await pymesAssistantChat({
         message: trimmed,
-        conversation_id: conv ?? null,
+        chat_id: chatId ?? null,
         confirmed_actions: options?.confirmedActions ?? [],
       });
-      setConversationIds((prev) => ({ ...prev, [active]: reply.conversation_id }));
+      setChatIds((prev) => ({ ...prev, [active]: reply.chat_id }));
       setPendingConfirmationsByContact((prev) => ({
         ...prev,
         [active]: reply.pending_confirmations ?? [],
@@ -306,7 +324,7 @@ export function UnifiedChatPage() {
     } finally {
       setBusy(false);
     }
-  }, [active, busy, conversationIds]);
+  }, [active, busy, chatIds]);
 
   const send = useCallback(async () => {
     const trimmed = input.trim();
@@ -431,6 +449,7 @@ export function UnifiedChatPage() {
                     {m.routedLabel}
                   </div>
                 ) : null}
+                {m.metaLabel ? <div className="cht__msg-submeta">{m.metaLabel}</div> : null}
                 {m.blocks && m.blocks.length > 0 ? (
                   <div className="cht__blocks">
                     {m.blocks.map((block, index) => {
@@ -442,9 +461,10 @@ export function UnifiedChatPage() {
                         );
                       }
                       if (block.type === 'actions') {
+                        const actions = block.actions ?? [];
                         return (
                           <div key={`${m.id}-block-${index}`} className="cht__block-actions">
-                            {block.actions.map((action) => (
+                            {actions.map((action) => (
                               <button
                                 key={action.id}
                                 type="button"
@@ -483,6 +503,60 @@ export function UnifiedChatPage() {
                                 ))}
                               </div>
                             ) : null}
+                          </section>
+                        );
+                      }
+                      if (block.type === 'kpi_group') {
+                        const items = block.items ?? [];
+                        return (
+                          <section key={`${m.id}-block-${index}`} className="cht__kpi-group">
+                            {block.title ? <div className="cht__kpi-group-title">{block.title}</div> : null}
+                            <div className="cht__kpi-grid">
+                              {items.map((item) => (
+                                <div key={`${item.label}-${item.value}`} className="cht__kpi-item">
+                                  <div className="cht__kpi-item-label">{item.label}</div>
+                                  <div className="cht__kpi-item-value">{item.value}</div>
+                                  {item.context ? (
+                                    <div className={kpiTrendClassName(item.trend)}>
+                                      {item.context}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        );
+                      }
+                      if (block.type === 'table') {
+                        const columns = block.columns ?? [];
+                        const rows = block.rows ?? [];
+                        return (
+                          <section key={`${m.id}-block-${index}`} className="cht__table-block">
+                            <div className="cht__table-title">{block.title}</div>
+                            {rows.length > 0 ? (
+                              <div className="cht__table-wrap">
+                                <table className="cht__table">
+                                  <thead>
+                                    <tr>
+                                      {columns.map((column) => (
+                                        <th key={column}>{column}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map((row, rowIndex) => (
+                                      <tr key={`${block.title}-row-${rowIndex}`}>
+                                        {row.map((cell, cellIndex) => (
+                                          <td key={`${block.title}-row-${rowIndex}-cell-${cellIndex}`}>{cell}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="cht__table-empty">{block.empty_state ?? 'Sin datos para mostrar.'}</div>
+                            )}
                           </section>
                         );
                       }

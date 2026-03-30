@@ -63,6 +63,18 @@ function mergeFeed(notifications: InAppNotificationItem[], approvals: ApprovalRe
   return rows;
 }
 
+function getNotificationScope(chatContext: unknown): string | null {
+  if (!chatContext || typeof chatContext !== 'object') return null;
+  const scope = (chatContext as Record<string, unknown>).scope;
+  return typeof scope === 'string' && scope.trim() !== '' ? scope : null;
+}
+
+function getNotificationRoutedAgent(chatContext: unknown): string | null {
+  if (!chatContext || typeof chatContext !== 'object') return null;
+  const routedAgent = (chatContext as Record<string, unknown>).routed_agent;
+  return typeof routedAgent === 'string' && routedAgent.trim() !== '' ? routedAgent : null;
+}
+
 export function NotificationsCenterPage({ embedded = false }: NotificationsCenterPageProps) {
   const navigate = useNavigate();
   const [feed, setFeed] = useState<FeedEntry[]>([]);
@@ -116,11 +128,15 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   }, [pendingApprovalsCount, unreadCount]);
 
   async function openInChat(n: InAppNotificationItem): Promise<void> {
+    const scope = getNotificationScope(n.chat_context);
+    const routedAgent = getNotificationRoutedAgent(n.chat_context);
     const handoff: NotificationChatHandoff = {
       notificationId: n.id,
       title: n.title,
       body: n.body,
       chatContext: n.chat_context && typeof n.chat_context === 'object' ? n.chat_context : {},
+      scope: scope ?? undefined,
+      routedAgent: routedAgent ?? undefined,
     };
     try {
       if (!n.read_at) {
@@ -170,6 +186,8 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
           {feed.map((entry) => {
             if (entry.kind === 'in_app') {
               const n = entry.notification;
+              const scope = getNotificationScope(n.chat_context);
+              const routedAgent = getNotificationRoutedAgent(n.chat_context);
               return (
                 <li key={`n-${n.id}`} className="card" style={{ margin: 0, padding: '1rem' }}>
                   <div className="text-secondary" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>
@@ -183,6 +201,13 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                         {new Date(n.created_at).toLocaleString()}
                         {n.read_at ? ' · Leída' : ''}
                       </div>
+                      {scope || routedAgent ? (
+                        <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                          {routedAgent ? `Agente: ${routedAgent}` : null}
+                          {routedAgent && scope ? ' · ' : null}
+                          {scope ? `Scope: ${scope}` : null}
+                        </div>
+                      ) : null}
                     </div>
                     <div
                       style={{

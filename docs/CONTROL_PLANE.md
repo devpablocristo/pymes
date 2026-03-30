@@ -9,16 +9,15 @@
 - billing, auditoria, notificaciones y admin
 - customers, suppliers, products, inventory, sales, quotes, cashflow y reports
 - appointments, recurring, price lists, payments, returns, procurement (solicitudes internas y políticas CEL), webhooks y WhatsApp
-- runtime compartido reutilizado por otras verticales
+- código transversal backend reutilizado por otras verticales
 
 ## Piezas vigentes
 
 - backend: `pymes-core/backend`
 - shared backend: `pymes-core/shared/backend`
-- shared AI runtime: `pymes-core/shared/ai`
 - infra: `pymes-core/infra`
 
-El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables unificados en `frontend/` y `ai/`.
+El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables unificados en `frontend/` y `ai/`. El runtime reusable de AI vive en `../../core/ai/python/src/runtime/`.
 
 ## Superficie local
 

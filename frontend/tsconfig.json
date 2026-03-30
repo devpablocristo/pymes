@@ -15,6 +15,8 @@
     "paths": {
       "@devpablocristo/modules-calendar-board": ["../../modules/calendar/board/ts/src/index.ts"],
       "@devpablocristo/modules-calendar-board/styles.css": ["../../modules/calendar/board/ts/src/styles.css"],
+      "@devpablocristo/modules-shell-sidebar": ["../../modules/sidebar/ts/src/index.ts"],
+      "@devpablocristo/modules-shell-sidebar/styles.css": ["../../modules/sidebar/ts/src/styles.css"],
       "@fullcalendar/core": ["./node_modules/@fullcalendar/core"],
       "@fullcalendar/daygrid": ["./node_modules/@fullcalendar/daygrid"],
       "@fullcalendar/interaction": ["./node_modules/@fullcalendar/interaction"],
@@ -26,5 +28,5 @@
       "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"]
     }
   },
-  "include": ["src", "../../modules/calendar/board/ts/src"]
+  "include": ["src", "../../modules/calendar/board/ts/src", "../../modules/sidebar/ts/src"]
 }

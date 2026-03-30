@@ -115,6 +115,8 @@ services:
       - "8200:8000"
     volumes:
       - ./ai/src:/workspace/ai/src
+      - ./ai/tests:/workspace/ai/tests
+      - ./ai/pyproject.toml:/workspace/ai/pyproject.toml
 
     env_file:
       - .env

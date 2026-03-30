@@ -116,6 +116,136 @@ async def test_run_internal_orchestrated_chat_uses_general_fallback(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_normalizes_unknown_route_to_general(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="inventado", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "general"
+    assert result.blocks == [{"type": "text", "text": result.reply}]
+    assistant_message = repo.append_calls[0]["new_messages"][1]
+    assert assistant_message["routed_agent"] == "general"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_routes_to_copilot_for_insights(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("el product agent no deberia ejecutar routing LLM cuando aplica copilot")
+
+    async def fake_maybe_build_copilot_response(**_kwargs):
+        return SimpleNamespace(
+            reply="Ventas arriba 12% este mes.",
+            blocks=[
+                {"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% este mes.", "scope": "Ventas y cobranzas · este mes", "highlights": [], "recommendations": ["Mantener seguimiento semanal."]},
+                {"type": "kpi_group", "title": "KPIs clave", "items": [{"label": "Ventas", "value": "$120,000.00", "trend": "up", "context": "+12.0% vs período anterior"}]},
+            ],
+        )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.maybe_build_copilot_response", fake_maybe_build_copilot_response)
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="resumí ventas del mes",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "copilot"
+    assert result.reply == "Ventas arriba 12% este mes."
+    assert result.blocks[0]["type"] == "insight_card"
+    assert result.blocks[1]["type"] == "kpi_group"
+    assistant_message = repo.append_calls[0]["new_messages"][1]
+    assert assistant_message["routed_agent"] == "copilot"
+    assert assistant_message["agent_mode"] == "copilot"
+    assert assistant_message["routing_source"] == "copilot_agent"
+    assert repo.agent_events[-1]["metadata"]["routing_source"] == "copilot_agent"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_falls_back_to_product_agent_when_copilot_does_not_apply(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="ventas", tool_call=None)
+        yield SimpleNamespace(type="text", text="Puedo ayudarte a registrar esa venta.", tool_call=None)
+
+    async def fake_maybe_build_copilot_response(**_kwargs):
+        return None
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.maybe_build_copilot_response", fake_maybe_build_copilot_response)
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="registrá una venta",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "ventas"
+    assert result.reply == "Puedo ayudarte a registrar esa venta."
+    assert result.blocks == [{"type": "text", "text": "Puedo ayudarte a registrar esa venta."}]
+
+
+@pytest.mark.asyncio
 async def test_run_internal_orchestrated_chat_requires_confirmation_for_sensitive_tools(monkeypatch) -> None:
     repo = StubRepo()
     conversation = SimpleNamespace(id="conv-1", messages=[])
@@ -180,3 +310,67 @@ async def test_run_internal_orchestrated_chat_requires_confirmation_for_sensitiv
     assert assistant_message["pending_confirmations"] == ["create_sale"]
     assert assistant_message["blocks"] == result.blocks
     assert repo.agent_events[-1]["result"] == "confirmation_required"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_marks_read_fallback_source(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    class CustomersAgent:
+        def __init__(self) -> None:
+            self.tool_handlers = {"search_customers": self.search_customers}
+
+        async def search_customers(self, **_kwargs):
+            return {
+                "total": 2,
+                "items": [
+                    {"name": "Acme"},
+                    {"name": "Beta"},
+                ],
+            }
+
+    class CustomersRegistry:
+        def __init__(self) -> None:
+            self.agent = CustomersAgent()
+
+        def names(self) -> list[str]:
+            return ["clientes"]
+
+        def get(self, name: str):
+            if name == "clientes":
+                return self.agent
+            return None
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="clientes", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: CustomersRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="resumí mis clientes",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "clientes"
+    assert result.reply == "Tenés 2 clientes registrados. Algunos son: Acme, Beta."
+    assert result.tool_calls == ["search_customers"]
+    assistant_message = repo.append_calls[0]["new_messages"][1]
+    assert assistant_message["routing_source"] == "read_fallback"
+    assert repo.agent_events[-1]["metadata"]["routing_source"] == "read_fallback"

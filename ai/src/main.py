@@ -13,9 +13,7 @@ from httpserver.fastapi_bootstrap import (
 from src.api.public_router import router as public_router
 from src.api.public_sales_router import router as public_sales_router
 from src.api.internal_router import router as internal_router
-from src.api.commercial_router import router as commercial_router
-from src.insights.router import router as insights_router
-from src.api.pymes_assistant_router import router as pymes_assistant_router
+from src.api.notifications_router import router as notifications_router
 from src.api.router import router as chat_router
 from src.backend_client.client import BackendClient
 from src.config import get_settings
@@ -138,7 +136,7 @@ install_request_context_middleware(app, bind_request_context, clear_request_cont
 app.add_middleware(
     AuthMiddleware,
     settings=AuthSettings(allow_api_key=settings.auth_allow_api_key),
-    protected_prefixes=("/v1/chat", "/v1/insights"),
+    protected_prefixes=("/v1/chat", "/v1/notifications"),
     api_key_verifier=(
         LocalAPIKeyVerifier(
             backend_url=settings.backend_url,
@@ -159,9 +157,7 @@ apply_permissive_cors(app)
 
 
 app.include_router(chat_router)
-app.include_router(commercial_router)
-app.include_router(insights_router)
-app.include_router(pymes_assistant_router)
+app.include_router(notifications_router)
 app.include_router(public_router)
 app.include_router(public_sales_router)
 app.include_router(internal_router)

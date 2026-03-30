@@ -10,7 +10,7 @@ La topologia activa hoy es:
 - `beauty/backend`: vertical `beauty` — salón (equipo, servicios)
 - `restaurants/backend`: vertical `restaurants` — zonas, mesas, sesiones de mesa
 - `frontend`: consola React unificada para core y verticales
-- `ai`: servicio FastAPI unificado (chat transversal, dominios `professionals/teachers` y `workshops/auto_repair`, chat comercial interno vía `ai/src/api/commercial_router.py`)
+- `ai`: servicio FastAPI unificado (chat transversal vía `POST /v1/chat`, notificaciones AI vía `POST /v1/notifications`, dominios `professionals/teachers` y `workshops/auto_repair`)
 - `pymes-core/shared/`: runtime compartido del producto (backend + AI)
 - Código reutilizable **agnóstico** vive en la librería **`core`** (módulos `github.com/devpablocristo/core/...`); lo atado al negocio de un solo servicio permanece en el **`internal/`** de ese backend (no se usa carpeta `pkgs/` en este monorepo)
 

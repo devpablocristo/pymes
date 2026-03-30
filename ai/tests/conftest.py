@@ -1,17 +1,38 @@
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 import types as _t
 
 
 def _ensure_runtime_package_stub() -> None:
-    if "runtime" not in sys.modules:
-        src = os.path.join(os.path.dirname(__file__), "..", "..", "..", "core", "ai", "python", "src")
+    src = os.path.join(os.path.dirname(__file__), "..", "..", "..", "core", "ai", "python", "src")
+    runtime_src = os.path.join(src, "runtime")
+    has_local_runtime = os.path.exists(os.path.join(runtime_src, "contexts.py"))
+
+    if has_local_runtime and src not in sys.path:
+        sys.path.insert(0, src)
+
+    if has_local_runtime and "runtime" not in sys.modules:
         runtime_pkg = _t.ModuleType("runtime")
-        runtime_pkg.__path__ = [os.path.join(src, "runtime")]
+        runtime_pkg.__path__ = [runtime_src]
         runtime_pkg.__package__ = "runtime"
         sys.modules["runtime"] = runtime_pkg
+        contracts_mod = importlib.import_module("runtime.domain.contracts")
+        for attr in (
+            "AIRequestContext",
+            "ALL_ROUTING_SOURCES",
+            "OUTPUT_KIND_CHAT_REPLY",
+            "OUTPUT_KIND_INSIGHT_NOTIFICATION",
+            "ROUTING_SOURCE_COPILOT_AGENT",
+            "ROUTING_SOURCE_ORCHESTRATOR",
+            "ROUTING_SOURCE_READ_FALLBACK",
+            "SERVICE_KIND_INSIGHT",
+            "is_known_routing_source",
+            "normalize_routing_source",
+        ):
+            setattr(runtime_pkg, attr, getattr(contracts_mod, attr))
 
     if "runtime.logging" not in sys.modules:
         logging_mod = _t.ModuleType("runtime.logging")

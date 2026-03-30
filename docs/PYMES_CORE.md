@@ -1,6 +1,6 @@
 # Pymes Core (transversal)
 
-Backend y runtime compartidos del producto. **Owner funcional**: dominio comercial y operativo que no pertenece a una sola vertical.
+Backend transversal del producto. **Owner funcional**: dominio comercial y operativo que no pertenece a una sola vertical.
 
 ## Ubicación
 
@@ -8,7 +8,6 @@ Backend y runtime compartidos del producto. **Owner funcional**: dominio comerci
 |------|-----|
 | `pymes-core/backend/` | API Go (Gin), migraciones SQL, `cmd/local` y `cmd/lambda` |
 | `pymes-core/shared/backend/` | Auth, app, middleware reutilizable por verticales |
-| `pymes-core/shared/ai/` | Runtime Python compartido con el servicio `ai/` |
 | `pymes-core/infra/` | Terraform / variables de despliegue del control plane |
 
 ## Módulos HTTP (`internal/`)
@@ -28,7 +27,7 @@ Además:
 
 ## Integración externa librería `core`
 
-El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). Detalle de criterios y `replace` locales: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.
+El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). El runtime reusable de AI también vive en `../../core/ai/python/src/runtime/`. Detalle de criterios y `replace` locales: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.
 
 Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-core/backend/docs/SAAS_CORE.md`**.
 

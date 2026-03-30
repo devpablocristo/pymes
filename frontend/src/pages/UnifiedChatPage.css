@@ -180,6 +180,13 @@
   margin-top: 0.2rem;
 }
 
+.cht__msg-submeta {
+  font-size: var(--text-2xs);
+  opacity: 0.72;
+  margin-bottom: 0.35rem;
+  word-break: break-word;
+}
+
 .cht__blocks {
   display: flex;
   flex-direction: column;
@@ -267,6 +274,104 @@
 
 .cht__insight-recommendation {
   font-size: var(--text-sm);
+}
+
+.cht__kpi-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cht__kpi-group-title,
+.cht__table-title {
+  font-weight: 700;
+}
+
+.cht__kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+}
+
+.cht__kpi-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme='dark'] .cht__kpi-item {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.cht__kpi-item-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.cht__kpi-item-value {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.cht__kpi-item-trend {
+  font-size: var(--text-2xs);
+  color: var(--color-text-muted);
+}
+
+.cht__kpi-item-trend--up {
+  color: var(--color-success, #16a34a);
+}
+
+.cht__kpi-item-trend--down {
+  color: var(--color-danger);
+}
+
+.cht__kpi-item-trend--flat {
+  color: var(--color-text-muted);
+}
+
+.cht__table-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cht__table-wrap {
+  overflow-x: auto;
+}
+
+.cht__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.cht__table th,
+.cht__table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cht__table th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+[data-theme='dark'] .cht__table th,
+[data-theme='dark'] .cht__table td {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.cht__table-empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .cht__pending-bar {

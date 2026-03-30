@@ -6,6 +6,8 @@ export type NotificationChatHandoff = {
   title: string;
   body: string;
   chatContext: Record<string, unknown>;
+  scope?: string;
+  routedAgent?: string;
 };
 
 /** Arma el primer mensaje al Asistente Pymes a partir del aviso y el JSON `chat_context`. */

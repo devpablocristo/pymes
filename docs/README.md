@@ -7,7 +7,7 @@
 | Documento | Contenido |
 |-----------|-----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Ownership, shared, bordes HTTP entre bounded contexts |
-| [AI_OWNERSHIP.md](./AI_OWNERSHIP.md) | Ownership IA del ecosistema: runtime compartido, assistant, insights, copilot, companion |
+| [AI_OWNERSHIP.md](./AI_OWNERSHIP.md) | Ownership IA del ecosistema: categorías `Agent`/`Service`, runtime reusable, `ProductAgent`, `DomainAgent`, `CopilotAgent`, `InsightService`, `GovernanceService` |
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [WHATSAPP_SETUP.md](./WHATSAPP_SETUP.md) | WhatsApp + Meta: env, webhook, conexión por org, opt-in; qué ya está y qué falta |
@@ -36,7 +36,7 @@ Integración detallada SaaS embebido: [../pymes-core/backend/docs/SAAS_CORE.md](
 | Postgres | servicio `postgres` | `5434` → 5432 |
 | MailHog | servicio `mailhog` | `8025`, `1025` |
 
-- `pymes-core/shared/`: runtime compartido del producto (Go + Python para AI)
+- `pymes-core/shared/`: código transversal del producto (principalmente backend/shared)
 - Librería **`core`** (`github.com/devpablocristo/core/...`): primitivas agnósticas vía `go.mod`; dominio Pymes en `internal/` de cada servicio (no hay `pkgs/` en este monorepo)
 - Documentación adicional bajo **`pymes-core/docs/`** (p. ej. anti-fraude); **`pymes-core/backend/docs/`** (SaaS embebido)
 

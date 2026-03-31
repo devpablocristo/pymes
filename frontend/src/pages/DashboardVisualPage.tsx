@@ -3,9 +3,13 @@
  * Usa los mismos endpoints que el sistema de widgets: /v1/dashboard-data/*
  */
 import { useQuery } from '@tanstack/react-query';
-import { IconArrowUp, IconArrowDown } from '../components/Icons';
+import {
+  IconAlert,
+  IconArrowDown,
+  IconArrowUp,
+  IconCalendar,
+} from '@devpablocristo/modules-ui-data-display/icons';
 import { apiRequest } from '../lib/api';
-import { IconCalendar, IconAlert } from '../components/Icons';
 import type {
   SalesSummaryData,
   CashflowSummaryData,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IconStar } from '../components/Icons';
+import { IconStar } from '@devpablocristo/modules-ui-data-display/icons';
 import './CryptoPage.css';
 
 type CryptoTab = 'wallet' | 'marketplace' | 'portfolio';

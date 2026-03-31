@@ -91,7 +91,9 @@ services:
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
       - ../modules/calendar/board/ts:/modules/calendar/board/ts
+      - ../modules/crud/ui/ts:/modules/crud/ui/ts
       - ../modules/sidebar/ts:/modules/sidebar/ts
+      - ../modules/ui/data-display/ts:/modules/ui/data-display/ts
     env_file:
       - .env
     environment:
@@ -117,6 +119,7 @@ services:
       - ./ai/src:/workspace/ai/src
       - ./ai/tests:/workspace/ai/tests
       - ./ai/pyproject.toml:/workspace/ai/pyproject.toml
+      - ../core/ai/python/src:/workspace/core/ai/python/src
 
     env_file:
       - .env
@@ -128,6 +131,7 @@ services:
       WORKSHOPS_BACKEND_URL: http://work-backend:8082
       BEAUTY_BACKEND_URL: http://beauty-backend:8083
       RESTAURANTS_BACKEND_URL: http://restaurants-backend:8084
+      PYTHONPATH: /workspace/core/ai/python/src:/workspace/ai
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}

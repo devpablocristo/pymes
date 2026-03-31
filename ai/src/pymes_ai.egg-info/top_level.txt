@@ -11,5 +11,4 @@ llm
 main
 middleware
 observability
-review_client
 tools

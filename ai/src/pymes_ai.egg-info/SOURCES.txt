@@ -72,8 +72,6 @@ src/pymes_ai.egg-info/SOURCES.txt
 src/pymes_ai.egg-info/dependency_links.txt
 src/pymes_ai.egg-info/requires.txt
 src/pymes_ai.egg-info/top_level.txt
-src/review_client/__init__.py
-src/review_client/client.py
 src/tools/__init__.py
 src/tools/accounts.py
 src/tools/appointments.py

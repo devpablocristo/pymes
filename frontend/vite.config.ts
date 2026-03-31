@@ -6,9 +6,13 @@ import react from '@vitejs/plugin-react';
 const calendarBoardEntry = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
 const calendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
 const calendarBoardRoot = fileURLToPath(new URL('../../modules/calendar/board/ts/src', import.meta.url));
+const crudCsvEntry = fileURLToPath(new URL('../../modules/crud/ui/ts/src/csv.ts', import.meta.url));
+const crudUiRoot = fileURLToPath(new URL('../../modules/crud/ui/ts/src', import.meta.url));
 const shellSidebarEntry = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
 const shellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
 const shellSidebarRoot = fileURLToPath(new URL('../../modules/sidebar/ts/src', import.meta.url));
+const uiDataDisplayIconsEntry = fileURLToPath(new URL('../../modules/ui/data-display/ts/src/icons.tsx', import.meta.url));
+const uiDataDisplayRoot = fileURLToPath(new URL('../../modules/ui/data-display/ts/src', import.meta.url));
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
 const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/daygrid', import.meta.url));
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
@@ -24,6 +28,8 @@ export default defineConfig({
       { find: '@devpablocristo/modules-shell-sidebar', replacement: shellSidebarEntry },
       { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: calendarBoardStyles },
       { find: '@devpablocristo/modules-calendar-board', replacement: calendarBoardEntry },
+      { find: '@devpablocristo/modules-crud-ui/csv', replacement: crudCsvEntry },
+      { find: '@devpablocristo/modules-ui-data-display/icons', replacement: uiDataDisplayIconsEntry },
       { find: '@fullcalendar/core', replacement: fullCalendarCore },
       { find: '@fullcalendar/daygrid', replacement: fullCalendarDayGrid },
       { find: '@fullcalendar/interaction', replacement: fullCalendarInteraction },
@@ -71,7 +77,7 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     fs: {
-      allow: [searchForWorkspaceRoot(process.cwd()), calendarBoardRoot, shellSidebarRoot],
+      allow: [searchForWorkspaceRoot(process.cwd()), calendarBoardRoot, crudUiRoot, shellSidebarRoot, uiDataDisplayRoot],
     },
     watch: {
       usePolling: true,

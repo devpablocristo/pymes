@@ -3,7 +3,7 @@
  * con navegación por estado interno.
  */
 import { useState, useCallback, useMemo } from 'react';
-import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
+import { IconClose, IconEdit, IconEye, IconTrash } from '@devpablocristo/modules-ui-data-display/icons';
 import './InvoicesPage.css';
 
 // ─── Tipos ───

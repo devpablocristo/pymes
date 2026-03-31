@@ -30,7 +30,7 @@ from runtime.rate_limit import RateLimitMiddleware, RateLimitSettings
 from runtime.logging import bind_request_context, clear_request_context, configure_logging, get_logger
 from src.api.review_callback import router as review_callback_router
 from src.observability.otel import configure_opentelemetry
-from src.review_client.client import ReviewClient
+from runtime.clients.review import ReviewClient, ReviewRequester
 
 settings = get_settings()
 configure_logging(settings.ai_log_level, json_logs=settings.ai_log_json)
@@ -107,6 +107,10 @@ async def lifespan(app: FastAPI):
         app.state.review_client = ReviewClient(
             base_url=settings.review_url,
             api_key=settings.review_api_key,
+            requester=ReviewRequester(
+                requester_id="pymes-ai",
+                requester_name="Pymes AI Service",
+            ),
         )
         logger.info("review_client_enabled", review_url=settings.review_url)
     else:

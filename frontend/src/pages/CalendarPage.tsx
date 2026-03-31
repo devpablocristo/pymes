@@ -4,7 +4,7 @@
  * FullCalendar con toolbar custom y estilos nativos.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { IconClose } from '../components/Icons';
+import { IconClose } from '@devpablocristo/modules-ui-data-display/icons';
 import FullCalendar from '@fullcalendar/react';
 import { CalendarSurface, resolveInitialTimeGridScrollTime, type CalendarView } from '@devpablocristo/modules-calendar-board';
 import type { EventInput, DateSelectArg, EventClickArg, EventApi, EventDropArg } from '@fullcalendar/core';

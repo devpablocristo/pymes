@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from src.review_client.client import ReviewClient
+from runtime.clients.review import ReviewClient
 
 logger = logging.getLogger(__name__)
 

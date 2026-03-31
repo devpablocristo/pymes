@@ -13,7 +13,7 @@ from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import orchestrate
 from src.core.system_prompt import build_system_prompt
 from src.db.repository import AIRepository
-from src.review_client.client import ReviewClient
+from runtime.clients.review import ReviewClient
 from runtime.types import LLMProvider, Message
 from runtime.logging import get_logger
 from runtime.text import estimate_tokens

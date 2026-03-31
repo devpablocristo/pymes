@@ -1,6 +1,6 @@
 import type { CrudFormField, CrudFormValues, CrudPageConfig, CrudToolbarAction } from '../components/CrudPage';
+import { buildCSV, downloadCSVFile, normalizeCSVFieldValue, parseCSV, pickCSVFile, type CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
 import { apiRequest, downloadAPIFile } from '../lib/api';
-import { buildCSV, downloadCSVFile, normalizeCSVFieldValue, parseCSV, pickCSVFile, type CSVColumn } from './csv';
 
 type CSVMode = 'client' | 'server';
 

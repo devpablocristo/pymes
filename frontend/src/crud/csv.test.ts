@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCSV, normalizeCSVFieldValue, parseCSV } from './csv';
+import { buildCSV, normalizeCSVFieldValue, parseCSV } from '@devpablocristo/modules-crud-ui/csv';
 
 describe('csv helpers', () => {
   it('builds CSV with BOM and escaped cells', () => {

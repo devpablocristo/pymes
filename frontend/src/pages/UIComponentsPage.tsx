@@ -2,7 +2,7 @@
  * Componentes UI — showcase de 19 categorías de componentes reutilizables.
  */
 import { useState } from 'react';
-import { IconStar } from '../components/Icons';
+import { IconStar } from '@devpablocristo/modules-ui-data-display/icons';
 import './UIComponentsPage.css';
 
 type Tab = 'alerts' | 'avatars' | 'badges' | 'buttons' | 'cards' | 'carousel' | 'colors' | 'dropdowns' | 'pagination' | 'progress' | 'radio' | 'rating' | 'switches' | 'tabs' | 'tags' | 'tooltips' | 'typography' | 'lists' | 'videos';

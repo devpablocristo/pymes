@@ -5,8 +5,8 @@ import re
 import logging
 from typing import Any
 
+from runtime.clients.review import ReviewClient
 from runtime.types import ToolDeclaration
-from src.review_client.client import ReviewClient
 
 logger = logging.getLogger(__name__)
 

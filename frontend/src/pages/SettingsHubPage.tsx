@@ -4,7 +4,19 @@
  */
 import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { IconEdit, IconTrash, IconUsers, IconDollar, IconAlert, IconBell, IconPalette, IconGlobe, IconCreditCard, IconSettings, IconBuilding } from '../components/Icons';
+import {
+  IconAlert,
+  IconBell,
+  IconBuilding,
+  IconCreditCard,
+  IconDollar,
+  IconEdit,
+  IconGlobe,
+  IconPalette,
+  IconSettings,
+  IconTrash,
+  IconUsers,
+} from '@devpablocristo/modules-ui-data-display/icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
 import { LanguageSelector } from '../components/LanguageSelector';
 import './SettingsHubPage.css';

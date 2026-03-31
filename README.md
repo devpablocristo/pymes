@@ -26,7 +26,7 @@ make up
 
 Prerequisitos locales:
 
-- Node `20.17.0` para `frontend/` (`frontend/.nvmrc` fija esa versión para alinear local, CI y builds auxiliares).
+- Node `20.19.0` para `frontend/` (`frontend/.nvmrc` fija esa versión para alinear local, CI y builds auxiliares).
 - `ENVIRONMENT=development` en backends Go y `AI_ENVIRONMENT=development` en AI para desarrollo local.
 
 Notas operativas del hardening:

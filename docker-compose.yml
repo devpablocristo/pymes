@@ -41,8 +41,8 @@ services:
   cp-backend:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/pymes-core/backend/Dockerfile.dev
+      context: .
+      dockerfile: ./pymes-core/backend/Dockerfile.dev
     ports:
       - "8100:8080"
     volumes:
@@ -107,8 +107,8 @@ services:
   ai:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/ai/Dockerfile.dev
+      context: .
+      dockerfile: ./ai/Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
@@ -142,8 +142,8 @@ services:
   prof-backend:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/professionals/backend/Dockerfile.dev
+      context: .
+      dockerfile: ./professionals/backend/Dockerfile.dev
     ports:
       - "8181:8081"
     volumes:
@@ -171,8 +171,8 @@ services:
   work-backend:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/workshops/backend/Dockerfile.dev
+      context: .
+      dockerfile: ./workshops/backend/Dockerfile.dev
     ports:
       - "8282:8082"
     volumes:
@@ -204,8 +204,8 @@ services:
   beauty-backend:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/beauty/backend/Dockerfile.dev
+      context: .
+      dockerfile: ./beauty/backend/Dockerfile.dev
     ports:
       - "8383:8083"
     volumes:
@@ -233,8 +233,8 @@ services:
   restaurants-backend:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: ./pymes/restaurants/backend/Dockerfile.dev
+      context: .
+      dockerfile: ./restaurants/backend/Dockerfile.dev
     ports:
       - "8484:8084"
     volumes:

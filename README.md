@@ -26,8 +26,14 @@ make up
 
 Prerequisitos locales:
 
-- Node `>= 20.9.0` para `frontend/` (`.nvmrc` fijado en `20.9.0`; Clerk ya exige esa base).
+- Node `20.17.0` para `frontend/` (`frontend/.nvmrc` fija esa versión para alinear local, CI y builds auxiliares).
 - `ENVIRONMENT=development` en backends Go y `AI_ENVIRONMENT=development` en AI para desarrollo local.
+
+Notas operativas del hardening:
+
+- `docker-compose.yml` ahora builda servicios propios con `context: .` y el repo tiene `.dockerignore`, para no enviar el árbol padre completo al daemon.
+- `ai/requirements.txt` contiene solo runtime; `ai/requirements-dev.txt` agrega `pytest`, `pytest-asyncio` y `ruff` para CI/desarrollo.
+- El frontend mantiene `package-lock.json` y en CI usa `npm ci` para reducir drift.
 
 **Flujo habitual:** todo el stack en **contenedores** (`make up`); no hace falta levantar backends ni el frontend como procesos nativos en el host.
 

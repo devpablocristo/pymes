@@ -50,7 +50,7 @@ export default defineConfig({
             if (id.includes('@devpablocristo/core-browser') || id.includes('@devpablocristo/core-http')) {
               return 'vendor-core';
             }
-            return 'vendor';
+            return undefined;
           }
           return undefined;
         },

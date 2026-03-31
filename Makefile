@@ -10,7 +10,7 @@ GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablo
 staticcheck:
 	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
 
-# Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements.txt` o ruff en PATH
+# Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements-dev.txt` o ruff en PATH
 ruff:
 	cd ai && (test -x .venv/bin/ruff && .venv/bin/ruff check src || ruff check src || python3 -m ruff check src)
 

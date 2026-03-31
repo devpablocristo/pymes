@@ -9,9 +9,8 @@ from pathlib import Path
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[2]
     ai_root = repo_root / "ai"
-    core_runtime_src = repo_root.parent / "core" / "ai" / "python" / "src"
 
-    pythonpath_entries = [str(core_runtime_src), str(ai_root)]
+    pythonpath_entries = [str(ai_root)]
     existing_pythonpath = os.environ.get("PYTHONPATH", "")
     if existing_pythonpath:
         pythonpath_entries.append(existing_pythonpath)
@@ -19,8 +18,6 @@ def main() -> int:
 
     if str(ai_root) not in sys.path:
         sys.path.insert(0, str(ai_root))
-    if str(core_runtime_src) not in sys.path:
-        sys.path.insert(0, str(core_runtime_src))
 
     from src.main import app
 

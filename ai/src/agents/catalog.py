@@ -8,6 +8,7 @@ try:
         ROUTING_SOURCE_COPILOT_AGENT,
         ROUTING_SOURCE_ORCHESTRATOR,
         ROUTING_SOURCE_READ_FALLBACK,
+        ROUTING_SOURCE_UI_HINT,
         is_known_routing_source,
         normalize_routing_source,
     )
@@ -15,10 +16,12 @@ except ImportError:
     ROUTING_SOURCE_COPILOT_AGENT: Final[str] = "copilot_agent"
     ROUTING_SOURCE_ORCHESTRATOR: Final[str] = "orchestrator"
     ROUTING_SOURCE_READ_FALLBACK: Final[str] = "read_fallback"
+    ROUTING_SOURCE_UI_HINT: Final[str] = "ui_hint"
     ALL_ROUTING_SOURCES: Final[tuple[str, ...]] = (
         ROUTING_SOURCE_COPILOT_AGENT,
         ROUTING_SOURCE_ORCHESTRATOR,
         ROUTING_SOURCE_READ_FALLBACK,
+        ROUTING_SOURCE_UI_HINT,
     )
 
     def is_known_routing_source(name: str | None) -> bool:

@@ -10,11 +10,11 @@ La topologia activa hoy es:
 - `beauty/backend`: vertical `beauty` — salón (equipo, servicios)
 - `restaurants/backend`: vertical `restaurants` — zonas, mesas, sesiones de mesa
 - `frontend`: consola React unificada para core y verticales
-- `ai`: servicio FastAPI unificado (chat transversal vía `POST /v1/chat`, notificaciones AI vía `POST /v1/notifications`, dominios `professionals/teachers` y `workshops/auto_repair`)
-- `pymes-core/shared/`: runtime compartido del producto (backend + AI)
+- `ai`: servicio FastAPI unificado (chat transversal vía `POST /v1/chat`, notificaciones factuales de insights vía `POST /v1/notifications`, handoff explícito a `copilot` desde notificaciones, contratos preparados para `preferred_language`/`content_language`, dominios `professionals/teachers` y `workshops/auto_repair`)
+- `pymes-core/shared/`: código transversal del producto (principalmente backend/shared; no es owner del runtime AI reusable)
 - Código reutilizable **agnóstico** vive en la librería **`core`** (módulos `github.com/devpablocristo/core/...`); lo atado al negocio de un solo servicio permanece en el **`internal/`** de ese backend (no se usa carpeta `pkgs/` en este monorepo)
 
-No existen deployables `pymes-core/ai` ni `professionals/ai`. El unico runtime AI vive en `ai/` y reutiliza piezas compartidas desde `pymes-core/shared/ai`.
+No existen deployables `pymes-core/ai` ni `professionals/ai`. El único runtime AI del producto vive en `ai/`; el runtime reusable efectivo está en la librería `core`, y `pymes-core/shared/` no debe reintroducir un runtime AI paralelo.
 
 ## Inicio rapido
 

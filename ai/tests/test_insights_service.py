@@ -120,13 +120,14 @@ async def test_build_sales_collections_insight_returns_structured_summary() -> N
     )
 
     assert result.scope == "sales_collections"
-    assert result.period.label == "custom"
+    assert result.period.label == "este período"
     assert result.comparison_period is not None
     assert "variación de +25.0%" in result.summary
     assert result.kpis[0].key == "total_sales"
     assert result.kpis[0].delta_pct == 25.0
     assert result.top_customers[0].customer_name == "Acme"
     assert result.top_customers[0].share_pct == 45.0
+    assert result.payment_mix[0].payment_method == "Efectivo"
     assert result.payment_mix[0].share_pct == 60.0
     assert result.debtors[0].party_name == "Cliente Uno"
     assert any(item.title == "Concentración de ingresos" for item in result.highlights)

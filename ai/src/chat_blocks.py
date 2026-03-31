@@ -27,6 +27,34 @@ def build_confirm_actions_block(actions: list[str]) -> dict[str, Any]:
     }
 
 
+def build_route_selection_block(
+    *,
+    original_message: str,
+    route_options: list[tuple[str, str]],
+    selection_behavior: str = "route_and_resend",
+) -> dict[str, Any]:
+    clean_message = original_message.strip()
+    actions: list[dict[str, Any]] = []
+    for route_hint, label in route_options:
+        if not route_hint.strip() or not label.strip():
+            continue
+        actions.append(
+            {
+                "id": f"clarify_route_{route_hint.strip()}",
+                "label": label.strip(),
+                "kind": "send_message",
+                "message": clean_message,
+                "route_hint": route_hint.strip(),
+                "selection_behavior": selection_behavior,
+                "style": "secondary",
+            }
+        )
+    return {
+        "type": "actions",
+        "actions": actions,
+    }
+
+
 def build_insight_card_block(
     *,
     title: str,

@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     ai_internal_rpm: int = 120
     ai_external_rpm: int = 60
+    ai_enforce_plan_limits: bool = True
     otel_service_name: str = "pymes-ai"
     otel_exporter_otlp_endpoint: str = ""
 

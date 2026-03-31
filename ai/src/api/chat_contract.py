@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Annotated, Literal
 
 from pydantic import AliasChoices, BaseModel, Field
-from runtime import OUTPUT_KIND_CHAT_REPLY
+
+from src.localization import LanguageCode
+from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
 
 
 class ChatRequest(BaseModel):
@@ -14,6 +16,20 @@ class ChatRequest(BaseModel):
     )
     message: str = Field(min_length=1, max_length=4000)
     confirmed_actions: list[str] = Field(default_factory=list)
+    route_hint: "ChatRouteHint | None" = Field(
+        default=None,
+        description=(
+            "Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. "
+            "`copilot` queda reservado para handoff explícito desde notificaciones."
+        ),
+    )
+    preferred_language: LanguageCode | None = Field(
+        default=None,
+        description=(
+            "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; "
+            "si falta o no se soporta, el backend cae a español."
+        ),
+    )
 
 
 class ChatAction(BaseModel):
@@ -22,6 +38,8 @@ class ChatAction(BaseModel):
     kind: Literal["send_message", "open_url", "confirm_action"]
     style: Literal["primary", "secondary", "ghost"] = "secondary"
     message: str | None = None
+    route_hint: "ChatRouteHint | None" = None
+    selection_behavior: Literal["route_and_resend", "prompt_for_query"] | None = None
     url: str | None = None
     confirmed_actions: list[str] = Field(default_factory=list)
 
@@ -78,12 +96,17 @@ ChatBlock = Annotated[
 
 
 RoutedAgent = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
-RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback"]
+ChatRouteHint = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
+RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback", "ui_hint"]
 
 
 class ChatResponse(BaseModel):
     request_id: str
     output_kind: Literal["chat_reply"] = Field(default=OUTPUT_KIND_CHAT_REPLY)
+    content_language: LanguageCode = Field(
+        default="es",
+        description="Idioma efectivo del contenido devuelto por el backend para este turno.",
+    )
     chat_id: str = Field(serialization_alias="chat_id")
     reply: str
     tokens_used: int
@@ -92,7 +115,10 @@ class ChatResponse(BaseModel):
     blocks: list[ChatBlock] = Field(default_factory=list)
     routed_agent: RoutedAgent = Field(
         ...,
-        description="Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras",
+        description=(
+            "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. "
+            "`copilot` se usa solo en handoff explícito desde notificaciones."
+        ),
     )
     routed_mode: RoutedAgent = Field(
         ...,
@@ -100,5 +126,5 @@ class ChatResponse(BaseModel):
     )
     routing_source: RoutingSource = Field(
         ...,
-        description="Origen efectivo del turno: copilot_agent | orchestrator | read_fallback",
+        description="Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint",
     )

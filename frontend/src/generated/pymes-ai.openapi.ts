@@ -268,6 +268,10 @@ export interface components {
             style: "primary" | "secondary" | "ghost";
             /** Message */
             message?: string | null;
+            /** Route Hint */
+            route_hint?: ("general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras") | null;
+            /** Selection Behavior */
+            selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Url */
             url?: string | null;
             /** Confirmed Actions */
@@ -339,6 +343,13 @@ export interface components {
              * @constant
              */
             output_kind: "chat_reply";
+            /**
+             * Content Language
+             * @description Idioma efectivo del contenido devuelto por el backend para este turno.
+             * @default es
+             * @enum {string}
+             */
+            content_language: "es" | "en";
             /** Chat Id */
             chat_id: string;
             /** Reply */
@@ -353,7 +364,7 @@ export interface components {
             blocks?: (components["schemas"]["ChatTextBlock"] | components["schemas"]["ChatActionsBlock"] | components["schemas"]["ChatInsightCardBlock"] | components["schemas"]["ChatKpiGroupBlock"] | components["schemas"]["ChatTableBlock"])[];
             /**
              * Routed Agent
-             * @description Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras
+             * @description Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff explícito desde notificaciones.
              * @enum {string}
              */
             routed_agent: "general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras";
@@ -365,10 +376,10 @@ export interface components {
             routed_mode: "general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras";
             /**
              * Routing Source
-             * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback
+             * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint
              * @enum {string}
              */
-            routing_source: "copilot_agent" | "orchestrator" | "read_fallback";
+            routing_source: "copilot_agent" | "orchestrator" | "read_fallback" | "ui_hint";
         };
         /** ChatTableBlock */
         ChatTableBlock: {
@@ -534,6 +545,12 @@ export interface components {
              * @constant
              */
             routed_agent: "copilot";
+            /**
+             * Content Language
+             * @default es
+             * @enum {string}
+             */
+            content_language: "es" | "en";
         };
         /** NotificationItem */
         NotificationItem: {
@@ -555,6 +572,12 @@ export interface components {
             entity_type: "insight";
             /** Entity Id */
             entity_id: string;
+            /**
+             * Content Language
+             * @default es
+             * @enum {string}
+             */
+            content_language: "es" | "en";
             chat_context: components["schemas"]["NotificationChatContext"];
             /** Created At */
             created_at: string;
@@ -583,6 +606,11 @@ export interface components {
              * @default 5
              */
             top_limit: number;
+            /**
+             * Preferred Language
+             * @description Idioma preferido para el contenido generado por el servicio. Hoy el backend normaliza sobre `es|en` y, si falta traducción, responde en español.
+             */
+            preferred_language?: ("es" | "en") | null;
         };
         /** NotificationsResponse */
         NotificationsResponse: {
@@ -600,6 +628,13 @@ export interface components {
              * @constant
              */
             output_kind: "insight_notification";
+            /**
+             * Content Language
+             * @description Idioma efectivo del contenido visible devuelto por este lote de notificaciones.
+             * @default es
+             * @enum {string}
+             */
+            content_language: "es" | "en";
             /** Items */
             items?: components["schemas"]["NotificationItem"][];
         };
@@ -672,6 +707,16 @@ export interface components {
             message: string;
             /** Confirmed Actions */
             confirmed_actions?: string[];
+            /**
+             * Route Hint
+             * @description Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. `copilot` queda reservado para handoff explícito desde notificaciones.
+             */
+            route_hint?: ("general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras") | null;
+            /**
+             * Preferred Language
+             * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.
+             */
+            preferred_language?: ("es" | "en") | null;
         };
         /** PublicChatRequest */
         src__api__public_router__PublicChatRequest: {
@@ -683,7 +728,7 @@ export interface components {
             phone?: string | null;
         };
         /** ChatRequest */
-        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
+        src__domains__professionals__teachers__internal_router__ChatRequest: {
             /** Message */
             message: string;
         };
@@ -953,7 +998,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChatRequest"];
+                "application/json": components["schemas"]["src__domains__professionals__teachers__internal_router__ChatRequest"];
             };
         };
         responses: {
@@ -1021,7 +1066,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["src__domains__workshops__auto_repair__internal_router__ChatRequest"];
+                "application/json": components["schemas"]["ChatRequest"];
             };
         };
         responses: {

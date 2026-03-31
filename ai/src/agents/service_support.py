@@ -15,6 +15,7 @@ from src.core.internal_conversations import can_access_internal_conversation, ge
 from runtime.types import ToolDeclaration
 from src.db.repository import AIRepository
 from runtime.logging import get_logger
+from src.runtime_contracts import DEFAULT_LANGUAGE_CODE
 from src.tools import (
     accounts,
     appointments,
@@ -58,6 +59,7 @@ class CommercialChatResult:
     blocks: list[dict[str, Any]] = field(default_factory=list)
     routed_agent: str | None = None
     routing_source: str | None = None
+    content_language: str = DEFAULT_LANGUAGE_CODE
 
     @property
     def tokens_used(self) -> int:

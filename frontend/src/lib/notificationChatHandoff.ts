@@ -8,6 +8,7 @@ export type NotificationChatHandoff = {
   chatContext: Record<string, unknown>;
   scope?: string;
   routedAgent?: string;
+  contentLanguage?: string;
 };
 
 /** Arma el primer mensaje al Asistente Pymes a partir del aviso y el JSON `chat_context`. */

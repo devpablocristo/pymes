@@ -52,6 +52,7 @@ export async function createInsightNotifications(payload?: {
   period?: 'today' | 'week' | 'month';
   compare?: boolean;
   top_limit?: number;
+  preferred_language?: 'es' | 'en';
 }): Promise<InsightNotificationsResponse> {
   return request('/v1/notifications', aiOptions({ method: 'POST', body: payload ?? {} }));
 }

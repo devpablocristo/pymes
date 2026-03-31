@@ -189,6 +189,10 @@ def _match_insight_request(message: str) -> _InsightRequest | None:
     return None
 
 
+def looks_like_copilot_insight_request(message: str) -> bool:
+    return _match_insight_request(message) is not None
+
+
 def _format_scope_label(scope: str, filters: InsightFilters) -> str:
     scope_labels = {
         "sales_collections": "Ventas y cobranzas",
@@ -331,7 +335,9 @@ async def maybe_build_copilot_response(
     backend_client: BackendClient,
     auth: AuthContext,
     user_message: str,
+    preferred_language: str | None = None,
 ) -> CopilotResponse | None:
+    _ = preferred_language
     request = _match_insight_request(user_message)
     if request is None:
         return None

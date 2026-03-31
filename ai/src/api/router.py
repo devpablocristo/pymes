@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.agents.catalog import normalize_routed_agent, normalize_routing_source
 from src.agents.service import run_internal_orchestrated_chat
@@ -11,9 +11,11 @@ from src.api.chat_contract import ChatRequest, ChatResponse
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
+from src.config import get_settings
 from src.db.repository import AIRepository
-from runtime import OUTPUT_KIND_CHAT_REPLY
 from runtime.logging import get_logger, get_request_id
+from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
+from src.localization import resolve_preferred_language
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
 logger = get_logger(__name__)
@@ -26,8 +28,11 @@ PLAN_LIMITS: dict[str, dict[str, int | bool]] = {
 
 
 async def check_quota(repo: AIRepository, org_id: str, mode: str) -> str:
+    settings = get_settings()
     now = datetime.now(UTC)
     plan = await repo.get_plan_code(org_id)
+    if not settings.ai_enforce_plan_limits:
+        return plan
     limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
     usage = await repo.get_month_usage(org_id, now.year, now.month)
 
@@ -46,12 +51,17 @@ async def check_quota(repo: AIRepository, org_id: str, mode: str) -> str:
 @router.post("", response_model=ChatResponse)
 async def chat_internal(
     req: ChatRequest,
+    request: Request,
     repo: AIRepository = Depends(get_repository),
     auth: AuthContext = Depends(get_auth_context),
     llm=Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
     request_id = get_request_id() or str(uuid4())
+    preferred_language = resolve_preferred_language(
+        req.preferred_language,
+        accept_language=request.headers.get("Accept-Language"),
+    )
     await check_quota(repo, auth.org_id, mode="internal")
     logger.info(
         "chat_internal_started",
@@ -60,6 +70,8 @@ async def chat_internal(
         user_id=auth.actor,
         conversation_id=req.chat_id or "",
         endpoint_kind="chat_json",
+        route_hint=req.route_hint or "",
+        preferred_language=preferred_language,
     )
     try:
         result = await run_internal_orchestrated_chat(
@@ -71,6 +83,8 @@ async def chat_internal(
             conversation_id=req.chat_id,
             auth=auth,
             confirmed_actions=req.confirmed_actions,
+            route_hint=req.route_hint,
+            preferred_language=preferred_language,
         )
     except HTTPException:
         raise
@@ -93,6 +107,7 @@ async def chat_internal(
     return ChatResponse(
         request_id=request_id,
         output_kind=OUTPUT_KIND_CHAT_REPLY,
+        content_language=result.content_language,
         chat_id=result.conversation_id,
         reply=result.reply,
         tokens_used=result.tokens_used,

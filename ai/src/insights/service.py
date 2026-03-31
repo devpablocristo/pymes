@@ -35,6 +35,30 @@ from src.insights.repository import InsightsRepository
 logger = get_logger(__name__)
 T = TypeVar("T")
 
+_PERIOD_LABELS = {
+    "today": "hoy",
+    "week": "esta semana",
+    "month": "este mes",
+    "custom": "este período",
+    "previous_period": "el período anterior",
+}
+
+_PAYMENT_METHOD_LABELS = {
+    "cash": "Efectivo",
+    "card": "Tarjeta",
+    "credit_card": "Tarjeta de crédito",
+    "debit_card": "Tarjeta de débito",
+    "transfer": "Transferencia",
+    "bank_transfer": "Transferencia bancaria",
+    "wallet": "Billetera virtual",
+    "mercado_pago": "Mercado Pago",
+    "check": "Cheque",
+    "account": "Cuenta corriente",
+    "account_balance": "Cuenta corriente",
+    "other": "Otro",
+    "unknown": "Sin especificar",
+}
+
 
 class InsightsService:
     def __init__(self, repository: InsightsRepository) -> None:
@@ -412,26 +436,38 @@ class InsightsService:
             top_customers=top_customers,
         )
 
+    def _leading_period_phrase(self, period: InsightPeriod) -> str:
+        label = period.label.strip()
+        if not label:
+            return "Este período"
+        if label.startswith(("hoy", "esta ", "este ", "el ")):
+            return label[:1].upper() + label[1:]
+        return f"En {label}"
+
     def _resolve_period(self, filters: InsightFilters) -> InsightPeriod:
         if filters.from_date is not None and filters.to_date is not None:
-            return InsightPeriod(label="custom", from_date=filters.from_date, to_date=filters.to_date)
+            return InsightPeriod(label=_PERIOD_LABELS["custom"], from_date=filters.from_date, to_date=filters.to_date)
 
         today = datetime.now(UTC).date()
-        label = (filters.period or "month").strip().lower()
-        if label == "today":
+        period_key = (filters.period or "month").strip().lower()
+        if period_key == "today":
             start = today
-        elif label == "week":
+        elif period_key == "week":
             start = today - timedelta(days=today.weekday())
         else:
-            label = "month"
+            period_key = "month"
             start = date(today.year, today.month, 1)
-        return InsightPeriod(label=label, from_date=start, to_date=today)
+        return InsightPeriod(label=_PERIOD_LABELS[period_key], from_date=start, to_date=today)
 
     def _resolve_comparison_period(self, period: InsightPeriod) -> InsightPeriod:
         span_days = (period.to_date - period.from_date).days + 1
         comparison_to = period.from_date - timedelta(days=1)
         comparison_from = comparison_to - timedelta(days=span_days - 1)
-        return InsightPeriod(label="previous_period", from_date=comparison_from, to_date=comparison_to)
+        return InsightPeriod(
+            label=_PERIOD_LABELS["previous_period"],
+            from_date=comparison_from,
+            to_date=comparison_to,
+        )
 
     def _metric(
         self,
@@ -489,13 +525,19 @@ class InsightsService:
             share = 0.0 if base <= 0 else (payment.total / base) * 100
             items.append(
                 PaymentMethodInsight(
-                    payment_method=payment.payment_method,
+                    payment_method=self._human_payment_method_label(payment.payment_method),
                     total=payment.total,
                     count=payment.count,
                     share_pct=round(share, 2),
                 )
             )
         return items
+
+    def _human_payment_method_label(self, payment_method: str) -> str:
+        normalized = payment_method.strip().lower()
+        if not normalized:
+            return "Sin especificar"
+        return _PAYMENT_METHOD_LABELS.get(normalized, payment_method.replace("_", " ").capitalize())
 
     def _build_debtors(self, debtors: list[DebtorSnapshot], limit: int) -> list[DebtorInsight]:
         ranked = sorted(debtors, key=lambda debtor: (-debtor.total_debt, debtor.oldest_date))
@@ -582,7 +624,7 @@ class InsightsService:
         if sales_delta_pct is not None:
             delta_fragment = f", con una variación de {sales_delta_pct:+.1f}% vs el período anterior"
         return (
-            f"En {period.label} acumulás {self._money(current_sales.total_sales)} en ventas "
+            f"{self._leading_period_phrase(period)} acumulás {self._money(current_sales.total_sales)} en ventas "
             f"repartidas en {current_sales.count_sales} operaciones, con ticket promedio de "
             f"{self._money(current_sales.average_ticket)}{delta_fragment}. "
             f"El balance de caja del período es {self._money(current_cashflow.balance)} "
@@ -606,7 +648,7 @@ class InsightsService:
         if margin_delta_pct is not None:
             delta_fragment = f", con variación de {margin_delta_pct:+.1f}% vs el período anterior"
         return (
-            f"En {period.label} el margen bruto es {current_margin.margin_pct:.1f}% "
+            f"{self._leading_period_phrase(period)} el margen bruto es {current_margin.margin_pct:.1f}% "
             f"sobre ingresos por {self._money(current_margin.revenue)}, con ganancia bruta de "
             f"{self._money(current_margin.gross_profit)}{delta_fragment}. "
             f"La valuación actual del inventario es {self._money(inventory_total)} "
@@ -629,7 +671,7 @@ class InsightsService:
         if repeat_rate_delta is not None:
             delta_fragment = f", con variación de {repeat_rate_delta:+.1f}% vs el período anterior"
         return (
-            f"En {period.label} la base total es de {customer_base} clientes. "
+            f"{self._leading_period_phrase(period)} la base total es de {customer_base} clientes. "
             f"Estuvieron activos {active_customers}, de los cuales {repeat_customers} son recurrentes "
             f"({repeat_rate:.1f}%){delta_fragment}. "
             f"Quedan {inactive_customers} clientes sin actividad en el período."

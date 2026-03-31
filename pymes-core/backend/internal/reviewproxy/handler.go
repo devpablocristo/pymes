@@ -1,6 +1,7 @@
 package reviewproxy
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -10,13 +11,24 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy/handler/dto"
 )
 
+type reviewClient interface {
+	ListPolicies(ctx context.Context) (int, []byte, error)
+	CreatePolicy(ctx context.Context, body any) (int, []byte, error)
+	UpdatePolicy(ctx context.Context, id string, updates any) (int, []byte, error)
+	DeletePolicy(ctx context.Context, id string) (int, error)
+	ListActionTypes(ctx context.Context) (int, []byte, error)
+	ListPendingApprovals(ctx context.Context) (int, []byte, error)
+	Approve(ctx context.Context, id string, body any) (int, []byte, error)
+	Reject(ctx context.Context, id string, body any) (int, []byte, error)
+}
+
 // Handler proxies requests del frontend a Nexus Review API.
 type Handler struct {
-	client *Client
+	client reviewClient
 }
 
 // NewHandler crea un nuevo handler de review proxy.
-func NewHandler(client *Client) *Handler {
+func NewHandler(client reviewClient) *Handler {
 	return &Handler{client: client}
 }
 
@@ -151,8 +163,11 @@ func (h *Handler) listActionTypes(c *gin.Context) {
 func (h *Handler) listPendingApprovals(c *gin.Context) {
 	status, data, err := h.client.ListPendingApprovals(c.Request.Context())
 	if err != nil {
-		log.Error().Err(err).Msg("review proxy: list pending approvals failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		// La bandeja de notificaciones usa approvals como señal opcional.
+		// Si Review no está disponible en local o en entornos sin governance,
+		// devolvemos lista vacía para no degradar toda la pantalla.
+		log.Warn().Err(err).Msg("review proxy: list pending approvals unavailable, returning empty list")
+		c.JSON(http.StatusOK, dto.ApprovalListResponse{Approvals: []dto.ApprovalResponse{}, Total: 0})
 		return
 	}
 	c.Data(status, "application/json", data)

@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 
 from src.agents.review_gate import evaluate_action
 from src.backend_client.client import BackendClient
+from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context
 from runtime.orchestrator import orchestrate
 from src.core.system_prompt import build_system_prompt
@@ -95,8 +96,11 @@ async def get_external_conversation(
 async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -> None:
     from src.api.router import PLAN_LIMITS  # local import to avoid router cycle at import time
 
+    settings = get_settings()
     now = datetime.now(UTC)
     plan = await repo.get_plan_code(org_id)
+    if not settings.ai_enforce_plan_limits:
+        return
     limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
     external_limit = int(limits["external_limit"])
     if external_limit == -1:

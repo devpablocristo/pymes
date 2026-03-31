@@ -357,7 +357,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
+                "$ref": "#/components/schemas/src__domains__professionals__teachers__internal_router__ChatRequest"
               }
             }
           },
@@ -447,7 +447,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__internal_router__ChatRequest"
+                "$ref": "#/components/schemas/ChatRequest"
               }
             }
           },
@@ -661,6 +661,41 @@
             ],
             "title": "Message"
           },
+          "route_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "copilot",
+                  "clientes",
+                  "productos",
+                  "ventas",
+                  "cobros",
+                  "compras"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Hint"
+          },
+          "selection_behavior": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "route_and_resend",
+                  "prompt_for_query"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Behavior"
+          },
           "url": {
             "anyOf": [
               {
@@ -867,6 +902,16 @@
             "title": "Output Kind",
             "default": "chat_reply"
           },
+          "content_language": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Content Language",
+            "description": "Idioma efectivo del contenido devuelto por el backend para este turno.",
+            "default": "es"
+          },
           "chat_id": {
             "type": "string",
             "title": "Chat Id"
@@ -938,7 +983,7 @@
               "compras"
             ],
             "title": "Routed Agent",
-            "description": "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras"
+            "description": "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff expl\u00edcito desde notificaciones."
           },
           "routed_mode": {
             "type": "string",
@@ -959,10 +1004,11 @@
             "enum": [
               "copilot_agent",
               "orchestrator",
-              "read_fallback"
+              "read_fallback",
+              "ui_hint"
             ],
             "title": "Routing Source",
-            "description": "Origen efectivo del turno: copilot_agent | orchestrator | read_fallback"
+            "description": "Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint"
           }
         },
         "type": "object",
@@ -1479,6 +1525,15 @@
             "type": "string",
             "const": "copilot",
             "title": "Routed Agent"
+          },
+          "content_language": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Content Language",
+            "default": "es"
           }
         },
         "type": "object",
@@ -1516,6 +1571,15 @@
           "entity_id": {
             "type": "string",
             "title": "Entity Id"
+          },
+          "content_language": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Content Language",
+            "default": "es"
           },
           "chat_context": {
             "$ref": "#/components/schemas/NotificationChatContext"
@@ -1567,6 +1631,22 @@
             "minimum": 1.0,
             "title": "Top Limit",
             "default": 5
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "es",
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language",
+            "description": "Idioma preferido para el contenido generado por el servicio. Hoy el backend normaliza sobre `es|en` y, si falta traducci\u00f3n, responde en espa\u00f1ol."
           }
         },
         "type": "object",
@@ -1589,6 +1669,16 @@
             "const": "insight_notification",
             "title": "Output Kind",
             "default": "insight_notification"
+          },
+          "content_language": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Content Language",
+            "description": "Idioma efectivo del contenido visible devuelto por este lote de notificaciones.",
+            "default": "es"
           },
           "items": {
             "items": {
@@ -1818,6 +1908,43 @@
             },
             "type": "array",
             "title": "Confirmed Actions"
+          },
+          "route_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "copilot",
+                  "clientes",
+                  "productos",
+                  "ventas",
+                  "cobros",
+                  "compras"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Hint",
+            "description": "Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. `copilot` queda reservado para handoff expl\u00edcito desde notificaciones."
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "es",
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language",
+            "description": "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a espa\u00f1ol."
           }
         },
         "type": "object",
@@ -1863,7 +1990,7 @@
         ],
         "title": "PublicChatRequest"
       },
-      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
+      "src__domains__professionals__teachers__internal_router__ChatRequest": {
         "properties": {
           "message": {
             "type": "string",

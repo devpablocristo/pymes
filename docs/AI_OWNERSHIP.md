@@ -58,6 +58,20 @@ flowchart LR
 | `Agent` | superficies conversacionales o ejecutoras que razonan y actúan con contexto del producto |
 | `Service` | capacidades de soporte, análisis, governance u orquestación usadas por agentes o productos |
 
+## Canales de interacción
+
+| Canal / modo | Qué significa | Qué no implica |
+|--------------|---------------|----------------|
+| `chat interno` | canal conversacional para usuarios internos del negocio | no define por sí solo si responde un `ProductAgent`, un `DomainAgent`, un `CopilotAgent` o una salida determinística |
+| `chat externo` | canal conversacional para clientes o contactos externos con superficie acotada | no reemplaza APIs públicas o flujos especializados del producto |
+| `streaming` | modo de entrega incremental de la respuesta | no es un canal ni una capacidad de negocio aparte |
+
+Regla práctica:
+
+- el **chat** es un canal de entrada/salida
+- el **streaming** es un modo de entrega
+- `CopilotAgent` e `InsightService` son **capacidades** del producto, no sinónimos de chat
+
 ## Categorías de `Agent`
 
 | Tipo | Rol | Vive en |
@@ -86,6 +100,7 @@ flowchart LR
 - `blocks`: salida estructurada reusable para UI
 - `tool_calls`: tools ejecutadas o propuestas
 - `pending_confirmations`: confirmaciones pendientes antes de actuar
+- `content_language`: idioma efectivo del contenido devuelto; puede diferir de `preferred_language` mientras un catálogo todavía no esté implementado
 - `routed_agent`: categoría o agente efectivo que resolvió el turno
 - `routing_source`: origen del routing (`copilot_agent`, `orchestrator`, `read_fallback`, etc.)
 
@@ -94,6 +109,7 @@ flowchart LR
 - `request_id`: identificador de correlación de la operación
 - `service_kind`: categoría canónica en formato wire (`insight_service`, `governance_service`, `synthesis_service`, `intelligence_service`)
 - `output_kind`: tipo concreto de salida (`chat_reply`, `insight_summary`, `copilot_explanation`, `governance_decision`, `llm_artifact`, etc.) cuando exista un output transversal ya tipificado
+- `content_language`: idioma efectivo del artefacto generado
 - `policy_profile`: perfil de policy/canal aplicado cuando corresponda
 - `policy_version` o `rules_version`: versión de reglas/policy que produjo el resultado
 
@@ -102,6 +118,7 @@ flowchart LR
 - logs y eventos deben poder correlacionarse por `request_id`
 - cuando exista routing conversacional, persistir `routed_agent` y `routing_source`
 - cuando exista policy, persistir `policy_profile`
+- cuando la superficie sea user-facing, registrar `preferred_language` y `content_language`
 - cuando exista contexto multi-tenant, incluir `tenant_id`/`org_id` y `user_id`/`actor_id`
 
 ### Ubicación canónica actual
@@ -122,6 +139,8 @@ flowchart LR
 ### Fase 3: assistant-contracts
 
 - `core` sigue siendo owner solo del vocabulario transversal mínimo: `request_id`, `routed_agent`, `routing_source`, `service_kind`, `output_kind`
+- ese vocabulario mínimo también incluye `preferred_language` y `content_language` para superficies user-facing
+- `preferred_language` pertenece al request/contexto/observabilidad; `content_language` pertenece a los outputs user-facing
 - en ese vocabulario, `routed_agent` comparte el nombre de campo pero sus valores válidos siguen siendo catálogo de producto; el único conjunto cerrado transversal hoy es `routing_source`
 - `pymes` y `ponti` adoptan ese vocabulario en sus respuestas OpenAPI cuando aplica, pero conservan sus DTOs de producto y sus shapes de negocio
 - no se suben a `core` bloques de chat, insights ni payloads específicos de cada producto
@@ -143,8 +162,8 @@ Fuente de verdad del servicio: [`ai/src/main.py`](../ai/src/main.py).
 |-----------|---------------|-----------|
 | `ProductAgent` | Sí | endpoint canónico `POST /v1/chat` en [`ai/src/api/router.py`](../ai/src/api/router.py) con orquestación principal en [`ai/src/agents/service.py`](../ai/src/agents/service.py) |
 | `DomainAgent` | Sí | sub-agentes en [`ai/src/agents/sub_agents/`](../ai/src/agents/sub_agents/) para `clientes`, `productos`, `ventas`, `cobros` y `compras` |
-| `CopilotAgent` | Sí | `POST /v1/chat` enruta a `copilot` para explicación de insights/estados dentro de [`ai/src/agents/copilot_service.py`](../ai/src/agents/copilot_service.py) |
-| `InsightService` | Sí | endpoint `POST /v1/notifications` en [`ai/src/api/notifications_router.py`](../ai/src/api/notifications_router.py) y lógica en [`ai/src/insights/service.py`](../ai/src/insights/service.py) |
+| `CopilotAgent` | Sí, pero por handoff explícito | en `pymes` queda reservado para el flujo `insight -> notification -> copilot -> chat`, disparado explícitamente desde [`ai/src/api/notifications_router.py`](../ai/src/api/notifications_router.py) y resuelto por [`ai/src/agents/copilot_service.py`](../ai/src/agents/copilot_service.py); no debe confundirse con el chat interno corriente |
+| `InsightService` | Sí, pero todavía no consolidado como superficie propia visible | endpoint `POST /v1/notifications` en [`ai/src/api/notifications_router.py`](../ai/src/api/notifications_router.py) y lógica en [`ai/src/insights/service.py`](../ai/src/insights/service.py) |
 | integración con `GovernanceService` | Sí, opcional | `ReviewClient` + callback en [`ai/src/main.py`](../ai/src/main.py) y [`ai/src/api/review_callback.py`](../ai/src/api/review_callback.py) |
 
 ### `ponti`
@@ -198,7 +217,12 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 ## Qué sigue ambiguo o transicional
 
 - `pymes` ya consolidó el chat interno en `POST /v1/chat`, pero todavía conviven otros canales públicos/especializados en el mismo deployable AI.
-- `pymes` ya proyecta `InsightService` como notificación en `POST /v1/notifications`; la explicación ahora vive en un `CopilotAgent` separado dentro del chat, pero la superficie frontend todavía es transicional.
+- en `pymes`, `chat interno` es hoy el canal conversacional principal; `streaming` debe entenderse solo como modo de entrega y no como un tercer canal.
+- el flujo actual del `chat interno` quedó separado en dos carriles:
+  - `dato directo`: lectura determinística por dominio (`clientes`, `productos`, `ventas`, `cobros`, `compras`) con bloques estructurados;
+  - `interpretación`: lectura determinística + interpretación estructurada vía LLM sobre evidencia factual, sin usar `CopilotAgent`.
+- `CopilotAgent` queda fuera del chat corriente y se reserva para el handoff explícito desde notificaciones de insights.
+- `InsightService` emite notificaciones factuales; la explicación de esas señales ocurre después, cuando el usuario entra al chat desde la notificación.
 - `pymes` puede apoyarse en `Review`, pero todavía no está definido un catálogo final de acciones que obligan governance.
 - la documentación principal ya quedó alineada al runtime reusable en [`../../core/ai/python/src/runtime/`](../../core/ai/python/src/runtime/); no reintroducir referencias a `pymes-core/shared/ai`.
 
@@ -215,7 +239,7 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 ### Gaps reales remanentes
 
 - en `core`, `AIRequestContext` / `RequestContext` ya existe como contrato base, pero su adopción completa en middleware y observabilidad sigue siendo opt-in por producto
-- en `pymes`, todavía queda estabilizar la superficie visible de `InsightService` y terminar de ordenar los canales que conviven en el mismo deployable AI
+- en `pymes`, todavía queda estabilizar una superficie visible propia para `InsightService`, desacoplarla mejor del chat y terminar de ordenar los canales que conviven en el mismo deployable AI
 - en `nexus`, `Review` sigue apareciendo como naming histórico en código, variables y parte de la UI; eso es aceptable mientras se mantenga explícita la equivalencia con `GovernanceService`
 - en esta pasada no apareció otro gap transversal que justifique extraer más runtime reusable antes de que lo pida un segundo producto
 
@@ -224,8 +248,8 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 ### Lo próximo en `pymes`
 
 - estabilizar `ProductAgent`
-- conectar `InsightService` a una superficie de producto en frontend
-- consolidar `CopilotAgent` propio encima de insights y estados del producto
+- consolidar la separación `chat actual` vs `insight -> notification -> copilot -> chat`
+- mantener `InsightService` como productor de señales factuales y `CopilotAgent` como capa explicativa explícita
 
 ### Lo próximo en `nexus`
 
@@ -242,7 +266,7 @@ Fuente de verdad: [`../../modules/README.md`](../../modules/README.md).
 
 1. estabilizar `ProductAgent` de `pymes` sobre el runtime ya consolidado
 2. consolidar `InsightService` de `pymes` como producto visible y persistente
-3. consolidar `CopilotAgent` de `pymes` encima de insights
+3. consolidar `CopilotAgent` de `pymes` encima de insights como capa explicativa separada del canal de chat
 4. definir acciones sensibles que pasan por `Nexus Governance`
 5. mantener `Companion` en `nexus` como agente transversal que consume productos, no como agente embebido de producto
 

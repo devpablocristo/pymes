@@ -9,6 +9,7 @@ import {
 import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
 import { vocab } from '../vocabulary';
 import { apiKeysMessages } from './messages/apiKeys';
+import { aiMessages } from './messages/ai';
 import { authMessages } from './messages/auth';
 import { billingMessages } from './messages/billing';
 import { calendarMessages } from './messages/calendar';
@@ -39,6 +40,7 @@ function mergeMessages(...sources: TranslationsByLanguage[]): Record<LanguageCod
 
 const messages = mergeMessages(
   commonMessages,
+  aiMessages,
   shellMessages,
   crudMessages,
   moduleMessages,

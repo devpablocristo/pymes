@@ -6,7 +6,9 @@ import {
   type InAppNotificationItem,
 } from '../lib/api';
 import { labelForApprovalAction } from '../lib/approvalActionLabels';
+import { humanInsightScopeLabel, humanRoutedLabel } from '../lib/aiLabels';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
+import { useI18n, type LanguageCode } from '../lib/i18n';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
   type NotificationChatHandoff,
@@ -33,17 +35,36 @@ type FeedEntry =
   | { kind: 'in_app'; createdAt: string; notification: InAppNotificationItem }
   | { kind: 'approval'; createdAt: string; approval: ApprovalResponse };
 
-function relativeTime(isoDate: string): string {
+function localeForLanguage(language: LanguageCode): string {
+  return language === 'en' ? 'en-US' : 'es-AR';
+}
+
+function relativeTime(isoDate: string, language: LanguageCode, t: (key: string, variables?: Record<string, string | number>) => string): string {
   const now = Date.now();
   const then = new Date(isoDate).getTime();
   const diffMs = now - then;
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'hace un momento';
-  if (diffMin < 60) return `hace ${diffMin} minuto${diffMin === 1 ? '' : 's'}`;
+  if (diffMin < 1) return t('ai.notifications.relative.now');
+  if (diffMin < 60) {
+    return diffMin === 1
+      ? t('ai.notifications.relative.minute', { count: diffMin })
+      : t('ai.notifications.relative.minutes', { count: diffMin });
+  }
   const diffHrs = Math.floor(diffMin / 60);
-  if (diffHrs < 24) return `hace ${diffHrs} hora${diffHrs === 1 ? '' : 's'}`;
+  if (diffHrs < 24) {
+    return diffHrs === 1
+      ? t('ai.notifications.relative.hour', { count: diffHrs })
+      : t('ai.notifications.relative.hours', { count: diffHrs });
+  }
   const diffDays = Math.floor(diffHrs / 24);
-  return `hace ${diffDays} día${diffDays === 1 ? '' : 's'}`;
+  if (language === 'en') {
+    return diffDays === 1
+      ? t('ai.notifications.relative.day', { count: diffDays })
+      : t('ai.notifications.relative.days', { count: diffDays });
+  }
+  return diffDays === 1
+    ? t('ai.notifications.relative.day', { count: diffDays })
+    : t('ai.notifications.relative.days', { count: diffDays });
 }
 
 function mergeFeed(notifications: InAppNotificationItem[], approvals: ApprovalResponse[]): FeedEntry[] {
@@ -75,7 +96,14 @@ function getNotificationRoutedAgent(chatContext: unknown): string | null {
   return typeof routedAgent === 'string' && routedAgent.trim() !== '' ? routedAgent : null;
 }
 
+function getNotificationContentLanguage(chatContext: unknown): string | null {
+  if (!chatContext || typeof chatContext !== 'object') return null;
+  const contentLanguage = (chatContext as Record<string, unknown>).content_language;
+  return typeof contentLanguage === 'string' && contentLanguage.trim() !== '' ? contentLanguage : null;
+}
+
 export function NotificationsCenterPage({ embedded = false }: NotificationsCenterPageProps) {
+  const { language, t } = useI18n();
   const navigate = useNavigate();
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -96,7 +124,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
       notifications = res.items;
       unread = res.unread_count;
     } catch (err) {
-      setInAppError(formatFetchErrorForUser(err, 'No se pudieron cargar los avisos in-app.'));
+      setInAppError(formatFetchErrorForUser(err, t('ai.notifications.error.loadInApp')));
     }
 
     let approvals: ApprovalResponse[] = [];
@@ -111,7 +139,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     setPendingApprovalsCount(approvals.length);
     setFeed(mergeFeed(notifications, approvals));
     setLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -130,6 +158,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   async function openInChat(n: InAppNotificationItem): Promise<void> {
     const scope = getNotificationScope(n.chat_context);
     const routedAgent = getNotificationRoutedAgent(n.chat_context);
+    const contentLanguage = getNotificationContentLanguage(n.chat_context);
     const handoff: NotificationChatHandoff = {
       notificationId: n.id,
       title: n.title,
@@ -137,6 +166,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
       chatContext: n.chat_context && typeof n.chat_context === 'object' ? n.chat_context : {},
       scope: scope ?? undefined,
       routedAgent: routedAgent ?? undefined,
+      contentLanguage: contentLanguage ?? undefined,
     };
     try {
       if (!n.read_at) {
@@ -175,11 +205,11 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
       {inAppError ? <p className="form-error">{inAppError}</p> : null}
       {loading ? (
         <div className="card">
-          <p>Cargando…</p>
+          <p>{t('ai.notifications.loading')}</p>
         </div>
       ) : feed.length === 0 ? (
         <div className="card">
-          <p className="text-secondary">No hay avisos ni solicitudes pendientes.</p>
+          <p className="text-secondary">{t('ai.notifications.empty')}</p>
         </div>
       ) : (
         <ul className="list-unstyled" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -191,21 +221,21 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
               return (
                 <li key={`n-${n.id}`} className="card" style={{ margin: 0, padding: '1rem' }}>
                   <div className="text-secondary" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>
-                    Aviso
+                    {t('ai.notifications.item.notice')}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 12rem' }}>
                       <div style={{ fontWeight: 600 }}>{n.title}</div>
                       <p style={{ margin: '0.35rem 0 0', whiteSpace: 'pre-wrap' }}>{n.body}</p>
                       <div className="text-secondary" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                        {new Date(n.created_at).toLocaleString()}
-                        {n.read_at ? ' · Leída' : ''}
+                        {new Date(n.created_at).toLocaleString(localeForLanguage(language))}
+                        {n.read_at ? ` · ${t('ai.notifications.item.read')}` : ''}
                       </div>
                       {scope || routedAgent ? (
                         <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                          {routedAgent ? `Agente: ${routedAgent}` : null}
+                          {routedAgent ? `${t('ai.chat.meta.agent')}: ${humanRoutedLabel(routedAgent, language)}` : null}
                           {routedAgent && scope ? ' · ' : null}
-                          {scope ? `Scope: ${scope}` : null}
+                          {scope ? `${t('ai.chat.meta.context')}: ${humanInsightScopeLabel(scope, language)}` : null}
                         </div>
                       ) : null}
                     </div>
@@ -225,10 +255,10 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                           openWhatsAppPrefilledShare(buildInAppNotificationShareText(n.title, n.body))
                         }
                       >
-                        Compartir
+                        {t('ai.notifications.item.share')}
                       </button>
                       <button type="button" className="btn-primary btn-sm" onClick={() => void openInChat(n)}>
-                        Más información
+                        {t('ai.notifications.item.explainInChat')}
                       </button>
                     </div>
                   </div>
@@ -242,7 +272,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
             return (
               <li key={`a-${approval.id}`} className="approval-card" style={{ margin: 0, listStyle: 'none' }}>
                 <div className="text-secondary" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>
-                  Requiere decisión
+                  {t('ai.notifications.approval.requiresDecision')}
                 </div>
                 <div className="approval-header">
                   <span className="approval-title">
@@ -252,7 +282,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                   <span className={`risk-badge ${approval.risk_level}`}>{approval.risk_level}</span>
                 </div>
                 <div className="approval-reason">{approval.reason}</div>
-                <div className="approval-time">{relativeTime(approval.created_at)}</div>
+                <div className="approval-time">{relativeTime(approval.created_at, language, t)}</div>
                 {approval.ai_summary ? <div className="approval-summary">{approval.ai_summary}</div> : null}
                 <div style={{ marginBottom: '8px' }}>
                   <button
@@ -269,13 +299,13 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                       )
                     }
                   >
-                    Compartir
+                    {t('ai.notifications.item.share')}
                   </button>
                 </div>
                 <div className="approval-actions">
                   <input
                     className="note-input"
-                    placeholder="Nota (opcional)"
+                    placeholder={t('ai.notifications.approval.notePlaceholder')}
                     value={approvalNotes[approval.id] ?? ''}
                     onChange={(e) =>
                       setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))
@@ -287,7 +317,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                     disabled={isProcessing}
                     onClick={() => void handleApprove(approval.id)}
                   >
-                    Aprobar
+                    {t('ai.notifications.approval.approve')}
                   </button>
                   <button
                     type="button"
@@ -295,7 +325,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
                     disabled={isProcessing}
                     onClick={() => void handleReject(approval.id)}
                   >
-                    Rechazar
+                    {t('ai.notifications.approval.reject')}
                   </button>
                 </div>
               </li>

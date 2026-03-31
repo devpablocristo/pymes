@@ -188,10 +188,12 @@ def test_internal_chat_failure_does_not_persist(monkeypatch) -> None:
 def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
     repo = StubRepo()
     client = create_internal_client(repo)
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-1")
 
     async def fake_run_internal_orchestrated_chat(**_kwargs):
+        captured.update(_kwargs)
         return CommercialChatResult(
             conversation_id="conv-1",
             reply="respuesta final",
@@ -212,6 +214,7 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
     assert response.json() == {
         "request_id": "req-chat-1",
         "output_kind": "chat_reply",
+        "content_language": "es",
         "chat_id": "conv-1",
         "reply": "respuesta final",
         "tokens_used": 25,
@@ -222,6 +225,37 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
         "routed_mode": "clientes",
         "routing_source": "orchestrator",
     }
+    assert captured["route_hint"] is None
+
+
+def test_internal_chat_bypasses_quota_when_plan_limits_are_disabled(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+
+    async def fake_get_month_usage(_org_id: str, _year: int, _month: int) -> dict[str, int]:
+        return {"queries": 50, "tokens_input": 0, "tokens_output": 0}
+
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="respuesta final",
+            tokens_input=10,
+            tokens_output=15,
+            tool_calls=[],
+            pending_confirmations=[],
+            blocks=[{"type": "text", "text": "respuesta final"}],
+            routed_agent="general",
+            routing_source="orchestrator",
+        )
+
+    monkeypatch.setattr(repo, "get_month_usage", fake_get_month_usage)
+    monkeypatch.setattr(router_module, "get_settings", lambda: SimpleNamespace(ai_enforce_plan_limits=False))
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post("/v1/chat", json={"message": "hola"})
+
+    assert response.status_code == 200
+    assert response.json()["reply"] == "respuesta final"
 
 
 def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
@@ -279,6 +313,7 @@ def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
     payload = response.json()
     assert payload["request_id"] == "req-chat-2"
     assert payload["output_kind"] == "chat_reply"
+    assert payload["content_language"] == "es"
     assert payload["chat_id"] == "conv-1"
     assert payload["blocks"][0]["type"] == "insight_card"
     assert payload["blocks"][1]["type"] == "kpi_group"
@@ -313,6 +348,7 @@ def test_internal_chat_normalizes_unknown_route_to_general(monkeypatch) -> None:
     assert response.status_code == 200
     assert response.json()["request_id"] == "req-chat-3"
     assert response.json()["output_kind"] == "chat_reply"
+    assert response.json()["content_language"] == "es"
     assert response.json()["routed_agent"] == "general"
     assert response.json()["routed_mode"] == "general"
     assert response.json()["routing_source"] == "orchestrator"
@@ -345,8 +381,96 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
     payload = response.json()
     assert payload["request_id"] == "req-chat-4"
     assert payload["output_kind"] == "chat_reply"
+    assert payload["content_language"] == "es"
     assert payload["routed_agent"] == "clientes"
     assert payload["routing_source"] == "read_fallback"
+
+
+def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-5")
+
+    async def fake_run_internal_orchestrated_chat(**kwargs):
+        captured.update(kwargs)
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="Tenés 1 solicitud en borrador.",
+            tokens_input=9,
+            tokens_output=11,
+            tool_calls=["list_procurement_requests"],
+            pending_confirmations=[],
+            blocks=[{"type": "text", "text": "Tenés 1 solicitud en borrador."}],
+            routed_agent="compras",
+            routing_source="ui_hint",
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post(
+        "/v1/chat",
+        json={"message": "estado compras", "route_hint": "compras", "preferred_language": "en"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["request_id"] == "req-chat-5"
+    assert response.json()["content_language"] == "es"
+    assert response.json()["routed_agent"] == "compras"
+    assert response.json()["routing_source"] == "ui_hint"
+    assert captured["route_hint"] == "compras"
+    assert captured["preferred_language"] == "en"
+
+
+def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+
+    monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-6")
+
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="Necesito un poco más de contexto para responder eso. Elegí una categoría y tomo esa selección sobre tu mensaje anterior.",
+            tokens_input=5,
+            tokens_output=9,
+            tool_calls=[],
+            pending_confirmations=[],
+            blocks=[
+                {
+                    "type": "text",
+                    "text": "Necesito un poco más de contexto para responder eso. Elegí una categoría y tomo esa selección sobre tu mensaje anterior.",
+                },
+                {
+                    "type": "actions",
+                    "actions": [
+                        {
+                            "id": "clarify_route_ventas",
+                            "label": "Ventas",
+                            "kind": "send_message",
+                            "message": "cuánto hay?",
+                            "route_hint": "ventas",
+                            "selection_behavior": "route_and_resend",
+                            "style": "secondary",
+                            "confirmed_actions": [],
+                        }
+                    ],
+                },
+            ],
+            routed_agent="general",
+            routing_source="orchestrator",
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post("/v1/chat", json={"message": "cuánto hay?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["request_id"] == "req-chat-6"
+    assert payload["blocks"][1]["actions"][0]["route_hint"] == "ventas"
+    assert payload["blocks"][1]["actions"][0]["selection_behavior"] == "route_and_resend"
 
 
 def test_internal_chat_preserves_http_exception_status(monkeypatch) -> None:

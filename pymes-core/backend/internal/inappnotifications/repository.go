@@ -36,6 +36,26 @@ func (r *Repository) GetUserIDByExternalID(externalID string) (uuid.UUID, bool) 
 	return row.ID, true
 }
 
+func (r *Repository) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
+	var rows []struct {
+		UserID uuid.UUID `gorm:"column:user_id"`
+	}
+	err := r.db.Table("org_members AS om").
+		Select("om.user_id").
+		Joins("JOIN users AS u ON u.id = om.user_id").
+		Where("om.org_id = ? AND u.deleted_at IS NULL", orgID).
+		Order("om.created_at ASC, om.user_id ASC").
+		Limit(2).
+		Find(&rows).Error
+	if err != nil {
+		return uuid.Nil, false
+	}
+	if len(rows) != 1 {
+		return uuid.Nil, false
+	}
+	return rows[0].UserID, true
+}
+
 func (r *Repository) ListForUser(orgID, userID uuid.UUID, limit int) ([]domain.InAppNotification, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 100

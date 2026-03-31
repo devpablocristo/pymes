@@ -209,14 +209,17 @@ def test_sales_collections_router_returns_response() -> None:
     assert payload["request_id"] == "req-notif-1"
     assert payload["service_kind"] == "insight_service"
     assert payload["output_kind"] == "insight_notification"
+    assert payload["content_language"] == "es"
     assert len(payload["items"]) == 3
     assert payload["items"][0]["kind"] == "insight"
     assert payload["items"][0]["entity_type"] == "insight"
     assert payload["items"][0]["entity_id"] == "sales_collections"
+    assert payload["items"][0]["content_language"] == "es"
     assert payload["items"][0]["title"] == "Insight de ventas y cobranzas"
-    assert payload["items"][0]["body"] == "Resumen generado"
+    assert payload["items"][0]["body"] == "Este mes: Ventas: $1,000.00 · Cliente destacado: Acme."
     assert payload["items"][0]["chat_context"]["scope"] == "sales_collections"
     assert payload["items"][0]["chat_context"]["routed_agent"] == "copilot"
+    assert payload["items"][0]["chat_context"]["content_language"] == "es"
     assert service.calls[0][0] == "sales_collections"
     assert service.calls[0][1].period == "month"
     assert service.calls[0][1].top_limit == 3

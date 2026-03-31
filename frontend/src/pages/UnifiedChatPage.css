@@ -180,6 +180,124 @@
   margin-top: 0.2rem;
 }
 
+.cht__msg-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.cht__msg-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.56rem;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(99, 102, 241, 0.12);
+  color: #4338ca;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+}
+
+[data-theme='dark'] .cht__msg-badge--ventas {
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+  border-color: rgba(16, 185, 129, 0.32);
+}
+
+.cht__msg-badge--ventas {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.22);
+}
+
+[data-theme='dark'] .cht__msg-badge--cobros {
+  background: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.cht__msg-badge--cobros {
+  background: rgba(59, 130, 246, 0.13);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.22);
+}
+
+[data-theme='dark'] .cht__msg-badge--compras {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.cht__msg-badge--compras {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+[data-theme='dark'] .cht__msg-badge--clientes {
+  background: rgba(168, 85, 247, 0.18);
+  color: #e9d5ff;
+  border-color: rgba(168, 85, 247, 0.28);
+}
+
+.cht__msg-badge--clientes {
+  background: rgba(168, 85, 247, 0.14);
+  color: #7e22ce;
+  border-color: rgba(168, 85, 247, 0.22);
+}
+
+[data-theme='dark'] .cht__msg-badge--productos {
+  background: rgba(236, 72, 153, 0.18);
+  color: #fbcfe8;
+  border-color: rgba(236, 72, 153, 0.3);
+}
+
+.cht__msg-badge--productos {
+  background: rgba(236, 72, 153, 0.13);
+  color: #be185d;
+  border-color: rgba(236, 72, 153, 0.22);
+}
+
+[data-theme='dark'] .cht__msg-badge--copilot {
+  background: rgba(99, 102, 241, 0.2);
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.3);
+}
+
+.cht__msg-badge--copilot {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4338ca;
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+[data-theme='dark'] .cht__msg-badge--general,
+[data-theme='dark'] .cht__msg-badge--neutral {
+  background: rgba(148, 163, 184, 0.18);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.cht__msg-badge--general,
+.cht__msg-badge--neutral {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+[data-theme='dark'] .cht__msg-badge:not(.cht__msg-badge--ventas):not(.cht__msg-badge--cobros):not(.cht__msg-badge--compras):not(.cht__msg-badge--clientes):not(.cht__msg-badge--productos):not(.cht__msg-badge--copilot):not(.cht__msg-badge--general):not(.cht__msg-badge--neutral) {
+  background: rgba(129, 140, 248, 0.18);
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.28);
+}
+
+.cht__msg--me .cht__msg-badge {
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .cht__msg-submeta {
   font-size: var(--text-2xs);
   opacity: 0.72;

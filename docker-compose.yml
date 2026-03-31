@@ -90,10 +90,6 @@ services:
       - ./frontend/index.html:/workspace/frontend/index.html
       - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
-      - ../modules/calendar/board/ts:/modules/calendar/board/ts
-      - ../modules/crud/ui/ts:/modules/crud/ui/ts
-      - ../modules/sidebar/ts:/modules/sidebar/ts
-      - ../modules/ui/data-display/ts:/modules/ui/data-display/ts
     env_file:
       - .env
     environment:

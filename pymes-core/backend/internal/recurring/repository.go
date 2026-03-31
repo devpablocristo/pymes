@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/repository/models"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
 )

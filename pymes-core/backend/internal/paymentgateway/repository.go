@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/repository/models"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 )

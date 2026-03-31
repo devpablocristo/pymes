@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts/repository/models"
 	accountsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts/usecases/domain"
 )

@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/core/concurrency/go/resilience"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httpclient"
-	"github.com/devpablocristo/core/utils/go/resilience"
 	schedulerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler/usecases/domain"
 )
 
@@ -56,8 +56,8 @@ type RecurringDue struct {
 
 func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort) *Usecases {
 	return &Usecases{
-		repo:            repo,
-		provider:        strings.ToLower(strings.TrimSpace(provider)),
+		repo:     repo,
+		provider: strings.ToLower(strings.TrimSpace(provider)),
 		caller: &httpclient.Caller{
 			HTTP: &http.Client{Timeout: 10 * time.Second},
 		},

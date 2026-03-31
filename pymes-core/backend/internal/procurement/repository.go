@@ -8,15 +8,15 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/repository/models"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
 )
 
 var (
-	ErrNotFound   = errors.New("procurement request not found")
-	ErrConflict   = errors.New("procurement request conflict")
-	ErrArchived   = errors.New("procurement request is archived")
+	ErrNotFound = errors.New("procurement request not found")
+	ErrConflict = errors.New("procurement request conflict")
+	ErrArchived = errors.New("procurement request is archived")
 )
 
 type Repository struct{ db *gorm.DB }
@@ -282,20 +282,20 @@ func toDomain(m models.ProcurementRequest, lines []models.ProcurementRequestLine
 		evalJSON = append([]byte(nil), m.EvaluationJSON...)
 	}
 	return domain.ProcurementRequest{
-		ID:              m.ID,
-		OrgID:           m.OrgID,
-		RequesterActor:  m.RequesterActor,
-		Title:           m.Title,
-		Description:     m.Description,
-		Category:        m.Category,
-		Status:          domain.RequestStatus(m.Status),
-		EstimatedTotal:  m.EstimatedTotal,
-		Currency:        m.Currency,
-		EvaluationJSON:  evalJSON,
-		PurchaseID:      m.PurchaseID,
-		Lines:           dl,
-		CreatedAt:       m.CreatedAt,
-		UpdatedAt:       m.UpdatedAt,
-		ArchivedAt:      m.ArchivedAt,
+		ID:             m.ID,
+		OrgID:          m.OrgID,
+		RequesterActor: m.RequesterActor,
+		Title:          m.Title,
+		Description:    m.Description,
+		Category:       m.Category,
+		Status:         domain.RequestStatus(m.Status),
+		EstimatedTotal: m.EstimatedTotal,
+		Currency:       m.Currency,
+		EvaluationJSON: evalJSON,
+		PurchaseID:     m.PurchaseID,
+		Lines:          dl,
+		CreatedAt:      m.CreatedAt,
+		UpdatedAt:      m.UpdatedAt,
+		ArchivedAt:     m.ArchivedAt,
 	}
 }

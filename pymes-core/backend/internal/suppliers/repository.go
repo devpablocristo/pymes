@@ -12,7 +12,7 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/utils/go/stringutil"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	supplierdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/usecases/domain"
 )
 

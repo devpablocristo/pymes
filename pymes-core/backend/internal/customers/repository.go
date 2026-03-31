@@ -11,7 +11,7 @@ import (
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 
-	utils "github.com/devpablocristo/core/utils/go/stringutil"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
 )
 

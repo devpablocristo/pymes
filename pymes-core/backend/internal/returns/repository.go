@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	returnmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )

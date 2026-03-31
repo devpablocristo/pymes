@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/core/utils/go/pagination"
+	"github.com/devpablocristo/core/http/go/pagination"
 	profmodels "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"

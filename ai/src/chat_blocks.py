@@ -1,13 +1,16 @@
+"""Builders de bloques de chat — re-exporta genéricos desde runtime.chat
+y agrega los específicos de pymes (confirmación de acciones, selección de ruta)."""
+
 from __future__ import annotations
 
 from typing import Any
 
-
-def build_text_block(text: str) -> dict[str, Any]:
-    return {
-        "type": "text",
-        "text": text,
-    }
+from runtime.chat.blocks import (
+    build_insight_card_block,
+    build_kpi_group_block,
+    build_table_block,
+    build_text_block,
+)
 
 
 def build_confirm_actions_block(actions: list[str]) -> dict[str, Any]:
@@ -55,43 +58,11 @@ def build_route_selection_block(
     }
 
 
-def build_insight_card_block(
-    *,
-    title: str,
-    summary: str,
-    scope: str | None = None,
-    highlights: list[dict[str, str]] | None = None,
-    recommendations: list[str] | None = None,
-) -> dict[str, Any]:
-    return {
-        "type": "insight_card",
-        "title": title,
-        "summary": summary,
-        "scope": scope,
-        "highlights": highlights or [],
-        "recommendations": recommendations or [],
-    }
-
-
-def build_kpi_group_block(*, title: str | None = None, items: list[dict[str, str]]) -> dict[str, Any]:
-    return {
-        "type": "kpi_group",
-        "title": title,
-        "items": items,
-    }
-
-
-def build_table_block(
-    *,
-    title: str,
-    columns: list[str],
-    rows: list[list[str]],
-    empty_state: str | None = None,
-) -> dict[str, Any]:
-    return {
-        "type": "table",
-        "title": title,
-        "columns": columns,
-        "rows": rows,
-        "empty_state": empty_state,
-    }
+__all__ = [
+    "build_confirm_actions_block",
+    "build_insight_card_block",
+    "build_kpi_group_block",
+    "build_route_selection_block",
+    "build_table_block",
+    "build_text_block",
+]

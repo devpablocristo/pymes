@@ -10,17 +10,18 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GONOPROXY=github.com/devpablocristo/* \
     GOPROXY=direct
 
-COPY go.mod go.sum /workspace/pymes/
+COPY pymes/go.mod pymes/go.sum /workspace/pymes/
+COPY core/notifications/go /workspace/core/notifications/go
 
 WORKDIR /workspace/pymes/pymes-core/backend
 
 RUN go mod download
 
-COPY pymes-core/backend/docker-entrypoint-dev.sh /usr/local/bin/pymes-cp-backend-entrypoint.sh
+COPY pymes/pymes-core/backend/docker-entrypoint-dev.sh /usr/local/bin/pymes-cp-backend-entrypoint.sh
 RUN chmod +x /usr/local/bin/pymes-cp-backend-entrypoint.sh
 
-COPY pymes-core/backend /workspace/pymes/pymes-core/backend
-COPY pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
+COPY pymes/pymes-core/backend /workspace/pymes/pymes-core/backend
+COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
 
 EXPOSE 8080
 

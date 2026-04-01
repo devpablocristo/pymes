@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 
 from runtime.contexts import AuthContext
 from runtime.logging import get_logger
-from src.api.chat_stream import Message, stream_orchestrated_chat
+from runtime.types import Message
+from src.api.chat_stream import stream_orchestrated_chat
 from src.api.sse import EventSourceResponse
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 from src.domains.workshops.auto_repair.deps import (

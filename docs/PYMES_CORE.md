@@ -35,6 +35,8 @@ Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-co
 
 - `pymes-core/backend/internal/notifications`:
   usa `pymes_notification_preferences` y `pymes_notification_log`.
+- `pymes-core/backend/internal/inappnotifications`:
+  es adapter de producto sobre `core/notifications/go/inbox` y persiste en `pymes_in_app_notifications`.
 - `core/saas/go`:
   usa `notification_preferences` y `notification_log`.
 

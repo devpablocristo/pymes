@@ -11,21 +11,49 @@ jobs:
   smoke-stack:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout pymes
+        uses: actions/checkout@v4
+        with:
+          path: pymes
+
+      - name: Checkout core
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+
+      - name: Checkout nexus
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/nexus
+          path: nexus
+
+      - name: Checkout modules
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
 
       - name: Create env file
+        working-directory: pymes
         run: |
           cat <<'EOF' > .env
           INTERNAL_SERVICE_TOKEN=local-internal-token
           AUTH_ENABLE_JWT=false
           AUTH_ALLOW_API_KEY=true
+          REVIEW_API_KEY=nexus-review-admin-dev-key
+          REVIEW_CALLBACK_TOKEN=local-review-callback-token
           EOF
 
       - name: Build and start stack
+        working-directory: pymes
         run: docker compose up -d --build
 
       - name: Wait for services
+        working-directory: pymes
         run: |
           for attempt in $(seq 1 60); do
             cp_status=$(curl -fsS http://127.0.0.1:8100/readyz >/dev/null && echo ok || true)
@@ -43,6 +71,7 @@ jobs:
           exit 1
 
       - name: Smoke API calls
+        working-directory: pymes
         run: |
           curl -fsS http://127.0.0.1:8100/healthz
           curl -fsS http://127.0.0.1:8181/healthz
@@ -52,10 +81,18 @@ jobs:
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8181/v1/teachers/professionals
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8282/v1/auto-repair/vehicles
 
+      - name: Run review notifications E2E
+        working-directory: pymes
+        env:
+          CALLBACK_TIMEOUT_SECONDS: "20"
+        run: make e2e-review-notifications
+
       - name: Print container logs on failure
         if: failure()
+        working-directory: pymes
         run: docker compose logs --no-color
 
       - name: Stop stack
         if: always()
+        working-directory: pymes
         run: docker compose down -v

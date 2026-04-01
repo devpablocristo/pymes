@@ -3,17 +3,20 @@ package internalapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	admindomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
 	appointmentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments/usecases/domain"
 	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 	productdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/products/usecases/domain"
@@ -72,21 +75,27 @@ type apiKeyResolverPort interface {
 	ResolveAPIKey(raw string) (users.ResolvedAPIKey, bool)
 }
 
+type notificationInboxPort interface {
+	CreateForActor(ctx context.Context, orgIDStr, actor string, input inappnotifications.CreateInput) (coredomain.Notification, error)
+	ApplyApprovalEvent(ctx context.Context, event inappnotifications.ApprovalEvent) (int, error)
+}
+
 type whatsAppSendPort interface {
 	SendText(ctx context.Context, req wapdomain.SendTextRequest) (wapdomain.Message, error)
 }
 
 type Handler struct {
-	admin     adminPort
-	parties   partyPort
-	customers customerPort
-	products  productPort
-	appts     appointmentPort
-	quotes    quotePort
-	sales     salePort
-	gateway   paymentGatewayPort
-	apiKeys   apiKeyResolverPort
-	whatsapp  whatsAppSendPort
+	admin             adminPort
+	parties           partyPort
+	customers         customerPort
+	products          productPort
+	appts             appointmentPort
+	quotes            quotePort
+	sales             salePort
+	gateway           paymentGatewayPort
+	apiKeys           apiKeyResolverPort
+	notificationInbox notificationInboxPort
+	whatsapp          whatsAppSendPort
 	// resolveOrgRef traduce Clerk org_... / slug / UUID (opcional; nil = ruta no registrada).
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error)
 }
@@ -101,21 +110,23 @@ func NewHandler(
 	sales salePort,
 	gateway paymentGatewayPort,
 	apiKeys apiKeyResolverPort,
+	notificationInbox notificationInboxPort,
 	whatsapp whatsAppSendPort,
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error),
 ) *Handler {
 	return &Handler{
-		admin:         admin,
-		parties:       parties,
-		customers:     customers,
-		products:      products,
-		appts:         appts,
-		quotes:        quotes,
-		sales:         sales,
-		gateway:       gateway,
-		apiKeys:       apiKeys,
-		whatsapp:      whatsapp,
-		resolveOrgRef: resolveOrgRef,
+		admin:             admin,
+		parties:           parties,
+		customers:         customers,
+		products:          products,
+		appts:             appts,
+		quotes:            quotes,
+		sales:             sales,
+		gateway:           gateway,
+		apiKeys:           apiKeys,
+		notificationInbox: notificationInbox,
+		whatsapp:          whatsapp,
+		resolveOrgRef:     resolveOrgRef,
 	}
 }
 
@@ -133,10 +144,15 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/products/:id", h.GetProduct)
 	internal.POST("/appointments", h.CreateAppointment)
 	internal.GET("/appointments/:id", h.GetAppointment)
+	internal.POST("/in-app-notifications", h.CreateInAppNotification)
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
 	internal.POST("/sales/:id/payment-link", h.CreateSalePaymentLink)
 	internal.POST("/whatsapp/send-text", h.InternalSendWhatsAppText)
+}
+
+func (h *Handler) RegisterReviewCallbackRoutes(internal *gin.RouterGroup) {
+	internal.POST("/review-callback", h.ReviewCallback)
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {
@@ -210,6 +226,77 @@ func (h *Handler) ResolveAPIKey(c *gin.Context) {
 		"id":     key.ID.String(),
 		"org_id": key.OrgID.String(),
 		"scopes": key.Scopes,
+	})
+}
+
+func (h *Handler) CreateInAppNotification(c *gin.Context) {
+	if h.notificationInbox == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification inbox unavailable"})
+		return
+	}
+	var req struct {
+		ID          string          `json:"id"`
+		OrgID       string          `json:"org_id" binding:"required"`
+		Actor       string          `json:"actor" binding:"required"`
+		Title       string          `json:"title" binding:"required"`
+		Body        string          `json:"body" binding:"required"`
+		Kind        string          `json:"kind"`
+		EntityType  string          `json:"entity_type"`
+		EntityID    string          `json:"entity_id"`
+		ChatContext json.RawMessage `json:"chat_context"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	created, err := h.notificationInbox.CreateForActor(c.Request.Context(), req.OrgID, req.Actor, inappnotifications.CreateInput{
+		ID:          req.ID,
+		Title:       req.Title,
+		Body:        req.Body,
+		Kind:        req.Kind,
+		EntityType:  req.EntityType,
+		EntityID:    req.EntityID,
+		ChatContext: req.ChatContext,
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	chatContext := created.Metadata
+	if len(chatContext) == 0 {
+		chatContext = json.RawMessage(`{}`)
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"id":           created.ID,
+		"title":        created.Title,
+		"body":         created.Body,
+		"kind":         created.Kind,
+		"entity_type":  created.EntityType,
+		"entity_id":    created.EntityID,
+		"chat_context": chatContext,
+		"created_at":   created.CreatedAt.UTC().Format(time.RFC3339Nano),
+	})
+}
+
+func (h *Handler) ReviewCallback(c *gin.Context) {
+	if h.notificationInbox == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification inbox unavailable"})
+		return
+	}
+	var req inappnotifications.ApprovalEvent
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	affected, err := h.notificationInbox.ApplyApprovalEvent(c.Request.Context(), req)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "processed",
+		"event":    strings.TrimSpace(req.Event),
+		"affected": affected,
 	})
 }
 

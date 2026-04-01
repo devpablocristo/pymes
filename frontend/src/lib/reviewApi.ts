@@ -46,6 +46,7 @@ export interface ActionTypeListResponse {
 
 export interface ApprovalResponse {
   id: string;
+  org_id?: string;
   request_id: string;
   action_type: string;
   target_resource: string;

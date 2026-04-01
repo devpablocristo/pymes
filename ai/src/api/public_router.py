@@ -5,10 +5,11 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
-from src.api.chat_stream import Message, stream_orchestrated_chat
+from runtime.types import Message
+from src.api.chat_stream import stream_orchestrated_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository
 from src.api.external_chat_support import clean_phone, get_external_conversation, history_to_messages, resolve_org_id
-from src.api.router import check_quota
+from src.api.quota import check_quota
 from src.api.sse import EventSourceResponse
 from src.backend_client.client import BackendClient
 from src.core.dossier import summarize_dossier_for_context

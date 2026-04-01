@@ -13,6 +13,9 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
+      "@devpablocristo/modules-shell-sidebar": ["../../modules/sidebar/ts/src/index.ts"],
+      "@devpablocristo/modules-ui-notification-feed": ["../../modules/ui/notification-feed/ts/src/index.ts"],
+      "@devpablocristo/core-browser/trigram": ["../../core/browser/ts/src/trigram.ts"],
       "@fullcalendar/core": ["./node_modules/@fullcalendar/core"],
       "@fullcalendar/daygrid": ["./node_modules/@fullcalendar/daygrid"],
       "@fullcalendar/interaction": ["./node_modules/@fullcalendar/interaction"],

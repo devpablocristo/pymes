@@ -7,7 +7,7 @@ from src.agents.contracts import CommercialContractEnvelope
 from src.agents.service import process_contract, run_commercial_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository
 from src.api.external_chat_support import clean_phone, resolve_org_id
-from src.api.router import check_quota
+from src.api.quota import check_quota
 from src.backend_client.client import BackendClient
 from src.db.repository import AIRepository
 from runtime.types import LLMProvider

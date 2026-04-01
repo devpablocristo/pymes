@@ -43,13 +43,15 @@ from src.agents.sub_agents import build_registry
 from src.api.external_chat_support import get_external_conversation, history_to_messages
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.chat_blocks import (
-    build_confirm_actions_block,
+from runtime.chat.blocks import (
     build_insight_card_block,
     build_kpi_group_block,
-    build_route_selection_block,
     build_table_block,
     build_text_block,
+)
+from src.chat_blocks import (
+    build_confirm_actions_block,
+    build_route_selection_block,
 )
 from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context

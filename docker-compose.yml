@@ -16,6 +16,23 @@ services:
       timeout: 3s
       retries: 5
 
+  review-postgres:
+    restart: unless-stopped
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nexus_review
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15434:5432"
+    volumes:
+      - review_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_review"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   mailhog:
     restart: unless-stopped
     image: mailhog/mailhog:v1.0.1
@@ -38,16 +55,44 @@ services:
       retries: 5
       start_period: 30s
 
+  review:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: nexus/v3/review/Dockerfile.dev
+    ports:
+      - "18084:8080"
+    volumes:
+      - ../nexus/v3/review:/workspace/nexus/v3/review
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://postgres:postgres@review-postgres:5432/nexus_review?sslmode=disable
+      NEXUS_API_KEYS: admin=${REVIEW_API_KEY:-nexus-review-admin-dev-key}
+      APPROVAL_DEFAULT_TTL: "3600"
+      NEXUS_SIGNING_KEY: nexus-dev-signing-key-change-in-production
+      REVIEW_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
+      REVIEW_APPROVAL_PENDING_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback
+      REVIEW_APPROVAL_RESOLVED_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback,http://ai:8000/v1/internal/review-callback
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      review-postgres:
+        condition: service_healthy
+
   cp-backend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./pymes-core/backend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/pymes-core/backend/Dockerfile.dev
     ports:
       - "8100:8080"
     volumes:
       - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ../core/notifications/go:/workspace/core/notifications/go
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -65,6 +110,7 @@ services:
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
       # Misma org que 01_local_org / seeds SQL: el JWT de Clerk suele traer otra org_id; en local forzamos la demo para ver clientes, productos, etc.
       PYMES_DEV_FORCE_ORG_UUID: "00000000-0000-0000-0000-000000000001"
+      REVIEW_URL: http://review:8080
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 5s
@@ -73,6 +119,8 @@ services:
       start_period: 120s
     depends_on:
       postgres:
+        condition: service_healthy
+      review:
         condition: service_healthy
 
   frontend:
@@ -83,13 +131,14 @@ services:
     ports:
       - "5180:5173"
     volumes:
-      - ./frontend/package.json:/workspace/frontend/package.json
-      - ./frontend/package-lock.json:/workspace/frontend/package-lock.json
-      - ./frontend/src:/workspace/frontend/src
-      - ./frontend/public:/workspace/frontend/public
-      - ./frontend/index.html:/workspace/frontend/index.html
-      - ./frontend/vite.config.ts:/workspace/frontend/vite.config.ts
-      - ./frontend/tsconfig.json:/workspace/frontend/tsconfig.json
+      - ./frontend/package.json:/workspace/pymes/frontend/package.json
+      - ./frontend/package-lock.json:/workspace/pymes/frontend/package-lock.json
+      - ./frontend/src:/workspace/pymes/frontend/src
+      - ./frontend/public:/workspace/pymes/frontend/public
+      - ./frontend/index.html:/workspace/pymes/frontend/index.html
+      - ./frontend/vite.config.ts:/workspace/pymes/frontend/vite.config.ts
+      - ./frontend/tsconfig.json:/workspace/pymes/frontend/tsconfig.json
+      - ../modules:/workspace/modules
     env_file:
       - .env
     environment:
@@ -115,6 +164,7 @@ services:
       - ./ai/src:/workspace/ai/src
       - ./ai/tests:/workspace/ai/tests
       - ./ai/pyproject.toml:/workspace/ai/pyproject.toml
+      - ../core/ai/python/src:/workspace/core/ai/python/src
 
     env_file:
       - .env
@@ -127,11 +177,15 @@ services:
       BEAUTY_BACKEND_URL: http://beauty-backend:8083
       RESTAURANTS_BACKEND_URL: http://restaurants-backend:8084
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+      REVIEW_URL: http://review:8080
+      PYTHONPATH: /workspace/ai:/workspace/core/ai/python/src
       # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     depends_on:
       cp-backend:
         condition: service_started
+      review:
+        condition: service_healthy
       work-backend:
         condition: service_started
       ollama:
@@ -142,13 +196,14 @@ services:
   prof-backend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./professionals/backend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/professionals/backend/Dockerfile.dev
     ports:
       - "8181:8081"
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ../core/notifications/go:/workspace/core/notifications/go
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -171,13 +226,14 @@ services:
   work-backend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./workshops/backend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/workshops/backend/Dockerfile.dev
     ports:
       - "8282:8082"
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ../core/notifications/go:/workspace/core/notifications/go
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
@@ -204,13 +260,14 @@ services:
   beauty-backend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./beauty/backend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/beauty/backend/Dockerfile.dev
     ports:
       - "8383:8083"
     volumes:
       - ./beauty/backend:/workspace/pymes/beauty/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ../core/notifications/go:/workspace/core/notifications/go
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
@@ -233,13 +290,14 @@ services:
   restaurants-backend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./restaurants/backend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/restaurants/backend/Dockerfile.dev
     ports:
       - "8484:8084"
     volumes:
       - ./restaurants/backend:/workspace/pymes/restaurants/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - ../core/notifications/go:/workspace/core/notifications/go
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:
@@ -260,6 +318,7 @@ services:
 volumes:
   ollama_data:
   pgdata:
+  review_pgdata:
   cp_backend_go_mod:
   cp_backend_go_build:
   prof_backend_go_mod:

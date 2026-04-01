@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from runtime.contexts import AuthContext
-from src.api.deps import get_auth_context, get_repository
+from src.api.deps import get_auth_context, get_backend_client, get_repository
 from src.api.notifications_router import get_insights_service, router
 import src.api.notifications_router as notifications_router_module
 from src.insights.domain import (
@@ -181,7 +181,22 @@ class StubInsightsService:
         )
 
 
-def create_client(service: StubInsightsService, repo: StubRepo) -> TestClient:
+class StubBackendClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, bool, dict[str, object]]] = []
+
+    async def request(self, method: str, path: str, auth=None, *, include_internal: bool = False, **kwargs):
+        _ = auth
+        payload = kwargs.get("json")
+        payload_dict = payload if isinstance(payload, dict) else {}
+        self.calls.append((method, path, include_internal, payload_dict))
+        return {
+            "id": f"persisted-{len(self.calls)}",
+            "created_at": "2026-04-01T12:00:00Z",
+        }
+
+
+def create_client(service: StubInsightsService, repo: StubRepo, backend_client: StubBackendClient | None = None) -> TestClient:
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_repository] = lambda: repo
@@ -193,13 +208,15 @@ def create_client(service: StubInsightsService, repo: StubRepo) -> TestClient:
         mode="jwt",
     )
     app.dependency_overrides[get_insights_service] = lambda: service
+    app.dependency_overrides[get_backend_client] = lambda: backend_client or StubBackendClient()
     return TestClient(app)
 
 
 def test_sales_collections_router_returns_response() -> None:
     service = StubInsightsService()
     repo = StubRepo()
-    client = create_client(service, repo)
+    backend_client = StubBackendClient()
+    client = create_client(service, repo, backend_client)
     notifications_router_module.get_request_id = lambda: "req-notif-1"  # type: ignore[assignment]
 
     response = client.post("/v1/notifications", json={"period": "month", "compare": True, "top_limit": 3})
@@ -211,6 +228,7 @@ def test_sales_collections_router_returns_response() -> None:
     assert payload["output_kind"] == "insight_notification"
     assert payload["content_language"] == "es"
     assert len(payload["items"]) == 3
+    assert payload["items"][0]["id"] == "persisted-1"
     assert payload["items"][0]["kind"] == "insight"
     assert payload["items"][0]["entity_type"] == "insight"
     assert payload["items"][0]["entity_id"] == "sales_collections"
@@ -226,6 +244,13 @@ def test_sales_collections_router_returns_response() -> None:
     assert service.calls[1][0] == "inventory_profit"
     assert service.calls[2][0] == "customers_retention"
     assert repo.tracked_usage == [(0, 0)]
+    assert len(backend_client.calls) == 3
+    assert backend_client.calls[0][0] == "POST"
+    assert backend_client.calls[0][1] == "/v1/internal/v1/in-app-notifications"
+    assert backend_client.calls[0][2] is True
+    assert backend_client.calls[0][3]["id"] == "insight:sales_collections:month"
+    assert backend_client.calls[0][3]["actor"] == "user-1"
+    assert backend_client.calls[0][3]["org_id"] == "org-123"
 
 
 def test_notifications_router_validates_top_limit() -> None:
@@ -240,7 +265,8 @@ def test_notifications_router_validates_top_limit() -> None:
 def test_notifications_router_supports_period_and_compare() -> None:
     service = StubInsightsService()
     repo = StubRepo()
-    client = create_client(service, repo)
+    backend_client = StubBackendClient()
+    client = create_client(service, repo, backend_client)
     notifications_router_module.get_request_id = lambda: "req-notif-2"  # type: ignore[assignment]
 
     response = client.post("/v1/notifications", json={"period": "week", "compare": False, "top_limit": 2})
@@ -251,3 +277,4 @@ def test_notifications_router_supports_period_and_compare() -> None:
     assert [call[1].compare for call in service.calls] == [False, False, False]
     assert [call[1].top_limit for call in service.calls] == [2, 2, 2]
     assert repo.tracked_usage == [(0, 0)]
+    assert len(backend_client.calls) == 3

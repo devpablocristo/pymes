@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
 from runtime.logging import get_logger, update_request_context
-from src.api.chat_stream import Message, stream_orchestrated_chat
+from runtime.types import Message
+from src.api.chat_stream import stream_orchestrated_chat
 from src.api.sse import EventSourceResponse
 from src.domains.professionals.teachers.backend_client import TeachersBackendClient
 from src.domains.professionals.teachers.deps import get_llm_provider, get_teachers_backend_client

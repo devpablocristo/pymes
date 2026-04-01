@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  NotificationFeed,
+  type NotificationFeedItem,
+  type NotificationFeedTone,
+} from '@devpablocristo/modules-ui-notification-feed';
+import '@devpablocristo/modules-ui-notification-feed/styles.css';
+import {
   listInAppNotifications,
   markInAppNotificationRead,
   type InAppNotificationItem,
@@ -15,9 +21,7 @@ import {
 } from '../lib/notificationChatHandoff';
 import {
   approveRequest,
-  listPendingApprovals,
   rejectRequest,
-  type ApprovalResponse,
 } from '../lib/reviewApi';
 import {
   buildApprovalShareText,
@@ -31,9 +35,18 @@ type NotificationsCenterPageProps = {
   embedded?: boolean;
 };
 
-type FeedEntry =
-  | { kind: 'in_app'; createdAt: string; notification: InAppNotificationItem }
-  | { kind: 'approval'; createdAt: string; approval: ApprovalResponse };
+type ApprovalNotification = {
+  id: string;
+  request_id: string;
+  action_type: string;
+  target_resource: string;
+  reason: string;
+  risk_level: string;
+  status: string;
+  ai_summary?: string;
+  created_at: string;
+  expires_at?: string;
+};
 
 function localeForLanguage(language: LanguageCode): string {
   return language === 'en' ? 'en-US' : 'es-AR';
@@ -67,21 +80,27 @@ function relativeTime(isoDate: string, language: LanguageCode, t: (key: string, 
     : t('ai.notifications.relative.days', { count: diffDays });
 }
 
-function mergeFeed(notifications: InAppNotificationItem[], approvals: ApprovalResponse[]): FeedEntry[] {
-  const rows: FeedEntry[] = [
-    ...notifications.map((n) => ({
-      kind: 'in_app' as const,
-      createdAt: n.created_at,
-      notification: n,
-    })),
-    ...approvals.map((a) => ({
-      kind: 'approval' as const,
-      createdAt: a.created_at,
-      approval: a,
-    })),
-  ];
-  rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return rows;
+function getApprovalNotification(data: unknown): ApprovalNotification | null {
+  if (!data || typeof data !== 'object') return null;
+  const record = data as Record<string, unknown>;
+  if (record.source !== 'review_approval') return null;
+  const approval = record.approval;
+  if (!approval || typeof approval !== 'object') return null;
+  const raw = approval as Record<string, unknown>;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id) return null;
+  return {
+    id,
+    request_id: typeof raw.request_id === 'string' ? raw.request_id : '',
+    action_type: typeof raw.action_type === 'string' ? raw.action_type : '',
+    target_resource: typeof raw.target_resource === 'string' ? raw.target_resource : '',
+    reason: typeof raw.reason === 'string' ? raw.reason : '',
+    risk_level: typeof raw.risk_level === 'string' ? raw.risk_level : 'low',
+    status: typeof raw.status === 'string' ? raw.status : 'pending',
+    ai_summary: typeof raw.ai_summary === 'string' ? raw.ai_summary : undefined,
+    created_at: typeof raw.created_at === 'string' ? raw.created_at : '',
+    expires_at: typeof raw.expires_at === 'string' ? raw.expires_at : undefined,
+  };
 }
 
 function getNotificationScope(chatContext: unknown): string | null {
@@ -102,10 +121,23 @@ function getNotificationContentLanguage(chatContext: unknown): string | null {
   return typeof contentLanguage === 'string' && contentLanguage.trim() !== '' ? contentLanguage : null;
 }
 
+function toneForApproval(riskLevel: string): NotificationFeedTone {
+  switch (riskLevel) {
+    case 'high':
+      return 'critical';
+    case 'medium':
+      return 'attention';
+    case 'low':
+      return 'default';
+    default:
+      return 'default';
+  }
+}
+
 export function NotificationsCenterPage({ embedded = false }: NotificationsCenterPageProps) {
   const { language, t } = useI18n();
   const navigate = useNavigate();
-  const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const [notifications, setNotifications] = useState<InAppNotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -117,27 +149,19 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     setLoading(true);
     setInAppError('');
 
-    let notifications: InAppNotificationItem[] = [];
+    let nextNotifications: InAppNotificationItem[] = [];
     let unread = 0;
     try {
       const res = await listInAppNotifications();
-      notifications = res.items;
+      nextNotifications = res.items;
       unread = res.unread_count;
     } catch (err) {
       setInAppError(formatFetchErrorForUser(err, t('ai.notifications.error.loadInApp')));
     }
 
-    let approvals: ApprovalResponse[] = [];
-    try {
-      const res = await listPendingApprovals();
-      approvals = res.approvals ?? [];
-    } catch {
-      approvals = [];
-    }
-
     setUnreadCount(unread);
-    setPendingApprovalsCount(approvals.length);
-    setFeed(mergeFeed(notifications, approvals));
+    setPendingApprovalsCount(nextNotifications.filter((item) => getApprovalNotification(item.chat_context)).length);
+    setNotifications(nextNotifications);
     setLoading(false);
   }, [t]);
 
@@ -200,140 +224,132 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     }
   }
 
-  return (
-    <>
-      {inAppError ? <p className="form-error">{inAppError}</p> : null}
-      {loading ? (
-        <div className="card">
-          <p>{t('ai.notifications.loading')}</p>
-        </div>
-      ) : feed.length === 0 ? (
-        <div className="card">
-          <p className="text-secondary">{t('ai.notifications.empty')}</p>
-        </div>
-      ) : (
-        <ul className="list-unstyled" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {feed.map((entry) => {
-            if (entry.kind === 'in_app') {
-              const n = entry.notification;
-              const scope = getNotificationScope(n.chat_context);
-              const routedAgent = getNotificationRoutedAgent(n.chat_context);
-              return (
-                <li key={`n-${n.id}`} className="card" style={{ margin: 0, padding: '1rem' }}>
-                  <div className="text-secondary" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>
-                    {t('ai.notifications.item.notice')}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 12rem' }}>
-                      <div style={{ fontWeight: 600 }}>{n.title}</div>
-                      <p style={{ margin: '0.35rem 0 0', whiteSpace: 'pre-wrap' }}>{n.body}</p>
-                      <div className="text-secondary" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                        {new Date(n.created_at).toLocaleString(localeForLanguage(language))}
-                        {n.read_at ? ` · ${t('ai.notifications.item.read')}` : ''}
-                      </div>
-                      {scope || routedAgent ? (
-                        <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                          {routedAgent ? `${t('ai.chat.meta.agent')}: ${humanRoutedLabel(routedAgent, language)}` : null}
-                          {routedAgent && scope ? ' · ' : null}
-                          {scope ? `${t('ai.chat.meta.context')}: ${humanInsightScopeLabel(scope, language)}` : null}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div
-                      style={{
-                        alignSelf: 'flex-end',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '0.5rem',
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="btn-secondary btn-sm"
-                        onClick={() =>
-                          openWhatsAppPrefilledShare(buildInAppNotificationShareText(n.title, n.body))
-                        }
-                      >
-                        {t('ai.notifications.item.share')}
-                      </button>
-                      <button type="button" className="btn-primary btn-sm" onClick={() => void openInChat(n)}>
-                        {t('ai.notifications.item.explainInChat')}
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            }
+  const items: NotificationFeedItem[] = notifications.map((n) => {
+    const approval = getApprovalNotification(n.chat_context);
+    if (approval) {
+      const isProcessing = approvalProcessing[approval.id] ?? false;
+      const displayAction = labelForApprovalAction(approval.action_type);
 
-            const approval = entry.approval;
-            const isProcessing = approvalProcessing[approval.id] ?? false;
-            const displayAction = labelForApprovalAction(approval.action_type);
-            return (
-              <li key={`a-${approval.id}`} className="approval-card" style={{ margin: 0, listStyle: 'none' }}>
-                <div className="text-secondary" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>
-                  {t('ai.notifications.approval.requiresDecision')}
-                </div>
-                <div className="approval-header">
-                  <span className="approval-title">
-                    {displayAction}
-                    {approval.target_resource ? ` — ${approval.target_resource}` : ''}
-                  </span>
-                  <span className={`risk-badge ${approval.risk_level}`}>{approval.risk_level}</span>
-                </div>
-                <div className="approval-reason">{approval.reason}</div>
-                <div className="approval-time">{relativeTime(approval.created_at, language, t)}</div>
-                {approval.ai_summary ? <div className="approval-summary">{approval.ai_summary}</div> : null}
-                <div style={{ marginBottom: '8px' }}>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() =>
-                      openWhatsAppPrefilledShare(
-                        buildApprovalShareText({
-                          actionLabel: displayAction,
-                          targetResource: approval.target_resource,
-                          reason: approval.reason,
-                          aiSummary: approval.ai_summary,
-                        }),
-                      )
-                    }
-                  >
-                    {t('ai.notifications.item.share')}
-                  </button>
-                </div>
-                <div className="approval-actions">
-                  <input
-                    className="note-input"
-                    placeholder={t('ai.notifications.approval.notePlaceholder')}
-                    value={approvalNotes[approval.id] ?? ''}
-                    onChange={(e) =>
-                      setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))
-                    }
-                  />
-                  <button
-                    type="button"
-                    className="btn-approve"
-                    disabled={isProcessing}
-                    onClick={() => void handleApprove(approval.id)}
-                  >
-                    {t('ai.notifications.approval.approve')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-reject"
-                    disabled={isProcessing}
-                    onClick={() => void handleReject(approval.id)}
-                  >
-                    {t('ai.notifications.approval.reject')}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </>
+      return {
+        id: `a-${n.id}`,
+        eyebrow: t('ai.notifications.approval.requiresDecision'),
+        title: (
+          <>
+            {displayAction}
+            {approval.target_resource ? ` — ${approval.target_resource}` : ''}
+          </>
+        ),
+        badge: <span className={`risk-badge ${approval.risk_level}`}>{approval.risk_level}</span>,
+        body: (
+          <>
+            <div className="approval-reason">{approval.reason}</div>
+            {approval.ai_summary ? <div className="approval-summary">{approval.ai_summary}</div> : null}
+          </>
+        ),
+        timestamp: relativeTime(approval.created_at || n.created_at, language, t),
+        extra: (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() =>
+              openWhatsAppPrefilledShare(
+                buildApprovalShareText({
+                  actionLabel: displayAction,
+                  targetResource: approval.target_resource,
+                  reason: approval.reason,
+                  aiSummary: approval.ai_summary,
+                }),
+              )
+            }
+          >
+            {t('ai.notifications.item.share')}
+          </button>
+        ),
+        actions: (
+          <div className="approval-actions">
+            <input
+              className="note-input"
+              placeholder={t('ai.notifications.approval.notePlaceholder')}
+              value={approvalNotes[approval.id] ?? ''}
+              onChange={(e) =>
+                setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))
+              }
+            />
+            <button
+              type="button"
+              className="btn-approve"
+              disabled={isProcessing}
+              onClick={() => void handleApprove(approval.id)}
+            >
+              {t('ai.notifications.approval.approve')}
+            </button>
+            <button
+              type="button"
+              className="btn-reject"
+              disabled={isProcessing}
+              onClick={() => void handleReject(approval.id)}
+            >
+              {t('ai.notifications.approval.reject')}
+            </button>
+          </div>
+        ),
+        unread: !n.read_at,
+        tone: toneForApproval(approval.risk_level),
+      };
+    }
+
+    const scope = getNotificationScope(n.chat_context);
+    const routedAgent = getNotificationRoutedAgent(n.chat_context);
+
+    return {
+      id: `n-${n.id}`,
+      eyebrow: t('ai.notifications.item.notice'),
+      title: n.title,
+      body: <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{n.body}</p>,
+      timestamp: (
+        <>
+          {new Date(n.created_at).toLocaleString(localeForLanguage(language))}
+          {n.read_at ? ` · ${t('ai.notifications.item.read')}` : ''}
+        </>
+      ),
+      meta:
+        scope || routedAgent ? (
+          <>
+            {routedAgent ? `${t('ai.chat.meta.agent')}: ${humanRoutedLabel(routedAgent, language)}` : null}
+            {routedAgent && scope ? ' · ' : null}
+            {scope ? `${t('ai.chat.meta.context')}: ${humanInsightScopeLabel(scope, language)}` : null}
+          </>
+        ) : undefined,
+      actions: (
+        <>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => openWhatsAppPrefilledShare(buildInAppNotificationShareText(n.title, n.body))}
+          >
+            {t('ai.notifications.item.share')}
+          </button>
+          <button type="button" className="btn-primary btn-sm" onClick={() => void openInChat(n)}>
+            {t('ai.notifications.item.explainInChat')}
+          </button>
+        </>
+      ),
+      unread: !n.read_at,
+      tone: 'default',
+    };
+  });
+
+  return (
+    <div data-embedded={embedded ? 'true' : 'false'}>
+      <NotificationFeed
+        error={inAppError ? <p className="form-error">{inAppError}</p> : undefined}
+        loading={loading}
+        loadingMessage={t('ai.notifications.loading')}
+        emptyMessage={<p className="text-secondary">{t('ai.notifications.empty')}</p>}
+        items={items}
+        summary={summaryBadge}
+      />
+    </div>
   );
 }
 

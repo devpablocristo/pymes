@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/devpablocristo/core/config/go/envconfig"
 )
@@ -45,6 +46,8 @@ type Config struct {
 	ExchangeRateProvider        string
 	InternalServiceToken        string
 	AIServiceURL                string
+	ReviewCallbackToken         string
+	ReviewSyncInterval          time.Duration
 	WhatsAppWebhookVerifyToken  string
 	WhatsAppAppSecret           string
 	WhatsAppGraphAPIBaseURL     string
@@ -97,6 +100,8 @@ func LoadFromEnv() Config {
 		ExchangeRateProvider:        envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:        strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
 		AIServiceURL:                envconfig.Get("AI_SERVICE_URL", "http://ai:8000"),
+		ReviewCallbackToken:         strings.TrimSpace(envconfig.Get("REVIEW_CALLBACK_TOKEN", "")),
+		ReviewSyncInterval:          envconfig.Duration("REVIEW_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:  envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),
 		WhatsAppAppSecret:           envconfig.Get("WHATSAPP_APP_SECRET", ""),
 		WhatsAppGraphAPIBaseURL:     envconfig.Get("WHATSAPP_GRAPH_API_BASE_URL", "https://graph.facebook.com/v23.0"),

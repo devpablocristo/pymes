@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 WORKDIR /workspace/ai
+ENV PYTHONPATH=/workspace/ai:/workspace/core/ai/python/src
 
 COPY ai/requirements.txt ./
 COPY ai/requirements-dev.txt ./

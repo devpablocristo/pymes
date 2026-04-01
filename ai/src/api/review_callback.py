@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
@@ -31,6 +32,15 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
     token = request.headers.get("X-Internal-Service-Token", "")
     if not token or token != settings.review_callback_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+    try:
+        UUID(payload.request_id)
+    except ValueError:
+        logger.warning(
+            "review_callback_invalid_request_id",
+            extra={"request_id": payload.request_id},
+        )
+        return {"status": "ignored", "reason": "invalid request_id"}
 
     async with get_session() as session:
         repo = AIRepository(session)

@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
-
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications/usecases/domain"
+	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
 )
 
 // InAppNotificationResponse DTO de salida.
 type InAppNotificationResponse struct {
-	ID          uuid.UUID       `json:"id"`
+	ID          string          `json:"id"`
 	Title       string          `json:"title"`
 	Body        string          `json:"body"`
 	Kind        string          `json:"kind"`
@@ -27,8 +25,8 @@ type PatchInAppNotificationRequest struct {
 	Read *bool `json:"read"`
 }
 
-func MapNotification(n domain.InAppNotification) InAppNotificationResponse {
-	ctx := n.ChatContext
+func MapNotification(n coredomain.Notification) InAppNotificationResponse {
+	ctx := n.Metadata
 	if len(ctx) == 0 {
 		ctx = json.RawMessage(`{}`)
 	}

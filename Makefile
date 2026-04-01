@@ -2,7 +2,7 @@
 # Verificación preferida: targets test-docker-* / build-docker-* (requieren `make up`).
 # build/test nativos abajo = respaldo/CI rápido en host si no hay Docker.
 # docker-compose.yml en la raíz de este directorio.
-.PHONY: up down build test build-docker-frontend test-docker-frontend test-docker-core test-docker-workshops logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all modules-check cleanup-pablo
+.PHONY: up down build test build-docker-frontend test-docker-frontend test-docker-core test-docker-workshops logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all modules-check cleanup-pablo e2e-review-notifications
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
 
@@ -54,6 +54,11 @@ seed-docker-workshops:
 # Demo completo en Docker: core + talleres (un solo comando tras `docker compose up`).
 seed-docker-all: seed-docker-core seed-docker-workshops
 
+# E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
+# Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
+e2e-review-notifications:
+	bash scripts/e2e-review-notifications.sh "$(DECISION)"
+
 # Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
 # Simular: make cleanup-pablo DRY_RUN=1
 cleanup-pablo:
@@ -63,7 +68,7 @@ cleanup-pablo:
 modules-check:
 	docker compose -f ../modules/docker-compose.yml build crud-ts-check crud-go-check
 
-# Levanta stack local (Postgres, cp-backend, 4 verticales Go, frontend, AI)
+# Levanta stack local (Postgres Pymes, Review, cp-backend, 4 verticales Go, frontend, AI)
 up:
 	docker compose up -d --build
 

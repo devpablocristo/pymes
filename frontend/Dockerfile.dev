@@ -1,11 +1,11 @@
 FROM node:20.19.0-alpine
 
-WORKDIR /workspace/frontend
+WORKDIR /workspace/pymes/frontend
 
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci
 
-COPY frontend/ /workspace/frontend
+COPY frontend/ /workspace/pymes/frontend
 
 COPY frontend/docker-entrypoint-dev.sh /usr/local/bin/docker-entrypoint-dev.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint-dev.sh

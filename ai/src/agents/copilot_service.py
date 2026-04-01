@@ -5,7 +5,7 @@ from typing import Any
 
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.chat_blocks import (
+from runtime.chat.blocks import (
     build_insight_card_block,
     build_kpi_group_block,
     build_table_block,

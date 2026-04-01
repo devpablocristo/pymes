@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -208,7 +209,20 @@ func InitializeApp() *app.App {
 		emailSender = notifications.NewNoopSender(logger)
 	}
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
-	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
+
+	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
+	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
+	var reviewClient *reviewproxy.Client
+	var inAppNotifUC *inappnotifications.Usecases
+	if reviewURL != "" {
+		reviewClient = reviewproxy.NewClient(reviewURL, reviewAPIKey)
+		inAppNotifUC = inappnotifications.NewUsecases(
+			inAppNotifRepo,
+			inappnotifications.WithApprovalSource(reviewproxy.NewPendingApprovalSource(reviewClient)),
+		)
+	} else {
+		inAppNotifUC = inappnotifications.NewUsecases(inAppNotifRepo)
+	}
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
@@ -250,7 +264,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), whatsappUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -268,6 +282,11 @@ func InitializeApp() *app.App {
 	internalGroup := v1.Group("/internal/v1")
 	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
 	internalAPIHandler.RegisterRoutes(internalGroup)
+	if strings.TrimSpace(cfg.ReviewCallbackToken) != "" {
+		reviewCallbackGroup := v1.Group("/internal/v1")
+		reviewCallbackGroup.Use(ginmw.NewInternalServiceAuth(cfg.ReviewCallbackToken))
+		internalAPIHandler.RegisterReviewCallbackRoutes(reviewCallbackGroup)
+	}
 
 	public := v1.Group("/public/:org_id")
 	public.Use(ginmw.NewRateLimit(30))
@@ -311,13 +330,22 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	// Review proxy — opcional, se activa si REVIEW_URL está configurado
-	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
-	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
-	if reviewURL != "" {
-		reviewClient := reviewproxy.NewClient(reviewURL, reviewAPIKey)
+	if reviewClient != nil {
 		reviewHandler := reviewproxy.NewHandler(reviewClient)
 		reviewHandler.RegisterRoutes(authGroup)
 		log.Info().Str("review_url", reviewURL).Msg("review proxy enabled")
+		if cfg.ReviewSyncInterval > 0 {
+			go coreworker.RunOnceAndPeriodic(context.Background(), cfg.ReviewSyncInterval, "pymes-review-approval-sync", func(ctx context.Context) {
+				synced, err := inAppNotifUC.SyncAllPendingApprovals(ctx)
+				if err != nil {
+					logger.Error().Err(err).Msg("review approval sync failed")
+					return
+				}
+				if synced > 0 {
+					logger.Debug().Int("recipient_count", synced).Msg("review approval sync completed")
+				}
+			})
+		}
 	}
 
 	AttachSaaSUnmatchedRoutes(router, saasSvc)

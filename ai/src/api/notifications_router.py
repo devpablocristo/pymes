@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from runtime.logging import get_request_id, get_logger
 from src.agents.catalog import COPILOT_AGENT_NAME
 from src.api.deps import get_auth_context, get_backend_client, get_repository
-from src.api.router import check_quota
+from src.api.quota import check_quota
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.db.repository import AIRepository
@@ -137,6 +137,46 @@ def get_insights_service(backend_client: BackendClient = Depends(get_backend_cli
     return InsightsService(BackendInsightsRepository(backend_client))
 
 
+async def _persist_notification_items(
+    backend_client: BackendClient,
+    auth: AuthContext,
+    items: list[NotificationItem],
+) -> list[NotificationItem]:
+    async def _persist_one(item: NotificationItem) -> NotificationItem:
+        try:
+            payload = await backend_client.request(
+                "POST",
+                "/v1/internal/v1/in-app-notifications",
+                include_internal=True,
+                json={
+                    "id": item.id,
+                    "org_id": auth.org_id,
+                    "actor": auth.actor,
+                    "title": item.title,
+                    "body": item.body,
+                    "kind": item.kind,
+                    "entity_type": item.entity_type,
+                    "entity_id": item.entity_id,
+                    "chat_context": item.chat_context.model_dump(mode="json"),
+                },
+            )
+        except Exception as exc:  # pragma: no cover - best effort path, covered by request assertions
+            logger.warning(
+                "notifications_in_app_persist_failed",
+                org_id=auth.org_id,
+                actor=auth.actor,
+                notification_scope=item.entity_id,
+                error=str(exc),
+            )
+            return item
+
+        persisted_id = str(payload.get("id") or item.id)
+        created_at = str(payload.get("created_at") or item.created_at)
+        return item.model_copy(update={"id": persisted_id, "created_at": created_at})
+
+    return list(await asyncio.gather(*[_persist_one(item) for item in items]))
+
+
 @router.post("", response_model=NotificationsResponse)
 async def create_notifications(
     req: NotificationsRequest,
@@ -144,6 +184,7 @@ async def create_notifications(
     repo: AIRepository = Depends(get_repository),
     auth: AuthContext = Depends(get_auth_context),
     service: InsightsService = Depends(get_insights_service),
+    backend_client: BackendClient = Depends(get_backend_client),
 ):
     request_id = get_request_id() or str(uuid4())
     preferred_language = resolve_preferred_language(
@@ -187,6 +228,7 @@ async def create_notifications(
             content_language=effective_content_language,
         ),
     ]
+    items = await _persist_notification_items(backend_client, auth, items)
     await repo.track_usage(auth.org_id, tokens_in=0, tokens_out=0)
     logger.info(
         "notifications_insights_completed",

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from src.agents.service import run_commercial_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository, get_settings_dep
 from src.api.external_chat_support import clean_phone
-from src.api.router import check_quota
+from src.api.quota import check_quota
 from src.backend_client.client import BackendClient
 from src.config import Settings
 from src.db.repository import AIRepository

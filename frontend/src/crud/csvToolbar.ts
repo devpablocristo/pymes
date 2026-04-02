@@ -1,10 +1,10 @@
-import type { CrudFormField, CrudFormValues, CrudPageConfig, CrudToolbarAction } from '../components/CrudPage';
+import type { CrudFormField, CrudFormValues, CrudPageConfig } from '../components/CrudPage';
 import { buildCSV, downloadCSVFile, normalizeCSVFieldValue, parseCSV, pickCSVFile, type CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 
 type CSVMode = 'client' | 'server';
 
-export type CSVToolbarOptions<T extends { id: string }> = {
+export type CSVToolbarOptions = {
   mode?: CSVMode;
   entity?: string;
   allowImport?: boolean;
@@ -129,7 +129,7 @@ async function importServerCSV(entity: string, importMode: 'create_only' | 'upse
 export function withCSVToolbar<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T>,
-  options: CSVToolbarOptions<T> = {},
+  options: CSVToolbarOptions = {},
 ): CrudPageConfig<T> {
   const mode = options.mode ?? 'client';
   const entity = options.entity ?? resourceId;

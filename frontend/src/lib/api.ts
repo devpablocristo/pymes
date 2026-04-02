@@ -193,7 +193,7 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
 export async function downloadAPIFile(path: string, options: RequestOptions = {}): Promise<string> {
   const response = await requestResponse(path, options);
   const disposition = response.headers.get('content-disposition') ?? '';
-  const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+  const match = disposition.match(/filename="?([^";]+)"?/i);
   const filename = match?.[1] ?? `download-${Date.now()}`;
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
@@ -205,4 +205,101 @@ export async function downloadAPIFile(path: string, options: RequestOptions = {}
   anchor.remove();
   window.URL.revokeObjectURL(url);
   return filename;
+}
+
+// ── WhatsApp Campaigns ──
+
+export type WhatsAppCampaign = {
+  id: string;
+  name: string;
+  template_name: string;
+  template_language: string;
+  template_params: string[];
+  tag_filter: string;
+  status: string;
+  total_recipients: number;
+  sent_count: number;
+  delivered_count: number;
+  read_count: number;
+  failed_count: number;
+  scheduled_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhatsAppCampaignRecipient = {
+  id: string;
+  party_id: string;
+  phone: string;
+  party_name: string;
+  status: string;
+  wa_message_id?: string;
+  error_message?: string;
+  sent_at?: string;
+  delivered_at?: string;
+  read_at?: string;
+};
+
+export async function listWhatsAppCampaigns(): Promise<{ items: WhatsAppCampaign[] }> {
+  return apiRequest('/v1/whatsapp/campaigns');
+}
+
+export async function getWhatsAppCampaign(id: string): Promise<WhatsAppCampaign & { recipients: WhatsAppCampaignRecipient[] }> {
+  return apiRequest(`/v1/whatsapp/campaigns/${id}`);
+}
+
+export async function createWhatsAppCampaign(data: {
+  name: string;
+  template_name: string;
+  template_language?: string;
+  template_params?: string[];
+  tag_filter?: string;
+}): Promise<WhatsAppCampaign> {
+  return apiRequest('/v1/whatsapp/campaigns', { method: 'POST', body: data });
+}
+
+export async function sendWhatsAppCampaign(id: string): Promise<{ status: string }> {
+  return apiRequest(`/v1/whatsapp/campaigns/${id}/send`, { method: 'POST' });
+}
+
+// ── WhatsApp Conversations (multi-operador) ──
+
+export type WhatsAppConversation = {
+  id: string;
+  party_id: string;
+  phone: string;
+  party_name: string;
+  assigned_to: string;
+  status: string;
+  last_message_at?: string;
+  last_message_preview: string;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listWhatsAppConversations(params?: {
+  assigned_to?: string;
+  status?: string;
+}): Promise<{ items: WhatsAppConversation[] }> {
+  const q = new URLSearchParams();
+  if (params?.assigned_to) q.set('assigned_to', params.assigned_to);
+  if (params?.status) q.set('status', params.status);
+  const suffix = q.toString() ? `?${q.toString()}` : '';
+  return apiRequest(`/v1/whatsapp/conversations${suffix}`);
+}
+
+export async function assignWhatsAppConversation(id: string, assignedTo: string): Promise<{ status: string }> {
+  return apiRequest(`/v1/whatsapp/conversations/${id}/assign`, { method: 'POST', body: { assigned_to: assignedTo } });
+}
+
+export async function markWhatsAppConversationRead(id: string): Promise<{ status: string }> {
+  return apiRequest(`/v1/whatsapp/conversations/${id}/read`, { method: 'POST' });
+}
+
+export async function resolveWhatsAppConversation(id: string): Promise<{ status: string }> {
+  return apiRequest(`/v1/whatsapp/conversations/${id}/resolve`, { method: 'POST' });
 }

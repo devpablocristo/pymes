@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/reviewApi';
 import './WatcherConfigPage.css';
 
@@ -157,13 +159,24 @@ export default function WatcherConfigPage() {
     }
   };
 
+  const wSearch = usePageSearch();
+  const wTextFn = useCallback(
+    (tpl: WatcherTemplate) => `${tpl.name} ${tpl.description} ${tpl.watcherType}`,
+    [],
+  );
+  const filteredWatchers = useSearch(WATCHER_TEMPLATES, wTextFn, wSearch);
+
   if (loading) {
     return <div className="watcher-config-page"><div className="loading">Cargando configuracion...</div></div>;
   }
 
   return (
-    <div className="watcher-config-page">
-      {WATCHER_TEMPLATES.map((tpl) => {
+    <div className="watcher-config-page page-stack">
+      <header className="page-header">
+        <h1>Monitores automáticos</h1>
+        <p>Activá alertas y umbrales; se aplican según la configuración del motor de revisión.</p>
+      </header>
+      {filteredWatchers.map((tpl) => {
         const state = watchers[tpl.watcherType];
         if (!state) return null;
         return (
@@ -210,8 +223,8 @@ export default function WatcherConfigPage() {
         );
       })}
 
-      <div className="save-bar">
-        <button className="save-btn" onClick={handleSave} disabled={saving}>
+      <div className="watcher-config-page__save-bar">
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? 'Guardando...' : 'Guardar cambios'}
         </button>
       </div>

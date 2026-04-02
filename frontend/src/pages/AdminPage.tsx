@@ -1,4 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import {
   downloadAuditExportCsv,
   getAuditEntries,
@@ -162,6 +164,9 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [form, setForm] = useState<TenantFormState | null>(null);
   const [activity, setActivity] = useState<AuditEntry[]>([]);
+  const adminSearch = usePageSearch();
+  const auditTextFn = useCallback((a: AuditEntry) => `${a.action} ${a.resource_type} ${a.resource_id ?? ''} ${a.actor ?? ''}`, []);
+  const filteredActivity = useSearch(activity, auditTextFn, adminSearch);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -636,9 +641,9 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
       {(showAll || section === 'rbac') && isConsoleAdmin && sessionOrgId ? <AdminRbacSection orgId={sessionOrgId} /> : null}
 
       {(showAll || section === 'audit') && <div className="card">
-        <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="card-header admin-card-header--wrap">
           <h2>Registro de auditoría</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="admin-audit-header-actions">
             <span className="badge badge-neutral">{activity.length} eventos</span>
             <button
               type="button"
@@ -667,7 +672,7 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
                 </tr>
               </thead>
               <tbody>
-                {activity.slice(0, 50).map((row) => (
+                {filteredActivity.slice(0, 50).map((row) => (
                   <tr key={row.id}>
                     <td>{formatDateTime(row.created_at)}</td>
                     <td>

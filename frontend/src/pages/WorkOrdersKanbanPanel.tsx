@@ -1,6 +1,8 @@
 import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
+import { normalize } from '@devpablocristo/core-browser/search';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
+import { usePageSearch } from '../components/PageSearch';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CrudHelpers, CrudPageConfig } from '../components/CrudPage';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
@@ -175,6 +177,7 @@ function workOrderKanbanToolbarBtnClass(kind?: 'primary' | 'secondary' | 'danger
 }
 
 export function WorkOrdersKanbanPanel() {
+  const pageSearch = usePageSearch();
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
   const { t, localizeText: formatFieldText } = useI18n();
@@ -269,8 +272,8 @@ export function WorkOrdersKanbanPanel() {
 
   const filterRow = useCallback((row: AutoRepairWorkOrder, q: string) => {
     const canon = canonicalWorkOrderStatus(row.status);
-    const badge = workOrderStatusBadgeLabel(row.status).toLowerCase();
-    const hay = [
+    const badge = workOrderStatusBadgeLabel(row.status);
+    const hay = normalize([
       row.number,
       row.vehicle_plate,
       row.customer_name,
@@ -278,10 +281,8 @@ export function WorkOrdersKanbanPanel() {
       row.created_by,
       canon,
       badge,
-    ]
-      .join(' ')
-      .toLowerCase();
-    return hay.includes(q);
+    ].join(' '));
+    return hay.includes(normalize(q));
   }, []);
 
   const statsLine = useCallback(
@@ -384,9 +385,11 @@ export function WorkOrdersKanbanPanel() {
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
         )}
         renderOverlayCard={(row) => <CardPreview row={row} />}
-        title={showArchived ? 'Tablero de órdenes (archivadas)' : 'Tablero de órdenes'}
+        title={t('shell.workOrders.kanbanToolbarTitle')}
+        subtitle={showArchived ? t('shell.workOrders.kanbanToolbarSubtitleArchived') : undefined}
         searchPlaceholder={LIST_SEARCH_PLACEHOLDER}
         searchInputClassName="crud-search"
+        externalSearch={pageSearch}
         afterStats={afterStats}
         toolbarButtonRow={toolbarButtonRow}
         statsLine={statsLine}

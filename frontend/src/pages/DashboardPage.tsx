@@ -1,5 +1,6 @@
 import { useUser } from '@clerk/react';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getDashboard,
@@ -155,9 +156,13 @@ export function DashboardPage() {
   }
 
   const profile = getTenantProfile();
+  const { t } = useI18n();
 
   return (
-    <>
+    <div className="page-stack">
+      <Link to="/dashboard" className="btn-secondary btn-sm">
+        {t('shell.dashboard.backToSummary')}
+      </Link>
       <div className="dashboard-shell-header">
         <div className="dashboard-welcome">
           <DashboardWelcomeTitle me={meQuery.data} />
@@ -240,6 +245,6 @@ export function DashboardPage() {
         onAdd={handleAddWidget}
         onClose={() => setCatalogOpen(false)}
       />
-    </>
+    </div>
   );
 }

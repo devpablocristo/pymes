@@ -122,6 +122,29 @@ func (u *handlerUsecases) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUI
 	return false, nil
 }
 
+func (u *handlerUsecases) ListConversations(_ context.Context, _ uuid.UUID, _, _ string, _ int) ([]domain.Conversation, error) {
+	return nil, nil
+}
+func (u *handlerUsecases) AssignConversation(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+func (u *handlerUsecases) MarkConversationRead(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (u *handlerUsecases) ResolveConversation(_ context.Context, _, _ uuid.UUID) error  { return nil }
+
+func (u *handlerUsecases) CreateCampaign(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _ []string) (*domain.Campaign, error) {
+	return nil, nil
+}
+func (u *handlerUsecases) SendCampaign(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (u *handlerUsecases) ListCampaigns(_ context.Context, _ uuid.UUID, _ int) ([]domain.Campaign, error) {
+	return nil, nil
+}
+func (u *handlerUsecases) GetCampaign(_ context.Context, _, _ uuid.UUID) (*domain.Campaign, error) {
+	return nil, ErrNotFound
+}
+func (u *handlerUsecases) GetCampaignRecipients(_ context.Context, _, _ uuid.UUID) ([]domain.CampaignRecipient, error) {
+	return nil, nil
+}
+
 func TestHandleWebhookRejectsInvalidSignature(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)

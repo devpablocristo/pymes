@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -36,9 +37,15 @@ type RepositoryPort interface {
 	ExportCashflow(ctx context.Context, orgID uuid.UUID, from, to *time.Time) ([]string, [][]string, error)
 }
 
+// OptInPort permite registrar opt-in de WhatsApp para contactos importados.
+type OptInPort interface {
+	EnsureOptIn(ctx context.Context, orgID, partyID uuid.UUID, phone string) error
+}
+
 type Usecases struct {
 	repo    RepositoryPort
 	audit   AuditPort
+	optIn   OptInPort
 	tempDir string
 }
 
@@ -67,6 +74,14 @@ type ImportResult struct {
 	Updated   int           `json:"updated"`
 	Skipped   int           `json:"skipped"`
 	Errors    []ImportError `json:"errors"`
+	// PartyPhones contiene party_id + phone de los customers importados con teléfono.
+	// No se serializa al cliente — solo se usa internamente para hooks post-import.
+	PartyPhones []PartyPhone `json:"-"`
+}
+
+type PartyPhone struct {
+	PartyID uuid.UUID
+	Phone   string
 }
 
 type previewJob struct {
@@ -79,8 +94,18 @@ type previewJob struct {
 	CreatedAt time.Time           `json:"created_at"`
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit, tempDir: "/tmp/pymes-dataio"}
+type Option func(*Usecases)
+
+func WithOptIn(optIn OptInPort) Option {
+	return func(u *Usecases) { u.optIn = optIn }
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases {
+	u := &Usecases{repo: repo, audit: audit, tempDir: "/tmp/pymes-dataio"}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 func (u *Usecases) Preview(ctx context.Context, entity, filename string, fileData []byte) (Preview, error) {
@@ -157,6 +182,16 @@ func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.
 		return ImportResult{}, err
 	}
 	result.TotalRows = len(job.Rows)
+
+	// Auto opt-in de WhatsApp para customers importados con teléfono
+	if entity == "customers" && u.optIn != nil && len(result.PartyPhones) > 0 {
+		for _, pp := range result.PartyPhones {
+			if optErr := u.optIn.EnsureOptIn(ctx, orgID, pp.PartyID, pp.Phone); optErr != nil {
+				slog.Warn("auto opt-in failed during import", "party_id", pp.PartyID, "error", optErr)
+			}
+		}
+	}
+
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "dataio.import.confirmed", "dataio_preview", previewID, map[string]any{
 			"entity":  entity,

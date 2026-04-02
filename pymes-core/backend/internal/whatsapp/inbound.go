@@ -10,9 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 )
@@ -162,7 +165,47 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 			}
 			return result, err
 		}
-		msg.OrgID = conn.OrgID
+		orgID := conn.OrgID
+		msg.OrgID = orgID
+
+		// Resolver party por teléfono y crear/actualizar conversación
+		var convID *uuid.UUID
+		var inboundPartyID *uuid.UUID
+		partyID, partyName, _ := u.repo.GetPartyByPhone(ctx, orgID, msg.FromPhone)
+		if partyID != uuid.Nil {
+			conv, convErr := u.repo.GetOrCreateConversation(ctx, orgID, partyID, msg.FromPhone, partyName)
+			if convErr == nil {
+				convID = &conv.ID
+				inboundPartyID = &partyID
+
+				// Guardar mensaje inbound
+				now := time.Now()
+				inboundMsg := domain.Message{
+					ID:             uuid.New(),
+					OrgID:          orgID,
+					PhoneNumberID:  msg.PhoneNumberID,
+					Direction:      domain.MessageDirection("inbound"),
+					WAMessageID:    msg.MessageID,
+					FromPhone:      msg.FromPhone,
+					ToPhone:        conn.PhoneNumberID,
+					MessageType:    domain.MessageType("text"),
+					Body:           msg.Text,
+					PartyID:        inboundPartyID,
+					ConversationID: convID,
+					Status:         domain.MessageStatus("delivered"),
+					CreatedAt:      now,
+					UpdatedAt:      now,
+				}
+				_ = u.repo.SaveMessage(ctx, inboundMsg)
+
+				// Actualizar conversación con preview del último mensaje
+				preview := msg.Text
+				if len(preview) > 100 {
+					preview = preview[:100]
+				}
+				_ = u.repo.UpdateConversationLastMessage(ctx, conv.ID, preview, true)
+			}
+		}
 
 		reply, err := u.ai.ProcessWhatsApp(ctx, msg)
 		if err != nil {
@@ -177,9 +220,25 @@ func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (In
 		if err != nil {
 			return result, domainerr.UpstreamError("failed to decrypt whatsapp access token")
 		}
-		if _, err := u.meta.SendTextMessage(ctx, conn.PhoneNumberID, accessToken, msg.FromPhone, reply.Reply); err != nil {
+		waReplyID, sendErr := u.meta.SendTextMessage(ctx, conn.PhoneNumberID, accessToken, msg.FromPhone, reply.Reply)
+		if sendErr != nil {
 			return result, fmt.Errorf("send whatsapp response phone=%s msg=%s: %w", msg.PhoneNumberID, msg.MessageID, domainerr.UpstreamError("failed to send whatsapp response"))
 		}
+
+		// Guardar mensaje outbound (respuesta AI)
+		if convID != nil {
+			domainConn := domain.Connection{OrgID: orgID, PhoneNumberID: conn.PhoneNumberID}
+			outMsg := u.buildOutboundMessage(domainConn, orgID, inboundPartyID, msg.FromPhone, domain.MessageType("text"), reply.Reply, waReplyID)
+			outMsg.ConversationID = convID
+			outMsg.CreatedBy = "ai"
+			_ = u.repo.SaveMessage(ctx, outMsg)
+			replyPreview := reply.Reply
+			if len(replyPreview) > 100 {
+				replyPreview = replyPreview[:100]
+			}
+			_ = u.repo.UpdateConversationLastMessage(ctx, *convID, replyPreview, false)
+		}
+
 		result.Replied++
 	}
 	return result, nil

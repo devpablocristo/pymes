@@ -154,12 +154,12 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
           </div>
 
           {permUserId ? (
-            <div className="admin-settings-section" style={{ marginTop: '1rem' }}>
+            <div className="admin-settings-section admin-rbac-block-mt">
               <h3>Permisos efectivos</h3>
               <p className="text-secondary">
                 Usuario: <code className="admin-code">{permUserId}</code>
               </p>
-              <pre className="admin-textarea" style={{ whiteSpace: 'pre-wrap', minHeight: '6rem' }}>
+              <pre className="admin-textarea admin-pre-permissions">
                 {permLines}
               </pre>
               <button type="button" className="btn-sm btn-secondary" onClick={() => setPermUserId(null)}>
@@ -169,8 +169,7 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
           ) : null}
 
           <form
-            className="admin-settings-grid"
-            style={{ marginTop: '1rem' }}
+            className="admin-settings-grid admin-rbac-assign-form"
             onSubmit={(e) => {
               e.preventDefault();
               void handleAssign();
@@ -208,7 +207,7 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
                 ))}
               </select>
             </div>
-            <div className="form-group admin-settings-toolbar-bottom" style={{ alignSelf: 'end' }}>
+            <div className="form-group admin-settings-toolbar-bottom admin-rbac-form-actions">
               <button type="submit" className="btn-primary btn-sm" disabled={busy}>
                 Asignar rol
               </button>

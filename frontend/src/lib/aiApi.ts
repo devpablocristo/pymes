@@ -1,7 +1,6 @@
 import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
 import type {
   CommercialChatRequest,
-  InsightNotificationItem,
   InsightNotificationsResponse,
   PymesAssistantChatResponse,
 } from '../types/aiChat';
@@ -45,6 +44,41 @@ export type {
 /** Asistente Pymes — un solo chat interno con router LLM y sub-agentes especializados. */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
   return request('/v1/chat', aiOptions({ method: 'POST', body: payload }));
+}
+
+// ── Conversaciones persistidas ──
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+};
+
+export type ConversationMessage = {
+  role: string;
+  content: string;
+  ts?: string | null;
+  tool_calls?: string[];
+};
+
+export type ConversationDetail = {
+  id: string;
+  title: string;
+  messages: ConversationMessage[];
+  created_at: string;
+  updated_at: string;
+};
+
+/** Lista conversaciones del usuario autenticado. */
+export async function listConversations(limit = 50): Promise<{ items: ConversationSummary[] }> {
+  return request(`/v1/chat/conversations?limit=${limit}`, aiOptions());
+}
+
+/** Carga una conversación con su historial de mensajes. */
+export async function getConversation(conversationId: string): Promise<ConversationDetail> {
+  return request(`/v1/chat/conversations/${conversationId}`, aiOptions());
 }
 
 export async function createInsightNotifications(payload?: {

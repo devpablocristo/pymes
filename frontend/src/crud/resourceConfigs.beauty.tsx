@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { CrudPageConfig } from '../components/CrudPage';
 import {
   createBeautySalonService,
@@ -53,7 +54,10 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         key: 'color',
         header: 'Color',
         render: (value) => (
-          <span className="badge badge-swatch" style={{ background: String(value || '#6366f1') }}>
+          <span
+            className="badge badge-swatch"
+            style={{ '--badge-swatch-bg': String(value || 'var(--color-accent-indigo)') } as CSSProperties}
+          >
             {' '}
           </span>
         ),
@@ -68,7 +72,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     formFields: [
       { key: 'display_name', label: 'Nombre', required: true, placeholder: 'María López' },
       { key: 'role', label: 'Rol', placeholder: 'Estilista, recepción, colorista...' },
-      { key: 'color', label: 'Color en agenda', placeholder: '#6366f1' },
+      { key: 'color', label: 'Color en agenda', placeholder: 'var(--color-accent-indigo) o #RRGGBB' },
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],

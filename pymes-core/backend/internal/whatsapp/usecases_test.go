@@ -134,6 +134,49 @@ func (r *testRepo) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (boo
 	return false, nil
 }
 
+func (r *testRepo) GetPartyByPhone(_ context.Context, _ uuid.UUID, _ string) (uuid.UUID, string, error) {
+	return uuid.Nil, "", ErrNotFound
+}
+func (r *testRepo) GetOrCreateConversation(_ context.Context, _, _ uuid.UUID, _, _ string) (*domain.Conversation, error) {
+	return nil, nil
+}
+func (r *testRepo) ListConversations(_ context.Context, _ uuid.UUID, _, _ string, _ int) ([]domain.Conversation, error) {
+	return nil, nil
+}
+func (r *testRepo) AssignConversation(_ context.Context, _, _ uuid.UUID, _ string) error { return nil }
+func (r *testRepo) UpdateConversationLastMessage(_ context.Context, _ uuid.UUID, _ string, _ bool) error {
+	return nil
+}
+func (r *testRepo) MarkConversationRead(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (r *testRepo) ResolveConversation(_ context.Context, _, _ uuid.UUID) error  { return nil }
+
+func (r *testRepo) CreateCampaign(_ context.Context, _ *domain.Campaign) error { return nil }
+func (r *testRepo) GetCampaign(_ context.Context, _, _ uuid.UUID) (*domain.Campaign, error) {
+	return nil, ErrNotFound
+}
+func (r *testRepo) ListCampaigns(_ context.Context, _ uuid.UUID, _ int) ([]domain.Campaign, error) {
+	return nil, nil
+}
+func (r *testRepo) UpdateCampaignStatus(_ context.Context, _, _ uuid.UUID, _ domain.CampaignStatus, _ map[string]any) error {
+	return nil
+}
+func (r *testRepo) SaveCampaignRecipients(_ context.Context, _ []domain.CampaignRecipient) error {
+	return nil
+}
+func (r *testRepo) UpdateRecipientStatus(_ context.Context, _ uuid.UUID, _ domain.RecipientStatus, _, _ string) error {
+	return nil
+}
+func (r *testRepo) ListCampaignRecipients(_ context.Context, _ uuid.UUID) ([]domain.CampaignRecipient, error) {
+	return nil, nil
+}
+func (r *testRepo) GetOptedInPartiesByTag(_ context.Context, _ uuid.UUID, _ string) ([]struct {
+	PartyID   uuid.UUID
+	Phone     string
+	PartyName string
+}, error) {
+	return nil, nil
+}
+
 type testAIClient struct {
 	last InboundMessage
 }

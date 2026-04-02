@@ -86,6 +86,29 @@ func (r *Repository) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID
 	return strings.TrimSpace(row.Phone), strings.TrimSpace(row.Name), nil
 }
 
+func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone string) (uuid.UUID, string, error) {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return uuid.Nil, "", ErrNotFound
+	}
+	var row struct {
+		ID   uuid.UUID `gorm:"column:id"`
+		Name string    `gorm:"column:name"`
+	}
+	// Buscar teléfono exacto o con variantes (+54, sin +, etc.)
+	err := r.db.WithContext(ctx).Table("parties").
+		Select("id, COALESCE(display_name,'') as name").
+		Where("org_id = ? AND REPLACE(REPLACE(phone,' ',''),'+','') = REPLACE(REPLACE(?,' ',''),'+','')", orgID, phone).
+		Order("created_at ASC").Limit(1).Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, "", ErrNotFound
+		}
+		return uuid.Nil, "", err
+	}
+	return row.ID, strings.TrimSpace(row.Name), nil
+}
+
 func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error) {
 	var row struct {
 		QuoteTemplate      string `gorm:"column:wa_quote_template"`
@@ -240,6 +263,8 @@ func (r *Repository) SaveMessage(ctx context.Context, msg domain.Message) error 
 		ErrorCode:        msg.ErrorCode,
 		ErrorMessage:     msg.ErrorMessage,
 		PartyID:          msg.PartyID,
+		ConversationID:   msg.ConversationID,
+		CreatedBy:        msg.CreatedBy,
 		Metadata:         datatypes.JSON(meta),
 		CreatedAt:        msg.CreatedAt,
 		UpdatedAt:        msg.UpdatedAt,
@@ -514,6 +539,8 @@ func messageToDomain(m models.WhatsAppMessage) domain.Message {
 		ErrorCode:        m.ErrorCode,
 		ErrorMessage:     m.ErrorMessage,
 		PartyID:          m.PartyID,
+		ConversationID:   m.ConversationID,
+		CreatedBy:        m.CreatedBy,
 		Metadata:         meta,
 		CreatedAt:        m.CreatedAt,
 		UpdatedAt:        m.UpdatedAt,
@@ -556,5 +583,316 @@ func optInToDomain(m models.WhatsAppOptIn) domain.OptIn {
 		OptedInAt:  m.OptedInAt,
 		OptedOutAt: m.OptedOutAt,
 		CreatedAt:  m.CreatedAt,
+	}
+}
+
+// ── Campañas ──
+
+func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) error {
+	params, _ := json.Marshal(c.TemplateParams)
+	m := models.WhatsAppCampaign{
+		ID:               c.ID,
+		OrgID:            c.OrgID,
+		Name:             c.Name,
+		TemplateName:     c.TemplateName,
+		TemplateLanguage: c.TemplateLanguage,
+		TemplateParams:   datatypes.JSON(params),
+		TagFilter:        c.TagFilter,
+		Status:           string(c.Status),
+		TotalRecipients:  c.TotalRecipients,
+		CreatedBy:        c.CreatedBy,
+		CreatedAt:        c.CreatedAt,
+		UpdatedAt:        c.UpdatedAt,
+	}
+	return r.db.WithContext(ctx).Create(&m).Error
+}
+
+func (r *Repository) GetCampaign(ctx context.Context, orgID, campaignID uuid.UUID) (*domain.Campaign, error) {
+	var m models.WhatsAppCampaign
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, campaignID).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return campaignToDomain(m), nil
+}
+
+func (r *Repository) ListCampaigns(ctx context.Context, orgID uuid.UUID, limit int) ([]domain.Campaign, error) {
+	var rows []models.WhatsAppCampaign
+	err := r.db.WithContext(ctx).
+		Where("org_id = ?", orgID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.Campaign, 0, len(rows))
+	for _, m := range rows {
+		result = append(result, *campaignToDomain(m))
+	}
+	return result, nil
+}
+
+func (r *Repository) UpdateCampaignStatus(ctx context.Context, orgID, campaignID uuid.UUID, status domain.CampaignStatus, updates map[string]any) error {
+	updates["status"] = string(status)
+	updates["updated_at"] = time.Now()
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppCampaign{}).
+		Where("org_id = ? AND id = ?", orgID, campaignID).
+		Updates(updates).Error
+}
+
+func (r *Repository) SaveCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error {
+	if len(recipients) == 0 {
+		return nil
+	}
+	rows := make([]models.WhatsAppCampaignRecipient, 0, len(recipients))
+	for _, rec := range recipients {
+		rows = append(rows, models.WhatsAppCampaignRecipient{
+			ID:         rec.ID,
+			CampaignID: rec.CampaignID,
+			OrgID:      rec.OrgID,
+			PartyID:    rec.PartyID,
+			Phone:      rec.Phone,
+			PartyName:  rec.PartyName,
+			Status:     string(rec.Status),
+			CreatedAt:  rec.CreatedAt,
+		})
+	}
+	return r.db.WithContext(ctx).CreateInBatches(rows, 100).Error
+}
+
+func (r *Repository) UpdateRecipientStatus(ctx context.Context, recipientID uuid.UUID, status domain.RecipientStatus, waMessageID, errorMsg string) error {
+	updates := map[string]any{
+		"status": string(status),
+	}
+	if waMessageID != "" {
+		updates["wa_message_id"] = waMessageID
+	}
+	if errorMsg != "" {
+		updates["error_message"] = errorMsg
+	}
+	now := time.Now()
+	switch status {
+	case domain.RecipientSent:
+		updates["sent_at"] = now
+	case domain.RecipientDelivered:
+		updates["delivered_at"] = now
+	case domain.RecipientRead:
+		updates["read_at"] = now
+	}
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppCampaignRecipient{}).
+		Where("id = ?", recipientID).
+		Updates(updates).Error
+}
+
+func (r *Repository) ListCampaignRecipients(ctx context.Context, campaignID uuid.UUID) ([]domain.CampaignRecipient, error) {
+	var rows []models.WhatsAppCampaignRecipient
+	err := r.db.WithContext(ctx).Where("campaign_id = ?", campaignID).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.CampaignRecipient, 0, len(rows))
+	for _, m := range rows {
+		result = append(result, domain.CampaignRecipient{
+			ID:          m.ID,
+			CampaignID:  m.CampaignID,
+			OrgID:       m.OrgID,
+			PartyID:     m.PartyID,
+			Phone:       m.Phone,
+			PartyName:   m.PartyName,
+			Status:      domain.RecipientStatus(m.Status),
+			WAMessageID: m.WAMessageID,
+			ErrorMessage: m.ErrorMessage,
+			SentAt:      m.SentAt,
+			DeliveredAt: m.DeliveredAt,
+			ReadAt:      m.ReadAt,
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+	return result, nil
+}
+
+// GetOptedInPartiesByTag recupera parties con opt-in activo, filtrados por tag.
+func (r *Repository) GetOptedInPartiesByTag(ctx context.Context, orgID uuid.UUID, tag string) ([]struct {
+	PartyID   uuid.UUID
+	Phone     string
+	PartyName string
+}, error) {
+	type row struct {
+		PartyID   uuid.UUID `gorm:"column:party_id"`
+		Phone     string    `gorm:"column:phone"`
+		PartyName string    `gorm:"column:display_name"`
+	}
+	var rows []row
+
+	query := r.db.WithContext(ctx).
+		Table("whatsapp_opt_ins o").
+		Select("o.party_id, o.phone, COALESCE(p.display_name, '') AS display_name").
+		Joins("LEFT JOIN parties p ON p.id = o.party_id AND p.org_id = o.org_id").
+		Where("o.org_id = ? AND o.status = 'opted_in'", orgID)
+
+	if strings.TrimSpace(tag) != "" {
+		query = query.Where("p.tags @> ?", datatypes.JSON([]byte(`["`+strings.TrimSpace(tag)+`"]`)))
+	}
+
+	err := query.Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]struct {
+		PartyID   uuid.UUID
+		Phone     string
+		PartyName string
+	}, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, struct {
+			PartyID   uuid.UUID
+			Phone     string
+			PartyName string
+		}{PartyID: r.PartyID, Phone: r.Phone, PartyName: r.PartyName})
+	}
+	return result, nil
+}
+
+// ── Conversaciones ──
+
+func (r *Repository) GetOrCreateConversation(ctx context.Context, orgID, partyID uuid.UUID, phone, partyName string) (*domain.Conversation, error) {
+	var m models.WhatsAppConversation
+	err := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ?", orgID, partyID).First(&m).Error
+	if err == nil {
+		return conversationToDomain(m), nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	now := time.Now()
+	m = models.WhatsAppConversation{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		PartyID:   partyID,
+		Phone:     phone,
+		PartyName: partyName,
+		Status:    string(domain.ConversationOpen),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+		// Puede fallar por unique constraint si otro request creó primero
+		if err2 := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ?", orgID, partyID).First(&m).Error; err2 != nil {
+			return nil, err
+		}
+	}
+	return conversationToDomain(m), nil
+}
+
+func (r *Repository) ListConversations(ctx context.Context, orgID uuid.UUID, assignedTo string, status string, limit int) ([]domain.Conversation, error) {
+	var rows []models.WhatsAppConversation
+	q := r.db.WithContext(ctx).Where("org_id = ?", orgID)
+	if assignedTo == "__unassigned__" {
+		q = q.Where("assigned_to = ''")
+	} else if assignedTo != "" {
+		q = q.Where("assigned_to = ?", assignedTo)
+	}
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	err := q.Order("last_message_at DESC NULLS LAST").Limit(limit).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.Conversation, 0, len(rows))
+	for _, m := range rows {
+		result = append(result, *conversationToDomain(m))
+	}
+	return result, nil
+}
+
+func (r *Repository) AssignConversation(ctx context.Context, orgID, conversationID uuid.UUID, assignedTo string) error {
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppConversation{}).
+		Where("org_id = ? AND id = ?", orgID, conversationID).
+		Updates(map[string]any{
+			"assigned_to": assignedTo,
+			"updated_at":  time.Now(),
+		}).Error
+}
+
+func (r *Repository) UpdateConversationLastMessage(ctx context.Context, conversationID uuid.UUID, preview string, inbound bool) error {
+	now := time.Now()
+	updates := map[string]any{
+		"last_message_at":      now,
+		"last_message_preview": preview,
+		"updated_at":           now,
+	}
+	if inbound {
+		updates["unread_count"] = gorm.Expr("unread_count + 1")
+		updates["status"] = string(domain.ConversationOpen)
+	}
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppConversation{}).
+		Where("id = ?", conversationID).
+		Updates(updates).Error
+}
+
+func (r *Repository) MarkConversationRead(ctx context.Context, orgID, conversationID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppConversation{}).
+		Where("org_id = ? AND id = ?", orgID, conversationID).
+		Updates(map[string]any{"unread_count": 0, "updated_at": time.Now()}).Error
+}
+
+func (r *Repository) ResolveConversation(ctx context.Context, orgID, conversationID uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&models.WhatsAppConversation{}).
+		Where("org_id = ? AND id = ?", orgID, conversationID).
+		Updates(map[string]any{"status": string(domain.ConversationResolved), "updated_at": time.Now()}).Error
+}
+
+func conversationToDomain(m models.WhatsAppConversation) *domain.Conversation {
+	return &domain.Conversation{
+		ID:                 m.ID,
+		OrgID:              m.OrgID,
+		PartyID:            m.PartyID,
+		Phone:              m.Phone,
+		PartyName:          m.PartyName,
+		AssignedTo:         m.AssignedTo,
+		Status:             domain.ConversationStatus(m.Status),
+		LastMessageAt:      m.LastMessageAt,
+		LastMessagePreview: m.LastMessagePreview,
+		UnreadCount:        m.UnreadCount,
+		CreatedAt:          m.CreatedAt,
+		UpdatedAt:          m.UpdatedAt,
+	}
+}
+
+func campaignToDomain(m models.WhatsAppCampaign) *domain.Campaign {
+	var params []string
+	_ = json.Unmarshal(m.TemplateParams, &params)
+	return &domain.Campaign{
+		ID:               m.ID,
+		OrgID:            m.OrgID,
+		Name:             m.Name,
+		TemplateName:     m.TemplateName,
+		TemplateLanguage: m.TemplateLanguage,
+		TemplateParams:   params,
+		TagFilter:        m.TagFilter,
+		Status:           domain.CampaignStatus(m.Status),
+		TotalRecipients:  m.TotalRecipients,
+		SentCount:        m.SentCount,
+		DeliveredCount:   m.DeliveredCount,
+		ReadCount:        m.ReadCount,
+		FailedCount:      m.FailedCount,
+		ScheduledAt:      m.ScheduledAt,
+		StartedAt:        m.StartedAt,
+		CompletedAt:      m.CompletedAt,
+		CreatedBy:        m.CreatedBy,
+		CreatedAt:        m.CreatedAt,
+		UpdatedAt:        m.UpdatedAt,
 	}
 }

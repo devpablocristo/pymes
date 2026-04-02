@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/api';
 import type { NotificationPreference } from '../lib/types';
 
@@ -28,6 +30,9 @@ type NotificationPreferencesPageProps = {
 
 export function NotificationPreferencesPage({ embedded = false }: NotificationPreferencesPageProps) {
   const [items, setItems] = useState<NotificationPreference[]>([]);
+  const npSearch = usePageSearch();
+  const npTextFn = useCallback((p: NotificationPreference) => `${p.notification_type} ${p.channel}`, []);
+  const filteredPrefs = useSearch(items, npTextFn, npSearch);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -62,8 +67,13 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
   }
 
   return (
-    <>
-      {/* Sin cabecera — el contexto viene del sidebar */}
+    <div className={embedded ? undefined : 'page-stack'}>
+      {!embedded && (
+        <header className="page-header">
+          <h1>Preferencias de notificación</h1>
+          <p>Elegí qué avisos recibís por canal.</p>
+        </header>
+      )}
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -87,7 +97,7 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {filteredPrefs.map((item) => (
                   <tr key={`${item.notification_type}-${item.channel}`}>
                     <td className="text-semibold">{labelForType(item.notification_type)}</td>
                     <td>
@@ -107,6 +117,6 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

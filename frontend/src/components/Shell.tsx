@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
+import { PageSearchProvider } from './PageSearch';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
@@ -167,6 +168,8 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
       { to: '/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/invoices', label: t('shell.nav.invoices'), icon: documentIcon },
+      { to: '/whatsapp/inbox', label: 'Bandeja WhatsApp', icon: chatIcon },
+      { to: '/whatsapp/campaigns', label: 'Campañas WhatsApp', icon: chatIcon },
       { to: '/crypto', label: t('shell.nav.crypto'), icon: chartIcon },
       { to: '/ui', label: t('shell.nav.uiComponents'), icon: dashboardIcon },
       { to: '/settings', label: 'Ajustes', icon: adminIcon },
@@ -186,6 +189,20 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/workshops/auto-repair/vehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
     { to: '/workshops/auto-repair/services', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
     { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+  ], [t]);
+
+  const bikeIcon = (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5.5" cy="17.5" r="3.5" />
+      <circle cx="18.5" cy="17.5" r="3.5" />
+      <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
+    </svg>
+  );
+
+  const bikeShopNav = useMemo<AppShellNavItem[]>(() => [
+    { to: '/workshops/bike-shop/bicycles', label: 'Bicicletas', icon: bikeIcon },
+    { to: '/workshops/bike-shop/services', label: 'Servicios', icon: wrenchIcon },
+    { to: '/workshops/bike-shop/orders', label: 'Órdenes de trabajo', icon: documentIcon },
   ], [t]);
 
   const beautyIcon = (
@@ -236,6 +253,9 @@ export function Shell({ children }: { children: ReactNode }) {
     if (vertical === 'workshops') {
       result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
     }
+    if (vertical === 'bike_shop') {
+      result.push({ label: 'Bicicletería', items: bikeShopNav });
+    }
     if (vertical === 'beauty') {
       result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });
     }
@@ -263,7 +283,9 @@ export function Shell({ children }: { children: ReactNode }) {
       brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
       sections={sections}
     >
-      {children}
+      <PageSearchProvider placeholder="Buscar…">
+        {children}
+      </PageSearchProvider>
     </AppShell>
   );
 }

@@ -2,7 +2,11 @@
  * Dashboard visual — gráficos, stats, tablas. Conectado a la API real.
  * Usa los mismos endpoints que el sistema de widgets: /v1/dashboard-data/*
  */
+import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { usePageSearch } from '../components/PageSearch';
+import { useI18n } from '../lib/i18n';
 import {
   IconAlert,
   IconArrowDown,
@@ -91,9 +95,11 @@ function StatCards() {
             {s.loading ? '…' : s.value.charAt(0)}
           </div>
           <div className="dash__stat-info">
-            <div className="dash__stat-value">{s.loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : s.value}</div>
+            <div className="dash__stat-value">
+              {s.loading ? <span className="spinner dash__stat-spinner" /> : s.value}
+            </div>
             <div className="dash__stat-label">{s.label}</div>
-            {s.sub && <div className="dash__stat-trend dash__stat-trend--up" style={{ color: 'var(--color-text-muted)' }}>{s.sub}</div>}
+            {s.sub && <div className="dash__stat-trend dash__stat-trend--muted">{s.sub}</div>}
           </div>
         </div>
       ))}
@@ -106,7 +112,13 @@ function StatCards() {
 function CashflowChart() {
   const { data, isLoading } = useWidgetData<CashflowSummaryData>('cashflow-summary');
   if (isLoading) return <div className="card"><div className="spinner" /></div>;
-  if (!data) return <div className="card"><p style={{ color: 'var(--color-text-muted)' }}>Sin datos de cashflow</p></div>;
+  if (!data) {
+    return (
+      <div className="card">
+        <p className="dash__empty-hint">Sin datos de cashflow</p>
+      </div>
+    );
+  }
 
   const max = Math.max(data.total_income, data.total_expense, 1);
   const balance = data.total_income - data.total_expense;
@@ -114,13 +126,14 @@ function CashflowChart() {
   return (
     <div className="card">
       <div className="dash__chart-header">
-        <div>          <div className="dash__chart-metric">{fmtMoney(balance)}</div>
+        <div>
+          <div className="dash__chart-metric">{fmtMoney(balance)}</div>
           <span className={`dash__stat-trend ${balance >= 0 ? 'dash__stat-trend--up' : 'dash__stat-trend--down'}`}>
             {balance >= 0 ? <IconArrowUp /> : <IconArrowDown />} Balance {data.period}
           </span>
         </div>
       </div>
-      <div className="dash__bars" style={{ height: 120 }}>
+      <div className="dash__bars dash__bars--dashboard">
         <div className="dash__bar-col">
           <div className="dash__bar dash__bar--success" style={{ height: `${(data.total_income / max) * 100}%` }} />
           <span className="dash__bar-label">Ingresos</span>
@@ -139,7 +152,13 @@ function CashflowChart() {
 function QuotesPipeline() {
   const { data, isLoading } = useWidgetData<QuotesPipelineData>('quotes-pipeline');
   if (isLoading) return <div className="card"><div className="spinner" /></div>;
-  if (!data) return <div className="card"><p style={{ color: 'var(--color-text-muted)' }}>Sin datos de presupuestos</p></div>;
+  if (!data) {
+    return (
+      <div className="card">
+        <p className="dash__empty-hint">Sin datos de presupuestos</p>
+      </div>
+    );
+  }
 
   const segments = [
     { label: 'Borrador', value: data.draft, color: 'var(--color-text-muted)' },
@@ -158,7 +177,6 @@ function QuotesPipeline() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">      </div>
       <div className="dash__donut-wrap">
         <div className="dash__donut" style={{ background: gradientParts.length ? `conic-gradient(${gradientParts.join(', ')})` : 'var(--color-border)' }}>
           <div className="dash__donut-center">{data.pending_total}</div>
@@ -185,19 +203,18 @@ function RecentSales() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin ventas recientes</p>
+        <p className="dash__empty-hint">Sin ventas recientes</p>
       ) : (
         <table className="dash__table">
           <thead><tr><th>N°</th><th>Cliente</th><th>Total</th><th>Fecha</th></tr></thead>
           <tbody>
             {items.slice(0, 6).map((s: any) => (
               <tr key={s.id ?? s.number}>
-                <td style={{ fontWeight: 600 }}>{s.number ?? s.id?.slice(0, 8)}</td>
+                <td className="dash__table-cell--strong">{s.number ?? s.id?.slice(0, 8)}</td>
                 <td>{s.party_name ?? s.customer_name ?? '—'}</td>
-                <td style={{ fontWeight: 600 }}>{fmtMoney(s.total ?? 0)}</td>
-                <td style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                <td className="dash__table-cell--strong">{fmtMoney(s.total ?? 0)}</td>
+                <td className="dash__table-cell--meta">
                   {s.created_at ? new Date(s.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '—'}
                 </td>
               </tr>
@@ -220,22 +237,21 @@ function TopProducts() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin datos de productos</p>
+        <p className="dash__empty-hint">Sin datos de productos</p>
       ) : (
         items.slice(0, 5).map((p: any, i: number) => {
           const qty = p.quantity ?? p.count ?? 0;
           const pct = (qty / maxQty) * 100;
           return (
-            <div key={p.id ?? p.name ?? i} style={{ marginBottom: 'var(--space-3)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: 'var(--text-sm)' }}>
-                <span style={{ fontWeight: 600 }}>{p.name ?? p.display_name}</span>
-                <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>{qty} ventas</span>
+            <div key={p.id ?? p.name ?? i} className="dash__product-row">
+              <div className="dash__product-row-head">
+                <span className="dash__product-name">{p.name ?? p.display_name}</span>
+                <span className="dash__product-meta">{qty} ventas</span>
               </div>
               <div className="dash__progress-wrap">
                 <div className="dash__progress">
-                  <div className="dash__progress-fill" style={{ width: `${pct}%`, background: 'var(--color-primary)' }} />
+                  <div className="dash__progress-fill dash__progress-fill--primary" style={{ width: `${pct}%` }} />
                 </div>
                 <span className="dash__progress-pct">{Math.round(pct)}%</span>
               </div>
@@ -256,19 +272,18 @@ function AuditActivity() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">      </div>
       {items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin actividad reciente</p>
+        <p className="dash__empty-hint">Sin actividad reciente</p>
       ) : (
         <table className="dash__table">
           <thead><tr><th>Acción</th><th>Recurso</th><th>Actor</th><th>Fecha</th></tr></thead>
           <tbody>
             {items.slice(0, 8).map((a: any, i: number) => (
               <tr key={a.id ?? i}>
-                <td style={{ fontWeight: 600, fontSize: 'var(--text-xs)' }}>{a.action}</td>
+                <td className="dash__table-cell--action">{a.action}</td>
                 <td>{a.resource_type} {a.resource_id?.slice(0, 8)}</td>
                 <td>{a.actor ?? '—'}</td>
-                <td style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                <td className="dash__table-cell--meta">
                   {a.created_at ? new Date(a.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
                 </td>
               </tr>
@@ -311,22 +326,21 @@ function TodayAppointments() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">        <span style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-primary)' }}>
-          {isLoading ? '…' : items.length}
-        </span>
+      <div className="dash__chart-header">
+        <span className="dash__chart-metric--primary">{isLoading ? '…' : items.length}</span>
       </div>
       {isLoading ? (
         <div className="spinner" />
       ) : items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin turnos hoy</p>
+        <p className="dash__empty-hint">Sin turnos hoy</p>
       ) : (
         <>
           {next && (
-            <div style={{ padding: 'var(--space-3)', background: 'var(--color-primary-subtle)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div className="dash__next-appt">
               <IconCalendar />
               <div>
-                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>Próximo: {next.title || next.customer_name}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                <div className="dash__next-appt-title">Próximo: {next.title || next.customer_name}</div>
+                <div className="dash__next-appt-meta">
                   {new Date(next.start_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                   {next.assigned_to ? ` · ${next.assigned_to}` : ''}
                 </div>
@@ -335,7 +349,10 @@ function TodayAppointments() {
           )}
           {items.slice(0, 5).map((a) => (
             <div key={a.id} className="dash__performer">
-              <div style={{ width: 4, height: 28, borderRadius: 2, background: a.color || 'var(--color-primary)', flexShrink: 0 }} />
+              <div
+                className="dash__appt-strip"
+                style={{ '--dash-accent': a.color || 'var(--color-primary)' } as CSSProperties}
+              />
               <div className="dash__performer-info">
                 <div className="dash__performer-name">{a.title || a.customer_name}</div>
                 <div className="dash__performer-role">
@@ -344,7 +361,9 @@ function TodayAppointments() {
                   {new Date(a.end_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
-              <span className={`badge ${a.status === 'confirmed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-neutral'}`} style={{ fontSize: 'var(--text-xs)' }}>
+              <span
+                className={`badge dash__badge-xs ${a.status === 'confirmed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-neutral'}`}
+              >
                 {a.status}
               </span>
             </div>
@@ -363,8 +382,9 @@ function LowStockAlerts() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">        {!isLoading && items.length > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--color-warning)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+      <div className="dash__chart-header">
+        {!isLoading && items.length > 0 && (
+          <span className="dash__chart-header-alert">
             <IconAlert /> {items.length}
           </span>
         )}
@@ -372,7 +392,7 @@ function LowStockAlerts() {
       {isLoading ? (
         <div className="spinner" />
       ) : items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Todo el stock está en orden</p>
+        <p className="dash__empty-hint">Todo el stock está en orden</p>
       ) : (
         items.slice(0, 6).map((p) => (
           <div key={p.product_id} className="dash__performer">
@@ -380,11 +400,13 @@ function LowStockAlerts() {
               <div className="dash__performer-name">{p.product_name}</div>
               <div className="dash__performer-role">{p.sku ? `SKU: ${p.sku}` : ''}</div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontWeight: 700, color: p.quantity <= 0 ? 'var(--color-danger)' : 'var(--color-warning)', fontSize: 'var(--text-sm)' }}>
+            <div className="dash__performer-money-wrap">
+              <div
+                className={`dash__performer-money ${p.quantity <= 0 ? 'dash__performer-money--danger' : 'dash__performer-money--warning'}`}
+              >
                 {p.quantity}
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>mín: {p.min_quantity}</div>
+              <div className="dash__performer-money-label">mín: {p.min_quantity}</div>
             </div>
           </div>
         ))
@@ -413,8 +435,9 @@ function Debtors() {
 
   return (
     <div className="card">
-      <div className="dash__chart-header">        {!isLoading && items.length > 0 && (
-          <span style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }}>
+      <div className="dash__chart-header">
+        {!isLoading && items.length > 0 && (
+          <span className="dash__chart-header-danger">
             {fmtMoney(items.reduce((s, d) => s + d.total_debt, 0))}
           </span>
         )}
@@ -422,7 +445,7 @@ function Debtors() {
       {isLoading ? (
         <div className="spinner" />
       ) : items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Sin deudas pendientes</p>
+        <p className="dash__empty-hint">Sin deudas pendientes</p>
       ) : (
         items.slice(0, 6).map((d) => (
           <div key={d.party_id} className="dash__performer">
@@ -434,9 +457,7 @@ function Debtors() {
                 </div>
               )}
             </div>
-            <div style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }}>
-              {fmtMoney(d.total_debt)}
-            </div>
+            <div className="dash__performer-money dash__performer-money--danger">{fmtMoney(d.total_debt)}</div>
           </div>
         ))
       )}
@@ -447,8 +468,20 @@ function Debtors() {
 // ─── Página ───
 
 export function DashboardVisualPage() {
+  const { t } = useI18n();
+  // Registra el search para que aparezca el input. Filtrado de gráficos pendiente.
+  usePageSearch();
   return (
-    <div className="dash">
+    <div className="dash page-stack">
+      <header className="page-header page-header--split">
+        <div className="page-header__main">
+          <h1>{t('shell.dashboard.panelTitle')}</h1>
+          <p>{t('shell.dashboard.panelLead')}</p>
+        </div>
+        <Link to="/dashboard/widgets" className="btn-secondary btn-sm">
+          {t('shell.dashboard.customizeWidgets')}
+        </Link>
+      </header>
       <StatCards />
 
       <div className="dash__grid--3">

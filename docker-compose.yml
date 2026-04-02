@@ -138,7 +138,9 @@ services:
       - ./frontend/index.html:/workspace/pymes/frontend/index.html
       - ./frontend/vite.config.ts:/workspace/pymes/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/pymes/frontend/tsconfig.json
+      - ./frontend/eslint.config.js:/workspace/pymes/frontend/eslint.config.js
       - ../modules:/workspace/modules
+      - ../core:/workspace/core
     env_file:
       - .env
     environment:

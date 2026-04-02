@@ -2,7 +2,7 @@
 # Verificación preferida: targets test-docker-* / build-docker-* (requieren `make up`).
 # build/test nativos abajo = respaldo/CI rápido en host si no hay Docker.
 # docker-compose.yml en la raíz de este directorio.
-.PHONY: up down build test build-docker-frontend test-docker-frontend test-docker-core test-docker-workshops logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all modules-check cleanup-pablo e2e-review-notifications
+.PHONY: up down build test build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops logs ps staticcheck ruff lint seed-core-demo seed-workshops-demo seed-docker-core seed-docker-workshops seed-docker-all modules-check cleanup-pablo e2e-review-notifications
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
 
@@ -82,6 +82,9 @@ build-docker-frontend:
 
 test-docker-frontend:
 	docker compose exec -T frontend npm test
+
+lint-docker-frontend:
+	docker compose exec -T frontend npm run lint
 
 test-docker-core:
 	docker compose exec -T cp-backend go test ./...

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { useNavigate } from 'react-router-dom';
 import {
   NotificationFeed,
@@ -224,7 +226,11 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     }
   }
 
-  const items: NotificationFeedItem[] = notifications.map((n) => {
+  const pageSearch = usePageSearch();
+  const notifTextFn = useCallback((n: InAppNotificationItem) => `${n.title ?? ''} ${n.body ?? ''}`, []);
+  const filteredNotifications = useSearch(notifications, notifTextFn, pageSearch);
+
+  const items: NotificationFeedItem[] = filteredNotifications.map((n) => {
     const approval = getApprovalNotification(n.chat_context);
     if (approval) {
       const isProcessing = approvalProcessing[approval.id] ?? false;
@@ -305,7 +311,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
       id: `n-${n.id}`,
       eyebrow: t('ai.notifications.item.notice'),
       title: n.title,
-      body: <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{n.body}</p>,
+      body: <p className="u-m-0 u-pre-wrap">{n.body}</p>,
       timestamp: (
         <>
           {new Date(n.created_at).toLocaleString(localeForLanguage(language))}
@@ -340,7 +346,13 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   });
 
   return (
-    <div data-embedded={embedded ? 'true' : 'false'}>
+    <div className={embedded ? undefined : 'page-stack'} data-embedded={embedded ? 'true' : 'false'}>
+      {!embedded && (
+        <header className="page-header">
+          <h1>{t('ai.notifications.pageTitle')}</h1>
+          <p>{t('ai.notifications.pageLead')}</p>
+        </header>
+      )}
       <NotificationFeed
         error={inAppError ? <p className="form-error">{inAppError}</p> : undefined}
         loading={loading}

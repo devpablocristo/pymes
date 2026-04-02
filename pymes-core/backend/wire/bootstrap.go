@@ -159,7 +159,6 @@ func InitializeApp() *app.App {
 	appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC, appointments.WithTimeline(timelineUC), appointments.WithWebhooks(outwebhooksUC))
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
-	dataioUC := dataio.NewUsecases(dataioRepo, auditUC)
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
@@ -189,6 +188,7 @@ func InitializeApp() *app.App {
 		cfg.WhatsAppWebhookVerifyToken,
 		cfg.WhatsAppAppSecret,
 	)
+	dataioUC := dataio.NewUsecases(dataioRepo, auditUC, dataio.WithOptIn(whatsappUC))
 	paymentGatewayUC := paymentgateway.NewUsecases(
 		paymentGatewayRepo,
 		paymentgatewayclient.NewMercadoPagoGateway(),

@@ -2,8 +2,10 @@
  * Facturación — 4 vistas (list, preview, add, edit) en una sola página
  * con navegación por estado interno.
  */
+import { useSearch } from '@devpablocristo/modules-search';
 import { useState, useCallback, useMemo } from 'react';
 import { IconClose, IconEdit, IconEye, IconTrash } from '@devpablocristo/modules-ui-data-display/icons';
+import { usePageSearch } from '../components/PageSearch';
 import './InvoicesPage.css';
 
 // ─── Tipos ───
@@ -100,28 +102,21 @@ function InvoiceList({
   onAdd: () => void;
   onDelete: (id: string) => void;
 }) {
-  const [search, setSearch] = useState('');
+  const search = usePageSearch();
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'all'>('all');
 
-  const filtered = useMemo(() => {
-    let result = invoices;
-    if (statusFilter !== 'all') result = result.filter(i => i.status === statusFilter);
-    const q = search.trim().toLowerCase();
-    if (q) result = result.filter(i => i.number.toLowerCase().includes(q) || i.customer.toLowerCase().includes(q));
-    return result;
-  }, [invoices, search, statusFilter]);
+  const statusFiltered = useMemo(() => {
+    if (statusFilter === 'all') return invoices;
+    return invoices.filter(i => i.status === statusFilter);
+  }, [invoices, statusFilter]);
+
+  const invoiceText = useCallback((i: Invoice) => `${i.number} ${i.customer}`, []);
+  const filtered = useSearch(statusFiltered, invoiceText, search);
 
   return (
     <div className="card">
       <div className="inv__toolbar">
         <div className="inv__toolbar-left">
-          <input
-            type="search"
-            className="inv__search"
-            placeholder="Buscar factura o cliente…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as InvoiceStatus | 'all')}>
             <option value="all">Todas</option>
             <option value="paid">Pagadas</option>
@@ -146,7 +141,7 @@ function InvoiceList({
         <tbody>
           {filtered.map(inv => (
             <tr key={inv.id}>
-              <td style={{ fontWeight: 600 }}>{inv.number}</td>
+              <td className="inv__cell-strong">{inv.number}</td>
               <td>
                 <div className="inv__customer">
                   <span className="inv__avatar">{inv.initials}</span>
@@ -154,7 +149,7 @@ function InvoiceList({
                 </div>
               </td>
               <td>{new Date(inv.issuedDate).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-              <td style={{ fontWeight: 600 }}>{fmtMoney(calcTotal(inv))}</td>
+              <td className="inv__cell-strong">{fmtMoney(calcTotal(inv))}</td>
               <td><span className={`badge ${STATUS_CLASSES[inv.status]}`}>{STATUS_LABELS[inv.status]}</span></td>
               <td>
                 <div className="inv__actions">
@@ -166,7 +161,7 @@ function InvoiceList({
             </tr>
           ))}
           {filtered.length === 0 && (
-            <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>Sin resultados</td></tr>
+            <tr><td colSpan={6} className="inv__empty-row">Sin resultados</td></tr>
           )}
         </tbody>
       </table>
@@ -194,7 +189,7 @@ function InvoicePreview({ invoice, onBack, onEdit }: { invoice: Invoice; onBack:
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: 'var(--space-4)' }}>
+      <div className="inv__preview-toolbar">
         <button type="button" className="btn-secondary btn-sm" onClick={onBack}>&larr; Volver</button>
         <button type="button" className="btn-secondary btn-sm" onClick={onEdit}>Editar</button>
         <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>Imprimir</button>
@@ -206,7 +201,7 @@ function InvoicePreview({ invoice, onBack, onEdit }: { invoice: Invoice; onBack:
             <h2 className="inv__preview-number">{invoice.number}</h2>
             <span className={`badge ${STATUS_CLASSES[invoice.status]}`}>{STATUS_LABELS[invoice.status]}</span>
           </div>
-          <div style={{ textAlign: 'right', fontSize: '0.85rem' }}>
+          <div className="inv__preview-company">
             <strong>Mi Empresa S.R.L.</strong><br />
             Av. Corrientes 1234, CABA<br />
             info@miempresa.com
@@ -331,7 +326,7 @@ function InvoiceForm({
 
   return (
     <div className="card">
-      <div style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="inv__form-back">
         <button type="button" className="btn-secondary btn-sm" onClick={onBack}>&larr; Volver</button>
       </div>
 
@@ -368,19 +363,19 @@ function InvoiceForm({
         </div>
 
         <div className="inv__line-items">
-          <label style={{ marginBottom: '0.5rem', display: 'block' }}>Ítems</label>
-          {items.map((item, i) => (
+          <label className="inv__line-items-label">Ítems</label>
+          {items.map((item) => (
             <div key={item.id} className="inv__line-row">
               <div className="form-group">
                 <input placeholder="Descripción" value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} />
               </div>
-              <div className="form-group" style={{ maxWidth: 80 }}>
+              <div className="form-group inv__line-qty">
                 <input type="number" min={1} placeholder="Cant." value={item.qty} onChange={e => updateItem(item.id, 'qty', Number(e.target.value))} />
               </div>
-              <div className="form-group" style={{ maxWidth: 100 }}>
+              <div className="form-group inv__line-unit">
                 <input placeholder="Unidad" value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)} />
               </div>
-              <div className="form-group" style={{ maxWidth: 120 }}>
+              <div className="form-group inv__line-price">
                 <input type="number" min={0} placeholder="Precio" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', Number(e.target.value))} />
               </div>
               <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} title="Quitar"><IconClose /></button>
@@ -389,14 +384,14 @@ function InvoiceForm({
           <button type="button" className="btn-secondary btn-sm inv__add-line" onClick={addItem}>+ Agregar ítem</button>
         </div>
 
-        <div className="inv__totals" style={{ marginTop: 'var(--space-4)' }}>
+        <div className="inv__totals inv__totals--form">
           <div className="inv__totals-row"><span>Subtotal</span><span>{fmtMoney(sub)}</span></div>
           {discount > 0 && <div className="inv__totals-row"><span>Descuento ({discount}%)</span><span>-{fmtMoney(sub * discount / 100)}</span></div>}
           <div className="inv__totals-row"><span>IVA ({tax}%)</span><span>{fmtMoney(afterDiscount * tax / 100)}</span></div>
           <div className="inv__totals-row inv__totals-row--total"><span>Total</span><span>{fmtMoney(total)}</span></div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: 'var(--space-4)' }}>
+        <div className="inv__form-actions">
           <button type="button" className="btn-secondary btn-sm" onClick={onBack}>Cancelar</button>
           <button type="submit" className="btn-primary btn-sm">{isEdit ? 'Guardar' : 'Crear factura'}</button>
         </div>
@@ -439,9 +434,15 @@ export function InvoicesPage() {
   }, []);
 
   return (
-    <div className="inv">
+    <div className="inv page-stack">
       {view === 'list' && (
-        <InvoiceList invoices={invoices} onView={handleView} onEdit={handleEdit} onAdd={handleAdd} onDelete={handleDelete} />
+        <>
+          <header className="page-header">
+            <h1>Facturación</h1>
+            <p>Facturas de demostración: listado, vista previa y edición.</p>
+          </header>
+          <InvoiceList invoices={invoices} onView={handleView} onEdit={handleEdit} onAdd={handleAdd} onDelete={handleDelete} />
+        </>
       )}
       {view === 'preview' && selectedInvoice && (
         <InvoicePreview invoice={selectedInvoice} onBack={handleBack} onEdit={() => setView('edit')} />

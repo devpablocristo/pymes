@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import {
   CrudPage as ModulesCrudPage,
   type CrudPageConfig,
@@ -6,6 +6,7 @@ import {
 import { apiRequest } from '../lib/api';
 import { buildPymesCrudStrings } from '../lib/crudModuleStrings';
 import { useI18n } from '../lib/i18n';
+import { PageSearchShellContext, usePageSearch } from './PageSearch';
 
 export type {
   CrudColumn,
@@ -27,6 +28,8 @@ export type {
 export function CrudPage<T extends { id: string }>(props: CrudPageConfig<T>) {
   const { localizeText, sentenceCase, language } = useI18n();
   const stringsBase = useMemo(() => buildPymesCrudStrings(language), [language]);
+  const pageSearchInShell = useContext(PageSearchShellContext);
+  const pageSearch = usePageSearch();
 
   const httpClient = useMemo(
     () =>
@@ -43,12 +46,15 @@ export function CrudPage<T extends { id: string }>(props: CrudPageConfig<T>) {
   );
 
   return (
-    <ModulesCrudPage
-      {...props}
-      stringsBase={stringsBase}
-      formatFieldText={localizeText}
-      sentenceCase={sentenceCase}
-      httpClient={props.httpClient ?? httpClient}
-    />
+    <div className="crud-page-host">
+      <ModulesCrudPage
+        {...props}
+        stringsBase={stringsBase}
+        formatFieldText={localizeText}
+        sentenceCase={sentenceCase}
+        httpClient={props.httpClient ?? httpClient}
+        externalSearch={pageSearchInShell ? pageSearch : undefined}
+      />
+    </div>
   );
 }

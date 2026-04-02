@@ -1,4 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import {
   closeRestaurantTableSession,
   getRestaurantDiningTables,
@@ -14,6 +16,9 @@ function formatSessionDate(iso: string): string {
 
 export function RestaurantTableSessionsPage() {
   const [sessions, setSessions] = useState<RestaurantTableSession[]>([]);
+  const sessSearch = usePageSearch();
+  const sessTextFn = useCallback((s: RestaurantTableSession) => `${s.table_code ?? ''} ${s.area_name ?? ''} ${s.party_label ?? ''}`, []);
+  const filteredSessions = useSearch(sessions, sessTextFn, sessSearch);
   const [tables, setTables] = useState<RestaurantDiningTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -187,7 +192,7 @@ export function RestaurantTableSessionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((s) => (
+                {filteredSessions.map((s) => (
                   <tr key={s.id}>
                     <td>
                       <strong>{s.table_code ?? s.table_id.slice(0, 8)}</strong>

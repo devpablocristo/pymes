@@ -1,4 +1,4 @@
-import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
+import { type CrudFieldValue, type CrudPageConfig } from '../components/CrudPage';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
 import {
@@ -10,7 +10,7 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
-import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments, type SalePaymentRow } from '../lib/api';
+import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
 
 type Address = {
@@ -756,7 +756,7 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
   },
 };
 
-export const commercialCsvStrategies: Record<string, CSVToolbarOptions<any>> = {
+export const commercialCsvStrategies: Record<string, CSVToolbarOptions> = {
   customers: { mode: 'server', entity: 'customers' },
   suppliers: { mode: 'server', entity: 'suppliers' },
   products: { mode: 'server', entity: 'products' },

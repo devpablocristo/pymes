@@ -33,6 +33,9 @@ type CrudModuleId =
   | 'workshopVehicles'
   | 'workshopServices'
   | 'workOrders'
+  | 'bikeBicycles'
+  | 'bikeShopServices'
+  | 'bikeWorkOrders'
   | 'beautyStaff'
   | 'beautySalonServices'
   | 'restaurantDiningAreas'
@@ -96,6 +99,9 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     labelPlural: 'servicios de taller',
   },
   workOrders: { title: 'Órdenes de trabajo', navLabel: 'Órdenes trabajo', labelPlural: 'órdenes de trabajo' },
+  bikeBicycles: { title: 'Bicicletas', navLabel: 'Bicicletas', labelPlural: 'bicicletas' },
+  bikeShopServices: { title: 'Servicios de bicicletería', navLabel: 'Servicios bici', labelPlural: 'servicios de bicicletería' },
+  bikeWorkOrders: { title: 'Órdenes de bicicletería', navLabel: 'Órdenes bici', labelPlural: 'órdenes de bicicletería' },
   beautyStaff: { title: 'Equipo', navLabel: 'Equipo', labelPlural: 'equipo' },
   beautySalonServices: {
     title: 'Servicios de salón',
@@ -350,6 +356,21 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'OT',
     summary:
       'Taller auto-repair: tablero por estado y lista administrativa en /modules/workOrders (selector Tablero / Lista).',
+  },
+  bikeBicycles: {
+    group: 'operations',
+    icon: 'BC',
+    summary: 'Catálogo de bicicletas del cliente con datos técnicos.',
+  },
+  bikeShopServices: {
+    group: 'operations',
+    icon: 'BS',
+    summary: 'Servicios de bicicletería (reparación, mantenimiento, ajustes).',
+  },
+  bikeWorkOrders: {
+    group: 'operations',
+    icon: 'BO',
+    summary: 'Órdenes de trabajo de bicicletería: recepción, diagnóstico y entrega.',
   },
 };
 

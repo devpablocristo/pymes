@@ -1,30 +1,20 @@
+/* Watchers — tokens alineados al resto de la consola */
+
 .watcher-config-page {
   max-width: 800px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.watcher-config-page h1 {
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.watcher-config-page .subtitle {
-  color: #6b7280;
-  font-size: var(--text-base);
-  margin-bottom: 24px;
+  padding: var(--space-5);
 }
 
 .watcher-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
 }
 
 .watcher-card .watcher-toggle {
@@ -32,7 +22,7 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #2563eb;
+  accent-color: var(--color-primary);
 }
 
 .watcher-card .watcher-content {
@@ -40,88 +30,71 @@
 }
 
 .watcher-card .watcher-name {
-  font-weight: 500;
-  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-role-section);
+  color: var(--color-text);
 }
 
 .watcher-card .watcher-desc {
-  font-size: var(--text-base);
-  color: #6b7280;
+  font-size: var(--text-role-body);
+  color: var(--color-text-secondary);
   margin-top: 2px;
 }
 
 .watcher-card .watcher-threshold {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  font-size: var(--text-base);
-  color: #6b7280;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-size: var(--text-role-body);
+  color: var(--color-text-secondary);
 }
 
 .watcher-card .watcher-threshold input {
   width: 60px;
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   text-align: center;
-  font-size: var(--text-base);
+  font-size: var(--text-role-body);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .watcher-card .watcher-last-run {
-  font-size: var(--text-xs);
-  color: #9ca3af;
-  margin-top: 4px;
+  font-size: var(--text-role-caption);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
 }
 
 .watcher-card.disabled {
   opacity: 0.5;
 }
 
-.watcher-config-page .save-bar {
+.watcher-config-page__save-bar {
   display: flex;
   justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.watcher-config-page .save-btn {
-  padding: 8px 24px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: var(--text-base);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.watcher-config-page .save-btn:hover {
-  background: #1d4ed8;
-}
-
-.watcher-config-page .save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .watcher-config-page .status-msg {
-  font-size: var(--text-base);
-  margin-top: 8px;
+  font-size: var(--text-role-body);
+  margin-top: var(--space-2);
   text-align: right;
 }
 
 .watcher-config-page .status-msg.success {
-  color: #059669;
+  color: var(--color-success);
 }
 
 .watcher-config-page .status-msg.error {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .watcher-config-page .loading {
   text-align: center;
-  padding: 48px;
-  color: #6b7280;
+  padding: var(--space-12);
+  color: var(--color-text-secondary);
 }

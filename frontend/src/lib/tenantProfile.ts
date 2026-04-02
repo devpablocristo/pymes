@@ -3,7 +3,7 @@ import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/stor
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
 export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'mixed';
-export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+export type VerticalType = 'none' | 'professionals' | 'workshops' | 'bike_shop' | 'beauty' | 'restaurants';
 
 export type TenantProfile = {
   businessName: string;

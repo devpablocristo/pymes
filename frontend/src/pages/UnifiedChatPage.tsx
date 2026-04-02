@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { pymesAssistantChat, type CommercialChatRequest, type PymesAssistantAction } from '../lib/aiApi';
+import { useSearch } from '@devpablocristo/modules-search';
+import {
+  pymesAssistantChat,
+  listConversations,
+  getConversation,
+  type CommercialChatRequest,
+  type PymesAssistantAction,
+  type ConversationSummary,
+} from '../lib/aiApi';
 import { humanInsightScopeLabel, humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
@@ -10,6 +19,7 @@ import {
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
 import type { PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
+import { usePageSearch } from '../components/PageSearch';
 import './UnifiedChatPage.css';
 
 type ContactKind = 'human' | 'ai_pymes';
@@ -26,11 +36,11 @@ type ContactDef = {
 
 const AI_PYMES_ID = 'ai-pymes';
 const HUMAN_CONTACT_DEFS: ContactDef[] = [
-  { id: '1', name: 'María García', initials: 'MG', color: '#3b82f6', kind: 'human', defaultPreview: 'Dale, hablamos mañana' },
-  { id: '2', name: 'Juan Pérez', initials: 'JP', color: '#10b981', kind: 'human', defaultPreview: 'Perfecto, gracias!' },
-  { id: '3', name: 'Ana López', initials: 'AL', color: '#8b5cf6', kind: 'human', defaultPreview: 'Te envío el presupuesto' },
-  { id: '4', name: 'Carlos Ruiz', initials: 'CR', color: '#f59e0b', kind: 'human', defaultPreview: 'Listo el deploy' },
-  { id: '5', name: 'Laura Díaz', initials: 'LD', color: '#ec4899', kind: 'human', defaultPreview: 'Quedó excelente!' },
+  { id: '1', name: 'María García', initials: 'MG', color: 'var(--color-primary)', kind: 'human', defaultPreview: 'Dale, hablamos mañana' },
+  { id: '2', name: 'Juan Pérez', initials: 'JP', color: 'var(--color-success)', kind: 'human', defaultPreview: 'Perfecto, gracias!' },
+  { id: '3', name: 'Ana López', initials: 'AL', color: 'var(--color-purple)', kind: 'human', defaultPreview: 'Te envío el presupuesto' },
+  { id: '4', name: 'Carlos Ruiz', initials: 'CR', color: 'var(--color-warning)', kind: 'human', defaultPreview: 'Listo el deploy' },
+  { id: '5', name: 'Laura Díaz', initials: 'LD', color: 'var(--color-accent-pink)', kind: 'human', defaultPreview: 'Quedó excelente!' },
 ];
 
 const SEED_HUMAN_MESSAGES: Array<{
@@ -58,7 +68,6 @@ type Msg = {
   fromMe: boolean;
   time: string;
   blocks?: PymesAssistantChatBlock[];
-  /** Sub-agente del orquestador (solo respuestas del Asistente Pymes). */
   routedLabel?: string;
   metaLabel?: string;
   badgeLabels?: string[];
@@ -117,6 +126,15 @@ function localeForLanguage(language: LanguageCode): string {
 
 function formatChatTime(language: LanguageCode): string {
   return new Date().toLocaleTimeString(localeForLanguage(language), { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatIsoTime(iso: string | null | undefined, language: LanguageCode): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString(localeForLanguage(language), { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
 }
 
 function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
@@ -191,7 +209,7 @@ export function UnifiedChatPage() {
         id: AI_PYMES_ID,
         name: 'Asistente Pymes',
         initials: 'AP',
-        color: '#6366f1',
+        color: 'var(--color-accent-indigo)',
         kind: 'ai_pymes',
         defaultPreview: t('ai.chat.input.defaultPlaceholder'),
       },
@@ -213,12 +231,74 @@ export function UnifiedChatPage() {
   const [pendingConfirmationsByContact, setPendingConfirmationsByContact] = useState<Record<string, string[]>>({});
   const [pendingRouteHintsByContact, setPendingRouteHintsByContact] = useState<Record<string, ManualRouteHint | undefined>>({});
   const [input, setInput] = useState('');
-  const [search, setSearch] = useState('');
+  const search = usePageSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
-  /** Evita doble envío en React StrictMode (doble montaje del efecto). */
   const notificationHandoffInFlightRef = useRef(false);
+
+  // ── Persistencia: conversaciones guardadas ──
+  const [savedConversations, setSavedConversations] = useState<ConversationSummary[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const loadedConversationRef = useRef<Set<string>>(new Set());
+
+  // Carga lista de conversaciones al montar
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const { items } = await listConversations(30);
+        if (!cancelled) {
+          setSavedConversations(items);
+          // Si hay conversación previa, pre-seleccionar la más reciente
+          if (items.length > 0 && !chatIds[AI_PYMES_ID]) {
+            const latest = items[0];
+            setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: latest.id }));
+            void loadConversationMessages(latest.id);
+          }
+        }
+      } catch {
+        // silencioso: no bloquear UI si falla la carga
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function loadConversationMessages(conversationId: string) {
+    if (loadedConversationRef.current.has(conversationId)) return;
+    loadedConversationRef.current.add(conversationId);
+    setLoadingHistory(true);
+    try {
+      const detail = await getConversation(conversationId);
+      const restored: Msg[] = detail.messages.map((m, i) => ({
+        id: `restored-${conversationId}-${i}`,
+        contactId: AI_PYMES_ID,
+        text: m.content,
+        fromMe: m.role === 'user',
+        time: formatIsoTime(m.ts, language),
+      }));
+      if (restored.length > 0) {
+        setMsgs((prev) => {
+          // Quitar mensajes previos del AI contact que no sean de otra conversación cargada
+          const withoutOldAi = prev.filter((p) => p.contactId !== AI_PYMES_ID || !p.id.startsWith('restored-'));
+          return [...withoutOldAi, ...restored];
+        });
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  function selectSavedConversation(conv: ConversationSummary) {
+    setActive(AI_PYMES_ID);
+    setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: conv.id }));
+    loadedConversationRef.current.delete(conv.id);
+    void loadConversationMessages(conv.id);
+    setError('');
+  }
 
   const activeDef = useMemo(() => contactDefs.find((c) => c.id === active)!, [active, contactDefs]);
   const thread = useMemo(() => msgs.filter((m) => m.contactId === active), [msgs, active]);
@@ -247,18 +327,12 @@ export function UnifiedChatPage() {
     }
   }, [contactDefs, searchParams]);
 
-  // Aviso in-app → Asistente Pymes: primer turno automático con contexto (handoff vía sessionStorage).
+  // Aviso in-app → Asistente Pymes: primer turno automático con contexto
   useEffect(() => {
-    if (typeof sessionStorage === 'undefined') {
-      return;
-    }
-    if (notificationHandoffInFlightRef.current) {
-      return;
-    }
+    if (typeof sessionStorage === 'undefined') return;
+    if (notificationHandoffInFlightRef.current) return;
     const raw = sessionStorage.getItem(NOTIFICATION_CHAT_HANDOFF_KEY);
-    if (!raw) {
-      return;
-    }
+    if (!raw) return;
     let handoff: NotificationChatHandoff;
     try {
       handoff = JSON.parse(raw) as NotificationChatHandoff;
@@ -313,13 +387,10 @@ export function UnifiedChatPage() {
           }),
         );
         setMsgs((p) => [...p, ...additions]);
+        // Actualizar lista de conversaciones
+        void refreshConversationList();
       } catch (err) {
-        setError(
-          formatFetchErrorForUser(
-            err,
-            t('ai.chat.error.unreachable'),
-          ),
-        );
+        setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
       } finally {
         setBusy(false);
       }
@@ -330,6 +401,15 @@ export function UnifiedChatPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread.length, active]);
+
+  async function refreshConversationList() {
+    try {
+      const { items } = await listConversations(30);
+      setSavedConversations(items);
+    } catch {
+      // silencioso
+    }
+  }
 
   const clearAiThread = useCallback(() => {
     setMsgs((prev) => prev.filter((m) => m.contactId !== active));
@@ -423,13 +503,10 @@ export function UnifiedChatPage() {
         }),
       );
       setMsgs((p) => [...p, ...additions]);
+      // Actualizar lista de conversaciones después de cada mensaje
+      void refreshConversationList();
     } catch (err) {
-      setError(
-        formatFetchErrorForUser(
-          err,
-          t('ai.chat.error.unreachable'),
-        ),
-      );
+      setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
     } finally {
       setBusy(false);
     }
@@ -467,16 +544,12 @@ export function UnifiedChatPage() {
   }, [activeDef.kind, activePendingConfirmations, busy, sendAssistantMessage, t]);
 
   const handleAssistantBlockAction = useCallback(async (action: PymesAssistantAction) => {
-    if (busy) {
-      return;
-    }
+    if (busy) return;
     if (action.kind === 'open_url' && action.url) {
       window.location.assign(action.url);
       return;
     }
-    if (activeDef.kind !== 'ai_pymes') {
-      return;
-    }
+    if (activeDef.kind !== 'ai_pymes') return;
     if (action.kind === 'confirm_action') {
       await sendAssistantMessage(action.message ?? t('ai.chat.action.confirmPending'), {
         confirmedActions: action.confirmed_actions ?? [],
@@ -522,23 +595,17 @@ export function UnifiedChatPage() {
     }
   }, [activeDef.kind, busy, language, sendAssistantMessage, t]);
 
-  const filteredContacts = contactsView.filter(
-    (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const contactTextFn = useCallback((c: typeof contactsView[number]) => c.name, []);
+  const filteredContacts = useSearch(contactsView, contactTextFn, search);
 
   return (
-    <div className="cht">
+    <div className="cht page-stack">
+      <header className="page-header">
+        <h1>{t('ai.chat.pageTitle')}</h1>
+        <p>{t('ai.chat.pageLead')}</p>
+      </header>
       <div className="cht__layout">
         <div className="cht__contacts">
-          <div className="cht__contacts-header">
-            <input
-              className="cht__contacts-search"
-              type="search"
-              placeholder={t('ai.chat.searchPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
           <div className="cht__contacts-list">
             {filteredContacts.map((c) => (
               <button
@@ -550,7 +617,7 @@ export function UnifiedChatPage() {
                   setError('');
                 }}
               >
-                <div className="cht__contact-avatar" style={{ background: c.color }}>
+                <div className="cht__contact-avatar" style={{ '--cht-avatar-bg': c.color } as CSSProperties}>
                   {c.initials}
                 </div>
                 <div className="cht__contact-info">
@@ -559,22 +626,46 @@ export function UnifiedChatPage() {
                 </div>
               </button>
             ))}
+            {/* Conversaciones previas guardadas */}
+            {savedConversations.length > 0 && (
+              <>
+                <div className="cht__conversations-divider">
+                  {t('ai.chat.previousConversations') || 'Conversaciones anteriores'}
+                </div>
+                {savedConversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    type="button"
+                    className={`cht__contact ${chatIds[AI_PYMES_ID] === conv.id ? 'cht__contact--active' : ''}`}
+                    onClick={() => selectSavedConversation(conv)}
+                  >
+                    <div className="cht__contact-avatar cht__contact-avatar--saved">
+                      AP
+                    </div>
+                    <div className="cht__contact-info">
+                      <div className="cht__contact-name">{conv.title || 'Sin título'}</div>
+                      <div className="cht__contact-preview">
+                        {conv.message_count} mensajes
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
         <div className="cht__main">
-          <div
-            className="cht__header"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}
-          >
-            <span style={{ flex: 1 }}>{activeDef.name}</span>
+          <div className="cht__header cht__header-row">
+            <span className="cht__header-title">{activeDef.name}</span>
             {activeDef.kind !== 'human' ? (
               <button type="button" className="btn-secondary btn-sm" onClick={() => void clearAiThread()}>
                 {t('ai.chat.newConversation')}
               </button>
             ) : null}
           </div>
-          {error ? <p className="form-error" style={{ margin: '0.5rem 1rem 0' }}>{error}</p> : null}
+          {error ? <p className="form-error cht__form-error-chat">{error}</p> : null}
           <div className="cht__messages">
+            {loadingHistory && <div className="spinner cht__history-spinner" />}
             {thread.map((m) => (
               <div key={m.id} className={`cht__msg ${m.fromMe ? 'cht__msg--me' : 'cht__msg--them'}`}>
                 {m.badgeLabels && m.badgeLabels.length > 0 ? (

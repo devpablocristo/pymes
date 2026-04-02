@@ -55,6 +55,19 @@ type usecasesPort interface {
 	RegisterOptOut(ctx context.Context, orgID, partyID uuid.UUID) error
 	ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.OptIn, error)
 	IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error)
+
+	// Conversations
+	ListConversations(ctx context.Context, orgID uuid.UUID, assignedTo, status string, limit int) ([]domain.Conversation, error)
+	AssignConversation(ctx context.Context, orgID, conversationID uuid.UUID, assignedTo string) error
+	MarkConversationRead(ctx context.Context, orgID, conversationID uuid.UUID) error
+	ResolveConversation(ctx context.Context, orgID, conversationID uuid.UUID) error
+
+	// Campaigns
+	CreateCampaign(ctx context.Context, orgID uuid.UUID, name, templateName, templateLanguage, tagFilter, actor string, templateParams []string) (*domain.Campaign, error)
+	SendCampaign(ctx context.Context, orgID, campaignID uuid.UUID) error
+	ListCampaigns(ctx context.Context, orgID uuid.UUID, limit int) ([]domain.Campaign, error)
+	GetCampaign(ctx context.Context, orgID, campaignID uuid.UUID) (*domain.Campaign, error)
+	GetCampaignRecipients(ctx context.Context, orgID, campaignID uuid.UUID) ([]domain.CampaignRecipient, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -95,6 +108,18 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 		wa.POST("/opt-ins", rbac.RequirePermission("whatsapp", "write"), h.RegisterOptIn)
 		wa.DELETE("/opt-ins/:party_id", rbac.RequirePermission("whatsapp", "write"), h.RegisterOptOut)
 		wa.GET("/opt-ins/:party_id/status", rbac.RequirePermission("whatsapp", "read"), h.CheckOptIn)
+
+		// Conversations
+		wa.GET("/conversations", rbac.RequirePermission("whatsapp", "read"), h.ListWAConversations)
+		wa.POST("/conversations/:id/assign", rbac.RequirePermission("whatsapp", "write"), h.AssignWAConversation)
+		wa.POST("/conversations/:id/read", rbac.RequirePermission("whatsapp", "write"), h.MarkWAConversationRead)
+		wa.POST("/conversations/:id/resolve", rbac.RequirePermission("whatsapp", "write"), h.ResolveWAConversation)
+
+		// Campaigns
+		wa.GET("/campaigns", rbac.RequirePermission("whatsapp", "read"), h.ListCampaigns)
+		wa.POST("/campaigns", rbac.RequirePermission("whatsapp", "write"), h.CreateCampaign)
+		wa.GET("/campaigns/:id", rbac.RequirePermission("whatsapp", "read"), h.GetCampaignDetail)
+		wa.POST("/campaigns/:id/send", rbac.RequirePermission("whatsapp", "write"), h.SendCampaign)
 	}
 }
 
@@ -661,4 +686,222 @@ func toOptInResponse(o domain.OptIn) dto.OptInResponse {
 		Source:    string(o.Source),
 		OptedInAt: o.OptedInAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+// --- Campaigns ---
+
+// --- Conversations ---
+
+func (h *Handler) ListWAConversations(c *gin.Context) {
+	orgID, ok := handlers.ParseAuthOrgID(c)
+	if !ok {
+		return
+	}
+	assignedTo := c.Query("assigned_to")
+	status := c.Query("status")
+	convs, err := h.uc.ListConversations(c.Request.Context(), orgID, assignedTo, status, 100)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	items := make([]dto.ConversationResponse, 0, len(convs))
+	for _, conv := range convs {
+		items = append(items, conversationToDTO(&conv))
+	}
+	c.JSON(http.StatusOK, dto.ConversationListResponse{Items: items})
+}
+
+func (h *Handler) AssignWAConversation(c *gin.Context) {
+	orgID, convID, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	var body dto.AssignConversationRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "bad_request", "message": "invalid request body"})
+		return
+	}
+	if err := h.uc.AssignConversation(c.Request.Context(), orgID, convID, body.AssignedTo); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "assigned"})
+}
+
+func (h *Handler) MarkWAConversationRead(c *gin.Context) {
+	orgID, convID, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.MarkConversationRead(c.Request.Context(), orgID, convID); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "read"})
+}
+
+func (h *Handler) ResolveWAConversation(c *gin.Context) {
+	orgID, convID, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.ResolveConversation(c.Request.Context(), orgID, convID); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "resolved"})
+}
+
+func conversationToDTO(c *domain.Conversation) dto.ConversationResponse {
+	r := dto.ConversationResponse{
+		ID:                 c.ID,
+		PartyID:            c.PartyID,
+		Phone:              c.Phone,
+		PartyName:          c.PartyName,
+		AssignedTo:         c.AssignedTo,
+		Status:             string(c.Status),
+		LastMessagePreview: c.LastMessagePreview,
+		UnreadCount:        c.UnreadCount,
+		CreatedAt:          c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:          c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if c.LastMessageAt != nil {
+		s := c.LastMessageAt.Format("2006-01-02T15:04:05Z07:00")
+		r.LastMessageAt = &s
+	}
+	return r
+}
+
+// --- Campaigns ---
+
+func (h *Handler) CreateCampaign(c *gin.Context) {
+	orgID, ok := handlers.ParseAuthOrgID(c)
+	if !ok {
+		return
+	}
+	var body dto.CreateCampaignRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "bad_request", "message": "invalid request body"})
+		return
+	}
+	lang := body.TemplateLanguage
+	if lang == "" {
+		lang = "es"
+	}
+	auth := handlers.GetAuthContext(c)
+	campaign, err := h.uc.CreateCampaign(c.Request.Context(), orgID, body.Name, body.TemplateName, lang, body.TagFilter, auth.Actor, body.TemplateParams)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, campaignToDTO(campaign))
+}
+
+func (h *Handler) ListCampaigns(c *gin.Context) {
+	orgID, ok := handlers.ParseAuthOrgID(c)
+	if !ok {
+		return
+	}
+	campaigns, err := h.uc.ListCampaigns(c.Request.Context(), orgID, 50)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	items := make([]dto.CampaignResponse, 0, len(campaigns))
+	for _, camp := range campaigns {
+		items = append(items, campaignToDTO(&camp))
+	}
+	c.JSON(http.StatusOK, dto.CampaignListResponse{Items: items})
+}
+
+func (h *Handler) GetCampaignDetail(c *gin.Context) {
+	orgID, campID, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	campaign, err := h.uc.GetCampaign(c.Request.Context(), orgID, campID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	recipients, err := h.uc.GetCampaignRecipients(c.Request.Context(), orgID, campID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	recDTOs := make([]dto.CampaignRecipientResponse, 0, len(recipients))
+	for _, r := range recipients {
+		rec := dto.CampaignRecipientResponse{
+			ID:          r.ID,
+			PartyID:     r.PartyID,
+			Phone:       r.Phone,
+			PartyName:   r.PartyName,
+			Status:      string(r.Status),
+			WAMessageID: r.WAMessageID,
+			ErrorMessage: r.ErrorMessage,
+		}
+		if r.SentAt != nil {
+			s := r.SentAt.Format("2006-01-02T15:04:05Z07:00")
+			rec.SentAt = &s
+		}
+		if r.DeliveredAt != nil {
+			s := r.DeliveredAt.Format("2006-01-02T15:04:05Z07:00")
+			rec.DeliveredAt = &s
+		}
+		if r.ReadAt != nil {
+			s := r.ReadAt.Format("2006-01-02T15:04:05Z07:00")
+			rec.ReadAt = &s
+		}
+		recDTOs = append(recDTOs, rec)
+	}
+	c.JSON(http.StatusOK, dto.CampaignDetailResponse{
+		CampaignResponse: campaignToDTO(campaign),
+		Recipients:       recDTOs,
+	})
+}
+
+func (h *Handler) SendCampaign(c *gin.Context) {
+	orgID, campID, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	err := h.uc.SendCampaign(c.Request.Context(), orgID, campID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "completed"})
+}
+
+func campaignToDTO(c *domain.Campaign) dto.CampaignResponse {
+	r := dto.CampaignResponse{
+		ID:               c.ID,
+		Name:             c.Name,
+		TemplateName:     c.TemplateName,
+		TemplateLanguage: c.TemplateLanguage,
+		TemplateParams:   c.TemplateParams,
+		TagFilter:        c.TagFilter,
+		Status:           string(c.Status),
+		TotalRecipients:  c.TotalRecipients,
+		SentCount:        c.SentCount,
+		DeliveredCount:   c.DeliveredCount,
+		ReadCount:        c.ReadCount,
+		FailedCount:      c.FailedCount,
+		CreatedBy:        c.CreatedBy,
+		CreatedAt:        c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:        c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if c.ScheduledAt != nil {
+		s := c.ScheduledAt.Format("2006-01-02T15:04:05Z07:00")
+		r.ScheduledAt = &s
+	}
+	if c.StartedAt != nil {
+		s := c.StartedAt.Format("2006-01-02T15:04:05Z07:00")
+		r.StartedAt = &s
+	}
+	if c.CompletedAt != nil {
+		s := c.CompletedAt.Format("2006-01-02T15:04:05Z07:00")
+		r.CompletedAt = &s
+	}
+	return r
 }

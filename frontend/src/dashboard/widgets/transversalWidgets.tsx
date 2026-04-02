@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useDashboardWidgetData } from '../hooks/useWidgetData';
 import type {
   AuditActivityData,
@@ -142,7 +142,14 @@ export function TopProductsWidget(props: DashboardWidgetRendererProps) {
                   </small>
                 </div>
                 <div className="widget-bar-track">
-                  <span style={{ width: `${Math.max((item.total / peak) * 100, 8)}%` }} />
+                  <span
+                    className="widget-bar-fill"
+                    style={
+                      {
+                        '--widget-bar-width': `${Math.max((item.total / peak) * 100, 8)}%`,
+                      } as CSSProperties
+                    }
+                  />
                 </div>
               </div>
             ))}

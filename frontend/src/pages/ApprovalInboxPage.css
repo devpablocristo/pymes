@@ -1,143 +1,151 @@
+/* Approval inbox — tokens alineados al resto de la consola */
+
 .approval-inbox-page {
   max-width: 800px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space-5);
 }
 
 .approval-inbox-page h1 {
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: var(--text-role-page-title);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-1);
+  color: var(--color-text);
 }
 
 .approval-inbox-page h1 .count-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 12px;
-  background: #ef4444;
-  color: #fff;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  margin-left: 8px;
+  min-width: var(--space-5);
+  height: var(--space-5);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
+  margin-left: var(--space-2);
   vertical-align: middle;
 }
 
 .approval-inbox-page .subtitle {
-  color: #6b7280;
-  font-size: var(--text-base);
-  margin-bottom: 24px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-role-lead);
+  margin-bottom: var(--space-5);
 }
 
 .approval-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .approval-card .approval-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .approval-card .approval-title {
-  font-weight: 500;
-  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-role-section);
+  color: var(--color-text);
 }
 
 .approval-card .risk-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: var(--text-xs);
-  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
 }
 
 .risk-badge.low {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--color-success-subtle);
+  color: var(--color-alert-success-text);
 }
 
 .risk-badge.medium {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--color-warning-subtle);
+  color: var(--color-alert-warning-text);
 }
 
 .risk-badge.high {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
 }
 
 .approval-card .approval-reason {
-  font-size: var(--text-base);
-  color: #374151;
-  margin-bottom: 4px;
+  font-size: var(--text-role-body);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
 }
 
 .approval-card .approval-time {
-  font-size: var(--text-xs);
-  color: #9ca3af;
-  margin-bottom: 8px;
+  font-size: var(--text-role-caption);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
 }
 
 .approval-card .approval-summary {
-  font-size: var(--text-base);
-  color: #6b7280;
+  font-size: var(--text-role-body);
+  color: var(--color-text-secondary);
   font-style: italic;
-  margin-bottom: 12px;
-  padding: 8px;
-  background: #f9fafb;
-  border-radius: 4px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
 }
 
 .approval-card .approval-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .approval-card .note-input {
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: var(--text-base);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .approval-card .btn-approve {
-  padding: 6px 16px;
-  background: #10b981;
-  color: #fff;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-success);
+  color: var(--color-on-primary);
   border: none;
-  border-radius: 6px;
-  font-size: var(--text-base);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
 }
 
 .approval-card .btn-approve:hover {
-  background: #059669;
+  filter: brightness(0.95);
 }
 
 .approval-card .btn-reject {
-  padding: 6px 16px;
-  background: #ef4444;
-  color: #fff;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-danger);
+  color: var(--color-on-primary);
   border: none;
-  border-radius: 6px;
-  font-size: var(--text-base);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
 }
 
 .approval-card .btn-reject:hover {
-  background: #dc2626;
+  background: var(--color-danger-hover);
 }
 
 .approval-card .btn-approve:disabled,
@@ -148,12 +156,12 @@
 
 .approval-inbox-page .empty-state {
   text-align: center;
-  padding: 48px;
-  color: #6b7280;
+  padding: var(--space-12);
+  color: var(--color-text-secondary);
 }
 
 .approval-inbox-page .loading {
   text-align: center;
-  padding: 48px;
-  color: #6b7280;
+  padding: var(--space-12);
+  color: var(--color-text-secondary);
 }

@@ -1,0 +1,243 @@
+/**
+ * Login / signup, planes, estados de auth, error boundary raíz y utilidades de tipografía ligadas.
+ * Importado desde `styles.css`.
+ */
+
+/* ── Auth layout ── */
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-sidebar);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-layout::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 40%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+              radial-gradient(circle at 70% 60%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.auth-card h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-1);
+  letter-spacing: -0.02em;
+}
+
+.auth-card p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-5);
+}
+
+.auth-card a {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.auth-card a:hover {
+  text-decoration: underline;
+}
+
+/* ── Loading spinner ── */
+.spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.spinner::after {
+  content: '';
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Plan cards ── */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.plan-card {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.plan-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.plan-card.current {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.plan-card h3,
+.plan-card h4 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  text-transform: capitalize;
+  margin-bottom: var(--space-1);
+}
+
+.plan-card .plan-badge {
+  margin-top: var(--space-3);
+}
+
+/* Grillas de tarjetas responsivas (preview, listados tipo catálogo) */
+.grid-cards-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+/* Párrafo secundario compacto (bios, ayudas en cards) */
+.text-secondary-lead {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+/* Auth: timeout / estados sin layout del shell */
+.auth-state-card {
+  max-width: calc(var(--space-4) * 36);
+  margin: var(--space-6) auto;
+}
+
+.auth-state-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.auth-state-body {
+  margin-top: var(--space-3);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  font-size: var(--text-md);
+}
+
+/* Pie del shell (modo sin Clerk) */
+.shell-footer-caption {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Error boundary raíz */
+.error-boundary-fallback {
+  padding: var(--space-6);
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+  min-height: 100vh;
+}
+
+.error-boundary-fallback h1 {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-3);
+}
+
+.error-boundary-fallback__dev-pre {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  margin: var(--space-4) 0;
+  max-height: calc(var(--space-4) * 250 / 15);
+  overflow: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-dev-error-pre-bg);
+  color: var(--color-dev-error-pre-fg);
+}
+
+/* Badge con color dinámico (valor vía --badge-swatch-bg en el elemento) */
+.badge-swatch {
+  background: var(--badge-swatch-bg, var(--color-accent-indigo));
+  color: var(--color-on-primary);
+  min-width: var(--space-8);
+  min-height: calc(var(--space-12) * 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: var(--font-weight-medium);
+}
+
+.actions-row--wrap {
+  flex-wrap: wrap;
+}
+
+.text-capitalize {
+  text-transform: capitalize;
+}
+
+/* Preferir estas utilidades o var(--font-weight-*) en CSS nuevo */
+.font-normal {
+  font-weight: var(--font-weight-normal);
+}
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
+
+.text-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+.stat-value-sm {
+  font-size: var(--text-md);
+}
+
+.badge + .badge {
+  margin-left: var(--space-1);
+}

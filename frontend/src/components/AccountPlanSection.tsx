@@ -53,7 +53,6 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- recargar solo al cambiar org
   }, [session.auth.org_id]);
 
   const returnUrl = `${window.location.origin}${settingsReturnPath}`;

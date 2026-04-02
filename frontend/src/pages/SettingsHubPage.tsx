@@ -2,7 +2,9 @@
  * Ajustes — solo configuración del producto (preferencias, apariencia, integraciones, etc.).
  * El trabajo operativo del negocio vive en el menú lateral / módulos, no acá.
  */
-import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useSearch } from '@devpablocristo/modules-search';
+import type { CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   IconAlert,
@@ -18,25 +20,16 @@ import {
   IconUsers,
 } from '@devpablocristo/modules-ui-data-display/icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
+import { usePageSearch } from '../components/PageSearch';
 import { LanguageSelector } from '../components/LanguageSelector';
+import { themeHubColorSwatches } from '../lib/productPalette';
 import './SettingsHubPage.css';
-
-const deepLinkCardStyle: CSSProperties = {
-  margin: 0,
-  padding: '1rem',
-  textDecoration: 'none',
-  color: 'inherit',
-  display: 'block',
-  border: '1px solid var(--color-border, #e5e7eb)',
-};
 
 function SettingsDeepLink({ to, title, desc }: { to: string; title: string; desc: string }) {
   return (
-    <Link to={to} className="card" style={deepLinkCardStyle}>
+    <Link to={to} className="card stg__deep-link">
       <strong>{title}</strong>
-      <p className="text-secondary" style={{ margin: '0.35rem 0 0', fontSize: '0.88rem' }}>
-        {desc}
-      </p>
+      <p className="text-secondary stg__deep-link-desc">{desc}</p>
     </Link>
   );
 }
@@ -78,8 +71,8 @@ const SETTING_SECTIONS: SectionCard[] = [
 
 function AutomationHubTab() {
   return (
-    <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div className="card stg__card-mb">
+      <div className="stg__stack">
         <SettingsDeepLink
           to="/automation-rules"
           title="Atención automática"
@@ -189,7 +182,7 @@ function AlertChannelsTab() {
   return (
     <div className="card">
       {channels.map((ch) => (
-        <div key={ch.id} style={{ marginBottom: 'var(--space-4)' }}>
+        <div key={ch.id} className="stg__channel-block">
           <div className="stg__toggle">
             <div>
               <div className="stg__toggle-label">{ch.label}</div>
@@ -198,7 +191,7 @@ function AlertChannelsTab() {
             <Toggle checked={ch.enabled} onChange={() => toggle(ch.id)} />
           </div>
           {ch.enabled && (
-            <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
+            <div className="form-group stg__form-group-mt">
               <textarea rows={2} value={ch.text} onChange={(e) => setText(ch.id, e.target.value)} placeholder="Texto del mensaje…" />
             </div>
           )}
@@ -214,36 +207,30 @@ function AlertChannelsTab() {
 
 // ─── Theme ───
 
-const THEME_COLORS = [
-  { id: 'blue', color: '#3b82f6', label: 'Azul' },
-  { id: 'green', color: '#10b981', label: 'Verde' },
-  { id: 'orange', color: '#f59e0b', label: 'Naranja' },
-  { id: 'red', color: '#ef4444', label: 'Rojo' },
-  { id: 'purple', color: '#8b5cf6', label: 'Violeta' },
-  { id: 'pink', color: '#ec4899', label: 'Rosa' },
-];
+/** Swatches de “color principal”: derivados de `productPalette` (ids estables: primary, success, …). */
+const THEME_COLORS = themeHubColorSwatches();
 
 function ThemeTab() {
-  const [selected, setSelected] = useState('blue');
+  const [selected, setSelected] = useState(THEME_COLORS[0]?.id ?? 'primary');
   return (
     <div className="card">
-      <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="form-group stg__form-group-mb">
         <label>Logo (subir imagen)</label>
         <input type="file" accept="image/*" />
       </div>
-      <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+      <div className="form-group stg__form-group-mb">
         <label>Logo oscuro (subir imagen)</label>
         <input type="file" accept="image/*" />
       </div>
       <div className="form-group">
-        <label style={{ marginBottom: 'var(--space-2)' }}>Color principal</label>
+        <label className="stg__label-mb">Color principal</label>
         <div className="stg__colors">
           {THEME_COLORS.map((c) => (
             <button
               key={c.id}
               type="button"
               className={`stg__color ${selected === c.id ? 'stg__color--active' : ''}`}
-              style={{ background: c.color }}
+              style={{ '--stg-swatch-bg': c.bg } as CSSProperties}
               onClick={() => setSelected(c.id)}
               title={c.label}
             />
@@ -272,8 +259,9 @@ const DEFAULT_CURRENCIES: Currency[] = [
 
 function CurrenciesTab() {
   const [items, setItems] = useState(DEFAULT_CURRENCIES);
-  const [search, setSearch] = useState('');
-  const filtered = items.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()));
+  const search = usePageSearch();
+  const currencyText = useCallback((c: Currency) => `${c.name} ${c.code}`, []);
+  const filtered = useSearch(items, currencyText, search);
 
   const toggleActive = (id: string) => setItems((p) => p.map((c) => c.id === id ? { ...c, active: !c.active } : c));
   const remove = (id: string) => setItems((p) => p.filter((c) => c.id !== id));
@@ -281,7 +269,7 @@ function CurrenciesTab() {
   return (
     <div className="card">
       <div className="stg__crud-toolbar">
-        <input type="search" placeholder="Buscar moneda…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: 250 }} />
+        <div className="stg__toolbar-spacer" />
         <button type="button" className="btn-primary btn-sm">+ Agregar moneda</button>
       </div>
       <table className="stg__crud-table">
@@ -289,7 +277,7 @@ function CurrenciesTab() {
         <tbody>
           {filtered.map((c) => (
             <tr key={c.id}>
-              <td style={{ fontWeight: 600 }}>{c.name}</td>
+              <td className="stg__crud-cell-name">{c.name}</td>
               <td>{c.symbol}</td>
               <td>{c.code}</td>
               <td>{c.crypto ? <span className="badge badge-neutral">Sí</span> : '—'}</td>
@@ -334,7 +322,7 @@ function LanguagesTab() {
         <tbody>
           {items.map((l) => (
             <tr key={l.id}>
-              <td style={{ fontWeight: 600 }}>{l.name}</td>
+              <td className="stg__crud-cell-name">{l.name}</td>
               <td><Toggle checked={l.active} onChange={() => toggle(l.id)} /></td>
               <td>
                 <div className="stg__crud-actions">
@@ -362,10 +350,10 @@ function GatewayTab() {
   const toggleGw = (i: number) => setStates((p) => p.map((v, j) => j === i ? !v : v));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+    <div className="stg__gateway-stack">
       {gateways.map((gw, i) => (
         <div key={gw.name} className="card">
-          <div className="stg__toggle" style={{ borderBottom: states[i] ? undefined : 'none' }}>
+          <div className={`stg__toggle ${!states[i] ? 'stg__toggle--collapsed' : ''}`}>
             <div>
               <div className="stg__toggle-label">{gw.name}</div>
               <div className="stg__toggle-desc">{gw.desc}</div>
@@ -374,7 +362,7 @@ function GatewayTab() {
           </div>
           {states[i] && (
             <>
-              <div className="stg__form-grid" style={{ marginTop: 'var(--space-3)' }}>
+              <div className="stg__form-grid stg__form-grid--after-toggle">
                 {gw.fields.map((f) => (
                   <div key={f} className="form-group"><label>{f}</label><input placeholder={`Ingresá tu ${f}…`} /></div>
                 ))}
@@ -393,6 +381,9 @@ function GatewayTab() {
 // ─── Página principal ───
 
 export function SettingsHubPage() {
+  const settingsSearch = usePageSearch();
+  const sectionTextFn = useCallback((s: SectionCard) => `${s.label} ${s.desc}`, []);
+  const filteredSections = useSearch(SETTING_SECTIONS, sectionTextFn, settingsSearch);
   const [searchParams, setSearchParams] = useSearchParams();
   const [section, setSection] = useState<Section>(() =>
     sectionFromSearchParam(searchParams.get('section')),
@@ -415,10 +406,15 @@ export function SettingsHubPage() {
   }
 
   return (
-    <div className="stg">
+    <div className="stg page-stack">
       {section === null ? (
-        <div className="stg__nav-grid">
-          {SETTING_SECTIONS.map((s) => (
+        <>
+          <header className="page-header">
+            <h1>Ajustes</h1>
+            <p>Elegí un área para configurar tu cuenta y tu espacio de trabajo.</p>
+          </header>
+          <div className="stg__nav-grid">
+          {filteredSections.map((s) => (
             <button
               key={s.id}
               type="button"
@@ -432,7 +428,8 @@ export function SettingsHubPage() {
               </div>
             </button>
           ))}
-        </div>
+          </div>
+        </>
       ) : (
         <>
           <button type="button" className="stg__back" onClick={goBackToGrid}>
@@ -442,8 +439,8 @@ export function SettingsHubPage() {
           {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage /></Suspense>}
           {section === 'notifications' && (
             <>
-              <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-                <p className="text-secondary" style={{ margin: 0, fontSize: '0.88rem' }}>
+              <div className="card stg__card-mb">
+                <p className="text-secondary u-m-0 u-text-base">
                   La bandeja de avisos y aprobaciones está en el menú <strong>Base → Notificaciones</strong> (
                   <Link to="/notifications">abrir centro</Link>
                   ).

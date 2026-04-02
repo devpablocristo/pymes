@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -21,6 +22,7 @@ type RepositoryPort interface {
 	GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error)
 	GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (SaleSnapshot, error)
 	GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID) (string, string, error)
+	GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone string) (uuid.UUID, string, error)
 	GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error)
 
 	// Connections
@@ -49,6 +51,28 @@ type RepositoryPort interface {
 	OptOut(ctx context.Context, orgID, partyID uuid.UUID) error
 	ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.OptIn, error)
 	IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error)
+
+	// Conversations
+	GetOrCreateConversation(ctx context.Context, orgID, partyID uuid.UUID, phone, partyName string) (*domain.Conversation, error)
+	ListConversations(ctx context.Context, orgID uuid.UUID, assignedTo, status string, limit int) ([]domain.Conversation, error)
+	AssignConversation(ctx context.Context, orgID, conversationID uuid.UUID, assignedTo string) error
+	UpdateConversationLastMessage(ctx context.Context, conversationID uuid.UUID, preview string, inbound bool) error
+	MarkConversationRead(ctx context.Context, orgID, conversationID uuid.UUID) error
+	ResolveConversation(ctx context.Context, orgID, conversationID uuid.UUID) error
+
+	// Campaigns
+	CreateCampaign(ctx context.Context, c *domain.Campaign) error
+	GetCampaign(ctx context.Context, orgID, campaignID uuid.UUID) (*domain.Campaign, error)
+	ListCampaigns(ctx context.Context, orgID uuid.UUID, limit int) ([]domain.Campaign, error)
+	UpdateCampaignStatus(ctx context.Context, orgID, campaignID uuid.UUID, status domain.CampaignStatus, updates map[string]any) error
+	SaveCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error
+	UpdateRecipientStatus(ctx context.Context, recipientID uuid.UUID, status domain.RecipientStatus, waMessageID, errorMsg string) error
+	ListCampaignRecipients(ctx context.Context, campaignID uuid.UUID) ([]domain.CampaignRecipient, error)
+	GetOptedInPartiesByTag(ctx context.Context, orgID uuid.UUID, tag string) ([]struct {
+		PartyID   uuid.UUID
+		Phone     string
+		PartyName string
+	}, error)
 }
 
 type TimelinePort interface {
@@ -266,7 +290,7 @@ func (u *Usecases) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (dom
 // --- Envío real de mensajes ---
 
 func (u *Usecases) SendText(ctx context.Context, req domain.SendTextRequest) (domain.Message, error) {
-	conn, accessToken, phone, _, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
+	conn, accessToken, phone, name, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
 	if err != nil {
 		return domain.Message{}, err
 	}
@@ -280,6 +304,7 @@ func (u *Usecases) SendText(ctx context.Context, req domain.SendTextRequest) (do
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, domain.TypeText, req.Body, waMessageID)
+	u.linkOutboundToConversation(ctx, &msg, req.OrgID, &req.PartyID, phone, name, req.Actor)
 	if err := u.repo.SaveMessage(ctx, msg); err != nil {
 		slog.Error("save whatsapp message", "error", err, "wa_message_id", waMessageID)
 	}
@@ -292,7 +317,7 @@ func (u *Usecases) SendText(ctx context.Context, req domain.SendTextRequest) (do
 }
 
 func (u *Usecases) SendTemplate(ctx context.Context, req domain.SendTemplateRequest) (domain.Message, error) {
-	conn, accessToken, phone, _, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
+	conn, accessToken, phone, name, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
 	if err != nil {
 		return domain.Message{}, err
 	}
@@ -314,6 +339,7 @@ func (u *Usecases) SendTemplate(ctx context.Context, req domain.SendTemplateRequ
 	msg.TemplateName = strings.TrimSpace(req.TemplateName)
 	msg.TemplateLanguage = lang
 	msg.TemplateParams = req.Params
+	u.linkOutboundToConversation(ctx, &msg, req.OrgID, &req.PartyID, phone, name, req.Actor)
 	if err := u.repo.SaveMessage(ctx, msg); err != nil {
 		slog.Error("save whatsapp message", "error", err, "wa_message_id", waMessageID)
 	}
@@ -326,7 +352,7 @@ func (u *Usecases) SendTemplate(ctx context.Context, req domain.SendTemplateRequ
 }
 
 func (u *Usecases) SendMedia(ctx context.Context, req domain.SendMediaRequest) (domain.Message, error) {
-	conn, accessToken, phone, _, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
+	conn, accessToken, phone, name, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
 	if err != nil {
 		return domain.Message{}, err
 	}
@@ -342,6 +368,7 @@ func (u *Usecases) SendMedia(ctx context.Context, req domain.SendMediaRequest) (
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, req.MediaType, "", waMessageID)
 	msg.MediaURL = strings.TrimSpace(req.MediaURL)
 	msg.MediaCaption = strings.TrimSpace(req.Caption)
+	u.linkOutboundToConversation(ctx, &msg, req.OrgID, &req.PartyID, phone, name, req.Actor)
 	if err := u.repo.SaveMessage(ctx, msg); err != nil {
 		slog.Error("save whatsapp message", "error", err, "wa_message_id", waMessageID)
 	}
@@ -349,7 +376,7 @@ func (u *Usecases) SendMedia(ctx context.Context, req domain.SendMediaRequest) (
 }
 
 func (u *Usecases) SendInteractive(ctx context.Context, req domain.SendInteractiveRequest) (domain.Message, error) {
-	conn, accessToken, phone, _, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
+	conn, accessToken, phone, name, err := u.resolvePartyForSend(ctx, req.OrgID, req.PartyID)
 	if err != nil {
 		return domain.Message{}, err
 	}
@@ -368,6 +395,7 @@ func (u *Usecases) SendInteractive(ctx context.Context, req domain.SendInteracti
 	}
 
 	msg := u.buildOutboundMessage(conn, req.OrgID, &req.PartyID, phone, domain.TypeInteractive, req.Body, waMessageID)
+	u.linkOutboundToConversation(ctx, &msg, req.OrgID, &req.PartyID, phone, name, req.Actor)
 	if err := u.repo.SaveMessage(ctx, msg); err != nil {
 		slog.Error("save whatsapp message", "error", err, "wa_message_id", waMessageID)
 	}
@@ -462,7 +490,56 @@ func (u *Usecases) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (boo
 	return u.repo.IsOptedIn(ctx, orgID, partyID)
 }
 
+// EnsureOptIn registra opt-in si el contacto no está ya registrado.
+// Implementa dataio.OptInPort para auto opt-in en CSV import.
+func (u *Usecases) EnsureOptIn(ctx context.Context, orgID, partyID uuid.UUID, phone string) error {
+	already, err := u.repo.IsOptedIn(ctx, orgID, partyID)
+	if err != nil {
+		return fmt.Errorf("check opt-in: %w", err)
+	}
+	if already {
+		return nil
+	}
+	optIn := domain.OptIn{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		PartyID:   partyID,
+		Phone:     strings.TrimSpace(phone),
+		Status:    domain.OptInStatusOptedIn,
+		Source:    domain.OptInSourceImport,
+		OptedInAt: time.Now(),
+		CreatedAt: time.Now(),
+	}
+	return u.repo.SaveOptIn(ctx, optIn)
+}
+
 // --- Helpers internos ---
+
+// linkOutboundToConversation vincula un mensaje outbound a la conversación del party,
+// creándola si no existe. Actualiza el preview del último mensaje en la conversación.
+func (u *Usecases) linkOutboundToConversation(ctx context.Context, msg *domain.Message, orgID uuid.UUID, partyID *uuid.UUID, phone, partyName, actor string) {
+	if partyID == nil {
+		return
+	}
+	conv, err := u.repo.GetOrCreateConversation(ctx, orgID, *partyID, phone, partyName)
+	if err != nil || conv == nil {
+		if err != nil {
+			slog.Error("get or create conversation for outbound", "error", err, "org_id", orgID)
+		}
+		return
+	}
+	msg.ConversationID = &conv.ID
+	msg.CreatedBy = actor
+
+	preview := msg.Body
+	if preview == "" {
+		preview = string(msg.MessageType)
+	}
+	if len(preview) > 100 {
+		preview = preview[:100]
+	}
+	_ = u.repo.UpdateConversationLastMessage(ctx, conv.ID, preview, false)
+}
 
 func (u *Usecases) resolvePartyForSend(ctx context.Context, orgID, partyID uuid.UUID) (domain.Connection, string, string, string, error) {
 	conn, err := u.repo.GetConnection(ctx, orgID)
@@ -557,4 +634,177 @@ func defaultString(v, def string) string {
 		return def
 	}
 	return strings.TrimSpace(v)
+}
+
+// ── Conversaciones ──
+
+func (u *Usecases) ListConversations(ctx context.Context, orgID uuid.UUID, assignedTo, status string, limit int) ([]domain.Conversation, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	return u.repo.ListConversations(ctx, orgID, assignedTo, status, limit)
+}
+
+func (u *Usecases) AssignConversation(ctx context.Context, orgID, conversationID uuid.UUID, assignedTo string) error {
+	return u.repo.AssignConversation(ctx, orgID, conversationID, assignedTo)
+}
+
+func (u *Usecases) MarkConversationRead(ctx context.Context, orgID, conversationID uuid.UUID) error {
+	return u.repo.MarkConversationRead(ctx, orgID, conversationID)
+}
+
+func (u *Usecases) ResolveConversation(ctx context.Context, orgID, conversationID uuid.UUID) error {
+	return u.repo.ResolveConversation(ctx, orgID, conversationID)
+}
+
+// ── Campañas ──
+
+func (u *Usecases) CreateCampaign(ctx context.Context, orgID uuid.UUID, name, templateName, templateLanguage, tagFilter, actor string, templateParams []string) (*domain.Campaign, error) {
+	// Verificar conexión activa
+	conn, err := u.repo.GetConnection(ctx, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("create campaign: %w", err)
+	}
+	if !conn.IsActive {
+		return nil, errors.New("whatsapp: connection not active")
+	}
+
+	// Verificar que el template existe y está aprobado
+	_, err = u.repo.GetTemplateByName(ctx, orgID, templateName, templateLanguage)
+	if err != nil {
+		return nil, fmt.Errorf("create campaign: template %q not found: %w", templateName, err)
+	}
+
+	// Obtener destinatarios con opt-in activo filtrados por tag
+	parties, err := u.repo.GetOptedInPartiesByTag(ctx, orgID, tagFilter)
+	if err != nil {
+		return nil, fmt.Errorf("create campaign: %w", err)
+	}
+	if len(parties) == 0 {
+		return nil, errors.New("whatsapp: no opted-in recipients found for this filter")
+	}
+
+	now := time.Now()
+	campaign := &domain.Campaign{
+		ID:               uuid.New(),
+		OrgID:            orgID,
+		Name:             name,
+		TemplateName:     templateName,
+		TemplateLanguage: templateLanguage,
+		TemplateParams:   templateParams,
+		TagFilter:        tagFilter,
+		Status:           domain.CampaignDraft,
+		TotalRecipients:  len(parties),
+		CreatedBy:        actor,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+
+	if err := u.repo.CreateCampaign(ctx, campaign); err != nil {
+		return nil, fmt.Errorf("create campaign: %w", err)
+	}
+
+	// Guardar destinatarios
+	recipients := make([]domain.CampaignRecipient, 0, len(parties))
+	for _, p := range parties {
+		recipients = append(recipients, domain.CampaignRecipient{
+			ID:         uuid.New(),
+			CampaignID: campaign.ID,
+			OrgID:      orgID,
+			PartyID:    p.PartyID,
+			Phone:      p.Phone,
+			PartyName:  p.PartyName,
+			Status:     domain.RecipientPending,
+			CreatedAt:  now,
+		})
+	}
+	if err := u.repo.SaveCampaignRecipients(ctx, recipients); err != nil {
+		return nil, fmt.Errorf("create campaign recipients: %w", err)
+	}
+
+	return campaign, nil
+}
+
+func (u *Usecases) SendCampaign(ctx context.Context, orgID, campaignID uuid.UUID) error {
+	campaign, err := u.repo.GetCampaign(ctx, orgID, campaignID)
+	if err != nil {
+		return fmt.Errorf("send campaign: %w", err)
+	}
+	if campaign.Status != domain.CampaignDraft && campaign.Status != domain.CampaignScheduled {
+		return fmt.Errorf("send campaign: cannot send campaign in status %s", campaign.Status)
+	}
+
+	conn, err := u.repo.GetConnection(ctx, orgID)
+	if err != nil {
+		return fmt.Errorf("send campaign: %w", err)
+	}
+	accessToken, err := u.tokenCrypto.Decrypt(conn.AccessToken)
+	if err != nil {
+		return fmt.Errorf("send campaign: decrypt token: %w", err)
+	}
+
+	recipients, err := u.repo.ListCampaignRecipients(ctx, campaignID)
+	if err != nil {
+		return fmt.Errorf("send campaign: list recipients: %w", err)
+	}
+
+	now := time.Now()
+	_ = u.repo.UpdateCampaignStatus(ctx, orgID, campaignID, domain.CampaignSending, map[string]any{"started_at": now})
+
+	sentCount, failedCount := 0, 0
+	for _, rec := range recipients {
+		if rec.Status != domain.RecipientPending {
+			continue
+		}
+		if rec.Phone == "" {
+			_ = u.repo.UpdateRecipientStatus(ctx, rec.ID, domain.RecipientFailed, "", "no phone number")
+			failedCount++
+			continue
+		}
+
+		waID, sendErr := u.meta.SendTemplateMessage(ctx, conn.PhoneNumberID, accessToken, rec.Phone, campaign.TemplateName, campaign.TemplateLanguage, campaign.TemplateParams)
+		if sendErr != nil {
+			_ = u.repo.UpdateRecipientStatus(ctx, rec.ID, domain.RecipientFailed, "", sendErr.Error())
+			failedCount++
+			continue
+		}
+
+		_ = u.repo.UpdateRecipientStatus(ctx, rec.ID, domain.RecipientSent, waID, "")
+
+		// Guardar mensaje en historial
+		partyID := rec.PartyID
+		msg := u.buildOutboundMessage(conn, orgID, &partyID, rec.Phone, domain.MessageType("template"), campaign.TemplateName, waID)
+		_ = u.repo.SaveMessage(ctx, msg)
+
+		sentCount++
+	}
+
+	completedAt := time.Now()
+	_ = u.repo.UpdateCampaignStatus(ctx, orgID, campaignID, domain.CampaignCompleted, map[string]any{
+		"sent_count":   sentCount,
+		"failed_count": failedCount,
+		"completed_at": completedAt,
+	})
+
+	return nil
+}
+
+func (u *Usecases) ListCampaigns(ctx context.Context, orgID uuid.UUID, limit int) ([]domain.Campaign, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return u.repo.ListCampaigns(ctx, orgID, limit)
+}
+
+func (u *Usecases) GetCampaign(ctx context.Context, orgID, campaignID uuid.UUID) (*domain.Campaign, error) {
+	return u.repo.GetCampaign(ctx, orgID, campaignID)
+}
+
+func (u *Usecases) GetCampaignRecipients(ctx context.Context, orgID, campaignID uuid.UUID) ([]domain.CampaignRecipient, error) {
+	// Verificar que la campaña pertenece al org
+	_, err := u.repo.GetCampaign(ctx, orgID, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	return u.repo.ListCampaignRecipients(ctx, campaignID)
 }

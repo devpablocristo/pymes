@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { listPolicies, createPolicy, deletePolicy, type PolicyResponse } from '../lib/reviewApi';
-import { useI18n } from '../lib/i18n';
 import './AutomationRulesPage.css';
 
 type Effect = 'allow' | 'deny' | 'require_approval';
@@ -54,7 +55,6 @@ const DEFAULT_EFFECTS: Record<string, Effect> = {
 };
 
 export default function AutomationRulesPage() {
-  const { t } = useI18n();
   const [rules, setRules] = useState<Record<string, RuleState>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -161,6 +161,14 @@ export default function AutomationRulesPage() {
     }
   };
 
+  const ruleSearch = usePageSearch();
+  const ruleTextFn = useCallback(
+    (tpl: RuleTemplate) => `${tpl.displayName} ${tpl.category} ${tpl.actionType}`,
+    [],
+  );
+  const filteredRules = useSearch(RULE_TEMPLATES, ruleTextFn, ruleSearch);
+  const categories = [...new Set(filteredRules.map((tpl) => tpl.category))];
+
   if (loading) {
     return (
       <div className="automation-rules-page">
@@ -169,15 +177,17 @@ export default function AutomationRulesPage() {
     );
   }
 
-  const categories = [...new Set(RULE_TEMPLATES.map((tpl) => tpl.category))];
-
   return (
     <>
-      <div className="automation-rules-page">
+      <div className="automation-rules-page page-stack">
+        <header className="page-header">
+          <h1>Reglas de automatización</h1>
+          <p>Qué puede hacer la IA o los usuarios sin tu aprobación, según el tipo de acción.</p>
+        </header>
         <div className="rules-stack">
           {categories.map((cat) => (
             <div key={cat} className="rules-category">
-              {RULE_TEMPLATES.filter((t) => t.category === cat).map((tpl) => {
+              {filteredRules.filter((t) => t.category === cat).map((tpl) => {
                 const rule = rules[tpl.actionType];
                 if (!rule) return null;
                 const effectClass =

@@ -1,4 +1,10 @@
-import { useState } from 'react';
+/**
+ * Datos de demo: colores por marca de cada activo (no son tokens de producto).
+ */
+import { useCallback, useState } from 'react';
+import type { CSSProperties } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { IconStar } from '@devpablocristo/modules-ui-data-display/icons';
 import './CryptoPage.css';
 
@@ -19,7 +25,17 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   const max = Math.max(...data);
   return (
     <div className="cry__sparkline">
-      {data.map((v, i) => <span key={i} style={{ height: `${(v / max) * 100}%`, background: color }} />)}
+      {data.map((v, i) => (
+        <span
+          key={i}
+          style={
+            {
+              '--cry-spark-h': `${(v / max) * 100}%`,
+              '--cry-spark-bg': color,
+            } as CSSProperties
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -39,10 +55,10 @@ function WalletView({ coins }: { coins: Coin[] }) {
           <tbody>
             {coins.map(c => (
               <tr key={c.id}>
-                <td><div className="cry__coin"><div className="cry__coin-icon" style={{ background: c.color }}>{c.icon}</div><div><strong>{c.name}</strong><br /><span style={{ fontSize: '.72rem', color: 'var(--color-text-muted)' }}>{c.symbol}</span></div></div></td>
+                <td><div className="cry__coin"><div className="cry__coin-icon" style={{ '--cry-coin-bg': c.color } as CSSProperties}>{c.icon}</div><div><strong>{c.name}</strong><br /><span className="cry__coin-symbol">{c.symbol}</span></div></div></td>
                 <td>{c.holding.toLocaleString()}</td>
                 <td>{fmtUsd(c.price)}</td>
-                <td style={{ fontWeight: 600 }}>{fmtUsd(c.price * c.holding)}</td>
+                <td className="cry__cell-strong">{fmtUsd(c.price * c.holding)}</td>
                 <td className={c.change >= 0 ? 'cry__change--up' : 'cry__change--down'}>{c.change >= 0 ? '+' : ''}{c.change}%</td>
                 <td>{c.allocation}%</td>
               </tr>
@@ -56,7 +72,13 @@ function WalletView({ coins }: { coins: Coin[] }) {
 
 function MarketView({ coins }: { coins: Coin[] }) {
   const [watched, setWatched] = useState<Set<string>>(new Set(['1', '3']));
-  const toggleWatch = (id: string) => setWatched(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleWatch = (id: string) =>
+    setWatched((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   return (
     <div className="card">
       <table className="cry__table">
@@ -64,13 +86,13 @@ function MarketView({ coins }: { coins: Coin[] }) {
         <tbody>
           {coins.map(c => (
             <tr key={c.id}>
-              <td><div className="cry__coin"><div className="cry__coin-icon" style={{ background: c.color }}>{c.icon}</div><strong>{c.name}</strong></div></td>
+              <td><div className="cry__coin"><div className="cry__coin-icon" style={{ '--cry-coin-bg': c.color } as CSSProperties}>{c.icon}</div><strong>{c.name}</strong></div></td>
               <td>{fmtUsd(c.price)}</td>
               <td className={c.change >= 0 ? 'cry__change--up' : 'cry__change--down'}>{c.change >= 0 ? '+' : ''}{c.change}%</td>
               <td>{c.supply}</td>
               <td>{c.marketCap}</td>
-              <td><Sparkline data={c.spark} color={c.change >= 0 ? '#10b981' : '#ef4444'} /></td>
-              <td><button type="button" onClick={() => toggleWatch(c.id)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.1rem', color: watched.has(c.id) ? '#f59e0b' : 'var(--color-border)' }}><IconStar filled={watched.has(c.id)} /></button></td>
+              <td><Sparkline data={c.spark} color={c.change >= 0 ? 'var(--color-success)' : 'var(--color-danger)'} /></td>
+              <td><button type="button" className={`cry__watch-btn${watched.has(c.id) ? ' cry__watch-btn--active' : ''}`} onClick={() => toggleWatch(c.id)}><IconStar filled={watched.has(c.id)} /></button></td>
             </tr>
           ))}
         </tbody>
@@ -93,16 +115,24 @@ function PortfolioView({ coins }: { coins: Coin[] }) {
           <tbody>
             {coins.map(c => (
               <tr key={c.id}>
-                <td><div className="cry__coin"><div className="cry__coin-icon" style={{ background: c.color }}>{c.icon}</div><strong>{c.symbol}</strong></div></td>
+                <td><div className="cry__coin"><div className="cry__coin-icon" style={{ '--cry-coin-bg': c.color } as CSSProperties}>{c.icon}</div><strong>{c.symbol}</strong></div></td>
                 <td>{c.holding.toLocaleString()} {c.symbol}</td>
                 <td>{fmtUsd(c.price)}</td>
                 <td className={c.change >= 0 ? 'cry__change--up' : 'cry__change--down'}>{c.change >= 0 ? '+' : ''}{c.change}%</td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                    <div style={{ flex: 1, height: 6, background: 'var(--color-border)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${c.allocation}%`, background: c.color, borderRadius: 3 }} />
+                  <div className="cry__alloc-row">
+                    <div className="cry__alloc-track">
+                      <div
+                        className="cry__alloc-fill"
+                        style={
+                          {
+                            '--cry-alloc-pct': `${c.allocation}%`,
+                            '--cry-alloc-color': c.color,
+                          } as CSSProperties
+                        }
+                      />
                     </div>
-                    <span style={{ fontSize: '.72rem', fontWeight: 600, color: 'var(--color-text-secondary)', minWidth: '2rem', textAlign: 'right' }}>{c.allocation}%</span>
+                    <span className="cry__alloc-label">{c.allocation}%</span>
                   </div>
                 </td>
               </tr>
@@ -116,16 +146,23 @@ function PortfolioView({ coins }: { coins: Coin[] }) {
 
 export function CryptoPage() {
   const [tab, setTab] = useState<CryptoTab>('wallet');
+  const search = usePageSearch();
+  const coinTextFn = useCallback((c: Coin) => `${c.name} ${c.symbol}`, []);
+  const filtered = useSearch(COINS, coinTextFn, search);
   return (
-    <div className="cry">
+    <div className="cry page-stack">
+      <header className="page-header">
+        <h1>Crypto (demo)</h1>
+        <p>Billetera, mercado y asignación — datos ilustrativos.</p>
+      </header>
       <div className="cry__tabs">
         {([['wallet', 'Billetera'], ['marketplace', 'Marketplace'], ['portfolio', 'Portfolio']] as const).map(([id, label]) => (
           <button key={id} type="button" className={`cry__tab ${tab === id ? 'cry__tab--active' : ''}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
-      {tab === 'wallet' && <WalletView coins={COINS} />}
-      {tab === 'marketplace' && <MarketView coins={COINS} />}
-      {tab === 'portfolio' && <PortfolioView coins={COINS} />}
+      {tab === 'wallet' && <WalletView coins={filtered} />}
+      {tab === 'marketplace' && <MarketView coins={filtered} />}
+      {tab === 'portfolio' && <PortfolioView coins={filtered} />}
     </div>
   );
 }

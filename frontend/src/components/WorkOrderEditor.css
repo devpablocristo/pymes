@@ -4,11 +4,11 @@
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 0 1.5rem;
+  padding: 0 0 var(--space-5);
 }
 
 .wo-editor-page__toolbar {
-  margin-bottom: 0.65rem;
+  margin-bottom: var(--space-3);
 }
 
 .wo-modal--embedded {
@@ -17,7 +17,7 @@
 }
 
 .wo-modal__textarea--items {
-  min-height: 10rem;
+  min-height: calc(var(--space-8) * 4);
   font-family: ui-monospace, monospace;
   font-size: var(--text-sm);
 }

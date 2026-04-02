@@ -13,13 +13,42 @@ import {
   type VerticalType,
 } from '../lib/tenantProfile';
 
-const VERTICAL_OPTIONS: { value: VerticalType; label: string; desc: string }[] = [
-  { value: 'none', label: 'Solo comercial', desc: 'Ventas, stock y cobros' },
+// Verticales principales (primer selector)
+type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+
+const VERTICAL_GROUP_OPTIONS: { value: VerticalGroup; label: string; desc: string }[] = [
+  { value: 'commercial', label: 'Solo comercial', desc: 'Ventas, stock y cobros' },
   { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, alumnos y fichas' },
-  { value: 'workshops', label: 'Talleres / Reparación', desc: 'Vehículos, órdenes y servicios' },
+  { value: 'workshops', label: 'Talleres', desc: 'Vehículos, bicicletas, reparaciones' },
   { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, servicios y agenda' },
   { value: 'restaurants', label: 'Bares / Restaurantes', desc: 'Salón, mesas y sesiones' },
 ];
+
+// Sub-verticales por grupo (solo los que tienen más de una opción)
+const SUB_VERTICAL_OPTIONS: Partial<Record<VerticalGroup, { value: VerticalType; label: string; desc: string }[]>> = {
+  workshops: [
+    { value: 'workshops', label: 'Taller mecánico', desc: 'Vehículos, órdenes y servicios' },
+    { value: 'bike_shop', label: 'Bicicletería', desc: 'Bicicletas, reparaciones y servicios' },
+  ],
+};
+
+// Mapeo directo grupo → vertical para los que no tienen sub-verticales
+const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
+  commercial: 'none',
+  professionals: 'professionals',
+  beauty: 'beauty',
+  restaurants: 'restaurants',
+};
+
+// Para el resumen final
+const ALL_VERTICAL_LABELS: Record<VerticalType, string> = {
+  none: 'Solo comercial',
+  professionals: 'Profesionales / Docentes',
+  workshops: 'Taller mecánico',
+  bike_shop: 'Bicicletería',
+  beauty: 'Belleza / Salón',
+  restaurants: 'Bares / Restaurantes',
+};
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -110,13 +139,21 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
   const [usesBilling, setUsesBilling] = useState<boolean | null>(null);
   const [currency, setCurrency] = useState('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
-  const [vertical, setVertical] = useState<VerticalType>('none');
+  const [verticalGroup, setVerticalGroup] = useState<VerticalGroup | ''>('');
+  const [vertical, setVertical] = useState<VerticalType | ''>('');
 
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState('');
 
+  // Resolver vertical final: si el grupo tiene sub-verticales, usar la selección; si no, mapeo directo
+  const resolvedVertical: VerticalType | '' = verticalGroup
+    ? (SUB_VERTICAL_OPTIONS[verticalGroup] ? vertical : GROUP_TO_VERTICAL[verticalGroup] ?? '')
+    : '';
+
+  const needsSubVertical = verticalGroup !== '' && !!SUB_VERTICAL_OPTIONS[verticalGroup];
+
   const canNext: Record<Step, boolean> = {
-    1: businessName.trim().length >= 2 && teamSize !== '',
+    1: businessName.trim().length >= 2 && teamSize !== '' && verticalGroup !== '' && (!needsSubVertical || vertical !== ''),
     2: sells !== '' && (clientLabel !== '' || customClientLabel.trim() !== '') && usesScheduling !== null && usesBilling !== null,
     3: currency !== '' && paymentMethod !== '',
     4: true,
@@ -143,7 +180,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
       usesBilling: usesBilling === true,
       currency,
       paymentMethod: paymentMethod as PaymentMethod,
-      vertical,
+      vertical: resolvedVertical as VerticalType,
       completedAt: new Date().toISOString(),
     };
 
@@ -227,12 +264,15 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               <div className="onboarding-field">
                 <label>¿Qué tipo de negocio es?</label>
                 <div className="onboarding-options onboarding-options-vertical">
-                  {VERTICAL_OPTIONS.map((opt) => (
+                  {VERTICAL_GROUP_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
-                      className={`onboarding-option${vertical === opt.value ? ' selected' : ''}`}
-                      onClick={() => setVertical(opt.value)}
+                      className={`onboarding-option${verticalGroup === opt.value ? ' selected' : ''}`}
+                      onClick={() => {
+                        setVerticalGroup(opt.value);
+                        setVertical('');
+                      }}
                     >
                       <strong>{opt.label}</strong>
                       <small>{opt.desc}</small>
@@ -240,6 +280,25 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                   ))}
                 </div>
               </div>
+
+              {needsSubVertical && (
+                <div className="onboarding-field">
+                  <label>¿Qué tipo de taller?</label>
+                  <div className="onboarding-options onboarding-options-vertical">
+                    {SUB_VERTICAL_OPTIONS[verticalGroup as VerticalGroup]!.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`onboarding-option${vertical === opt.value ? ' selected' : ''}`}
+                        onClick={() => setVertical(opt.value)}
+                      >
+                        <strong>{opt.label}</strong>
+                        <small>{opt.desc}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -392,7 +451,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                 </div>
                 <div className="onboarding-summary-row">
                   <span>Tipo de negocio</span>
-                  <strong>{VERTICAL_OPTIONS.find((o) => o.value === vertical)?.label ?? vertical}</strong>
+                  <strong>{resolvedVertical ? ALL_VERTICAL_LABELS[resolvedVertical] : '-'}</strong>
                 </div>
                 <div className="onboarding-summary-row">
                   <span>Ofrecés</span>

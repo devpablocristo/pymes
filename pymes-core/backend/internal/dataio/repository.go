@@ -36,12 +36,19 @@ func (r *Repository) ImportCustomers(ctx context.Context, orgID uuid.UUID, rows 
 					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
 					continue
 				}
+				if phone := strings.TrimSpace(row["phone"]); phone != "" {
+					result.PartyPhones = append(result.PartyPhones, PartyPhone{PartyID: *existingID, Phone: phone})
+				}
 				result.Updated++
 				continue
 			}
-			if err := createCustomerParty(ctx, tx, orgID, row); err != nil {
+			partyID, err := createCustomerParty(ctx, tx, orgID, row)
+			if err != nil {
 				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
 				continue
+			}
+			if phone := strings.TrimSpace(row["phone"]); phone != "" {
+				result.PartyPhones = append(result.PartyPhones, PartyPhone{PartyID: partyID, Phone: phone})
 			}
 			result.Created++
 		}
@@ -270,7 +277,7 @@ func (r *Repository) findProduct(ctx context.Context, tx *gorm.DB, orgID uuid.UU
 	return &id, nil
 }
 
-func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string) error {
+func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string) (uuid.UUID, error) {
 	partyID := uuid.New()
 	partyType := customerPartyType(row["type"])
 	address, meta, tags := customerPartyData(row)
@@ -289,12 +296,12 @@ func createCustomerParty(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row 
 		"created_at":   time.Now().UTC(),
 		"updated_at":   time.Now().UTC(),
 	}).Error; err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if err := upsertCustomerExtension(ctx, tx, partyID, partyType, strings.TrimSpace(row["name"])); err != nil {
-		return err
+		return uuid.Nil, err
 	}
-	return tx.WithContext(ctx).Exec(`
+	return partyID, tx.WithContext(ctx).Exec(`
 		INSERT INTO party_roles (id, party_id, org_id, role, is_active, metadata, created_at)
 		VALUES (?, ?, ?, 'customer', true, '{}'::jsonb, now())
 		ON CONFLICT (party_id, org_id, role) DO UPDATE SET is_active = true

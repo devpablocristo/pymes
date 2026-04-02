@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import type { CSSProperties, PropsWithChildren } from 'react';
 import type { DashboardLayoutItem, DashboardWidgetDefinition } from '../types';
 
 type WidgetFrameProps = PropsWithChildren<{
@@ -26,10 +26,12 @@ export function WidgetFrame({
   return (
     <article
       className={`dashboard-widget-card${editing ? ' editing' : ''}${item.visible ? '' : ' muted'}`}
-      style={{
-        gridColumn: `${item.x + 1} / span ${item.w}`,
-        gridRow: `${item.y + 1} / span ${item.h}`,
-      }}
+      style={
+        {
+          '--widget-grid-col': `${item.x + 1} / span ${item.w}`,
+          '--widget-grid-row': `${item.y + 1} / span ${item.h}`,
+        } as CSSProperties
+      }
     >
       <header className="dashboard-widget-header">
         <div>

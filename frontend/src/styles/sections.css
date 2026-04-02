@@ -1,0 +1,57 @@
+/**
+ * Patrones de sección y tipografía — alinear con `.page-header`, `.card`, tablas globales.
+ * Usar clases aquí en páginas nuevas; hojas por página deben referir `var(--text-role-*)` y `var(--color-*)`.
+ */
+
+/* Contenedor vertical estándar entre bloques */
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Cabecera con acción a la derecha (título + lead a la izquierda) */
+.page-header--split {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.page-header--split .page-header__main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Título de página (paridad con `.page-header h1`) */
+.text-page-title {
+  font-size: var(--text-role-page-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+/* Subtítulo / lead bajo el título (paridad con `.page-header p`) */
+.text-page-lead {
+  font-size: var(--text-role-lead);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+/* Encabezado de bloque dentro del contenido (card, lista, formulario) */
+.text-section-title {
+  font-size: var(--text-role-section);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+/* Etiqueta secundaria / meta */
+.text-caption {
+  font-size: var(--text-role-caption);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}

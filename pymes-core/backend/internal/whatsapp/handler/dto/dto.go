@@ -150,3 +150,80 @@ type OptInListResponse struct {
 	OptIns []OptInResponse `json:"opt_ins"`
 	Total  int             `json:"total"`
 }
+
+// --- Conversations ---
+
+type ConversationResponse struct {
+	ID                 uuid.UUID `json:"id"`
+	PartyID            uuid.UUID `json:"party_id"`
+	Phone              string    `json:"phone"`
+	PartyName          string    `json:"party_name"`
+	AssignedTo         string    `json:"assigned_to"`
+	Status             string    `json:"status"`
+	LastMessageAt      *string   `json:"last_message_at,omitempty"`
+	LastMessagePreview string    `json:"last_message_preview"`
+	UnreadCount        int       `json:"unread_count"`
+	CreatedAt          string    `json:"created_at"`
+	UpdatedAt          string    `json:"updated_at"`
+}
+
+type ConversationListResponse struct {
+	Items []ConversationResponse `json:"items"`
+}
+
+type AssignConversationRequest struct {
+	AssignedTo string `json:"assigned_to" binding:"required"`
+}
+
+// --- Campaigns ---
+
+type CreateCampaignRequest struct {
+	Name             string   `json:"name" binding:"required"`
+	TemplateName     string   `json:"template_name" binding:"required"`
+	TemplateLanguage string   `json:"template_language"`
+	TemplateParams   []string `json:"template_params"`
+	TagFilter        string   `json:"tag_filter"`
+}
+
+type CampaignResponse struct {
+	ID               uuid.UUID `json:"id"`
+	Name             string    `json:"name"`
+	TemplateName     string    `json:"template_name"`
+	TemplateLanguage string    `json:"template_language"`
+	TemplateParams   []string  `json:"template_params"`
+	TagFilter        string    `json:"tag_filter"`
+	Status           string    `json:"status"`
+	TotalRecipients  int       `json:"total_recipients"`
+	SentCount        int       `json:"sent_count"`
+	DeliveredCount   int       `json:"delivered_count"`
+	ReadCount        int       `json:"read_count"`
+	FailedCount      int       `json:"failed_count"`
+	ScheduledAt      *string   `json:"scheduled_at,omitempty"`
+	StartedAt        *string   `json:"started_at,omitempty"`
+	CompletedAt      *string   `json:"completed_at,omitempty"`
+	CreatedBy        string    `json:"created_by"`
+	CreatedAt        string    `json:"created_at"`
+	UpdatedAt        string    `json:"updated_at"`
+}
+
+type CampaignListResponse struct {
+	Items []CampaignResponse `json:"items"`
+}
+
+type CampaignRecipientResponse struct {
+	ID          uuid.UUID `json:"id"`
+	PartyID     uuid.UUID `json:"party_id"`
+	Phone       string    `json:"phone"`
+	PartyName   string    `json:"party_name"`
+	Status      string    `json:"status"`
+	WAMessageID string    `json:"wa_message_id,omitempty"`
+	ErrorMessage string   `json:"error_message,omitempty"`
+	SentAt      *string   `json:"sent_at,omitempty"`
+	DeliveredAt *string   `json:"delivered_at,omitempty"`
+	ReadAt      *string   `json:"read_at,omitempty"`
+}
+
+type CampaignDetailResponse struct {
+	CampaignResponse
+	Recipients []CampaignRecipientResponse `json:"recipients"`
+}

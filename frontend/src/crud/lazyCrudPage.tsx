@@ -42,7 +42,7 @@ function resolveCrudModuleGroup(resourceId: string): string {
   if (['professionals', 'teachers', 'specialties', 'intakes', 'sessions'].includes(resourceId)) {
     return 'professionals';
   }
-  if (['workshopVehicles', 'workshopServices', 'workOrders'].includes(resourceId)) {
+  if (['workshopVehicles', 'workshopServices', 'workOrders', 'bikeBicycles', 'bikeShopServices', 'bikeWorkOrders'].includes(resourceId)) {
     return 'workshops';
   }
   if (['beautyStaff', 'beautySalonServices'].includes(resourceId)) {

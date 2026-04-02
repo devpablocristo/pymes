@@ -1,0 +1,40 @@
+/**
+ * Utilidades globales (margen, tipografía, padding de página).
+ * Importado desde `styles.css` justo después de `tokens.css`.
+ */
+
+/* ── Utility classes ── */
+/* Convención: ritmo vertical/horizontal con --space-* en :root; márgenes puntuales con .u-mt-*, .u-mb-*.
+   Evitar style={{}} salvo valores dinámicos (grid, % de barras). */
+/* Márgenes (prefijo u- para no chocar con otras libs) */
+.u-mt-sm {
+  margin-top: var(--space-3);
+}
+
+.u-mt-md {
+  margin-top: var(--space-4);
+}
+
+.u-mb-sm {
+  margin-bottom: var(--space-2);
+}
+
+.u-mb-md {
+  margin-bottom: var(--space-4);
+}
+
+.u-m-0 {
+  margin: 0;
+}
+
+.u-pre-wrap {
+  white-space: pre-wrap;
+}
+
+.u-text-base {
+  font-size: var(--text-base);
+}
+
+.u-pad-page {
+  padding: var(--space-6);
+}

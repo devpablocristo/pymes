@@ -105,9 +105,12 @@ describe('SettingsPage (modo clave API)', () => {
 
     await waitFor(() => {
       expect(apiMocks.getSession).toHaveBeenCalled();
+      expect(apiMocks.getMe).toHaveBeenCalled();
     });
 
-    expect(screen.getByText('Fábrica Norte')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Fábrica Norte')).toBeInTheDocument();
+    });
   });
 
   it('no revienta si /v1/session trae scopes null (JSON desde Go)', async () => {
@@ -122,9 +125,12 @@ describe('SettingsPage (modo clave API)', () => {
 
     await waitFor(() => {
       expect(apiMocks.getSession).toHaveBeenCalled();
+      expect(apiMocks.getMe).toHaveBeenCalled();
     });
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
+    });
     expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
   });
 

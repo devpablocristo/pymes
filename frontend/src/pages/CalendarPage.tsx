@@ -4,12 +4,20 @@
  * FullCalendar con toolbar custom y estilos nativos.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { CSSProperties } from 'react';
+import { usePageSearch } from '../components/PageSearch';
+import { useSearch } from '@devpablocristo/modules-search';
 import { IconClose } from '@devpablocristo/modules-ui-data-display/icons';
 import FullCalendar from '@fullcalendar/react';
 import { CalendarSurface, resolveInitialTimeGridScrollTime, type CalendarView } from '@devpablocristo/modules-calendar-board';
-import type { EventInput, DateSelectArg, EventClickArg, EventApi, EventDropArg } from '@fullcalendar/core';
+import type { EventInput, DateSelectArg, EventClickArg, EventDropArg } from '@fullcalendar/core';
 import type { EventResizeDoneArg } from '@fullcalendar/interaction';
 import { apiRequest } from '../lib/api';
+import { useI18n } from '../lib/i18n';
+import {
+  CALENDAR_APPOINTMENT_COLOR_OPTIONS,
+  DEFAULT_APPOINTMENT_COLOR_HEX,
+} from '../lib/productPalette';
 import '@devpablocristo/modules-calendar-board/styles.css';
 import './CalendarPage.css';
 
@@ -31,15 +39,13 @@ type ApiAppointment = {
   notes?: string;
 };
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
-
 function apiToEvent(a: ApiAppointment): EventInput {
   return {
     id: a.id,
     title: a.title || a.customer_name || 'Sin título',
     start: a.start_at,
     end: a.end_at,
-    color: a.color || '#3b82f6',
+    color: a.color || DEFAULT_APPOINTMENT_COLOR_HEX,
     extendedProps: { appointment: a },
   };
 }
@@ -67,7 +73,7 @@ type ModalState = {
 
 const emptyModal: ModalState = {
   open: false, mode: 'create', title: '', customerName: '', customerPhone: '',
-  start: '', end: '', color: '#3b82f6', description: '', notes: '', location: '', assignedTo: '', allDay: false,
+  start: '', end: '', color: DEFAULT_APPOINTMENT_COLOR_HEX, description: '', notes: '', location: '', assignedTo: '', allDay: false,
 };
 
 function EventModal({
@@ -140,8 +146,14 @@ function EventModal({
           <div className="form-group">
             <label>Color</label>
             <div className="gcal__color-row">
-              {COLORS.map((c) => (
-                <button key={c} type="button" className={`gcal__color-dot ${form.color === c ? 'gcal__color-dot--active' : ''}`} style={{ background: c }} onClick={() => setForm((p) => ({ ...p, color: c }))} />
+              {CALENDAR_APPOINTMENT_COLOR_OPTIONS.map((o) => (
+                <button
+                  key={o.hex}
+                  type="button"
+                  className={`gcal__color-dot ${form.color === o.hex ? 'gcal__color-dot--active' : ''}`}
+                  style={{ '--gcal-dot-bg': o.swatch } as CSSProperties}
+                  onClick={() => setForm((p) => ({ ...p, color: o.hex }))}
+                />
               ))}
             </div>
           </div>
@@ -150,7 +162,7 @@ function EventModal({
           {state.mode === 'edit' && onDelete && (
             <button type="button" className="btn-danger btn-sm" onClick={onDelete} disabled={saving}>Eliminar</button>
           )}
-          <div style={{ flex: 1 }} />
+          <div className="gcal__modal-footer-spacer" aria-hidden />
           <button type="button" className="btn-secondary btn-sm" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn-primary btn-sm" disabled={saving}>
             {saving ? 'Guardando…' : state.mode === 'edit' ? 'Guardar' : 'Crear'}
@@ -170,12 +182,19 @@ function toLocalDatetime(iso: string): string {
 }
 
 export function CalendarPage() {
+  const { t } = useI18n();
   const calRef = useRef<FullCalendar>(null);
   const [modal, setModal] = useState<ModalState>(emptyModal);
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<CalendarView>('timeGridWeek');
   const [titleText, setTitleText] = useState('');
   const [events, setEvents] = useState<EventInput[]>([]);
+  const calSearch = usePageSearch();
+  const eventTextFn = useCallback((e: EventInput) => {
+    const props = (e.extendedProps as Record<string, any>)?.appointment;
+    return [e.title, props?.customer_name, props?.description, props?.notes].filter(Boolean).join(' ');
+  }, []);
+  const filteredEvents = useSearch(events, eventTextFn, calSearch);
   const [loaded, setLoaded] = useState(false);
 
   const scrollCalendarToRelevantTime = useCallback(() => {
@@ -254,7 +273,7 @@ export function CalendarPage() {
     setModal({
       open: true, mode: 'create', title: '', customerName: '', customerPhone: '',
       start: toLocalDatetime(info.startStr), end: toLocalDatetime(info.endStr),
-      color: '#3b82f6', description: '', notes: '', location: '', assignedTo: '', allDay: info.allDay,
+      color: DEFAULT_APPOINTMENT_COLOR_HEX, description: '', notes: '', location: '', assignedTo: '', allDay: info.allDay,
     });
   }, []);
 
@@ -266,7 +285,7 @@ export function CalendarPage() {
       title: a?.title ?? info.event.title, customerName: a?.customer_name ?? '',
       customerPhone: a?.customer_phone ?? '',
       start: toLocalDatetime(info.event.startStr), end: toLocalDatetime(info.event.endStr ?? info.event.startStr),
-      color: info.event.backgroundColor || '#3b82f6',
+      color: info.event.backgroundColor || DEFAULT_APPOINTMENT_COLOR_HEX,
       description: a?.description ?? '', notes: a?.notes ?? '',
       location: a?.location ?? '', assignedTo: a?.assigned_to ?? '', allDay: info.event.allDay,
     });
@@ -349,7 +368,11 @@ export function CalendarPage() {
   }, [modal.id, loadEvents]);
 
   return (
-    <div className="gcal">
+    <div className="gcal page-stack">
+      <header className="page-header">
+        <h1>{t('calendar.pageTitle')}</h1>
+        <p>{t('calendar.pageLead')}</p>
+      </header>
       <CalendarSurface
         calendarRef={calRef}
         view={view}
@@ -369,7 +392,7 @@ export function CalendarPage() {
           selectMirror: true,
           dayMaxEvents: true,
           weekends: true,
-          events,
+          events: filteredEvents,
           select: handleSelect,
           eventClick: handleEventClick,
           eventDrop: handleEventDrop,

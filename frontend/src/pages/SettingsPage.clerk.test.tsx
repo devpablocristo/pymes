@@ -141,7 +141,9 @@ describe('SettingsPage (modo Clerk)', () => {
       expect(apiMocks.getMe).toHaveBeenCalled();
     });
 
-    expect(screen.getByText('Ana López')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Ana López')).toBeInTheDocument();
+    });
     expect(screen.getByText(/^Ana$/)).toBeInTheDocument();
     expect(screen.getByText(/^López$/)).toBeInTheDocument();
     expect(screen.getByText('ana@example.com')).toBeInTheDocument();

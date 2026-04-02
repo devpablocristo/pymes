@@ -43,6 +43,8 @@ type Message struct {
 	ErrorCode        string
 	ErrorMessage     string
 	PartyID          *uuid.UUID
+	ConversationID   *uuid.UUID
+	CreatedBy        string
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -222,4 +224,89 @@ type ConnectionStats struct {
 	TotalDelivered int `json:"total_delivered"`
 	TotalRead      int `json:"total_read"`
 	TotalFailed    int `json:"total_failed"`
+}
+
+// ── Conversaciones (multi-operador) ──
+
+type ConversationStatus string
+
+const (
+	ConversationOpen     ConversationStatus = "open"
+	ConversationResolved ConversationStatus = "resolved"
+	ConversationOnHold   ConversationStatus = "on_hold"
+)
+
+type Conversation struct {
+	ID                 uuid.UUID          `json:"id"`
+	OrgID              uuid.UUID          `json:"org_id"`
+	PartyID            uuid.UUID          `json:"party_id"`
+	Phone              string             `json:"phone"`
+	PartyName          string             `json:"party_name"`
+	AssignedTo         string             `json:"assigned_to"`
+	Status             ConversationStatus `json:"status"`
+	LastMessageAt      *time.Time         `json:"last_message_at,omitempty"`
+	LastMessagePreview string             `json:"last_message_preview"`
+	UnreadCount        int                `json:"unread_count"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+// ── Campañas (envíos masivos) ──
+
+type CampaignStatus string
+
+const (
+	CampaignDraft      CampaignStatus = "draft"
+	CampaignScheduled  CampaignStatus = "scheduled"
+	CampaignSending    CampaignStatus = "sending"
+	CampaignCompleted  CampaignStatus = "completed"
+	CampaignCancelled  CampaignStatus = "cancelled"
+)
+
+type Campaign struct {
+	ID               uuid.UUID      `json:"id"`
+	OrgID            uuid.UUID      `json:"org_id"`
+	Name             string         `json:"name"`
+	TemplateName     string         `json:"template_name"`
+	TemplateLanguage string         `json:"template_language"`
+	TemplateParams   []string       `json:"template_params"`
+	TagFilter        string         `json:"tag_filter"`
+	Status           CampaignStatus `json:"status"`
+	TotalRecipients  int            `json:"total_recipients"`
+	SentCount        int            `json:"sent_count"`
+	DeliveredCount   int            `json:"delivered_count"`
+	ReadCount        int            `json:"read_count"`
+	FailedCount      int            `json:"failed_count"`
+	ScheduledAt      *time.Time     `json:"scheduled_at,omitempty"`
+	StartedAt        *time.Time     `json:"started_at,omitempty"`
+	CompletedAt      *time.Time     `json:"completed_at,omitempty"`
+	CreatedBy        string         `json:"created_by"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+}
+
+type RecipientStatus string
+
+const (
+	RecipientPending   RecipientStatus = "pending"
+	RecipientSent      RecipientStatus = "sent"
+	RecipientDelivered RecipientStatus = "delivered"
+	RecipientRead      RecipientStatus = "read"
+	RecipientFailed    RecipientStatus = "failed"
+)
+
+type CampaignRecipient struct {
+	ID          uuid.UUID       `json:"id"`
+	CampaignID  uuid.UUID       `json:"campaign_id"`
+	OrgID       uuid.UUID       `json:"org_id"`
+	PartyID     uuid.UUID       `json:"party_id"`
+	Phone       string          `json:"phone"`
+	PartyName   string          `json:"party_name"`
+	Status      RecipientStatus `json:"status"`
+	WAMessageID string          `json:"wa_message_id"`
+	ErrorMessage string         `json:"error_message"`
+	SentAt      *time.Time      `json:"sent_at,omitempty"`
+	DeliveredAt *time.Time      `json:"delivered_at,omitempty"`
+	ReadAt      *time.Time      `json:"read_at,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
 }

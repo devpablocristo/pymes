@@ -14,6 +14,8 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.stat.week': 'esta semana',
     'calendar.event.untitled': 'Sin título',
     'calendar.demo': 'Vista de ejemplo. Creá turnos en {{appointments}} para ver tu agenda real.',
+    'calendar.pageTitle': 'Agenda',
+    'calendar.pageLead': 'Turnos y citas conectados a tu cuenta.',
   },
   en: {
     'calendar.day.mon': 'Mon',
@@ -28,5 +30,7 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.stat.week': 'this week',
     'calendar.event.untitled': 'Untitled',
     'calendar.demo': 'Demo view. Create appointments in {{appointments}} to see your real schedule.',
+    'calendar.pageTitle': 'Schedule',
+    'calendar.pageLead': 'Appointments synced with your account.',
   },
 };

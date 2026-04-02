@@ -20,6 +20,7 @@ import {
   IconUsers,
 } from '@devpablocristo/modules-ui-data-display/icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { themeHubColorSwatches } from '../lib/productPalette';
@@ -405,15 +406,16 @@ export function SettingsHubPage() {
     }
   }
 
-  return (
-    <div className="stg page-stack">
-      {section === null ? (
-        <>
-          <header className="page-header">
-            <h1>Ajustes</h1>
-            <p>Elegí un área para configurar tu cuenta y tu espacio de trabajo.</p>
-          </header>
-          <div className="stg__nav-grid">
+  const activeSectionCard = SETTING_SECTIONS.find((item) => item.id === section) ?? null;
+
+  if (section === null) {
+    return (
+      <PageLayout
+        className="stg"
+        title="Ajustes"
+        lead="Elegí un área para configurar tu cuenta y tu espacio de trabajo."
+      >
+        <div className="stg__nav-grid">
           {filteredSections.map((s) => (
             <button
               key={s.id}
@@ -428,57 +430,63 @@ export function SettingsHubPage() {
               </div>
             </button>
           ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <button type="button" className="stg__back" onClick={goBackToGrid}>
-            ← Volver a Ajustes
-          </button>
+        </div>
+      </PageLayout>
+    );
+  }
 
-          {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage /></Suspense>}
-          {section === 'notifications' && (
-            <>
-              <div className="card stg__card-mb">
-                <p className="text-secondary u-m-0 u-text-base">
-                  La bandeja de avisos y aprobaciones está en el menú <strong>Base → Notificaciones</strong> (
-                  <Link to="/notifications">abrir centro</Link>
-                  ).
-                </p>
-              </div>
-              <Suspense fallback={<div className="spinner" />}>
-                <NotificationPreferencesPage embedded />
-              </Suspense>
-              <AlertChannelsTab />
-            </>
-          )}
-          {section === 'automation' && <AutomationHubTab />}
-          {section === 'company' && <CompanyTab />}
-          {section === 'firebaseNotif' && <FirebaseNotifTab />}
-          {section === 'currencies' && <CurrenciesTab />}
-          {section === 'gateway' && (
-            <>
-              <Suspense fallback={<div className="spinner" />}><BillingSection /></Suspense>
-              <GatewayTab />
-            </>
-          )}
-          {section === 'appearance' && (
-            <>
-              <Suspense fallback={<div className="spinner" />}><AdminPage section="appearance" /></Suspense>
-              <div className="card"><AdminSkinSelector /></div>
-              <ThemeTab />
-            </>
-          )}
-          {section === 'language' && (
-            <>
-              <div className="card"><LanguageSelector /></div>
-              <LanguagesTab />
-            </>
-          )}
-          {section === 'workspace' && <Suspense fallback={<div className="spinner" />}><AdminPage section="workspace" /></Suspense>}
+  return (
+    <PageLayout
+      className="stg"
+      title={activeSectionCard?.label ?? 'Ajustes'}
+      lead={activeSectionCard?.desc}
+      actions={(
+        <button type="button" className="stg__back" onClick={goBackToGrid}>
+          ← Volver a Ajustes
+        </button>
+      )}
+    >
+      {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage embedded /></Suspense>}
+      {section === 'notifications' && (
+        <>
+          <div className="card stg__card-mb">
+            <p className="text-secondary u-m-0 u-text-base">
+              La bandeja de avisos y aprobaciones está en el menú <strong>Base → Notificaciones</strong> (
+              <Link to="/notifications">abrir centro</Link>
+              ).
+            </p>
+          </div>
+          <Suspense fallback={<div className="spinner" />}>
+            <NotificationPreferencesPage embedded />
+          </Suspense>
+          <AlertChannelsTab />
         </>
       )}
-    </div>
+      {section === 'automation' && <AutomationHubTab />}
+      {section === 'company' && <CompanyTab />}
+      {section === 'firebaseNotif' && <FirebaseNotifTab />}
+      {section === 'currencies' && <CurrenciesTab />}
+      {section === 'gateway' && (
+        <>
+          <Suspense fallback={<div className="spinner" />}><BillingSection /></Suspense>
+          <GatewayTab />
+        </>
+      )}
+      {section === 'appearance' && (
+        <>
+          <Suspense fallback={<div className="spinner" />}><AdminPage section="appearance" embedded /></Suspense>
+          <div className="card"><AdminSkinSelector /></div>
+          <ThemeTab />
+        </>
+      )}
+      {section === 'language' && (
+        <>
+          <div className="card"><LanguageSelector /></div>
+          <LanguagesTab />
+        </>
+      )}
+      {section === 'workspace' && <Suspense fallback={<div className="spinner" />}><AdminPage section="workspace" embedded /></Suspense>}
+    </PageLayout>
   );
 }
 

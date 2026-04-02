@@ -18,6 +18,7 @@ require (
 	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
+	github.com/devpablocristo/modules/scheduling/go v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -70,6 +71,7 @@ require (
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/devpablocristo/core/authz/go v0.1.0 // indirect
+	github.com/devpablocristo/core/scheduling/go v0.0.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -116,3 +118,7 @@ require (
 replace github.com/devpablocristo/core/authz/go => github.com/devpablocristo/core/authz/go v0.0.0-20260328151810-084828e80b26
 
 replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go
+
+replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
+
+replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go

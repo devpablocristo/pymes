@@ -1,7 +1,9 @@
 import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
+import { PageLayout } from '../components/PageLayout';
 import { getMe, getSession, patchMeProfile } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
 import { clearTenantProfile } from '../lib/tenantProfile';
@@ -9,6 +11,7 @@ import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import { displayFamilyFromUser, displayGivenFromUser, mergeClerkSessionWithApiUser } from '../lib/profileDisplay';
+import { queryKeys } from '../lib/queryKeys';
 import type { MeProfileResponse, MeProfileUser, SessionResponse } from '../lib/types';
 
 /** Evita spinner infinito si Clerk/getToken o la red no resuelven. */
@@ -18,6 +21,20 @@ function rejectAfterMs(ms: number, message: string): Promise<never> {
   return new Promise((_, reject) => {
     window.setTimeout(() => reject(new Error(message)), ms);
   });
+}
+
+async function getSessionWithTimeout(): Promise<SessionResponse> {
+  return Promise.race([
+    getSession(),
+    rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
+  ]);
+}
+
+async function getMeWithTimeout(): Promise<MeProfileResponse> {
+  return Promise.race([
+    getMe(),
+    rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
+  ]);
 }
 
 function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
@@ -270,20 +287,34 @@ function LocalAccountSignOutButton() {
 function PersonalDataForm({
   displayUser,
   canEdit,
-  onProfileUpdated,
 }: {
   displayUser: MeProfileUser | null;
   canEdit: boolean;
-  onProfileUpdated: (next: MeProfileResponse) => void;
 }) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [givenEdit, setGivenEdit] = useState('');
   const [familyEdit, setFamilyEdit] = useState('');
   const [phoneEdit, setPhoneEdit] = useState('');
-  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [savedHint, setSavedHint] = useState(false);
+  const saveProfileMutation = useMutation({
+    mutationFn: async () =>
+      patchMeProfile({
+        given_name: givenEdit.trim(),
+        family_name: familyEdit.trim(),
+        phone: phoneEdit.trim(),
+      }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(queryKeys.me.current, next);
+      setSavedHint(true);
+      setEditing(false);
+    },
+    onError: (e) => {
+      setFormError(formatFetchErrorForUser(e, t('profile.error.unreachable')));
+    },
+  });
 
   function syncFieldsFromDisplay(): void {
     if (!displayUser) {
@@ -321,20 +352,10 @@ function PersonalDataForm({
     }
     setFormError('');
     setSavedHint(false);
-    setSaving(true);
     try {
-      const next = await patchMeProfile({
-        given_name: givenEdit.trim(),
-        family_name: familyEdit.trim(),
-        phone: phoneEdit.trim(),
-      });
-      onProfileUpdated(next);
-      setSavedHint(true);
-      setEditing(false);
-    } catch (e) {
-      setFormError(formatFetchErrorForUser(e, t('profile.error.unreachable')));
-    } finally {
-      setSaving(false);
+      await saveProfileMutation.mutateAsync();
+    } catch {
+      // El mensaje ya se resuelve en `onError`.
     }
   }
 
@@ -442,10 +463,10 @@ function PersonalDataForm({
       />
       {formError && <p className="alert alert-error profile-form-alert">{formError}</p>}
       <p className="profile-form-actions profile-form-actions--edit">
-        <button type="button" className="btn-primary" disabled={saving} onClick={() => void handleSave()}>
-          {saving ? t('profile.personal.saving') : t('profile.personal.save')}
+        <button type="button" className="btn-primary" disabled={saveProfileMutation.isPending} onClick={() => void handleSave()}>
+          {saveProfileMutation.isPending ? t('profile.personal.saving') : t('profile.personal.save')}
         </button>
-        <button type="button" className="btn-secondary" disabled={saving} onClick={handleCancelEdit}>
+        <button type="button" className="btn-secondary" disabled={saveProfileMutation.isPending} onClick={handleCancelEdit}>
           {t('profile.personal.cancel')}
         </button>
       </p>
@@ -456,11 +477,9 @@ function PersonalDataForm({
 function ClerkPersonalDataSection({
   apiUser,
   session,
-  onProfileUpdated,
 }: {
   apiUser: MeProfileUser | null | undefined;
   session: SessionResponse;
-  onProfileUpdated: (next: MeProfileResponse) => void;
 }) {
   const { t } = useI18n();
   const { isLoaded, user: clerkUser } = useUser();
@@ -472,9 +491,7 @@ function ClerkPersonalDataSection({
 
   const displayUser = clerkUser ? mergeClerkSessionWithApiUser(clerkUser, apiUser ?? undefined) : apiUser ?? null;
 
-  return (
-    <PersonalDataForm displayUser={displayUser} canEdit={canEdit} onProfileUpdated={onProfileUpdated} />
-  );
+  return <PersonalDataForm displayUser={displayUser} canEdit={canEdit} />;
 }
 
 function ClerkProfileAccountSection({
@@ -514,59 +531,32 @@ function ClerkProfileAccountSection({
 
 function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
   const { t } = useI18n();
-  const tRef = useRef(t);
-  tRef.current = t;
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  const [me, setMe] = useState<MeProfileResponse | null>(null);
-  const [error, setError] = useState('');
-  const [meWarning, setMeWarning] = useState('');
-  const [reloadToken, setReloadToken] = useState(0);
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSessionWithTimeout,
+    retry: false,
+  });
+  const meQuery = useQuery({
+    queryKey: queryKeys.me.current,
+    queryFn: getMeWithTimeout,
+    retry: false,
+  });
 
+  const session = sessionQuery.data ?? null;
+  const me = meQuery.data ?? null;
   const user = me?.user;
+  const loading = sessionQuery.isLoading || meQuery.isLoading;
+  const error = sessionQuery.error
+    ? formatFetchErrorForUser(sessionQuery.error, t('profile.error.unreachable'))
+    : '';
+  const meWarning = !sessionQuery.error && meQuery.error
+    ? formatFetchErrorForUser(meQuery.error, t('profile.error.meUnreachable'))
+    : '';
   const accountLoadFailed = Boolean(meWarning);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      const tr = tRef.current;
-      try {
-        const [sessionRes, meRes] = await Promise.race([
-          Promise.allSettled([getSession(), getMe()]),
-          rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
-        ]);
-        if (cancelled) return;
-        if (sessionRes.status === 'fulfilled') {
-          setSession(sessionRes.value);
-          setError('');
-        } else {
-          setSession(null);
-          setError(formatFetchErrorForUser(sessionRes.reason, tr('profile.error.unreachable')));
-        }
-        if (meRes.status === 'fulfilled') {
-          setMe(meRes.value);
-          setMeWarning('');
-        } else {
-          setMe(null);
-          setMeWarning(formatFetchErrorForUser(meRes.reason, tr('profile.error.meUnreachable')));
-        }
-      } catch (e) {
-        if (cancelled) return;
-        setSession(null);
-        setMe(null);
-        const unreachable = tr('profile.error.unreachable');
-        const isTimeout = e instanceof Error && e.message === 'profile_fetch_timeout';
-        setError(isTimeout ? unreachable : formatFetchErrorForUser(e, unreachable));
-        setMeWarning('');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken]);
+  const refetchProfile = () => {
+    void sessionQuery.refetch();
+    void meQuery.refetch();
+  };
 
   return (
     <>
@@ -574,7 +564,7 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
         <div className="alert alert-error">
           <p>{error}</p>
           <p>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => setReloadToken((n) => n + 1)}>
+            <button type="button" className="btn-secondary btn-sm" onClick={refetchProfile}>
               {t('profile.actions.retry')}
             </button>
           </p>
@@ -638,13 +628,11 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <ClerkPersonalDataSection
                   apiUser={user ?? undefined}
                   session={session}
-                  onProfileUpdated={(next) => setMe(next)}
                 />
               ) : (
                 <PersonalDataForm
                   displayUser={user ?? null}
                   canEdit={session.auth.auth_method === 'jwt'}
-                  onProfileUpdated={(next) => setMe(next)}
                 />
               )}
             </div>
@@ -656,25 +644,36 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
   );
 }
 
-export function SettingsPage() {
+type SettingsPageProps = {
+  embedded?: boolean;
+};
+
+export function SettingsPage({ embedded = false }: SettingsPageProps = {}) {
   const { t } = useI18n();
+  const body = <SettingsProfileBody clerkMode={clerkEnabled} />;
+
+  if (embedded) {
+    return <>{body}</>;
+  }
+
   return (
-    <div className="profile-page">
-      <div className="page-header">
-        <h1>{t('profile.page.title')}</h1>
-        <p>{t('profile.page.subtitle')}</p>
-      </div>
-      <SettingsProfileBody clerkMode={clerkEnabled} />
-    </div>
+    <PageLayout
+      className="profile-page"
+      title={t('profile.page.title')}
+      lead={t('profile.page.subtitle')}
+    >
+      {body}
+    </PageLayout>
   );
 }
 
 /** Sección de facturación standalone para usar en tabs de ajustes. */
 export function BillingSettingsSection() {
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  useEffect(() => {
-    void getSession().then(setSession).catch(() => {});
-  }, []);
-  if (!session) return <div className="spinner" />;
-  return <AccountPlanSection session={session} />;
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSessionWithTimeout,
+    retry: false,
+  });
+  if (!sessionQuery.data) return <div className="spinner" />;
+  return <AccountPlanSection session={sessionQuery.data} />;
 }

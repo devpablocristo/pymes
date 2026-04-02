@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import {
@@ -98,14 +99,14 @@ export function RestaurantTableSessionsPage() {
   const tableOptions = tables.filter((t) => t.status === 'available' || t.status === 'reserved');
 
   return (
-    <>
-      <div className="page-header">
-        <h1>Sesiones de mesa</h1>
-        <p className="text-secondary">
+    <PageLayout
+      title="Sesiones de mesa"
+      lead={
+        <span className="text-secondary">
           Apertura y cierre de cuenta en el salón. Ventas y cobros siguen en el módulo comercial del core.
-        </p>
-      </div>
-
+        </span>
+      }
+    >
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <section className="card">
@@ -213,6 +214,6 @@ export function RestaurantTableSessionsPage() {
           </div>
         )}
       </section>
-    </>
+    </PageLayout>
   );
 }

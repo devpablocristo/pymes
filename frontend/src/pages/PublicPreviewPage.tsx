@@ -1,59 +1,52 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
+import { queryKeys } from '../lib/queryKeys';
 import { getPublicTeachers, getTeachersPreviewBootstrap } from '../lib/teachersApi';
-import type { TeacherProfile } from '../lib/teachersTypes';
 
 export function PublicPreviewPage() {
-  const [items, setItems] = useState<TeacherProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
+  const [activeSlug, setActiveSlug] = useState('');
+  const slugInputId = 'public-preview-org-slug';
 
-  async function load(slug: string) {
-    try {
-      setLoading(true);
-      setError('');
-      const resp = await getPublicTeachers(slug);
-      setItems(resp.items ?? []);
-    } catch (err) {
-      setError(String(err));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const bootstrapQuery = useQuery({
+    queryKey: queryKeys.teachers.previewBootstrap,
+    queryFn: getTeachersPreviewBootstrap,
+  });
+  const teachersQuery = useQuery({
+    queryKey: queryKeys.teachers.publicBySlug(activeSlug),
+    queryFn: () => getPublicTeachers(activeSlug),
+    enabled: activeSlug.trim().length > 0,
+  });
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const bootstrap = await getTeachersPreviewBootstrap();
-        const slug = bootstrap.slug?.trim();
-        if (!slug) {
-          setError('No se pudo resolver el slug publico de la organizacion.');
-          setLoading(false);
-          return;
-        }
-        setOrgSlug(slug);
-        await load(slug);
-      } catch (err) {
-        setError(String(err));
-        setLoading(false);
-      }
-    })();
-  }, []);
+    const slug = bootstrapQuery.data?.slug?.trim();
+    if (!slug) return;
+    setOrgSlug(slug);
+    setActiveSlug(slug);
+  }, [bootstrapQuery.data]);
 
   function handleLoad() {
     if (orgSlug.trim()) {
-      load(orgSlug.trim());
+      setActiveSlug(orgSlug.trim());
     }
   }
 
-  return (
-    <>
-      <div className="page-header">
-        <h1>Vista pública</h1>
-        <p>Vista previa de cómo se vería la página pública del módulo teachers</p>
-      </div>
+  const bootstrapSlugError =
+    bootstrapQuery.isSuccess && !bootstrapQuery.data.slug?.trim()
+      ? 'No se pudo resolver el slug publico de la organizacion.'
+      : '';
+  const error = bootstrapSlugError
+    || (bootstrapQuery.error instanceof Error ? bootstrapQuery.error.message : '')
+    || (teachersQuery.error instanceof Error ? teachersQuery.error.message : '');
+  const items = teachersQuery.data?.items ?? [];
+  const loading = bootstrapQuery.isLoading || teachersQuery.isFetching;
 
+  return (
+    <PageLayout
+      title="Vista pública"
+      lead="Vista previa de cómo se vería la página pública del módulo teachers"
+    >
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card u-mb-md">
@@ -62,10 +55,17 @@ export function PublicPreviewPage() {
         </div>
         <div className="form-row">
           <div className="form-group grow">
-            <label>Slug de organización</label>
-            <input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="slug-organizacion" />
+            <label htmlFor={slugInputId}>Slug de organización</label>
+            <input
+              id={slugInputId}
+              value={orgSlug}
+              onChange={(e) => setOrgSlug(e.target.value)}
+              placeholder="slug-organizacion"
+            />
           </div>
-          <button className="btn-primary" onClick={handleLoad}>Cargar</button>
+          <button type="button" className="btn-primary" onClick={handleLoad} disabled={!orgSlug.trim()}>
+            Cargar
+          </button>
         </div>
       </div>
 
@@ -112,6 +112,6 @@ export function PublicPreviewPage() {
           ))}
         </div>
       )}
-    </>
+    </PageLayout>
   );
 }

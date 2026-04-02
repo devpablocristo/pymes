@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { PageLayout } from '../components/PageLayout';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
 import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
 import {
@@ -13,6 +15,7 @@ import {
   type ModuleRuntimeContext,
 } from '../lib/moduleCatalog';
 import { useI18n } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import { vocab } from '../lib/vocabulary';
 
 function currentRuntimeContext(): ModuleRuntimeContext {
@@ -425,11 +428,10 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 function NotFoundState() {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   return (
-    <>
-      <div className="page-header">
-        <h1>{sentenceCase(t('module.notFound.title'))}</h1>
-        <p>{t('module.notFound.description')}</p>
-      </div>
+    <PageLayout
+      title={sentenceCase(t('module.notFound.title'))}
+      lead={t('module.notFound.description')}
+    >
       <div className="card">
         <div className="card-header">
           <h2>{sentenceCase(t('module.notFound.available'))}</h2>
@@ -445,32 +447,17 @@ function NotFoundState() {
           ))}
         </div>
       </div>
-    </>
+    </PageLayout>
   );
 }
 
-function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: ModuleRuntimeContext }) {
+function ModuleOverviewCards({ module }: { module: ModuleDefinition }) {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const showExplorerChrome =
     (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
-  const summaryText = localizeText(vocab(module.summary)).trim();
   return (
     <>
-      <div className="page-header module-page-header">
-        <div>
-          <h1>{localizeUiText(vocab(module.title))}</h1>
-          {summaryText.length > 0 && <p>{summaryText}</p>}
-          {module.helpIntro && <p className="module-help-intro">{localizeText(module.helpIntro)}</p>}
-        </div>
-        {showExplorerChrome && (
-          <div className="module-runtime-card">
-            <span>{t('module.runtime.activeOrg')}</span>
-            <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
-            <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
-          </div>
-        )}
-      </div>
-
+      {module.helpIntro && <p className="module-help-intro">{localizeText(module.helpIntro)}</p>}
       {showExplorerChrome && (
       <div className="stats-grid compact-grid">
         {(module.datasets?.length ?? 0) > 0 && (
@@ -524,31 +511,21 @@ function ModuleHeader({ module, runtime }: { module: ModuleDefinition; runtime: 
 }
 
 function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
-  const { t, sentenceCase } = useI18n();
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const module = useMemo(() => moduleCatalog[moduleId], [moduleId]);
   const [runtime, setRuntime] = useState<ModuleRuntimeContext>(() => currentRuntimeContext());
-  const [bootstrapError, setBootstrapError] = useState('');
   const [showAllOperations, setShowAllOperations] = useState(false);
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSession,
+    retry: false,
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const session = await getSession();
-        if (!cancelled) {
-          setRuntime((current) => ({ ...current, orgId: session.auth.org_id }));
-          setBootstrapError('');
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setBootstrapError(String(err));
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (sessionQuery.data) {
+      setRuntime((current) => ({ ...current, orgId: sessionQuery.data.auth.org_id }));
+    }
+  }, [sessionQuery.data]);
 
   const configGroupKeys = module?.explorerConfigGroupKeys;
   const allActionGroups = useMemo(
@@ -569,10 +546,32 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
     return <NotFoundState />;
   }
 
+  const showExplorerChrome =
+    (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
+  const summaryText = localizeText(vocab(module.summary)).trim();
+  const headerActions = showExplorerChrome ? (
+    <div className="module-runtime-card">
+      <span>{t('module.runtime.activeOrg')}</span>
+      <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
+      <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
+    </div>
+  ) : undefined;
+
   return (
-    <>
-      <ModuleHeader module={module} runtime={runtime} />
-      {bootstrapError && <div className="alert alert-warning">{t('module.bootstrap.error', { error: bootstrapError })}</div>}
+    <PageLayout
+      className="module-page"
+      title={localizeUiText(vocab(module.title))}
+      lead={summaryText.length > 0 ? summaryText : undefined}
+      actions={headerActions}
+    >
+      <ModuleOverviewCards module={module} />
+      {sessionQuery.error && (
+        <div className="alert alert-warning">
+          {t('module.bootstrap.error', {
+            error: sessionQuery.error instanceof Error ? sessionQuery.error.message : String(sessionQuery.error),
+          })}
+        </div>
+      )}
 
       {module.datasets && module.datasets.length > 0 && (
         <div className="module-section">
@@ -636,34 +635,39 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
           })()}
         </div>
       )}
-    </>
+    </PageLayout>
   );
 }
 
 export function ModulePage() {
   const { moduleId = '' } = useParams();
-  const [isCrudModule, setIsCrudModule] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void hasLazyCrudResource(moduleId).then((result) => {
-      if (!cancelled) {
-        setIsCrudModule(result);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [moduleId]);
+  const crudModuleQuery = useQuery({
+    queryKey: queryKeys.modules.isCrud(moduleId),
+    queryFn: () => hasLazyCrudResource(moduleId),
+  });
 
   if (moduleId === 'workOrders') {
     return <Navigate to="/modules/workOrders" replace />;
   }
 
-  if (isCrudModule == null) {
-    return <div className="card"><p>Cargando modulo…</p></div>;
+  if (crudModuleQuery.isError) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo resolver la configuración del módulo.">
+        <div className="alert alert-error">
+          {crudModuleQuery.error instanceof Error ? crudModuleQuery.error.message : 'Error al cargar el módulo.'}
+        </div>
+      </PageLayout>
+    );
   }
-  if (isCrudModule) {
+
+  if (crudModuleQuery.data == null) {
+    return (
+      <PageLayout title="Módulo" lead="Cargando configuración y superficies disponibles.">
+        <div className="card"><p>Cargando modulo…</p></div>
+      </PageLayout>
+    );
+  }
+  if (crudModuleQuery.data) {
     return <LazyConfiguredCrudPage resourceId={moduleId} />;
   }
   return <ModuleExplorerPage moduleId={moduleId} />;

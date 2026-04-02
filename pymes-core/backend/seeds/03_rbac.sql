@@ -51,6 +51,9 @@ BEGIN
         (gen_random_uuid(), r_vendedor, 'appointments', 'read'),
         (gen_random_uuid(), r_vendedor, 'appointments', 'create'),
         (gen_random_uuid(), r_vendedor, 'appointments', 'update'),
+        (gen_random_uuid(), r_vendedor, 'scheduling', 'read'),
+        (gen_random_uuid(), r_vendedor, 'scheduling', 'create'),
+        (gen_random_uuid(), r_vendedor, 'scheduling', 'update'),
         (gen_random_uuid(), r_vendedor, 'returns', 'read'),
         (gen_random_uuid(), r_vendedor, 'returns', 'create'),
         (gen_random_uuid(), r_vendedor, 'accounts', 'read'),
@@ -67,6 +70,8 @@ BEGIN
         (gen_random_uuid(), r_cajero, 'returns', 'create'),
         (gen_random_uuid(), r_cajero, 'accounts', 'read'),
         (gen_random_uuid(), r_cajero, 'appointments', 'read'),
+        (gen_random_uuid(), r_cajero, 'scheduling', 'read'),
+        (gen_random_uuid(), r_cajero, 'scheduling', 'operate'),
 
         (gen_random_uuid(), r_contador, 'reports', 'read'),
         (gen_random_uuid(), r_contador, 'cashflow', 'read'),

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 import type { NotificationPreference } from '../lib/types';
 
 const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
@@ -29,56 +32,38 @@ type NotificationPreferencesPageProps = {
 };
 
 export function NotificationPreferencesPage({ embedded = false }: NotificationPreferencesPageProps) {
-  const [items, setItems] = useState<NotificationPreference[]>([]);
   const npSearch = usePageSearch();
   const npTextFn = useCallback((p: NotificationPreference) => `${p.notification_type} ${p.channel}`, []);
+  const queryClient = useQueryClient();
+  const preferencesQuery = useQuery({
+    queryKey: queryKeys.notifications.preferences,
+    queryFn: getNotificationPreferences,
+  });
+  const items = preferencesQuery.data?.items ?? [];
   const filteredPrefs = useSearch(items, npTextFn, npSearch);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  async function load(): Promise<void> {
-    setLoading(true);
-    try {
-      const response = await getNotificationPreferences();
-      setItems(response.items);
-      setError('');
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  async function toggle(item: NotificationPreference): Promise<void> {
-    try {
-      await updateNotificationPreference({
+  const toggleMutation = useMutation({
+    mutationFn: async (item: NotificationPreference) =>
+      updateNotificationPreference({
         notification_type: item.notification_type,
         channel: item.channel,
         enabled: !item.enabled,
-      });
-      await load();
-    } catch (err) {
-      setError(String(err));
-    }
-  }
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences });
+    },
+  });
+  const error = preferencesQuery.error instanceof Error
+    ? preferencesQuery.error.message
+    : toggleMutation.error instanceof Error
+      ? toggleMutation.error.message
+      : '';
 
-  return (
-    <div className={embedded ? undefined : 'page-stack'}>
-      {!embedded && (
-        <header className="page-header">
-          <h1>Preferencias de notificación</h1>
-          <p>Elegí qué avisos recibís por canal.</p>
-        </header>
-      )}
-
+  const body = (
+    <>
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
-        {loading ? (
+        {preferencesQuery.isLoading ? (
           <div className="empty-state">
             <p>Cargando…</p>
           </div>
@@ -104,8 +89,13 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
                       <span className="badge badge-neutral">{labelForChannel(item.channel)}</span>
                     </td>
                     <td>
-                      <label className="toggle" onClick={() => void toggle(item)}>
-                        <input type="checkbox" checked={item.enabled} readOnly />
+                      <label className="toggle" onClick={() => void toggleMutation.mutateAsync(item)}>
+                        <input
+                          type="checkbox"
+                          checked={item.enabled}
+                          disabled={toggleMutation.isPending}
+                          readOnly
+                        />
                         <span className="toggle-track" />
                         <span className="toggle-thumb" />
                       </label>
@@ -117,6 +107,16 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
           </div>
         )}
       </div>
-    </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div>{body}</div>;
+  }
+
+  return (
+    <PageLayout title="Preferencias de notificación" lead="Elegí qué avisos recibís por canal.">
+      {body}
+    </PageLayout>
   );
 }

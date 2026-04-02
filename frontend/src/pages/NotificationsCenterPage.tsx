@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +16,10 @@ import {
 } from '../lib/api';
 import { labelForApprovalAction } from '../lib/approvalActionLabels';
 import { humanInsightScopeLabel, humanRoutedLabel } from '../lib/aiLabels';
+import { PageLayout } from '../components/PageLayout';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
   type NotificationChatHandoff,
@@ -139,39 +142,38 @@ function toneForApproval(riskLevel: string): NotificationFeedTone {
 export function NotificationsCenterPage({ embedded = false }: NotificationsCenterPageProps) {
   const { language, t } = useI18n();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<InAppNotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [inAppError, setInAppError] = useState('');
+  const queryClient = useQueryClient();
   const [approvalNotes, setApprovalNotes] = useState<Record<string, string>>({});
   const [approvalProcessing, setApprovalProcessing] = useState<Record<string, boolean>>({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setInAppError('');
-
-    let nextNotifications: InAppNotificationItem[] = [];
-    let unread = 0;
-    try {
-      const res = await listInAppNotifications();
-      nextNotifications = res.items;
-      unread = res.unread_count;
-    } catch (err) {
-      setInAppError(formatFetchErrorForUser(err, t('ai.notifications.error.loadInApp')));
-    }
-
-    setUnreadCount(unread);
-    setPendingApprovalsCount(nextNotifications.filter((item) => getApprovalNotification(item.chat_context)).length);
-    setNotifications(nextNotifications);
-    setLoading(false);
-  }, [t]);
-
-  useEffect(() => {
-    void load();
-    const interval = window.setInterval(() => void load(), 30_000);
-    return () => window.clearInterval(interval);
-  }, [load]);
+  const notificationsQuery = useQuery({
+    queryKey: queryKeys.notifications.inApp,
+    queryFn: listInAppNotifications,
+    refetchInterval: 30_000,
+  });
+  const markReadMutation = useMutation({
+    mutationFn: markInAppNotificationRead,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+    },
+  });
+  const approveMutation = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => approveRequest(id, note),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+    },
+  });
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) => rejectRequest(id, note),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+    },
+  });
+  const notifications = notificationsQuery.data?.items ?? [];
+  const unreadCount = notificationsQuery.data?.unread_count ?? 0;
+  const pendingApprovalsCount = notifications.filter((item) => getApprovalNotification(item.chat_context)).length;
+  const inAppError = notificationsQuery.error
+    ? formatFetchErrorForUser(notificationsQuery.error, t('ai.notifications.error.loadInApp'))
+    : '';
 
   const summaryBadge = useMemo(() => {
     const parts: string[] = [];
@@ -196,21 +198,19 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     };
     try {
       if (!n.read_at) {
-        await markInAppNotificationRead(n.id);
+        await markReadMutation.mutateAsync(n.id);
       }
     } catch {
       // Seguimos al chat aunque falle marcar leída.
     }
     sessionStorage.setItem(NOTIFICATION_CHAT_HANDOFF_KEY, JSON.stringify(handoff));
     navigate('/chat');
-    void load();
   }
 
   async function handleApprove(id: string): Promise<void> {
     setApprovalProcessing((prev) => ({ ...prev, [id]: true }));
     try {
-      await approveRequest(id, approvalNotes[id] ?? '');
-      await load();
+      await approveMutation.mutateAsync({ id, note: approvalNotes[id] ?? '' });
     } finally {
       setApprovalProcessing((prev) => ({ ...prev, [id]: false }));
     }
@@ -219,8 +219,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   async function handleReject(id: string): Promise<void> {
     setApprovalProcessing((prev) => ({ ...prev, [id]: true }));
     try {
-      await rejectRequest(id, approvalNotes[id] ?? '');
-      await load();
+      await rejectMutation.mutateAsync({ id, note: approvalNotes[id] ?? '' });
     } finally {
       setApprovalProcessing((prev) => ({ ...prev, [id]: false }));
     }
@@ -275,6 +274,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
           <div className="approval-actions">
             <input
               className="note-input"
+              aria-label={`Nota para ${displayAction}`}
               placeholder={t('ai.notifications.approval.notePlaceholder')}
               value={approvalNotes[approval.id] ?? ''}
               onChange={(e) =>
@@ -345,23 +345,29 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     };
   });
 
+  const feed = (
+    <NotificationFeed
+      error={inAppError ? <p role="alert" className="form-error">{inAppError}</p> : undefined}
+      loading={notificationsQuery.isLoading}
+      loadingMessage={t('ai.notifications.loading')}
+      emptyMessage={<p className="text-secondary">{t('ai.notifications.empty')}</p>}
+      items={items}
+      summary={summaryBadge}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div data-embedded="true">
+        {feed}
+      </div>
+    );
+  }
+
   return (
-    <div className={embedded ? undefined : 'page-stack'} data-embedded={embedded ? 'true' : 'false'}>
-      {!embedded && (
-        <header className="page-header">
-          <h1>{t('ai.notifications.pageTitle')}</h1>
-          <p>{t('ai.notifications.pageLead')}</p>
-        </header>
-      )}
-      <NotificationFeed
-        error={inAppError ? <p className="form-error">{inAppError}</p> : undefined}
-        loading={loading}
-        loadingMessage={t('ai.notifications.loading')}
-        emptyMessage={<p className="text-secondary">{t('ai.notifications.empty')}</p>}
-        items={items}
-        summary={summaryBadge}
-      />
-    </div>
+    <PageLayout title={t('ai.notifications.pageTitle')} lead={t('ai.notifications.pageLead')}>
+      {feed}
+    </PageLayout>
   );
 }
 

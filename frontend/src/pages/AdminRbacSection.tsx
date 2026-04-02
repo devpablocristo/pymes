@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   assignRbacRole,
   getUserEffectivePermissions,
@@ -9,6 +10,7 @@ import {
   type RbacRoleSummary,
 } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
+import { queryKeys } from '../lib/queryKeys';
 
 function memberLabel(m: OrgMemberRow): string {
   const name = m.user?.name?.trim();
@@ -18,51 +20,58 @@ function memberLabel(m: OrgMemberRow): string {
 }
 
 export function AdminRbacSection({ orgId }: { orgId: string }) {
-  const [members, setMembers] = useState<OrgMemberRow[]>([]);
-  const [roles, setRoles] = useState<RbacRoleSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [permUserId, setPermUserId] = useState<string | null>(null);
-  const [permLines, setPermLines] = useState<string>('');
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [mRes, rRes] = await Promise.all([listOrgMembers(orgId), listRbacRoles()]);
-      setMembers(mRes.items ?? []);
-      setRoles(rRes.items ?? []);
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No se pudieron cargar miembros o roles.'));
-    } finally {
-      setLoading(false);
+  const queryClient = useQueryClient();
+  const membersQuery = useQuery({
+    queryKey: queryKeys.rbac.members(orgId),
+    queryFn: () => listOrgMembers(orgId),
+  });
+  const rolesQuery = useQuery({
+    queryKey: queryKeys.rbac.roles,
+    queryFn: listRbacRoles,
+  });
+  const permissionsQuery = useQuery({
+    queryKey: queryKeys.rbac.permissions(permUserId ?? ''),
+    queryFn: () => getUserEffectivePermissions(permUserId ?? ''),
+    enabled: permUserId !== null,
+  });
+  const assignMutation = useMutation({
+    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => assignRbacRole(roleId, userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(orgId) });
+    },
+  });
+  const removeMutation = useMutation({
+    mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => removeRbacRoleAssignment(roleId, userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(orgId) });
+    },
+  });
+  const members = membersQuery.data?.items ?? [];
+  const roles = rolesQuery.data?.items ?? [];
+  const loading = membersQuery.isLoading || rolesQuery.isLoading;
+  const busy = assignMutation.isPending || removeMutation.isPending;
+  const queryError = membersQuery.error || rolesQuery.error;
+  const permLines = useMemo(() => {
+    const permissions = permissionsQuery.data?.permissions ?? {};
+    const lines: string[] = [];
+    const keys = Object.keys(permissions).sort();
+    for (const resource of keys) {
+      const actions = permissions[resource] ?? [];
+      lines.push(`${resource}: ${actions.join(', ')}`);
     }
-  }, [orgId]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+    return lines.length ? lines.join('\n') : '(sin permisos efectivos)';
+  }, [permissionsQuery.data]);
 
   async function onShowPermissions(userId: string): Promise<void> {
-    setBusy(true);
     try {
-      const { permissions } = await getUserEffectivePermissions(userId);
-      const lines: string[] = [];
-      const keys = Object.keys(permissions ?? {}).sort();
-      for (const resource of keys) {
-        const actions = permissions[resource] ?? [];
-        lines.push(`${resource}: ${actions.join(', ')}`);
-      }
       setPermUserId(userId);
-      setPermLines(lines.length ? lines.join('\n') : '(sin permisos efectivos)');
       setError('');
     } catch (err) {
       setError(formatFetchErrorForUser(err, 'No se pudieron leer los permisos.'));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -71,15 +80,11 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
       setError('Elegí un rol y un miembro.');
       return;
     }
-    setBusy(true);
     try {
-      await assignRbacRole(selectedRoleId, selectedUserId);
+      await assignMutation.mutateAsync({ roleId: selectedRoleId, userId: selectedUserId });
       setError('');
-      await reload();
     } catch (err) {
       setError(formatFetchErrorForUser(err, 'No se pudo asignar el rol.'));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -88,15 +93,11 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
       setError('Elegí un rol y un miembro para quitar.');
       return;
     }
-    setBusy(true);
     try {
-      await removeRbacRoleAssignment(selectedRoleId, selectedUserId);
+      await removeMutation.mutateAsync({ roleId: selectedRoleId, userId: selectedUserId });
       setError('');
-      await reload();
     } catch (err) {
       setError(formatFetchErrorForUser(err, 'No se pudo quitar la asignación.'));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -111,6 +112,9 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
         efectivos.
       </p>
       {error ? <p className="form-error">{error}</p> : null}
+      {!error && queryError ? (
+        <p className="form-error">{formatFetchErrorForUser(queryError, 'No se pudieron cargar miembros o roles.')}</p>
+      ) : null}
       {loading ? (
         <p className="text-secondary">Cargando…</p>
       ) : (
@@ -159,6 +163,10 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
               <p className="text-secondary">
                 Usuario: <code className="admin-code">{permUserId}</code>
               </p>
+              {permissionsQuery.isLoading ? <p className="text-secondary">Cargando permisos…</p> : null}
+              {permissionsQuery.error ? (
+                <p className="form-error">{formatFetchErrorForUser(permissionsQuery.error, 'No se pudieron leer los permisos.')}</p>
+              ) : null}
               <pre className="admin-textarea admin-pre-permissions">
                 {permLines}
               </pre>

@@ -9,6 +9,14 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
 )
 
+type AvailabilityParams struct {
+	Date       string
+	Duration   int
+	BranchID   string
+	ServiceID  string
+	ResourceID string
+}
+
 // Client communicates with the pymes-core backend over HTTP.
 type Client struct {
 	*pymescorehttp.Client
@@ -23,14 +31,23 @@ func (c *Client) GetBusinessInfo(ctx context.Context, orgRef string) (map[string
 	return c.Get(ctx, fmt.Sprintf("/v1/public/%s/info", url.PathEscape(orgRef)), "")
 }
 
-func (c *Client) GetAvailability(ctx context.Context, orgRef string, date string, duration int) (map[string]any, error) {
+func (c *Client) GetAvailability(ctx context.Context, orgRef string, params AvailabilityParams) (map[string]any, error) {
 	path := fmt.Sprintf("/v1/public/%s/availability", url.PathEscape(orgRef))
 	query := url.Values{}
-	if date != "" {
-		query.Set("date", date)
+	if params.Date != "" {
+		query.Set("date", params.Date)
 	}
-	if duration > 0 {
-		query.Set("duration", fmt.Sprintf("%d", duration))
+	if params.Duration > 0 {
+		query.Set("duration", fmt.Sprintf("%d", params.Duration))
+	}
+	if params.BranchID != "" {
+		query.Set("branch_id", params.BranchID)
+	}
+	if params.ServiceID != "" {
+		query.Set("service_id", params.ServiceID)
+	}
+	if params.ResourceID != "" {
+		query.Set("resource_id", params.ResourceID)
 	}
 	if encoded := query.Encode(); encoded != "" {
 		path += "?" + encoded

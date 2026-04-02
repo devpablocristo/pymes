@@ -1,6 +1,7 @@
 import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { normalize } from '@devpablocristo/core-browser/search';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
 import { usePageSearch } from '../components/PageSearch';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,6 +29,7 @@ import {
   type WorkOrderKanbanPhase,
 } from '../lib/workOrderKanban';
 import { useI18n } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import './WorkOrdersKanbanPanel.css';
 
 const COLUMN_ORDER: KanbanColumnDef[] = [
@@ -92,7 +94,7 @@ function CardPreview({ row }: { row: AutoRepairWorkOrder }) {
   if (overdue) cls.push('m-kanban__card--overdue');
   else if (soon) cls.push('m-kanban__card--soon');
   return (
-    <div className={cls.join(' ')}>
+    <div className={cls.join(' ')} aria-hidden="true">
       <strong>{row.number}</strong>
       <div className="wo-kanban__badges" aria-hidden="true">
         <WorkOrderStatusBadge status={row.status} />
@@ -129,6 +131,7 @@ function KanbanCardBody({
     <div
       className={cls.join(' ')}
       title="Clic para editar · arrastrar para mover de fase (detalle para el estado fino)"
+      aria-label={`Orden ${row.number}. Cliente ${row.customer_name || 'Sin cliente'}. Estado ${workOrderStatusBadgeLabel(row.status)}.`}
       draggable={false}
       onClick={handleClick}
       onKeyDown={(e) => {
@@ -186,8 +189,6 @@ export function WorkOrdersKanbanPanel() {
   const showArchived = searchParams.get('archived') === '1';
 
   const [items, setItems] = useState<AutoRepairWorkOrder[]>([]);
-  const [crudConfig, setCrudConfig] = useState<CrudPageConfig<AutoRepairWorkOrder> | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   /** Por defecto (Clerk): `pick` con Set vacío = solo OT del usuario actual (`selfId`). */
@@ -195,36 +196,44 @@ export function WorkOrdersKanbanPanel() {
     clerkEnabled ? { mode: 'pick', actors: new Set() } : { mode: 'all' },
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const all = showArchived
+  const queryClient = useQueryClient();
+  const workOrdersQueryKey = queryKeys.workOrders.kanban(showArchived);
+  const workOrdersQuery = useQuery({
+    queryKey: workOrdersQueryKey,
+    queryFn: async () => (
+      showArchived
         ? ((await getAutoRepairWorkOrdersArchived()).items ?? [])
-        : await getAllAutoRepairWorkOrders();
-      setItems(all);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudieron cargar las órdenes');
-    } finally {
-      setLoading(false);
+        : getAllAutoRepairWorkOrders()
+    ),
+  });
+  const crudConfigQuery = useQuery({
+    queryKey: queryKeys.workOrders.crudConfig,
+    queryFn: () => loadLazyCrudPageConfig<AutoRepairWorkOrder>('workOrders'),
+  });
+  const patchWorkOrderMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => patchAutoRepairWorkOrder(id, { status }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
+        (current ?? []).map((row) => (row.id === updated.id ? updated : row)),
+      );
+    },
+  });
+
+  useEffect(() => {
+    if (workOrdersQuery.data) {
+      setItems(workOrdersQuery.data);
+      setError(null);
     }
-  }, [showArchived]);
+    if (workOrdersQuery.error) {
+      setError(workOrdersQuery.error instanceof Error ? workOrdersQuery.error.message : 'No se pudieron cargar las órdenes');
+    }
+  }, [workOrdersQuery.data, workOrdersQuery.error]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadLazyCrudPageConfig<AutoRepairWorkOrder>('workOrders').then((config) => {
-      if (!cancelled) {
-        setCrudConfig(config);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const load = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: workOrdersQueryKey });
+  }, [queryClient, workOrdersQueryKey]);
+  const crudConfig = crudConfigQuery.data ?? null;
+  const loading = workOrdersQuery.isLoading;
 
   const boardItems = useMemo(
     () =>
@@ -247,7 +256,7 @@ export function WorkOrdersKanbanPanel() {
       );
       void (async () => {
         try {
-          const updated = await patchAutoRepairWorkOrder(id, { status: next });
+          const updated = await patchWorkOrderMutation.mutateAsync({ id, status: next });
           setItems((prev) => prev.map((x) => (x.id === id ? updated : x)));
           setError(null);
         } catch (e) {
@@ -258,17 +267,23 @@ export function WorkOrdersKanbanPanel() {
         }
       })();
     },
-    [load],
+    [load, patchWorkOrderMutation],
   );
 
   const handleModalSaved = useCallback((wo: AutoRepairWorkOrder) => {
+    queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
+      (current ?? []).map((row) => (row.id === wo.id ? wo : row)),
+    );
     setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
-  }, []);
+  }, [queryClient, workOrdersQueryKey]);
 
   const handleOrderRemoved = useCallback((id: string) => {
+    queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
+      (current ?? []).filter((row) => row.id !== id),
+    );
     setItems((prev) => prev.filter((x) => x.id !== id));
     setDetailOrderId(null);
-  }, []);
+  }, [queryClient, workOrdersQueryKey]);
 
   const filterRow = useCallback((row: AutoRepairWorkOrder, q: string) => {
     const canon = canonicalWorkOrderStatus(row.status);
@@ -394,7 +409,12 @@ export function WorkOrdersKanbanPanel() {
         toolbarButtonRow={toolbarButtonRow}
         statsLine={statsLine}
         columnFooter={() => (
-          <Link to={listPath} className="m-kanban__column-add" draggable={false}>
+          <Link
+            to={listPath}
+            className="m-kanban__column-add"
+            draggable={false}
+            aria-label="Añadir orden de trabajo desde la lista"
+          >
             <span className="m-kanban__column-add-icon" aria-hidden="true">
               +
             </span>

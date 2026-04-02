@@ -3,6 +3,7 @@ package migrations
 import (
 	"embed"
 
+	schedulingmigrations "github.com/devpablocristo/modules/scheduling/go/migrations"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
@@ -14,6 +15,9 @@ var sqlFiles embed.FS
 
 func Run(db *gorm.DB, logger zerolog.Logger) error {
 	if err := gormdb.GormMigrateUp(db, sqlFiles, "."); err != nil {
+		return err
+	}
+	if err := schedulingmigrations.Run(db); err != nil {
 		return err
 	}
 	logger.Info().Msg("database migrations applied")

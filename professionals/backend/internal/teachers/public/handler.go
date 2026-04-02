@@ -11,9 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	corepublic "github.com/devpablocristo/pymes/professionals/backend/internal/shared/pymescore"
 	profdomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	sldomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type profilePort interface {
@@ -26,7 +27,7 @@ type serviceLinkPort interface {
 }
 
 type bookingPort interface {
-	GetAvailability(ctx context.Context, orgRef string, date string, duration int) (map[string]any, error)
+	GetAvailability(ctx context.Context, orgRef string, params corepublic.AvailabilityParams) (map[string]any, error)
 	BookAppointment(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
 }
 
@@ -169,7 +170,13 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 		}
 		duration = parsed
 	}
-	out, err := h.bookings.GetAvailability(c.Request.Context(), orgSlug, strings.TrimSpace(c.Query("date")), duration)
+	out, err := h.bookings.GetAvailability(c.Request.Context(), orgSlug, corepublic.AvailabilityParams{
+		Date:       strings.TrimSpace(c.Query("date")),
+		Duration:   duration,
+		BranchID:   strings.TrimSpace(c.Query("branch_id")),
+		ServiceID:  strings.TrimSpace(c.Query("service_id")),
+		ResourceID: strings.TrimSpace(c.Query("resource_id")),
+	})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { listPolicies, createPolicy, deletePolicy, type PolicyResponse } from '../lib/reviewApi';
+import { queryKeys } from '../lib/queryKeys';
 import './AutomationRulesPage.css';
 
 type Effect = 'allow' | 'deny' | 'require_approval';
@@ -56,77 +59,44 @@ const DEFAULT_EFFECTS: Record<string, Effect> = {
 
 export default function AutomationRulesPage() {
   const [rules, setRules] = useState<Record<string, RuleState>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const queryClient = useQueryClient();
+  const policiesQuery = useQuery({
+    queryKey: queryKeys.review.policies,
+    queryFn: listPolicies,
+    retry: false,
+  });
 
-  const loadPolicies = useCallback(async () => {
-    try {
-      const resp = await listPolicies();
-      const policies = resp.policies || [];
-      const state: Record<string, RuleState> = {};
-
-      for (const tpl of RULE_TEMPLATES) {
-        const matching = policies.filter((p: PolicyResponse) => p.action_type === tpl.actionType);
-        const policy = matching.length > 0 ? matching[0] : null;
-        state[tpl.actionType] = {
-          effect: (policy?.effect as Effect) || DEFAULT_EFFECTS[tpl.actionType] || 'require_approval',
-          threshold: tpl.defaultThreshold || 0,
-          policyId: policy?.id,
-        };
-      }
-      setRules(state);
-    } catch {
-      // Si Review no está disponible, usar defaults
-      const state: Record<string, RuleState> = {};
-      for (const tpl of RULE_TEMPLATES) {
-        state[tpl.actionType] = {
-          effect: DEFAULT_EFFECTS[tpl.actionType] || 'require_approval',
-          threshold: tpl.defaultThreshold || 0,
-        };
-      }
-      setRules(state);
-    } finally {
-      setLoading(false);
+  const buildRulesState = useCallback((policies: PolicyResponse[] | undefined): Record<string, RuleState> => {
+    const state: Record<string, RuleState> = {};
+    for (const tpl of RULE_TEMPLATES) {
+      const matching = (policies ?? []).filter((p) => p.action_type === tpl.actionType);
+      const policy = matching.length > 0 ? matching[0] : null;
+      state[tpl.actionType] = {
+        effect: (policy?.effect as Effect) || DEFAULT_EFFECTS[tpl.actionType] || 'require_approval',
+        threshold: tpl.defaultThreshold || 0,
+        policyId: policy?.id,
+      };
     }
+    return state;
   }, []);
 
   useEffect(() => {
-    loadPolicies();
-  }, [loadPolicies]);
+    setRules(buildRulesState(policiesQuery.data?.policies));
+  }, [buildRulesState, policiesQuery.data]);
 
-  const handleEffectChange = (actionType: string, effect: Effect) => {
-    setRules((prev) => ({
-      ...prev,
-      [actionType]: { ...prev[actionType], effect },
-    }));
-    setStatusMsg(null);
-  };
-
-  const handleThresholdChange = (actionType: string, threshold: number) => {
-    setRules((prev) => ({
-      ...prev,
-      [actionType]: { ...prev[actionType], threshold },
-    }));
-    setStatusMsg(null);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setStatusMsg(null);
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async (draft: Record<string, RuleState>) => {
       for (const tpl of RULE_TEMPLATES) {
-        const rule = rules[tpl.actionType];
+        const rule = draft[tpl.actionType];
         if (!rule) continue;
 
-        // Si ya existe, eliminar y recrear
         if (rule.policyId) {
           await deletePolicy(rule.policyId);
         }
 
         let condition: string | undefined;
         if (tpl.hasThreshold && tpl.thresholdPattern && rule.threshold > 0) {
-          // Crear dos reglas: una para <= umbral (allow) y otra para > umbral
           if (rule.effect === 'allow') {
             condition = `${tpl.thresholdUnit}:${rule.threshold}`;
             await createPolicy({
@@ -152,13 +122,35 @@ export default function AutomationRulesPage() {
           condition,
         });
       }
+    },
+    onSuccess: async () => {
       setStatusMsg({ text: 'Reglas guardadas', type: 'success' });
-      await loadPolicies();
-    } catch {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.review.policies });
+    },
+    onError: () => {
       setStatusMsg({ text: 'Error al guardar las reglas', type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  const handleEffectChange = (actionType: string, effect: Effect) => {
+    setRules((prev) => ({
+      ...prev,
+      [actionType]: { ...prev[actionType], effect },
+    }));
+    setStatusMsg(null);
+  };
+
+  const handleThresholdChange = (actionType: string, threshold: number) => {
+    setRules((prev) => ({
+      ...prev,
+      [actionType]: { ...prev[actionType], threshold },
+    }));
+    setStatusMsg(null);
+  };
+
+  const handleSave = async () => {
+    setStatusMsg(null);
+    await saveMutation.mutateAsync(rules);
   };
 
   const ruleSearch = usePageSearch();
@@ -169,7 +161,7 @@ export default function AutomationRulesPage() {
   const filteredRules = useSearch(RULE_TEMPLATES, ruleTextFn, ruleSearch);
   const categories = [...new Set(filteredRules.map((tpl) => tpl.category))];
 
-  if (loading) {
+  if (policiesQuery.isLoading) {
     return (
       <div className="automation-rules-page">
         <div className="loading-wrap">Cargando reglas…</div>
@@ -178,12 +170,11 @@ export default function AutomationRulesPage() {
   }
 
   return (
-    <>
-      <div className="automation-rules-page page-stack">
-        <header className="page-header">
-          <h1>Reglas de automatización</h1>
-          <p>Qué puede hacer la IA o los usuarios sin tu aprobación, según el tipo de acción.</p>
-        </header>
+    <PageLayout
+      className="automation-rules-page"
+      title="Reglas de automatización"
+      lead="Qué puede hacer la IA o los usuarios sin tu aprobación, según el tipo de acción."
+    >
         <div className="rules-stack">
           {categories.map((cat) => (
             <div key={cat} className="rules-category">
@@ -209,6 +200,7 @@ export default function AutomationRulesPage() {
                           <input
                             type="number"
                             min={0}
+                            aria-label={`Umbral para ${tpl.displayName}`}
                             value={rule.threshold}
                             onChange={(e) =>
                               handleThresholdChange(tpl.actionType, Number(e.target.value))
@@ -219,6 +211,7 @@ export default function AutomationRulesPage() {
                       )}
                       <select
                         className={effectClass}
+                        aria-label={`Acción para ${tpl.displayName}`}
                         value={rule.effect}
                         onChange={(e) =>
                           handleEffectChange(tpl.actionType, e.target.value as Effect)
@@ -239,20 +232,19 @@ export default function AutomationRulesPage() {
         </div>
 
         <div className="save-bar">
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </div>
 
         {statusMsg && (
           <div
             className={`automation-status alert ${statusMsg.type === 'success' ? 'alert-success' : 'alert-error'}`}
-            role="status"
+            role={statusMsg.type === 'success' ? 'status' : 'alert'}
           >
             {statusMsg.text}
           </div>
         )}
-      </div>
-    </>
+    </PageLayout>
   );
 }

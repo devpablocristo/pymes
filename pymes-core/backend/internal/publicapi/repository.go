@@ -5,12 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
 )
 
 var (
@@ -19,12 +23,21 @@ var (
 	ErrSlotUnavailable = errors.New("slot unavailable")
 )
 
-type Repository struct {
-	db *gorm.DB
+type schedulingPort interface {
+	ListBranches(ctx context.Context, orgID uuid.UUID) ([]schedulingdomain.Branch, error)
+	ListServices(ctx context.Context, orgID uuid.UUID) ([]schedulingdomain.Service, error)
+	ListResources(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]schedulingdomain.Resource, error)
+	ListAvailableSlots(ctx context.Context, orgID uuid.UUID, query schedulingdomain.SlotQuery) ([]schedulingdomain.TimeSlot, error)
+	CreateBooking(ctx context.Context, orgID uuid.UUID, actor string, in schedulingdomain.CreateBookingInput) (schedulingdomain.Booking, error)
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{db: db}
+type Repository struct {
+	db         *gorm.DB
+	scheduling schedulingPort
+}
+
+func NewRepository(db *gorm.DB, scheduling schedulingPort) *Repository {
+	return &Repository{db: db, scheduling: scheduling}
 }
 
 type BusinessInfo struct {
@@ -54,12 +67,12 @@ type AvailabilitySlot struct {
 	Remaining int       `json:"remaining"`
 }
 
-type BookInput struct {
-	CustomerName  string
-	CustomerPhone string
-	Title         string
-	StartAt       time.Time
-	Duration      int
+type AvailabilityQuery struct {
+	Date       time.Time
+	Duration   int
+	BranchID   *uuid.UUID
+	ServiceID  *uuid.UUID
+	ResourceID *uuid.UUID
 }
 
 type AppointmentPublic struct {
@@ -71,6 +84,12 @@ type AppointmentPublic struct {
 	StartAt       time.Time `json:"start_at"`
 	EndAt         time.Time `json:"end_at"`
 	Duration      int       `json:"duration"`
+}
+
+type schedulingSelection struct {
+	Branch   schedulingdomain.Branch
+	Service  schedulingdomain.Service
+	Resource *schedulingdomain.Resource
 }
 
 func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
@@ -168,6 +187,11 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 	if limit > 100 {
 		limit = 100
 	}
+	if items, ok, err := r.listSchedulingPublicServices(ctx, orgID, limit); err != nil {
+		return nil, err
+	} else if ok {
+		return items, nil
+	}
 
 	var rows []PublicService
 	err := r.db.WithContext(ctx).
@@ -183,7 +207,295 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 	return rows, nil
 }
 
-func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, day time.Time, duration int) ([]AvailabilitySlot, error) {
+func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error) {
+	if query.Duration < 0 || query.Duration > 720 {
+		return nil, ErrInvalidInput
+	}
+	if selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, query.BranchID, query.ServiceID, query.ResourceID); err != nil {
+		return nil, err
+	} else if ok {
+		slots, err := r.scheduling.ListAvailableSlots(ctx, orgID, schedulingdomain.SlotQuery{
+			BranchID:   selection.Branch.ID,
+			ServiceID:  selection.Service.ID,
+			Date:       query.Date.UTC(),
+			ResourceID: query.ResourceID,
+		})
+		if err != nil {
+			return nil, mapSchedulingErr(err)
+		}
+		out := make([]AvailabilitySlot, 0, len(slots))
+		for _, slot := range slots {
+			out = append(out, AvailabilitySlot{
+				StartAt:   slot.StartAt.UTC(),
+				EndAt:     slot.EndAt.UTC(),
+				Remaining: slot.Remaining,
+			})
+		}
+		return out, nil
+	}
+
+	return r.getAvailabilityLegacy(ctx, orgID, query.Date, query.Duration)
+}
+
+func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error) {
+	branchID, err := uuidPtrFromPayload(payload, "branch_id")
+	if err != nil {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	serviceID, err := uuidPtrFromPayload(payload, "service_id")
+	if err != nil {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	resourceID, err := uuidPtrFromPayload(payload, "resource_id")
+	if err != nil {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	if selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, branchID, serviceID, resourceID); err != nil {
+		return AppointmentPublic{}, err
+	} else if ok {
+		return r.bookScheduling(ctx, orgID, selection, payload)
+	}
+	return r.bookLegacy(ctx, orgID, payload)
+}
+
+func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	phoneDigits := digitsOnly(phone)
+	if phoneDigits == "" {
+		return nil, ErrInvalidInput
+	}
+
+	out := make([]AppointmentPublic, 0)
+	newRows, err := r.listSchedulingBookingsByPhone(ctx, orgID, phoneDigits, limit)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, newRows...)
+
+	legacyRows, err := r.listLegacyAppointmentsByPhone(ctx, orgID, phoneDigits, limit)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, legacyRows...)
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].StartAt.After(out[j].StartAt)
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (r *Repository) listSchedulingPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, bool, error) {
+	if r.scheduling == nil {
+		return nil, false, nil
+	}
+	services, err := r.scheduling.ListServices(ctx, orgID)
+	if err != nil {
+		return nil, false, err
+	}
+	active := make([]PublicService, 0, len(services))
+	for _, service := range services {
+		if !service.Active {
+			continue
+		}
+		unit := "appointment"
+		if service.FulfillmentMode == schedulingdomain.FulfillmentModeQueue {
+			unit = "ticket"
+		}
+		active = append(active, PublicService{
+			ID:          service.ID,
+			Name:        service.Name,
+			Type:        string(service.FulfillmentMode),
+			Description: service.Description,
+			Unit:        unit,
+			Price:       0,
+			Currency:    "",
+		})
+	}
+	if len(active) == 0 {
+		return nil, false, nil
+	}
+	sort.Slice(active, func(i, j int) bool { return strings.ToLower(active[i].Name) < strings.ToLower(active[j].Name) })
+	if len(active) > limit {
+		active = active[:limit]
+	}
+	return active, true, nil
+}
+
+func (r *Repository) resolveSchedulingSelection(ctx context.Context, orgID uuid.UUID, branchID, serviceID, resourceID *uuid.UUID) (schedulingSelection, bool, error) {
+	if r.scheduling == nil {
+		return schedulingSelection{}, false, nil
+	}
+	branches, err := r.scheduling.ListBranches(ctx, orgID)
+	if err != nil {
+		return schedulingSelection{}, false, err
+	}
+	activeBranches := make([]schedulingdomain.Branch, 0, len(branches))
+	for _, branch := range branches {
+		if branch.Active {
+			activeBranches = append(activeBranches, branch)
+		}
+	}
+	services, err := r.scheduling.ListServices(ctx, orgID)
+	if err != nil {
+		return schedulingSelection{}, false, err
+	}
+	activeServices := make([]schedulingdomain.Service, 0, len(services))
+	for _, service := range services {
+		if !service.Active {
+			continue
+		}
+		if service.FulfillmentMode == schedulingdomain.FulfillmentModeQueue {
+			continue
+		}
+		activeServices = append(activeServices, service)
+	}
+	if len(activeBranches) == 0 || len(activeServices) == 0 {
+		return schedulingSelection{}, false, nil
+	}
+
+	branch, err := chooseBranch(activeBranches, branchID)
+	if err != nil {
+		return schedulingSelection{}, true, err
+	}
+	service, err := chooseService(activeServices, serviceID)
+	if err != nil {
+		return schedulingSelection{}, true, err
+	}
+
+	var resource *schedulingdomain.Resource
+	if resourceID != nil && *resourceID != uuid.Nil {
+		resources, err := r.scheduling.ListResources(ctx, orgID, &branch.ID)
+		if err != nil {
+			return schedulingSelection{}, true, err
+		}
+		found := false
+		for _, candidate := range resources {
+			if candidate.ID == *resourceID && candidate.Active {
+				tmp := candidate
+				resource = &tmp
+				found = true
+				break
+			}
+		}
+		if !found {
+			return schedulingSelection{}, true, ErrInvalidInput
+		}
+	}
+
+	return schedulingSelection{
+		Branch:   branch,
+		Service:  service,
+		Resource: resource,
+	}, true, nil
+}
+
+func chooseBranch(branches []schedulingdomain.Branch, branchID *uuid.UUID) (schedulingdomain.Branch, error) {
+	if branchID != nil && *branchID != uuid.Nil {
+		for _, branch := range branches {
+			if branch.ID == *branchID {
+				return branch, nil
+			}
+		}
+		return schedulingdomain.Branch{}, ErrInvalidInput
+	}
+	if len(branches) == 1 {
+		return branches[0], nil
+	}
+	return schedulingdomain.Branch{}, ErrInvalidInput
+}
+
+func chooseService(services []schedulingdomain.Service, serviceID *uuid.UUID) (schedulingdomain.Service, error) {
+	if serviceID != nil && *serviceID != uuid.Nil {
+		for _, service := range services {
+			if service.ID == *serviceID {
+				return service, nil
+			}
+		}
+		return schedulingdomain.Service{}, ErrInvalidInput
+	}
+	if len(services) == 1 {
+		return services[0], nil
+	}
+	return schedulingdomain.Service{}, ErrInvalidInput
+}
+
+func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, selection schedulingSelection, payload map[string]any) (AppointmentPublic, error) {
+	startAt, err := timeValueFromPayload(payload, "start_at")
+	if err != nil || startAt.IsZero() {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	customerName := firstStringFromPayload(payload, "party_name", "customer_name")
+	customerPhone := firstStringFromPayload(payload, "party_phone", "customer_phone")
+	if strings.TrimSpace(customerName) == "" || strings.TrimSpace(customerPhone) == "" {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	partyID, err := uuidPtrFromPayload(payload, "party_id")
+	if err != nil {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	idempotencyKey := firstStringFromPayload(payload, "idempotency_key")
+	notes := firstStringFromPayload(payload, "notes")
+	customTitle := firstStringFromPayload(payload, "title")
+	if strings.TrimSpace(customTitle) != "" {
+		payload = cloneMap(payload)
+		metadata := ensureMap(payload["metadata"])
+		metadata["public_title"] = customTitle
+		payload["metadata"] = metadata
+	}
+	holdUntil, err := optionalTimeValueFromPayload(payload, "hold_until")
+	if err != nil {
+		return AppointmentPublic{}, ErrInvalidInput
+	}
+	source := firstStringFromPayload(payload, "source")
+	if strings.TrimSpace(source) == "" {
+		source = string(schedulingdomain.BookingSourcePublicWeb)
+	}
+	metadata := ensureMap(payload["metadata"])
+	input := schedulingdomain.CreateBookingInput{
+		BranchID:       selection.Branch.ID,
+		ServiceID:      selection.Service.ID,
+		PartyID:        partyID,
+		CustomerName:   customerName,
+		CustomerPhone:  customerPhone,
+		StartAt:        startAt.UTC(),
+		Source:         schedulingdomain.BookingSource(source),
+		IdempotencyKey: idempotencyKey,
+		HoldUntil:      holdUntil,
+		Notes:          notes,
+		Metadata:       metadata,
+	}
+	if selection.Resource != nil {
+		input.ResourceID = &selection.Resource.ID
+	}
+	booking, err := r.scheduling.CreateBooking(ctx, orgID, "public-api", input)
+	if err != nil {
+		return AppointmentPublic{}, mapSchedulingErr(err)
+	}
+	title := strings.TrimSpace(customTitle)
+	if title == "" {
+		title = selection.Service.Name
+	}
+	return AppointmentPublic{
+		ID:            booking.ID,
+		CustomerName:  booking.CustomerName,
+		CustomerPhone: booking.CustomerPhone,
+		Title:         title,
+		Status:        string(booking.Status),
+		StartAt:       booking.StartAt.UTC(),
+		EndAt:         booking.EndAt.UTC(),
+		Duration:      int(booking.EndAt.Sub(booking.StartAt).Minutes()),
+	}, nil
+}
+
+func (r *Repository) getAvailabilityLegacy(ctx context.Context, orgID uuid.UUID, day time.Time, duration int) ([]AvailabilitySlot, error) {
 	if duration <= 0 {
 		duration = 60
 	}
@@ -233,29 +545,34 @@ func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, day t
 	return out, nil
 }
 
-func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, in BookInput) (AppointmentPublic, error) {
-	name := strings.TrimSpace(in.CustomerName)
-	phone := strings.TrimSpace(in.CustomerPhone)
-	title := strings.TrimSpace(in.Title)
-	if name == "" || phone == "" || title == "" {
+func (r *Repository) bookLegacy(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error) {
+	name := firstStringFromPayload(payload, "party_name", "customer_name")
+	phone := firstStringFromPayload(payload, "party_phone", "customer_phone")
+	title := firstStringFromPayload(payload, "title")
+	startAt, err := timeValueFromPayload(payload, "start_at")
+	if err != nil {
 		return AppointmentPublic{}, ErrInvalidInput
 	}
-	if in.Duration <= 0 {
-		in.Duration = 60
+	duration := intValueFromPayload(payload, "duration")
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(phone) == "" || strings.TrimSpace(title) == "" {
+		return AppointmentPublic{}, ErrInvalidInput
 	}
-	if in.Duration > 720 {
+	if duration <= 0 {
+		duration = 60
+	}
+	if duration > 720 {
 		return AppointmentPublic{}, ErrInvalidInput
 	}
 
 	maxPerSlot := 1
-	if v, err := r.findMaxPerSlot(ctx, orgID, in.StartAt); err != nil {
+	if v, err := r.findMaxPerSlot(ctx, orgID, startAt); err != nil {
 		return AppointmentPublic{}, err
 	} else if v > 0 {
 		maxPerSlot = v
 	}
 
-	endAt := in.StartAt.Add(time.Duration(in.Duration) * time.Minute)
-	overlaps, err := r.countOverlaps(ctx, orgID, in.StartAt, endAt)
+	endAt := startAt.Add(time.Duration(duration) * time.Minute)
+	overlaps, err := r.countOverlaps(ctx, orgID, startAt, endAt)
 	if err != nil {
 		return AppointmentPublic{}, err
 	}
@@ -269,9 +586,9 @@ func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, in BookInput) (A
 		CustomerPhone: phone,
 		Title:         title,
 		Status:        "scheduled",
-		StartAt:       in.StartAt.UTC(),
+		StartAt:       startAt.UTC(),
 		EndAt:         endAt.UTC(),
-		Duration:      in.Duration,
+		Duration:      duration,
 	}
 
 	err = r.db.WithContext(ctx).Table("appointments").Create(map[string]any{
@@ -294,18 +611,35 @@ func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, in BookInput) (A
 	return appointment, nil
 }
 
-func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error) {
-	if limit <= 0 {
-		limit = 20
+func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
+	var rows []AppointmentPublic
+	err := r.db.WithContext(ctx).
+		Table("scheduling_bookings tb").
+		Select(`
+			tb.id,
+			tb.customer_name as party_name,
+			tb.customer_phone as party_phone,
+			COALESCE(ts.name, tb.reference, 'Turno') as title,
+			tb.status,
+			tb.start_at,
+			tb.end_at,
+			EXTRACT(EPOCH FROM (tb.end_at - tb.start_at))::int / 60 as duration
+		`).
+		Joins("LEFT JOIN scheduling_services ts ON ts.id = tb.service_id").
+		Where("tb.org_id = ? AND regexp_replace(tb.customer_phone, '[^0-9]', '', 'g') = ?", orgID, phoneDigits).
+		Order("tb.start_at DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "scheduling_bookings") {
+			return nil, nil
+		}
+		return nil, err
 	}
-	if limit > 100 {
-		limit = 100
-	}
-	phoneDigits := digitsOnly(phone)
-	if phoneDigits == "" {
-		return nil, ErrInvalidInput
-	}
+	return rows, nil
+}
 
+func (r *Repository) listLegacyAppointmentsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
 	var rows []AppointmentPublic
 	err := r.db.WithContext(ctx).
 		Table("appointments").
@@ -373,6 +707,128 @@ func (r *Repository) findMaxPerSlot(ctx context.Context, orgID uuid.UUID, startA
 		return 0, err
 	}
 	return result.MaxPerSlot, nil
+}
+
+func mapSchedulingErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "not found"):
+		return ErrInvalidInput
+	case strings.Contains(msg, "validation"):
+		return ErrInvalidInput
+	case strings.Contains(msg, "required"):
+		return ErrInvalidInput
+	case strings.Contains(msg, "invalid"):
+		return ErrInvalidInput
+	case strings.Contains(msg, "slot not available"):
+		return ErrSlotUnavailable
+	case strings.Contains(msg, "conflict"):
+		return ErrSlotUnavailable
+	default:
+		return err
+	}
+}
+
+func uuidPtrFromPayload(payload map[string]any, key string) (*uuid.UUID, error) {
+	value := firstStringFromPayload(payload, key)
+	if value == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
+func firstStringFromPayload(payload map[string]any, keys ...string) string {
+	for _, key := range keys {
+		raw, ok := payload[key]
+		if !ok || raw == nil {
+			continue
+		}
+		switch value := raw.(type) {
+		case string:
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		case fmt.Stringer:
+			if trimmed := strings.TrimSpace(value.String()); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	return ""
+}
+
+func timeValueFromPayload(payload map[string]any, key string) (time.Time, error) {
+	raw := firstStringFromPayload(payload, key)
+	if raw == "" {
+		return time.Time{}, ErrInvalidInput
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsed.UTC(), nil
+}
+
+func optionalTimeValueFromPayload(payload map[string]any, key string) (*time.Time, error) {
+	raw := firstStringFromPayload(payload, key)
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil, err
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
+}
+
+func intValueFromPayload(payload map[string]any, key string) int {
+	raw, ok := payload[key]
+	if !ok || raw == nil {
+		return 0
+	}
+	switch value := raw.(type) {
+	case float64:
+		return int(value)
+	case int:
+		return value
+	case int32:
+		return int(value)
+	case int64:
+		return int(value)
+	case string:
+		if value = strings.TrimSpace(value); value != "" {
+			if parsed, err := strconv.Atoi(value); err == nil {
+				return parsed
+			}
+		}
+	}
+	return 0
+}
+
+func ensureMap(v any) map[string]any {
+	if v == nil {
+		return map[string]any{}
+	}
+	if m, ok := v.(map[string]any); ok {
+		return cloneMap(m)
+	}
+	return map[string]any{}
+}
+
+func cloneMap(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func composeDayTime(day time.Time, hhmm string) (time.Time, error) {

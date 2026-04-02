@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
@@ -43,12 +44,20 @@ const meWithoutUser: MeProfileResponse = {
 };
 
 function renderSettings() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <LanguageProvider initialLanguage="es">
-        <SettingsPage />
-      </LanguageProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <LanguageProvider initialLanguage="es">
+          <SettingsPage />
+        </LanguageProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -78,9 +87,11 @@ describe('SettingsPage (modo clave API)', () => {
     });
 
     expect(screen.getByText('Modo consola · clave API')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Sesión en este entorno' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Datos personales' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Sesión en este entorno' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Cuenta' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Datos personales' })).toBeInTheDocument();
+    });
     expect(screen.queryByRole('heading', { level: 2, name: 'Idioma' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: 'Facturación' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Seleccionar idioma' })).not.toBeInTheDocument();

@@ -2,6 +2,7 @@ import { useUser } from '@clerk/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import {
   getDashboard,
   getMe,
@@ -31,23 +32,23 @@ import {
   upsertWidgetInstance,
 } from '../dashboard/utils/layout';
 
-function DashboardWelcomeTitle({ me }: { me: MeProfileResponse | undefined }) {
+function DashboardWelcomeText({ me }: { me: MeProfileResponse | undefined }) {
   const { t } = useI18n();
   if (!clerkEnabled) {
     const name = greetingDisplayName(me, undefined);
-    return <h1>{name ? t('dashboard.welcome', { name }) : t('dashboard.heading')}</h1>;
+    return name ? t('dashboard.welcome', { name }) : t('dashboard.heading');
   }
-  return <ClerkDashboardWelcomeTitle me={me} />;
+  return <ClerkDashboardWelcomeText me={me} />;
 }
 
-function ClerkDashboardWelcomeTitle({ me }: { me: MeProfileResponse | undefined }) {
+function ClerkDashboardWelcomeText({ me }: { me: MeProfileResponse | undefined }) {
   const { t } = useI18n();
   const { user, isLoaded } = useUser();
   const name = greetingDisplayName(me, user ?? undefined);
   if (!isLoaded) {
-    return <h1>{t('dashboard.heading')}</h1>;
+    return t('dashboard.heading');
   }
-  return <h1>{name ? t('dashboard.welcome', { name }) : t('dashboard.heading')}</h1>;
+  return name ? t('dashboard.welcome', { name }) : t('dashboard.heading');
 }
 
 export function DashboardPage() {
@@ -157,64 +158,61 @@ export function DashboardPage() {
 
   const profile = getTenantProfile();
   const { t } = useI18n();
-
-  return (
-    <div className="page-stack">
+  const headerActions = (
+    <div className="actions-row dashboard-actions">
       <Link to="/dashboard" className="btn-secondary btn-sm">
         {t('shell.dashboard.backToSummary')}
       </Link>
-      <div className="dashboard-shell-header">
-        <div className="dashboard-welcome">
-          <DashboardWelcomeTitle me={meQuery.data} />
-          {profile?.businessName && (
-            <p className="text-secondary">{profile.businessName}</p>
-          )}
-        </div>
+      {editing ? (
+        <>
+          <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
+            Catálogo
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleCancelEditing}
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={() => resetMutation.mutate()}
+            disabled={saving}
+          >
+            Resetear
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => saveMutation.mutate()}
+            disabled={saving || !dirty}
+          >
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setEditing(true)}
+          disabled={busy}
+        >
+          Personalizar
+        </button>
+      )}
+    </div>
+  );
 
-        <div className="actions-row dashboard-actions">
-          {editing ? (
-            <>
-              <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
-                Catálogo
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleCancelEditing}
-                disabled={saving}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => resetMutation.mutate()}
-                disabled={saving}
-              >
-                Resetear
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => saveMutation.mutate()}
-                disabled={saving || !dirty}
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setEditing(true)}
-              disabled={busy}
-            >
-              Personalizar
-            </button>
-          )}
-        </div>
-      </div>
-
+  return (
+    <PageLayout
+      className="dashboard-page"
+      title={<DashboardWelcomeText me={meQuery.data} />}
+      lead={profile?.businessName || undefined}
+      actions={headerActions}
+    >
       {primaryError ? <div className="alert alert-error">{primaryError}</div> : null}
       {editing && dirty ? (
         <div className="alert alert-success">
@@ -245,6 +243,6 @@ export function DashboardPage() {
         onAdd={handleAddWidget}
         onClose={() => setCatalogOpen(false)}
       />
-    </div>
+    </PageLayout>
   );
 }

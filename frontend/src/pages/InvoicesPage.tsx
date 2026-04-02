@@ -5,6 +5,7 @@
 import { useSearch } from '@devpablocristo/modules-search';
 import { useState, useCallback, useMemo } from 'react';
 import { IconClose, IconEdit, IconEye, IconTrash } from '@devpablocristo/modules-ui-data-display/icons';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import './InvoicesPage.css';
 
@@ -434,26 +435,44 @@ export function InvoicesPage() {
   }, []);
 
   return (
-    <div className="inv page-stack">
+    <>
       {view === 'list' && (
-        <>
-          <header className="page-header">
-            <h1>Facturación</h1>
-            <p>Facturas de demostración: listado, vista previa y edición.</p>
-          </header>
+        <PageLayout
+          className="inv"
+          title="Facturación"
+          lead="Facturas de demostración: listado, vista previa y edición."
+        >
           <InvoiceList invoices={invoices} onView={handleView} onEdit={handleEdit} onAdd={handleAdd} onDelete={handleDelete} />
-        </>
+        </PageLayout>
       )}
       {view === 'preview' && selectedInvoice && (
-        <InvoicePreview invoice={selectedInvoice} onBack={handleBack} onEdit={() => setView('edit')} />
+        <PageLayout
+          className="inv"
+          title={`Factura ${selectedInvoice.number}`}
+          lead="Vista previa antes de imprimir o editar."
+        >
+          <InvoicePreview invoice={selectedInvoice} onBack={handleBack} onEdit={() => setView('edit')} />
+        </PageLayout>
       )}
       {view === 'add' && (
-        <InvoiceForm invoice={null} onSave={handleSave} onBack={handleBack} />
+        <PageLayout
+          className="inv"
+          title="Nueva factura"
+          lead="Completá los datos básicos, líneas y totales de la factura."
+        >
+          <InvoiceForm invoice={null} onSave={handleSave} onBack={handleBack} />
+        </PageLayout>
       )}
       {view === 'edit' && selectedInvoice && (
-        <InvoiceForm invoice={selectedInvoice} onSave={handleSave} onBack={handleBack} />
+        <PageLayout
+          className="inv"
+          title={`Editar ${selectedInvoice.number}`}
+          lead="Actualizá los datos y recalculá el total antes de guardar."
+        >
+          <InvoiceForm invoice={selectedInvoice} onSave={handleSave} onBack={handleBack} />
+        </PageLayout>
       )}
-    </div>
+    </>
   );
 }
 

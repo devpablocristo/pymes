@@ -278,14 +278,21 @@ export function Shell({ children }: { children: ReactNode }) {
   ]);
 
   return (
-    <AppShell
-      brandTitle="Pymes SaaS"
-      brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
-      sections={sections}
-    >
-      <PageSearchProvider placeholder="Buscar…">
-        {children}
-      </PageSearchProvider>
-    </AppShell>
+    <>
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
+      <AppShell
+        brandTitle="Pymes SaaS"
+        brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
+        sections={sections}
+      >
+        <PageSearchProvider placeholder="Buscar…">
+          <main id="main-content" className="app-shell-main" tabIndex={-1}>
+            {children}
+          </main>
+        </PageSearchProvider>
+      </AppShell>
+    </>
   );
 }

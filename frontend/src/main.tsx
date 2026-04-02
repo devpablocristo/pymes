@@ -29,16 +29,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   render() {
     if (this.state.error) {
       return (
-        <div className="error-boundary-fallback">
-          <h1>Something went wrong</h1>
-          <p className="text-secondary u-mb-md">Please reload the page. If the problem persists, contact support.</p>
+        <div className="error-boundary-fallback" role="alert">
+          <h1>Algo salió mal</h1>
+          <p className="text-secondary u-mb-md">Recargá la página. Si el problema continúa, contactá soporte.</p>
           {import.meta.env.DEV && (
             <pre className="error-boundary-fallback__dev-pre">
               {this.state.error.message}
             </pre>
           )}
           <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-            Reload
+            Recargar
           </button>
         </div>
       );

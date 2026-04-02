@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { listWatchers, updateWatcher, type WatcherResponse } from '../lib/reviewApi';
+import { queryKeys } from '../lib/queryKeys';
 import './WatcherConfigPage.css';
 
 interface WatcherTemplate {
@@ -78,49 +81,61 @@ interface WatcherState {
 
 export default function WatcherConfigPage() {
   const [watchers, setWatchers] = useState<Record<string, WatcherState>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const queryClient = useQueryClient();
+  const watchersQuery = useQuery({
+    queryKey: queryKeys.review.watchers,
+    queryFn: listWatchers,
+    retry: false,
+  });
 
-  const loadWatchers = useCallback(async () => {
-    try {
-      const resp = await listWatchers();
-      const items = resp.watchers || [];
-      const state: Record<string, WatcherState> = {};
-
-      for (const tpl of WATCHER_TEMPLATES) {
-        const match = items.find((w: WatcherResponse) => w.watcher_type === tpl.watcherType);
-        if (match) {
-          const config = (match.config || {}) as Record<string, number>;
-          state[tpl.watcherType] = {
-            enabled: match.enabled,
-            threshold: config[tpl.thresholdKey] ?? tpl.defaultThreshold,
-            watcherId: match.id,
-            lastRunAt: match.last_run_at,
-            lastResult: match.last_result,
-          };
-        } else {
-          state[tpl.watcherType] = {
-            enabled: false,
-            threshold: tpl.defaultThreshold,
-          };
-        }
+  const buildWatcherState = useCallback((items: WatcherResponse[] | undefined): Record<string, WatcherState> => {
+    const state: Record<string, WatcherState> = {};
+    for (const tpl of WATCHER_TEMPLATES) {
+      const match = (items ?? []).find((w) => w.watcher_type === tpl.watcherType);
+      if (match) {
+        const config = (match.config || {}) as Record<string, number>;
+        state[tpl.watcherType] = {
+          enabled: match.enabled,
+          threshold: config[tpl.thresholdKey] ?? tpl.defaultThreshold,
+          watcherId: match.id,
+          lastRunAt: match.last_run_at,
+          lastResult: match.last_result,
+        };
+      } else {
+        state[tpl.watcherType] = {
+          enabled: false,
+          threshold: tpl.defaultThreshold,
+        };
       }
-      setWatchers(state);
-    } catch {
-      const state: Record<string, WatcherState> = {};
-      for (const tpl of WATCHER_TEMPLATES) {
-        state[tpl.watcherType] = { enabled: false, threshold: tpl.defaultThreshold };
-      }
-      setWatchers(state);
-    } finally {
-      setLoading(false);
     }
+    return state;
   }, []);
 
   useEffect(() => {
-    loadWatchers();
-  }, [loadWatchers]);
+    setWatchers(buildWatcherState(watchersQuery.data?.watchers));
+  }, [buildWatcherState, watchersQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (draft: Record<string, WatcherState>) => {
+      for (const tpl of WATCHER_TEMPLATES) {
+        const state = draft[tpl.watcherType];
+        if (!state || !state.watcherId) continue;
+        await updateWatcher(
+          state.watcherId,
+          { [tpl.thresholdKey]: state.threshold },
+          state.enabled,
+        );
+      }
+    },
+    onSuccess: async () => {
+      setStatusMsg({ text: 'Configuracion guardada', type: 'success' });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.review.watchers });
+    },
+    onError: () => {
+      setStatusMsg({ text: 'Error al guardar', type: 'error' });
+    },
+  });
 
   const handleToggle = (watcherType: string) => {
     setWatchers((prev) => ({
@@ -139,24 +154,8 @@ export default function WatcherConfigPage() {
   };
 
   const handleSave = async () => {
-    setSaving(true);
     setStatusMsg(null);
-    try {
-      for (const tpl of WATCHER_TEMPLATES) {
-        const state = watchers[tpl.watcherType];
-        if (!state || !state.watcherId) continue;
-        await updateWatcher(
-          state.watcherId,
-          { [tpl.thresholdKey]: state.threshold },
-          state.enabled,
-        );
-      }
-      setStatusMsg({ text: 'Configuracion guardada', type: 'success' });
-    } catch {
-      setStatusMsg({ text: 'Error al guardar', type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+    await saveMutation.mutateAsync(watchers);
   };
 
   const wSearch = usePageSearch();
@@ -166,16 +165,16 @@ export default function WatcherConfigPage() {
   );
   const filteredWatchers = useSearch(WATCHER_TEMPLATES, wTextFn, wSearch);
 
-  if (loading) {
+  if (watchersQuery.isLoading) {
     return <div className="watcher-config-page"><div className="loading">Cargando configuracion...</div></div>;
   }
 
   return (
-    <div className="watcher-config-page page-stack">
-      <header className="page-header">
-        <h1>Monitores automáticos</h1>
-        <p>Activá alertas y umbrales; se aplican según la configuración del motor de revisión.</p>
-      </header>
+    <PageLayout
+      className="watcher-config-page"
+      title="Monitores automáticos"
+      lead="Activá alertas y umbrales; se aplican según la configuración del motor de revisión."
+    >
       {filteredWatchers.map((tpl) => {
         const state = watchers[tpl.watcherType];
         if (!state) return null;
@@ -187,6 +186,7 @@ export default function WatcherConfigPage() {
             <input
               type="checkbox"
               className="watcher-toggle"
+              aria-label={`Activar monitor ${tpl.name}`}
               checked={state.enabled}
               onChange={() => handleToggle(tpl.watcherType)}
             />
@@ -199,6 +199,7 @@ export default function WatcherConfigPage() {
                   <input
                     type="number"
                     min={1}
+                    aria-label={`${tpl.name}: ${tpl.thresholdLabel}`}
                     value={state.threshold}
                     onChange={(e) =>
                       handleThresholdChange(tpl.watcherType, Number(e.target.value))
@@ -224,14 +225,16 @@ export default function WatcherConfigPage() {
       })}
 
       <div className="watcher-config-page__save-bar">
-        <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar cambios'}
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={saveMutation.isPending}>
+          {saveMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
         </button>
       </div>
 
       {statusMsg && (
-        <p className={`status-msg ${statusMsg.type}`}>{statusMsg.text}</p>
+        <p className={`status-msg ${statusMsg.type}`} role={statusMsg.type === 'success' ? 'status' : 'alert'}>
+          {statusMsg.text}
+        </p>
       )}
-    </div>
+    </PageLayout>
   );
 }

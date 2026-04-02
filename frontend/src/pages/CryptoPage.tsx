@@ -3,6 +3,7 @@
  */
 import { useCallback, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { IconStar } from '@devpablocristo/modules-ui-data-display/icons';
@@ -150,11 +151,11 @@ export function CryptoPage() {
   const coinTextFn = useCallback((c: Coin) => `${c.name} ${c.symbol}`, []);
   const filtered = useSearch(COINS, coinTextFn, search);
   return (
-    <div className="cry page-stack">
-      <header className="page-header">
-        <h1>Crypto (demo)</h1>
-        <p>Billetera, mercado y asignación — datos ilustrativos.</p>
-      </header>
+    <PageLayout
+      className="cry"
+      title="Crypto (demo)"
+      lead="Billetera, mercado y asignación — datos ilustrativos."
+    >
       <div className="cry__tabs">
         {([['wallet', 'Billetera'], ['marketplace', 'Marketplace'], ['portfolio', 'Portfolio']] as const).map(([id, label]) => (
           <button key={id} type="button" className={`cry__tab ${tab === id ? 'cry__tab--active' : ''}`} onClick={() => setTab(id)}>{label}</button>
@@ -163,7 +164,7 @@ export function CryptoPage() {
       {tab === 'wallet' && <WalletView coins={filtered} />}
       {tab === 'marketplace' && <MarketView coins={filtered} />}
       {tab === 'portfolio' && <PortfolioView coins={filtered} />}
-    </div>
+    </PageLayout>
   );
 }
 export default CryptoPage;

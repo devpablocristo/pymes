@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { IconStar } from '@devpablocristo/modules-ui-data-display/icons';
 import { PRODUCT_PALETTE } from '../lib/productPalette';
+import { PageLayout } from '../components/PageLayout';
 import './UIComponentsPage.css';
 
 type Tab = 'alerts' | 'avatars' | 'badges' | 'buttons' | 'cards' | 'carousel' | 'colors' | 'dropdowns' | 'pagination' | 'progress' | 'radio' | 'rating' | 'switches' | 'tabs' | 'tags' | 'tooltips' | 'typography' | 'lists' | 'videos';
@@ -403,11 +404,11 @@ export function UIComponentsPage() {
   const Content = TAB_COMPONENTS[tab];
 
   return (
-    <div className="ui-catalog page-stack">
-      <header className="page-header">
-        <h1>Catálogo de componentes</h1>
-        <p>Patrones de UI y tokens del producto para desarrollo y QA.</p>
-      </header>
+    <PageLayout
+      className="ui-catalog"
+      title="Catálogo de componentes"
+      lead="Patrones de UI y tokens del producto para desarrollo y QA."
+    >
       <div className="ui-catalog__tabs">
         {TABS.map((t) => (
           <button key={t.id} type="button" className={`ui-catalog__tab ${tab === t.id ? 'ui-catalog__tab--active' : ''}`} onClick={() => setTab(t.id)}>
@@ -417,7 +418,7 @@ export function UIComponentsPage() {
       </div>
 
       <Content />
-    </div>
+    </PageLayout>
   );
 }
 

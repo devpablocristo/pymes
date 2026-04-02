@@ -1,4 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import {
@@ -10,6 +12,7 @@ import {
 } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import { getTheme, toggleTheme } from '../lib/theme';
 import type { AuditEntry, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
 import { AdminRbacSection } from './AdminRbacSection';
@@ -158,57 +161,88 @@ function settingsToForm(s: TenantSettings): TenantFormState {
 
 export type AdminSection = 'all' | 'appearance' | 'workspace' | 'rbac' | 'audit';
 
-export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) {
+type AdminPageProps = {
+  section?: AdminSection;
+  embedded?: boolean;
+};
+
+const ADMIN_SECTION_META: Record<AdminSection, { title: string; lead: string }> = {
+  all: {
+    title: 'Administración',
+    lead: 'Configuración del espacio y registro de actividad',
+  },
+  appearance: {
+    title: 'Apariencia',
+    lead: 'Tema visual y preferencias globales del espacio de trabajo.',
+  },
+  workspace: {
+    title: 'Negocio',
+    lead: 'Datos base, monedas, correlativos y configuración operativa del espacio.',
+  },
+  rbac: {
+    title: 'Roles y permisos',
+    lead: 'Asignación de accesos y gestión de permisos administrativos.',
+  },
+  audit: {
+    title: 'Auditoría',
+    lead: 'Registro de actividad y exportación de eventos del espacio.',
+  },
+};
+
+export function AdminPage({ section = 'all', embedded = false }: AdminPageProps = {}) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [uiTheme, setUiTheme] = useState(getTheme);
-  const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [form, setForm] = useState<TenantFormState | null>(null);
-  const [activity, setActivity] = useState<AuditEntry[]>([]);
   const adminSearch = usePageSearch();
   const auditTextFn = useCallback((a: AuditEntry) => `${a.action} ${a.resource_type} ${a.resource_id ?? ''} ${a.actor ?? ''}`, []);
+
+  const tenantQuery = useQuery({
+    queryKey: queryKeys.tenant.settings,
+    queryFn: getTenantSettings,
+    staleTime: 60_000,
+  });
+  const auditQuery = useQuery({
+    queryKey: queryKeys.audit.entries,
+    queryFn: async () => {
+      const audit = await getAuditEntries();
+      return audit.items ?? [];
+    },
+    staleTime: 30_000,
+  });
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSession,
+    staleTime: 5 * 60_000,
+  });
+
+  const settings = tenantQuery.data ?? null;
+  const activity = auditQuery.data ?? [];
   const filteredActivity = useSearch(activity, auditTextFn, adminSearch);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const loading = tenantQuery.isPending || auditQuery.isPending;
   const [saving, setSaving] = useState(false);
-  const [sessionOrgId, setSessionOrgId] = useState('');
-  const [isConsoleAdmin, setIsConsoleAdmin] = useState(false);
+  const sessionOrgId = sessionQuery.data?.auth.org_id ?? '';
+  const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const [auditExportBusy, setAuditExportBusy] = useState(false);
+
+  const loadError =
+    tenantQuery.isError
+      ? formatFetchErrorForUser(tenantQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
+      : auditQuery.isError
+        ? formatFetchErrorForUser(auditQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
+        : '';
+
+  useEffect(() => {
+    if (tenantQuery.data && form === null) {
+      setForm(settingsToForm(tenantQuery.data));
+    }
+  }, [tenantQuery.data, form]);
 
   function handleAppearanceToggle(): void {
     const next = toggleTheme();
     setUiTheme(next);
   }
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [tenant, audit] = await Promise.all([getTenantSettings(), getAuditEntries()]);
-      setSettings(tenant);
-      setForm(settingsToForm(tenant));
-      setActivity(audit.items ?? []);
-      setError('');
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, 'No pudimos conectar con el servidor. Verificá tu red.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    void getSession()
-      .then((s) => {
-        setSessionOrgId(s.auth.org_id);
-        setIsConsoleAdmin(s.auth.product_role === 'admin');
-      })
-      .catch(() => {
-        setSessionOrgId('');
-        setIsConsoleAdmin(false);
-      });
-  }, []);
 
   async function handleAuditExportCsv(): Promise<void> {
     setAuditExportBusy(true);
@@ -270,7 +304,7 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
     setError('');
     try {
       const updated = await updateTenantSettings(built);
-      setSettings(updated);
+      queryClient.setQueryData(queryKeys.tenant.settings, updated);
       setForm(settingsToForm(updated));
     } catch (err) {
       setError(formatFetchErrorForUser(err, 'No pudimos conectar con el servidor. Verificá tu red.'));
@@ -280,21 +314,14 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
   }
 
   function onResetForm(): void {
-    if (settings) setForm(settingsToForm(settings));
+    if (tenantQuery.data) setForm(settingsToForm(tenantQuery.data));
     setError('');
   }
 
   const showAll = section === 'all';
 
-  return (
+  const content = (
     <>
-      {showAll && (
-        <div className="page-header">
-          <h1>Administración</h1>
-          <p>Configuración del espacio y registro de actividad</p>
-        </div>
-      )}
-
       {(showAll || section === 'appearance') && <div className="card">
         <div className="card-header">
           <h2>{t('profile.admin.appearanceTitle')}</h2>
@@ -312,7 +339,7 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
         </div>
       </div>}
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {(error || loadError) && <div className="alert alert-error">{error || loadError}</div>}
 
       {(showAll || section === 'workspace') && <div className="card">
         <div className="card-header">
@@ -691,5 +718,19 @@ export function AdminPage({ section = 'all' }: { section?: AdminSection } = {}) 
         )}
       </div>}
     </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  const meta = ADMIN_SECTION_META[section];
+  return (
+    <PageLayout
+      title={meta.title}
+      lead={meta.lead}
+    >
+      {content}
+    </PageLayout>
   );
 }

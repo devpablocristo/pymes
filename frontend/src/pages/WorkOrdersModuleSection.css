@@ -5,6 +5,19 @@
   min-width: 0;
 }
 
+/* El h1 de página vive en `PageLayout`; los hijos CRUD aportan toolbar, búsqueda y acciones. */
+.wo-mod-orders .page-header.crud-page-shell__header {
+  margin-bottom: var(--space-3);
+}
+
+.wo-mod-orders .page-header.crud-page-shell__header .crud-page-shell__header-main > h1.crud-page-shell__title {
+  display: none;
+}
+
+.wo-mod-orders .page-header.crud-page-shell__header .crud-page-shell__header-main {
+  gap: var(--space-2);
+}
+
 .wo-mod-orders__switch {
   position: relative;
   display: inline-flex;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@devpablocristo/modules-search';
 import {
@@ -19,7 +20,9 @@ import {
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
 import type { PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
+import { queryKeys } from '../lib/queryKeys';
 import './UnifiedChatPage.css';
 
 type ContactKind = 'human' | 'ai_pymes';
@@ -232,71 +235,70 @@ export function UnifiedChatPage() {
   const [pendingRouteHintsByContact, setPendingRouteHintsByContact] = useState<Record<string, ManualRouteHint | undefined>>({});
   const [input, setInput] = useState('');
   const search = usePageSearch();
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
   const notificationHandoffInFlightRef = useRef(false);
+  const initialConversationHydratedRef = useRef(false);
+  const [historyConversationId, setHistoryConversationId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // ── Persistencia: conversaciones guardadas ──
-  const [savedConversations, setSavedConversations] = useState<ConversationSummary[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const loadedConversationRef = useRef<Set<string>>(new Set());
+  const conversationsQuery = useQuery({
+    queryKey: queryKeys.ai.conversations.list(30),
+    queryFn: () => listConversations(30),
+  });
+  const conversationDetailQuery = useQuery({
+    queryKey: queryKeys.ai.conversations.detail(historyConversationId ?? ''),
+    queryFn: () => getConversation(historyConversationId ?? ''),
+    enabled: historyConversationId !== null,
+  });
+  const chatMutation = useMutation({
+    mutationFn: pymesAssistantChat,
+    onSuccess: async (reply) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.list(30) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.detail(reply.chat_id) }),
+      ]);
+    },
+  });
+  const savedConversations = conversationsQuery.data?.items ?? [];
+  const loadingHistory = conversationDetailQuery.isFetching;
+  const busy = chatMutation.isPending;
 
-  // Carga lista de conversaciones al montar
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const { items } = await listConversations(30);
-        if (!cancelled) {
-          setSavedConversations(items);
-          // Si hay conversación previa, pre-seleccionar la más reciente
-          if (items.length > 0 && !chatIds[AI_PYMES_ID]) {
-            const latest = items[0];
-            setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: latest.id }));
-            void loadConversationMessages(latest.id);
-          }
-        }
-      } catch {
-        // silencioso: no bloquear UI si falla la carga
-      }
+    if (initialConversationHydratedRef.current) return;
+    if (savedConversations.length > 0 && !chatIds[AI_PYMES_ID]) {
+      const latest = savedConversations[0];
+      initialConversationHydratedRef.current = true;
+      setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: latest.id }));
+      setHistoryConversationId(latest.id);
+      return;
     }
-    void load();
-    return () => { cancelled = true; };
-  }, []);
+    if (conversationsQuery.isSuccess) {
+      initialConversationHydratedRef.current = true;
+    }
+  }, [chatIds, conversationsQuery.isSuccess, savedConversations]);
 
-  async function loadConversationMessages(conversationId: string) {
-    if (loadedConversationRef.current.has(conversationId)) return;
-    loadedConversationRef.current.add(conversationId);
-    setLoadingHistory(true);
-    try {
-      const detail = await getConversation(conversationId);
+  useEffect(() => {
+    if (conversationDetailQuery.data) {
+      const detail = conversationDetailQuery.data;
       const restored: Msg[] = detail.messages.map((m, i) => ({
-        id: `restored-${conversationId}-${i}`,
+        id: `restored-${detail.id}-${i}`,
         contactId: AI_PYMES_ID,
         text: m.content,
         fromMe: m.role === 'user',
         time: formatIsoTime(m.ts, language),
       }));
       if (restored.length > 0) {
-        setMsgs((prev) => {
-          // Quitar mensajes previos del AI contact que no sean de otra conversación cargada
-          const withoutOldAi = prev.filter((p) => p.contactId !== AI_PYMES_ID || !p.id.startsWith('restored-'));
-          return [...withoutOldAi, ...restored];
-        });
+        setMsgs((prev) => [...prev.filter((p) => p.contactId !== AI_PYMES_ID), ...restored]);
       }
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingHistory(false);
     }
-  }
+  }, [conversationDetailQuery.data, historyConversationId, language]);
 
   function selectSavedConversation(conv: ConversationSummary) {
     setActive(AI_PYMES_ID);
     setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: conv.id }));
-    loadedConversationRef.current.delete(conv.id);
-    void loadConversationMessages(conv.id);
+    setHistoryConversationId(conv.id);
     setError('');
   }
 
@@ -357,11 +359,10 @@ export function UnifiedChatPage() {
     };
     setMsgs((p) => [...p, userMsg]);
 
-    setBusy(true);
-    setError('');
-    const run = async () => {
+      setError('');
+      const run = async () => {
       try {
-        const reply = await pymesAssistantChat({
+        const reply = await chatMutation.mutateAsync({
           message: text,
           chat_id: null,
           confirmed_actions: [],
@@ -387,29 +388,16 @@ export function UnifiedChatPage() {
           }),
         );
         setMsgs((p) => [...p, ...additions]);
-        // Actualizar lista de conversaciones
-        void refreshConversationList();
       } catch (err) {
         setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
-      } finally {
-        setBusy(false);
       }
-    };
+      };
     void run();
-  }, [language, t]);
+  }, [chatMutation, language, t]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread.length, active]);
-
-  async function refreshConversationList() {
-    try {
-      const { items } = await listConversations(30);
-      setSavedConversations(items);
-    } catch {
-      // silencioso
-    }
-  }
 
   const clearAiThread = useCallback(() => {
     setMsgs((prev) => prev.filter((m) => m.contactId !== active));
@@ -428,6 +416,7 @@ export function UnifiedChatPage() {
       delete next[active];
       return next;
     });
+    setHistoryConversationId(null);
     setError('');
   }, [active]);
 
@@ -459,11 +448,10 @@ export function UnifiedChatPage() {
       setInput('');
     }
 
-    setBusy(true);
     setError('');
     const chatId = chatIds[active];
     try {
-      const reply = await pymesAssistantChat({
+      const reply = await chatMutation.mutateAsync({
         message: trimmed,
         chat_id: chatId ?? null,
         confirmed_actions: options?.confirmedActions ?? [],
@@ -503,14 +491,10 @@ export function UnifiedChatPage() {
         }),
       );
       setMsgs((p) => [...p, ...additions]);
-      // Actualizar lista de conversaciones después de cada mensaje
-      void refreshConversationList();
     } catch (err) {
       setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
-    } finally {
-      setBusy(false);
     }
-  }, [active, busy, chatIds, language, pendingRouteHintsByContact, t]);
+  }, [active, busy, chatIds, chatMutation, language, pendingRouteHintsByContact, t]);
 
   const send = useCallback(async () => {
     const trimmed = input.trim();
@@ -599,19 +583,17 @@ export function UnifiedChatPage() {
   const filteredContacts = useSearch(contactsView, contactTextFn, search);
 
   return (
-    <div className="cht page-stack">
-      <header className="page-header">
-        <h1>{t('ai.chat.pageTitle')}</h1>
-        <p>{t('ai.chat.pageLead')}</p>
-      </header>
+    <PageLayout className="cht" title={t('ai.chat.pageTitle')} lead={t('ai.chat.pageLead')}>
       <div className="cht__layout">
         <div className="cht__contacts">
-          <div className="cht__contacts-list">
+          <nav className="cht__contacts-list" aria-label="Contactos y conversaciones">
             {filteredContacts.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 className={`cht__contact ${active === c.id ? 'cht__contact--active' : ''}`}
+                aria-pressed={active === c.id}
+                aria-label={`${c.name}. ${c.lastMsg}`}
                 onClick={() => {
                   setActive(c.id);
                   setError('');
@@ -637,6 +619,8 @@ export function UnifiedChatPage() {
                     key={conv.id}
                     type="button"
                     className={`cht__contact ${chatIds[AI_PYMES_ID] === conv.id ? 'cht__contact--active' : ''}`}
+                    aria-pressed={chatIds[AI_PYMES_ID] === conv.id}
+                    aria-label={`${conv.title || 'Sin título'}. ${conv.message_count} mensajes`}
                     onClick={() => selectSavedConversation(conv)}
                   >
                     <div className="cht__contact-avatar cht__contact-avatar--saved">
@@ -652,20 +636,27 @@ export function UnifiedChatPage() {
                 ))}
               </>
             )}
-          </div>
+          </nav>
         </div>
         <div className="cht__main">
           <div className="cht__header cht__header-row">
-            <span className="cht__header-title">{activeDef.name}</span>
+            <h2 className="cht__header-title">{activeDef.name}</h2>
             {activeDef.kind !== 'human' ? (
               <button type="button" className="btn-secondary btn-sm" onClick={() => void clearAiThread()}>
                 {t('ai.chat.newConversation')}
               </button>
             ) : null}
           </div>
-          {error ? <p className="form-error cht__form-error-chat">{error}</p> : null}
-          <div className="cht__messages">
-            {loadingHistory && <div className="spinner cht__history-spinner" />}
+          {error ? <p role="alert" className="form-error cht__form-error-chat">{error}</p> : null}
+          <div
+            className="cht__messages"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-busy={busy || loadingHistory}
+            aria-label={`Mensajes con ${activeDef.name}`}
+          >
+            {loadingHistory && <div className="spinner cht__history-spinner" role="status" aria-label="Cargando historial" />}
             {thread.map((m) => (
               <div key={m.id} className={`cht__msg ${m.fromMe ? 'cht__msg--me' : 'cht__msg--them'}`}>
                 {m.badgeLabels && m.badgeLabels.length > 0 ? (
@@ -808,6 +799,15 @@ export function UnifiedChatPage() {
           ) : null}
           <div className="cht__input-bar">
             <input
+              aria-label={
+                activeDef.kind === 'human'
+                  ? t('ai.chat.input.humanPlaceholder')
+                  : activePendingRouteHint
+                    ? t('ai.chat.input.routePlaceholder', {
+                        label: humanRoutedLabel(activePendingRouteHint, language),
+                      })
+                    : t('ai.chat.input.defaultPlaceholder')
+              }
               placeholder={
                 activeDef.kind === 'human'
                   ? t('ai.chat.input.humanPlaceholder')
@@ -838,7 +838,7 @@ export function UnifiedChatPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

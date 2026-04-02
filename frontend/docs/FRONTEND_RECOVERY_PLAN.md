@@ -26,7 +26,7 @@ Documento de auditoría, arquitectura objetivo, fases de migración, tradeoffs e
 
 **Problemas principales:** (1) Mezcla de paradigmas de datos — React Query presente pero poco usado fuera de dashboard / dashboard visual. (2) Estilos: global monolítico + CSS por página + muchos `style={{}}` inline — no es un design system completo propio. (3) Límites de features difusos: `pages/` mezcla producto y demos (`CryptoPage`, `UIComponentsPage`). (4) Tests: pocos archivos; cobertura acotada (Vitest en verde tras fixes de búsqueda CRUD y asincronía en tests Clerk).
 
-**Riesgos:** deuda en cascada CSS; acoplamiento a clases globales; inconsistencia fetch/cache; a11y no auditada de punta a punta (mejora aplicada: `index.html` con `lang="es"`).
+**Riesgos:** acoplamiento a clases globales; fetch/cache aún heterogéneo fuera de pantallas migradas a React Query; a11y no auditada de punta a punta (mejoras incrementales: `lang="es"`, skip link, landmark principal).
 
 ---
 
@@ -135,6 +135,7 @@ src/
 - HTTP vía `lib/api` / patrones existentes.
 - Estilos nuevos: variables primero.
 - Estado servidor: preferir React Query en código nuevo.
+- Páginas **custom** (no CRUD): usar `PageLayout` (`src/components/PageLayout.tsx`) para `page-stack` + cabecera (`title`, `lead`, `actions` opcional); el buscador del shell sigue con `usePageSearch()` en la página.
 
 ---
 
@@ -213,6 +214,10 @@ src/
 - **CSS utilidades:** `src/styles/utilities.css` (`.u-*`) importado desde `styles.css` tras `tokens.css`.
 - **ESLint + hooks:** corrección de hooks condicionales en `AutomationRulesPage` y `WatcherConfigPage` (búsqueda siempre tras hooks); regex `downloadAPIFile` en `api.ts`; `CryptoPage` toggle sin expresión suelta; imports limpios (`App.tsx` sin lazy `DashboardPage` duplicado, `csvToolbar` / `commercial` / talleres / `aiApi`). `AccountPlanSection`: directiva eslint obsoleta eliminada.
 - **Tests:** `src/lib/productPalette.test.ts` (Vitest).
+- **React Query + claves:** `src/lib/queryKeys.ts`; `CalendarPage` usa `useQuery` para `/v1/appointments` e invalidación tras crear/editar/archivar; `AdminPage` usa `useQuery` para tenant settings, auditoría y sesión (`staleTime` acotado), `setQueryData` tras guardar.
+- **Rutas:** `App.tsx` aligerado — `lazyRoutes.tsx` (todos los `lazy()`), `ShellRoutes.tsx` (rutas anidadas del shell), `suspended.tsx`; comentario en `ShellRoutes` para rutas demo (`/crypto`, `/ui`).
+- **a11y (incremental):** enlace **“Saltar al contenido principal”** (`skip-link` en `base.css`) + `<main id="main-content">` en `Shell`; modal de calendario con `role="dialog"`, `aria-modal`, `aria-labelledby`; indicador de guardado con `role="status"` / `aria-live="polite"`; `ErrorBoundary` en español con `role="alert"`.
+- **Pulido previo:** `WorkOrdersModuleSection` (thumb), `resourceConfigs.beauty` (`--badge-swatch-bg`), `transversalWidgets` (`--widget-bar-width`), `WidgetFrame` (grid por CSS vars).
 
 ## 18. Archivos tocados en esa línea de trabajo
 
@@ -236,19 +241,26 @@ Ver historial git; incluyen entre otros: `frontend/index.html`, `frontend/src/st
 - **Tokens en archivo dedicado:** edición de color/tipo/tema sin abrir el monolito completo de reglas de componentes.
 - **Ajustes (hub):** más uso de variables de espacio y peso en deep links y tablas de ejemplo.
 
-## 21. Remaining Debt
+## 21. Remaining Debt (actualizado 2026-04-02)
 
-- `styles.css` sigue siendo grande (solo se extrajeron tokens).
-- React Query no universal.
-- Mucho inline sin migrar en otras páginas.
-- Sin ESLint en el paquete.
+- **CSS global:** `styles.css` es solo **barrel de `@import`** (tokens, utilities, sections, base, shell, perfil, onboarding, weekly-calendar, auth, dashboard, admin-crud-theme, components, module-page). El “monolito” de reglas está repartido en esos archivos; seguir extrayendo si crece una sección concreta.
+- **React Query:** hay **patrón estable** (`src/lib/queryKeys.ts`) y uso en **Calendar** (lista de turnos) y **Admin** (tenant, auditoría, sesión). Otras pantallas con `useEffect` + fetch pueden migrarse por feature.
+- **Inline dinámico:** en páginas calientes quedan sobre todo **variables CSS / %** (dashboard, showcase UI, crypto, etc.), no deuda de “márgenes sueltos”.
+- **ESLint:** está en el paquete (`eslint.config.js`, `npm run lint`, `make lint-docker-frontend`).
 
-## 22. Next Steps (orden)
+Pendiente de **alcance mayor** (no cerrado en esta recuperación):
 
-1. Migrar más inline → tokens (se avanzó en `UIComponentsPage`, `DashboardVisualPage`; siguen otras pantallas con `rem` sueltos).
-2. Seguir partiendo `styles.css` (p. ej. `base.css` o `utilities.css`) si sigue creciendo.
-3. ESLint incremental.
-4. Hooks + `useQuery` en páginas que hoy hacen fetch ad hoc.
+- **Auditoría a11y completa:** revisar *todo* el producto con criterio sistemático (WCAG, teclado, lector de pantalla, contraste). Lo hecho hasta ahora son **mejoras puntuales** (skip link, `main`, modal calendario, etc.), no un certificado ni un checklist cerrado.
+- **React Query en el resto de pantallas:** migrar cada `useEffect` + `fetch` que quede a `useQuery` / mutaciones donde aplique; Calendar y Admin ya usan el patrón con `queryKeys`.
+- **E2E Playwright en CI:** tener pruebas de navegador automáticas en el pipeline (build → tests unitarios → e2e); el repo puede tener Playwright en config pero **no sustituye** definir flujos, mantenerlos y ejecutarlos en CI.
+
+Separación estricta **demo vs producto** en rutas: hoy documentada en comentario en `ShellRoutes.tsx`; no implica mover código de dominio.
+
+## 22. Next Steps (orden sugerido)
+
+1. Extender **useQuery** + `queryKeys` a más páginas (priorizar listados que repiten fetch al montar).
+2. Revisar **a11y** por flujo (navegación teclado, modales, tablas).
+3. Opcional: tests e2e Playwright en CI (el paquete tiene Playwright en config pero no en el run unitario).
 
 ---
 

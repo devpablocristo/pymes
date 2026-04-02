@@ -1,6 +1,7 @@
 package publicapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,11 +12,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type Handler struct {
-	repo *Repository
+type repositoryPort interface {
+	ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error)
+	GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error)
+	ListPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, error)
+	GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error)
+	Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error)
+	ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error)
 }
 
-func NewHandler(repo *Repository) *Handler {
+type Handler struct {
+	repo repositoryPort
+}
+
+func NewHandler(repo repositoryPort) *Handler {
 	return &Handler{repo: repo}
 }
 
@@ -92,15 +102,38 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 		return
 	}
 	duration, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("duration", "60")))
-
-	slots, err := h.repo.GetAvailability(c.Request.Context(), orgID, day.UTC(), duration)
+	branchID, err := parseUUIDQuery(c.Query("branch_id"))
 	if err != nil {
-		if errors.Is(err, ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid duration"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
+	serviceID, err := parseUUIDQuery(c.Query("service_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
+		return
+	}
+	resourceID, err := parseUUIDQuery(c.Query("resource_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource_id"})
+		return
+	}
+
+	slots, err := h.repo.GetAvailability(c.Request.Context(), orgID, AvailabilityQuery{
+		Date:       day.UTC(),
+		Duration:   duration,
+		BranchID:   branchID,
+		ServiceID:  serviceID,
+		ResourceID: resourceID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidInput):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid availability query"})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch availability"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch availability"})
-		return
 	}
 
 	response := make([]gin.H, 0, len(slots))
@@ -112,15 +145,17 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"date": day.UTC().Format("2006-01-02"), "slots": response})
-}
-
-type bookRequest struct {
-	CustomerName  string `json:"party_name"`
-	CustomerPhone string `json:"party_phone"`
-	Title         string `json:"title"`
-	StartAt       string `json:"start_at"`
-	Duration      int    `json:"duration"`
+	out := gin.H{"date": day.UTC().Format("2006-01-02"), "slots": response}
+	if branchID != nil {
+		out["branch_id"] = branchID.String()
+	}
+	if serviceID != nil {
+		out["service_id"] = serviceID.String()
+	}
+	if resourceID != nil {
+		out["resource_id"] = resourceID.String()
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) BookAppointment(c *gin.Context) {
@@ -129,25 +164,16 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 		return
 	}
 
-	var req bookRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var payload map[string]any
+	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-
-	startAt, err := time.Parse(time.RFC3339, strings.TrimSpace(req.StartAt))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_at (expected RFC3339)"})
-		return
+	if payload == nil {
+		payload = map[string]any{}
 	}
 
-	appointment, err := h.repo.Book(c.Request.Context(), orgID, BookInput{
-		CustomerName:  req.CustomerName,
-		CustomerPhone: req.CustomerPhone,
-		Title:         req.Title,
-		StartAt:       startAt.UTC(),
-		Duration:      req.Duration,
-	})
+	appointment, err := h.repo.Book(c.Request.Context(), orgID, payload)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidInput):
@@ -211,4 +237,16 @@ func (h *Handler) GetMyAppointments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"items": out})
+}
+
+func parseUUIDQuery(raw string) (*uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }

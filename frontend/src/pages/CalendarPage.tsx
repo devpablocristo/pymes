@@ -3,8 +3,10 @@
  * CRUD real: crear, mover (drag), resize, eliminar.
  * FullCalendar con toolbar custom y estilos nativos.
  */
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { CSSProperties } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
 import { IconClose } from '@devpablocristo/modules-ui-data-display/icons';
@@ -14,6 +16,7 @@ import type { EventInput, DateSelectArg, EventClickArg, EventDropArg } from '@fu
 import type { EventResizeDoneArg } from '@fullcalendar/interaction';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import {
   CALENDAR_APPOINTMENT_COLOR_OPTIONS,
   DEFAULT_APPOINTMENT_COLOR_HEX,
@@ -98,11 +101,22 @@ function EventModal({
   };
 
   return (
-    <div className="gcal__backdrop" onClick={onClose}>
-      <form className="gcal__modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="gcal__backdrop" onClick={onClose} role="presentation">
+      <form
+        className="gcal__modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gcal-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+      >
         <div className="gcal__modal-header">
-          <h3 className="gcal__modal-title">{state.mode === 'edit' ? 'Editar turno' : 'Nuevo turno'}</h3>
-          <button type="button" className="gcal__modal-close" onClick={onClose}><IconClose /></button>
+          <h3 id="gcal-modal-title" className="gcal__modal-title">
+            {state.mode === 'edit' ? 'Editar turno' : 'Nuevo turno'}
+          </h3>
+          <button type="button" className="gcal__modal-close" onClick={onClose} aria-label="Cerrar">
+            <IconClose />
+          </button>
         </div>
         <div className="gcal__modal-body">
           <div className="form-group">
@@ -183,19 +197,34 @@ function toLocalDatetime(iso: string): string {
 
 export function CalendarPage() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const calRef = useRef<FullCalendar>(null);
   const [modal, setModal] = useState<ModalState>(emptyModal);
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<CalendarView>('timeGridWeek');
   const [titleText, setTitleText] = useState('');
-  const [events, setEvents] = useState<EventInput[]>([]);
   const calSearch = usePageSearch();
+
+  const { data: appointmentRows, isFetched: loaded } = useQuery({
+    queryKey: queryKeys.appointments.list,
+    queryFn: async () => {
+      const data = await apiRequest<{ items?: ApiAppointment[] }>('/v1/appointments?limit=200');
+      const items = data.items ?? (Array.isArray(data) ? data : []);
+      return items as ApiAppointment[];
+    },
+    staleTime: 60_000,
+  });
+
+  const events = useMemo(
+    () => (appointmentRows ?? []).map(apiToEvent),
+    [appointmentRows],
+  );
+
   const eventTextFn = useCallback((e: EventInput) => {
     const props = (e.extendedProps as Record<string, any>)?.appointment;
     return [e.title, props?.customer_name, props?.description, props?.notes].filter(Boolean).join(' ');
   }, []);
   const filteredEvents = useSearch(events, eventTextFn, calSearch);
-  const [loaded, setLoaded] = useState(false);
 
   const scrollCalendarToRelevantTime = useCallback(() => {
     const api = calRef.current?.getApi();
@@ -212,20 +241,6 @@ export function CalendarPage() {
     );
   }, [events]);
 
-  // Cargar eventos de la API
-  const loadEvents = useCallback(async () => {
-    try {
-      const data = await apiRequest<{ items?: ApiAppointment[] }>('/v1/appointments?limit=200');
-      const items = data.items ?? (Array.isArray(data) ? data : []);
-      setEvents((items as ApiAppointment[]).map(apiToEvent));
-    } catch {
-      // Sin datos — quedará vacío
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => { void loadEvents(); }, [loadEvents]);
   useEffect(() => {
     if (!loaded) {
       return;
@@ -344,13 +359,13 @@ export function CalendarPage() {
         await apiRequest('/v1/appointments', { method: 'POST', body });
       }
       setModal(emptyModal);
-      await loadEvents();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appointments.list });
     } catch (err) {
       window.alert(String(err));
     } finally {
       setSaving(false);
     }
-  }, [loadEvents]);
+  }, [queryClient]);
 
   // Eliminar (archive)
   const handleDelete = useCallback(async () => {
@@ -359,20 +374,16 @@ export function CalendarPage() {
     try {
       await apiRequest(`/v1/appointments/${modal.id}`, { method: 'DELETE' });
       setModal(emptyModal);
-      await loadEvents();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.appointments.list });
     } catch (err) {
       window.alert(String(err));
     } finally {
       setSaving(false);
     }
-  }, [modal.id, loadEvents]);
+  }, [modal.id, queryClient]);
 
   return (
-    <div className="gcal page-stack">
-      <header className="page-header">
-        <h1>{t('calendar.pageTitle')}</h1>
-        <p>{t('calendar.pageLead')}</p>
-      </header>
+    <PageLayout className="gcal" title={t('calendar.pageTitle')} lead={t('calendar.pageLead')}>
       <CalendarSurface
         calendarRef={calRef}
         view={view}
@@ -416,8 +427,12 @@ export function CalendarPage() {
       )}
 
       {/* Indicador de guardado */}
-      {saving && <div className="gcal__saving">Guardando…</div>}
-    </div>
+      {saving && (
+        <div className="gcal__saving" role="status" aria-live="polite">
+          Guardando…
+        </div>
+      )}
+    </PageLayout>
   );
 }
 

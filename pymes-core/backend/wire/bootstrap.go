@@ -9,6 +9,7 @@ import (
 	"time"
 
 	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
+	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -49,6 +50,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
+	schedulinghttp "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduling"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
@@ -142,6 +144,7 @@ func InitializeApp() *app.App {
 	recurringRepo := recurring.NewRepository(db)
 	schedulerRepo := scheduler.NewRepository(db)
 	timelineRepo := timeline.NewRepository(db)
+	schedulingRepo := schedulingmodule.NewRepository(db)
 	whatsappRepo := whatsapp.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
@@ -170,6 +173,7 @@ func InitializeApp() *app.App {
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
+	schedulingUC := schedulingmodule.NewUsecases(schedulingRepo, auditUC, schedulingmodule.WithNotifications(outwebhooksUC))
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
@@ -258,8 +262,9 @@ func InitializeApp() *app.App {
 	pdfgenHandler := pdfgen.NewHandler(pdfgenUC)
 	returnsHandler := returns.NewHandler(returnsUC)
 	timelineHandler := timeline.NewHandler(timelineUC)
+	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
-	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db))
+	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db, schedulingUC))
 	var resolveOrgRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
@@ -327,6 +332,7 @@ func InitializeApp() *app.App {
 	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	// Review proxy — opcional, se activa si REVIEW_URL está configurado

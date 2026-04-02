@@ -5,6 +5,7 @@
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useI18n } from '../lib/i18n';
 import {
@@ -472,16 +473,16 @@ export function DashboardVisualPage() {
   // Registra el search para que aparezca el input. Filtrado de gráficos pendiente.
   usePageSearch();
   return (
-    <div className="dash page-stack">
-      <header className="page-header page-header--split">
-        <div className="page-header__main">
-          <h1>{t('shell.dashboard.panelTitle')}</h1>
-          <p>{t('shell.dashboard.panelLead')}</p>
-        </div>
+    <PageLayout
+      className="dash"
+      title={t('shell.dashboard.panelTitle')}
+      lead={t('shell.dashboard.panelLead')}
+      actions={
         <Link to="/dashboard/widgets" className="btn-secondary btn-sm">
           {t('shell.dashboard.customizeWidgets')}
         </Link>
-      </header>
+      }
+    >
       <StatCards />
 
       <div className="dash__grid--3">
@@ -500,7 +501,7 @@ export function DashboardVisualPage() {
         <LowStockAlerts />
         <AuditActivity />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

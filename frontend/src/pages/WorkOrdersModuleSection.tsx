@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useMatch } from 'react-router-dom';
+import { PageLayout } from '../components/PageLayout';
 import { useI18n } from '../lib/i18n';
 import './WorkOrdersModuleSection.css';
 
@@ -7,11 +8,7 @@ export function WorkOrdersModuleSection() {
   const isBoardActive = useMatch('/modules/workOrders/board');
 
   return (
-    <div className="wo-mod-orders page-stack">
-      <header className="page-header">
-        <h1>{t('shell.workOrders.pageTitle')}</h1>
-        <p>{t('shell.workOrders.pageLead')}</p>
-      </header>
+    <PageLayout className="wo-mod-orders" title={t('shell.workOrders.pageTitle')} lead={t('shell.workOrders.pageLead')}>
       <div className="wo-mod-orders__switch" role="group" aria-label={t('shell.workOrders.tabsNavAria')}>
         <NavLink to="board" className="wo-mod-orders__switch-track" draggable={false}>
           <span className={`wo-mod-orders__switch-label${isBoardActive ? ' wo-mod-orders__switch-label--active' : ''}`}>
@@ -28,6 +25,6 @@ export function WorkOrdersModuleSection() {
         {isBoardActive && <NavLink to="list" className="wo-mod-orders__switch-hit wo-mod-orders__switch-hit--right" aria-hidden="true" draggable={false} tabIndex={-1}>&nbsp;</NavLink>}
       </div>
       <Outlet />
-    </div>
+    </PageLayout>
   );
 }

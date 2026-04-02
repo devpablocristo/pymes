@@ -97,7 +97,7 @@ function StatCards() {
           </div>
           <div className="dash__stat-info">
             <div className="dash__stat-value">
-              {s.loading ? <span className="spinner dash__stat-spinner" /> : s.value}
+              {s.loading ? <span className="spinner" /> : s.value}
             </div>
             <div className="dash__stat-label">{s.label}</div>
             {s.sub && <div className="dash__stat-trend dash__stat-trend--muted">{s.sub}</div>}

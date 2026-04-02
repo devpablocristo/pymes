@@ -116,6 +116,38 @@ const bellIcon = (
   </svg>
 );
 
+const chartIcon = (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+);
+
+const calendarIconBase = (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+const bikeIcon = (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="5.5" cy="17.5" r="3.5" />
+    <circle cx="18.5" cy="17.5" r="3.5" />
+    <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
+  </svg>
+);
+
+const beautyIcon = (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v18" />
+    <path d="M8 7c0-2 1.5-4 4-4s4 2 4 4c0 3-4 5-4 9" />
+    <path d="M16 7c0-2-1.5-4-4-4S8 5 8 7c0 3 4 5 4 9" />
+  </svg>
+);
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
@@ -144,35 +176,18 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const chartIcon = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  );
-
-  const calendarIconBase = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-
   const mainNav = useMemo<AppShellNavItem[]>(() => {
     const items: AppShellNavItem[] = [
-      { to: '/dashboard', label: 'Dashboard', icon: chartIcon },
-      { to: '/calendar', label: 'Calendario', icon: calendarIconBase },
+      { to: '/dashboard', label: t('shell.nav.dashboard'), icon: chartIcon },
+      { to: '/calendar', label: t('shell.nav.calendar'), icon: calendarIconBase },
       { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
       { to: '/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/invoices', label: t('shell.nav.invoices'), icon: documentIcon },
-      { to: '/whatsapp/inbox', label: 'Bandeja WhatsApp', icon: chatIcon },
-      { to: '/whatsapp/campaigns', label: 'Campañas WhatsApp', icon: chatIcon },
+      { to: '/whatsapp/inbox', label: t('shell.nav.whatsappInbox'), icon: chatIcon },
+      { to: '/whatsapp/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: chatIcon },
       { to: '/crypto', label: t('shell.nav.crypto'), icon: chartIcon },
       { to: '/ui', label: t('shell.nav.uiComponents'), icon: dashboardIcon },
-      { to: '/settings', label: 'Ajustes', icon: adminIcon },
+      { to: '/settings', label: t('shell.nav.settings'), icon: adminIcon },
     ];
     return items;
   }, [t]);
@@ -191,27 +206,11 @@ export function Shell({ children }: { children: ReactNode }) {
     { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
   ], [t]);
 
-  const bikeIcon = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="5.5" cy="17.5" r="3.5" />
-      <circle cx="18.5" cy="17.5" r="3.5" />
-      <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-    </svg>
-  );
-
   const bikeShopNav = useMemo<AppShellNavItem[]>(() => [
-    { to: '/workshops/bike-shop/bicycles', label: 'Bicicletas', icon: bikeIcon },
-    { to: '/workshops/bike-shop/services', label: 'Servicios', icon: wrenchIcon },
-    { to: '/workshops/bike-shop/orders', label: 'Órdenes de trabajo', icon: documentIcon },
+    { to: '/workshops/bike-shop/bicycles', label: t('shell.nav.bikeBicycles'), icon: bikeIcon },
+    { to: '/workshops/bike-shop/services', label: t('shell.nav.bikeServices'), icon: wrenchIcon },
+    { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: documentIcon },
   ], [t]);
-
-  const beautyIcon = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18" />
-      <path d="M8 7c0-2 1.5-4 4-4s4 2 4 4c0 3-4 5-4 9" />
-      <path d="M16 7c0-2-1.5-4-4-4S8 5 8 7c0 3 4 5 4 9" />
-    </svg>
-  );
 
   const beautyNav = useMemo<AppShellNavItem[]>(() => [
     { to: '/beauty/salon/staff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
@@ -254,7 +253,7 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
     }
     if (vertical === 'bike_shop') {
-      result.push({ label: 'Bicicletería', items: bikeShopNav });
+      result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
     }
     if (vertical === 'beauty') {
       result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });
@@ -266,6 +265,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return result;
   }, [
     beautyNav,
+    bikeShopNav,
     catalog.groups,
     catalog.modules,
     localizeUiText,
@@ -280,14 +280,14 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <>
       <a href="#main-content" className="skip-link">
-        Saltar al contenido principal
+        {t('shell.skipLink')}
       </a>
       <AppShell
         brandTitle="Pymes SaaS"
         brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
         sections={sections}
       >
-        <PageSearchProvider placeholder="Buscar...">
+        <PageSearchProvider placeholder={t('shell.search.placeholder')}>
           <main id="main-content" className="app-shell-main" tabIndex={-1}>
             {children}
           </main>

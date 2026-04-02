@@ -430,11 +430,10 @@
   color: var(--color-text-muted);
 }
 
-.dash__stat-value .spinner.dash__stat-spinner {
+.dash__stat-value .spinner {
   display: inline-flex;
-  width: calc(var(--space-4) * 16 / 15);
-  height: calc(var(--space-4) * 16 / 15);
-  min-height: 0;
+  --spinner-size: calc(var(--space-4) * 16 / 15);
+  --spinner-min-height: 0;
   align-items: center;
   justify-content: center;
 }

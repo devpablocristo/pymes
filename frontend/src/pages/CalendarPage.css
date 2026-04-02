@@ -1,25 +1,6 @@
-.gcal .modules-calendar .fc .fc-timegrid-axis-cushion,
-.gcal .modules-calendar .fc .fc-timegrid-axis-frame {
-  font-size: var(--text-sm);
-}
-
-.gcal .modules-calendar .fc .fc-col-header-cell-cushion {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-.gcal .modules-calendar .fc .fc-daygrid-day-number {
-  font-size: var(--text-md);
-  font-weight: var(--font-weight-semibold);
-}
-
 .gcal .modules-calendar .fc .fc-day-today .fc-daygrid-day-number {
   width: 34px;
   height: 34px;
-}
-
-.gcal .modules-calendar .fc .fc-timegrid-slot-label {
-  font-size: var(--text-sm);
 }
 
 /* ── Modal ── */

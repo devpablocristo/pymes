@@ -13,6 +13,7 @@ import (
 	"github.com/devpablocristo/core/concurrency/go/resilience"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httpclient"
+	schedulingdomain "github.com/devpablocristo/modules/scheduling/go/domain"
 	schedulerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler/usecases/domain"
 )
 
@@ -21,6 +22,7 @@ type RepositoryPort interface {
 	UpsertExchangeRate(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency, rateType string, buyRate, sellRate float64, source string, rateDate time.Time) error
 	ListDueRecurring(ctx context.Context, day time.Time) ([]RecurringDue, error)
 	ApplyRecurringExpense(ctx context.Context, item RecurringDue, paidAt, nextDue time.Time) error
+	ListDueSchedulingReminders(ctx context.Context, now time.Time, limit int) ([]SchedulingReminderDue, error)
 	RecordRun(ctx context.Context, task, status, errorMessage string, nextRunAt time.Time) error
 }
 
@@ -33,12 +35,26 @@ type PaymentGatewayTaskPort interface {
 	ProcessPendingWebhookEvents(ctx context.Context, limit int) (int, error)
 }
 
+type SchedulingTaskPort interface {
+	ExpireOverdueHolds(ctx context.Context, limit int) ([]schedulingdomain.Booking, error)
+	CreateBookingActionTokens(ctx context.Context, orgID, bookingID uuid.UUID, ttl time.Duration) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error)
+	MarkBookingReminderSent(ctx context.Context, orgID, bookingID uuid.UUID, sentAt time.Time) (schedulingdomain.Booking, error)
+	ProcessWaitlistAvailability(ctx context.Context, now time.Time, limit int) ([]schedulingdomain.WaitlistEntry, error)
+}
+
+type EmailSenderPort interface {
+	Send(ctx context.Context, to, subject, htmlBody, textBody string) error
+}
+
 type Usecases struct {
 	repo            RepositoryPort
 	provider        string
 	caller          *httpclient.Caller
 	webhooks        WebhookTaskPort
 	paymentGateways PaymentGatewayTaskPort
+	scheduling      SchedulingTaskPort
+	emailSender     EmailSenderPort
+	publicBaseURL   string
 }
 
 type RecurringDue struct {
@@ -54,7 +70,19 @@ type RecurringDue struct {
 	NextDueDate   time.Time
 }
 
-func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort) *Usecases {
+type SchedulingReminderDue struct {
+	OrgID         uuid.UUID
+	OrgSlug       string
+	BookingID     uuid.UUID
+	CustomerName  string
+	CustomerEmail string
+	ServiceName   string
+	BranchName    string
+	Status        string
+	StartAt       time.Time
+}
+
+func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort, paymentGateways PaymentGatewayTaskPort, scheduling SchedulingTaskPort, emailSender EmailSenderPort, publicBaseURL string) *Usecases {
 	return &Usecases{
 		repo:     repo,
 		provider: strings.ToLower(strings.TrimSpace(provider)),
@@ -63,6 +91,9 @@ func NewUsecases(repo RepositoryPort, provider string, webhooks WebhookTaskPort,
 		},
 		webhooks:        webhooks,
 		paymentGateways: paymentGateways,
+		scheduling:      scheduling,
+		emailSender:     emailSender,
+		publicBaseURL:   strings.TrimRight(strings.TrimSpace(publicBaseURL), "/"),
 	}
 }
 
@@ -71,7 +102,7 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 	if task == "" {
 		task = "all"
 	}
-	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" {
+	if task != "all" && task != "exchange_rates" && task != "recurring_expenses" && task != "retry_webhooks" && task != "cleanup_webhook_deliveries" && task != "payment_gateway_webhooks" && task != "scheduling_holds" && task != "scheduling_reminders" && task != "scheduling_waitlist" {
 		return schedulerdomain.RunResult{}, domainerr.Validation("invalid task")
 	}
 	result := schedulerdomain.RunResult{Task: task, Metadata: map[string]any{}}
@@ -120,7 +151,90 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		result.Metadata["payment_gateway_events_processed"] = processed
 		_ = u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute))
 	}
+	if u.scheduling != nil && (task == "all" || task == "scheduling_holds") {
+		expired, err := u.runSchedulingHoldExpiration(ctx)
+		if err != nil {
+			_ = u.repo.RecordRun(ctx, "scheduling_holds", "error", err.Error(), time.Now().UTC().Add(5*time.Minute))
+			return schedulerdomain.RunResult{}, err
+		}
+		result.Metadata["scheduling_holds_expired"] = expired
+		_ = u.repo.RecordRun(ctx, "scheduling_holds", "ok", "", time.Now().UTC().Add(5*time.Minute))
+	}
+	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_reminders") {
+		sent, err := u.sendSchedulingReminders(ctx)
+		if err != nil {
+			_ = u.repo.RecordRun(ctx, "scheduling_reminders", "error", err.Error(), time.Now().UTC().Add(10*time.Minute))
+			return schedulerdomain.RunResult{}, err
+		}
+		result.Metadata["scheduling_reminders_sent"] = sent
+		_ = u.repo.RecordRun(ctx, "scheduling_reminders", "ok", "", time.Now().UTC().Add(10*time.Minute))
+	}
+	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_waitlist") {
+		notified, err := u.notifySchedulingWaitlist(ctx)
+		if err != nil {
+			_ = u.repo.RecordRun(ctx, "scheduling_waitlist", "error", err.Error(), time.Now().UTC().Add(10*time.Minute))
+			return schedulerdomain.RunResult{}, err
+		}
+		result.Metadata["scheduling_waitlist_notified"] = notified
+		_ = u.repo.RecordRun(ctx, "scheduling_waitlist", "ok", "", time.Now().UTC().Add(10*time.Minute))
+	}
 	return result, nil
+}
+
+func (u *Usecases) runSchedulingHoldExpiration(ctx context.Context) (int, error) {
+	items, err := u.scheduling.ExpireOverdueHolds(ctx, 200)
+	if err != nil {
+		return 0, err
+	}
+	return len(items), nil
+}
+
+func (u *Usecases) sendSchedulingReminders(ctx context.Context) (int, error) {
+	now := time.Now().UTC()
+	items, err := u.repo.ListDueSchedulingReminders(ctx, now, 200)
+	if err != nil {
+		return 0, err
+	}
+	sent := 0
+	for _, item := range items {
+		if strings.TrimSpace(item.CustomerEmail) == "" {
+			continue
+		}
+		tokens, err := u.scheduling.CreateBookingActionTokens(ctx, item.OrgID, item.BookingID, 72*time.Hour)
+		if err != nil {
+			return sent, err
+		}
+		subject, textBody, htmlBody := buildSchedulingReminderEmail(u.publicBaseURL, item, tokens)
+		if err := u.emailSender.Send(ctx, item.CustomerEmail, subject, htmlBody, textBody); err != nil {
+			return sent, err
+		}
+		if _, err := u.scheduling.MarkBookingReminderSent(ctx, item.OrgID, item.BookingID, now); err != nil {
+			return sent, err
+		}
+		sent++
+	}
+	return sent, nil
+}
+
+func (u *Usecases) notifySchedulingWaitlist(ctx context.Context) (int, error) {
+	items, err := u.scheduling.ProcessWaitlistAvailability(ctx, time.Now().UTC(), 200)
+	if err != nil {
+		return 0, err
+	}
+	sent := 0
+	for _, item := range items {
+		if strings.TrimSpace(item.CustomerEmail) == "" {
+			continue
+		}
+		subject := "A slot is available for your waitlist request"
+		textBody := fmt.Sprintf("Hi %s,\n\nA slot is now available for %s.\nRequested time: %s\nYou can return to the booking flow to complete the reservation.\n", defaultSchedulingName(item.CustomerName), item.RequestedStartAt.Format("2006-01-02 15:04"), item.RequestedStartAt.Format(time.RFC3339))
+		htmlBody := "<p>" + strings.ReplaceAll(textBody, "\n", "<br>") + "</p>"
+		if err := u.emailSender.Send(ctx, item.CustomerEmail, subject, htmlBody, textBody); err != nil {
+			return sent, err
+		}
+		sent++
+	}
+	return sent, nil
 }
 
 func (u *Usecases) applyRecurring(ctx context.Context) (int, error) {
@@ -239,4 +353,59 @@ func normalizeDay(day int) int {
 		return 28
 	}
 	return day
+}
+
+func buildSchedulingReminderEmail(publicBaseURL string, item SchedulingReminderDue, tokens map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken) (subject, textBody, htmlBody string) {
+	subject = "Booking reminder"
+	if strings.EqualFold(strings.TrimSpace(item.Status), string(schedulingdomain.BookingStatusPendingConfirmation)) {
+		subject = "Please confirm your booking"
+	}
+	confirmURL := schedulingActionURL(publicBaseURL, item.OrgSlug, "confirm", tokens[schedulingdomain.BookingActionConfirm].Token)
+	cancelURL := schedulingActionURL(publicBaseURL, item.OrgSlug, "cancel", tokens[schedulingdomain.BookingActionCancel].Token)
+	lines := []string{
+		fmt.Sprintf("Hi %s,", defaultSchedulingName(item.CustomerName)),
+		"",
+		fmt.Sprintf("This is a reminder for %s at %s.", defaultSchedulingLabel(item.ServiceName), item.StartAt.Format("2006-01-02 15:04")),
+	}
+	if strings.TrimSpace(item.BranchName) != "" {
+		lines = append(lines, "Branch: "+item.BranchName)
+	}
+	if confirmURL != "" {
+		lines = append(lines, "Confirm: "+confirmURL)
+	}
+	if cancelURL != "" {
+		lines = append(lines, "Cancel: "+cancelURL)
+	}
+	textBody = strings.Join(lines, "\n")
+	htmlBody = "<p>" + strings.ReplaceAll(textBody, "\n", "<br>") + "</p>"
+	return subject, textBody, htmlBody
+}
+
+func schedulingActionURL(baseURL, orgSlug, action, token string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	token = strings.TrimSpace(token)
+	if baseURL == "" || token == "" {
+		return ""
+	}
+	orgSlug = strings.TrimSpace(orgSlug)
+	if orgSlug == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/v1/public/%s/scheduling/bookings/actions/%s?token=%s", baseURL, orgSlug, action, token)
+}
+
+func defaultSchedulingName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "there"
+	}
+	return name
+}
+
+func defaultSchedulingLabel(label string) string {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return "your booking"
+	}
+	return label
 }

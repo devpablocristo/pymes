@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	schedulingseeds "github.com/devpablocristo/modules/scheduling/go/seeds"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -37,7 +38,6 @@ var legacyFileOrder = []string{
 	"03_rbac.sql",
 	"04_transversal_modules_demo.sql",
 	"05_in_app_notifications_demo.sql",
-	"06_scheduling_demo.sql",
 }
 
 var clerkFileOrder = []string{
@@ -46,7 +46,6 @@ var clerkFileOrder = []string{
 	"03_rbac.sql",
 	"04_transversal_modules_demo.sql",
 	"05_in_app_notifications_demo.sql",
-	"06_scheduling_demo.sql",
 }
 
 // Run ejecuta los scripts en orden. Idempotente vía ON CONFLICT en el SQL.
@@ -70,5 +69,9 @@ func Run(ctx context.Context, db *gorm.DB, logger zerolog.Logger, p Params) erro
 		}
 		logger.Info().Str("seed_file", name).Msg("pymes core demo seed applied")
 	}
+	if err := schedulingseeds.RunDemo(ctx, db, p.TargetOrgUUID); err != nil {
+		return err
+	}
+	logger.Info().Msg("scheduling module demo seed applied")
 	return nil
 }

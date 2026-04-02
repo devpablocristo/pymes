@@ -72,7 +72,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: true,
-    searchPlaceholder: 'Buscar por archivo, tipo o MIME…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'Indicá en la URL ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/attachments).',
     dataSource: {
       list: async () => {
@@ -148,7 +148,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: false,
-    searchPlaceholder: 'Buscar por acción, recurso o actor…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay eventos de auditoría recientes.',
     toolbarActions: [
       {
@@ -202,7 +202,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowDelete: false,
     allowCreate: true,
     createLabel: '+ Nota manual',
-    searchPlaceholder: 'Buscar en título, descripción o tipo…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'Indicá ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/timeline).',
     dataSource: {
       list: async () => {

@@ -30,6 +30,7 @@ type Config struct {
 	StripeWebhookSecret         string
 	NotificationBackend         string
 	FrontendURL                 string
+	PublicBaseURL               string
 	AWSRegion                   string
 	AWSSesFromEmail             string
 	SMTPHost                    string
@@ -84,6 +85,7 @@ func LoadFromEnv() Config {
 		StripeWebhookSecret:         envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
 		NotificationBackend:         envconfig.Get("NOTIFICATION_BACKEND", "noop"),
 		FrontendURL:                 envconfig.Get("FRONTEND_URL", "http://localhost:5173"),
+		PublicBaseURL:               envconfig.Get("PUBLIC_BASE_URL", "http://localhost:8080"),
 		AWSRegion:                   envconfig.Get("AWS_REGION", "us-east-1"),
 		AWSSesFromEmail:             envconfig.Get("AWS_SES_FROM_EMAIL", ""),
 		SMTPHost:                    envconfig.Get("SMTP_HOST", "localhost"),

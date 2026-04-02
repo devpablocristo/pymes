@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type Repository struct { db *gorm.DB }
+type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
@@ -44,13 +44,51 @@ func (r *Repository) ApplyRecurringExpense(ctx context.Context, item RecurringDu
 		if err := tx.Exec(`
 			INSERT INTO cash_movements (id, org_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at)
 			VALUES (gen_random_uuid(), ?, 'expense', ?, ?, ?, ?, ?, 'recurring_expense', ?, 'scheduler', now())
-		`, item.OrgID, item.Amount, item.Currency, item.Category, item.Description, item.PaymentMethod, item.ID).Error; err != nil { return err }
+		`, item.OrgID, item.Amount, item.Currency, item.Category, item.Description, item.PaymentMethod, item.ID).Error; err != nil {
+			return err
+		}
 		return tx.Exec(`
 			UPDATE recurring_expenses
 			SET last_paid_date = ?, next_due_date = ?, updated_at = now()
 			WHERE id = ?
 		`, paidAt, nextDue, item.ID).Error
 	})
+}
+
+func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Time, limit int) ([]SchedulingReminderDue, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	var rows []SchedulingReminderDue
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			b.org_id,
+			COALESCE(o.slug, b.org_id::text) AS org_slug,
+			b.id AS booking_id,
+			b.customer_name,
+			b.customer_email,
+			COALESCE(s.name, b.reference, 'Booking') AS service_name,
+			COALESCE(br.name, '') AS branch_name,
+			b.status,
+			b.start_at
+		FROM scheduling_bookings b
+		JOIN orgs o ON o.id = b.org_id
+		JOIN tenant_settings ts ON ts.org_id = b.org_id
+		LEFT JOIN scheduling_services s ON s.id = b.service_id
+		LEFT JOIN scheduling_branches br ON br.id = b.branch_id
+		WHERE ts.appointments_enabled = true
+		  AND b.customer_email <> ''
+		  AND b.reminder_sent_at IS NULL
+		  AND b.status IN ('pending_confirmation', 'confirmed')
+		  AND b.start_at >= ?
+		  AND b.start_at <= (? + make_interval(hours => GREATEST(ts.appointment_reminder_hours, 0)))
+		ORDER BY b.start_at ASC
+		LIMIT ?
+	`, now.UTC(), now.UTC(), limit).Scan(&rows).Error
+	return rows, err
 }
 
 func (r *Repository) RecordRun(ctx context.Context, task, status, errorMessage string, nextRunAt time.Time) error {

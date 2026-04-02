@@ -99,10 +99,18 @@ function sectionFromSearchParam(raw: string | null): Section {
 
 // ─── Toggle ───
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  checked,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  ariaLabel?: string;
+}) {
   return (
     <label className="stg__switch">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" checked={checked} aria-label={ariaLabel} onChange={(e) => onChange(e.target.checked)} />
       <span className="stg__switch-slider" />
     </label>
   );
@@ -120,17 +128,17 @@ function CompanyTab() {
   return (
     <div className="card">
       <div className="stg__form-grid">
-        <div className="form-group"><label>Nombre completo</label><input value={form.name} onChange={set('name')} placeholder="Mi Empresa S.R.L." /></div>
-        <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={set('email')} placeholder="info@empresa.com" /></div>
-        <div className="form-group"><label>Teléfono</label><input value={form.phone} onChange={set('phone')} placeholder="+54 11 1234-5678" /></div>
-        <div className="form-group"><label>Sitio web</label><input value={form.website} onChange={set('website')} placeholder="https://empresa.com" /></div>
+        <div className="form-group"><label>Nombre completo</label><input aria-label="Nombre completo" value={form.name} onChange={set('name')} placeholder="Mi Empresa S.R.L." /></div>
+        <div className="form-group"><label>Email</label><input aria-label="Email" type="email" value={form.email} onChange={set('email')} placeholder="info@empresa.com" /></div>
+        <div className="form-group"><label>Teléfono</label><input aria-label="Teléfono" value={form.phone} onChange={set('phone')} placeholder="+54 11 1234-5678" /></div>
+        <div className="form-group"><label>Sitio web</label><input aria-label="Sitio web" value={form.website} onChange={set('website')} placeholder="https://empresa.com" /></div>
         <div className="form-group"><label>País</label>
-          <select value={form.country} onChange={set('country')}><option value="">Seleccionar</option><option>Argentina</option><option>Chile</option><option>Colombia</option><option>México</option><option>Perú</option><option>Uruguay</option></select>
+          <select aria-label="País" value={form.country} onChange={set('country')}><option value="">Seleccionar</option><option>Argentina</option><option>Chile</option><option>Colombia</option><option>México</option><option>Perú</option><option>Uruguay</option></select>
         </div>
-        <div className="form-group"><label>Ciudad</label><input value={form.city} onChange={set('city')} placeholder="Buenos Aires" /></div>
-        <div className="form-group"><label>Provincia</label><input value={form.state} onChange={set('state')} placeholder="CABA" /></div>
-        <div className="form-group"><label>Código postal</label><input value={form.zip} onChange={set('zip')} placeholder="C1000" /></div>
-        <div className="form-group stg__form-full"><label>Dirección</label><input value={form.address} onChange={set('address')} placeholder="Av. Corrientes 1234" /></div>
+        <div className="form-group"><label>Ciudad</label><input aria-label="Ciudad" value={form.city} onChange={set('city')} placeholder="Buenos Aires" /></div>
+        <div className="form-group"><label>Provincia</label><input aria-label="Provincia" value={form.state} onChange={set('state')} placeholder="CABA" /></div>
+        <div className="form-group"><label>Código postal</label><input aria-label="Código postal" value={form.zip} onChange={set('zip')} placeholder="C1000" /></div>
+        <div className="form-group stg__form-full"><label>Dirección</label><input aria-label="Dirección" value={form.address} onChange={set('address')} placeholder="Av. Corrientes 1234" /></div>
       </div>
       <div className="stg__form-actions">
         <button type="button" className="btn-secondary btn-sm">Resetear</button>
@@ -157,7 +165,7 @@ function FirebaseNotifTab() {
     <div className="card">
       <div className="stg__form-grid">
         {fields.map((f) => (
-          <div key={f.label} className="form-group"><label>{f.label}</label><input placeholder={f.placeholder} /></div>
+          <div key={f.label} className="form-group"><label>{f.label}</label><input aria-label={f.label} placeholder={f.placeholder} /></div>
         ))}
       </div>
       <div className="stg__form-actions">
@@ -189,11 +197,11 @@ function AlertChannelsTab() {
               <div className="stg__toggle-label">{ch.label}</div>
               <div className="stg__toggle-desc">{ch.desc}</div>
             </div>
-            <Toggle checked={ch.enabled} onChange={() => toggle(ch.id)} />
+            <Toggle checked={ch.enabled} ariaLabel={`Activar ${ch.label}`} onChange={() => toggle(ch.id)} />
           </div>
           {ch.enabled && (
             <div className="form-group stg__form-group-mt">
-              <textarea rows={2} value={ch.text} onChange={(e) => setText(ch.id, e.target.value)} placeholder="Texto del mensaje…" />
+              <textarea aria-label={`Texto del mensaje para ${ch.label}`} rows={2} value={ch.text} onChange={(e) => setText(ch.id, e.target.value)} placeholder="Texto del mensaje…" />
             </div>
           )}
         </div>
@@ -217,11 +225,11 @@ function ThemeTab() {
     <div className="card">
       <div className="form-group stg__form-group-mb">
         <label>Logo (subir imagen)</label>
-        <input type="file" accept="image/*" />
+        <input aria-label="Logo (subir imagen)" type="file" accept="image/*" />
       </div>
       <div className="form-group stg__form-group-mb">
         <label>Logo oscuro (subir imagen)</label>
-        <input type="file" accept="image/*" />
+        <input aria-label="Logo oscuro (subir imagen)" type="file" accept="image/*" />
       </div>
       <div className="form-group">
         <label className="stg__label-mb">Color principal</label>
@@ -233,6 +241,8 @@ function ThemeTab() {
               className={`stg__color ${selected === c.id ? 'stg__color--active' : ''}`}
               style={{ '--stg-swatch-bg': c.bg } as CSSProperties}
               onClick={() => setSelected(c.id)}
+              aria-label={`Seleccionar color ${c.label}`}
+              aria-pressed={selected === c.id}
               title={c.label}
             />
           ))}
@@ -282,11 +292,11 @@ function CurrenciesTab() {
               <td>{c.symbol}</td>
               <td>{c.code}</td>
               <td>{c.crypto ? <span className="badge badge-neutral">Sí</span> : '—'}</td>
-              <td><Toggle checked={c.active} onChange={() => toggleActive(c.id)} /></td>
+              <td><Toggle checked={c.active} ariaLabel={`Activar moneda ${c.name}`} onChange={() => toggleActive(c.id)} /></td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar"><IconEdit /></button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(c.id)}><IconTrash /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--edit" aria-label={`Editar ${c.name}`} title="Editar"><IconEdit /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--delete" aria-label={`Eliminar ${c.name}`} title="Eliminar" onClick={() => remove(c.id)}><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -324,11 +334,11 @@ function LanguagesTab() {
           {items.map((l) => (
             <tr key={l.id}>
               <td className="stg__crud-cell-name">{l.name}</td>
-              <td><Toggle checked={l.active} onChange={() => toggle(l.id)} /></td>
+              <td><Toggle checked={l.active} ariaLabel={`Activar idioma ${l.name}`} onChange={() => toggle(l.id)} /></td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" title="Editar"><IconEdit /></button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" title="Eliminar" onClick={() => remove(l.id)}><IconTrash /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--edit" aria-label={`Editar ${l.name}`} title="Editar"><IconEdit /></button>
+                  <button type="button" className="stg__crud-action stg__crud-action--delete" aria-label={`Eliminar ${l.name}`} title="Eliminar" onClick={() => remove(l.id)}><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -359,13 +369,13 @@ function GatewayTab() {
               <div className="stg__toggle-label">{gw.name}</div>
               <div className="stg__toggle-desc">{gw.desc}</div>
             </div>
-            <Toggle checked={states[i]} onChange={() => toggleGw(i)} />
+            <Toggle checked={states[i]} ariaLabel={`Activar pasarela ${gw.name}`} onChange={() => toggleGw(i)} />
           </div>
           {states[i] && (
             <>
               <div className="stg__form-grid stg__form-grid--after-toggle">
                 {gw.fields.map((f) => (
-                  <div key={f} className="form-group"><label>{f}</label><input placeholder={`Ingresá tu ${f}…`} /></div>
+                  <div key={f} className="form-group"><label>{f}</label><input aria-label={`${gw.name}: ${f}`} placeholder={`Ingresá tu ${f}…`} /></div>
                 ))}
               </div>
               <div className="stg__form-actions">

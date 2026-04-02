@@ -10,6 +10,8 @@ import (
 
 	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
+	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
+	schedulingpublichttp "github.com/devpablocristo/modules/scheduling/go/publichttpgin"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -46,11 +48,9 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reports"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
-
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
-	schedulinghttp "github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduling"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
@@ -205,13 +205,12 @@ func InitializeApp() *app.App {
 		cfg.MPRedirectURI,
 		cfg.FrontendURL,
 	)
-	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC)
-
 	emailSender, err := notifications.NewEmailSender(cfg.NotificationBackend, logger)
 	if err != nil {
 		logger.Error().Err(err).Msg("invalid notification backend, falling back to noop")
 		emailSender = notifications.NewNoopSender(logger)
 	}
+	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL)
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
 	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
@@ -264,7 +263,9 @@ func InitializeApp() *app.App {
 	timelineHandler := timeline.NewHandler(timelineUC)
 	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
-	publicAPIHandler := publicapi.NewHandler(publicapi.NewRepository(db, schedulingUC))
+	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
+	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
+	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
 	var resolveOrgRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
@@ -297,6 +298,7 @@ func InitializeApp() *app.App {
 	public.Use(ginmw.NewRateLimit(30))
 	public.Use(ginmw.NewBodySizeLimit(64 << 10))
 	publicAPIHandler.RegisterRoutes(public)
+	publicSchedulingHandler.RegisterRoutes(public)
 	paymentGatewayHandler.RegisterExternalRoutes(public)
 
 	authGroup := v1.Group("")
@@ -332,7 +334,7 @@ func InitializeApp() *app.App {
 	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware.RequirePermission)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	// Review proxy — opcional, se activa si REVIEW_URL está configurado

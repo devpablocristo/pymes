@@ -133,16 +133,18 @@ function CarouselSection() {
         Slide {idx + 1}
       </div>
       <div className="ui-catalog__row ui-catalog__row--carousel-dots">
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx - 1 + slides.length) % slides.length)}>&larr;</button>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx - 1 + slides.length) % slides.length)} aria-label="Slide anterior">&larr;</button>
         {slides.map((_, i) => (
           <button
             key={i}
             type="button"
             className={`ui-catalog__carousel-dot ${i === idx ? 'ui-catalog__carousel-dot--active' : ''}`}
             onClick={() => setIdx(i)}
+            aria-label={`Ir a slide ${i + 1}`}
+            aria-current={i === idx ? 'true' : undefined}
           />
         ))}
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx + 1) % slides.length)}>&rarr;</button>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx + 1) % slides.length)} aria-label="Slide siguiente">&rarr;</button>
       </div>
     </div>
   );
@@ -263,7 +265,7 @@ function RatingSection() {
     <div className="card">
       <div className="ui-catalog__stars">
         {[1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className={`ui-catalog__star ${i <= rating ? 'ui-catalog__star--filled' : ''}`} onClick={() => setRating(i)}><IconStar filled={i <= rating} /></span>
+          <button key={i} type="button" className={`ui-catalog__star ${i <= rating ? 'ui-catalog__star--filled' : ''}`} onClick={() => setRating(i)} aria-label={`Puntuar ${i} de 5`}><IconStar filled={i <= rating} /></button>
         ))}
       </div>
       <p className="ui-catalog__rating-caption">Seleccionado: {rating}/5</p>

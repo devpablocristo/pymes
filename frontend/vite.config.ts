@@ -8,6 +8,15 @@ const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
 const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/react', import.meta.url));
 const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
+const coreBrowserIndex = fileURLToPath(new URL('../../core/browser/ts/src/index.ts', import.meta.url));
+const coreBrowserCrud = fileURLToPath(new URL('../../core/browser/ts/src/crud/index.ts', import.meta.url));
+const coreBrowserSearch = fileURLToPath(new URL('../../core/browser/ts/src/search/index.ts', import.meta.url));
+const coreBrowserStorage = fileURLToPath(new URL('../../core/browser/ts/src/storage.ts', import.meta.url));
+const modulesCrudUiIndex = fileURLToPath(new URL('../../modules/crud/ui/ts/src/index.ts', import.meta.url));
+const modulesCrudUiCsv = fileURLToPath(new URL('../../modules/crud/ui/ts/src/csv.ts', import.meta.url));
+const modulesKanbanBoardIndex = fileURLToPath(new URL('../../modules/kanban/board/ts/src/index.ts', import.meta.url));
+const modulesShellSidebarIndex = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
+const modulesShellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
 
 export default defineConfig({
   envDir: '..',
@@ -19,6 +28,15 @@ export default defineConfig({
       { find: '@fullcalendar/interaction', replacement: fullCalendarInteraction },
       { find: '@fullcalendar/react', replacement: fullCalendarReact },
       { find: '@fullcalendar/timegrid', replacement: fullCalendarTimeGrid },
+      { find: '@devpablocristo/core-browser/crud', replacement: coreBrowserCrud },
+      { find: '@devpablocristo/core-browser/search', replacement: coreBrowserSearch },
+      { find: '@devpablocristo/core-browser/storage', replacement: coreBrowserStorage },
+      { find: '@devpablocristo/core-browser', replacement: coreBrowserIndex },
+      { find: '@devpablocristo/modules-crud-ui/csv', replacement: modulesCrudUiCsv },
+      { find: '@devpablocristo/modules-crud-ui', replacement: modulesCrudUiIndex },
+      { find: '@devpablocristo/modules-kanban-board', replacement: modulesKanbanBoardIndex },
+      { find: '@devpablocristo/modules-shell-sidebar/styles.css', replacement: modulesShellSidebarStyles },
+      { find: '@devpablocristo/modules-shell-sidebar', replacement: modulesShellSidebarIndex },
     ],
   },
   build: {

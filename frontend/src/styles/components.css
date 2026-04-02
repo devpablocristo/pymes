@@ -52,14 +52,14 @@
 .page-header.crud-page-shell__header .crud-page-shell__header-actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: var(--space-3);
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
 }
 
-/* Misma lógica de tamaño que `.m-kanban__toolbar-actions .m-kanban__search` (lista no importa CSS del tablero). */
+/* Misma lógica de tamaño para el buscador canónico en headers compartidos. */
 .page-header.crud-page-shell__header .crud-list-header-search {
   display: flex;
   justify-content: flex-end;
@@ -67,17 +67,39 @@
   min-width: 0;
 }
 
-.page-header.crud-page-shell__header .crud-list-header-search .crud-search {
-  min-width: min(calc(var(--space-4) * 14), 100%);
-  flex: 1 1 calc(var(--space-4) * 14);
-  max-width: min(calc(var(--space-4) * 24), 100%);
+.page-header.crud-page-shell__header .crud-list-header-search .page-search {
+  min-width: 0;
+  flex: 0 0 calc(var(--space-4) * 20);
+  max-width: 100%;
   box-sizing: border-box;
-  width: auto;
+  width: calc(var(--space-4) * 20);
+  margin-left: auto;
 }
 
 .page-header.crud-page-shell__header .crud-page-shell__header-actions > .actions-row {
+  display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 960px) {
+  .page-header.crud-page-shell__header .crud-page-shell__header-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .page-header.crud-page-shell__header .crud-list-header-search .page-search {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .page-header.crud-page-shell__header .crud-page-shell__header-actions > .actions-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* Contenedor del CRUD en la consola: evita compresión rara en flex del shell/layout */

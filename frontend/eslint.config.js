@@ -32,8 +32,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // Muchas pantallas omiten deps a propósito (evitar bucles); revisar al tocar efectos
-      'react-hooks/exhaustive-deps': 'off',
+      // Warn para detectar deps faltantes sin romper el build; fix gradual
+      'react-hooks/exhaustive-deps': 'warn',
       // CRUD/i18n exportan constantes junto a componentes; Fast Refresh sigue útil en páginas
       'react-refresh/only-export-components': 'off',
       // Proyecto legado: demasiados usos puntuales de any en adaptadores CRUD/API

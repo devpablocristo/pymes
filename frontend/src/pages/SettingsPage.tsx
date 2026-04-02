@@ -95,7 +95,7 @@ function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
   return (
     <div className="profile-account-block">
       {user.avatar_url ? (
-        <img className="profile-account-avatar" src={user.avatar_url} alt="" width={64} height={64} />
+        <img className="profile-account-avatar" src={user.avatar_url} alt={`Avatar de ${user.name ?? user.email ?? 'usuario'}`} width={64} height={64} />
       ) : (
         <div className="profile-account-avatar profile-account-avatar-placeholder" aria-hidden>
           {initial}

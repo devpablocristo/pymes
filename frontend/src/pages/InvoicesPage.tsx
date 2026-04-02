@@ -118,7 +118,11 @@ function InvoiceList({
     <div className="card">
       <div className="inv__toolbar">
         <div className="inv__toolbar-left">
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as InvoiceStatus | 'all')}>
+          <select
+            aria-label="Filtrar facturas por estado"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
+          >
             <option value="all">Todas</option>
             <option value="paid">Pagadas</option>
             <option value="pending">Pendientes</option>
@@ -154,9 +158,9 @@ function InvoiceList({
               <td><span className={`badge ${STATUS_CLASSES[inv.status]}`}>{STATUS_LABELS[inv.status]}</span></td>
               <td>
                 <div className="inv__actions">
-                  <button type="button" className="inv__action inv__action--view" onClick={() => onView(inv.id)} title="Ver"><IconEye /></button>
-                  <button type="button" className="inv__action inv__action--edit" onClick={() => onEdit(inv.id)} title="Editar"><IconEdit /></button>
-                  <button type="button" className="inv__action inv__action--delete" onClick={() => onDelete(inv.id)} title="Eliminar"><IconTrash /></button>
+                  <button type="button" className="inv__action inv__action--view" onClick={() => onView(inv.id)} aria-label="Ver"><IconEye /></button>
+                  <button type="button" className="inv__action inv__action--edit" onClick={() => onEdit(inv.id)} aria-label="Editar"><IconEdit /></button>
+                  <button type="button" className="inv__action inv__action--delete" onClick={() => onDelete(inv.id)} aria-label="Eliminar"><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -170,9 +174,9 @@ function InvoiceList({
       <div className="inv__pagination">
         <span>Mostrando {filtered.length} de {invoices.length}</span>
         <div className="inv__page-btns">
-          <button type="button" className="inv__page-btn">&larr;</button>
-          <button type="button" className="inv__page-btn inv__page-btn--active">1</button>
-          <button type="button" className="inv__page-btn">&rarr;</button>
+          <button type="button" className="inv__page-btn" aria-label="Página anterior">&larr;</button>
+          <button type="button" className="inv__page-btn inv__page-btn--active" aria-current="page">1</button>
+          <button type="button" className="inv__page-btn" aria-label="Página siguiente">&rarr;</button>
         </div>
       </div>
     </div>
@@ -368,18 +372,18 @@ function InvoiceForm({
           {items.map((item) => (
             <div key={item.id} className="inv__line-row">
               <div className="form-group">
-                <input placeholder="Descripción" value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} />
+                <input aria-label="Descripción del ítem" placeholder="Descripción" value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} />
               </div>
               <div className="form-group inv__line-qty">
-                <input type="number" min={1} placeholder="Cant." value={item.qty} onChange={e => updateItem(item.id, 'qty', Number(e.target.value))} />
+                <input aria-label="Cantidad" type="number" min={1} placeholder="Cant." value={item.qty} onChange={e => updateItem(item.id, 'qty', Number(e.target.value))} />
               </div>
               <div className="form-group inv__line-unit">
-                <input placeholder="Unidad" value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)} />
+                <input aria-label="Unidad" placeholder="Unidad" value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)} />
               </div>
               <div className="form-group inv__line-price">
-                <input type="number" min={0} placeholder="Precio" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', Number(e.target.value))} />
+                <input aria-label="Precio unitario" type="number" min={0} placeholder="Precio" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', Number(e.target.value))} />
               </div>
-              <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} title="Quitar"><IconClose /></button>
+              <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} aria-label="Quitar ítem"><IconClose /></button>
             </div>
           ))}
           <button type="button" className="btn-secondary btn-sm inv__add-line" onClick={addItem}>+ Agregar ítem</button>

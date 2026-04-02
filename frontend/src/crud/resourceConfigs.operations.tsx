@@ -140,7 +140,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: false,
-    searchPlaceholder: 'Buscar por número, venta, cliente o estado...',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay devoluciones. Las altas se registran desde la venta (API POST /v1/sales/:id/return).',
     columns: [
       {
@@ -183,7 +183,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: false,
-    searchPlaceholder: 'Buscar por número, party o estado...',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',
     columns: [
       {
@@ -222,7 +222,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowEdit: false,
     allowDelete: false,
     createLabel: '+ Registrar movimiento',
-    searchPlaceholder: 'Buscar por tipo, categoría, descripción o importe...',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay movimientos en el rango consultado.',
     columns: [
       {
@@ -294,7 +294,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: false,
-    searchPlaceholder: 'Buscar por nombre, SKU o cantidad…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay stock listado o no tenés permiso inventory:read.',
     dataSource: {
       list: async () => {
@@ -369,7 +369,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowCreate: false,
     allowEdit: false,
     allowDelete: false,
-    searchPlaceholder: 'Buscar por producto, tipo o notas…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay movimientos o no tenés permiso inventory:read.',
     dataSource: {
       list: async () => {
@@ -411,7 +411,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     allowDelete: false,
     allowCreate: true,
     createLabel: '+ Registrar pago',
-    searchPlaceholder: 'Buscar por método, notas o importe…',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'Sin venta en contexto. Agregá ?sale_id=<UUID> a la URL o registrá cobros desde el listado de ventas.',
     dataSource: {
       list: async () => {
@@ -621,7 +621,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'campañas',
     labelPluralCap: 'Campañas WhatsApp',
     createLabel: '+ Nueva campaña',
-    searchPlaceholder: 'Buscar campañas por nombre, template o tag...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async () => {
         const data = await listWhatsAppCampaigns();
@@ -711,7 +711,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     label: 'conversación',
     labelPlural: 'conversaciones',
     labelPluralCap: 'Bandeja WhatsApp',
-    searchPlaceholder: 'Buscar conversaciones por nombre, teléfono o mensaje...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async () => {
         const data = await listWhatsAppConversations();

@@ -3,7 +3,6 @@ import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '
 import { normalize } from '@devpablocristo/core-browser/search';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
-import { usePageSearch } from '../components/PageSearch';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CrudHelpers, CrudPageConfig } from '../components/CrudPage';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
@@ -30,6 +29,7 @@ import {
 } from '../lib/workOrderKanban';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
+import { WorkOrdersHeaderLead } from './WorkOrdersHeaderLead';
 import './WorkOrdersKanbanPanel.css';
 
 const COLUMN_ORDER: KanbanColumnDef[] = [
@@ -42,7 +42,7 @@ const COLUMN_ORDER: KanbanColumnDef[] = [
 
 const COLUMN_IDS = new Set(COLUMN_ORDER.map((c) => c.id));
 
-const LIST_SEARCH_PLACEHOLDER = 'Buscar órdenes por número, patente, cliente o trabajo…';
+const LIST_SEARCH_PLACEHOLDER = 'Buscar...';
 
 function WorkOrderStatusBadge({ status }: { status: string }) {
   const canon = canonicalWorkOrderStatus(status);
@@ -180,7 +180,6 @@ function workOrderKanbanToolbarBtnClass(kind?: 'primary' | 'secondary' | 'danger
 }
 
 export function WorkOrdersKanbanPanel() {
-  const pageSearch = usePageSearch();
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
   const { t, localizeText: formatFieldText } = useI18n();
@@ -400,11 +399,10 @@ export function WorkOrdersKanbanPanel() {
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
         )}
         renderOverlayCard={(row) => <CardPreview row={row} />}
-        title={t('shell.workOrders.kanbanToolbarTitle')}
+        title={t('shell.workOrders.pageTitle')}
         subtitle={showArchived ? t('shell.workOrders.kanbanToolbarSubtitleArchived') : undefined}
+        headerLeadSlot={<WorkOrdersHeaderLead />}
         searchPlaceholder={LIST_SEARCH_PLACEHOLDER}
-        searchInputClassName="crud-search"
-        externalSearch={pageSearch}
         afterStats={afterStats}
         toolbarButtonRow={toolbarButtonRow}
         statsLine={statsLine}

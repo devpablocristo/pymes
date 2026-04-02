@@ -95,7 +95,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'vehículos',
     labelPluralCap: 'Vehículos',
     createLabel: '+ Nuevo vehículo',
-    searchPlaceholder: 'Buscar vehículos por patente, marca, dueño o notas...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async (opts) => workshopVehiclesArchivedCrud.list<WorkshopVehicle>(opts),
       create: async (values) => {
@@ -183,7 +183,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'servicios de taller',
     labelPluralCap: 'Servicios de taller',
     createLabel: '+ Nuevo servicio de taller',
-    searchPlaceholder: 'Buscar servicios de taller por código, nombre o categoría...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async (opts) => workshopServicesArchivedCrud.list<WorkshopService>(opts),
       create: async (values) => {
@@ -284,7 +284,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo',
     createLabel: '+ Nueva orden de trabajo',
-    searchPlaceholder: 'Buscar órdenes por número, patente, cliente o trabajo...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async ({ archived }) => {
         if (archived) {
@@ -509,7 +509,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'bicicletas',
     labelPluralCap: 'Bicicletas',
     createLabel: '+ Nueva bicicleta',
-    searchPlaceholder: 'Buscar bicicletas por cuadro, marca, dueño o notas...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async (opts) => bikeBicyclesArchivedCrud.list<Bicycle>(opts),
       create: async (values) => {
@@ -602,7 +602,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'servicios de bicicletería',
     labelPluralCap: 'Servicios de bicicletería',
     createLabel: '+ Nuevo servicio',
-    searchPlaceholder: 'Buscar servicios por código, nombre o categoría...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async (opts) => bikeServicesArchivedCrud.list<BikeShopService>(opts),
       create: async (values) => {
@@ -702,7 +702,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo (bicicletería)',
     createLabel: '+ Nueva orden',
-    searchPlaceholder: 'Buscar órdenes por número, cuadro, cliente o trabajo...',
+    searchPlaceholder: 'Buscar...',
     dataSource: {
       list: async () => {
         const data = await getBikeWorkOrders({ limit: 250 });

@@ -640,7 +640,7 @@ export function UnifiedChatPage() {
         </div>
         <div className="cht__main">
           <div className="cht__header cht__header-row">
-            <h2 className="cht__header-title">{activeDef.name}</h2>
+            <div className="cht__header-title">{activeDef.name}</div>
             {activeDef.kind !== 'human' ? (
               <button type="button" className="btn-secondary btn-sm" onClick={() => void clearAiThread()}>
                 {t('ai.chat.newConversation')}

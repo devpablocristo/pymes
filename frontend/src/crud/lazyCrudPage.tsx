@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import type { CrudPageConfig } from '../components/CrudPage';
+import { PageLayout } from '../components/PageLayout';
 import { hasCrudModule } from './crudModuleCatalog';
 
 type CrudModule =
@@ -134,7 +135,13 @@ export function LazyConfiguredCrudPage({
   }, [resourceId]);
 
   if (ConfiguredCrudPage == null) {
-    return <div className="card"><p>Cargando modulo…</p></div>;
+    return (
+      <PageLayout title="Módulo" lead="Cargando superficie del módulo.">
+        <div className="card">
+          <p>Cargando módulo…</p>
+        </div>
+      </PageLayout>
+    );
   }
   return <ConfiguredCrudPage resourceId={resourceId} mergeConfig={mergeConfig} />;
 }

@@ -92,6 +92,7 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
                       <label className="toggle" onClick={() => void toggleMutation.mutateAsync(item)}>
                         <input
                           type="checkbox"
+                          aria-label={`Activar ${labelForType(item.notification_type)} por ${labelForChannel(item.channel)}`}
                           checked={item.enabled}
                           disabled={toggleMutation.isPending}
                           readOnly

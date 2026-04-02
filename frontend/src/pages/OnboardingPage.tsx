@@ -234,8 +234,9 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               <h2>Tu negocio</h2>
 
               <div className="onboarding-field">
-                <label>¿Cómo se llama tu negocio o actividad?</label>
+                <label htmlFor="onboarding-business-name">¿Cómo se llama tu negocio o actividad?</label>
                 <input
+                  id="onboarding-business-name"
                   type="text"
                   placeholder="Ej: Clases de inglés, Estudio López, Mi emprendimiento..."
                   value={businessName}
@@ -349,8 +350,10 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                 </div>
                 {clientLabel === '__custom' && (
                   <input
+                    id="onboarding-custom-client"
                     type="text"
                     placeholder="¿Cómo les decís?"
+                    aria-label="Nombre personalizado para tus clientes"
                     value={customClientLabel}
                     onChange={(e) => setCustomClientLabel(e.target.value)}
                     autoFocus
@@ -405,8 +408,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               <h2>Moneda y cobro</h2>
 
               <div className="onboarding-field">
-                <label>¿En qué moneda operás?</label>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <label htmlFor="onboarding-currency">¿En qué moneda operás?</label>
+                <select id="onboarding-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {CURRENCY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}

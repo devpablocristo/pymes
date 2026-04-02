@@ -206,7 +206,7 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: customerPlural,
     labelPluralCap: customerPluralCap,
     createLabel: `+ Nuevo ${customerLabel}`,
-    searchPlaceholder: `Buscar ${customerPlural} por nombre, email o tags...`,
+    searchPlaceholder: 'Buscar...',
     columns: [
       {
         key: 'name',

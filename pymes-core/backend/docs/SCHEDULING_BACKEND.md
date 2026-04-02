@@ -2,27 +2,28 @@
 
 ## 1. Decisión arquitectónica final
 
-- Decisión: monolito modular dentro de `pymes-core/backend`.
-- Motivo: el MVP necesita consistencia transaccional fuerte para reservas y colas, un modelo común para verticales y menor costo operativo que microservicios.
-- Stack decidido:
-  - HTTP: Gin, para seguir el estándar actual del repo.
-  - Persistencia: GORM para CRUD y mapeo de modelos, SQL puntual para concurrencia, exclusiones y consultas de disponibilidad.
+- Decision: modular monolith for product runtime, with reusable scheduling primitives in `core` and the reusable business module in `modules`.
+- Why: the MVP needs strong transactional consistency for bookings and queues, a shared model for verticals, and lower operational cost than microservices.
+- Chosen stack:
+  - HTTP: Gin, aligned with the existing backend.
+  - Persistence: GORM for model mapping plus targeted SQL for concurrency, exclusions, and availability checks.
   - DB: PostgreSQL.
-- Bounded contexts internos:
-  - `scheduling`: agenda, bookings, colas y tickets.
-  - `party`: clientes existentes.
-  - `notifications`: recordatorios y mensajería vía puertos.
-  - `rbac`: permisos.
-- Reglas estructurales:
-  - handlers delgados
-  - use cases con lógica de negocio
-  - repository con queries y transacciones
-  - dominio separado de DTOs
-- Librerías internas reutilizables:
-  - generador de slots
-  - policy de no-solapamiento
-  - emisión segura de tickets
-  - interfaces de notificación e idempotencia
+- Internal bounded contexts:
+  - `scheduling`: calendars, bookings, queues, waitlist, and public action links.
+  - `party`: existing customer data.
+  - `notifications`: reminders and outbound delivery via ports.
+  - `rbac`: permissions.
+- Structural rules:
+  - thin handlers
+  - use cases own business rules
+  - repositories own SQL, locking, and transactions
+  - domain stays separate from DTOs and transport
+- Reusable libraries:
+  - slot generation and time window primitives in `core/scheduling/go`
+  - reusable scheduling and queue module in `modules/scheduling/go`
+  - reusable authenticated Gin adapter in `modules/scheduling/go/httpgin`
+  - reusable public Gin adapter in `modules/scheduling/go/publichttpgin`
+  - reusable schema and demo bootstrap in `modules/scheduling/go/migrations` and `modules/scheduling/go/seeds`
 
 ## 2. Modelo de dominio
 
@@ -141,8 +142,10 @@
 - `scheduling_availability_rules`
 - `scheduling_blocked_ranges`
 - `scheduling_bookings`
+- `scheduling_booking_action_tokens`
 - `scheduling_queues`
 - `scheduling_queue_tickets`
+- `scheduling_waitlist_entries`
 
 ### Constraints y concurrencia
 - exclusión PostgreSQL en `scheduling_bookings`:
@@ -188,16 +191,39 @@
 - `POST /v1/scheduling/bookings/:id/confirm`
 - `POST /v1/scheduling/bookings/:id/cancel`
 - `POST /v1/scheduling/bookings/:id/reschedule`
+- `POST /v1/scheduling/bookings/:id/check-in`
+- `POST /v1/scheduling/bookings/:id/start-service`
+- `POST /v1/scheduling/bookings/:id/complete`
+- `POST /v1/scheduling/bookings/:id/no-show`
+- `GET /v1/scheduling/waitlist`
+- `POST /v1/scheduling/waitlist`
 - `GET /v1/scheduling/queues`
 - `POST /v1/scheduling/queues`
+- `POST /v1/scheduling/queues/:id/pause`
+- `POST /v1/scheduling/queues/:id/reopen`
+- `POST /v1/scheduling/queues/:id/close`
 - `POST /v1/scheduling/queues/:id/tickets`
 - `GET /v1/scheduling/queues/:id/tickets/:ticket_id/position`
 - `POST /v1/scheduling/queues/:id/next`
 - `POST /v1/scheduling/queues/:id/tickets/:ticket_id/serve`
+- `POST /v1/scheduling/queues/:id/tickets/:ticket_id/cancel`
 - `POST /v1/scheduling/queues/:id/tickets/:ticket_id/no-show`
+- `POST /v1/scheduling/queues/:id/tickets/:ticket_id/return-to-waiting`
 - `POST /v1/scheduling/queues/:id/tickets/:ticket_id/reassign`
 - `GET /v1/scheduling/dashboard`
 - `GET /v1/scheduling/day`
+
+### Public reusable edge
+- `GET /v1/public/:org_id/scheduling/services`
+- `GET /v1/public/:org_id/scheduling/availability`
+- `POST /v1/public/:org_id/scheduling/book`
+- `GET /v1/public/:org_id/scheduling/my-bookings`
+- `GET /v1/public/:org_id/scheduling/queues`
+- `POST /v1/public/:org_id/scheduling/queues/:id/tickets`
+- `GET /v1/public/:org_id/scheduling/queues/:id/tickets/:ticket_id/position`
+- `POST /v1/public/:org_id/scheduling/waitlist`
+- `POST /v1/public/:org_id/scheduling/bookings/actions/confirm`
+- `POST /v1/public/:org_id/scheduling/bookings/actions/cancel`
 
 ### Validaciones
 - IDs UUID válidos.
@@ -228,30 +254,43 @@ core/scheduling/go/
 
 modules/scheduling/go/
   domain/entities.go
+  httpgin/handler.go
+  httpgin/dto/dto.go
+  publicapi/types.go
+  publichttpgin/handler.go
+  publichttpgin/dto/dto.go
+  migrations/0001_initial.up.sql
+  migrations/0002_workflows.up.sql
+  migrations/runner.go
+  seeds/0001_demo.sql
+  seeds/runner.go
   repository.go
   repository/models/models.go
   usecases.go
 
-pymes-core/backend/internal/scheduling/
-  handler.go
-  handler/dto/dto.go
+pymes/pymes-core/backend/
+  internal/publicapi/repository.go
+  internal/scheduler/repository.go
+  internal/scheduler/usecases.go
+  seeds/runner.go
+  wire/bootstrap.go
 ```
 
 ## 6. Estructura frontend
 
-- Diferida por pedido explícito del usuario.
-- El backend deja preparados:
-  - calendario/slots
+- Deferred by explicit user request.
+- The backend now exposes:
+  - calendar and slots
   - bookings
   - queue tickets
-  - dashboard operativo
+  - operator dashboard
 
 ## 7. Plan de implementación por etapas
 
-1. Crear esquema `scheduling_*` y dominio base.
-2. Implementar catálogo y reglas de disponibilidad.
-3. Implementar búsqueda de slots y reservas con exclusión PostgreSQL.
-4. Implementar colas y tickets con locking transaccional.
-5. Exponer dashboard y vistas del día.
-6. Conectar canales públicos y bridge con `publicapi` legado.
-7. Agregar recordatorios, políticas de cancelación y waitlist.
+1. Done: create `scheduling_*` schema and base domain.
+2. Done: implement catalog and availability rules.
+3. Done: implement slot search and bookings with PostgreSQL exclusion.
+4. Done: implement queues and tickets with transactional locking.
+5. Done: expose dashboard and day views.
+6. Done: connect reusable public channels and bridge with legacy `publicapi`.
+7. Done: add reminders, public confirm/cancel actions, waitlist, and hold expiration jobs.

@@ -11,6 +11,7 @@
 | `02_core_business.sql` | Clientes, proveedores, productos, cotización, ventas, stock, caja |
 | `03_rbac.sql` | Roles, permisos, `user_roles`, lista de precios default |
 | `04_transversal_modules_demo.sql` | Citas, recurrentes, compras, procurement, webhooks, cuentas |
+| `modules/scheduling/go/seeds/0001_demo.sql` | Demo reusable de scheduling/queue, invocado desde `seeds/runner.go` |
 
 ## Cómo aplicar
 

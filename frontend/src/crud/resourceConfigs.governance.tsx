@@ -583,7 +583,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     labelPlural: 'empleados',
     labelPluralCap: 'Empleados',
     createLabel: '+ Nuevo empleado',
-    searchPlaceholder: 'Buscar empleados por nombre, email o roles...',
+    searchPlaceholder: 'Buscar...',
     emptyState:
       'No hay entidades con rol empleado. El alta crea una party en /v1/parties con rol employee. Los usuarios con acceso a la consola (miembros de org) se administran aparte.',
     columns: [

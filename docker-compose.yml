@@ -92,7 +92,8 @@ services:
     volumes:
       - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core/notifications/go:/workspace/core/notifications/go
+      - ../core:/workspace/core
+      - ../modules:/workspace/modules
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:

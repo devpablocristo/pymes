@@ -1,6 +1,6 @@
 /**
- * Buscador de página — arriba a la derecha del área de contenido.
- * Se renderiza desde el Shell. Solo es visible cuando la página activa se registra.
+ * Buscador de página — vive en el Shell, pero se incrusta en la cabecera (`PageLayout`)
+ * para quedar alineado con el título principal cuando la página activa se registra.
  *
  * Flujo:
  *  1. Shell monta <PageSearchProvider>
@@ -15,12 +15,16 @@ type PageSearchContextValue = {
   query: string;
   setQuery: (value: string) => void;
   register: () => () => void;
+  visible: boolean;
+  placeholder: string;
 };
 
 const PageSearchContext = createContext<PageSearchContextValue>({
   query: '',
   setQuery: () => {},
   register: () => () => {},
+  visible: false,
+  placeholder: 'Buscar...',
 });
 
 /** true solo dentro de <PageSearchProvider> (Shell); el resto usa búsqueda inline del CRUD. */
@@ -36,10 +40,21 @@ export function usePageSearch(): string {
   return query;
 }
 
-/** Provider + input. Se monta una vez en el Shell. */
+export function usePageSearchShellControl() {
+  const { query, setQuery, visible, placeholder } = useContext(PageSearchContext);
+  return {
+    query,
+    visible,
+    placeholder,
+    setQuery,
+    clear: () => setQuery(''),
+  };
+}
+
+/** Provider del buscador global. Se monta una vez en el Shell. */
 export function PageSearchProvider({
   children,
-  placeholder = 'Buscar…',
+  placeholder = 'Buscar...',
 }: PropsWithChildren<{ placeholder?: string }>) {
   const [query, setQuery] = useState('');
   const countRef = useRef(0);
@@ -60,30 +75,7 @@ export function PageSearchProvider({
 
   return (
     <PageSearchShellContext.Provider value>
-      <PageSearchContext.Provider value={{ query, setQuery, register }}>
-        {visible && (
-          <div className="page-search">
-            <input
-              type="search"
-              className="page-search__input"
-              placeholder={placeholder}
-              autoComplete="off"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label={placeholder}
-            />
-            {query.length > 0 && (
-              <button
-                className="page-search__clear"
-                onClick={() => setQuery('')}
-                aria-label="Limpiar búsqueda"
-                type="button"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        )}
+      <PageSearchContext.Provider value={{ query, setQuery, register, visible, placeholder }}>
         {children}
       </PageSearchContext.Provider>
     </PageSearchShellContext.Provider>

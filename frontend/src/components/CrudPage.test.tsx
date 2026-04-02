@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CrudPage } from './CrudPage';
 import { LanguageProvider } from '../lib/i18n';
+import { PageSearchProvider } from './PageSearch';
 
 type SampleItem = {
   id: string;
@@ -138,6 +139,38 @@ describe('CrudPage', () => {
     await screen.findByText('Existing');
 
     expect(screen.getByRole('button', { name: '+ New item' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search items...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Buscar...')).toBeInTheDocument();
+  });
+
+  it('keeps the CRUD search visible inside the shell provider', async () => {
+    const list = vi.fn().mockResolvedValue([{ id: '1', name: 'Cliente uno', active: true }]);
+
+    render(
+      <PageSearchProvider placeholder="Buscar...">
+        <CrudPage<SampleItem>
+          label="cliente"
+          labelPlural="clientes"
+          labelPluralCap="Clientes"
+          dataSource={{
+            list: async () => list(),
+          }}
+          columns={[
+            { key: 'name', header: 'Nombre' },
+            { key: 'active', header: 'Activo', render: (value) => (value ? 'Si' : 'No') },
+          ]}
+          formFields={[
+            { key: 'name', label: 'Nombre', required: true },
+            { key: 'active', label: 'Activo', type: 'checkbox' },
+          ]}
+          searchText={(row) => row.name}
+          toFormValues={(row) => ({ name: row.name, active: row.active })}
+          isValid={() => true}
+        />
+      </PageSearchProvider>,
+    );
+
+    await screen.findByText('Cliente uno');
+
+    expect(screen.getByRole('searchbox', { name: 'Buscar...' })).toBeInTheDocument();
   });
 });

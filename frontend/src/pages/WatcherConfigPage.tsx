@@ -166,7 +166,15 @@ export default function WatcherConfigPage() {
   const filteredWatchers = useSearch(WATCHER_TEMPLATES, wTextFn, wSearch);
 
   if (watchersQuery.isLoading) {
-    return <div className="watcher-config-page"><div className="loading">Cargando configuracion...</div></div>;
+    return (
+      <PageLayout
+        className="watcher-config-page"
+        title="Monitores automáticos"
+        lead="Activá alertas y umbrales; se aplican según la configuración del motor de revisión."
+      >
+        <div className="loading">Cargando configuración...</div>
+      </PageLayout>
+    );
   }
 
   return (

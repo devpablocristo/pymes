@@ -91,14 +91,4 @@
   color: var(--color-text);
 }
 
-/* ── B2: la página ya tiene `page-header` en WorkOrdersModuleSection; el Kanban aporta toolbar, no un segundo título de página */
-
-.wo-mod-orders .m-kanban .page-header.crud-page-shell__header {
-  margin-bottom: var(--space-3);
-}
-
-.wo-mod-orders .m-kanban .crud-page-shell__header-main > h1.crud-page-shell__title {
-  font-size: var(--text-role-section);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.01em;
-}
+/* El tablero usa el mismo shell canónico que el resto; no ocultar ni rebajar el h1. */

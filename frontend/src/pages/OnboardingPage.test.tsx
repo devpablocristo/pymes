@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — vitest mocks use dynamic types that tsc cannot verify
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,12 +105,15 @@ function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSet
 }
 
 function renderOnboardingPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <LanguageProvider initialLanguage="es">
-        <OnboardingPage />
-      </LanguageProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <LanguageProvider initialLanguage="es">
+          <OnboardingPage />
+        </LanguageProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

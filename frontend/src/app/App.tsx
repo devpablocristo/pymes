@@ -7,17 +7,20 @@ import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
 import { getTenantSettings } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
-import { syncTenantProfileFromSettings } from '../lib/tenantProfile';
+import { hasCompletedOnboarding, syncTenantProfileFromSettings } from '../lib/tenantProfile';
 import { LoginPage, OnboardingPage, Shell, SignupPage } from './lazyRoutes';
 import { ShellRoutes } from './ShellRoutes';
 import { Suspended } from './suspended';
 
 function RequireOnboarding({ children }: { children: ReactNode }) {
+  const localProfileExists = hasCompletedOnboarding();
+
   const tenantSettingsQuery = useQuery({
     queryKey: queryKeys.tenant.settings,
     queryFn: getTenantSettings,
     staleTime: 60_000,
-    retry: false,
+    retry: 2,
+    retryDelay: 1_000,
   });
   const tenantSettings = tenantSettingsQuery.data;
 
@@ -28,12 +31,30 @@ function RequireOnboarding({ children }: { children: ReactNode }) {
     syncTenantProfileFromSettings(tenantSettings);
   }, [tenantSettings]);
 
+  // Si localStorage confirma onboarding completado, no bloquear la UI
+  // mientras la API carga o si falla transitoriamente (hard refresh, token no listo).
+  if (localProfileExists) {
+    if (tenantSettingsQuery.isPending) {
+      return <>{children}</>;
+    }
+    // API cargó bien → renderizar children (el sync ya se hizo arriba)
+    return <>{children}</>;
+  }
+
+  // Sin perfil local: depender de la API
   if (tenantSettingsQuery.isPending) {
     return <div className="spinner" aria-label="Cargando" />;
   }
 
   if (tenantSettingsQuery.isError || !tenantSettings) {
-    return <Navigate to="/onboarding" replace />;
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>No se pudo cargar la configuración del tenant.</p>
+        <button type="button" onClick={() => tenantSettingsQuery.refetch()} style={{ marginTop: '1rem' }}>
+          Reintentar
+        </button>
+      </div>
+    );
   }
 
   if (!tenantSettings.onboarding_completed_at) {

@@ -1,10 +1,12 @@
 import { useClerk, useOrganization, useSession } from '@clerk/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
 import { updateTenantSettings } from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
+import { queryKeys } from '../lib/queryKeys';
 import {
   syncTenantProfileFromSettings,
   type PaymentMethod,
@@ -131,6 +133,7 @@ export function OnboardingPage() {
 
 function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBridges | null }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { t } = useI18n();
   const [step, setStep] = useState<Step>(1);
 
@@ -233,6 +236,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         vertical: profile.vertical,
         onboarding_completed_at: profile.completedAt,
       });
+      queryClient.setQueryData(queryKeys.tenant.settings, updated);
       syncTenantProfileFromSettings(updated);
       navigate('/', { replace: true });
     } catch (err) {

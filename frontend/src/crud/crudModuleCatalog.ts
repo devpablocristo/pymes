@@ -10,8 +10,7 @@ type CrudModuleId =
   | 'returns'
   | 'creditNotes'
   | 'cashflow'
-  | 'inventory'
-  | 'inventoryMovements'
+  | 'stock'
   | 'payments'
   | 'attachments'
   | 'audit'
@@ -47,7 +46,7 @@ type CrudModuleDefaults = {
 };
 
 type CrudModuleMeta = Pick<ModuleDefinition, 'group' | 'icon' | 'summary'> &
-  Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes' | 'datasets' | 'actions'>>;
+  Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes' | 'datasets' | 'actions' | 'customRoute'>>;
 
 const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   customers: { title: 'Clientes', navLabel: 'Clientes', labelPlural: 'clientes' },
@@ -59,12 +58,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   returns: { title: 'Devoluciones', navLabel: 'Devoluciones', labelPlural: 'devoluciones' },
   creditNotes: { title: 'Notas de crédito', navLabel: 'Notas de crédito', labelPlural: 'notas de crédito' },
   cashflow: { title: 'Caja', navLabel: 'Caja', labelPlural: 'movimientos de caja' },
-  inventory: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'líneas de stock' },
-  inventoryMovements: {
-    title: 'Movimientos de inventario',
-    navLabel: 'Mov. inventario',
-    labelPlural: 'movimientos de stock',
-  },
+  stock: { title: 'Stock', navLabel: 'Stock', labelPlural: 'niveles de stock' },
   payments: { title: 'Pagos', navLabel: 'Pagos', labelPlural: 'pagos' },
   attachments: { title: 'Adjuntos', navLabel: 'Adjuntos', labelPlural: 'adjuntos' },
   audit: { title: 'Auditoría', navLabel: 'Auditoría', labelPlural: 'eventos de auditoría' },
@@ -97,7 +91,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     labelPlural: 'servicios de taller',
   },
   workOrders: { title: 'Órdenes de trabajo', navLabel: 'Órdenes trabajo', labelPlural: 'órdenes de trabajo' },
-  bikeBicycles: { title: 'Bicicletas', navLabel: 'Bicicletas', labelPlural: 'bicicletas' },
+  bikeBicycles: { title: 'Bicis en taller', navLabel: 'Bicis en taller', labelPlural: 'bicis en taller' },
   bikeShopServices: {
     title: 'Servicios de bicicletería',
     navLabel: 'Servicios bici',
@@ -179,16 +173,11 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'CJ',
     summary: 'Movimientos de caja manuales (ingreso/egreso). Resúmenes agregados en reportes.',
   },
-  inventory: {
+  stock: {
     group: 'operations',
-    icon: 'IN',
-    summary: 'Stock consolidado por producto. Ajustes manuales por fila (POST /v1/inventory/:product_id/adjust).',
-    notes: ['Para kardex detallado usá «Mov. inventario». Alertas agregadas también en reportes de stock.'],
-  },
-  inventoryMovements: {
-    group: 'operations',
-    icon: 'KD',
-    summary: 'Movimientos de stock (kardex) recientes.',
+    icon: 'ST',
+    summary: 'Niveles de stock por producto, ajustes manuales y historial de movimientos.',
+    customRoute: '/stock',
   },
   payments: {
     group: 'commercial',

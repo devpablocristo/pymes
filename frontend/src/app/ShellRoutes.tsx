@@ -9,7 +9,9 @@ import {
   BeautyStaffPage,
   BikeShopBicyclesPage,
   BikeShopServicesPage,
+  BikeShopWorkOrdersBoard,
   BikeShopWorkOrdersPage,
+  BikeShopWorkOrdersSection,
   CalendarPage,
   CryptoPage,
   CustomersPage,
@@ -26,6 +28,7 @@ import {
   RestaurantTableSessionsPage,
   SessionsPage,
   SettingsHubPage,
+  StockPage,
   SpecialtiesPage,
   TeachersPage,
   UIComponentsPage,
@@ -78,7 +81,11 @@ export function ShellRoutes() {
       <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/workOrders" replace />} />
       <Route path="/workshops/bike-shop/bicycles" element={<BikeShopBicyclesPage />} />
       <Route path="/workshops/bike-shop/services" element={<BikeShopServicesPage />} />
-      <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersPage />} />
+      <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersSection />}>
+        <Route index element={<Navigate to="board" replace />} />
+        <Route path="board" element={<BikeShopWorkOrdersBoard />} />
+        <Route path="list" element={<BikeShopWorkOrdersPage />} />
+      </Route>
       <Route path="/beauty/salon/staff" element={<BeautyStaffPage />} />
       <Route path="/beauty/salon/services" element={<BeautySalonServicesPage />} />
       <Route path="/restaurants/dining/areas" element={<RestaurantDiningAreasPage />} />
@@ -107,6 +114,9 @@ export function ShellRoutes() {
       />
       <Route path="/dashboard" element={<DashboardVisualPage />} />
       <Route path="/dashboard/widgets" element={<DashboardPage />} />
+      <Route path="/stock" element={<StockPage />} />
+      <Route path="/modules/inventory" element={<Navigate to="/stock" replace />} />
+      <Route path="/modules/inventoryMovements" element={<Navigate to="/stock" replace />} />
       <Route path="/calendar" element={<CalendarPage />} />
     </Routes>
   );

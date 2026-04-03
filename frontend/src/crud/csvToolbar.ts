@@ -125,7 +125,7 @@ async function importServerCSV(
     rawBody: formData,
     skipJSONContentType: true,
   });
-  const firstErrors = preview.errors
+  const firstErrors = (preview.errors ?? [])
     .slice(0, 3)
     .map((error) => `fila ${error.row}: ${error.message}`)
     .join('\n');

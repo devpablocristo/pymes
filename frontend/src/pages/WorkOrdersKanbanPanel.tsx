@@ -233,8 +233,8 @@ export function WorkOrdersKanbanPanel() {
   const boardItems = useMemo(
     () =>
       applyWorkOrderCreatorFilter(items, {
-        clerkEnabled,
-        clerkUserLoaded,
+        authEnabled: clerkEnabled,
+        authUserLoaded: clerkUserLoaded,
         selfId,
         creatorFilter,
       }),

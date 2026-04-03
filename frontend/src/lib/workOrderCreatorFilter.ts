@@ -1,6 +1,7 @@
 /**
- * Filtro por `created_by` (creador del registro). Listas sin el campo siguen viéndose al filtrar por actor
- * (filas sin `created_by` no se excluyen).
+ * Filtro por `created_by` (creador del registro).
+ * Lógica idéntica a @devpablocristo/modules-work-orders/creatorFilter
+ * pero sin importar del módulo para evitar problemas de resolución en Docker.
  */
 
 export type CreatorFilterState = { mode: 'all' } | { mode: 'pick'; actors: Set<string> };
@@ -15,14 +16,14 @@ export function formatWorkOrderActorLabel(actor: string, selfId: string | undefi
 export function applyWorkOrderCreatorFilter<T extends { id: string; created_by?: string }>(
   rows: T[],
   opts: {
-    clerkEnabled: boolean;
-    clerkUserLoaded: boolean;
+    authEnabled: boolean;
+    authUserLoaded: boolean;
     selfId: string | undefined;
     creatorFilter: CreatorFilterState;
   },
 ): T[] {
-  const { clerkEnabled, clerkUserLoaded, selfId, creatorFilter } = opts;
-  if (!clerkEnabled || !clerkUserLoaded) return rows;
+  const { authEnabled, authUserLoaded, selfId, creatorFilter } = opts;
+  if (!authEnabled || !authUserLoaded) return rows;
   if (creatorFilter.mode === 'all') return rows;
   let actors = creatorFilter.actors;
   if (actors.size === 0 && selfId) {

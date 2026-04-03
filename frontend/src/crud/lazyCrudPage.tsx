@@ -26,8 +26,6 @@ function resolveCrudModuleGroup(resourceId: string): string {
       'returns',
       'creditNotes',
       'cashflow',
-      'inventory',
-      'inventoryMovements',
       'payments',
       'recurring',
     ].includes(resourceId)

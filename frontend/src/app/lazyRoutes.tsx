@@ -23,6 +23,8 @@ export const BikeShopServicesPage = lazy(() =>
 export const BikeShopWorkOrdersPage = lazy(() =>
   import('../pages/BikeShopWorkOrdersPage').then((mod) => ({ default: mod.BikeShopWorkOrdersPage })),
 );
+export const BikeShopWorkOrdersBoard = lazy(() => import('../pages/BikeShopWorkOrdersBoard'));
+export const BikeShopWorkOrdersSection = lazy(() => import('../pages/BikeShopWorkOrdersSection'));
 export const WorkOrdersModuleSection = lazy(() =>
   import('../pages/WorkOrdersModuleSection').then((mod) => ({ default: mod.WorkOrdersModuleSection })),
 );
@@ -83,6 +85,7 @@ export const WhatsAppInboxPage = lazy(() =>
 );
 export const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })));
+export const StockPage = lazy(() => import('../pages/StockPage').then((mod) => ({ default: mod.StockPage })));
 export const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
 );

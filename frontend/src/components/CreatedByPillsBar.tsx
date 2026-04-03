@@ -4,7 +4,6 @@ import {
   formatWorkOrderActorLabel,
   isYoCreatorFilterActive,
 } from '../lib/workOrderCreatorFilter';
-import '../pages/WorkOrdersKanbanPanel.css';
 
 type Props = {
   items: Array<{ created_by?: string }>;
@@ -13,9 +12,6 @@ type Props = {
   selfId: string | undefined;
 };
 
-/**
- * Píldoras Todos / Yo / otros creadores (`created_by`). Mismo aspecto que el tablero Kanban de OT.
- */
 export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId }: Props) {
   const uniqueCreators = useMemo(() => {
     const s = new Set<string>();

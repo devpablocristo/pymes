@@ -13,6 +13,7 @@ const coreBrowserIndex = fileURLToPath(new URL('../../core/browser/ts/src/index.
 const coreBrowserCrud = fileURLToPath(new URL('../../core/browser/ts/src/crud/index.ts', import.meta.url));
 const coreBrowserSearch = fileURLToPath(new URL('../../core/browser/ts/src/search/index.ts', import.meta.url));
 const coreAuthnErrors = fileURLToPath(new URL('../../core/authn/ts/src/errors.ts', import.meta.url));
+const coreFsmIndex = fileURLToPath(new URL('../../core/concurrency/fsm/ts/src/index.ts', import.meta.url));
 const coreBrowserStorage = fileURLToPath(new URL('../../core/browser/ts/src/storage.ts', import.meta.url));
 const coreBrowserTheme = fileURLToPath(new URL('../../core/browser/ts/src/theme.ts', import.meta.url));
 const coreBrowserObservability = fileURLToPath(new URL('../../core/browser/ts/src/observability.ts', import.meta.url));
@@ -23,7 +24,11 @@ const modulesCalendarBoardIndex = fileURLToPath(new URL('../../modules/calendar/
 const modulesCalendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
 const modulesKanbanBoardIndex = fileURLToPath(new URL('../../modules/kanban/board/ts/src/index.ts', import.meta.url));
 const modulesSchedulingIndex = fileURLToPath(new URL('../../modules/scheduling/ts/src/index.ts', import.meta.url));
+const modulesSchedulingNext = fileURLToPath(new URL('../../modules/scheduling/ts/src/next.ts', import.meta.url));
 const modulesSchedulingStyles = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.css', import.meta.url));
+const modulesSchedulingStylesNext = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.next.css', import.meta.url));
+const modulesWorkOrdersIndex = fileURLToPath(new URL('../../modules/work-orders/ts/src/index.ts', import.meta.url));
+const modulesWorkOrdersStyles = fileURLToPath(new URL('../../modules/work-orders/ts/src/styles.css', import.meta.url));
 const modulesShellSidebarIndex = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
 const modulesShellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
 const modulesUiModalStyles = fileURLToPath(new URL('../../modules/ui/modal/ts/src/styles.css', import.meta.url));
@@ -51,14 +56,19 @@ export default defineConfig({
       { find: '@devpablocristo/core-browser/theme', replacement: coreBrowserTheme },
       { find: '@devpablocristo/core-browser/observability', replacement: coreBrowserObservability },
       { find: '@devpablocristo/core-browser/i18n', replacement: coreBrowserI18n },
+      { find: '@devpablocristo/core-fsm', replacement: coreFsmIndex },
       { find: '@devpablocristo/core-browser', replacement: coreBrowserIndex },
       { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: modulesCalendarBoardStyles },
       { find: '@devpablocristo/modules-calendar-board', replacement: modulesCalendarBoardIndex },
       { find: '@devpablocristo/modules-crud-ui/csv', replacement: modulesCrudUiCsv },
       { find: '@devpablocristo/modules-crud-ui', replacement: modulesCrudUiIndex },
       { find: '@devpablocristo/modules-kanban-board', replacement: modulesKanbanBoardIndex },
+      { find: /^@devpablocristo\/modules-scheduling\/styles\.next\.css$/, replacement: modulesSchedulingStylesNext },
       { find: /^@devpablocristo\/modules-scheduling\/styles\.css$/, replacement: modulesSchedulingStyles },
+      { find: /^@devpablocristo\/modules-scheduling\/next$/, replacement: modulesSchedulingNext },
       { find: /^@devpablocristo\/modules-scheduling$/, replacement: modulesSchedulingIndex },
+      { find: '@devpablocristo/modules-work-orders/styles.css', replacement: modulesWorkOrdersStyles },
+      { find: '@devpablocristo/modules-work-orders', replacement: modulesWorkOrdersIndex },
       { find: '@devpablocristo/modules-shell-sidebar/styles.css', replacement: modulesShellSidebarStyles },
       { find: '@devpablocristo/modules-shell-sidebar', replacement: modulesShellSidebarIndex },
       { find: '@devpablocristo/modules-ui-modal/styles.css', replacement: modulesUiModalStyles },

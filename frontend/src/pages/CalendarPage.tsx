@@ -1,5 +1,5 @@
-import { QueueOperatorBoard, SchedulingCalendar, createSchedulingClient } from '@devpablocristo/modules-scheduling';
-import '@devpablocristo/modules-scheduling/styles.css';
+import { QueueOperatorBoard, SchedulingCalendar, createSchedulingClient } from '../../../../modules/scheduling/ts/src/next';
+import '../../../../modules/scheduling/ts/src/styles.next.css';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { apiRequest } from '../lib/api';

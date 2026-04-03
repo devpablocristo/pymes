@@ -32,3 +32,9 @@ yarn-error.log*
 pnpm-debug.log*
 .deps/
 frontend/.deps/
+
+# Dumps de clientes y CSVs temporales de migración
+*.sql
+!**/migrations/*.sql
+!**/seeds/*.sql
+*_productos.csv

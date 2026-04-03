@@ -63,4 +63,6 @@ export type ModuleDefinition = {
    * El usuario puede expandir para ver el resto de operaciones.
    */
   explorerConfigGroupKeys?: string[];
+  /** Ruta custom en vez de `/modules/{id}`. Útil para páginas que no son CRUD genérico. */
+  customRoute?: string;
 };

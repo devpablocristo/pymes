@@ -27,7 +27,7 @@ describe('moduleCatalog CRUD split', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const lazyCrudSrc = readFileSync(path.join(dir, '../crud/lazyCrudPage.tsx'), 'utf8');
 
-    expect(lazyCrudSrc).toContain("'inventory'");
+    expect(lazyCrudSrc).toContain("'cashflow'");
     expect(lazyCrudSrc).toContain("import('./resourceConfigs.operations')");
     expect(lazyCrudSrc).toContain("'procurementRequests'");
     expect(lazyCrudSrc).toContain("import('./resourceConfigs.governance')");

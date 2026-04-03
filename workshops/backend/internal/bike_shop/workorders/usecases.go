@@ -11,8 +11,9 @@ import (
 	"gorm.io/gorm"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/usecases/domain"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
 )
 
 type ListParams struct {
@@ -138,7 +139,11 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.BookingID = vertvalues.ParseOptionalUUID(*in.BookingID)
 	}
 	if in.Status != nil {
-		current.Status = strings.TrimSpace(*in.Status)
+		newStatus := strings.TrimSpace(*in.Status)
+		if err := workshops.ValidateStatusTransition(current.Status, newStatus); err != nil {
+			return domain.WorkOrder{}, err
+		}
+		current.Status = newStatus
 	}
 	if in.RequestedWork != nil {
 		current.RequestedWork = strings.TrimSpace(*in.RequestedWork)

@@ -34,6 +34,7 @@ type ModuleListItem = {
   group: string;
   navLabel: string;
   icon: string;
+  customRoute?: string;
 };
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
@@ -57,6 +58,7 @@ export function Shell({ children }: { children: ReactNode }) {
             group: module.group,
             navLabel: module.navLabel,
             icon: module.icon,
+            customRoute: module.customRoute,
           })),
         });
       }
@@ -150,7 +152,7 @@ export function Shell({ children }: { children: ReactNode }) {
             localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
           )
           .map((module) => ({
-            to: `/modules/${module.id}`,
+            to: module.customRoute ?? `/modules/${module.id}`,
             label: localizeUiText(vocab(module.navLabel)),
             icon: <Glyph label={module.icon} />,
           })),

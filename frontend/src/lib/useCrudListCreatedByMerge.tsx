@@ -25,8 +25,8 @@ export function useCrudListCreatedByMerge(): {
       return {};
     }
     const opts = {
-      clerkEnabled,
-      clerkUserLoaded,
+      authEnabled: clerkEnabled,
+      authUserLoaded: clerkUserLoaded,
       selfId,
       creatorFilter,
     };

@@ -11,11 +11,6 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GOPROXY=direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
-COPY core/databases/postgres/go /workspace/core/databases/postgres/go
-COPY core/notifications/go /workspace/core/notifications/go
-COPY core/scheduling/go /workspace/core/scheduling/go
-COPY modules/crud/paths/go /workspace/modules/crud/paths/go
-COPY modules/scheduling/go /workspace/modules/scheduling/go
 
 WORKDIR /workspace/pymes/professionals/backend
 

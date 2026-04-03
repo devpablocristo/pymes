@@ -13,10 +13,10 @@ import (
 
 // Sentinel errors — domainerr.Error, soportan errors.Is por Kind.
 var (
-	ErrNotFound  = domainerr.NotFound("not found")
-	ErrConflict  = domainerr.Conflict("conflict")
-	ErrForbidden = domainerr.Forbidden("forbidden")
-	ErrBadInput  = domainerr.Validation("bad input")
+	ErrNotFound  = ginmw.ErrNotFound
+	ErrConflict  = ginmw.ErrConflict
+	ErrForbidden = ginmw.ErrForbidden
+	ErrBadInput  = ginmw.ErrBadInput
 	ErrNotDraft  = domainerr.Conflict("resource is not in draft status")
 )
 

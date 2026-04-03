@@ -7,19 +7,20 @@ require (
 	github.com/aws/aws-lambda-go v1.53.0
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/devpablocristo/core/authn/go v0.2.1
+	github.com/devpablocristo/core/authz/go v0.1.0
 	github.com/devpablocristo/core/concurrency/go v0.1.1
 	github.com/devpablocristo/core/config/go v0.0.0-20260328151810-084828e80b26
-	github.com/devpablocristo/core/databases/postgres/go v0.1.0
+	github.com/devpablocristo/core/databases/postgres/go v0.1.1
 	github.com/devpablocristo/core/errors/go v0.1.0
 	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
-	github.com/devpablocristo/core/http/gin/go v0.1.0
+	github.com/devpablocristo/core/http/gin/go v0.1.1
 	github.com/devpablocristo/core/http/go v0.1.1
 	github.com/devpablocristo/core/notifications/go v0.2.0
 	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
-	github.com/devpablocristo/modules/crud/paths/go v0.0.0
-	github.com/devpablocristo/modules/scheduling/go v0.0.0
+	github.com/devpablocristo/modules/crud/paths/go v0.1.0
+	github.com/devpablocristo/modules/scheduling/go v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -71,8 +72,7 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/devpablocristo/core/authz/go v0.1.0 // indirect
-	github.com/devpablocristo/core/scheduling/go v0.0.0 // indirect
+	github.com/devpablocristo/core/scheduling/go v0.1.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -115,15 +115,3 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 )
-
-replace github.com/devpablocristo/core/authz/go => github.com/devpablocristo/core/authz/go v0.0.0-20260328151810-084828e80b26
-
-replace github.com/devpablocristo/core/databases/postgres/go => ../core/databases/postgres/go
-
-replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go
-
-replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
-
-replace github.com/devpablocristo/modules/crud/paths/go => ../modules/crud/paths/go
-
-replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go

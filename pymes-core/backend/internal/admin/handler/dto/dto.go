@@ -28,7 +28,6 @@ type UpdateTenantSettingsRequest struct {
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`
 	SchedulingEnabled        *bool          `json:"scheduling_enabled,omitempty"`
-	AppointmentsEnabled      *bool          `json:"appointments_enabled,omitempty"`
 	AppointmentLabel         *string        `json:"appointment_label,omitempty"`
 	AppointmentReminderHours *int           `json:"appointment_reminder_hours,omitempty"`
 	SecondaryCurrency        *string        `json:"secondary_currency,omitempty"`

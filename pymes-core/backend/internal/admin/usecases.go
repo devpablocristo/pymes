@@ -59,9 +59,6 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch
 	if err != nil {
 		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
-	if patch.SchedulingEnabled != nil {
-		patch.AppointmentsEnabled = patch.SchedulingEnabled
-	}
 	if patch.AppointmentReminderHours != nil && *patch.AppointmentReminderHours < 0 {
 		return domain.TenantSettings{}, domainerr.Validation("appointment_reminder_hours must be >= 0")
 	}

@@ -14,7 +14,7 @@ type BikeWorkOrderModel struct {
 	BicycleLabel     string     `gorm:"not null;default:''"`
 	CustomerID       *uuid.UUID `gorm:"type:uuid"`
 	CustomerName     string     `gorm:"not null;default:''"`
-	AppointmentID    *uuid.UUID `gorm:"type:uuid"`
+	BookingID    *uuid.UUID `gorm:"type:uuid"`
 	QuoteID          *uuid.UUID `gorm:"type:uuid"`
 	SaleID           *uuid.UUID `gorm:"type:uuid"`
 	Status           string     `gorm:"not null"`

@@ -66,64 +66,29 @@ function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSet
   };
 }
 
-describe('tenant settings API compatibility', () => {
+describe('tenant settings API', () => {
   beforeEach(() => {
     fetchMocks.request.mockReset();
     fetchMocks.requestResponse.mockReset();
   });
 
-  it('normalizes old appointments_enabled responses into scheduling_enabled', async () => {
+  it('normalizes scheduling_enabled on get', async () => {
     fetchMocks.request.mockResolvedValue(
-      buildTenantSettings({
-        scheduling_enabled: undefined as unknown as boolean,
-        appointments_enabled: true,
-      }),
+      buildTenantSettings({ scheduling_enabled: true }),
     );
-
     const settings = await getTenantSettings();
-
-    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/admin/tenant-settings');
     expect(settings.scheduling_enabled).toBe(true);
-    expect(settings.appointments_enabled).toBe(true);
   });
 
-  it('sends both flags when patching with scheduling_enabled only', async () => {
+  it('passes payload through on update', async () => {
     fetchMocks.request.mockResolvedValue(
-      buildTenantSettings({
-        scheduling_enabled: true,
-        appointments_enabled: true,
-      }),
+      buildTenantSettings({ scheduling_enabled: true }),
     );
-
     const settings = await updateTenantSettings({ scheduling_enabled: true });
-
     expect(fetchMocks.request).toHaveBeenCalledWith('/v1/admin/tenant-settings', {
       method: 'PATCH',
-      body: {
-        scheduling_enabled: true,
-        appointments_enabled: true,
-      },
+      body: { scheduling_enabled: true },
     });
     expect(settings.scheduling_enabled).toBe(true);
-    expect(settings.appointments_enabled).toBe(true);
-  });
-
-  it('keeps compatibility when old callers still send appointments_enabled only', async () => {
-    fetchMocks.request.mockResolvedValue(
-      buildTenantSettings({
-        scheduling_enabled: true,
-        appointments_enabled: true,
-      }),
-    );
-
-    await updateTenantSettings({ appointments_enabled: true });
-
-    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/admin/tenant-settings', {
-      method: 'PATCH',
-      body: {
-        appointments_enabled: true,
-        scheduling_enabled: true,
-      },
-    });
   });
 });

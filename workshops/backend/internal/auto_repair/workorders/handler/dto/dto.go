@@ -32,7 +32,7 @@ type WorkOrderItem struct {
 	VehiclePlate     string              `json:"vehicle_plate"`
 	CustomerID       *string             `json:"customer_id,omitempty"`
 	CustomerName     string              `json:"customer_name"`
-	AppointmentID    *string             `json:"appointment_id,omitempty"`
+	BookingID    *string             `json:"booking_id,omitempty"`
 	QuoteID          *string             `json:"quote_id,omitempty"`
 	SaleID           *string             `json:"sale_id,omitempty"`
 	Status           string              `json:"status"`
@@ -70,7 +70,7 @@ type CreateWorkOrderRequest struct {
 	VehiclePlate  string               `json:"vehicle_plate"`
 	CustomerID    string               `json:"customer_id"`
 	CustomerName  string               `json:"customer_name"`
-	AppointmentID string               `json:"appointment_id"`
+	BookingID string               `json:"booking_id"`
 	Status        string               `json:"status"`
 	RequestedWork string               `json:"requested_work"`
 	Diagnosis     string               `json:"diagnosis"`
@@ -87,7 +87,7 @@ type UpdateWorkOrderRequest struct {
 	VehiclePlate  *string               `json:"vehicle_plate"`
 	CustomerID    *string               `json:"customer_id"`
 	CustomerName  *string               `json:"customer_name"`
-	AppointmentID *string               `json:"appointment_id"`
+	BookingID *string               `json:"booking_id"`
 	Status        *string               `json:"status"`
 	RequestedWork *string               `json:"requested_work"`
 	Diagnosis     *string               `json:"diagnosis"`

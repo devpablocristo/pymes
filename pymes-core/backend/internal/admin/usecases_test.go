@@ -22,7 +22,6 @@ func (f *fakeAdminRepo) GetTenantSettings(_ uuid.UUID) admindomain.TenantSetting
 func (f *fakeAdminRepo) UpdateTenantSettings(_ uuid.UUID, patch admindomain.TenantSettingsPatch, _ *string) admindomain.TenantSettings {
 	f.updatePatch = patch
 	f.settings.SchedulingEnabled = patch.SchedulingEnabled != nil && *patch.SchedulingEnabled
-	f.settings.AppointmentsEnabled = patch.AppointmentsEnabled != nil && *patch.AppointmentsEnabled
 	return f.settings
 }
 
@@ -30,7 +29,7 @@ func (f *fakeAdminRepo) ListActivity(_ uuid.UUID, _ int) []admindomain.ActivityE
 	return nil
 }
 
-func TestUsecasesUpdateTenantSettingsMirrorsSchedulingEnabledToLegacyAlias(t *testing.T) {
+func TestUsecasesUpdateTenantSettingsForwardsSchedulingEnabled(t *testing.T) {
 	t.Parallel()
 
 	repo := &fakeAdminRepo{}
@@ -51,11 +50,8 @@ func TestUsecasesUpdateTenantSettingsMirrorsSchedulingEnabledToLegacyAlias(t *te
 	if repo.updatePatch.SchedulingEnabled == nil || !*repo.updatePatch.SchedulingEnabled {
 		t.Fatalf("expected scheduling_enabled to reach repository")
 	}
-	if repo.updatePatch.AppointmentsEnabled == nil || !*repo.updatePatch.AppointmentsEnabled {
-		t.Fatalf("expected appointments_enabled legacy alias to be mirrored in repository patch")
-	}
-	if !updated.SchedulingEnabled || !updated.AppointmentsEnabled {
-		t.Fatalf("expected returned settings to keep both flags enabled")
+	if !updated.SchedulingEnabled {
+		t.Fatalf("expected returned settings to have scheduling_enabled=true")
 	}
 }
 

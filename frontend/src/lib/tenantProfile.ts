@@ -57,7 +57,7 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
     teamSize: teamSize as TeamSize,
     sells: sells as SellsType,
     clientLabel: settings.client_label?.trim() || 'clientes',
-    usesScheduling: Boolean(settings.scheduling_enabled ?? settings.appointments_enabled),
+    usesScheduling: Boolean(settings.scheduling_enabled),
     usesBilling: Boolean(settings.uses_billing),
     currency: settings.currency?.trim() || 'ARS',
     paymentMethod: paymentMethod as PaymentMethod,

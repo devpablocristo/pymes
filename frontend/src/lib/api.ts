@@ -12,14 +12,9 @@ import type {
 } from './types';
 
 function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
-  const schedulingEnabled =
-    typeof settings.scheduling_enabled === 'boolean'
-      ? settings.scheduling_enabled
-      : Boolean(settings.appointments_enabled);
   return {
     ...settings,
-    scheduling_enabled: schedulingEnabled,
-    appointments_enabled: schedulingEnabled,
+    scheduling_enabled: Boolean(settings.scheduling_enabled),
   };
 }
 
@@ -33,14 +28,7 @@ export async function getTenantSettings(): Promise<TenantSettings> {
 }
 
 export async function updateTenantSettings(payload: TenantSettingsUpdatePayload): Promise<TenantSettings> {
-  const normalizedPayload: TenantSettingsUpdatePayload = { ...payload };
-  if (normalizedPayload.scheduling_enabled !== undefined && normalizedPayload.appointments_enabled === undefined) {
-    normalizedPayload.appointments_enabled = normalizedPayload.scheduling_enabled;
-  }
-  if (normalizedPayload.appointments_enabled !== undefined && normalizedPayload.scheduling_enabled === undefined) {
-    normalizedPayload.scheduling_enabled = normalizedPayload.appointments_enabled;
-  }
-  const response = await request<TenantSettings>('/v1/admin/tenant-settings', { method: 'PATCH', body: normalizedPayload });
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', { method: 'PATCH', body: payload });
   return normalizeTenantSettings(response);
 }
 

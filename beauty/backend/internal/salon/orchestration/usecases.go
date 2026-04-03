@@ -9,7 +9,7 @@ import (
 )
 
 type controlPlanePort interface {
-	CreateAppointment(ctx context.Context, payload map[string]any) (map[string]any, error)
+	CreateBooking(ctx context.Context, payload map[string]any) (map[string]any, error)
 }
 
 type Usecases struct {
@@ -20,13 +20,13 @@ func NewUsecases(cp controlPlanePort) *Usecases {
 	return &Usecases{cp: cp}
 }
 
-func (u *Usecases) CreateAppointment(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
+func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(orgID) == "" {
 		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
 	}
 	out := copyMap(payload)
 	out["org_id"] = orgID
-	return u.cp.CreateAppointment(ctx, out)
+	return u.cp.CreateBooking(ctx, out)
 }
 
 func copyMap(payload map[string]any) map[string]any {

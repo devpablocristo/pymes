@@ -37,7 +37,6 @@ export type TenantSettings = {
   wa_receipt_template: string;
   wa_default_country_code: string;
   scheduling_enabled: boolean;
-  appointments_enabled?: boolean;
   appointment_label: string;
   appointment_reminder_hours: number;
   secondary_currency: string;
@@ -84,7 +83,6 @@ export type TenantSettingsUpdatePayload = {
   wa_receipt_template?: string;
   wa_default_country_code?: string;
   scheduling_enabled?: boolean;
-  appointments_enabled?: boolean;
   appointment_label?: string;
   appointment_reminder_hours?: number;
   default_rate_type?: string;

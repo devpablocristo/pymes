@@ -14,7 +14,7 @@ type WorkOrder struct {
 	BicycleLabel     string
 	CustomerID       *uuid.UUID
 	CustomerName     string
-	AppointmentID    *uuid.UUID
+	BookingID    *uuid.UUID
 	QuoteID          *uuid.UUID
 	SaleID           *uuid.UUID
 	Status           string

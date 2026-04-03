@@ -28,7 +28,7 @@ type UpdateInput struct {
 	BicycleLabel  *string
 	CustomerID    *string
 	CustomerName  *string
-	AppointmentID *string
+	BookingID *string
 	Status        *string
 	RequestedWork *string
 	Diagnosis     *string
@@ -134,8 +134,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.CustomerName != nil {
 		current.CustomerName = strings.TrimSpace(*in.CustomerName)
 	}
-	if in.AppointmentID != nil {
-		current.AppointmentID = vertvalues.ParseOptionalUUID(*in.AppointmentID)
+	if in.BookingID != nil {
+		current.BookingID = vertvalues.ParseOptionalUUID(*in.BookingID)
 	}
 	if in.Status != nil {
 		current.Status = strings.TrimSpace(*in.Status)

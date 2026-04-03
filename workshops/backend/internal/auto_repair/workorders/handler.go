@@ -127,7 +127,7 @@ func (h *Handler) Create(c *gin.Context) {
 		VehiclePlate:  req.VehiclePlate,
 		CustomerID:    vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName:  req.CustomerName,
-		AppointmentID: vertvalues.ParseOptionalUUID(req.AppointmentID),
+		BookingID: vertvalues.ParseOptionalUUID(req.BookingID),
 		Status:        req.Status,
 		RequestedWork: req.RequestedWork,
 		Diagnosis:     req.Diagnosis,
@@ -194,7 +194,7 @@ func (h *Handler) Update(c *gin.Context) {
 		VehiclePlate:  req.VehiclePlate,
 		CustomerID:    req.CustomerID,
 		CustomerName:  req.CustomerName,
-		AppointmentID: req.AppointmentID,
+		BookingID: req.BookingID,
 		Status:        req.Status,
 		RequestedWork: req.RequestedWork,
 		Diagnosis:     req.Diagnosis,
@@ -302,9 +302,9 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		value := item.CustomerID.String()
 		result.CustomerID = &value
 	}
-	if item.AppointmentID != nil {
-		value := item.AppointmentID.String()
-		result.AppointmentID = &value
+	if item.BookingID != nil {
+		value := item.BookingID.String()
+		result.BookingID = &value
 	}
 	if item.QuoteID != nil {
 		value := item.QuoteID.String()

@@ -34,7 +34,6 @@ func (f *fakeUsecases) UpdateTenantSettings(_ context.Context, _ string, patch a
 	f.updatePatch = patch
 	f.updateActor = actor
 	f.settings.SchedulingEnabled = patch.SchedulingEnabled != nil && *patch.SchedulingEnabled
-	f.settings.AppointmentsEnabled = patch.AppointmentsEnabled != nil && *patch.AppointmentsEnabled
 	return f.settings, nil
 }
 
@@ -54,35 +53,12 @@ func TestHandlerUpdateTenantSettingsAcceptsSchedulingEnabled(t *testing.T) {
 	if repo.updatePatch.SchedulingEnabled == nil || !*repo.updatePatch.SchedulingEnabled {
 		t.Fatalf("expected scheduling_enabled to be forwarded")
 	}
-	if repo.updatePatch.AppointmentsEnabled == nil || !*repo.updatePatch.AppointmentsEnabled {
-		t.Fatalf("expected appointments_enabled compatibility alias to be forwarded")
-	}
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 	if body["scheduling_enabled"] != true {
 		t.Fatalf("expected scheduling_enabled=true in response, got %#v", body["scheduling_enabled"])
-	}
-	if body["appointments_enabled"] != true {
-		t.Fatalf("expected appointments_enabled=true in response, got %#v", body["appointments_enabled"])
-	}
-}
-
-func TestHandlerUpdateTenantSettingsAcceptsAppointmentsEnabledFallback(t *testing.T) {
-	t.Parallel()
-
-	repo := &fakeUsecases{settings: baseTenantSettings()}
-	rec := performTenantSettingsUpdate(t, repo, `{"appointments_enabled":true}`)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if repo.updatePatch.SchedulingEnabled == nil || !*repo.updatePatch.SchedulingEnabled {
-		t.Fatalf("expected scheduling_enabled compatibility field to be populated from appointments_enabled")
-	}
-	if repo.updatePatch.AppointmentsEnabled == nil || !*repo.updatePatch.AppointmentsEnabled {
-		t.Fatalf("expected appointments_enabled to be forwarded")
 	}
 }
 
@@ -136,7 +112,6 @@ func baseTenantSettings() admindomain.TenantSettings {
 		PaymentMethod:            "mixed",
 		Vertical:                 "workshops",
 		SchedulingEnabled:        false,
-		AppointmentsEnabled:      false,
 		AppointmentLabel:         "Turno",
 		AppointmentReminderHours: 24,
 		DefaultRateType:          "blue",

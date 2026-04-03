@@ -11,7 +11,7 @@ import (
 )
 
 type usecasesPort interface {
-	CreateAppointment(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
+	CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -21,10 +21,10 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
-	authGroup.POST("/salon-appointments", h.CreateAppointment)
+	authGroup.POST("/salon-appointments", h.CreateBooking)
 }
 
-func (h *Handler) CreateAppointment(c *gin.Context) {
+func (h *Handler) CreateBooking(c *gin.Context) {
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
@@ -33,7 +33,7 @@ func (h *Handler) CreateAppointment(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.uc.CreateAppointment(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
+	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

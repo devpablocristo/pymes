@@ -62,7 +62,6 @@ function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSet
     wa_receipt_template: '',
     wa_default_country_code: '54',
     scheduling_enabled: false,
-    appointments_enabled: false,
     appointment_label: 'Turno',
     appointment_reminder_hours: 24,
     secondary_currency: '',
@@ -136,30 +135,14 @@ describe('AdminPage scheduling settings', () => {
     });
   });
 
-  it('hydrates the scheduling checkbox from the legacy appointments_enabled fallback', async () => {
-    apiMocks.getTenantSettings.mockResolvedValue(
-      buildTenantSettings({
-        scheduling_enabled: undefined as unknown as boolean,
-        appointments_enabled: true,
-      }),
-    );
-
-    renderAdminPage();
-
-    const checkbox = await screen.findByLabelText('Scheduling habilitado');
-    expect(checkbox).toBeChecked();
-  });
-
   it('submits the canonical scheduling_enabled field from the workspace form', async () => {
     const initialSettings = buildTenantSettings({
       scheduling_enabled: true,
-      appointments_enabled: true,
     });
     apiMocks.getTenantSettings.mockResolvedValue(initialSettings);
     apiMocks.updateTenantSettings.mockResolvedValue(
       buildTenantSettings({
         scheduling_enabled: false,
-        appointments_enabled: false,
       }),
     );
 
@@ -178,6 +161,6 @@ describe('AdminPage scheduling settings', () => {
     });
 
     const payload = apiMocks.updateTenantSettings.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty('appointments_enabled');
+    expect(payload.scheduling_enabled).toBe(false);
   });
 });

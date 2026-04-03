@@ -161,11 +161,8 @@ describe('tenantProfileFromSettings', () => {
     expect(result!.usesScheduling).toBe(true);
   });
 
-  it('falls back to appointments_enabled when scheduling_enabled is undefined', () => {
-    const settings = makeSettings({ appointments_enabled: true });
-    // Remove scheduling_enabled to test the ?? fallback
-    delete (settings as Record<string, unknown>).scheduling_enabled;
-    const result = tenantProfileFromSettings(settings);
+  it('uses scheduling_enabled for usesScheduling', () => {
+    const result = tenantProfileFromSettings(makeSettings({ scheduling_enabled: true }));
     expect(result!.usesScheduling).toBe(true);
   });
 

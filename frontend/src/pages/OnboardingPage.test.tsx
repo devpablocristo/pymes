@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — vitest mocks use dynamic types that tsc cannot verify
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -84,7 +85,6 @@ function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSet
     wa_receipt_template: '',
     wa_default_country_code: '54',
     scheduling_enabled: true,
-    appointments_enabled: true,
     appointment_label: 'Turno',
     appointment_reminder_hours: 24,
     secondary_currency: '',
@@ -157,7 +157,6 @@ describe('OnboardingPage scheduling setup', () => {
     });
 
     const payload = apiMocks.updateTenantSettings.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty('appointments_enabled');
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
   });

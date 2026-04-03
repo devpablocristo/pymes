@@ -20,7 +20,6 @@ import (
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
@@ -132,7 +131,6 @@ func InitializeApp() *app.App {
 	returnsRepo := returns.NewRepository(db)
 	rbacRepo := rbac.NewRepository(db)
 	accountsRepo := accounts.NewRepository(db)
-	appointmentsRepo := appointments.NewRepository(db)
 	currencyRepo := currency.NewRepository(db)
 	dashboardRepo := dashboard.NewRepository(db)
 	dataioRepo := dataio.NewRepository(db)
@@ -159,7 +157,6 @@ func InitializeApp() *app.App {
 	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
 	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC, sales.WithTimeline(timelineUC), sales.WithWebhooks(outwebhooksUC))
 	accountsUC := accounts.NewUsecases(accountsRepo)
-	appointmentsUC := appointments.NewUsecases(appointmentsRepo, auditUC, appointments.WithTimeline(timelineUC), appointments.WithWebhooks(outwebhooksUC))
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC)
@@ -240,7 +237,6 @@ func InitializeApp() *app.App {
 	cashflowHandler := cashflow.NewHandler(cashflowUC)
 	salesHandler := sales.NewHandler(salesUC)
 	accountsHandler := accounts.NewHandler(accountsUC)
-	appointmentsHandler := appointments.NewHandler(appointmentsUC)
 	currencyHandler := currency.NewHandler(currencyUC)
 	dashboardHandler := dashboard.NewHandler(dashboardUC)
 	dataioHandler := dataio.NewHandler(dataioUC)
@@ -270,7 +266,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, appointmentsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -288,6 +284,7 @@ func InitializeApp() *app.App {
 	internalGroup := v1.Group("/internal/v1")
 	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
 	internalAPIHandler.RegisterRoutes(internalGroup)
+	schedulingHandler.RegisterRoutes(internalGroup, rbacMiddleware.RequirePermission)
 	if strings.TrimSpace(cfg.ReviewCallbackToken) != "" {
 		reviewCallbackGroup := v1.Group("/internal/v1")
 		reviewCallbackGroup.Use(ginmw.NewInternalServiceAuth(cfg.ReviewCallbackToken))
@@ -316,7 +313,6 @@ func InitializeApp() *app.App {
 	inAppNotifHandler.RegisterRoutes(authGroup)
 	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	appointmentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	currencyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	dashboardHandler.RegisterRoutes(authGroup, rbacMiddleware)

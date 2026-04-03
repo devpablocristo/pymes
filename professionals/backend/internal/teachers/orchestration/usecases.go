@@ -9,7 +9,7 @@ import (
 )
 
 type controlPlanePort interface {
-	CreateAppointment(ctx context.Context, payload map[string]any) (map[string]any, error)
+	CreateBooking(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateQuote(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
 	GetBusinessInfo(ctx context.Context, orgRef string) (map[string]any, error)
@@ -23,11 +23,11 @@ func NewUsecases(cp controlPlanePort) *Usecases {
 	return &Usecases{cp: cp}
 }
 
-func (u *Usecases) CreateAppointment(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
+func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(orgID) == "" {
 		return nil, fmt.Errorf("org_id is required: %w", httperrors.ErrBadInput)
 	}
-	return u.cp.CreateAppointment(ctx, withOrgID(orgID, payload))
+	return u.cp.CreateBooking(ctx, withOrgID(orgID, payload))
 }
 
 func (u *Usecases) CreateQuote(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {

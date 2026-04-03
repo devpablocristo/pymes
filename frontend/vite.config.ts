@@ -12,7 +12,11 @@ const tanstackReactQuery = fileURLToPath(new URL('./node_modules/@tanstack/react
 const coreBrowserIndex = fileURLToPath(new URL('../../core/browser/ts/src/index.ts', import.meta.url));
 const coreBrowserCrud = fileURLToPath(new URL('../../core/browser/ts/src/crud/index.ts', import.meta.url));
 const coreBrowserSearch = fileURLToPath(new URL('../../core/browser/ts/src/search/index.ts', import.meta.url));
+const coreAuthnErrors = fileURLToPath(new URL('../../core/authn/ts/src/errors.ts', import.meta.url));
 const coreBrowserStorage = fileURLToPath(new URL('../../core/browser/ts/src/storage.ts', import.meta.url));
+const coreBrowserTheme = fileURLToPath(new URL('../../core/browser/ts/src/theme.ts', import.meta.url));
+const coreBrowserObservability = fileURLToPath(new URL('../../core/browser/ts/src/observability.ts', import.meta.url));
+const coreBrowserI18n = fileURLToPath(new URL('../../core/browser/ts/src/i18n/index.ts', import.meta.url));
 const modulesCrudUiIndex = fileURLToPath(new URL('../../modules/crud/ui/ts/src/index.ts', import.meta.url));
 const modulesCrudUiCsv = fileURLToPath(new URL('../../modules/crud/ui/ts/src/csv.ts', import.meta.url));
 const modulesCalendarBoardIndex = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
@@ -35,9 +39,13 @@ export default defineConfig({
       { find: '@fullcalendar/react', replacement: fullCalendarReact },
       { find: '@fullcalendar/timegrid', replacement: fullCalendarTimeGrid },
       { find: '@tanstack/react-query', replacement: tanstackReactQuery },
+      { find: '@devpablocristo/core-authn/errors', replacement: coreAuthnErrors },
       { find: '@devpablocristo/core-browser/crud', replacement: coreBrowserCrud },
       { find: '@devpablocristo/core-browser/search', replacement: coreBrowserSearch },
       { find: '@devpablocristo/core-browser/storage', replacement: coreBrowserStorage },
+      { find: '@devpablocristo/core-browser/theme', replacement: coreBrowserTheme },
+      { find: '@devpablocristo/core-browser/observability', replacement: coreBrowserObservability },
+      { find: '@devpablocristo/core-browser/i18n', replacement: coreBrowserI18n },
       { find: '@devpablocristo/core-browser', replacement: coreBrowserIndex },
       { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: modulesCalendarBoardStyles },
       { find: '@devpablocristo/modules-calendar-board', replacement: modulesCalendarBoardIndex },

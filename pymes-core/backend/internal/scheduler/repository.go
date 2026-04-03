@@ -79,7 +79,7 @@ func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Ti
 		JOIN tenant_settings ts ON ts.org_id = b.org_id
 		LEFT JOIN scheduling_services s ON s.id = b.service_id
 		LEFT JOIN scheduling_branches br ON br.id = b.branch_id
-		WHERE ts.appointments_enabled = true
+		WHERE ts.scheduling_enabled = true
 		  AND b.customer_email <> ''
 		  AND b.reminder_sent_at IS NULL
 		  AND b.status IN ('pending_confirmation', 'confirmed')

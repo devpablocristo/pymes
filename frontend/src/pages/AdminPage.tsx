@@ -147,7 +147,7 @@ function settingsToForm(s: TenantSettings): TenantFormState {
     wa_quote_template: s.wa_quote_template ?? '',
     wa_receipt_template: s.wa_receipt_template ?? '',
     wa_default_country_code: s.wa_default_country_code ?? '',
-    scheduling_enabled: Boolean(s.scheduling_enabled ?? s.appointments_enabled),
+    scheduling_enabled: Boolean(s.scheduling_enabled),
     appointment_label: s.appointment_label ?? '',
     appointment_reminder_hours: String(s.appointment_reminder_hours ?? ''),
     default_rate_type: s.default_rate_type ?? '',

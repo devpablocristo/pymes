@@ -192,30 +192,31 @@ func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, query
 	if query.Duration < 0 || query.Duration > 720 {
 		return nil, ErrInvalidInput
 	}
-	if selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, query.BranchID, query.ServiceID, query.ResourceID); err != nil {
+	selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, query.BranchID, query.ServiceID, query.ResourceID)
+	if err != nil {
 		return nil, err
-	} else if ok {
-		slots, err := r.scheduling.ListAvailableSlots(ctx, orgID, schedulingdomain.SlotQuery{
-			BranchID:   selection.Branch.ID,
-			ServiceID:  selection.Service.ID,
-			Date:       query.Date.UTC(),
-			ResourceID: query.ResourceID,
-		})
-		if err != nil {
-			return nil, mapSchedulingErr(err)
-		}
-		out := make([]AvailabilitySlot, 0, len(slots))
-		for _, slot := range slots {
-			out = append(out, AvailabilitySlot{
-				StartAt:   slot.StartAt.UTC(),
-				EndAt:     slot.EndAt.UTC(),
-				Remaining: slot.Remaining,
-			})
-		}
-		return out, nil
 	}
-
-	return r.getAvailabilityLegacy(ctx, orgID, query.Date, query.Duration)
+	if !ok {
+		return nil, fmt.Errorf("scheduling not configured for this organization")
+	}
+	slots, err := r.scheduling.ListAvailableSlots(ctx, orgID, schedulingdomain.SlotQuery{
+		BranchID:   selection.Branch.ID,
+		ServiceID:  selection.Service.ID,
+		Date:       query.Date.UTC(),
+		ResourceID: query.ResourceID,
+	})
+	if err != nil {
+		return nil, mapSchedulingErr(err)
+	}
+	out := make([]AvailabilitySlot, 0, len(slots))
+	for _, slot := range slots {
+		out = append(out, AvailabilitySlot{
+			StartAt:   slot.StartAt.UTC(),
+			EndAt:     slot.EndAt.UTC(),
+			Remaining: slot.Remaining,
+		})
+	}
+	return out, nil
 }
 
 func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error) {
@@ -231,12 +232,14 @@ func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[stri
 	if err != nil {
 		return AppointmentPublic{}, ErrInvalidInput
 	}
-	if selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, branchID, serviceID, resourceID); err != nil {
+	selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, branchID, serviceID, resourceID)
+	if err != nil {
 		return AppointmentPublic{}, err
-	} else if ok {
-		return r.bookScheduling(ctx, orgID, selection, payload)
 	}
-	return r.bookLegacy(ctx, orgID, payload)
+	if !ok {
+		return AppointmentPublic{}, fmt.Errorf("scheduling not configured for this organization")
+	}
+	return r.bookScheduling(ctx, orgID, selection, payload)
 }
 
 func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error) {
@@ -250,27 +253,7 @@ func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone str
 	if phoneDigits == "" {
 		return nil, ErrInvalidInput
 	}
-
-	out := make([]AppointmentPublic, 0)
-	newRows, err := r.listSchedulingBookingsByPhone(ctx, orgID, phoneDigits, limit)
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, newRows...)
-
-	legacyRows, err := r.listLegacyAppointmentsByPhone(ctx, orgID, phoneDigits, limit)
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, legacyRows...)
-
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].StartAt.After(out[j].StartAt)
-	})
-	if len(out) > limit {
-		out = out[:limit]
-	}
-	return out, nil
+	return r.listSchedulingBookingsByPhone(ctx, orgID, phoneDigits, limit)
 }
 
 func (r *Repository) ListPublicQueues(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]schedulingpublic.QueueSummary, error) {
@@ -606,122 +589,6 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 	}, nil
 }
 
-func (r *Repository) getAvailabilityLegacy(ctx context.Context, orgID uuid.UUID, day time.Time, duration int) ([]AvailabilitySlot, error) {
-	if duration <= 0 {
-		duration = 60
-	}
-	if duration > 720 {
-		return nil, ErrInvalidInput
-	}
-
-	slots, err := r.listSlotConfigs(ctx, orgID, int(day.Weekday()))
-	if err != nil {
-		return nil, err
-	}
-	if len(slots) == 0 {
-		slots = []slotConfig{{StartHHMM: "09:00", EndHHMM: "18:00", SlotMinutes: 60, MaxPerSlot: 1}}
-	}
-
-	out := make([]AvailabilitySlot, 0)
-	for _, slot := range slots {
-		start, err := composeDayTime(day, slot.StartHHMM)
-		if err != nil {
-			continue
-		}
-		end, err := composeDayTime(day, slot.EndHHMM)
-		if err != nil {
-			continue
-		}
-		if !end.After(start) {
-			continue
-		}
-
-		step := slot.SlotMinutes
-		if step <= 0 {
-			step = duration
-		}
-		for cursor := start; cursor.Add(time.Duration(duration)*time.Minute).Equal(end) || cursor.Add(time.Duration(duration)*time.Minute).Before(end); cursor = cursor.Add(time.Duration(step) * time.Minute) {
-			candidateEnd := cursor.Add(time.Duration(duration) * time.Minute)
-			count, err := r.countOverlaps(ctx, orgID, cursor, candidateEnd)
-			if err != nil {
-				return nil, err
-			}
-			remaining := slot.MaxPerSlot - int(count)
-			if remaining > 0 {
-				out = append(out, AvailabilitySlot{StartAt: cursor, EndAt: candidateEnd, Remaining: remaining})
-			}
-		}
-	}
-
-	return out, nil
-}
-
-func (r *Repository) bookLegacy(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error) {
-	name := firstStringFromPayload(payload, "party_name", "customer_name")
-	phone := firstStringFromPayload(payload, "party_phone", "customer_phone")
-	title := firstStringFromPayload(payload, "title")
-	startAt, err := timeValueFromPayload(payload, "start_at")
-	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
-	}
-	duration := intValueFromPayload(payload, "duration")
-	if strings.TrimSpace(name) == "" || strings.TrimSpace(phone) == "" || strings.TrimSpace(title) == "" {
-		return AppointmentPublic{}, ErrInvalidInput
-	}
-	if duration <= 0 {
-		duration = 60
-	}
-	if duration > 720 {
-		return AppointmentPublic{}, ErrInvalidInput
-	}
-
-	maxPerSlot := 1
-	if v, err := r.findMaxPerSlot(ctx, orgID, startAt); err != nil {
-		return AppointmentPublic{}, err
-	} else if v > 0 {
-		maxPerSlot = v
-	}
-
-	endAt := startAt.Add(time.Duration(duration) * time.Minute)
-	overlaps, err := r.countOverlaps(ctx, orgID, startAt, endAt)
-	if err != nil {
-		return AppointmentPublic{}, err
-	}
-	if int(overlaps) >= maxPerSlot {
-		return AppointmentPublic{}, ErrSlotUnavailable
-	}
-
-	appointment := AppointmentPublic{
-		ID:            uuid.New(),
-		CustomerName:  name,
-		CustomerPhone: phone,
-		CustomerEmail: firstStringFromPayload(payload, "customer_email"),
-		Title:         title,
-		Status:        "scheduled",
-		StartAt:       startAt.UTC(),
-		EndAt:         endAt.UTC(),
-		Duration:      duration,
-	}
-
-	err = r.db.WithContext(ctx).Table("appointments").Create(map[string]any{
-		"id":          appointment.ID,
-		"org_id":      orgID,
-		"party_name":  appointment.CustomerName,
-		"party_phone": appointment.CustomerPhone,
-		"title":       appointment.Title,
-		"status":      appointment.Status,
-		"start_at":    appointment.StartAt,
-		"end_at":      appointment.EndAt,
-		"duration":    appointment.Duration,
-		"created_by":  "public-api",
-		"created_at":  time.Now().UTC(),
-		"updated_at":  time.Now().UTC(),
-	}).Error
-	if err != nil {
-		return AppointmentPublic{}, err
-	}
-	return appointment, nil
-}
 
 func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
 	var rows []AppointmentPublic
@@ -752,75 +619,6 @@ func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uu
 	return rows, nil
 }
 
-func (r *Repository) listLegacyAppointmentsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
-	var rows []AppointmentPublic
-	err := r.db.WithContext(ctx).
-		Table("appointments").
-		Select("id, party_name as customer_name, party_phone as customer_phone, '' as customer_email, title, status, start_at, end_at, duration").
-		Where("org_id = ? AND regexp_replace(party_phone, '[^0-9]', '', 'g') = ?", orgID, phoneDigits).
-		Order("start_at DESC").
-		Limit(limit).
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
-type slotConfig struct {
-	StartHHMM   string `gorm:"column:start_hhmm"`
-	EndHHMM     string `gorm:"column:end_hhmm"`
-	SlotMinutes int    `gorm:"column:slot_minutes"`
-	MaxPerSlot  int    `gorm:"column:max_per_slot"`
-}
-
-func (r *Repository) listSlotConfigs(ctx context.Context, orgID uuid.UUID, dayOfWeek int) ([]slotConfig, error) {
-	var rows []slotConfig
-	err := r.db.WithContext(ctx).
-		Table("appointment_slots").
-		Select("to_char(start_time, 'HH24:MI') as start_hhmm, to_char(end_time, 'HH24:MI') as end_hhmm, slot_minutes, max_per_slot").
-		Where("org_id = ? AND day_of_week = ?", orgID, dayOfWeek).
-		Order("start_time ASC").
-		Scan(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
-func (r *Repository) countOverlaps(ctx context.Context, orgID uuid.UUID, startAt, endAt time.Time) (int64, error) {
-	var count int64
-	err := r.db.WithContext(ctx).
-		Table("appointments").
-		Where("org_id = ?", orgID).
-		Where("status IN ?", []string{"scheduled", "confirmed", "in_progress"}).
-		Where("start_at < ? AND end_at > ?", endAt.UTC(), startAt.UTC()).
-		Count(&count).Error
-	return count, err
-}
-
-func (r *Repository) findMaxPerSlot(ctx context.Context, orgID uuid.UUID, startAt time.Time) (int, error) {
-	timeText := startAt.UTC().Format("15:04:05")
-	var result struct {
-		MaxPerSlot int
-	}
-	err := r.db.WithContext(ctx).
-		Raw(`
-			SELECT max_per_slot
-			FROM appointment_slots
-			WHERE org_id = ?
-			  AND day_of_week = ?
-			  AND start_time <= ?::time
-			  AND end_time > ?::time
-			ORDER BY start_time ASC
-			LIMIT 1
-		`, orgID, int(startAt.Weekday()), timeText, timeText).
-		Scan(&result).Error
-	if err != nil {
-		return 0, err
-	}
-	return result.MaxPerSlot, nil
-}
 
 func mapSchedulingErr(err error) error {
 	if err == nil {
@@ -980,14 +778,6 @@ func cloneMap(in map[string]any) map[string]any {
 		out[key] = value
 	}
 	return out
-}
-
-func composeDayTime(day time.Time, hhmm string) (time.Time, error) {
-	parsed, err := time.Parse("15:04", hhmm)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parse time %q: %w", hhmm, err)
-	}
-	return time.Date(day.Year(), day.Month(), day.Day(), parsed.Hour(), parsed.Minute(), 0, 0, time.UTC), nil
 }
 
 func digitsOnly(v string) string {

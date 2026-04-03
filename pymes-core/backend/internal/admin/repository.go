@@ -85,11 +85,7 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	applyString(&m.WAQuoteTemplate, patch.WAQuoteTemplate)
 	applyString(&m.WAReceiptTemplate, patch.WAReceiptTemplate)
 	applyString(&m.WADefaultCountryCode, patch.WADefaultCountryCode)
-	if patch.SchedulingEnabled != nil {
-		applyBool(&m.AppointmentsEnabled, patch.SchedulingEnabled)
-	} else {
-		applyBool(&m.AppointmentsEnabled, patch.AppointmentsEnabled)
-	}
+	applyBool(&m.AppointmentsEnabled, patch.SchedulingEnabled)
 	applyString(&m.AppointmentLabel, patch.AppointmentLabel)
 	applyInt(&m.AppointmentReminderHours, patch.AppointmentReminderHours)
 	applyString(&m.DefaultRateType, patch.DefaultRateType)
@@ -191,7 +187,6 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		WAReceiptTemplate:        m.WAReceiptTemplate,
 		WADefaultCountryCode:     m.WADefaultCountryCode,
 		SchedulingEnabled:        m.AppointmentsEnabled,
-		AppointmentsEnabled:      m.AppointmentsEnabled,
 		AppointmentLabel:         m.AppointmentLabel,
 		AppointmentReminderHours: m.AppointmentReminderHours,
 		SecondaryCurrency:        secondaryCurrencyFromSupportedList(supportedList),

@@ -93,9 +93,6 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		}
 	}
 	schedulingEnabled := req.SchedulingEnabled
-	if schedulingEnabled == nil {
-		schedulingEnabled = req.AppointmentsEnabled
-	}
 	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{
 		PlanCode:                 req.PlanCode,
 		HardLimits:               req.HardLimits,
@@ -124,7 +121,6 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		WAReceiptTemplate:        req.WAReceiptTemplate,
 		WADefaultCountryCode:     req.WADefaultCountryCode,
 		SchedulingEnabled:        schedulingEnabled,
-		AppointmentsEnabled:      schedulingEnabled,
 		AppointmentLabel:         req.AppointmentLabel,
 		AppointmentReminderHours: req.AppointmentReminderHours,
 		SecondaryCurrency:        req.SecondaryCurrency,

@@ -13,7 +13,7 @@ import (
 )
 
 type usecasesPort interface {
-	CreateAppointment(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
+	CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 	CreateQuote(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
 	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
 	GetPublicPreviewBootstrap(ctx context.Context, orgID string) (map[string]any, error)
@@ -29,7 +29,7 @@ func NewHandler(uc usecasesPort) *Handler {
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/public-preview/bootstrap", h.GetPublicPreviewBootstrap)
-	authGroup.POST("/appointments", h.CreateAppointment)
+	authGroup.POST("/appointments", h.CreateBooking)
 	authGroup.POST("/quotes", h.CreateQuote)
 	authGroup.POST("/payments/:sale_id/link", h.CreateSalePaymentLink)
 }
@@ -43,12 +43,12 @@ func (h *Handler) GetPublicPreviewBootstrap(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func (h *Handler) CreateAppointment(c *gin.Context) {
+func (h *Handler) CreateBooking(c *gin.Context) {
 	payload, ok := bindJSONMap(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreateAppointment(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
+	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

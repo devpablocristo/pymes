@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 
 	admindomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/admin/usecases/domain"
-	appointmentsdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/appointments/usecases/domain"
 	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	partydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/party/usecases/domain"
@@ -53,12 +52,6 @@ type productPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 }
 
-type appointmentPort interface {
-	List(ctx context.Context, orgID uuid.UUID, from, to *time.Time, status, assigned string, limit int, archived bool) ([]appointmentsdomain.Appointment, error)
-	Create(ctx context.Context, in appointmentsdomain.Appointment) (appointmentsdomain.Appointment, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (appointmentsdomain.Appointment, error)
-}
-
 type quotePort interface {
 	Create(ctx context.Context, in quotes.CreateQuoteInput) (quotedomain.Quote, error)
 }
@@ -89,7 +82,6 @@ type Handler struct {
 	parties           partyPort
 	customers         customerPort
 	products          productPort
-	appts             appointmentPort
 	quotes            quotePort
 	sales             salePort
 	gateway           paymentGatewayPort
@@ -105,7 +97,6 @@ func NewHandler(
 	parties partyPort,
 	customers customerPort,
 	products productPort,
-	appts appointmentPort,
 	quotes quotePort,
 	sales salePort,
 	gateway paymentGatewayPort,
@@ -119,7 +110,6 @@ func NewHandler(
 		parties:           parties,
 		customers:         customers,
 		products:          products,
-		appts:             appts,
 		quotes:            quotes,
 		sales:             sales,
 		gateway:           gateway,
@@ -142,8 +132,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/customers/resolve", h.ResolveCustomer)
 	internal.GET("/products", h.ListProducts)
 	internal.GET("/products/:id", h.GetProduct)
-	internal.POST("/appointments", h.CreateAppointment)
-	internal.GET("/appointments/:id", h.GetAppointment)
+	// Legacy appointment routes removidos — verticales usan /scheduling/bookings via schedulingHandler
 	internal.POST("/in-app-notifications", h.CreateInAppNotification)
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
@@ -462,97 +451,6 @@ func (h *Handler) GetProduct(c *gin.Context) {
 		"created_at":  item.CreatedAt.UTC().Format(time.RFC3339),
 		"updated_at":  item.UpdatedAt.UTC().Format(time.RFC3339),
 	})
-}
-
-func (h *Handler) CreateAppointment(c *gin.Context) {
-	var req struct {
-		OrgID         string         `json:"org_id" binding:"required"`
-		CustomerID    *string        `json:"customer_id,omitempty"`
-		CustomerName  string         `json:"customer_name" binding:"required"`
-		CustomerPhone string         `json:"customer_phone"`
-		Title         string         `json:"title" binding:"required"`
-		Description   string         `json:"description"`
-		Status        string         `json:"status"`
-		StartAt       string         `json:"start_at" binding:"required"`
-		EndAt         string         `json:"end_at,omitempty"`
-		Duration      int            `json:"duration,omitempty"`
-		Location      string         `json:"location"`
-		AssignedTo    string         `json:"assigned_to"`
-		Notes         string         `json:"notes"`
-		Metadata      map[string]any `json:"metadata,omitempty"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	orgID, err := uuid.Parse(req.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org_id"})
-		return
-	}
-	startAt, err := time.Parse(time.RFC3339, strings.TrimSpace(req.StartAt))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_at"})
-		return
-	}
-	var endAt time.Time
-	if strings.TrimSpace(req.EndAt) != "" {
-		endAt, err = time.Parse(time.RFC3339, strings.TrimSpace(req.EndAt))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_at"})
-			return
-		}
-	}
-	var customerID *uuid.UUID
-	if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
-		id, err := uuid.Parse(strings.TrimSpace(*req.CustomerID))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
-			return
-		}
-		customerID = &id
-	}
-	out, err := h.appts.Create(c.Request.Context(), appointmentsdomain.Appointment{
-		OrgID:         orgID,
-		CustomerID:    customerID,
-		CustomerName:  strings.TrimSpace(req.CustomerName),
-		CustomerPhone: strings.TrimSpace(req.CustomerPhone),
-		Title:         strings.TrimSpace(req.Title),
-		Description:   strings.TrimSpace(req.Description),
-		Status:        req.Status,
-		StartAt:       startAt.UTC(),
-		EndAt:         endAt.UTC(),
-		Duration:      req.Duration,
-		Location:      strings.TrimSpace(req.Location),
-		AssignedTo:    strings.TrimSpace(req.AssignedTo),
-		Notes:         strings.TrimSpace(req.Notes),
-		Metadata:      req.Metadata,
-		CreatedBy:     "internal-service",
-	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, out)
-}
-
-func (h *Handler) GetAppointment(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
-		return
-	}
-	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	out, err := h.appts.GetByID(c.Request.Context(), orgID, id)
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) CreateQuote(c *gin.Context) {

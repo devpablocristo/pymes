@@ -47,7 +47,6 @@ type TenantSettings struct {
 	WAReceiptTemplate        string         `json:"wa_receipt_template"`
 	WADefaultCountryCode     string         `json:"wa_default_country_code"`
 	SchedulingEnabled        bool           `json:"scheduling_enabled"`
-	AppointmentsEnabled      bool           `json:"appointments_enabled"`
 	AppointmentLabel         string         `json:"appointment_label"`
 	AppointmentReminderHours int            `json:"appointment_reminder_hours"`
 	SecondaryCurrency        string         `json:"secondary_currency"`
@@ -93,7 +92,6 @@ type TenantSettingsPatch struct {
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`
 	SchedulingEnabled        *bool          `json:"scheduling_enabled,omitempty"`
-	AppointmentsEnabled      *bool          `json:"appointments_enabled,omitempty"`
 	AppointmentLabel         *string        `json:"appointment_label,omitempty"`
 	AppointmentReminderHours *int           `json:"appointment_reminder_hours,omitempty"`
 	SecondaryCurrency        *string        `json:"secondary_currency,omitempty"`

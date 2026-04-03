@@ -37,7 +37,11 @@ export function CashflowSummaryWidget(props: DashboardWidgetRendererProps) {
           <MetricTile label="Periodo" value={data.period} subtle />
           <MetricTile label="Ingresos" value={formatAmount(data.total_income)} tone="success" />
           <MetricTile label="Egresos" value={formatAmount(data.total_expense)} tone="danger" />
-          <MetricTile label="Balance" value={formatAmount(data.balance)} tone={data.balance >= 0 ? 'success' : 'danger'} />
+          <MetricTile
+            label="Balance"
+            value={formatAmount(data.balance)}
+            tone={data.balance >= 0 ? 'success' : 'danger'}
+          />
         </div>
       )}
     </WidgetQueryState>
@@ -231,13 +235,7 @@ type QueryLike<T> = {
   error: Error | null;
 };
 
-function WidgetQueryState<T>({
-  query,
-  children,
-}: {
-  query: QueryLike<T>;
-  children: (data: T) => ReactNode;
-}) {
+function WidgetQueryState<T>({ query, children }: { query: QueryLike<T>; children: (data: T) => ReactNode }) {
   if (query.isLoading) {
     return <div className="widget-state widget-state-loading">Cargando widget...</div>;
   }

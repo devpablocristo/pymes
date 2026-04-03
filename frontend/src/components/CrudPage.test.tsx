@@ -12,9 +12,7 @@ type SampleItem = {
 
 describe('CrudPage', () => {
   it('reuses the shared engine for create flows and custom row actions', async () => {
-    const list = vi.fn().mockResolvedValue([
-      { id: '1', name: 'Existente', active: true },
-    ]);
+    const list = vi.fn().mockResolvedValue([{ id: '1', name: 'Existente', active: true }]);
     const create = vi.fn().mockResolvedValue(undefined);
     const customAction = vi.fn().mockResolvedValue(undefined);
 
@@ -103,7 +101,10 @@ describe('CrudPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalledWith({ id: '1', name: 'Existente', active: true }, { name: 'Existente', active: true });
+      expect(update).toHaveBeenCalledWith(
+        { id: '1', name: 'Existente', active: true },
+        { name: 'Existente', active: true },
+      );
     });
   });
 
@@ -172,5 +173,55 @@ describe('CrudPage', () => {
     await screen.findByText('Cliente uno');
 
     expect(screen.getByRole('searchbox', { name: 'Buscar...' })).toBeInTheDocument();
+  });
+
+  it('mantiene el hard delete como confirmación inline reforzada', async () => {
+    const list = vi.fn().mockResolvedValue([{ id: '1', name: 'Archivado', active: false }]);
+    const hardDelete = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <CrudPage<SampleItem>
+        label="item"
+        labelPlural="items"
+        labelPluralCap="Items"
+        supportsArchived
+        allowHardDelete
+        dataSource={{
+          list: async ({ archived }: { archived?: boolean } = {}) => (archived ? list() : []),
+          hardDelete: async (row) => hardDelete(row),
+        }}
+        columns={[
+          { key: 'name', header: 'Nombre' },
+          { key: 'active', header: 'Activo', render: (value) => (value ? 'Si' : 'No') },
+        ]}
+        formFields={[
+          { key: 'name', label: 'Nombre', required: true },
+          { key: 'active', label: 'Activo', type: 'checkbox' },
+        ]}
+        searchText={(row) => row.name}
+        toFormValues={(row) => ({ name: row.name, active: row.active })}
+        isValid={() => true}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver archivados' }));
+    await screen.findByText('Archivado');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+
+    expect(screen.getByText(/Escribí eliminar para confirmar/i)).toBeInTheDocument();
+    const confirmationInput = screen.getByRole('textbox');
+    const confirmButton = screen.getByRole('button', { name: 'Confirmar' });
+
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.change(confirmationInput, { target: { value: 'eliminar' } });
+    expect(confirmButton).not.toBeDisabled();
+
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(hardDelete).toHaveBeenCalledWith({ id: '1', name: 'Archivado', active: false });
+    });
   });
 });

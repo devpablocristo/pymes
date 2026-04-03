@@ -9,25 +9,15 @@ import {
   type NotificationFeedTone,
 } from '@devpablocristo/modules-ui-notification-feed';
 import '@devpablocristo/modules-ui-notification-feed/styles.css';
-import {
-  listInAppNotifications,
-  markInAppNotificationRead,
-  type InAppNotificationItem,
-} from '../lib/api';
+import { listInAppNotifications, markInAppNotificationRead, type InAppNotificationItem } from '../lib/api';
 import { labelForApprovalAction } from '../lib/approvalActionLabels';
 import { humanInsightScopeLabel, humanRoutedLabel } from '../lib/aiLabels';
 import { PageLayout } from '../components/PageLayout';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
-import {
-  NOTIFICATION_CHAT_HANDOFF_KEY,
-  type NotificationChatHandoff,
-} from '../lib/notificationChatHandoff';
-import {
-  approveRequest,
-  rejectRequest,
-} from '../lib/reviewApi';
+import { NOTIFICATION_CHAT_HANDOFF_KEY, type NotificationChatHandoff } from '../lib/notificationChatHandoff';
+import { approveRequest, rejectRequest } from '../lib/reviewApi';
 import {
   buildApprovalShareText,
   buildInAppNotificationShareText,
@@ -57,7 +47,11 @@ function localeForLanguage(language: LanguageCode): string {
   return language === 'en' ? 'en-US' : 'es-AR';
 }
 
-function relativeTime(isoDate: string, language: LanguageCode, t: (key: string, variables?: Record<string, string | number>) => string): string {
+function relativeTime(
+  isoDate: string,
+  language: LanguageCode,
+  t: (key: string, variables?: Record<string, string | number>) => string,
+): string {
   const now = Date.now();
   const then = new Date(isoDate).getTime();
   const diffMs = now - then;
@@ -178,7 +172,8 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   const summaryBadge = useMemo(() => {
     const parts: string[] = [];
     if (unreadCount > 0) parts.push(`${unreadCount} sin leer`);
-    if (pendingApprovalsCount > 0) parts.push(`${pendingApprovalsCount} decisión${pendingApprovalsCount === 1 ? '' : 'es'}`);
+    if (pendingApprovalsCount > 0)
+      parts.push(`${pendingApprovalsCount} decisión${pendingApprovalsCount === 1 ? '' : 'es'}`);
     if (parts.length === 0) return 'Al día';
     return parts.join(' · ');
   }, [pendingApprovalsCount, unreadCount]);
@@ -277,9 +272,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
               aria-label={`Nota para ${displayAction}`}
               placeholder={t('ai.notifications.approval.notePlaceholder')}
               value={approvalNotes[approval.id] ?? ''}
-              onChange={(e) =>
-                setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))
-              }
+              onChange={(e) => setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))}
             />
             <button
               type="button"
@@ -347,7 +340,13 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
 
   const feed = (
     <NotificationFeed
-      error={inAppError ? <p role="alert" className="form-error">{inAppError}</p> : undefined}
+      error={
+        inAppError ? (
+          <p role="alert" className="form-error">
+            {inAppError}
+          </p>
+        ) : undefined
+      }
       loading={notificationsQuery.isLoading}
       loadingMessage={t('ai.notifications.loading')}
       emptyMessage={<p className="text-secondary">{t('ai.notifications.empty')}</p>}
@@ -357,11 +356,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   );
 
   if (embedded) {
-    return (
-      <div data-embedded="true">
-        {feed}
-      </div>
-    );
+    return <div data-embedded="true">{feed}</div>;
   }
 
   return (

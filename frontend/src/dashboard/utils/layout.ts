@@ -115,9 +115,7 @@ export function toggleLayoutItemVisibility(
   widgets: DashboardWidgetDefinition[],
 ): DashboardLayoutItem[] {
   return packLayoutItems(
-    items.map((item) =>
-      item.instance_id === instanceId ? { ...item, visible: !item.visible } : item,
-    ),
+    items.map((item) => (item.instance_id === instanceId ? { ...item, visible: !item.visible } : item)),
     widgets,
   );
 }
@@ -127,14 +125,10 @@ export function upsertWidgetInstance(
   widget: DashboardWidgetDefinition,
   widgets: DashboardWidgetDefinition[],
 ): DashboardLayoutItem[] {
-  const existingHidden = items.find(
-    (item) => item.widget_key === widget.widget_key && !item.visible,
-  );
+  const existingHidden = items.find((item) => item.widget_key === widget.widget_key && !item.visible);
   if (existingHidden) {
     return packLayoutItems(
-      items.map((item) =>
-        item.instance_id === existingHidden.instance_id ? { ...item, visible: true } : item,
-      ),
+      items.map((item) => (item.instance_id === existingHidden.instance_id ? { ...item, visible: true } : item)),
       widgets,
     );
   }
@@ -156,10 +150,7 @@ export function upsertWidgetInstance(
   return packLayoutItems(next, widgets);
 }
 
-export function serializeLayout(
-  items: DashboardLayoutItem[],
-  widgets: DashboardWidgetDefinition[],
-): string {
+export function serializeLayout(items: DashboardLayoutItem[], widgets: DashboardWidgetDefinition[]): string {
   return JSON.stringify(packLayoutItems(items, widgets));
 }
 
@@ -178,10 +169,7 @@ export function visibleItems(items: DashboardLayoutItem[]): DashboardLayoutItem[
   return sortLayoutItems(items).filter((item) => item.visible);
 }
 
-function clampLayoutItem(
-  item: DashboardLayoutItem,
-  widget: DashboardWidgetDefinition,
-): DashboardLayoutItem {
+function clampLayoutItem(item: DashboardLayoutItem, widget: DashboardWidgetDefinition): DashboardLayoutItem {
   return {
     ...item,
     w: clampNumber(item.w || widget.default_size.w, widget.min_w, widget.max_w),
@@ -195,7 +183,6 @@ function clampNumber(value: number, min: number, max: number): number {
 }
 
 function createWidgetInstanceId(widgetKey: string): string {
-  const suffix =
-    globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Math.random().toString(16).slice(2, 10);
+  const suffix = globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Math.random().toString(16).slice(2, 10);
   return `${widgetKey.replace(/[^a-z0-9]+/gi, '-')}-${suffix}`.toLowerCase();
 }

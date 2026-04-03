@@ -1,7 +1,7 @@
-import { CrudPage, type CrudPageConfig } from '../components/CrudPage';
+import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
-type ResourceConfigMap = Record<string, CrudPageConfig<any>>;
+type ResourceConfigMap = CrudResourceConfigMap;
 
 export function hasCrudResourceInMap(resourceConfigs: ResourceConfigMap, resourceId: string): boolean {
   return resourceId in resourceConfigs;
@@ -26,7 +26,7 @@ export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {
     resourceId: string;
     mergeConfig?: Record<string, unknown>;
   }) {
-    const config = resourceConfigs[resourceId] as CrudPageConfig<any> | undefined;
+    const config = resourceConfigs[resourceId] as ResourceConfigMap[string] | undefined;
     const createdByMerge = useCrudListCreatedByMerge();
     if (!config) {
       return (

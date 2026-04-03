@@ -4,7 +4,9 @@ import { useI18n } from '../lib/i18n';
 export function WorkOrdersHeaderLead() {
   const { t } = useI18n();
   const isBoardActive = useMatch('/modules/workOrders/board');
-  const isListContext = useMatch('/modules/workOrders/list') || useMatch('/modules/workOrders/edit/:orderId');
+  const isListMatch = useMatch('/modules/workOrders/list');
+  const isEditMatch = useMatch('/modules/workOrders/edit/:orderId');
+  const isListContext = isListMatch || isEditMatch;
 
   return (
     <div className="wo-mod-orders__header-lead">
@@ -14,7 +16,9 @@ export function WorkOrdersHeaderLead() {
           <span className={`wo-mod-orders__switch-label${isBoardActive ? ' wo-mod-orders__switch-label--active' : ''}`}>
             {t('shell.workOrders.tabBoard')}
           </span>
-          <span className={`wo-mod-orders__switch-label${!isBoardActive && isListContext ? ' wo-mod-orders__switch-label--active' : ''}`}>
+          <span
+            className={`wo-mod-orders__switch-label${!isBoardActive && isListContext ? ' wo-mod-orders__switch-label--active' : ''}`}
+          >
             {t('shell.workOrders.tabList')}
           </span>
           <span

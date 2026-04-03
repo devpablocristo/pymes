@@ -18,8 +18,7 @@ export const apiKeysMessages: TranslationsByLanguage = {
   },
   en: {
     'apiKeys.adminOnly.title': 'Admins only',
-    'apiKeys.adminOnly.body':
-      'Managing API keys is sensitive. Ask a workspace admin to create or revoke keys.',
+    'apiKeys.adminOnly.body': 'Managing API keys is sensitive. Ask a workspace admin to create or revoke keys.',
     'apiKeys.loading': 'Loading…',
     'apiKeys.error.unreachable': 'Could not reach the server. Check your network.',
     'apiKeys.scopes.section': 'Permissions',

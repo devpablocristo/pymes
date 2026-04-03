@@ -2,18 +2,17 @@
  * Dashboard visual — gráficos, stats, tablas. Conectado a la API real.
  * Usa los mismos endpoints que el sistema de widgets: /v1/dashboard-data/*
  */
-import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { SchedulingDaySummary, createSchedulingClient } from '@devpablocristo/modules-scheduling';
+import '@devpablocristo/modules-scheduling/styles.css';
 import { Link } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useI18n } from '../lib/i18n';
-import {
-  IconAlert,
-  IconArrowDown,
-  IconArrowUp,
-  IconCalendar,
-} from '@devpablocristo/modules-ui-data-display/icons';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- datos genéricos del dashboard API
+type DashItem = Record<string, any>;
+import { IconAlert, IconArrowDown, IconArrowUp } from '@devpablocristo/modules-ui-data-display/icons';
 import { apiRequest } from '../lib/api';
 import type {
   SalesSummaryData,
@@ -25,6 +24,8 @@ import type {
   LowStockData,
 } from '../dashboard/types';
 import './DashboardVisualPage.css';
+
+const schedulingClient = createSchedulingClient(apiRequest);
 
 // ─── Hooks de datos ───
 
@@ -92,13 +93,9 @@ function StatCards() {
     <div className="dash__stats">
       {stats.map((s) => (
         <div key={s.label} className="dash__stat-card">
-          <div className={`dash__stat-icon dash__stat-icon--${s.tone}`}>
-            {s.loading ? '…' : s.value.charAt(0)}
-          </div>
+          <div className={`dash__stat-icon dash__stat-icon--${s.tone}`}>{s.loading ? '…' : s.value.charAt(0)}</div>
           <div className="dash__stat-info">
-            <div className="dash__stat-value">
-              {s.loading ? <span className="spinner" /> : s.value}
-            </div>
+            <div className="dash__stat-value">{s.loading ? <span className="spinner" /> : s.value}</div>
             <div className="dash__stat-label">{s.label}</div>
             {s.sub && <div className="dash__stat-trend dash__stat-trend--muted">{s.sub}</div>}
           </div>
@@ -112,7 +109,12 @@ function StatCards() {
 
 function CashflowChart() {
   const { data, isLoading } = useWidgetData<CashflowSummaryData>('cashflow-summary');
-  if (isLoading) return <div className="card"><div className="spinner" /></div>;
+  if (isLoading)
+    return (
+      <div className="card">
+        <div className="spinner" />
+      </div>
+    );
   if (!data) {
     return (
       <div className="card">
@@ -152,7 +154,12 @@ function CashflowChart() {
 
 function QuotesPipeline() {
   const { data, isLoading } = useWidgetData<QuotesPipelineData>('quotes-pipeline');
-  if (isLoading) return <div className="card"><div className="spinner" /></div>;
+  if (isLoading)
+    return (
+      <div className="card">
+        <div className="spinner" />
+      </div>
+    );
   if (!data) {
     return (
       <div className="card">
@@ -169,24 +176,33 @@ function QuotesPipeline() {
   ];
   const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
   let accum = 0;
-  const gradientParts = segments.filter(s => s.value > 0).map((seg) => {
-    const start = (accum / total) * 360;
-    accum += seg.value;
-    const end = (accum / total) * 360;
-    return `${seg.color} ${start}deg ${end}deg`;
-  });
+  const gradientParts = segments
+    .filter((s) => s.value > 0)
+    .map((seg) => {
+      const start = (accum / total) * 360;
+      accum += seg.value;
+      const end = (accum / total) * 360;
+      return `${seg.color} ${start}deg ${end}deg`;
+    });
 
   return (
     <div className="card">
       <div className="dash__donut-wrap">
-        <div className="dash__donut" style={{ background: gradientParts.length ? `conic-gradient(${gradientParts.join(', ')})` : 'var(--color-border)' }}>
+        <div
+          className="dash__donut"
+          style={{
+            background: gradientParts.length ? `conic-gradient(${gradientParts.join(', ')})` : 'var(--color-border)',
+          }}
+        >
           <div className="dash__donut-center">{data.pending_total}</div>
         </div>
         <div className="dash__donut-legend">
           {segments.map((seg) => (
             <div key={seg.label} className="dash__donut-legend-item">
               <span className="dash__donut-legend-dot" style={{ background: seg.color }} />
-              <span>{seg.label}: <strong>{seg.value}</strong></span>
+              <span>
+                {seg.label}: <strong>{seg.value}</strong>
+              </span>
             </div>
           ))}
         </div>
@@ -199,7 +215,12 @@ function QuotesPipeline() {
 
 function RecentSales() {
   const { data, isLoading } = useWidgetData<RecentSalesData>('sales-recent');
-  if (isLoading) return <div className="card"><div className="spinner" /></div>;
+  if (isLoading)
+    return (
+      <div className="card">
+        <div className="spinner" />
+      </div>
+    );
   const items = data?.items ?? [];
 
   return (
@@ -208,15 +229,24 @@ function RecentSales() {
         <p className="dash__empty-hint">Sin ventas recientes</p>
       ) : (
         <table className="dash__table">
-          <thead><tr><th>N°</th><th>Cliente</th><th>Total</th><th>Fecha</th></tr></thead>
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Cliente</th>
+              <th>Total</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
           <tbody>
-            {items.slice(0, 6).map((s: any) => (
+            {items.slice(0, 6).map((s: DashItem) => (
               <tr key={s.id ?? s.number}>
                 <td className="dash__table-cell--strong">{s.number ?? s.id?.slice(0, 8)}</td>
                 <td>{s.party_name ?? s.customer_name ?? '—'}</td>
                 <td className="dash__table-cell--strong">{fmtMoney(s.total ?? 0)}</td>
                 <td className="dash__table-cell--meta">
-                  {s.created_at ? new Date(s.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '—'}
+                  {s.created_at
+                    ? new Date(s.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+                    : '—'}
                 </td>
               </tr>
             ))}
@@ -231,17 +261,22 @@ function RecentSales() {
 
 function TopProducts() {
   const { data, isLoading } = useWidgetData<TopProductsData>('products-top');
-  if (isLoading) return <div className="card"><div className="spinner" /></div>;
+  if (isLoading)
+    return (
+      <div className="card">
+        <div className="spinner" />
+      </div>
+    );
   const items = data?.items ?? [];
 
-  const maxQty = Math.max(...items.map((p: any) => p.quantity ?? p.count ?? 1), 1);
+  const maxQty = Math.max(...items.map((p: DashItem) => p.quantity ?? p.count ?? 1), 1);
 
   return (
     <div className="card">
       {items.length === 0 ? (
         <p className="dash__empty-hint">Sin datos de productos</p>
       ) : (
-        items.slice(0, 5).map((p: any, i: number) => {
+        items.slice(0, 5).map((p: DashItem, i: number) => {
           const qty = p.quantity ?? p.count ?? 0;
           const pct = (qty / maxQty) * 100;
           return (
@@ -268,7 +303,12 @@ function TopProducts() {
 
 function AuditActivity() {
   const { data, isLoading } = useWidgetData<AuditActivityData>('audit-activity');
-  if (isLoading) return <div className="card"><div className="spinner" /></div>;
+  if (isLoading)
+    return (
+      <div className="card">
+        <div className="spinner" />
+      </div>
+    );
   const items = data?.items ?? [];
 
   return (
@@ -277,99 +317,36 @@ function AuditActivity() {
         <p className="dash__empty-hint">Sin actividad reciente</p>
       ) : (
         <table className="dash__table">
-          <thead><tr><th>Acción</th><th>Recurso</th><th>Actor</th><th>Fecha</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Recurso</th>
+              <th>Actor</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
           <tbody>
-            {items.slice(0, 8).map((a: any, i: number) => (
+            {items.slice(0, 8).map((a: DashItem, i: number) => (
               <tr key={a.id ?? i}>
                 <td className="dash__table-cell--action">{a.action}</td>
-                <td>{a.resource_type} {a.resource_id?.slice(0, 8)}</td>
+                <td>
+                  {a.resource_type} {a.resource_id?.slice(0, 8)}
+                </td>
                 <td>{a.actor ?? '—'}</td>
                 <td className="dash__table-cell--meta">
-                  {a.created_at ? new Date(a.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  {a.created_at
+                    ? new Date(a.created_at).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
-    </div>
-  );
-}
-
-// ─── Turnos de hoy ───
-
-type AppointmentItem = {
-  id: string;
-  title: string;
-  customer_name: string;
-  start_at: string;
-  end_at: string;
-  status: string;
-  assigned_to?: string;
-  color?: string;
-};
-
-function TodayAppointments() {
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard-appointments-today'],
-    queryFn: () => apiRequest<{ items?: AppointmentItem[] }>(`/v1/appointments?from=${today}&to=${today}&limit=10`),
-    staleTime: 30_000,
-    retry: 1,
-  });
-
-  const items = data?.items ?? [];
-  const now = new Date();
-  const upcoming = items
-    .filter((a) => new Date(a.start_at) >= now)
-    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
-  const next = upcoming[0];
-
-  return (
-    <div className="card">
-      <div className="dash__chart-header">
-        <span className="dash__chart-metric--primary">{isLoading ? '…' : items.length}</span>
-      </div>
-      {isLoading ? (
-        <div className="spinner" />
-      ) : items.length === 0 ? (
-        <p className="dash__empty-hint">Sin turnos hoy</p>
-      ) : (
-        <>
-          {next && (
-            <div className="dash__next-appt">
-              <IconCalendar />
-              <div>
-                <div className="dash__next-appt-title">Próximo: {next.title || next.customer_name}</div>
-                <div className="dash__next-appt-meta">
-                  {new Date(next.start_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                  {next.assigned_to ? ` · ${next.assigned_to}` : ''}
-                </div>
-              </div>
-            </div>
-          )}
-          {items.slice(0, 5).map((a) => (
-            <div key={a.id} className="dash__performer">
-              <div
-                className="dash__appt-strip"
-                style={{ '--dash-accent': a.color || 'var(--color-primary)' } as CSSProperties}
-              />
-              <div className="dash__performer-info">
-                <div className="dash__performer-name">{a.title || a.customer_name}</div>
-                <div className="dash__performer-role">
-                  {new Date(a.start_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                  {' — '}
-                  {new Date(a.end_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-              <span
-                className={`badge dash__badge-xs ${a.status === 'confirmed' ? 'badge-success' : a.status === 'cancelled' ? 'badge-danger' : 'badge-neutral'}`}
-              >
-                {a.status}
-              </span>
-            </div>
-          ))}
-        </>
       )}
     </div>
   );
@@ -438,9 +415,7 @@ function Debtors() {
     <div className="card">
       <div className="dash__chart-header">
         {!isLoading && items.length > 0 && (
-          <span className="dash__chart-header-danger">
-            {fmtMoney(items.reduce((s, d) => s + d.total_debt, 0))}
-          </span>
+          <span className="dash__chart-header-danger">{fmtMoney(items.reduce((s, d) => s + d.total_debt, 0))}</span>
         )}
       </div>
       {isLoading ? (
@@ -469,7 +444,7 @@ function Debtors() {
 // ─── Página ───
 
 export function DashboardVisualPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Registra el search para que aparezca el input. Filtrado de gráficos pendiente.
   usePageSearch();
   return (
@@ -488,7 +463,7 @@ export function DashboardVisualPage() {
       <div className="dash__grid--3">
         <CashflowChart />
         <QuotesPipeline />
-        <TodayAppointments />
+        <SchedulingDaySummary client={schedulingClient} locale={language === 'en' ? 'en' : 'es'} />
       </div>
 
       <div className="dash__grid">

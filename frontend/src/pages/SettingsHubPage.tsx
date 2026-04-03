@@ -38,7 +38,9 @@ function SettingsDeepLink({ to, title, desc }: { to: string; title: string; desc
 const AdminPage = lazy(() => import('./AdminPage').then((m) => ({ default: m.AdminPage })));
 const BillingSection = lazy(() => import('./SettingsPage').then((m) => ({ default: m.BillingSettingsSection })));
 const ProfilePage = lazy(() => import('./SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const NotificationPreferencesPage = lazy(() => import('./NotificationPreferencesPage').then((m) => ({ default: m.NotificationPreferencesPage })));
+const NotificationPreferencesPage = lazy(() =>
+  import('./NotificationPreferencesPage').then((m) => ({ default: m.NotificationPreferencesPage })),
+);
 
 type Section =
   | null
@@ -60,7 +62,12 @@ const SETTING_SECTIONS: SectionCard[] = [
   { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: <IconBuilding /> },
   { id: 'appearance', label: 'Apariencia', desc: 'Tema, skin, logos y colores', icon: <IconPalette /> },
   { id: 'language', label: 'Idioma', desc: 'Idioma de la plataforma', icon: <IconGlobe /> },
-  { id: 'notifications', label: 'Notificaciones', desc: 'Preferencias de correo y canales de alerta', icon: <IconBell /> },
+  {
+    id: 'notifications',
+    label: 'Notificaciones',
+    desc: 'Preferencias de correo y canales de alerta',
+    icon: <IconBell />,
+  },
   { id: 'automation', label: 'Automatización', desc: 'Reglas del asistente y tareas proactivas', icon: <IconAlert /> },
   { id: 'gateway', label: 'Pagos y facturación', desc: 'Plan, pasarelas y métodos de cobro', icon: <IconCreditCard /> },
   { id: 'currencies', label: 'Monedas', desc: 'Monedas habilitadas', icon: <IconDollar /> },
@@ -120,7 +127,15 @@ function Toggle({
 
 function CompanyTab() {
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', website: '', country: '', city: '', state: '', zip: '', address: '',
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    country: '',
+    city: '',
+    state: '',
+    zip: '',
+    address: '',
   });
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -128,21 +143,79 @@ function CompanyTab() {
   return (
     <div className="card">
       <div className="stg__form-grid">
-        <div className="form-group"><label>Nombre completo</label><input aria-label="Nombre completo" value={form.name} onChange={set('name')} placeholder="Mi Empresa S.R.L." /></div>
-        <div className="form-group"><label>Email</label><input aria-label="Email" type="email" value={form.email} onChange={set('email')} placeholder="info@empresa.com" /></div>
-        <div className="form-group"><label>Teléfono</label><input aria-label="Teléfono" value={form.phone} onChange={set('phone')} placeholder="+54 11 1234-5678" /></div>
-        <div className="form-group"><label>Sitio web</label><input aria-label="Sitio web" value={form.website} onChange={set('website')} placeholder="https://empresa.com" /></div>
-        <div className="form-group"><label>País</label>
-          <select aria-label="País" value={form.country} onChange={set('country')}><option value="">Seleccionar</option><option>Argentina</option><option>Chile</option><option>Colombia</option><option>México</option><option>Perú</option><option>Uruguay</option></select>
+        <div className="form-group">
+          <label>Nombre completo</label>
+          <input
+            aria-label="Nombre completo"
+            value={form.name}
+            onChange={set('name')}
+            placeholder="Mi Empresa S.R.L."
+          />
         </div>
-        <div className="form-group"><label>Ciudad</label><input aria-label="Ciudad" value={form.city} onChange={set('city')} placeholder="Buenos Aires" /></div>
-        <div className="form-group"><label>Provincia</label><input aria-label="Provincia" value={form.state} onChange={set('state')} placeholder="CABA" /></div>
-        <div className="form-group"><label>Código postal</label><input aria-label="Código postal" value={form.zip} onChange={set('zip')} placeholder="C1000" /></div>
-        <div className="form-group stg__form-full"><label>Dirección</label><input aria-label="Dirección" value={form.address} onChange={set('address')} placeholder="Av. Corrientes 1234" /></div>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            aria-label="Email"
+            type="email"
+            value={form.email}
+            onChange={set('email')}
+            placeholder="info@empresa.com"
+          />
+        </div>
+        <div className="form-group">
+          <label>Teléfono</label>
+          <input aria-label="Teléfono" value={form.phone} onChange={set('phone')} placeholder="+54 11 1234-5678" />
+        </div>
+        <div className="form-group">
+          <label>Sitio web</label>
+          <input
+            aria-label="Sitio web"
+            value={form.website}
+            onChange={set('website')}
+            placeholder="https://empresa.com"
+          />
+        </div>
+        <div className="form-group">
+          <label>País</label>
+          <select aria-label="País" value={form.country} onChange={set('country')}>
+            <option value="">Seleccionar</option>
+            <option>Argentina</option>
+            <option>Chile</option>
+            <option>Colombia</option>
+            <option>México</option>
+            <option>Perú</option>
+            <option>Uruguay</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Ciudad</label>
+          <input aria-label="Ciudad" value={form.city} onChange={set('city')} placeholder="Buenos Aires" />
+        </div>
+        <div className="form-group">
+          <label>Provincia</label>
+          <input aria-label="Provincia" value={form.state} onChange={set('state')} placeholder="CABA" />
+        </div>
+        <div className="form-group">
+          <label>Código postal</label>
+          <input aria-label="Código postal" value={form.zip} onChange={set('zip')} placeholder="C1000" />
+        </div>
+        <div className="form-group stg__form-full">
+          <label>Dirección</label>
+          <input
+            aria-label="Dirección"
+            value={form.address}
+            onChange={set('address')}
+            placeholder="Av. Corrientes 1234"
+          />
+        </div>
       </div>
       <div className="stg__form-actions">
-        <button type="button" className="btn-secondary btn-sm">Resetear</button>
-        <button type="button" className="btn-primary btn-sm">Guardar</button>
+        <button type="button" className="btn-secondary btn-sm">
+          Resetear
+        </button>
+        <button type="button" className="btn-primary btn-sm">
+          Guardar
+        </button>
       </div>
     </div>
   );
@@ -165,12 +238,19 @@ function FirebaseNotifTab() {
     <div className="card">
       <div className="stg__form-grid">
         {fields.map((f) => (
-          <div key={f.label} className="form-group"><label>{f.label}</label><input aria-label={f.label} placeholder={f.placeholder} /></div>
+          <div key={f.label} className="form-group">
+            <label>{f.label}</label>
+            <input aria-label={f.label} placeholder={f.placeholder} />
+          </div>
         ))}
       </div>
       <div className="stg__form-actions">
-        <button type="button" className="btn-secondary btn-sm">Resetear</button>
-        <button type="button" className="btn-primary btn-sm">Guardar</button>
+        <button type="button" className="btn-secondary btn-sm">
+          Resetear
+        </button>
+        <button type="button" className="btn-primary btn-sm">
+          Guardar
+        </button>
       </div>
     </div>
   );
@@ -180,13 +260,21 @@ function FirebaseNotifTab() {
 
 function AlertChannelsTab() {
   const [channels, setChannels] = useState([
-    { id: 'mail', label: 'Email', desc: 'Notificaciones por correo electrónico', enabled: true, text: 'Se envió un nuevo mensaje a tu bandeja.' },
+    {
+      id: 'mail',
+      label: 'Email',
+      desc: 'Notificaciones por correo electrónico',
+      enabled: true,
+      text: 'Se envió un nuevo mensaje a tu bandeja.',
+    },
     { id: 'sms', label: 'SMS', desc: 'Notificaciones por mensaje de texto', enabled: false, text: '' },
     { id: 'push', label: 'Push', desc: 'Notificaciones push en el navegador', enabled: false, text: '' },
   ]);
 
-  const toggle = (id: string) => setChannels((prev) => prev.map((c) => c.id === id ? { ...c, enabled: !c.enabled } : c));
-  const setText = (id: string, text: string) => setChannels((prev) => prev.map((c) => c.id === id ? { ...c, text } : c));
+  const toggle = (id: string) =>
+    setChannels((prev) => prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)));
+  const setText = (id: string, text: string) =>
+    setChannels((prev) => prev.map((c) => (c.id === id ? { ...c, text } : c)));
 
   return (
     <div className="card">
@@ -201,14 +289,24 @@ function AlertChannelsTab() {
           </div>
           {ch.enabled && (
             <div className="form-group stg__form-group-mt">
-              <textarea aria-label={`Texto del mensaje para ${ch.label}`} rows={2} value={ch.text} onChange={(e) => setText(ch.id, e.target.value)} placeholder="Texto del mensaje…" />
+              <textarea
+                aria-label={`Texto del mensaje para ${ch.label}`}
+                rows={2}
+                value={ch.text}
+                onChange={(e) => setText(ch.id, e.target.value)}
+                placeholder="Texto del mensaje…"
+              />
             </div>
           )}
         </div>
       ))}
       <div className="stg__form-actions">
-        <button type="button" className="btn-secondary btn-sm">Resetear</button>
-        <button type="button" className="btn-primary btn-sm">Guardar</button>
+        <button type="button" className="btn-secondary btn-sm">
+          Resetear
+        </button>
+        <button type="button" className="btn-primary btn-sm">
+          Guardar
+        </button>
       </div>
     </div>
   );
@@ -249,8 +347,12 @@ function ThemeTab() {
         </div>
       </div>
       <div className="stg__form-actions">
-        <button type="button" className="btn-secondary btn-sm">Resetear</button>
-        <button type="button" className="btn-primary btn-sm">Guardar</button>
+        <button type="button" className="btn-secondary btn-sm">
+          Resetear
+        </button>
+        <button type="button" className="btn-primary btn-sm">
+          Guardar
+        </button>
       </div>
     </div>
   );
@@ -274,17 +376,28 @@ function CurrenciesTab() {
   const currencyText = useCallback((c: Currency) => `${c.name} ${c.code}`, []);
   const filtered = useSearch(items, currencyText, search);
 
-  const toggleActive = (id: string) => setItems((p) => p.map((c) => c.id === id ? { ...c, active: !c.active } : c));
+  const toggleActive = (id: string) => setItems((p) => p.map((c) => (c.id === id ? { ...c, active: !c.active } : c)));
   const remove = (id: string) => setItems((p) => p.filter((c) => c.id !== id));
 
   return (
     <div className="card">
       <div className="stg__crud-toolbar">
         <div className="stg__toolbar-spacer" />
-        <button type="button" className="btn-primary btn-sm">+ Agregar moneda</button>
+        <button type="button" className="btn-primary btn-sm">
+          + Agregar moneda
+        </button>
       </div>
       <table className="stg__crud-table">
-        <thead><tr><th>Nombre</th><th>Símbolo</th><th>Código</th><th>Cripto</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Símbolo</th>
+            <th>Código</th>
+            <th>Cripto</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
           {filtered.map((c) => (
             <tr key={c.id}>
@@ -292,11 +405,28 @@ function CurrenciesTab() {
               <td>{c.symbol}</td>
               <td>{c.code}</td>
               <td>{c.crypto ? <span className="badge badge-neutral">Sí</span> : '—'}</td>
-              <td><Toggle checked={c.active} ariaLabel={`Activar moneda ${c.name}`} onChange={() => toggleActive(c.id)} /></td>
+              <td>
+                <Toggle checked={c.active} ariaLabel={`Activar moneda ${c.name}`} onChange={() => toggleActive(c.id)} />
+              </td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" aria-label={`Editar ${c.name}`} title="Editar"><IconEdit /></button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" aria-label={`Eliminar ${c.name}`} title="Eliminar" onClick={() => remove(c.id)}><IconTrash /></button>
+                  <button
+                    type="button"
+                    className="stg__crud-action stg__crud-action--edit"
+                    aria-label={`Editar ${c.name}`}
+                    title="Editar"
+                  >
+                    <IconEdit />
+                  </button>
+                  <button
+                    type="button"
+                    className="stg__crud-action stg__crud-action--delete"
+                    aria-label={`Eliminar ${c.name}`}
+                    title="Eliminar"
+                    onClick={() => remove(c.id)}
+                  >
+                    <IconTrash />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -320,25 +450,50 @@ const DEFAULT_LANGUAGES: Language[] = [
 
 function LanguagesTab() {
   const [items, setItems] = useState(DEFAULT_LANGUAGES);
-  const toggle = (id: string) => setItems((p) => p.map((l) => l.id === id ? { ...l, active: !l.active } : l));
+  const toggle = (id: string) => setItems((p) => p.map((l) => (l.id === id ? { ...l, active: !l.active } : l)));
   const remove = (id: string) => setItems((p) => p.filter((l) => l.id !== id));
 
   return (
     <div className="card">
       <div className="stg__crud-toolbar">
-        <button type="button" className="btn-primary btn-sm">+ Agregar idioma</button>
+        <button type="button" className="btn-primary btn-sm">
+          + Agregar idioma
+        </button>
       </div>
       <table className="stg__crud-table">
-        <thead><tr><th>Idioma</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Idioma</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
           {items.map((l) => (
             <tr key={l.id}>
               <td className="stg__crud-cell-name">{l.name}</td>
-              <td><Toggle checked={l.active} ariaLabel={`Activar idioma ${l.name}`} onChange={() => toggle(l.id)} /></td>
+              <td>
+                <Toggle checked={l.active} ariaLabel={`Activar idioma ${l.name}`} onChange={() => toggle(l.id)} />
+              </td>
               <td>
                 <div className="stg__crud-actions">
-                  <button type="button" className="stg__crud-action stg__crud-action--edit" aria-label={`Editar ${l.name}`} title="Editar"><IconEdit /></button>
-                  <button type="button" className="stg__crud-action stg__crud-action--delete" aria-label={`Eliminar ${l.name}`} title="Eliminar" onClick={() => remove(l.id)}><IconTrash /></button>
+                  <button
+                    type="button"
+                    className="stg__crud-action stg__crud-action--edit"
+                    aria-label={`Editar ${l.name}`}
+                    title="Editar"
+                  >
+                    <IconEdit />
+                  </button>
+                  <button
+                    type="button"
+                    className="stg__crud-action stg__crud-action--delete"
+                    aria-label={`Eliminar ${l.name}`}
+                    title="Eliminar"
+                    onClick={() => remove(l.id)}
+                  >
+                    <IconTrash />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -353,12 +508,22 @@ function LanguagesTab() {
 
 function GatewayTab() {
   const gateways = [
-    { name: 'Mercado Pago', desc: 'Pagos con tarjeta, transferencia y QR', enabled: true, fields: ['Access Token', 'Public Key'] },
-    { name: 'Stripe', desc: 'Pagos internacionales con tarjeta', enabled: false, fields: ['Secret Key', 'Publishable Key', 'Webhook Secret'] },
+    {
+      name: 'Mercado Pago',
+      desc: 'Pagos con tarjeta, transferencia y QR',
+      enabled: true,
+      fields: ['Access Token', 'Public Key'],
+    },
+    {
+      name: 'Stripe',
+      desc: 'Pagos internacionales con tarjeta',
+      enabled: false,
+      fields: ['Secret Key', 'Publishable Key', 'Webhook Secret'],
+    },
     { name: 'PayPal', desc: 'Pagos vía PayPal', enabled: false, fields: ['Client ID', 'Client Secret'] },
   ];
   const [states, setStates] = useState(gateways.map((g) => g.enabled));
-  const toggleGw = (i: number) => setStates((p) => p.map((v, j) => j === i ? !v : v));
+  const toggleGw = (i: number) => setStates((p) => p.map((v, j) => (j === i ? !v : v)));
 
   return (
     <div className="stg__gateway-stack">
@@ -375,11 +540,16 @@ function GatewayTab() {
             <>
               <div className="stg__form-grid stg__form-grid--after-toggle">
                 {gw.fields.map((f) => (
-                  <div key={f} className="form-group"><label>{f}</label><input aria-label={`${gw.name}: ${f}`} placeholder={`Ingresá tu ${f}…`} /></div>
+                  <div key={f} className="form-group">
+                    <label>{f}</label>
+                    <input aria-label={`${gw.name}: ${f}`} placeholder={`Ingresá tu ${f}…`} />
+                  </div>
                 ))}
               </div>
               <div className="stg__form-actions">
-                <button type="button" className="btn-primary btn-sm">Guardar</button>
+                <button type="button" className="btn-primary btn-sm">
+                  Guardar
+                </button>
               </div>
             </>
           )}
@@ -396,9 +566,7 @@ export function SettingsHubPage() {
   const sectionTextFn = useCallback((s: SectionCard) => `${s.label} ${s.desc}`, []);
   const filteredSections = useSearch(SETTING_SECTIONS, sectionTextFn, settingsSearch);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [section, setSection] = useState<Section>(() =>
-    sectionFromSearchParam(searchParams.get('section')),
-  );
+  const [section, setSection] = useState<Section>(() => sectionFromSearchParam(searchParams.get('section')));
 
   useEffect(() => {
     setSection(sectionFromSearchParam(searchParams.get('section')));
@@ -427,12 +595,7 @@ export function SettingsHubPage() {
       >
         <div className="stg__nav-grid">
           {filteredSections.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className="stg__nav-card"
-              onClick={() => openSection(s.id)}
-            >
+            <button key={s.id} type="button" className="stg__nav-card" onClick={() => openSection(s.id)}>
               <div className="stg__nav-icon">{s.icon}</div>
               <div className="stg__nav-info">
                 <div className="stg__nav-title">{s.label}</div>
@@ -450,13 +613,17 @@ export function SettingsHubPage() {
       className="stg"
       title={activeSectionCard?.label ?? 'Ajustes'}
       lead={activeSectionCard?.desc}
-      actions={(
+      actions={
         <button type="button" className="stg__back" onClick={goBackToGrid}>
           ← Volver a Ajustes
         </button>
-      )}
+      }
     >
-      {section === 'profile' && <Suspense fallback={<div className="spinner" />}><ProfilePage embedded /></Suspense>}
+      {section === 'profile' && (
+        <Suspense fallback={<div className="spinner" />}>
+          <ProfilePage embedded />
+        </Suspense>
+      )}
       {section === 'notifications' && (
         <>
           <div className="card stg__card-mb">
@@ -478,24 +645,36 @@ export function SettingsHubPage() {
       {section === 'currencies' && <CurrenciesTab />}
       {section === 'gateway' && (
         <>
-          <Suspense fallback={<div className="spinner" />}><BillingSection /></Suspense>
+          <Suspense fallback={<div className="spinner" />}>
+            <BillingSection />
+          </Suspense>
           <GatewayTab />
         </>
       )}
       {section === 'appearance' && (
         <>
-          <Suspense fallback={<div className="spinner" />}><AdminPage section="appearance" embedded /></Suspense>
-          <div className="card"><AdminSkinSelector /></div>
+          <Suspense fallback={<div className="spinner" />}>
+            <AdminPage section="appearance" embedded />
+          </Suspense>
+          <div className="card">
+            <AdminSkinSelector />
+          </div>
           <ThemeTab />
         </>
       )}
       {section === 'language' && (
         <>
-          <div className="card"><LanguageSelector /></div>
+          <div className="card">
+            <LanguageSelector />
+          </div>
           <LanguagesTab />
         </>
       )}
-      {section === 'workspace' && <Suspense fallback={<div className="spinner" />}><AdminPage section="workspace" embedded /></Suspense>}
+      {section === 'workspace' && (
+        <Suspense fallback={<div className="spinner" />}>
+          <AdminPage section="workspace" embedded />
+        </Suspense>
+      )}
     </PageLayout>
   );
 }

@@ -21,16 +21,12 @@ import { vocab } from '../lib/vocabulary';
 function currentRuntimeContext(): ModuleRuntimeContext {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-    .toISOString()
-    .slice(0, 10);
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
   return { orgId: '', today, monthStart };
 }
 
 function buildInitialValues(fields: ModuleField[] | undefined, ctx: ModuleRuntimeContext): Record<string, string> {
-  return Object.fromEntries(
-    (fields ?? []).map((field) => [field.name, resolveModuleDefault(field.defaultValue, ctx)]),
-  );
+  return Object.fromEntries((fields ?? []).map((field) => [field.name, resolveModuleDefault(field.defaultValue, ctx)]));
 }
 
 function buildPath(
@@ -86,7 +82,9 @@ function buildBody(fields: ModuleField[] | undefined, values: Record<string, str
   return body;
 }
 
-function groupedModuleActions(module: ModuleDefinition): Array<{ key: string; title: string; actions: ModuleAction[] }> {
+function groupedModuleActions(
+  module: ModuleDefinition,
+): Array<{ key: string; title: string; actions: ModuleAction[] }> {
   const actions = module.actions ?? [];
   const order = module.actionGroupOrder;
   const labels = module.actionGroupLabels;
@@ -135,9 +133,7 @@ function stringifyValue(value: unknown): string {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return value
-      .map((item) => (typeof item === 'object' ? JSON.stringify(item) : String(item)))
-      .join(', ');
+    return value.map((item) => (typeof item === 'object' ? JSON.stringify(item) : String(item))).join(', ');
   }
   return JSON.stringify(value);
 }
@@ -283,6 +279,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 
   useEffect(() => {
     setValues(buildInitialValues(fields, runtime));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reiniciar solo cuando cambia la definición o el runtime key
   }, [defId, runtimeKey]);
 
   async function execute(currentValues: Record<string, string>): Promise<void> {
@@ -334,6 +331,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
         void execute(initial);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-ejecutar solo al cambiar de definición/runtime
   }, [defId, kind, runtimeKey]);
 
   function onSubmit(event: FormEvent): void {
@@ -373,16 +371,12 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
                     className={field.type === 'json' ? 'mono' : undefined}
                     placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     value={values[field.name] ?? ''}
-                    onChange={(event) =>
-                      setValues((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
                   />
                 ) : field.type === 'select' ? (
                   <select
                     value={values[field.name] ?? ''}
-                    onChange={(event) =>
-                      setValues((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
                   >
                     <option value="">{t('module.select.placeholder')}</option>
                     {field.options?.map((option) => (
@@ -396,9 +390,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
                     type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
                     placeholder={field.placeholder ? localizeText(field.placeholder) : undefined}
                     value={values[field.name] ?? ''}
-                    onChange={(event) =>
-                      setValues((current) => ({ ...current, [field.name]: event.target.value }))
-                    }
+                    onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
                   />
                 )}
               </div>
@@ -408,7 +400,11 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 
         <div className="actions-row module-actions-row">
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? t('common.status.processing') : kind === 'dataset' ? t('common.actions.update') : sentenceCase(localizeText((definition as ModuleAction).submitLabel ?? t('common.actions.run')))}
+            {loading
+              ? t('common.status.processing')
+              : kind === 'dataset'
+                ? t('common.actions.update')
+                : sentenceCase(localizeText((definition as ModuleAction).submitLabel ?? t('common.actions.run')))}
           </button>
           {kind === 'dataset' && (
             <button type="button" className="btn-secondary" onClick={() => void execute(values)} disabled={loading}>
@@ -428,10 +424,7 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 function NotFoundState() {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   return (
-    <PageLayout
-      title={sentenceCase(t('module.notFound.title'))}
-      lead={t('module.notFound.description')}
-    >
+    <PageLayout title={sentenceCase(t('module.notFound.title'))} lead={t('module.notFound.description')}>
       <div className="card">
         <div className="card-header">
           <h2>{sentenceCase(t('module.notFound.available'))}</h2>
@@ -453,28 +446,27 @@ function NotFoundState() {
 
 function ModuleOverviewCards({ module }: { module: ModuleDefinition }) {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
-  const showExplorerChrome =
-    (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
+  const showExplorerChrome = (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
   return (
     <>
       {module.helpIntro && <p className="module-help-intro">{localizeText(module.helpIntro)}</p>}
       {showExplorerChrome && (
-      <div className="stats-grid compact-grid">
-        {(module.datasets?.length ?? 0) > 0 && (
+        <div className="stats-grid compact-grid">
+          {(module.datasets?.length ?? 0) > 0 && (
+            <div className="stat-card">
+              <div className="stat-label">{sentenceCase(t('module.stats.datasets'))}</div>
+              <div className="stat-value">{module.datasets?.length ?? 0}</div>
+            </div>
+          )}
           <div className="stat-card">
-            <div className="stat-label">{sentenceCase(t('module.stats.datasets'))}</div>
-            <div className="stat-value">{module.datasets?.length ?? 0}</div>
+            <div className="stat-label">{sentenceCase(t('module.stats.actions'))}</div>
+            <div className="stat-value">{module.actions?.length ?? 0}</div>
           </div>
-        )}
-        <div className="stat-card">
-          <div className="stat-label">{sentenceCase(t('module.stats.actions'))}</div>
-          <div className="stat-value">{module.actions?.length ?? 0}</div>
+          <div className="stat-card">
+            <div className="stat-label">{sentenceCase(t('module.stats.consolePath'))}</div>
+            <div className="stat-value stat-value-sm mono">/modules/{module.id}</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">{sentenceCase(t('module.stats.consolePath'))}</div>
-          <div className="stat-value stat-value-sm mono">/modules/{module.id}</div>
-        </div>
-      </div>
       )}
 
       {module.setupGuide && module.setupGuide.steps.length > 0 && (
@@ -528,10 +520,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   }, [sessionQuery.data]);
 
   const configGroupKeys = module?.explorerConfigGroupKeys;
-  const allActionGroups = useMemo(
-    () => (module ? groupedModuleActions(module) : []),
-    [module],
-  );
+  const allActionGroups = useMemo(() => (module ? groupedModuleActions(module) : []), [module]);
   const visibleActionGroups = useMemo(() => {
     if (!module || !configGroupKeys?.length || showAllOperations) {
       return allActionGroups;
@@ -546,14 +535,15 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
     return <NotFoundState />;
   }
 
-  const showExplorerChrome =
-    (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
+  const showExplorerChrome = (module.datasets?.length ?? 0) > 0 || (module.actions?.length ?? 0) > 0;
   const summaryText = localizeText(vocab(module.summary)).trim();
   const headerActions = showExplorerChrome ? (
     <div className="module-runtime-card">
       <span>{t('module.runtime.activeOrg')}</span>
       <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
-      <small>{t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}</small>
+      <small>
+        {t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}
+      </small>
     </div>
   ) : undefined;
 
@@ -590,11 +580,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
       {module.actions && module.actions.length > 0 && (
         <div className="module-section">
           <div className="section-title-row">
-            <h2>
-              {sentenceCase(
-                configFocusActive ? t('module.sections.config') : t('module.sections.actions'),
-              )}
-            </h2>
+            <h2>{sentenceCase(configFocusActive ? t('module.sections.config') : t('module.sections.actions'))}</h2>
             <span className="badge badge-neutral">
               {configFocusActive ? visibleActionCount : module.actions.length}
             </span>
@@ -604,9 +590,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
                 className="btn btn-secondary btn-sm module-explorer-toggle"
                 onClick={() => setShowAllOperations((v) => !v)}
               >
-                {showAllOperations
-                  ? t('module.explorer.backToConfigOnly')
-                  : t('module.explorer.showAllOperations')}
+                {showAllOperations ? t('module.explorer.backToConfigOnly') : t('module.explorer.showAllOperations')}
               </button>
             )}
           </div>
@@ -663,7 +647,9 @@ export function ModulePage() {
   if (crudModuleQuery.data == null) {
     return (
       <PageLayout title="Módulo" lead="Cargando configuración y superficies disponibles.">
-        <div className="card"><p>Cargando modulo…</p></div>
+        <div className="card">
+          <p>Cargando modulo…</p>
+        </div>
       </PageLayout>
     );
   }

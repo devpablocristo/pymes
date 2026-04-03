@@ -186,7 +186,10 @@ export async function getAutoRepairWorkOrders(params?: {
 }
 
 /** Todas las páginas (cursor), para tablero Kanban y listas completas. */
-export async function getAllAutoRepairWorkOrders(options?: { search?: string; status?: string }): Promise<AutoRepairWorkOrder[]> {
+export async function getAllAutoRepairWorkOrders(options?: {
+  search?: string;
+  status?: string;
+}): Promise<AutoRepairWorkOrder[]> {
   const acc: AutoRepairWorkOrder[] = [];
   let after: string | undefined;
   const limit = 250;
@@ -301,7 +304,10 @@ export async function createAutoRepairSale(id: string): Promise<{ id: string }> 
 }
 
 export async function createAutoRepairPaymentLink(id: string): Promise<AutoRepairPaymentLink> {
-  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}/payment-link`, { method: 'POST', body: {} });
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/work-orders/${id}/payment-link`, {
+    method: 'POST',
+    body: {},
+  });
 }
 
 export const getWorkshopVehicles = getAutoRepairVehicles;

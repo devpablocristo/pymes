@@ -1,8 +1,8 @@
 package rbac
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	rbacdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/rbac/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -395,7 +396,7 @@ func memberDefaultAllows(resource, action string) bool {
 
 func isAdminRole(role string) bool {
 	role = strings.ToLower(strings.TrimSpace(role))
-	return role == "admin" || role == "org:admin"
+	return role == "org:admin" || authz.IsPrivilegedRole(role)
 }
 
 func permissionMapToResponse(m map[string]map[string]bool) map[string][]string {

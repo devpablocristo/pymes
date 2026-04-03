@@ -1,9 +1,5 @@
 import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
-import type {
-  CommercialChatRequest,
-  InsightNotificationsResponse,
-  PymesAssistantChatResponse,
-} from '../types/aiChat';
+import type { CommercialChatRequest, InsightNotificationsResponse, PymesAssistantChatResponse } from '../types/aiChat';
 
 function resolveAiBaseURLs(): string[] {
   const env = import.meta.env as Record<string, string | undefined>;

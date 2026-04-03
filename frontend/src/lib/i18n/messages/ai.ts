@@ -23,8 +23,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.chat.meta.agent': 'Agente',
     'ai.chat.meta.context': 'Contexto',
     'ai.chat.meta.manualRoute': 'Ruta manual',
-    'ai.chat.error.unreachable':
-      'No se pudo contactar al asistente. Revisá VITE_AI_API_URL y el servicio AI.',
+    'ai.chat.error.unreachable': 'No se pudo contactar al asistente. Revisá VITE_AI_API_URL y el servicio AI.',
     'ai.chat.action.confirmPending': 'Confirmo las acciones pendientes.',
     'ai.chat.action.confirmEcho': 'Confirmo: {{actions}}',
     'ai.chat.action.categoryPrefix': 'Categoría: {{label}}',
@@ -33,8 +32,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.chat.newConversation': 'Nueva conversación',
     'ai.chat.input.humanPlaceholder': 'Escribí un mensaje…',
     'ai.chat.input.routePlaceholder': 'Escribí tu consulta sobre {{label}}…',
-    'ai.chat.input.defaultPlaceholder':
-      'Ej.: resumí ventas del mes o preguntá libre y te pido contexto si hace falta…',
+    'ai.chat.input.defaultPlaceholder': 'Ej.: resumí ventas del mes o preguntá libre y te pido contexto si hace falta…',
     'ai.chat.table.empty': 'Sin datos para mostrar.',
     'ai.chat.send': 'Enviar',
     'ai.chat.sending': 'Enviando…',
@@ -83,8 +81,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.chat.meta.agent': 'Agent',
     'ai.chat.meta.context': 'Context',
     'ai.chat.meta.manualRoute': 'Manual route',
-    'ai.chat.error.unreachable':
-      'Could not reach the assistant. Check VITE_AI_API_URL and the AI service.',
+    'ai.chat.error.unreachable': 'Could not reach the assistant. Check VITE_AI_API_URL and the AI service.',
     'ai.chat.action.confirmPending': 'I confirm the pending actions.',
     'ai.chat.action.confirmEcho': 'I confirm: {{actions}}',
     'ai.chat.action.categoryPrefix': 'Category: {{label}}',

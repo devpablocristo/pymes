@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal, getBillingStatus } from '../lib/api';
 import { formatBillingPageError } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
@@ -30,7 +30,7 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
     [t],
   );
 
-  async function load(): Promise<void> {
+  const load = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
       const resp = await getBillingStatus();
@@ -49,11 +49,11 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [t]);
 
   useEffect(() => {
     void load();
-  }, [session.auth.org_id]);
+  }, [load, session.auth.org_id]);
 
   const returnUrl = `${window.location.origin}${settingsReturnPath}`;
 
@@ -79,11 +79,10 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
 
   const statusLabel =
     billing?.status != null
-      ? billingStatusLabels[billing.status as keyof typeof billingStatusLabels] ?? billing.status
+      ? (billingStatusLabels[billing.status as keyof typeof billingStatusLabels] ?? billing.status)
       : '—';
 
-  const planLabel =
-    billing != null && billing.plan_code ? t(`billing.plan.${billing.plan_code}`) : '—';
+  const planLabel = billing != null && billing.plan_code ? t(`billing.plan.${billing.plan_code}`) : '—';
 
   const periodEndLabel =
     billing?.current_period_end != null
@@ -91,8 +90,7 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
       : '—';
 
   const statusBadgeClass =
-    billing != null &&
-    (billing.status === 'active' || billing.status === 'trialing')
+    billing != null && (billing.status === 'active' || billing.status === 'trialing')
       ? 'badge-success'
       : 'badge-warning';
 
@@ -121,11 +119,7 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
                 <th scope="row">{t('profile.billing.status')}</th>
                 <td>
                   <span className="profile-session-value">
-                    {billing != null ? (
-                      <span className={`badge ${statusBadgeClass}`}>{statusLabel}</span>
-                    ) : (
-                      '—'
-                    )}
+                    {billing != null ? <span className={`badge ${statusBadgeClass}`}>{statusLabel}</span> : '—'}
                   </span>
                 </td>
               </tr>
@@ -138,7 +132,9 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
             </tbody>
           </table>
 
-          {!billing && !banner && <p className="text-muted profile-billing-load-error">{t('profile.billing.loadError')}</p>}
+          {!billing && !banner && (
+            <p className="text-muted profile-billing-load-error">{t('profile.billing.loadError')}</p>
+          )}
 
           {isAdmin && (
             <p className="profile-billing-actions profile-billing-actions--tight">

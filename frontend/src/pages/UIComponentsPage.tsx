@@ -8,15 +8,46 @@ import { PRODUCT_PALETTE } from '../lib/productPalette';
 import { PageLayout } from '../components/PageLayout';
 import './UIComponentsPage.css';
 
-type Tab = 'alerts' | 'avatars' | 'badges' | 'buttons' | 'cards' | 'carousel' | 'colors' | 'dropdowns' | 'pagination' | 'progress' | 'radio' | 'rating' | 'switches' | 'tabs' | 'tags' | 'tooltips' | 'typography' | 'lists' | 'videos';
+type Tab =
+  | 'alerts'
+  | 'avatars'
+  | 'badges'
+  | 'buttons'
+  | 'cards'
+  | 'carousel'
+  | 'colors'
+  | 'dropdowns'
+  | 'pagination'
+  | 'progress'
+  | 'radio'
+  | 'rating'
+  | 'switches'
+  | 'tabs'
+  | 'tags'
+  | 'tooltips'
+  | 'typography'
+  | 'lists'
+  | 'videos';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'alerts', label: 'Alertas' }, { id: 'avatars', label: 'Avatares' }, { id: 'badges', label: 'Badges' },
-  { id: 'buttons', label: 'Botones' }, { id: 'cards', label: 'Cards' }, { id: 'carousel', label: 'Carrusel' },
-  { id: 'colors', label: 'Colores' }, { id: 'dropdowns', label: 'Dropdowns' }, { id: 'pagination', label: 'Paginación' },
-  { id: 'progress', label: 'Progreso' }, { id: 'radio', label: 'Radio' }, { id: 'rating', label: 'Estrellas' },
-  { id: 'switches', label: 'Switches' }, { id: 'tabs', label: 'Tabs' }, { id: 'tags', label: 'Tags' },
-  { id: 'tooltips', label: 'Tooltips' }, { id: 'typography', label: 'Tipografía' }, { id: 'lists', label: 'Listas' },
+  { id: 'alerts', label: 'Alertas' },
+  { id: 'avatars', label: 'Avatares' },
+  { id: 'badges', label: 'Badges' },
+  { id: 'buttons', label: 'Botones' },
+  { id: 'cards', label: 'Cards' },
+  { id: 'carousel', label: 'Carrusel' },
+  { id: 'colors', label: 'Colores' },
+  { id: 'dropdowns', label: 'Dropdowns' },
+  { id: 'pagination', label: 'Paginación' },
+  { id: 'progress', label: 'Progreso' },
+  { id: 'radio', label: 'Radio' },
+  { id: 'rating', label: 'Estrellas' },
+  { id: 'switches', label: 'Switches' },
+  { id: 'tabs', label: 'Tabs' },
+  { id: 'tags', label: 'Tags' },
+  { id: 'tooltips', label: 'Tooltips' },
+  { id: 'typography', label: 'Tipografía' },
+  { id: 'lists', label: 'Listas' },
   { id: 'videos', label: 'Videos' },
 ];
 
@@ -24,8 +55,12 @@ function AlertsSection() {
   return (
     <div className="card">
       <div className="ui-catalog__alert ui-catalog__alert--info">Información — Este es un mensaje informativo.</div>
-      <div className="ui-catalog__alert ui-catalog__alert--success">Éxito — La operación se completó correctamente.</div>
-      <div className="ui-catalog__alert ui-catalog__alert--warning">Advertencia — Revisá los datos antes de continuar.</div>
+      <div className="ui-catalog__alert ui-catalog__alert--success">
+        Éxito — La operación se completó correctamente.
+      </div>
+      <div className="ui-catalog__alert ui-catalog__alert--warning">
+        Advertencia — Revisá los datos antes de continuar.
+      </div>
       <div className="ui-catalog__alert ui-catalog__alert--danger">Error — No se pudo completar la acción.</div>
     </div>
   );
@@ -33,7 +68,10 @@ function AlertsSection() {
 
 function AvatarsSection() {
   const sizes = [
-    { cls: 'sm', label: 'SM' }, { cls: 'md', label: 'MD' }, { cls: 'lg', label: 'LG' }, { cls: 'xl', label: 'XL' },
+    { cls: 'sm', label: 'SM' },
+    { cls: 'md', label: 'MD' },
+    { cls: 'lg', label: 'LG' },
+    { cls: 'xl', label: 'XL' },
   ];
   return (
     <div className="card">
@@ -87,18 +125,34 @@ function ButtonsSection() {
   return (
     <div className="card">
       <div className="ui-catalog__row">
-        <button type="button" className="btn-primary">Primary</button>
-        <button type="button" className="btn-secondary">Secondary</button>
-        <button type="button" className="btn-success">Success</button>
-        <button type="button" className="btn-danger">Danger</button>
+        <button type="button" className="btn-primary">
+          Primary
+        </button>
+        <button type="button" className="btn-secondary">
+          Secondary
+        </button>
+        <button type="button" className="btn-success">
+          Success
+        </button>
+        <button type="button" className="btn-danger">
+          Danger
+        </button>
       </div>
       <div className="ui-catalog__row">
-        <button type="button" className="btn-primary btn-sm">Pequeño</button>
-        <button type="button" className="btn-primary">Normal</button>
+        <button type="button" className="btn-primary btn-sm">
+          Pequeño
+        </button>
+        <button type="button" className="btn-primary">
+          Normal
+        </button>
       </div>
       <div className="ui-catalog__row">
-        <button type="button" className="btn-primary" disabled>Deshabilitado</button>
-        <button type="button" className="btn-secondary" disabled>Deshabilitado</button>
+        <button type="button" className="btn-primary" disabled>
+          Deshabilitado
+        </button>
+        <button type="button" className="btn-secondary" disabled>
+          Deshabilitado
+        </button>
       </div>
     </div>
   );
@@ -133,7 +187,14 @@ function CarouselSection() {
         Slide {idx + 1}
       </div>
       <div className="ui-catalog__row ui-catalog__row--carousel-dots">
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx - 1 + slides.length) % slides.length)} aria-label="Slide anterior">&larr;</button>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => setIdx((idx - 1 + slides.length) % slides.length)}
+          aria-label="Slide anterior"
+        >
+          &larr;
+        </button>
         {slides.map((_, i) => (
           <button
             key={i}
@@ -144,7 +205,14 @@ function CarouselSection() {
             aria-current={i === idx ? 'true' : undefined}
           />
         ))}
-        <button type="button" className="btn-secondary btn-sm" onClick={() => setIdx((idx + 1) % slides.length)} aria-label="Slide siguiente">&rarr;</button>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => setIdx((idx + 1) % slides.length)}
+          aria-label="Slide siguiente"
+        >
+          &rarr;
+        </button>
       </div>
     </div>
   );
@@ -160,7 +228,11 @@ function ColorsSection() {
               className="ui-catalog__swatch-color ui-catalog__swatch-color--token"
               style={{ '--ui-token': c.token } as CSSProperties}
             />
-            <div className="ui-catalog__swatch-info"><strong>{c.label}</strong><br />{c.hex}</div>
+            <div className="ui-catalog__swatch-info">
+              <strong>{c.label}</strong>
+              <br />
+              {c.hex}
+            </div>
           </div>
         ))}
       </div>
@@ -174,7 +246,9 @@ function DropdownsSection() {
     <div className="card">
       <div className="ui-catalog__row">
         <div className="ui-catalog__dropdown-wrap">
-          <button type="button" className="btn-primary btn-sm" onClick={() => setOpen(!open)}>Dropdown ▾</button>
+          <button type="button" className="btn-primary btn-sm" onClick={() => setOpen(!open)}>
+            Dropdown ▾
+          </button>
           {open && (
             <div className="ui-catalog__dropdown-panel">
               {['Acción 1', 'Acción 2', 'Acción 3'].map((a) => (
@@ -200,11 +274,22 @@ function PaginationSection() {
   return (
     <div className="card">
       <div className="ui-catalog__row">
-        <button type="button" className="inv__page-btn" onClick={() => setPage(Math.max(1, page - 1))}>&larr;</button>
+        <button type="button" className="inv__page-btn" onClick={() => setPage(Math.max(1, page - 1))}>
+          &larr;
+        </button>
         {[1, 2, 3, 4, 5].map((p) => (
-          <button key={p} type="button" className={`inv__page-btn ${page === p ? 'inv__page-btn--active' : ''}`} onClick={() => setPage(p)}>{p}</button>
+          <button
+            key={p}
+            type="button"
+            className={`inv__page-btn ${page === p ? 'inv__page-btn--active' : ''}`}
+            onClick={() => setPage(p)}
+          >
+            {p}
+          </button>
         ))}
-        <button type="button" className="inv__page-btn" onClick={() => setPage(Math.min(5, page + 1))}>&rarr;</button>
+        <button type="button" className="inv__page-btn" onClick={() => setPage(Math.min(5, page + 1))}>
+          &rarr;
+        </button>
       </div>
     </div>
   );
@@ -245,12 +330,22 @@ function RadioSection() {
   return (
     <div className="card">
       <div className="ui-catalog__stack">
-        {[{ id: 'a', label: 'Opción A' }, { id: 'b', label: 'Opción B' }, { id: 'c', label: 'Opción C (deshabilitada)' }].map((o) => (
+        {[
+          { id: 'a', label: 'Opción A' },
+          { id: 'b', label: 'Opción B' },
+          { id: 'c', label: 'Opción C (deshabilitada)' },
+        ].map((o) => (
           <label
             key={o.id}
             className={`ui-catalog__radio-label ${o.id === 'c' ? 'ui-catalog__radio-label--disabled' : ''}`}
           >
-            <input type="radio" name="ui-radio" checked={v === o.id} onChange={() => setV(o.id)} disabled={o.id === 'c'} />
+            <input
+              type="radio"
+              name="ui-radio"
+              checked={v === o.id}
+              onChange={() => setV(o.id)}
+              disabled={o.id === 'c'}
+            />
             {o.label}
           </label>
         ))}
@@ -265,7 +360,15 @@ function RatingSection() {
     <div className="card">
       <div className="ui-catalog__stars">
         {[1, 2, 3, 4, 5].map((i) => (
-          <button key={i} type="button" className={`ui-catalog__star ${i <= rating ? 'ui-catalog__star--filled' : ''}`} onClick={() => setRating(i)} aria-label={`Puntuar ${i} de 5`}><IconStar filled={i <= rating} /></button>
+          <button
+            key={i}
+            type="button"
+            className={`ui-catalog__star ${i <= rating ? 'ui-catalog__star--filled' : ''}`}
+            onClick={() => setRating(i)}
+            aria-label={`Puntuar ${i} de 5`}
+          >
+            <IconStar filled={i <= rating} />
+          </button>
         ))}
       </div>
       <p className="ui-catalog__rating-caption">Seleccionado: {rating}/5</p>
@@ -304,12 +407,17 @@ function TabsSection() {
     <div className="card">
       <div className="ui-catalog__preview-tabs">
         {['General', 'Perfil', 'Seguridad'].map((label, i) => (
-          <button key={label} type="button" className={`ui-catalog__preview-tab ${t === i ? 'ui-catalog__preview-tab--active' : ''}`} onClick={() => setT(i)}>{label}</button>
+          <button
+            key={label}
+            type="button"
+            className={`ui-catalog__preview-tab ${t === i ? 'ui-catalog__preview-tab--active' : ''}`}
+            onClick={() => setT(i)}
+          >
+            {label}
+          </button>
         ))}
       </div>
-      <p className="ui-catalog__tab-lead">
-        Contenido de la pestaña "{['General', 'Perfil', 'Seguridad'][t]}".
-      </p>
+      <p className="ui-catalog__tab-lead">Contenido de la pestaña "{['General', 'Perfil', 'Seguridad'][t]}".</p>
     </div>
   );
 }
@@ -341,10 +449,14 @@ function TooltipsSection() {
     <div className="card">
       <div className="ui-catalog__row">
         {['Arriba', 'Abajo', 'Izquierda', 'Derecha'].map((dir) => (
-          <button key={dir} type="button" className="btn-secondary btn-sm" title={`Tooltip ${dir.toLowerCase()}`}>Hover: {dir}</button>
+          <button key={dir} type="button" className="btn-secondary btn-sm" title={`Tooltip ${dir.toLowerCase()}`}>
+            Hover: {dir}
+          </button>
         ))}
       </div>
-      <p className="ui-catalog__hint-muted">Pasá el cursor sobre los botones para ver tooltips nativos del navegador.</p>
+      <p className="ui-catalog__hint-muted">
+        Pasá el cursor sobre los botones para ver tooltips nativos del navegador.
+      </p>
     </div>
   );
 }
@@ -358,7 +470,9 @@ function TypographySection() {
       <h4>Heading 4</h4>
       <p className="ui-catalog__paragraph-spaced">
         Texto de párrafo normal. <strong>Negrita.</strong> <em>Itálica.</em>{' '}
-        <a href="#" onClick={(e) => e.preventDefault()}>Enlace.</a>{' '}
+        <a href="#" onClick={(e) => e.preventDefault()}>
+          Enlace.
+        </a>{' '}
         <code className="ui-catalog__code-inline">código inline</code>
       </p>
       <blockquote className="ui-catalog__blockquote">
@@ -387,18 +501,37 @@ function VideosSection() {
   return (
     <div className="card">
       <div className="ui-catalog__video-wrap">
-        <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video embebido" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        <iframe
+          src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+          title="Video embebido"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
       </div>
     </div>
   );
 }
 
 const TAB_COMPONENTS: Record<Tab, () => JSX.Element> = {
-  alerts: AlertsSection, avatars: AvatarsSection, badges: BadgesSection, buttons: ButtonsSection,
-  cards: CardsSection, carousel: CarouselSection, colors: ColorsSection, dropdowns: DropdownsSection,
-  pagination: PaginationSection, progress: ProgressSection, radio: RadioSection, rating: RatingSection,
-  switches: SwitchesSection, tabs: TabsSection, tags: TagsSection, tooltips: TooltipsSection,
-  typography: TypographySection, lists: ListsSection, videos: VideosSection,
+  alerts: AlertsSection,
+  avatars: AvatarsSection,
+  badges: BadgesSection,
+  buttons: ButtonsSection,
+  cards: CardsSection,
+  carousel: CarouselSection,
+  colors: ColorsSection,
+  dropdowns: DropdownsSection,
+  pagination: PaginationSection,
+  progress: ProgressSection,
+  radio: RadioSection,
+  rating: RatingSection,
+  switches: SwitchesSection,
+  tabs: TabsSection,
+  tags: TagsSection,
+  tooltips: TooltipsSection,
+  typography: TypographySection,
+  lists: ListsSection,
+  videos: VideosSection,
 };
 
 export function UIComponentsPage() {
@@ -413,7 +546,12 @@ export function UIComponentsPage() {
     >
       <div className="ui-catalog__tabs">
         {TABS.map((t) => (
-          <button key={t.id} type="button" className={`ui-catalog__tab ${tab === t.id ? 'ui-catalog__tab--active' : ''}`} onClick={() => setTab(t.id)}>
+          <button
+            key={t.id}
+            type="button"
+            className={`ui-catalog__tab ${tab === t.id ? 'ui-catalog__tab--active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
             {t.label}
           </button>
         ))}

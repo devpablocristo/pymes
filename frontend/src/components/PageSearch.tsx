@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- hooks acoplados al Context del mismo archivo */
 /**
  * Buscador de página — vive en el Shell, pero se incrusta en la cabecera (`PageLayout`)
  * para quedar alineado con el título principal cuando la página activa se registra.
@@ -28,7 +29,7 @@ const PageSearchContext = createContext<PageSearchContextValue>({
 });
 
 /** true solo dentro de <PageSearchProvider> (Shell); el resto usa búsqueda inline del CRUD. */
-export const PageSearchShellContext = createContext(false);
+const PageSearchShellContext = createContext(false);
 
 /**
  * Hook que registra la página como consumidora del search y devuelve el query.

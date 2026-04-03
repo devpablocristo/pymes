@@ -8,13 +8,18 @@ const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
 const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/react', import.meta.url));
 const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
+const tanstackReactQuery = fileURLToPath(new URL('./node_modules/@tanstack/react-query', import.meta.url));
 const coreBrowserIndex = fileURLToPath(new URL('../../core/browser/ts/src/index.ts', import.meta.url));
 const coreBrowserCrud = fileURLToPath(new URL('../../core/browser/ts/src/crud/index.ts', import.meta.url));
 const coreBrowserSearch = fileURLToPath(new URL('../../core/browser/ts/src/search/index.ts', import.meta.url));
 const coreBrowserStorage = fileURLToPath(new URL('../../core/browser/ts/src/storage.ts', import.meta.url));
 const modulesCrudUiIndex = fileURLToPath(new URL('../../modules/crud/ui/ts/src/index.ts', import.meta.url));
 const modulesCrudUiCsv = fileURLToPath(new URL('../../modules/crud/ui/ts/src/csv.ts', import.meta.url));
+const modulesCalendarBoardIndex = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
+const modulesCalendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
 const modulesKanbanBoardIndex = fileURLToPath(new URL('../../modules/kanban/board/ts/src/index.ts', import.meta.url));
+const modulesSchedulingIndex = fileURLToPath(new URL('../../modules/scheduling/ts/src/index.ts', import.meta.url));
+const modulesSchedulingStyles = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.css', import.meta.url));
 const modulesShellSidebarIndex = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
 const modulesShellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
 
@@ -22,19 +27,25 @@ export default defineConfig({
   envDir: '..',
   plugins: [react()],
   resolve: {
+    preserveSymlinks: true,
     alias: [
       { find: '@fullcalendar/core', replacement: fullCalendarCore },
       { find: '@fullcalendar/daygrid', replacement: fullCalendarDayGrid },
       { find: '@fullcalendar/interaction', replacement: fullCalendarInteraction },
       { find: '@fullcalendar/react', replacement: fullCalendarReact },
       { find: '@fullcalendar/timegrid', replacement: fullCalendarTimeGrid },
+      { find: '@tanstack/react-query', replacement: tanstackReactQuery },
       { find: '@devpablocristo/core-browser/crud', replacement: coreBrowserCrud },
       { find: '@devpablocristo/core-browser/search', replacement: coreBrowserSearch },
       { find: '@devpablocristo/core-browser/storage', replacement: coreBrowserStorage },
       { find: '@devpablocristo/core-browser', replacement: coreBrowserIndex },
+      { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: modulesCalendarBoardStyles },
+      { find: '@devpablocristo/modules-calendar-board', replacement: modulesCalendarBoardIndex },
       { find: '@devpablocristo/modules-crud-ui/csv', replacement: modulesCrudUiCsv },
       { find: '@devpablocristo/modules-crud-ui', replacement: modulesCrudUiIndex },
       { find: '@devpablocristo/modules-kanban-board', replacement: modulesKanbanBoardIndex },
+      { find: /^@devpablocristo\/modules-scheduling\/styles\.css$/, replacement: modulesSchedulingStyles },
+      { find: /^@devpablocristo\/modules-scheduling$/, replacement: modulesSchedulingIndex },
       { find: '@devpablocristo/modules-shell-sidebar/styles.css', replacement: modulesShellSidebarStyles },
       { find: '@devpablocristo/modules-shell-sidebar', replacement: modulesShellSidebarIndex },
     ],
@@ -56,7 +67,7 @@ export default defineConfig({
             if (id.includes('@tanstack/react-query')) {
               return 'vendor-query';
             }
-            if (id.includes('@devpablocristo/modules-kanban-board') || id.includes('@hello-pangea/dnd') || id.includes('@dnd-kit/')) {
+            if (id.includes('@devpablocristo/modules-kanban-board') || id.includes('@dnd-kit/')) {
               return 'vendor-kanban';
             }
             if (id.includes('@devpablocristo/modules-crud-ui')) {

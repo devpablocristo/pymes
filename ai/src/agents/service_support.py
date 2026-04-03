@@ -336,7 +336,8 @@ async def _build_external_sales_tools(
             "address": str(payload.get("business_address", "")).strip(),
             "phone": str(payload.get("business_phone", "")).strip(),
             "email": str(payload.get("business_email", "")).strip(),
-            "appointments_enabled": bool(payload.get("appointments_enabled", False)),
+            "scheduling_enabled": bool(payload.get("scheduling_enabled", payload.get("appointments_enabled", False))),
+            "appointments_enabled": bool(payload.get("scheduling_enabled", payload.get("appointments_enabled", False))),
         }
 
     async def _get_public_services(org_id: str, limit: int = 20) -> dict[str, Any]:

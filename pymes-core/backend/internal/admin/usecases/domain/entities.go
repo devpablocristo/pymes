@@ -36,9 +36,17 @@ type TenantSettings struct {
 	BusinessAddress          string         `json:"business_address"`
 	BusinessPhone            string         `json:"business_phone"`
 	BusinessEmail            string         `json:"business_email"`
+	TeamSize                 string         `json:"team_size"`
+	Sells                    string         `json:"sells"`
+	ClientLabel              string         `json:"client_label"`
+	UsesBilling              bool           `json:"uses_billing"`
+	PaymentMethod            string         `json:"payment_method"`
+	Vertical                 string         `json:"vertical"`
+	OnboardingCompletedAt    *time.Time     `json:"onboarding_completed_at,omitempty"`
 	WAQuoteTemplate          string         `json:"wa_quote_template"`
 	WAReceiptTemplate        string         `json:"wa_receipt_template"`
 	WADefaultCountryCode     string         `json:"wa_default_country_code"`
+	SchedulingEnabled        bool           `json:"scheduling_enabled"`
 	AppointmentsEnabled      bool           `json:"appointments_enabled"`
 	AppointmentLabel         string         `json:"appointment_label"`
 	AppointmentReminderHours int            `json:"appointment_reminder_hours"`
@@ -74,9 +82,17 @@ type TenantSettingsPatch struct {
 	BusinessAddress          *string        `json:"business_address,omitempty"`
 	BusinessPhone            *string        `json:"business_phone,omitempty"`
 	BusinessEmail            *string        `json:"business_email,omitempty"`
+	TeamSize                 *string        `json:"team_size,omitempty"`
+	Sells                    *string        `json:"sells,omitempty"`
+	ClientLabel              *string        `json:"client_label,omitempty"`
+	UsesBilling              *bool          `json:"uses_billing,omitempty"`
+	PaymentMethod            *string        `json:"payment_method,omitempty"`
+	Vertical                 *string        `json:"vertical,omitempty"`
+	OnboardingCompletedAt    *time.Time     `json:"onboarding_completed_at,omitempty"`
 	WAQuoteTemplate          *string        `json:"wa_quote_template,omitempty"`
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`
+	SchedulingEnabled        *bool          `json:"scheduling_enabled,omitempty"`
 	AppointmentsEnabled      *bool          `json:"appointments_enabled,omitempty"`
 	AppointmentLabel         *string        `json:"appointment_label,omitempty"`
 	AppointmentReminderHours *int           `json:"appointment_reminder_hours,omitempty"`
@@ -91,6 +107,74 @@ type TenantSettingsPatch struct {
 	ShowQRInPDF              *bool          `json:"show_qr_in_pdf,omitempty"`
 	WAPaymentTemplate        *string        `json:"wa_payment_template,omitempty"`
 	WAPaymentLinkTemplate    *string        `json:"wa_payment_link_template,omitempty"`
+}
+
+var validVerticals = map[string]struct{}{
+	"none":          {},
+	"professionals": {},
+	"workshops":     {},
+	"bike_shop":     {},
+	"beauty":        {},
+	"restaurants":   {},
+}
+
+var validTeamSizes = map[string]struct{}{
+	"solo":   {},
+	"small":  {},
+	"medium": {},
+	"large":  {},
+}
+
+var validSells = map[string]struct{}{
+	"products": {},
+	"services": {},
+	"both":     {},
+	"unsure":   {},
+}
+
+var validPaymentMethods = map[string]struct{}{
+	"cash":     {},
+	"transfer": {},
+	"card":     {},
+	"mixed":    {},
+}
+
+func NormalizeEnum(raw string, allowed map[string]struct{}, field string) (string, error) {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	if value == "" {
+		return "", nil
+	}
+	if _, ok := allowed[value]; !ok {
+		return "", fmt.Errorf("%s: invalid value %q", field, raw)
+	}
+	return value, nil
+}
+
+func NormalizeClientLabel(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if utf8.RuneCountInString(value) > 80 {
+		return "", fmt.Errorf("client_label: maximum 80 characters")
+	}
+	return value, nil
+}
+
+func NormalizeVertical(raw string) (string, error) {
+	return NormalizeEnum(raw, validVerticals, "vertical")
+}
+
+func NormalizeTeamSize(raw string) (string, error) {
+	return NormalizeEnum(raw, validTeamSizes, "team_size")
+}
+
+func NormalizeSells(raw string) (string, error) {
+	return NormalizeEnum(raw, validSells, "sells")
+}
+
+func NormalizePaymentMethod(raw string) (string, error) {
+	return NormalizeEnum(raw, validPaymentMethods, "payment_method")
 }
 
 // NormalizeSupportedCurrencies valida y normaliza códigos (3–8 caracteres alfanuméricos; máx. 16).

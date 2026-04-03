@@ -3,12 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
-import {
-  getDashboard,
-  getMe,
-  resetDashboard,
-  saveDashboard,
-} from '../lib/api';
+import { getDashboard, getMe, resetDashboard, saveDashboard } from '../lib/api';
 import { DashboardBoard } from '../dashboard/components/DashboardBoard';
 import { WidgetCatalog } from '../dashboard/components/WidgetCatalog';
 import { getVisibleWidgetKeys } from '../lib/profileFilters';
@@ -17,11 +12,7 @@ import { useI18n } from '../lib/i18n';
 import { greetingDisplayName } from '../lib/profileDisplay';
 import { getTenantProfile } from '../lib/tenantProfile';
 import type { MeProfileResponse } from '../lib/types';
-import {
-  type DashboardContext,
-  type DashboardLayoutItem,
-  type DashboardWidgetDefinition,
-} from '../dashboard/types';
+import { type DashboardContext, type DashboardLayoutItem, type DashboardWidgetDefinition } from '../dashboard/types';
 import {
   moveLayoutItem,
   packLayoutItems,
@@ -71,12 +62,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (dashboardQuery.data && !editing) {
-      setDraftItems(
-        packLayoutItems(
-          dashboardQuery.data.layout.items,
-          dashboardQuery.data.available_widgets,
-        ),
-      );
+      setDraftItems(packLayoutItems(dashboardQuery.data.layout.items, dashboardQuery.data.available_widgets));
     }
   }, [dashboardQuery.data, editing]);
 
@@ -85,10 +71,7 @@ export function DashboardPage() {
     () => (dashboardQuery.data?.available_widgets ?? []).filter((w) => profileWidgetKeys.has(w.widget_key)),
     [dashboardQuery.data?.available_widgets, profileWidgetKeys],
   );
-  const normalizedDraft = useMemo(
-    () => packLayoutItems(draftItems, availableWidgets),
-    [draftItems, availableWidgets],
-  );
+  const normalizedDraft = useMemo(() => packLayoutItems(draftItems, availableWidgets), [draftItems, availableWidgets]);
   const dirty = dashboardQuery.data
     ? serializeLayout(normalizedDraft, availableWidgets) !==
       serializeLayout(dashboardQuery.data.layout.items, availableWidgets)
@@ -96,9 +79,7 @@ export function DashboardPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () =>
-      saveDashboard(
-        toDashboardSavePayload(String(selectedContext), normalizedDraft, availableWidgets),
-      ),
+      saveDashboard(toDashboardSavePayload(String(selectedContext), normalizedDraft, availableWidgets)),
     onSuccess: (data) => {
       queryClient.setQueryData(['dashboard', selectedContext], data);
       setDraftItems(packLayoutItems(data.layout.items, data.available_widgets));
@@ -136,9 +117,7 @@ export function DashboardPage() {
   }
 
   function handleToggleVisibility(instanceId: string) {
-    setDraftItems((current) =>
-      toggleLayoutItemVisibility(current, instanceId, ensureWidgets()),
-    );
+    setDraftItems((current) => toggleLayoutItemVisibility(current, instanceId, ensureWidgets()));
   }
 
   function handleAddWidget(widget: DashboardWidgetDefinition) {
@@ -149,9 +128,7 @@ export function DashboardPage() {
     if (!dashboardQuery.data) {
       return;
     }
-    setDraftItems(
-      packLayoutItems(dashboardQuery.data.layout.items, dashboardQuery.data.available_widgets),
-    );
+    setDraftItems(packLayoutItems(dashboardQuery.data.layout.items, dashboardQuery.data.available_widgets));
     setEditing(false);
     setCatalogOpen(false);
   }
@@ -168,20 +145,10 @@ export function DashboardPage() {
           <button type="button" className="btn-secondary" onClick={() => setCatalogOpen(true)}>
             Catálogo
           </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleCancelEditing}
-            disabled={saving}
-          >
+          <button type="button" className="btn-secondary" onClick={handleCancelEditing} disabled={saving}>
             Cancelar
           </button>
-          <button
-            type="button"
-            className="btn-danger"
-            onClick={() => resetMutation.mutate()}
-            disabled={saving}
-          >
+          <button type="button" className="btn-danger" onClick={() => resetMutation.mutate()} disabled={saving}>
             Resetear
           </button>
           <button
@@ -194,12 +161,7 @@ export function DashboardPage() {
           </button>
         </>
       ) : (
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => setEditing(true)}
-          disabled={busy}
-        >
+        <button type="button" className="btn-secondary" onClick={() => setEditing(true)} disabled={busy}>
           Personalizar
         </button>
       )}
@@ -214,11 +176,7 @@ export function DashboardPage() {
       actions={headerActions}
     >
       {primaryError ? <div className="alert alert-error">{primaryError}</div> : null}
-      {editing && dirty ? (
-        <div className="alert alert-success">
-          Tenés cambios sin guardar.
-        </div>
-      ) : null}
+      {editing && dirty ? <div className="alert alert-success">Tenés cambios sin guardar.</div> : null}
 
       {busy ? (
         <div className="spinner" />

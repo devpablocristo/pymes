@@ -2,11 +2,9 @@ import type { components, paths } from '../generated/pymes-ai.openapi';
 
 type Schemas = components['schemas'];
 
-export type CommercialChatRequest =
-  paths['/v1/chat']['post']['requestBody']['content']['application/json'];
+export type CommercialChatRequest = paths['/v1/chat']['post']['requestBody']['content']['application/json'];
 
-export type PymesAssistantChatResponse =
-  paths['/v1/chat']['post']['responses'][200]['content']['application/json'];
+export type PymesAssistantChatResponse = paths['/v1/chat']['post']['responses'][200]['content']['application/json'];
 
 export type PymesAssistantChatBaseResponse = Pick<
   PymesAssistantChatResponse,

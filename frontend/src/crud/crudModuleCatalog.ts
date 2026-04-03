@@ -23,7 +23,6 @@ type CrudModuleId =
   | 'roles'
   | 'parties'
   | 'employees'
-  | 'appointments'
   | 'recurring'
   | 'webhooks'
   | 'professionals'
@@ -85,7 +84,6 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   roles: { title: 'Roles', navLabel: 'Roles', labelPlural: 'roles' },
   parties: { title: 'Entidades', navLabel: 'Entidades', labelPlural: 'entidades' },
   employees: { title: 'Empleados', navLabel: 'Empleados', labelPlural: 'empleados' },
-  appointments: { title: 'Turnos', navLabel: 'Turnos', labelPlural: 'turnos' },
   recurring: { title: 'Gastos recurrentes', navLabel: 'Gastos recurrentes', labelPlural: 'gastos recurrentes' },
   webhooks: { title: 'Webhooks', navLabel: 'Webhooks', labelPlural: 'endpoints webhook' },
   professionals: { title: 'Teachers', navLabel: 'Teachers', labelPlural: 'teachers' },
@@ -100,8 +98,16 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   },
   workOrders: { title: 'Órdenes de trabajo', navLabel: 'Órdenes trabajo', labelPlural: 'órdenes de trabajo' },
   bikeBicycles: { title: 'Bicicletas', navLabel: 'Bicicletas', labelPlural: 'bicicletas' },
-  bikeShopServices: { title: 'Servicios de bicicletería', navLabel: 'Servicios bici', labelPlural: 'servicios de bicicletería' },
-  bikeWorkOrders: { title: 'Órdenes de bicicletería', navLabel: 'Órdenes bici', labelPlural: 'órdenes de bicicletería' },
+  bikeShopServices: {
+    title: 'Servicios de bicicletería',
+    navLabel: 'Servicios bici',
+    labelPlural: 'servicios de bicicletería',
+  },
+  bikeWorkOrders: {
+    title: 'Órdenes de bicicletería',
+    navLabel: 'Órdenes bici',
+    labelPlural: 'órdenes de bicicletería',
+  },
   beautyStaff: { title: 'Equipo', navLabel: 'Equipo', labelPlural: 'equipo' },
   beautySalonServices: {
     title: 'Servicios de salón',
@@ -177,9 +183,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'operations',
     icon: 'IN',
     summary: 'Stock consolidado por producto. Ajustes manuales por fila (POST /v1/inventory/:product_id/adjust).',
-    notes: [
-      'Para kardex detallado usá «Mov. inventario». Alertas agregadas también en reportes de stock.',
-    ],
+    notes: ['Para kardex detallado usá «Mov. inventario». Alertas agregadas también en reportes de stock.'],
   },
   inventoryMovements: {
     group: 'operations',
@@ -189,11 +193,8 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   payments: {
     group: 'commercial',
     icon: 'PG',
-    summary:
-      'Cobros de una venta. Usá ?sale_id=<UUID> en la URL o registrá cobros desde el listado de ventas.',
-    notes: [
-      'No existe listado global de pagos en el API; cada listado es GET /v1/sales/:id/payments.',
-    ],
+    summary: 'Cobros de una venta. Usá ?sale_id=<UUID> en la URL o registrá cobros desde el listado de ventas.',
+    notes: ['No existe listado global de pagos en el API; cada listado es GET /v1/sales/:id/payments.'],
   },
   attachments: {
     group: 'integrations',
@@ -209,8 +210,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   timeline: {
     group: 'control',
     icon: 'TL',
-    summary:
-      'Historial y notas manuales por entidad. Query: ?entity=sales|quotes|…&entity_id=<UUID>.',
+    summary: 'Historial y notas manuales por entidad. Query: ?entity=sales|quotes|…&entity_id=<UUID>.',
   },
   purchases: {
     group: 'operations',
@@ -328,11 +328,6 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'commercial',
     icon: 'CC',
     summary: 'Saldo por entidad, deuda y movimientos de cuentas.',
-  },
-  appointments: {
-    group: 'operations',
-    icon: 'TR',
-    summary: 'Agenda operativa con filtros por fecha, estado y asignación.',
   },
   recurring: {
     group: 'operations',

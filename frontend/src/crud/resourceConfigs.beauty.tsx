@@ -1,5 +1,6 @@
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CSSProperties } from 'react';
-import type { CrudPageConfig } from '../components/CrudPage';
+import type { CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
   createBeautySalonService,
   createBeautyStaff,
@@ -10,9 +11,16 @@ import {
 } from '../lib/beautyApi';
 import type { BeautySalonService, BeautyStaffMember } from '../lib/beautyTypes';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
-import { asBoolean, asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
+import {
+  asBoolean,
+  asNumber,
+  asOptionalNumber,
+  asOptionalString,
+  asString,
+  formatDate,
+} from './resourceConfigs.shared';
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   beautyStaff: {
     label: 'miembro del equipo',
     labelPlural: 'equipo',
@@ -65,7 +73,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
     ],
@@ -129,16 +139,24 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: BeautySalonService) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.code} · {row.category || 'General'}</div>
+            <div className="text-secondary">
+              {row.code} · {row.category || 'General'}
+            </div>
           </>
         ),
       },
       { key: 'duration_minutes', header: 'Min', render: (value) => `${Number(value ?? 0)} min` },
-      { key: 'base_price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'base_price',
+        header: 'Precio',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
     ],
     formFields: [
@@ -163,7 +181,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: BeautySalonService) => [row.code, row.name, row.category, row.description].filter(Boolean).join(' '),
+    searchText: (row: BeautySalonService) =>
+      [row.code, row.name, row.category, row.description].filter(Boolean).join(' '),
     toFormValues: (row: BeautySalonService) => ({
       code: row.code ?? '',
       name: row.name ?? '',

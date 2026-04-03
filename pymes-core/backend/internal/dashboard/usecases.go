@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	dashboarddomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -349,7 +350,7 @@ func intersectsFold(left, right []string) bool {
 }
 
 func isPrivilegedRole(role string) bool {
-	return strings.EqualFold(role, "owner") || strings.EqualFold(role, "admin") || strings.EqualFold(role, "service")
+	return authz.IsPrivilegedRole(role)
 }
 
 func clampInt(value, minValue, maxValue, fallback int) int {

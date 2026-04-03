@@ -32,23 +32,30 @@ type TenantSettingsModel struct {
 	BusinessAddress          string  `gorm:"not null;default:''"`
 	BusinessPhone            string  `gorm:"not null;default:''"`
 	BusinessEmail            string  `gorm:"not null;default:''"`
-	WAQuoteTemplate          string  `gorm:"not null;default:''"`
-	WAReceiptTemplate        string  `gorm:"not null;default:''"`
-	WADefaultCountryCode     string  `gorm:"not null;default:'54'"`
-	AppointmentsEnabled      bool    `gorm:"not null;default:false"`
-	AppointmentLabel         string  `gorm:"not null;default:'Turno'"`
-	AppointmentReminderHours int     `gorm:"not null;default:24"`
-	SecondaryCurrency        string  `gorm:"not null;default:''"`
-	DefaultRateType          string  `gorm:"not null;default:'blue'"`
-	AutoFetchRates           bool    `gorm:"not null;default:false"`
-	ShowDualPrices           bool    `gorm:"not null;default:false"`
-	BankHolder               string  `gorm:"not null;default:''"`
-	BankCBU                  string  `gorm:"not null;default:''"`
-	BankAlias                string  `gorm:"not null;default:''"`
-	BankName                 string  `gorm:"not null;default:''"`
-	ShowQRInPDF              bool    `gorm:"not null;default:false"`
-	WAPaymentTemplate        string  `gorm:"not null;default:''"`
-	WAPaymentLinkTemplate    string  `gorm:"not null;default:''"`
+	TeamSize                 string  `gorm:"not null;default:''"`
+	Sells                    string  `gorm:"not null;default:''"`
+	ClientLabel              string  `gorm:"not null;default:''"`
+	UsesBilling              bool    `gorm:"not null;default:false"`
+	PaymentMethod            string  `gorm:"not null;default:''"`
+	Vertical                 string  `gorm:"not null;default:''"`
+	OnboardingCompletedAt    *time.Time
+	WAQuoteTemplate          string `gorm:"not null;default:''"`
+	WAReceiptTemplate        string `gorm:"not null;default:''"`
+	WADefaultCountryCode     string `gorm:"not null;default:'54'"`
+	AppointmentsEnabled      bool   `gorm:"not null;default:false"`
+	AppointmentLabel         string `gorm:"not null;default:'Turno'"`
+	AppointmentReminderHours int    `gorm:"not null;default:24"`
+	SecondaryCurrency        string `gorm:"not null;default:''"`
+	DefaultRateType          string `gorm:"not null;default:'blue'"`
+	AutoFetchRates           bool   `gorm:"not null;default:false"`
+	ShowDualPrices           bool   `gorm:"not null;default:false"`
+	BankHolder               string `gorm:"not null;default:''"`
+	BankCBU                  string `gorm:"not null;default:''"`
+	BankAlias                string `gorm:"not null;default:''"`
+	BankName                 string `gorm:"not null;default:''"`
+	ShowQRInPDF              bool   `gorm:"not null;default:false"`
+	WAPaymentTemplate        string `gorm:"not null;default:''"`
+	WAPaymentLinkTemplate    string `gorm:"not null;default:''"`
 	UpdatedBy                *string
 	CreatedAt                time.Time
 	UpdatedAt                time.Time

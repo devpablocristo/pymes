@@ -22,15 +22,67 @@ interface RuleTemplate {
 }
 
 const RULE_TEMPLATES: RuleTemplate[] = [
-  { actionType: 'appointment.book', displayName: 'Agendar turno', category: 'Turnos', riskClass: 'low', hasThreshold: false },
-  { actionType: 'appointment.reschedule', displayName: 'Reagendar turno', category: 'Turnos', riskClass: 'low', hasThreshold: false },
-  { actionType: 'appointment.cancel', displayName: 'Cancelar turno', category: 'Turnos', riskClass: 'medium', hasThreshold: false },
-  { actionType: 'discount.apply', displayName: 'Aplicar descuento', category: 'Descuentos', riskClass: 'medium', hasThreshold: true, thresholdLabel: '%', thresholdUnit: 'percentage_lte', thresholdPattern: 'percentage_gt', defaultThreshold: 10 },
-  { actionType: 'payment_link.generate', displayName: 'Generar link de pago', category: 'Pagos', riskClass: 'low', hasThreshold: false },
+  {
+    actionType: 'appointment.book',
+    displayName: 'Agendar turno',
+    category: 'Turnos',
+    riskClass: 'low',
+    hasThreshold: false,
+  },
+  {
+    actionType: 'appointment.reschedule',
+    displayName: 'Reagendar turno',
+    category: 'Turnos',
+    riskClass: 'low',
+    hasThreshold: false,
+  },
+  {
+    actionType: 'appointment.cancel',
+    displayName: 'Cancelar turno',
+    category: 'Turnos',
+    riskClass: 'medium',
+    hasThreshold: false,
+  },
+  {
+    actionType: 'discount.apply',
+    displayName: 'Aplicar descuento',
+    category: 'Descuentos',
+    riskClass: 'medium',
+    hasThreshold: true,
+    thresholdLabel: '%',
+    thresholdUnit: 'percentage_lte',
+    thresholdPattern: 'percentage_gt',
+    defaultThreshold: 10,
+  },
+  {
+    actionType: 'payment_link.generate',
+    displayName: 'Generar link de pago',
+    category: 'Pagos',
+    riskClass: 'low',
+    hasThreshold: false,
+  },
   { actionType: 'refund.create', displayName: 'Reembolso', category: 'Pagos', riskClass: 'high', hasThreshold: false },
-  { actionType: 'sale.create', displayName: 'Crear venta', category: 'Ventas', riskClass: 'medium', hasThreshold: false },
-  { actionType: 'quote.create', displayName: 'Crear presupuesto', category: 'Ventas', riskClass: 'low', hasThreshold: false },
-  { actionType: 'notification.bulk_send', displayName: 'Envío masivo', category: 'Notificaciones', riskClass: 'medium', hasThreshold: false },
+  {
+    actionType: 'sale.create',
+    displayName: 'Crear venta',
+    category: 'Ventas',
+    riskClass: 'medium',
+    hasThreshold: false,
+  },
+  {
+    actionType: 'quote.create',
+    displayName: 'Crear presupuesto',
+    category: 'Ventas',
+    riskClass: 'low',
+    hasThreshold: false,
+  },
+  {
+    actionType: 'notification.bulk_send',
+    displayName: 'Envío masivo',
+    category: 'Notificaciones',
+    riskClass: 'medium',
+    hasThreshold: false,
+  },
 ];
 
 interface RuleState {
@@ -154,10 +206,7 @@ export default function AutomationRulesPage() {
   };
 
   const ruleSearch = usePageSearch();
-  const ruleTextFn = useCallback(
-    (tpl: RuleTemplate) => `${tpl.displayName} ${tpl.category} ${tpl.actionType}`,
-    [],
-  );
+  const ruleTextFn = useCallback((tpl: RuleTemplate) => `${tpl.displayName} ${tpl.category} ${tpl.actionType}`, []);
   const filteredRules = useSearch(RULE_TEMPLATES, ruleTextFn, ruleSearch);
   const categories = [...new Set(filteredRules.map((tpl) => tpl.category))];
 
@@ -175,10 +224,12 @@ export default function AutomationRulesPage() {
       title="Reglas de automatización"
       lead="Qué puede hacer la IA o los usuarios sin tu aprobación, según el tipo de acción."
     >
-        <div className="rules-stack">
-          {categories.map((cat) => (
-            <div key={cat} className="rules-category">
-              {filteredRules.filter((t) => t.category === cat).map((tpl) => {
+      <div className="rules-stack">
+        {categories.map((cat) => (
+          <div key={cat} className="rules-category">
+            {filteredRules
+              .filter((t) => t.category === cat)
+              .map((tpl) => {
                 const rule = rules[tpl.actionType];
                 if (!rule) return null;
                 const effectClass =
@@ -202,9 +253,7 @@ export default function AutomationRulesPage() {
                             min={0}
                             aria-label={`Umbral para ${tpl.displayName}`}
                             value={rule.threshold}
-                            onChange={(e) =>
-                              handleThresholdChange(tpl.actionType, Number(e.target.value))
-                            }
+                            onChange={(e) => handleThresholdChange(tpl.actionType, Number(e.target.value))}
                           />
                           <span>{tpl.thresholdLabel}</span>
                         </div>
@@ -213,9 +262,7 @@ export default function AutomationRulesPage() {
                         className={effectClass}
                         aria-label={`Acción para ${tpl.displayName}`}
                         value={rule.effect}
-                        onChange={(e) =>
-                          handleEffectChange(tpl.actionType, e.target.value as Effect)
-                        }
+                        onChange={(e) => handleEffectChange(tpl.actionType, e.target.value as Effect)}
                       >
                         {Object.entries(EFFECT_LABELS).map(([val, label]) => (
                           <option key={val} value={val}>
@@ -227,24 +274,24 @@ export default function AutomationRulesPage() {
                   </div>
                 );
               })}
-            </div>
-          ))}
-        </div>
-
-        <div className="save-bar">
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-        </div>
-
-        {statusMsg && (
-          <div
-            className={`automation-status alert ${statusMsg.type === 'success' ? 'alert-success' : 'alert-error'}`}
-            role={statusMsg.type === 'success' ? 'status' : 'alert'}
-          >
-            {statusMsg.text}
           </div>
-        )}
+        ))}
+      </div>
+
+      <div className="save-bar">
+        <button type="button" className="btn-primary" onClick={handleSave} disabled={saveMutation.isPending}>
+          {saveMutation.isPending ? 'Guardando…' : 'Guardar cambios'}
+        </button>
+      </div>
+
+      {statusMsg && (
+        <div
+          className={`automation-status alert ${statusMsg.type === 'success' ? 'alert-success' : 'alert-error'}`}
+          role={statusMsg.type === 'success' ? 'status' : 'alert'}
+        >
+          {statusMsg.text}
+        </div>
+      )}
     </PageLayout>
   );
 }

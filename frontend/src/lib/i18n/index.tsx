@@ -1,11 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
+/* eslint-disable react-refresh/only-export-components -- módulo i18n: exporta provider + hook + utilidad */
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
 import { vocab } from '../vocabulary';
 import { apiKeysMessages } from './messages/apiKeys';
@@ -138,10 +132,7 @@ const defaultContext: I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue>(defaultContext);
 
-export function LanguageProvider({
-  children,
-  initialLanguage,
-}: PropsWithChildren<{ initialLanguage?: LanguageCode }>) {
+export function LanguageProvider({ children, initialLanguage }: PropsWithChildren<{ initialLanguage?: LanguageCode }>) {
   const [language, setLanguageState] = useState<LanguageCode>(() => initialLanguage ?? readStoredLanguage());
 
   useEffect(() => {
@@ -149,15 +140,18 @@ export function LanguageProvider({
     applyDocumentLanguage(language);
   }, [language]);
 
-  const value = useMemo<I18nContextValue>(() => ({
-    language,
-    setLanguage: setLanguageState,
-    t: (key, variables) => getMessage(language, key, variables),
-    localizeText: (text) => vocab(text),
-    sentenceCase: toSentenceCase,
-    localizeUiText: (text) => toSentenceCase(vocab(text)),
-    options: supportedLanguages,
-  }), [language]);
+  const value = useMemo<I18nContextValue>(
+    () => ({
+      language,
+      setLanguage: setLanguageState,
+      t: (key, variables) => getMessage(language, key, variables),
+      localizeText: (text) => vocab(text),
+      sentenceCase: toSentenceCase,
+      localizeUiText: (text) => toSentenceCase(vocab(text)),
+      options: supportedLanguages,
+    }),
+    [language],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

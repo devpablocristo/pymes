@@ -13,7 +13,7 @@ export default defineConfig({
     video: 'off',
   },
   webServer: {
-    command: 'bash ./scripts/e2e-wowdash-preview.sh',
+    command: 'bash ./scripts/e2e-preview.sh',
     url: 'http://127.0.0.1:4173',
     timeout: 240_000,
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',

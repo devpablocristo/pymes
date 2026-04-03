@@ -1,4 +1,5 @@
-import type { CrudPageConfig } from '../components/CrudPage';
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import type { CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
   addTeacherSessionNote,
   completeTeacherSession,
@@ -19,7 +20,7 @@ import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } 
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from './resourceConfigs.shared';
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   professionals: {
     label: 'teacher',
     labelPlural: 'teachers',
@@ -56,7 +57,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: TeacherProfile) => (
           <>
             <strong>{row.headline || row.party_id}</strong>
-            <div className="text-secondary">{row.public_slug || 'Sin slug'} · {row.party_id}</div>
+            <div className="text-secondary">
+              {row.public_slug || 'Sin slug'} · {row.party_id}
+            </div>
           </>
         ),
       },
@@ -64,7 +67,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         key: 'specialties',
         header: 'Especialidades',
         render: (value) =>
-          (value as TeacherProfile['specialties'] ?? [])
+          ((value as TeacherProfile['specialties']) ?? [])
             .map((item) => (typeof item === 'string' ? item : item.name))
             .join(', ') || '---',
       },
@@ -111,7 +114,13 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       },
     ],
     searchText: (row: TeacherProfile) =>
-      [row.party_id, row.headline, row.public_slug, row.bio, row.specialties.map((item) => (typeof item === 'string' ? item : item.name)).join(', ')]
+      [
+        row.party_id,
+        row.headline,
+        row.public_slug,
+        row.bio,
+        row.specialties.map((item) => (typeof item === 'string' ? item : item.name)).join(', '),
+      ]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: TeacherProfile) => ({
@@ -264,7 +273,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: TeacherSession) => (
           <>
             <strong>{row.profile_id}</strong>
-            <div className="text-secondary">{row.appointment_id} · {row.summary || 'Sin resumen'}</div>
+            <div className="text-secondary">
+              {row.appointment_id} · {row.summary || 'Sin resumen'}
+            </div>
           </>
         ),
       },
@@ -272,7 +283,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         key: 'status',
         header: 'Estado',
         render: (value) => (
-          <span className={`badge ${value === 'completed' ? 'badge-success' : value === 'active' ? 'badge-warning' : 'badge-neutral'}`}>
+          <span
+            className={`badge ${value === 'completed' ? 'badge-success' : value === 'active' ? 'badge-warning' : 'badge-neutral'}`}
+          >
             {String(value)}
           </span>
         ),
@@ -310,7 +323,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: TeacherSession) => [row.appointment_id, row.profile_id, row.status, row.summary].filter(Boolean).join(' '),
+    searchText: (row: TeacherSession) =>
+      [row.appointment_id, row.profile_id, row.status, row.summary].filter(Boolean).join(' '),
     toFormValues: () => ({
       appointment_id: '',
       profile_id: '',

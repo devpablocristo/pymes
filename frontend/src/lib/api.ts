@@ -1,8 +1,4 @@
-import {
-  request,
-  requestResponse,
-  type RequestOptions,
-} from '@devpablocristo/core-authn/http/fetch';
+import { request, requestResponse, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
 import type { DashboardResponse, DashboardSavePayload } from '../dashboard/types';
 import type {
   APIKeyItem,
@@ -15,18 +11,37 @@ import type {
   TenantSettingsUpdatePayload,
 } from './types';
 
+function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
+  const schedulingEnabled =
+    typeof settings.scheduling_enabled === 'boolean'
+      ? settings.scheduling_enabled
+      : Boolean(settings.appointments_enabled);
+  return {
+    ...settings,
+    scheduling_enabled: schedulingEnabled,
+    appointments_enabled: schedulingEnabled,
+  };
+}
+
 export async function getSession(): Promise<SessionResponse> {
   return request('/v1/session');
 }
 
 export async function getTenantSettings(): Promise<TenantSettings> {
-  return request('/v1/admin/tenant-settings');
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings');
+  return normalizeTenantSettings(response);
 }
 
-export async function updateTenantSettings(
-  payload: TenantSettingsUpdatePayload,
-): Promise<TenantSettings> {
-  return request('/v1/admin/tenant-settings', { method: 'PATCH', body: payload });
+export async function updateTenantSettings(payload: TenantSettingsUpdatePayload): Promise<TenantSettings> {
+  const normalizedPayload: TenantSettingsUpdatePayload = { ...payload };
+  if (normalizedPayload.scheduling_enabled !== undefined && normalizedPayload.appointments_enabled === undefined) {
+    normalizedPayload.appointments_enabled = normalizedPayload.scheduling_enabled;
+  }
+  if (normalizedPayload.appointments_enabled !== undefined && normalizedPayload.scheduling_enabled === undefined) {
+    normalizedPayload.scheduling_enabled = normalizedPayload.appointments_enabled;
+  }
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', { method: 'PATCH', body: normalizedPayload });
+  return normalizeTenantSettings(response);
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
@@ -247,7 +262,9 @@ export async function listWhatsAppCampaigns(): Promise<{ items: WhatsAppCampaign
   return apiRequest('/v1/whatsapp/campaigns');
 }
 
-export async function getWhatsAppCampaign(id: string): Promise<WhatsAppCampaign & { recipients: WhatsAppCampaignRecipient[] }> {
+export async function getWhatsAppCampaign(
+  id: string,
+): Promise<WhatsAppCampaign & { recipients: WhatsAppCampaignRecipient[] }> {
   return apiRequest(`/v1/whatsapp/campaigns/${id}`);
 }
 

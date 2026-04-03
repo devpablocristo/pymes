@@ -13,9 +13,9 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.stat.today': 'hoy',
     'calendar.stat.week': 'esta semana',
     'calendar.event.untitled': 'Sin título',
-    'calendar.demo': 'Vista de ejemplo. Creá turnos en {{appointments}} para ver tu agenda real.',
+    'calendar.demo': 'Vista operativa real de scheduling con reservas, disponibilidad y cola.',
     'calendar.pageTitle': 'Agenda',
-    'calendar.pageLead': 'Turnos y citas conectados a tu cuenta.',
+    'calendar.pageLead': 'Reservas, disponibilidad y operación diaria desde scheduling.',
   },
   en: {
     'calendar.day.mon': 'Mon',
@@ -29,8 +29,8 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.stat.today': 'today',
     'calendar.stat.week': 'this week',
     'calendar.event.untitled': 'Untitled',
-    'calendar.demo': 'Demo view. Create appointments in {{appointments}} to see your real schedule.',
+    'calendar.demo': 'Live scheduling workspace with bookings, availability, and queue operations.',
     'calendar.pageTitle': 'Schedule',
-    'calendar.pageLead': 'Appointments synced with your account.',
+    'calendar.pageLead': 'Bookings, availability, and daily operations powered by scheduling.',
   },
 };

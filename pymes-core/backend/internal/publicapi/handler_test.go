@@ -13,7 +13,8 @@ import (
 )
 
 type fakeRepo struct {
-	query AvailabilityQuery
+	query        AvailabilityQuery
+	businessInfo BusinessInfo
 }
 
 func (f *fakeRepo) ResolveOrgID(_ context.Context, _ string) (uuid.UUID, error) {
@@ -21,7 +22,7 @@ func (f *fakeRepo) ResolveOrgID(_ context.Context, _ string) (uuid.UUID, error) 
 }
 
 func (f *fakeRepo) GetBusinessInfo(_ context.Context, _ uuid.UUID) (BusinessInfo, error) {
-	return BusinessInfo{}, nil
+	return f.businessInfo, nil
 }
 
 func (f *fakeRepo) ListPublicServices(_ context.Context, _ uuid.UUID, _ int) ([]PublicService, error) {
@@ -72,5 +73,44 @@ func TestHandlerGetAvailabilityForwardsSchedulingSelectors(t *testing.T) {
 	}
 	if body["branch_id"] != "00000000-0000-0000-0000-000000000010" {
 		t.Fatalf("expected branch_id in response, got %#v", body["branch_id"])
+	}
+}
+
+func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	repo := &fakeRepo{
+		businessInfo: BusinessInfo{
+			OrgID:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Name:                "Demo Org",
+			Slug:                "demo-org",
+			BusinessName:        "Demo Scheduling",
+			SchedulingEnabled:   true,
+			AppointmentsEnabled: true,
+		},
+	}
+	handler := NewHandler(repo)
+
+	router := gin.New()
+	group := router.Group("/v1/public/:org_id")
+	handler.RegisterRoutes(group)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/public/demo-org/info", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if body["scheduling_enabled"] != true {
+		t.Fatalf("expected scheduling_enabled=true, got %#v", body["scheduling_enabled"])
+	}
+	if body["appointments_enabled"] != true {
+		t.Fatalf("expected appointments_enabled=true, got %#v", body["appointments_enabled"])
 	}
 }

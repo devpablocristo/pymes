@@ -1,4 +1,5 @@
 import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
+import type { TenantSettings } from './types';
 
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
@@ -35,4 +36,42 @@ export function clearTenantProfile(): void {
 
 export function hasCompletedOnboarding(): boolean {
   return getTenantProfile() !== null;
+}
+
+export function tenantProfileFromSettings(settings: TenantSettings): TenantProfile | null {
+  const completedAt = settings.onboarding_completed_at?.trim();
+  if (!completedAt) {
+    return null;
+  }
+
+  const teamSize = settings.team_size?.trim();
+  const sells = settings.sells?.trim();
+  const paymentMethod = settings.payment_method?.trim();
+  const vertical = settings.vertical?.trim();
+  if (!teamSize || !sells || !paymentMethod || !vertical) {
+    return null;
+  }
+
+  return {
+    businessName: settings.business_name?.trim() || '',
+    teamSize: teamSize as TeamSize,
+    sells: sells as SellsType,
+    clientLabel: settings.client_label?.trim() || 'clientes',
+    usesScheduling: Boolean(settings.scheduling_enabled ?? settings.appointments_enabled),
+    usesBilling: Boolean(settings.uses_billing),
+    currency: settings.currency?.trim() || 'ARS',
+    paymentMethod: paymentMethod as PaymentMethod,
+    vertical: vertical as VerticalType,
+    completedAt,
+  };
+}
+
+export function syncTenantProfileFromSettings(settings: TenantSettings): TenantProfile | null {
+  const profile = tenantProfileFromSettings(settings);
+  if (!profile) {
+    clearTenantProfile();
+    return null;
+  }
+  saveTenantProfile(profile);
+  return profile;
 }

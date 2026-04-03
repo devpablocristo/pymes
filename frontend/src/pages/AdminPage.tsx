@@ -14,6 +14,7 @@ import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import { getTheme, toggleTheme } from '../lib/theme';
+import { syncTenantProfileFromSettings } from '../lib/tenantProfile';
 import type { AuditEntry, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
 import { AdminRbacSection } from './AdminRbacSection';
 
@@ -65,10 +66,11 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
     business_address: f.business_address.trim(),
     business_phone: f.business_phone.trim(),
     business_email: f.business_email.trim(),
+    vertical: f.vertical.trim(),
     wa_quote_template: f.wa_quote_template,
     wa_receipt_template: f.wa_receipt_template,
     wa_default_country_code: f.wa_default_country_code.trim(),
-    appointments_enabled: f.appointments_enabled,
+    scheduling_enabled: f.scheduling_enabled,
     appointment_label: f.appointment_label.trim(),
     appointment_reminder_hours: reminder,
     default_rate_type: f.default_rate_type.trim(),
@@ -107,10 +109,11 @@ type TenantFormState = {
   business_address: string;
   business_phone: string;
   business_email: string;
+  vertical: string;
   wa_quote_template: string;
   wa_receipt_template: string;
   wa_default_country_code: string;
-  appointments_enabled: boolean;
+  scheduling_enabled: boolean;
   appointment_label: string;
   appointment_reminder_hours: string;
   default_rate_type: string;
@@ -140,10 +143,11 @@ function settingsToForm(s: TenantSettings): TenantFormState {
     business_address: s.business_address ?? '',
     business_phone: s.business_phone ?? '',
     business_email: s.business_email ?? '',
+    vertical: s.vertical ?? '',
     wa_quote_template: s.wa_quote_template ?? '',
     wa_receipt_template: s.wa_receipt_template ?? '',
     wa_default_country_code: s.wa_default_country_code ?? '',
-    appointments_enabled: Boolean(s.appointments_enabled),
+    scheduling_enabled: Boolean(s.scheduling_enabled ?? s.appointments_enabled),
     appointment_label: s.appointment_label ?? '',
     appointment_reminder_hours: String(s.appointment_reminder_hours ?? ''),
     default_rate_type: s.default_rate_type ?? '',
@@ -195,7 +199,10 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   const [uiTheme, setUiTheme] = useState(getTheme);
   const [form, setForm] = useState<TenantFormState | null>(null);
   const adminSearch = usePageSearch();
-  const auditTextFn = useCallback((a: AuditEntry) => `${a.action} ${a.resource_type} ${a.resource_id ?? ''} ${a.actor ?? ''}`, []);
+  const auditTextFn = useCallback(
+    (a: AuditEntry) => `${a.action} ${a.resource_type} ${a.resource_id ?? ''} ${a.actor ?? ''}`,
+    [],
+  );
 
   const tenantQuery = useQuery({
     queryKey: queryKeys.tenant.settings,
@@ -226,12 +233,11 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const [auditExportBusy, setAuditExportBusy] = useState(false);
 
-  const loadError =
-    tenantQuery.isError
-      ? formatFetchErrorForUser(tenantQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
-      : auditQuery.isError
-        ? formatFetchErrorForUser(auditQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
-        : '';
+  const loadError = tenantQuery.isError
+    ? formatFetchErrorForUser(tenantQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
+    : auditQuery.isError
+      ? formatFetchErrorForUser(auditQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
+      : '';
 
   useEffect(() => {
     if (tenantQuery.data && form === null) {
@@ -306,6 +312,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
       const updated = await updateTenantSettings(built);
       queryClient.setQueryData(queryKeys.tenant.settings, updated);
       setForm(settingsToForm(updated));
+      syncTenantProfileFromSettings(updated);
     } catch (err) {
       setError(formatFetchErrorForUser(err, 'No pudimos conectar con el servidor. Verificá tu red.'));
     } finally {
@@ -322,401 +329,448 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
 
   const content = (
     <>
-      {(showAll || section === 'appearance') && <div className="card">
-        <div className="card-header">
-          <h2>{t('profile.admin.appearanceTitle')}</h2>
-        </div>
-        <p className="text-secondary">{t('profile.admin.appearanceLead')}</p>
-        <div className="actions-row u-mt-sm">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleAppearanceToggle}
-            title={uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
-          >
-            {uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
-          </button>
-        </div>
-      </div>}
-
-      {(error || loadError) && <div className="alert alert-error">{error || loadError}</div>}
-
-      {(showAll || section === 'workspace') && <div className="card">
-        <div className="card-header">
-          <h2>Configuración del espacio</h2>
-        </div>
-
-        {loading && <div className="spinner" aria-label="Cargando" />}
-
-        {!loading && settings && form && (
-          <form onSubmit={(e) => void onSubmit(e)} className="admin-settings-form">
-            <div className="admin-settings-toolbar">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={onResetForm} disabled={saving}>
-                Deshacer cambios
-              </button>
-            </div>
-
-            <section className="admin-settings-section">
-              <h3>Monedas e impuestos</h3>
-              <p className="admin-settings-hint">
-                La primera moneda es la principal (documentos y totales por defecto). Podés sumar las que uses en operaciones o cotizaciones.
-              </p>
-              <div className="admin-currencies-list">
-                {form.currencies.map((code, index) => (
-                  <div key={index} className="admin-currency-row">
-                    <span className="admin-currency-rank" title="Orden">
-                      {index === 0 ? 'Principal' : `${index + 1}`}
-                    </span>
-                    <input
-                      type="text"
-                      className="admin-currency-input"
-                      value={code}
-                      onChange={(e) => updateCurrencyRow(index, e.target.value)}
-                      placeholder="ARS"
-                      maxLength={8}
-                      autoCapitalize="characters"
-                    />
-                    <div className="admin-currency-actions">
-                      <button
-                        type="button"
-                        className="btn-secondary btn-sm"
-                        disabled={index === 0}
-                        onClick={() => moveCurrencyRow(index, -1)}
-                        title="Subir"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary btn-sm"
-                        disabled={index >= form.currencies.length - 1}
-                        onClick={() => moveCurrencyRow(index, 1)}
-                        title="Bajar"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-danger btn-sm"
-                        disabled={form.currencies.length <= 1}
-                        onClick={() => removeCurrencyRow(index)}
-                        title="Quitar"
-                      >
-                        Quitar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button type="button" className="btn-secondary btn-sm admin-currency-add" onClick={addCurrencyRow}>
-                  + Agregar moneda
-                </button>
-              </div>
-              <div className="admin-settings-grid u-mt-md">
-                <div className="form-group">
-                  <label>IVA / impuesto (%)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.tax_rate}
-                    onChange={(e) => updateField('tax_rate', e.target.value)}
-                  />
-                </div>
-                <div className="form-group admin-checkbox-row">
-                  <input
-                    id="allow_negative_stock"
-                    type="checkbox"
-                    checked={form.allow_negative_stock}
-                    onChange={(e) => updateField('allow_negative_stock', e.target.checked)}
-                  />
-                  <label htmlFor="allow_negative_stock">Permitir stock negativo</label>
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-settings-section">
-              <h3>Prefijos y correlativos</h3>
-              <p className="admin-settings-hint">
-                Los próximos números los asigna el sistema al crear documentos; no se pueden editar aquí.
-              </p>
-              <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Prefijo presupuestos</label>
-                  <input
-                    type="text"
-                    value={form.quote_prefix}
-                    onChange={(e) => updateField('quote_prefix', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Próximo presupuesto</label>
-                  <input type="text" value={String(settings.next_quote_number)} readOnly className="input-readonly" />
-                </div>
-                <div className="form-group">
-                  <label>Prefijo ventas</label>
-                  <input
-                    type="text"
-                    value={form.sale_prefix}
-                    onChange={(e) => updateField('sale_prefix', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Próxima venta</label>
-                  <input type="text" value={String(settings.next_sale_number)} readOnly className="input-readonly" />
-                </div>
-                <div className="form-group">
-                  <label>Prefijo compras</label>
-                  <input
-                    type="text"
-                    value={form.purchase_prefix}
-                    onChange={(e) => updateField('purchase_prefix', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Próxima compra</label>
-                  <input type="text" value={String(settings.next_purchase_number)} readOnly className="input-readonly" />
-                </div>
-                <div className="form-group">
-                  <label>Prefijo devoluciones</label>
-                  <input
-                    type="text"
-                    value={form.return_prefix}
-                    onChange={(e) => updateField('return_prefix', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Próxima devolución</label>
-                  <input type="text" value={String(settings.next_return_number)} readOnly className="input-readonly" />
-                </div>
-                <div className="form-group">
-                  <label>Prefijo notas de crédito</label>
-                  <input
-                    type="text"
-                    value={form.credit_note_prefix}
-                    onChange={(e) => updateField('credit_note_prefix', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Próxima nota de crédito</label>
-                  <input
-                    type="text"
-                    value={String(settings.next_credit_note_number)}
-                    readOnly
-                    className="input-readonly"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-settings-section">
-              <h3>Datos del negocio</h3>
-              <div className="admin-settings-grid">
-                <div className="form-group grow">
-                  <label>Razón social / nombre</label>
-                  <input
-                    type="text"
-                    value={form.business_name}
-                    onChange={(e) => updateField('business_name', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>CUIT / ID fiscal</label>
-                  <input
-                    type="text"
-                    value={form.business_tax_id}
-                    onChange={(e) => updateField('business_tax_id', e.target.value)}
-                  />
-                </div>
-                <div className="form-group full-width">
-                  <label>Dirección</label>
-                  <input
-                    type="text"
-                    value={form.business_address}
-                    onChange={(e) => updateField('business_address', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Teléfono</label>
-                  <input
-                    type="text"
-                    value={form.business_phone}
-                    onChange={(e) => updateField('business_phone', e.target.value)}
-                  />
-                </div>
-                <div className="form-group grow">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={form.business_email}
-                    onChange={(e) => updateField('business_email', e.target.value)}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-settings-section">
-              <h3>Turnos / citas</h3>
-              <div className="admin-settings-grid">
-                <div className="form-group admin-checkbox-row">
-                  <input
-                    id="appointments_enabled"
-                    type="checkbox"
-                    checked={form.appointments_enabled}
-                    onChange={(e) => updateField('appointments_enabled', e.target.checked)}
-                  />
-                  <label htmlFor="appointments_enabled">Turnos habilitados</label>
-                </div>
-                <div className="form-group">
-                  <label>Etiqueta (ej. Turno, Clase)</label>
-                  <input
-                    type="text"
-                    value={form.appointment_label}
-                    onChange={(e) => updateField('appointment_label', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Recordatorio (horas antes)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.appointment_reminder_hours}
-                    onChange={(e) => updateField('appointment_reminder_hours', e.target.value)}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-settings-section">
-              <h3>Cotización</h3>
-              <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Tipo de cotización por defecto</label>
-                  <input
-                    type="text"
-                    value={form.default_rate_type}
-                    onChange={(e) => updateField('default_rate_type', e.target.value)}
-                    placeholder="blue, oficial…"
-                  />
-                </div>
-                <div className="form-group admin-checkbox-row">
-                  <input
-                    id="auto_fetch_rates"
-                    type="checkbox"
-                    checked={form.auto_fetch_rates}
-                    onChange={(e) => updateField('auto_fetch_rates', e.target.checked)}
-                  />
-                  <label htmlFor="auto_fetch_rates">Obtener cotizaciones automáticamente</label>
-                </div>
-                <div className="form-group admin-checkbox-row">
-                  <input
-                    id="show_dual_prices"
-                    type="checkbox"
-                    checked={form.show_dual_prices}
-                    onChange={(e) => updateField('show_dual_prices', e.target.checked)}
-                  />
-                  <label htmlFor="show_dual_prices">Mostrar precios duales</label>
-                </div>
-              </div>
-            </section>
-
-            <section className="admin-settings-section">
-              <h3>Banco y PDF</h3>
-              <div className="admin-settings-grid">
-                <div className="form-group">
-                  <label>Titular</label>
-                  <input type="text" value={form.bank_holder} onChange={(e) => updateField('bank_holder', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>CBU</label>
-                  <input type="text" value={form.bank_cbu} onChange={(e) => updateField('bank_cbu', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Alias</label>
-                  <input type="text" value={form.bank_alias} onChange={(e) => updateField('bank_alias', e.target.value)} />
-                </div>
-                <div className="form-group grow">
-                  <label>Banco</label>
-                  <input type="text" value={form.bank_name} onChange={(e) => updateField('bank_name', e.target.value)} />
-                </div>
-                <div className="form-group admin-checkbox-row">
-                  <input
-                    id="show_qr_in_pdf"
-                    type="checkbox"
-                    checked={form.show_qr_in_pdf}
-                    onChange={(e) => updateField('show_qr_in_pdf', e.target.checked)}
-                  />
-                  <label htmlFor="show_qr_in_pdf">Mostrar QR en PDF</label>
-                </div>
-              </div>
-            </section>
-
-            <div className="admin-settings-toolbar admin-settings-toolbar-bottom">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-              <button type="button" className="btn-secondary" onClick={onResetForm} disabled={saving}>
-                Deshacer cambios
-              </button>
-            </div>
-          </form>
-        )}
-      </div>}
-
-      {(showAll || section === 'rbac') && isConsoleAdmin && sessionOrgId ? <AdminRbacSection orgId={sessionOrgId} /> : null}
-
-      {(showAll || section === 'audit') && <div className="card">
-        <div className="card-header admin-card-header--wrap">
-          <h2>Registro de auditoría</h2>
-          <div className="admin-audit-header-actions">
-            <span className="badge badge-neutral">{activity.length} eventos</span>
+      {(showAll || section === 'appearance') && (
+        <div className="card">
+          <div className="card-header">
+            <h2>{t('profile.admin.appearanceTitle')}</h2>
+          </div>
+          <p className="text-secondary">{t('profile.admin.appearanceLead')}</p>
+          <div className="actions-row u-mt-sm">
             <button
               type="button"
-              className="btn-sm btn-secondary"
-              disabled={auditExportBusy}
-              onClick={() => void handleAuditExportCsv()}
+              className="btn-secondary"
+              onClick={handleAppearanceToggle}
+              title={uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
             >
-              {auditExportBusy ? 'Descargando…' : 'Descargar CSV'}
+              {uiTheme === 'dark' ? t('shell.theme.light') : t('shell.theme.dark')}
             </button>
           </div>
         </div>
-        {activity.length === 0 ? (
-          <div className="empty-state">
-            <p>Sin eventos registrados</p>
+      )}
+
+      {(error || loadError) && <div className="alert alert-error">{error || loadError}</div>}
+
+      {(showAll || section === 'workspace') && (
+        <div className="card">
+          <div className="card-header">
+            <h2>Configuración del espacio</h2>
           </div>
-        ) : (
-          <div className="admin-activity-wrap">
-            <table className="admin-activity-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Acción</th>
-                  <th>Recurso</th>
-                  <th>ID</th>
-                  <th>Actor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredActivity.slice(0, 50).map((row) => (
-                  <tr key={row.id}>
-                    <td>{formatDateTime(row.created_at)}</td>
-                    <td>
-                      <code className="admin-code">{row.action}</code>
-                    </td>
-                    <td>
-                      <code className="admin-code">{row.resource_type}</code>
-                    </td>
-                    <td className="admin-activity-id">{row.resource_id ?? '—'}</td>
-                    <td>{row.actor ?? '—'}</td>
+
+          {loading && <div className="spinner" aria-label="Cargando" />}
+
+          {!loading && settings && form && (
+            <form onSubmit={(e) => void onSubmit(e)} className="admin-settings-form">
+              <div className="admin-settings-toolbar">
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={onResetForm} disabled={saving}>
+                  Deshacer cambios
+                </button>
+              </div>
+
+              <section className="admin-settings-section">
+                <h3>Monedas e impuestos</h3>
+                <p className="admin-settings-hint">
+                  La primera moneda es la principal (documentos y totales por defecto). Podés sumar las que uses en
+                  operaciones o cotizaciones.
+                </p>
+                <div className="admin-currencies-list">
+                  {form.currencies.map((code, index) => (
+                    <div key={index} className="admin-currency-row">
+                      <span className="admin-currency-rank" title="Orden">
+                        {index === 0 ? 'Principal' : `${index + 1}`}
+                      </span>
+                      <input
+                        type="text"
+                        className="admin-currency-input"
+                        value={code}
+                        onChange={(e) => updateCurrencyRow(index, e.target.value)}
+                        placeholder="ARS"
+                        maxLength={8}
+                        autoCapitalize="characters"
+                      />
+                      <div className="admin-currency-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          disabled={index === 0}
+                          onClick={() => moveCurrencyRow(index, -1)}
+                          title="Subir"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          disabled={index >= form.currencies.length - 1}
+                          onClick={() => moveCurrencyRow(index, 1)}
+                          title="Bajar"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger btn-sm"
+                          disabled={form.currencies.length <= 1}
+                          onClick={() => removeCurrencyRow(index)}
+                          title="Quitar"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" className="btn-secondary btn-sm admin-currency-add" onClick={addCurrencyRow}>
+                    + Agregar moneda
+                  </button>
+                </div>
+                <div className="admin-settings-grid u-mt-md">
+                  <div className="form-group">
+                    <label>IVA / impuesto (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={form.tax_rate}
+                      onChange={(e) => updateField('tax_rate', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group admin-checkbox-row">
+                    <input
+                      id="allow_negative_stock"
+                      type="checkbox"
+                      checked={form.allow_negative_stock}
+                      onChange={(e) => updateField('allow_negative_stock', e.target.checked)}
+                    />
+                    <label htmlFor="allow_negative_stock">Permitir stock negativo</label>
+                  </div>
+                </div>
+              </section>
+
+              <section className="admin-settings-section">
+                <h3>Prefijos y correlativos</h3>
+                <p className="admin-settings-hint">
+                  Los próximos números los asigna el sistema al crear documentos; no se pueden editar aquí.
+                </p>
+                <div className="admin-settings-grid">
+                  <div className="form-group">
+                    <label>Prefijo presupuestos</label>
+                    <input
+                      type="text"
+                      value={form.quote_prefix}
+                      onChange={(e) => updateField('quote_prefix', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Próximo presupuesto</label>
+                    <input type="text" value={String(settings.next_quote_number)} readOnly className="input-readonly" />
+                  </div>
+                  <div className="form-group">
+                    <label>Prefijo ventas</label>
+                    <input
+                      type="text"
+                      value={form.sale_prefix}
+                      onChange={(e) => updateField('sale_prefix', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Próxima venta</label>
+                    <input type="text" value={String(settings.next_sale_number)} readOnly className="input-readonly" />
+                  </div>
+                  <div className="form-group">
+                    <label>Prefijo compras</label>
+                    <input
+                      type="text"
+                      value={form.purchase_prefix}
+                      onChange={(e) => updateField('purchase_prefix', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Próxima compra</label>
+                    <input
+                      type="text"
+                      value={String(settings.next_purchase_number)}
+                      readOnly
+                      className="input-readonly"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Prefijo devoluciones</label>
+                    <input
+                      type="text"
+                      value={form.return_prefix}
+                      onChange={(e) => updateField('return_prefix', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Próxima devolución</label>
+                    <input
+                      type="text"
+                      value={String(settings.next_return_number)}
+                      readOnly
+                      className="input-readonly"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Prefijo notas de crédito</label>
+                    <input
+                      type="text"
+                      value={form.credit_note_prefix}
+                      onChange={(e) => updateField('credit_note_prefix', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Próxima nota de crédito</label>
+                    <input
+                      type="text"
+                      value={String(settings.next_credit_note_number)}
+                      readOnly
+                      className="input-readonly"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="admin-settings-section">
+                <h3>Datos del negocio</h3>
+                <div className="admin-settings-grid">
+                  <div className="form-group grow">
+                    <label>Razón social / nombre</label>
+                    <input
+                      type="text"
+                      value={form.business_name}
+                      onChange={(e) => updateField('business_name', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>CUIT / ID fiscal</label>
+                    <input
+                      type="text"
+                      value={form.business_tax_id}
+                      onChange={(e) => updateField('business_tax_id', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group full-width">
+                    <label>Dirección</label>
+                    <input
+                      type="text"
+                      value={form.business_address}
+                      onChange={(e) => updateField('business_address', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Teléfono</label>
+                    <input
+                      type="text"
+                      value={form.business_phone}
+                      onChange={(e) => updateField('business_phone', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group grow">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={form.business_email}
+                      onChange={(e) => updateField('business_email', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Vertical</label>
+                    <select value={form.vertical} onChange={(e) => updateField('vertical', e.target.value)}>
+                      <option value="">Sin definir</option>
+                      <option value="none">Solo comercial</option>
+                      <option value="professionals">Profesionales</option>
+                      <option value="workshops">Talleres</option>
+                      <option value="bike_shop">Bicicletería</option>
+                      <option value="beauty">Belleza</option>
+                      <option value="restaurants">Restaurantes</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section className="admin-settings-section">
+                <h3>Scheduling</h3>
+                <div className="admin-settings-grid">
+                  <div className="form-group admin-checkbox-row">
+                    <input
+                      id="scheduling_enabled"
+                      type="checkbox"
+                      checked={form.scheduling_enabled}
+                      onChange={(e) => updateField('scheduling_enabled', e.target.checked)}
+                    />
+                    <label htmlFor="scheduling_enabled">Scheduling habilitado</label>
+                  </div>
+                  <div className="form-group">
+                    <label>Etiqueta (ej. Turno, Clase)</label>
+                    <input
+                      type="text"
+                      value={form.appointment_label}
+                      onChange={(e) => updateField('appointment_label', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Recordatorio (horas antes)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.appointment_reminder_hours}
+                      onChange={(e) => updateField('appointment_reminder_hours', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="admin-settings-section">
+                <h3>Cotización</h3>
+                <div className="admin-settings-grid">
+                  <div className="form-group">
+                    <label>Tipo de cotización por defecto</label>
+                    <input
+                      type="text"
+                      value={form.default_rate_type}
+                      onChange={(e) => updateField('default_rate_type', e.target.value)}
+                      placeholder="blue, oficial…"
+                    />
+                  </div>
+                  <div className="form-group admin-checkbox-row">
+                    <input
+                      id="auto_fetch_rates"
+                      type="checkbox"
+                      checked={form.auto_fetch_rates}
+                      onChange={(e) => updateField('auto_fetch_rates', e.target.checked)}
+                    />
+                    <label htmlFor="auto_fetch_rates">Obtener cotizaciones automáticamente</label>
+                  </div>
+                  <div className="form-group admin-checkbox-row">
+                    <input
+                      id="show_dual_prices"
+                      type="checkbox"
+                      checked={form.show_dual_prices}
+                      onChange={(e) => updateField('show_dual_prices', e.target.checked)}
+                    />
+                    <label htmlFor="show_dual_prices">Mostrar precios duales</label>
+                  </div>
+                </div>
+              </section>
+
+              <section className="admin-settings-section">
+                <h3>Banco y PDF</h3>
+                <div className="admin-settings-grid">
+                  <div className="form-group">
+                    <label>Titular</label>
+                    <input
+                      type="text"
+                      value={form.bank_holder}
+                      onChange={(e) => updateField('bank_holder', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>CBU</label>
+                    <input
+                      type="text"
+                      value={form.bank_cbu}
+                      onChange={(e) => updateField('bank_cbu', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Alias</label>
+                    <input
+                      type="text"
+                      value={form.bank_alias}
+                      onChange={(e) => updateField('bank_alias', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group grow">
+                    <label>Banco</label>
+                    <input
+                      type="text"
+                      value={form.bank_name}
+                      onChange={(e) => updateField('bank_name', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group admin-checkbox-row">
+                    <input
+                      id="show_qr_in_pdf"
+                      type="checkbox"
+                      checked={form.show_qr_in_pdf}
+                      onChange={(e) => updateField('show_qr_in_pdf', e.target.checked)}
+                    />
+                    <label htmlFor="show_qr_in_pdf">Mostrar QR en PDF</label>
+                  </div>
+                </div>
+              </section>
+
+              <div className="admin-settings-toolbar admin-settings-toolbar-bottom">
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={onResetForm} disabled={saving}>
+                  Deshacer cambios
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {(showAll || section === 'rbac') && isConsoleAdmin && sessionOrgId ? (
+        <AdminRbacSection orgId={sessionOrgId} />
+      ) : null}
+
+      {(showAll || section === 'audit') && (
+        <div className="card">
+          <div className="card-header admin-card-header--wrap">
+            <h2>Registro de auditoría</h2>
+            <div className="admin-audit-header-actions">
+              <span className="badge badge-neutral">{activity.length} eventos</span>
+              <button
+                type="button"
+                className="btn-sm btn-secondary"
+                disabled={auditExportBusy}
+                onClick={() => void handleAuditExportCsv()}
+              >
+                {auditExportBusy ? 'Descargando…' : 'Descargar CSV'}
+              </button>
+            </div>
+          </div>
+          {activity.length === 0 ? (
+            <div className="empty-state">
+              <p>Sin eventos registrados</p>
+            </div>
+          ) : (
+            <div className="admin-activity-wrap">
+              <table className="admin-activity-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                    <th>Recurso</th>
+                    <th>ID</th>
+                    <th>Actor</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>}
+                </thead>
+                <tbody>
+                  {filteredActivity.slice(0, 50).map((row) => (
+                    <tr key={row.id}>
+                      <td>{formatDateTime(row.created_at)}</td>
+                      <td>
+                        <code className="admin-code">{row.action}</code>
+                      </td>
+                      <td>
+                        <code className="admin-code">{row.resource_type}</code>
+                      </td>
+                      <td className="admin-activity-id">{row.resource_id ?? '—'}</td>
+                      <td>{row.actor ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 
@@ -726,10 +780,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
 
   const meta = ADMIN_SECTION_META[section];
   return (
-    <PageLayout
-      title={meta.title}
-      lead={meta.lead}
-    >
+    <PageLayout title={meta.title} lead={meta.lead}>
       {content}
     </PageLayout>
   );

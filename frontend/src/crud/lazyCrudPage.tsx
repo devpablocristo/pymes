@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- infraestructura de lazy loading CRUD */
 import { useEffect, useState, type ComponentType } from 'react';
 import type { CrudPageConfig } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
@@ -28,13 +29,14 @@ function resolveCrudModuleGroup(resourceId: string): string {
       'inventory',
       'inventoryMovements',
       'payments',
-      'appointments',
       'recurring',
     ].includes(resourceId)
   ) {
     return 'operations';
   }
-  if (['procurementRequests', 'procurementPolicies', 'accounts', 'roles', 'parties', 'employees'].includes(resourceId)) {
+  if (
+    ['procurementRequests', 'procurementPolicies', 'accounts', 'roles', 'parties', 'employees'].includes(resourceId)
+  ) {
     return 'governance';
   }
   if (['attachments', 'audit', 'timeline', 'webhooks'].includes(resourceId)) {
@@ -43,7 +45,16 @@ function resolveCrudModuleGroup(resourceId: string): string {
   if (['professionals', 'teachers', 'specialties', 'intakes', 'sessions'].includes(resourceId)) {
     return 'professionals';
   }
-  if (['workshopVehicles', 'workshopServices', 'workOrders', 'bikeBicycles', 'bikeShopServices', 'bikeWorkOrders'].includes(resourceId)) {
+  if (
+    [
+      'workshopVehicles',
+      'workshopServices',
+      'workOrders',
+      'bikeBicycles',
+      'bikeShopServices',
+      'bikeWorkOrders',
+    ].includes(resourceId)
+  ) {
     return 'workshops';
   }
   if (['beautyStaff', 'beautySalonServices'].includes(resourceId)) {

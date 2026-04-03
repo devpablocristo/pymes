@@ -72,7 +72,8 @@ export function createVerticalRequest(config: VerticalRequestConfig) {
   const baseURLs = resolveVerticalBaseURLs(config.envVar, config.fallbackPorts);
   const timeoutMs = config.timeoutMs ?? 0;
   const timeoutMessage =
-    config.timeoutMessage ?? 'El servidor tardó demasiado en responder. Comprobá que el backend vertical esté en marcha y el puerto en VITE_*_API_URL.';
+    config.timeoutMessage ??
+    'El servidor tardó demasiado en responder. Comprobá que el backend vertical esté en marcha y el puerto en VITE_*_API_URL.';
 
   return async function verticalRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const run = async (): Promise<T> => {

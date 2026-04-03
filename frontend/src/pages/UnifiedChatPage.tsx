@@ -39,11 +39,46 @@ type ContactDef = {
 
 const AI_PYMES_ID = 'ai-pymes';
 const HUMAN_CONTACT_DEFS: ContactDef[] = [
-  { id: '1', name: 'María García', initials: 'MG', color: 'var(--color-primary)', kind: 'human', defaultPreview: 'Dale, hablamos mañana' },
-  { id: '2', name: 'Juan Pérez', initials: 'JP', color: 'var(--color-success)', kind: 'human', defaultPreview: 'Perfecto, gracias!' },
-  { id: '3', name: 'Ana López', initials: 'AL', color: 'var(--color-purple)', kind: 'human', defaultPreview: 'Te envío el presupuesto' },
-  { id: '4', name: 'Carlos Ruiz', initials: 'CR', color: 'var(--color-warning)', kind: 'human', defaultPreview: 'Listo el deploy' },
-  { id: '5', name: 'Laura Díaz', initials: 'LD', color: 'var(--color-accent-pink)', kind: 'human', defaultPreview: 'Quedó excelente!' },
+  {
+    id: '1',
+    name: 'María García',
+    initials: 'MG',
+    color: 'var(--color-primary)',
+    kind: 'human',
+    defaultPreview: 'Dale, hablamos mañana',
+  },
+  {
+    id: '2',
+    name: 'Juan Pérez',
+    initials: 'JP',
+    color: 'var(--color-success)',
+    kind: 'human',
+    defaultPreview: 'Perfecto, gracias!',
+  },
+  {
+    id: '3',
+    name: 'Ana López',
+    initials: 'AL',
+    color: 'var(--color-purple)',
+    kind: 'human',
+    defaultPreview: 'Te envío el presupuesto',
+  },
+  {
+    id: '4',
+    name: 'Carlos Ruiz',
+    initials: 'CR',
+    color: 'var(--color-warning)',
+    kind: 'human',
+    defaultPreview: 'Listo el deploy',
+  },
+  {
+    id: '5',
+    name: 'Laura Díaz',
+    initials: 'LD',
+    color: 'var(--color-accent-pink)',
+    kind: 'human',
+    defaultPreview: 'Quedó excelente!',
+  },
 ];
 
 const SEED_HUMAN_MESSAGES: Array<{
@@ -79,7 +114,13 @@ type Msg = {
 let nextMsgId = 100;
 
 function normalizeManualRouteHint(value: string | null | undefined): ManualRouteHint | undefined {
-  if (value === 'clientes' || value === 'productos' || value === 'ventas' || value === 'cobros' || value === 'compras') {
+  if (
+    value === 'clientes' ||
+    value === 'productos' ||
+    value === 'ventas' ||
+    value === 'cobros' ||
+    value === 'compras'
+  ) {
     return value;
   }
   return undefined;
@@ -149,7 +190,11 @@ function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
   return humanRoutedLabel('general', language);
 }
 
-function buildAssistantMetaLabel(reply: PymesAssistantChatResponse, language: LanguageCode, t: (key: string, variables?: Record<string, string | number>) => string): string {
+function buildAssistantMetaLabel(
+  reply: PymesAssistantChatResponse,
+  language: LanguageCode,
+  t: (key: string, variables?: Record<string, string | number>) => string,
+): string {
   const parts = [
     `${t('ai.chat.meta.request')} ${reply.request_id}`,
     reply.output_kind,
@@ -159,7 +204,11 @@ function buildAssistantMetaLabel(reply: PymesAssistantChatResponse, language: La
   return parts.join(' · ');
 }
 
-function buildNotificationHandoffMetaLabel(handoff: NotificationChatHandoff, language: LanguageCode, t: (key: string, variables?: Record<string, string | number>) => string): string | null {
+function buildNotificationHandoffMetaLabel(
+  handoff: NotificationChatHandoff,
+  language: LanguageCode,
+  t: (key: string, variables?: Record<string, string | number>) => string,
+): string | null {
   const parts = [`${t('ai.chat.meta.notification')} ${handoff.notificationId}`];
   if (handoff.routedAgent) {
     parts.push(`${t('ai.chat.meta.agent')} ${humanRoutedLabel(handoff.routedAgent, language)}`);
@@ -232,7 +281,9 @@ export function UnifiedChatPage() {
   );
   const [chatIds, setChatIds] = useState<Record<string, string | undefined>>({});
   const [pendingConfirmationsByContact, setPendingConfirmationsByContact] = useState<Record<string, string[]>>({});
-  const [pendingRouteHintsByContact, setPendingRouteHintsByContact] = useState<Record<string, ManualRouteHint | undefined>>({});
+  const [pendingRouteHintsByContact, setPendingRouteHintsByContact] = useState<
+    Record<string, ManualRouteHint | undefined>
+  >({});
   const [input, setInput] = useState('');
   const search = usePageSearch();
   const [error, setError] = useState('');
@@ -261,7 +312,7 @@ export function UnifiedChatPage() {
       ]);
     },
   });
-  const savedConversations = conversationsQuery.data?.items ?? [];
+  const savedConversations = useMemo(() => conversationsQuery.data?.items ?? [], [conversationsQuery.data?.items]);
   const loadingHistory = conversationDetailQuery.isFetching;
   const busy = chatMutation.isPending;
 
@@ -304,7 +355,10 @@ export function UnifiedChatPage() {
 
   const activeDef = useMemo(() => contactDefs.find((c) => c.id === active)!, [active, contactDefs]);
   const thread = useMemo(() => msgs.filter((m) => m.contactId === active), [msgs, active]);
-  const activePendingConfirmations = pendingConfirmationsByContact[active] ?? [];
+  const activePendingConfirmations = useMemo(
+    () => pendingConfirmationsByContact[active] ?? [],
+    [pendingConfirmationsByContact, active],
+  );
   const activePendingRouteHint = pendingRouteHintsByContact[active];
 
   const contactsView = useMemo(() => {
@@ -359,8 +413,8 @@ export function UnifiedChatPage() {
     };
     setMsgs((p) => [...p, userMsg]);
 
-      setError('');
-      const run = async () => {
+    setError('');
+    const run = async () => {
       try {
         const reply = await chatMutation.mutateAsync({
           message: text,
@@ -391,7 +445,7 @@ export function UnifiedChatPage() {
       } catch (err) {
         setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
       }
-      };
+    };
     void run();
   }, [chatMutation, language, t]);
 
@@ -420,81 +474,85 @@ export function UnifiedChatPage() {
     setError('');
   }, [active]);
 
-  const sendAssistantMessage = useCallback(async (
-    text: string,
-    options?: {
-      confirmedActions?: string[];
-      echoText?: string;
-      clearInput?: boolean;
-      routeHint?: ManualRouteHint;
-    },
-  ) => {
-    const trimmed = text.trim();
-    if (!trimmed || busy) return;
-    const inheritedRouteHint = pendingRouteHintsByContact[active] ?? null;
-    const apiRouteHint: CommercialChatRequest['route_hint'] = options?.routeHint ?? inheritedRouteHint;
+  const sendAssistantMessage = useCallback(
+    async (
+      text: string,
+      options?: {
+        confirmedActions?: string[];
+        echoText?: string;
+        clearInput?: boolean;
+        routeHint?: ManualRouteHint;
+      },
+    ) => {
+      const trimmed = text.trim();
+      if (!trimmed || busy) return;
+      const inheritedRouteHint = pendingRouteHintsByContact[active] ?? null;
+      const apiRouteHint: CommercialChatRequest['route_hint'] = options?.routeHint ?? inheritedRouteHint;
 
-    const time = formatChatTime(language);
-    const userMsg: Msg = {
-      id: String(++nextMsgId),
-      contactId: active,
-      text: options?.echoText ?? trimmed,
-      fromMe: true,
-      time,
-      metaLabel: buildRouteHintMetaLabel(apiRouteHint, language, t),
-    };
-    setMsgs((p) => [...p, userMsg]);
-    if (options?.clearInput ?? true) {
-      setInput('');
-    }
+      const time = formatChatTime(language);
+      const userMsg: Msg = {
+        id: String(++nextMsgId),
+        contactId: active,
+        text: options?.echoText ?? trimmed,
+        fromMe: true,
+        time,
+        metaLabel: buildRouteHintMetaLabel(apiRouteHint, language, t),
+      };
+      setMsgs((p) => [...p, userMsg]);
+      if (options?.clearInput ?? true) {
+        setInput('');
+      }
 
-    setError('');
-    const chatId = chatIds[active];
-    try {
-      const reply = await chatMutation.mutateAsync({
-        message: trimmed,
-        chat_id: chatId ?? null,
-        confirmed_actions: options?.confirmedActions ?? [],
-        route_hint: apiRouteHint,
-        preferred_language: language,
-      });
-      setChatIds((prev) => ({ ...prev, [active]: reply.chat_id }));
-      setPendingConfirmationsByContact((prev) => ({
-        ...prev,
-        [active]: reply.pending_confirmations ?? [],
-      }));
-      if (hasPromptForQueryBlock(reply.blocks)) {
-        setPendingRouteHintsByContact((prev) => ({
+      setError('');
+      const chatId = chatIds[active];
+      try {
+        const reply = await chatMutation.mutateAsync({
+          message: trimmed,
+          chat_id: chatId ?? null,
+          confirmed_actions: options?.confirmedActions ?? [],
+          route_hint: apiRouteHint,
+          preferred_language: language,
+        });
+        setChatIds((prev) => ({ ...prev, [active]: reply.chat_id }));
+        setPendingConfirmationsByContact((prev) => ({
           ...prev,
-          [active]: undefined,
+          [active]: reply.pending_confirmations ?? [],
         }));
-      } else {
-        const nextStickyRouteHint = normalizeManualRouteHint(reply.routed_agent || reply.routed_mode) ?? apiRouteHint ?? undefined;
-        if (nextStickyRouteHint) {
+        if (hasPromptForQueryBlock(reply.blocks)) {
           setPendingRouteHintsByContact((prev) => ({
             ...prev,
-            [active]: nextStickyRouteHint,
+            [active]: undefined,
           }));
+        } else {
+          const nextStickyRouteHint =
+            normalizeManualRouteHint(reply.routed_agent || reply.routed_mode) ?? apiRouteHint ?? undefined;
+          if (nextStickyRouteHint) {
+            setPendingRouteHintsByContact((prev) => ({
+              ...prev,
+              [active]: nextStickyRouteHint,
+            }));
+          }
         }
+        const additions = applyPymesReply(reply, language, t).map(
+          (row): Msg => ({
+            id: String(++nextMsgId),
+            contactId: active,
+            text: row.text,
+            blocks: row.blocks,
+            fromMe: row.fromMe,
+            time: formatChatTime(language),
+            routedLabel: row.routedLabel,
+            metaLabel: row.metaLabel,
+            badgeLabels: row.badgeLabels,
+          }),
+        );
+        setMsgs((p) => [...p, ...additions]);
+      } catch (err) {
+        setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
       }
-      const additions = applyPymesReply(reply, language, t).map(
-        (row): Msg => ({
-          id: String(++nextMsgId),
-          contactId: active,
-          text: row.text,
-          blocks: row.blocks,
-          fromMe: row.fromMe,
-          time: formatChatTime(language),
-          routedLabel: row.routedLabel,
-          metaLabel: row.metaLabel,
-          badgeLabels: row.badgeLabels,
-        }),
-      );
-      setMsgs((p) => [...p, ...additions]);
-    } catch (err) {
-      setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
-    }
-  }, [active, busy, chatIds, chatMutation, language, pendingRouteHintsByContact, t]);
+    },
+    [active, busy, chatIds, chatMutation, language, pendingRouteHintsByContact, t],
+  );
 
   const send = useCallback(async () => {
     const trimmed = input.trim();
@@ -527,59 +585,62 @@ export function UnifiedChatPage() {
     });
   }, [activeDef.kind, activePendingConfirmations, busy, sendAssistantMessage, t]);
 
-  const handleAssistantBlockAction = useCallback(async (action: PymesAssistantAction) => {
-    if (busy) return;
-    if (action.kind === 'open_url' && action.url) {
-      window.location.assign(action.url);
-      return;
-    }
-    if (activeDef.kind !== 'ai_pymes') return;
-    if (action.kind === 'confirm_action') {
-      await sendAssistantMessage(action.message ?? t('ai.chat.action.confirmPending'), {
-        confirmedActions: action.confirmed_actions ?? [],
-        echoText: action.label,
-        clearInput: false,
-      });
-      return;
-    }
-    if (action.kind === 'send_message') {
-      if (action.selection_behavior === 'prompt_for_query' && action.route_hint) {
-        const routeHint = action.route_hint as ManualRouteHint;
-        const routeLabel = humanRoutedLabel(routeHint, language);
-        const now = formatChatTime(language);
-        setPendingRouteHintsByContact((prev) => ({
-          ...prev,
-          [active]: routeHint,
-        }));
-        setMsgs((prev) => [
-          ...prev,
-          {
-            id: String(++nextMsgId),
-            contactId: active,
-            text: t('ai.chat.action.categoryPrefix', { label: action.label }),
-            fromMe: true,
-            time: now,
-          },
-          {
-            id: String(++nextMsgId),
-            contactId: active,
-            text: t('ai.chat.action.askAboutRoute', { label: routeLabel }),
-            fromMe: false,
-            time: now,
-            badgeLabels: [routeLabel],
-          },
-        ]);
+  const handleAssistantBlockAction = useCallback(
+    async (action: PymesAssistantAction) => {
+      if (busy) return;
+      if (action.kind === 'open_url' && action.url) {
+        window.location.assign(action.url);
         return;
       }
-      await sendAssistantMessage(action.message ?? action.label, {
-        echoText: action.route_hint ? t('ai.chat.action.categoryPrefix', { label: action.label }) : undefined,
-        clearInput: false,
-        routeHint: action.route_hint as ManualRouteHint | undefined,
-      });
-    }
-  }, [activeDef.kind, busy, language, sendAssistantMessage, t]);
+      if (activeDef.kind !== 'ai_pymes') return;
+      if (action.kind === 'confirm_action') {
+        await sendAssistantMessage(action.message ?? t('ai.chat.action.confirmPending'), {
+          confirmedActions: action.confirmed_actions ?? [],
+          echoText: action.label,
+          clearInput: false,
+        });
+        return;
+      }
+      if (action.kind === 'send_message') {
+        if (action.selection_behavior === 'prompt_for_query' && action.route_hint) {
+          const routeHint = action.route_hint as ManualRouteHint;
+          const routeLabel = humanRoutedLabel(routeHint, language);
+          const now = formatChatTime(language);
+          setPendingRouteHintsByContact((prev) => ({
+            ...prev,
+            [active]: routeHint,
+          }));
+          setMsgs((prev) => [
+            ...prev,
+            {
+              id: String(++nextMsgId),
+              contactId: active,
+              text: t('ai.chat.action.categoryPrefix', { label: action.label }),
+              fromMe: true,
+              time: now,
+            },
+            {
+              id: String(++nextMsgId),
+              contactId: active,
+              text: t('ai.chat.action.askAboutRoute', { label: routeLabel }),
+              fromMe: false,
+              time: now,
+              badgeLabels: [routeLabel],
+            },
+          ]);
+          return;
+        }
+        await sendAssistantMessage(action.message ?? action.label, {
+          echoText: action.route_hint ? t('ai.chat.action.categoryPrefix', { label: action.label }) : undefined,
+          clearInput: false,
+          routeHint: action.route_hint as ManualRouteHint | undefined,
+        });
+      }
+    },
+    [active, activeDef.kind, busy, language, sendAssistantMessage, t],
+  );
 
-  const contactTextFn = useCallback((c: typeof contactsView[number]) => c.name, []);
+  const contactTextFn = useCallback((c: (typeof contactsView)[number]) => c.name, []);
   const filteredContacts = useSearch(contactsView, contactTextFn, search);
 
   return (
@@ -623,14 +684,10 @@ export function UnifiedChatPage() {
                     aria-label={`${conv.title || 'Sin título'}. ${conv.message_count} mensajes`}
                     onClick={() => selectSavedConversation(conv)}
                   >
-                    <div className="cht__contact-avatar cht__contact-avatar--saved">
-                      AP
-                    </div>
+                    <div className="cht__contact-avatar cht__contact-avatar--saved">AP</div>
                     <div className="cht__contact-info">
                       <div className="cht__contact-name">{conv.title || 'Sin título'}</div>
-                      <div className="cht__contact-preview">
-                        {conv.message_count} mensajes
-                      </div>
+                      <div className="cht__contact-preview">{conv.message_count} mensajes</div>
                     </div>
                   </button>
                 ))}
@@ -647,7 +704,11 @@ export function UnifiedChatPage() {
               </button>
             ) : null}
           </div>
-          {error ? <p role="alert" className="form-error cht__form-error-chat">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="form-error cht__form-error-chat">
+              {error}
+            </p>
+          ) : null}
           <div
             className="cht__messages"
             role="log"
@@ -656,7 +717,9 @@ export function UnifiedChatPage() {
             aria-busy={busy || loadingHistory}
             aria-label={`Mensajes con ${activeDef.name}`}
           >
-            {loadingHistory && <div className="spinner cht__history-spinner" role="status" aria-label="Cargando historial" />}
+            {loadingHistory && (
+              <div className="spinner cht__history-spinner" role="status" aria-label="Cargando historial" />
+            )}
             {thread.map((m) => (
               <div key={m.id} className={`cht__msg ${m.fromMe ? 'cht__msg--me' : 'cht__msg--them'}`}>
                 {m.badgeLabels && m.badgeLabels.length > 0 ? (
@@ -735,9 +798,7 @@ export function UnifiedChatPage() {
                                   <div className="cht__kpi-item-label">{item.label}</div>
                                   <div className="cht__kpi-item-value">{item.value}</div>
                                   {item.context ? (
-                                    <div className={kpiTrendClassName(item.trend)}>
-                                      {item.context}
-                                    </div>
+                                    <div className={kpiTrendClassName(item.trend)}>{item.context}</div>
                                   ) : null}
                                 </div>
                               ))}
@@ -792,7 +853,12 @@ export function UnifiedChatPage() {
           {activeDef.kind === 'ai_pymes' && activePendingConfirmations.length > 0 ? (
             <div className="cht__pending-bar">
               <span>Pendientes: {activePendingConfirmations.join(', ')}</span>
-              <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => void confirmPendingActions()}>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={busy}
+                onClick={() => void confirmPendingActions()}
+              >
                 Confirmar acciones
               </button>
             </div>

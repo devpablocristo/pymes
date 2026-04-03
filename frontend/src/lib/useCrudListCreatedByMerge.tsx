@@ -2,10 +2,7 @@ import { useUser } from '@clerk/react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { CreatedByPillsBar } from '../components/CreatedByPillsBar';
 import { clerkEnabled } from './auth';
-import {
-  applyWorkOrderCreatorFilter,
-  type CreatorFilterState,
-} from './workOrderCreatorFilter';
+import { applyWorkOrderCreatorFilter, type CreatorFilterState } from './workOrderCreatorFilter';
 
 type ListCtx = { items: Array<{ id: string; created_by?: string }> };
 
@@ -33,7 +30,7 @@ export function useCrudListCreatedByMerge(): {
       selfId,
       creatorFilter,
     };
-    const preSearchFilter = <T extends { id: string; created_by?: string },>(rows: T[]) =>
+    const preSearchFilter = <T extends { id: string; created_by?: string }>(rows: T[]) =>
       applyWorkOrderCreatorFilter(rows, opts);
     const listHeaderInlineSlot = ({ items }: ListCtx) =>
       clerkUserLoaded && user ? (

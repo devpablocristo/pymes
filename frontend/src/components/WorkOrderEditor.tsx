@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { confirmAction } from '@devpablocristo/core-browser';
 import { createPortal } from 'react-dom';
 import {
   archiveAutoRepairWorkOrder,
@@ -130,15 +131,6 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     void load(orderId);
   }, [orderId, load]);
 
-  useEffect(() => {
-    if (variant !== 'modal') return;
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [variant, onClose]);
-
   const isDirty = useMemo(() => {
     if (!wo || !draft) return false;
     const nextPromised = fromDatetimeLocal(draft.promised_at_local);
@@ -170,11 +162,66 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
 
   const isArchived = Boolean(wo?.archived_at);
   const canSave = isDirty && !saving && !loading && wo != null && draft != null;
+  const closeDisabled = saving || archiveBusy || restoreBusy;
+
+  const requestClose = useCallback(() => {
+    if (closeDisabled) {
+      return;
+    }
+
+    void (async () => {
+      if (!isDirty) {
+        onClose();
+        return;
+      }
+
+      const confirmed = await confirmAction({
+        title: 'Cancelar edición',
+        description: '¿Realmente querés cancelar? Se perderán los cambios no guardados.',
+        confirmLabel: 'Sí, cancelar',
+        cancelLabel: 'Seguir editando',
+      });
+      if (!confirmed) {
+        return;
+      }
+
+      onClose();
+    })();
+  }, [closeDisabled, isDirty, onClose]);
+
+  useEffect(() => {
+    if (variant !== 'modal') return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') {
+        return;
+      }
+      ev.preventDefault();
+      requestClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [requestClose, variant]);
 
   const handleArchive = async () => {
     if (!wo) return;
-    if (isDirty && !window.confirm('Hay cambios sin guardar. ¿Archivar sin guardar?')) return;
-    if (!window.confirm('¿Archivar esta orden de trabajo? Va a salir del listado activo.')) return;
+    if (isDirty) {
+      const discardChanges = await confirmAction({
+        title: 'Descartar cambios',
+        description: 'Hay cambios sin guardar. ¿Archivar sin guardar?',
+        confirmLabel: 'Sí, archivar',
+        cancelLabel: 'Seguir editando',
+        tone: 'danger',
+      });
+      if (!discardChanges) return;
+    }
+    const confirmed = await confirmAction({
+      title: 'Archivar orden de trabajo',
+      description: '¿Archivar esta orden de trabajo? Va a salir del listado activo.',
+      confirmLabel: 'Archivar',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setArchiveBusy(true);
     setError(null);
     try {
@@ -190,7 +237,13 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
 
   const handleRestore = async () => {
     if (!wo) return;
-    if (!window.confirm('¿Restaurar esta orden al listado activo?')) return;
+    const confirmed = await confirmAction({
+      title: 'Restaurar orden de trabajo',
+      description: '¿Restaurar esta orden al listado activo?',
+      confirmLabel: 'Restaurar',
+      cancelLabel: 'Cancelar',
+    });
+    if (!confirmed) return;
     setRestoreBusy(true);
     setError(null);
     try {
@@ -473,54 +526,68 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     </>
   );
 
-  const headerActions =
+  const footerActions =
     wo && draft && !loading ? (
-      <div className="wo-modal__header-actions">
-        <button
-          type="button"
-          className="wo-modal__btn wo-modal__btn--header wo-modal__btn--primary"
-          disabled={!canSave}
-          onClick={() => void handleSave()}
-        >
-          {saving ? 'Guardando…' : 'Guardar'}
-        </button>
-        <button type="button" className="wo-modal__btn wo-modal__btn--header wo-modal__btn--ghost" onClick={onClose}>
-          Cancelar
-        </button>
-        {!isArchived ? (
+      <div className="wo-modal__footer app-modal__footer wo-modal__footer--split">
+        <div className="wo-modal__footer-start">
+          {!isArchived ? (
+            <button
+              type="button"
+              className="wo-modal__btn wo-modal__btn--danger"
+              disabled={archiveBusy || saving}
+              onClick={() => void handleArchive()}
+            >
+              {archiveBusy ? 'Archivando…' : 'Archivar'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="wo-modal__btn wo-modal__btn--restore"
+              disabled={restoreBusy || saving}
+              onClick={() => void handleRestore()}
+            >
+              {restoreBusy ? 'Restaurando…' : 'Restaurar'}
+            </button>
+          )}
+        </div>
+        <div className="wo-modal__footer-end">
           <button
             type="button"
-            className="wo-modal__btn wo-modal__btn--header wo-modal__btn--danger"
-            disabled={archiveBusy || saving}
-            onClick={() => void handleArchive()}
+            className="wo-modal__btn wo-modal__btn--ghost app-modal__action"
+            onClick={requestClose}
+            disabled={closeDisabled}
           >
-            {archiveBusy ? 'Archivando…' : 'Archivar'}
+            Cancelar
           </button>
-        ) : (
           <button
             type="button"
-            className="wo-modal__btn wo-modal__btn--header wo-modal__btn--restore"
-            disabled={restoreBusy || saving}
-            onClick={() => void handleRestore()}
+            className="wo-modal__btn wo-modal__btn--primary app-modal__action"
+            disabled={!canSave}
+            onClick={() => void handleSave()}
           >
-            {restoreBusy ? 'Restaurando…' : 'Restaurar'}
+            {saving ? 'Guardando…' : 'Guardar'}
           </button>
-        )}
+        </div>
       </div>
     ) : null;
 
   const header = (
-    <div className="wo-modal__header">
-      <div className="wo-modal__title-block">
-        <div className="wo-modal__eyebrow">Orden de trabajo</div>
-        <h2 id="wo-modal-title" className="wo-modal__title">
-          {loading ? 'Cargando…' : wo?.number ?? '—'}
+    <div className="wo-modal__header app-modal__header">
+      <div className="wo-modal__title-block app-modal__title-block">
+        <div className="wo-modal__eyebrow app-modal__eyebrow">Orden de trabajo</div>
+        <h2 id="wo-modal-title" className="wo-modal__title app-modal__title">
+          {loading ? 'Cargando…' : (wo?.number ?? '—')}
         </h2>
       </div>
       <div className="wo-modal__header-trailing">
-        {headerActions}
         {variant === 'modal' ? (
-          <button type="button" className="wo-modal__close" onClick={onClose} aria-label="Cerrar">
+          <button
+            type="button"
+            className="wo-modal__close app-modal__close"
+            onClick={requestClose}
+            aria-label="Cerrar"
+            disabled={closeDisabled}
+          >
             ×
           </button>
         ) : null}
@@ -528,19 +595,20 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     </div>
   );
 
-  const body = <div className="wo-modal__body">{formInner}</div>;
+  const body = <div className="wo-modal__body app-modal__body">{formInner}</div>;
 
   if (variant === 'page') {
     return (
       <div className="wo-editor-page">
         <div className="wo-editor-page__toolbar">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={closeDisabled}>
             ← Volver a la lista
           </button>
         </div>
-        <div className="wo-modal wo-modal--embedded" role="dialog" aria-modal="false" aria-labelledby="wo-modal-title">
+        <div className="wo-modal wo-modal--embedded app-modal" role="dialog" aria-modal="false" aria-labelledby="wo-modal-title">
           {header}
           {body}
+          {footerActions}
         </div>
       </div>
     );
@@ -548,15 +616,16 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
 
   const modal = (
     <div
-      className="wo-modal-backdrop"
+      className="wo-modal-backdrop app-modal-backdrop"
       role="presentation"
       onMouseDown={(ev) => {
-        if (ev.target === ev.currentTarget) onClose();
+        if (ev.target === ev.currentTarget) requestClose();
       }}
     >
-      <div className="wo-modal" role="dialog" aria-modal="true" aria-labelledby="wo-modal-title">
+      <div className="wo-modal app-modal" role="dialog" aria-modal="true" aria-labelledby="wo-modal-title">
         {header}
         {body}
+        {footerActions}
       </div>
     </div>
   );

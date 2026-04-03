@@ -15,7 +15,11 @@ export function getVisibleWidgetKeys(): Set<string> {
     'audit.activity': true,
   };
 
-  return new Set(Object.entries(vis).filter(([, show]) => show).map(([key]) => key));
+  return new Set(
+    Object.entries(vis)
+      .filter(([, show]) => show)
+      .map(([key]) => key),
+  );
 }
 
 export function getVisibleModuleIds(): Set<string> {
@@ -70,10 +74,8 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('recurring');
   }
 
-  // Scheduling: only if uses scheduling
-  if (profile.usesScheduling) {
-    visible.add('appointments');
-  }
+  // Scheduling now lives in dedicated routes (`/calendar`, `/scheduling/public-preview`)
+  // instead of the legacy CRUD module.
 
   // Integrations: only if billing or products
   if (profile.usesBilling || sellsProducts || exploring) {

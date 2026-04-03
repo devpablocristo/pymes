@@ -52,6 +52,52 @@ func (f *fakeScheduling) CreateBooking(_ context.Context, _ uuid.UUID, _ string,
 	}, nil
 }
 
+func (f *fakeScheduling) ListBookingsByPhone(_ context.Context, _ uuid.UUID, _ string, _ int) ([]schedulingdomain.Booking, error) {
+	return nil, nil
+}
+
+func (f *fakeScheduling) CreateBookingActionTokens(
+	_ context.Context,
+	_, _ uuid.UUID,
+	_ time.Duration,
+) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error) {
+	return nil, nil
+}
+
+func (f *fakeScheduling) ConfirmBookingByToken(_ context.Context, _ string) (schedulingdomain.Booking, error) {
+	return schedulingdomain.Booking{}, nil
+}
+
+func (f *fakeScheduling) CancelBookingByToken(_ context.Context, _, _ string) (schedulingdomain.Booking, error) {
+	return schedulingdomain.Booking{}, nil
+}
+
+func (f *fakeScheduling) ListQueues(_ context.Context, _ uuid.UUID, _ *uuid.UUID) ([]schedulingdomain.Queue, error) {
+	return nil, nil
+}
+
+func (f *fakeScheduling) IssueQueueTicket(
+	_ context.Context,
+	_ uuid.UUID,
+	_ string,
+	_ schedulingdomain.CreateQueueTicketInput,
+) (schedulingdomain.QueueTicket, error) {
+	return schedulingdomain.QueueTicket{}, nil
+}
+
+func (f *fakeScheduling) GetQueueTicketPosition(_ context.Context, _, _, _ uuid.UUID) (schedulingdomain.QueuePosition, error) {
+	return schedulingdomain.QueuePosition{}, nil
+}
+
+func (f *fakeScheduling) JoinWaitlist(
+	_ context.Context,
+	_ uuid.UUID,
+	_ string,
+	_ schedulingdomain.CreateWaitlistInput,
+) (schedulingdomain.WaitlistEntry, error) {
+	return schedulingdomain.WaitlistEntry{}, nil
+}
+
 func TestRepositoryGetAvailabilityUsesSchedulingWhenConfigured(t *testing.T) {
 	t.Parallel()
 

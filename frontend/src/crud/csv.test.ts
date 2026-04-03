@@ -8,9 +8,7 @@ describe('csv helpers', () => {
         { key: 'name', label: 'Nombre' },
         { key: 'notes', label: 'Notas' },
       ],
-      [
-        { name: 'Juan', notes: 'Cliente "VIP", revisar frenos' },
-      ],
+      [{ name: 'Juan', notes: 'Cliente "VIP", revisar frenos' }],
     );
 
     expect(csv.startsWith('\uFEFFname,notes\n')).toBe(true);

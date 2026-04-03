@@ -67,19 +67,21 @@ type pymesAPIKeyScopeRow struct {
 func (pymesAPIKeyScopeRow) TableName() string { return "org_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
-	OrgID                uuid.UUID  `gorm:"column:org_id"`
-	PlanCode             string     `gorm:"column:plan_code"`
-	HardLimits           []byte     `gorm:"column:hard_limits"`
-	HardLimitsJSON       []byte     `gorm:"column:hard_limits_json"`
-	BillingStatus        string     `gorm:"column:billing_status"`
-	StripeCustomerID     *string    `gorm:"column:stripe_customer_id"`
-	StripeSubscriptionID *string    `gorm:"column:stripe_subscription_id"`
-	Status               string     `gorm:"column:status"`
-	DeletedAt            *time.Time `gorm:"column:deleted_at"`
-	PastDueSince         *time.Time `gorm:"column:past_due_since"`
-	UpdatedBy            *string    `gorm:"column:updated_by"`
-	CreatedAt            time.Time  `gorm:"column:created_at"`
-	UpdatedAt            time.Time  `gorm:"column:updated_at"`
+	OrgID                 uuid.UUID  `gorm:"column:org_id"`
+	PlanCode              string     `gorm:"column:plan_code"`
+	HardLimits            []byte     `gorm:"column:hard_limits"`
+	HardLimitsJSON        []byte     `gorm:"column:hard_limits_json"`
+	BillingStatus         string     `gorm:"column:billing_status"`
+	StripeCustomerID      *string    `gorm:"column:stripe_customer_id"`
+	StripeSubscriptionID  *string    `gorm:"column:stripe_subscription_id"`
+	Status                string     `gorm:"column:status"`
+	Vertical              string     `gorm:"column:vertical"`
+	OnboardingCompletedAt *time.Time `gorm:"column:onboarding_completed_at"`
+	DeletedAt             *time.Time `gorm:"column:deleted_at"`
+	PastDueSince          *time.Time `gorm:"column:past_due_since"`
+	UpdatedBy             *string    `gorm:"column:updated_by"`
+	CreatedAt             time.Time  `gorm:"column:created_at"`
+	UpdatedAt             time.Time  `gorm:"column:updated_at"`
 }
 
 func (pymesTenantSettingsRow) TableName() string { return "tenant_settings" }

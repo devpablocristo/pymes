@@ -34,10 +34,10 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       // Warn para detectar deps faltantes sin romper el build; fix gradual
       'react-hooks/exhaustive-deps': 'warn',
-      // CRUD/i18n exportan constantes junto a componentes; Fast Refresh sigue útil en páginas
-      'react-refresh/only-export-components': 'off',
-      // Proyecto legado: demasiados usos puntuales de any en adaptadores CRUD/API
-      '@typescript-eslint/no-explicit-any': 'off',
+      // Warn para detectar archivos mixtos; allowConstantExport para configs CRUD/i18n
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Warn para detectar nuevos usos de any; los existentes en CRUD configs están justificados
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {

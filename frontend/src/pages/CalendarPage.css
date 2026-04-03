@@ -12,10 +12,9 @@
   backdrop-filter: blur(2px);
   z-index: var(--z-modal);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 15vh;
-  padding-bottom: var(--space-5);
+  padding: var(--space-5);
   overflow-y: auto;
   animation: gcal-fade 0.12s ease;
 }
@@ -34,6 +33,7 @@
   animation: gcal-slide 0.15s ease;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 @keyframes gcal-slide {
@@ -84,6 +84,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
 }
@@ -94,11 +95,17 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5) var(--space-4);
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .gcal__modal-footer-spacer {
   flex: 1;
   min-width: 0;
+}
+
+.gcal__modal-action {
+  min-width: 128px;
 }
 
 .gcal__color-row {

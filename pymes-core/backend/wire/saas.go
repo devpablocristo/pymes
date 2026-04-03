@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	saasjwks "github.com/devpablocristo/core/authn/go/jwks"
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	saasclerk "github.com/devpablocristo/core/saas/go/clerkwebhook"
 	saasidentity "github.com/devpablocristo/core/saas/go/identity"
+	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
 	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	saasmigrations "github.com/devpablocristo/core/saas/go/migrations"
 
@@ -137,13 +137,17 @@ type apiKeyPrincipalVerifier struct {
 }
 
 func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string) (kerneldomain.Principal, error) {
-	principal, _, err := v.store.FindPrincipalByAPIKeyHash(ctx, sha256Hex(strings.TrimSpace(credential)))
+	principal, keyID, err := v.store.FindPrincipalByAPIKeyHash(ctx, sha256Hex(strings.TrimSpace(credential)))
 	if err != nil {
 		return kerneldomain.Principal{}, err
 	}
+	actor := "api_key:" + principal.TenantID
+	if strings.TrimSpace(keyID) != "" {
+		actor = "api_key:" + strings.TrimSpace(keyID)
+	}
 	return kerneldomain.Principal{
 		TenantID:   principal.TenantID,
-		Actor:      "api_key:" + principal.TenantID,
+		Actor:      actor,
 		Role:       "service",
 		Scopes:     append([]string(nil), principal.Scopes...),
 		AuthMethod: "api_key",

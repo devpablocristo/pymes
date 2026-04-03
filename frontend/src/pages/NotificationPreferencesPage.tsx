@@ -52,11 +52,12 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences });
     },
   });
-  const error = preferencesQuery.error instanceof Error
-    ? preferencesQuery.error.message
-    : toggleMutation.error instanceof Error
-      ? toggleMutation.error.message
-      : '';
+  const error =
+    preferencesQuery.error instanceof Error
+      ? preferencesQuery.error.message
+      : toggleMutation.error instanceof Error
+        ? toggleMutation.error.message
+        : '';
 
   const body = (
     <>

@@ -1,4 +1,5 @@
-import { type CrudFieldValue, type CrudPageConfig } from '../components/CrudPage';
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import { type CrudFieldValue, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
 import {
@@ -198,7 +199,7 @@ const customerLabel = vocab('cliente');
 const customerPlural = vocab('clientes');
 const customerPluralCap = vocab('Clientes');
 
-export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
+export const commercialResourceConfigs: CrudResourceConfigMap = {
   customers: {
     basePath: '/v1/customers',
     supportsArchived: true,
@@ -215,7 +216,9 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Customer) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.type === 'company' ? 'Empresa' : 'Persona'} · {row.tax_id || 'Sin CUIT/CUIL'}</div>
+            <div className="text-secondary">
+              {row.type === 'company' ? 'Empresa' : 'Persona'} · {row.tax_id || 'Sin CUIT/CUIL'}
+            </div>
           </>
         ),
       },
@@ -264,7 +267,9 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', label: 'Notas', type: 'textarea', placeholder: 'Notas internas...', fullWidth: true },
     ],
     searchText: (row: Customer) =>
-      [row.name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags), formatAddress(row.address)].filter(Boolean).join(' '),
+      [row.name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags), formatAddress(row.address)]
+        .filter(Boolean)
+        .join(' '),
     toFormValues: (row: Customer) => ({
       type: row.type || 'person',
       name: row.name ?? '',
@@ -309,7 +314,9 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Supplier) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.contact_name || 'Sin contacto'} · {row.tax_id || 'Sin CUIT'}</div>
+            <div className="text-secondary">
+              {row.contact_name || 'Sin contacto'} · {row.tax_id || 'Sin CUIT'}
+            </div>
           </>
         ),
       },
@@ -335,7 +342,10 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'tags', label: 'Tags', placeholder: 'importado, insumos, logistico' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
-    searchText: (row: Supplier) => [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags)].filter(Boolean).join(' '),
+    searchText: (row: Supplier) =>
+      [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags)]
+        .filter(Boolean)
+        .join(' '),
     toFormValues: (row: Supplier) => ({
       name: row.name ?? '',
       contact_name: row.contact_name ?? '',
@@ -370,7 +380,9 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Product) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.sku || 'Sin SKU'} · {row.type || 'general'}</div>
+            <div className="text-secondary">
+              {row.sku || 'Sin SKU'} · {row.type || 'general'}
+            </div>
           </>
         ),
       },
@@ -379,7 +391,11 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'track_stock',
         header: 'Stock',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Controlado' : 'Sin control'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>
+            {value ? 'Controlado' : 'Sin control'}
+          </span>
+        ),
       },
     ],
     formFields: [
@@ -394,7 +410,8 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'tags', label: 'Tags', placeholder: 'nuevo, combo, premium' },
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
-    searchText: (row: Product) => [row.name, row.sku, row.type, row.description, row.unit, tagsToText(row.tags)].filter(Boolean).join(' '),
+    searchText: (row: Product) =>
+      [row.name, row.sku, row.type, row.description, row.unit, tagsToText(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Product) => ({
       name: row.name ?? '',
       sku: row.sku ?? '',
@@ -442,12 +459,16 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'is_default',
         header: 'Default',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Si' : 'No'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Si' : 'No'}</span>
+        ),
       },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activa' : 'Inactiva'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activa' : 'Inactiva'}</span>
+        ),
       },
     ],
     formFields: [
@@ -497,11 +518,17 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Quote) => (
           <>
             <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{row.customer_name || 'Sin cliente'} · {row.status || 'draft'}</div>
+            <div className="text-secondary">
+              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
+            </div>
           </>
         ),
       },
-      { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'total',
+        header: 'Total',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '---' },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -564,7 +591,8 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       items: parsePricedLineItems(values.items_json),
       notes: asOptionalString(values.notes),
     }),
-    isValid: (values) => asString(values.customer_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
+    isValid: (values) =>
+      asString(values.customer_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
   },
   sales: {
     basePath: '/v1/sales',
@@ -581,19 +609,30 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Sale) => (
           <>
             <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{row.customer_name || 'Sin cliente'} · {row.status || 'draft'}</div>
+            <div className="text-secondary">
+              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
+            </div>
           </>
         ),
       },
       { key: 'payment_method', header: 'Cobro' },
-      { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'total',
+        header: 'Total',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
       { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
       { key: 'quote_id', label: 'Quote ID' },
-      { key: 'payment_method', label: 'Metodo de cobro', required: true, placeholder: 'efectivo, transferencia, tarjeta' },
+      {
+        key: 'payment_method',
+        label: 'Metodo de cobro',
+        required: true,
+        placeholder: 'efectivo, transferencia, tarjeta',
+      },
       {
         key: 'items_json',
         label: 'Items JSON',
@@ -624,7 +663,9 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
               helpers.setError('No hay cobros registrados para esta venta.');
               return;
             }
-            const lines = items.map((p) => `${p.method} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`);
+            const lines = items.map(
+              (p) => `${p.method} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`,
+            );
             const w = window.open('', '_blank', 'noopener,noreferrer,width=520,height=480');
             if (w) {
               w.document.write(
@@ -676,7 +717,8 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: Sale) => [row.number, row.customer_name, row.status, row.payment_method, row.notes].filter(Boolean).join(' '),
+    searchText: (row: Sale) =>
+      [row.number, row.customer_name, row.status, row.payment_method, row.notes].filter(Boolean).join(' '),
     toFormValues: (row: Sale) => ({
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
@@ -712,12 +754,18 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Purchase) => (
           <>
             <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{row.supplier_name || 'Sin proveedor'} · {row.status || 'draft'}</div>
+            <div className="text-secondary">
+              {row.supplier_name || 'Sin proveedor'} · {row.status || 'draft'}
+            </div>
           </>
         ),
       },
       { key: 'payment_status', header: 'Pago' },
-      { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'total',
+        header: 'Total',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
     formFields: [
@@ -735,7 +783,8 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
-    searchText: (row: Purchase) => [row.number, row.supplier_name, row.status, row.payment_status, row.notes].filter(Boolean).join(' '),
+    searchText: (row: Purchase) =>
+      [row.number, row.supplier_name, row.status, row.payment_status, row.notes].filter(Boolean).join(' '),
     toFormValues: (row: Purchase) => ({
       supplier_id: row.supplier_id ?? '',
       supplier_name: row.supplier_name ?? '',
@@ -752,7 +801,8 @@ export const commercialResourceConfigs: Record<string, CrudPageConfig<any>> = {
       items: parseCostLineItems(values.items_json),
       notes: asOptionalString(values.notes),
     }),
-    isValid: (values) => asString(values.supplier_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
+    isValid: (values) =>
+      asString(values.supplier_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
   },
 };
 
@@ -767,7 +817,7 @@ const resourceConfigs = Object.fromEntries(
     resourceId,
     withCSVToolbar(resourceId, config, commercialCsvStrategies[resourceId]),
   ]),
-) as Record<string, CrudPageConfig<any>>;
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

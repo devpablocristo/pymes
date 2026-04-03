@@ -43,8 +43,24 @@ func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
 	}
 
 	if authMethod == "api_key" {
-		c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
-		c.Set(ctxkeys.CtxKeyRole, "service")
+		if v := reqCtx.Value(ctxkeys.Actor); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				c.Set(ctxkeys.CtxKeyActor, s)
+			} else {
+				c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
+			}
+		} else {
+			c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
+		}
+		if v := reqCtx.Value(ctxkeys.Role); v != nil {
+			if s, ok := v.(string); ok && s != "" {
+				c.Set(ctxkeys.CtxKeyRole, s)
+			} else {
+				c.Set(ctxkeys.CtxKeyRole, "service")
+			}
+		} else {
+			c.Set(ctxkeys.CtxKeyRole, "service")
+		}
 	} else {
 		if v := reqCtx.Value(ctxkeys.Actor); v != nil {
 			if s, ok := v.(string); ok && s != "" {

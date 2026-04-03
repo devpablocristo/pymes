@@ -1,4 +1,5 @@
-import type { CrudPageConfig } from '../components/CrudPage';
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import type { CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
   createRestaurantDiningArea,
   createRestaurantDiningTable,
@@ -11,7 +12,7 @@ import type { RestaurantDiningArea, RestaurantDiningTable } from '../lib/restaur
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   restaurantDiningAreas: {
     label: 'zona del salón',
     labelPlural: 'zonas del salón',
@@ -86,7 +87,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
           </>
         ),
       },
-      { key: 'area_id', header: 'Área (ID)', render: (v) => <span className="text-secondary">{String(v ?? '').slice(0, 8)}…</span> },
+      {
+        key: 'area_id',
+        header: 'Área (ID)',
+        render: (v) => <span className="text-secondary">{String(v ?? '').slice(0, 8)}…</span>,
+      },
       { key: 'capacity', header: 'Cap.' },
       {
         key: 'status',
@@ -94,14 +99,25 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (value) => {
           const s = String(value ?? '');
           const cls =
-            s === 'occupied' ? 'badge-warning' : s === 'reserved' ? 'badge-neutral' : s === 'cleaning' ? 'badge-neutral' : 'badge-success';
+            s === 'occupied'
+              ? 'badge-warning'
+              : s === 'reserved'
+                ? 'badge-neutral'
+                : s === 'cleaning'
+                  ? 'badge-neutral'
+                  : 'badge-success';
           return <span className={`badge ${cls}`}>{s || 'available'}</span>;
         },
       },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
-      { key: 'area_id', label: 'ID de zona', required: true, placeholder: 'UUID de la zona (crear primero en Zonas del salón)' },
+      {
+        key: 'area_id',
+        label: 'ID de zona',
+        required: true,
+        placeholder: 'UUID de la zona (crear primero en Zonas del salón)',
+      },
       { key: 'code', label: 'Código', required: true, placeholder: 'M1, T12, BAR-3' },
       { key: 'label', label: 'Etiqueta', placeholder: 'Ventana, VIP' },
       { key: 'capacity', label: 'Capacidad', type: 'number', placeholder: '4' },

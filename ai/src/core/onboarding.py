@@ -17,27 +17,27 @@ STEPS = [
 BUSINESS_PROFILES: dict[str, dict[str, Any]] = {
     "comercio_minorista": {
         "modules": ["customers", "products", "inventory", "sales", "cashflow", "suppliers"],
-        "settings": {"track_stock": True, "appointments_enabled": False},
+        "settings": {"track_stock": True, "scheduling_enabled": False},
         "description": "Kiosco, almacen, tienda de ropa, ferreteria",
     },
     "servicio_profesional": {
         "modules": ["customers", "appointments", "sales", "cashflow"],
-        "settings": {"track_stock": False, "appointments_enabled": True},
+        "settings": {"track_stock": False, "scheduling_enabled": True},
         "description": "Peluqueria, consultorio, estudio juridico, taller",
     },
     "gastronomia": {
         "modules": ["products", "sales", "cashflow", "suppliers", "recurring"],
-        "settings": {"track_stock": False, "appointments_enabled": False},
+        "settings": {"track_stock": False, "scheduling_enabled": False},
         "description": "Restaurante, bar, delivery, cafeteria",
     },
     "distribuidora": {
         "modules": ["customers", "suppliers", "products", "inventory", "purchases", "sales", "accounts", "cashflow"],
-        "settings": {"track_stock": True, "appointments_enabled": False},
+        "settings": {"track_stock": True, "scheduling_enabled": False},
         "description": "Mayorista, distribuidor, deposito",
     },
     "freelancer": {
         "modules": ["customers", "quotes", "sales", "cashflow"],
-        "settings": {"track_stock": False, "appointments_enabled": False},
+        "settings": {"track_stock": False, "scheduling_enabled": False},
         "description": "Disenador, programador, consultor, contador",
     },
     "otro": {

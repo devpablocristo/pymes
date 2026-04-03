@@ -1,5 +1,13 @@
 import type { CrudFormField, CrudFormValues, CrudPageConfig } from '../components/CrudPage';
-import { buildCSV, downloadCSVFile, normalizeCSVFieldValue, parseCSV, pickCSVFile, type CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
+import { confirmAction } from '@devpablocristo/core-browser';
+import {
+  buildCSV,
+  downloadCSVFile,
+  normalizeCSVFieldValue,
+  parseCSV,
+  pickCSVFile,
+  type CSVColumn,
+} from '@devpablocristo/modules-crud-ui/csv';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 
 type CSVMode = 'client' | 'server';
@@ -26,7 +34,11 @@ function defaultColumns<T extends { id: string }>(config: CrudPageConfig<T>): CS
   return config.formFields.map((field) => ({ key: field.key, label: field.label }));
 }
 
-function valuesFromRow<T extends { id: string }>(config: CrudPageConfig<T>, row: T, columns: CSVColumn[]): Record<string, string> {
+function valuesFromRow<T extends { id: string }>(
+  config: CrudPageConfig<T>,
+  row: T,
+  columns: CSVColumn[],
+): Record<string, string> {
   const values = config.toFormValues(row);
   return columns.reduce<Record<string, string>>((accumulator, column) => {
     const rawValue = values[column.key];
@@ -35,7 +47,10 @@ function valuesFromRow<T extends { id: string }>(config: CrudPageConfig<T>, row:
   }, {});
 }
 
-async function createFromValues<T extends { id: string }>(config: CrudPageConfig<T>, values: CrudFormValues): Promise<void> {
+async function createFromValues<T extends { id: string }>(
+  config: CrudPageConfig<T>,
+  values: CrudFormValues,
+): Promise<void> {
   if (config.dataSource?.create) {
     await config.dataSource.create(values);
     return;
@@ -67,7 +82,12 @@ async function importClientCSV<T extends { id: string }>(
   }
 
   const fieldsByKey = fieldMap(config.formFields);
-  const summary = window.confirm(`Se importaran ${rows.length} filas de ${file.name}. ¿Continuar?`);
+  const summary = await confirmAction({
+    title: 'Importar CSV',
+    description: `Se importaran ${rows.length} filas de ${file.name}. ¿Continuar?`,
+    confirmLabel: 'Importar',
+    cancelLabel: 'Cancelar',
+  });
   if (!summary) {
     return { created: 0, failed: 0 };
   }
@@ -90,7 +110,10 @@ async function importClientCSV<T extends { id: string }>(
   return { created, failed };
 }
 
-async function importServerCSV(entity: string, importMode: 'create_only' | 'upsert'): Promise<{ created: number; updated: number; skipped: number }> {
+async function importServerCSV(
+  entity: string,
+  importMode: 'create_only' | 'upsert',
+): Promise<{ created: number; updated: number; skipped: number }> {
   const file = await pickCSVFile();
   if (!file) {
     return { created: 0, updated: 0, skipped: 0 };
@@ -102,17 +125,25 @@ async function importServerCSV(entity: string, importMode: 'create_only' | 'upse
     rawBody: formData,
     skipJSONContentType: true,
   });
-  const firstErrors = preview.errors.slice(0, 3).map((error) => `fila ${error.row}: ${error.message}`).join('\n');
-  const confirmed = window.confirm(
-    [
+  const firstErrors = preview.errors
+    .slice(0, 3)
+    .map((error) => `fila ${error.row}: ${error.message}`)
+    .join('\n');
+  const confirmed = await confirmAction({
+    title: 'Confirmar importación',
+    description: [
       `Archivo: ${file.name}`,
       `Total: ${preview.total_rows}`,
       `Validas: ${preview.valid_rows}`,
       `Con errores: ${preview.error_rows}`,
       firstErrors ? `Errores:\n${firstErrors}` : '',
       '¿Continuar con la importacion?',
-    ].filter(Boolean).join('\n\n'),
-  );
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    confirmLabel: 'Continuar',
+    cancelLabel: 'Cancelar',
+  });
   if (!confirmed) {
     return { created: 0, updated: 0, skipped: 0 };
   }
@@ -145,7 +176,9 @@ export function withCSVToolbar<T extends { id: string }>(
         if (mode === 'server') {
           const result = await importServerCSV(entity, options.importMode ?? 'upsert');
           await reload();
-          window.alert(`Importacion completada. Creados: ${result.created}. Actualizados: ${result.updated}. Omitidos: ${result.skipped}.`);
+          window.alert(
+            `Importacion completada. Creados: ${result.created}. Actualizados: ${result.updated}. Omitidos: ${result.skipped}.`,
+          );
           return;
         }
         const result = await importClientCSV(config, columns);
@@ -165,7 +198,10 @@ export function withCSVToolbar<T extends { id: string }>(
           await downloadAPIFile(`/v1/export/${entity}?format=csv`);
           return;
         }
-        const content = buildCSV(columns, items.map((row) => valuesFromRow(config, row, columns)));
+        const content = buildCSV(
+          columns,
+          items.map((row) => valuesFromRow(config, row, columns)),
+        );
         downloadCSVFile(options.fileName ?? `${entity}.csv`, content);
       },
     });

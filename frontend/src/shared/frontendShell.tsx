@@ -1,6 +1,10 @@
 import { type PropsWithChildren, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { AppShell as ShellSidebar, type AppShellNavItem, type AppShellNavSection } from '@devpablocristo/modules-shell-sidebar';
+import {
+  AppShell as ShellSidebar,
+  type AppShellNavItem,
+  type AppShellNavSection,
+} from '@devpablocristo/modules-shell-sidebar';
 import '@devpablocristo/modules-shell-sidebar/styles.css';
 import { useI18n } from '../lib/i18n';
 
@@ -35,9 +39,7 @@ export function AppShell({
           to={item.to}
           end={item.end}
           className={({ isActive: navLinkActive }) => {
-            const active = item.isActive
-              ? item.isActive(location.pathname, location.search)
-              : navLinkActive;
+            const active = item.isActive ? item.isActive(location.pathname, location.search) : navLinkActive;
             return `${className}${active ? ' active' : ''}`;
           }}
         >

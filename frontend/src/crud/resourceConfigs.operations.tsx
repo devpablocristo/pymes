@@ -1,5 +1,7 @@
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import { confirmAction } from '@devpablocristo/core-browser';
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
-import { type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
+import { type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import {
   apiRequest,
   assignWhatsAppConversation,
@@ -23,7 +25,6 @@ import {
   asOptionalString,
   asString,
   formatDate,
-  toDateTimeInput,
   toRFC3339,
 } from './resourceConfigs.shared';
 
@@ -93,22 +94,6 @@ type InventoryMovementRow = {
   created_at: string;
 };
 
-type Appointment = {
-  id: string;
-  customer_name: string;
-  customer_phone?: string;
-  title: string;
-  description?: string;
-  status: string;
-  start_at: string;
-  end_at?: string;
-  duration?: number;
-  location?: string;
-  assigned_to?: string;
-  color?: string;
-  notes?: string;
-};
-
 type RecurringExpense = {
   id: string;
   description: string;
@@ -131,7 +116,7 @@ function searchParam(name: string): string | undefined {
   return t || undefined;
 }
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   returns: {
     basePath: '/v1/returns',
     label: 'devolución',
@@ -150,7 +135,10 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: ReturnRow) => (
           <>
             <strong>{row.number}</strong>
-            <div className="text-secondary">{row.status}{row.sale_id ? ` · venta ${row.sale_id.slice(0, 8)}…` : ''}</div>
+            <div className="text-secondary">
+              {row.status}
+              {row.sale_id ? ` · venta ${row.sale_id.slice(0, 8)}…` : ''}
+            </div>
           </>
         ),
       },
@@ -160,7 +148,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [],
-    searchText: (row: ReturnRow) => [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
+    searchText: (row: ReturnRow) =>
+      [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
     rowActions: [
@@ -210,7 +199,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         return parseListItemsFromResponse<CreditNoteRow>(data);
       },
     },
-    searchText: (row: CreditNoteRow) => [row.number, row.party_id, row.return_id, row.status, String(row.amount), String(row.balance)].join(' '),
+    searchText: (row: CreditNoteRow) =>
+      [row.number, row.party_id, row.return_id, row.status, String(row.amount), String(row.balance)].join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
   },
@@ -232,11 +222,17 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: CashMovementRow) => (
           <>
             <strong>{row.type}</strong>
-            <div className="text-secondary">{row.category} · {row.payment_method}</div>
+            <div className="text-secondary">
+              {row.category} · {row.payment_method}
+            </div>
           </>
         ),
       },
-      { key: 'amount', header: 'Importe', render: (value, row: CashMovementRow) => `${row.currency} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'amount',
+        header: 'Importe',
+        render: (value, row: CashMovementRow) => `${row.currency} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'description', header: 'Descripción', className: 'cell-notes' },
       { key: 'reference_type', header: 'Origen', render: (_v, row: CashMovementRow) => row.reference_type || '---' },
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
@@ -261,7 +257,17 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'currency', label: 'Moneda', placeholder: 'ARS (default org)' },
     ],
     searchText: (row: CashMovementRow) =>
-      [row.type, row.category, row.description, row.payment_method, row.reference_type, String(row.amount), row.currency].filter(Boolean).join(' '),
+      [
+        row.type,
+        row.category,
+        row.description,
+        row.payment_method,
+        row.reference_type,
+        String(row.amount),
+        row.currency,
+      ]
+        .filter(Boolean)
+        .join(' '),
     toFormValues: (row: CashMovementRow) => ({
       type: row.type ?? 'expense',
       amount: row.amount != null ? String(row.amount) : '',
@@ -358,7 +364,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: InventoryStockRow) => [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
+    searchText: (row: InventoryStockRow) =>
+      [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
   },
@@ -399,7 +406,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
     ],
     formFields: [],
     searchText: (row: InventoryMovementRow) =>
-      [row.product_name, row.type, row.reason, row.notes, row.created_by, String(row.quantity)].filter(Boolean).join(' '),
+      [row.product_name, row.type, row.reason, row.notes, row.created_by, String(row.quantity)]
+        .filter(Boolean)
+        .join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
   },
@@ -446,13 +455,19 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
     formFields: [
-      { key: 'sale_id', label: 'Venta (UUID)', createOnly: true, placeholder: 'Opcional si ya hay ?sale_id= en la URL' },
+      {
+        key: 'sale_id',
+        label: 'Venta (UUID)',
+        createOnly: true,
+        placeholder: 'Opcional si ya hay ?sale_id= en la URL',
+      },
       { key: 'method', label: 'Método', required: true, placeholder: 'efectivo, transferencia, tarjeta' },
       { key: 'amount', label: 'Importe', type: 'number', required: true },
       { key: 'received_at', label: 'Recibido', type: 'datetime-local' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
-    searchText: (row: SalePaymentRow) => [row.method, row.notes, String(row.amount), row.received_at, row.id].filter(Boolean).join(' '),
+    searchText: (row: SalePaymentRow) =>
+      [row.method, row.notes, String(row.amount), row.received_at, row.id].filter(Boolean).join(' '),
     toFormValues: () =>
       ({
         sale_id: searchParam('sale_id') ?? '',
@@ -465,89 +480,6 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       const saleOk = Boolean(searchParam('sale_id')?.trim() || asString(values.sale_id).trim());
       return saleOk && asString(values.method).trim().length > 0 && asNumber(values.amount) > 0;
     },
-  },
-  appointments: {
-    basePath: '/v1/appointments',
-    supportsArchived: true,
-    label: 'turno',
-    labelPlural: 'turnos',
-    labelPluralCap: 'Turnos',
-    columns: [
-      {
-        key: 'title',
-        header: 'Turno',
-        className: 'cell-name',
-        render: (_value, row: Appointment) => (
-          <>
-            <strong>{row.title}</strong>
-            <div className="text-secondary">{row.customer_name || 'Sin cliente'} · {row.assigned_to || 'Sin asignar'}</div>
-          </>
-        ),
-      },
-      { key: 'status', header: 'Estado' },
-      { key: 'start_at', header: 'Inicio', render: (value) => formatDate(String(value ?? '')) },
-      { key: 'location', header: 'Ubicacion' },
-    ],
-    formFields: [
-      { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
-      { key: 'customer_phone', label: 'Telefono', type: 'tel' },
-      { key: 'title', label: 'Titulo', required: true, placeholder: 'Consulta inicial' },
-      {
-        key: 'status',
-        label: 'Estado',
-        type: 'select',
-        options: [
-          { label: 'Scheduled', value: 'scheduled' },
-          { label: 'Confirmed', value: 'confirmed' },
-          { label: 'In progress', value: 'in_progress' },
-          { label: 'Completed', value: 'completed' },
-          { label: 'Cancelled', value: 'cancelled' },
-          { label: 'No show', value: 'no_show' },
-        ],
-      },
-      { key: 'start_at', label: 'Inicio', type: 'datetime-local', required: true },
-      { key: 'end_at', label: 'Fin', type: 'datetime-local' },
-      { key: 'duration', label: 'Duracion (min)', type: 'number', placeholder: '60' },
-      { key: 'assigned_to', label: 'Asignado a' },
-      { key: 'location', label: 'Ubicacion' },
-      { key: 'color', label: 'Color' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Appointment) =>
-      [row.customer_name, row.customer_phone, row.title, row.status, row.location, row.assigned_to, row.notes].filter(Boolean).join(' '),
-    toFormValues: (row: Appointment) => ({
-      customer_name: row.customer_name ?? '',
-      customer_phone: row.customer_phone ?? '',
-      title: row.title ?? '',
-      status: row.status ?? 'scheduled',
-      start_at: toDateTimeInput(row.start_at),
-      end_at: toDateTimeInput(row.end_at),
-      duration: row.duration?.toString() ?? '',
-      assigned_to: row.assigned_to ?? '',
-      location: row.location ?? '',
-      color: row.color ?? '',
-      description: row.description ?? '',
-      notes: row.notes ?? '',
-    }),
-    toBody: (values) => ({
-      customer_name: asString(values.customer_name),
-      customer_phone: asOptionalString(values.customer_phone),
-      title: asString(values.title),
-      status: asOptionalString(values.status),
-      start_at: toRFC3339(values.start_at),
-      end_at: toRFC3339(values.end_at),
-      duration: asOptionalNumber(values.duration) ?? 60,
-      assigned_to: asOptionalString(values.assigned_to),
-      location: asOptionalString(values.location),
-      color: asOptionalString(values.color),
-      description: asOptionalString(values.description),
-      notes: asOptionalString(values.notes),
-    }),
-    isValid: (values) =>
-      asString(values.customer_name).trim().length >= 2 &&
-      asString(values.title).trim().length >= 2 &&
-      Boolean(toRFC3339(values.start_at)),
   },
   recurring: {
     basePath: '/v1/recurring-expenses',
@@ -562,16 +494,24 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: RecurringExpense) => (
           <>
             <strong>{row.description}</strong>
-            <div className="text-secondary">{row.category || 'Sin categoria'} · {row.frequency || 'Sin frecuencia'}</div>
+            <div className="text-secondary">
+              {row.category || 'Sin categoria'} · {row.frequency || 'Sin frecuencia'}
+            </div>
           </>
         ),
       },
-      { key: 'amount', header: 'Importe', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'amount',
+        header: 'Importe',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'next_due_date', header: 'Proximo venc.', render: (value) => String(value ?? '') || '---' },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
     ],
     formFields: [
@@ -587,7 +527,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
-    searchText: (row: RecurringExpense) => [row.description, row.category, row.payment_method, row.frequency, row.notes].filter(Boolean).join(' '),
+    searchText: (row: RecurringExpense) =>
+      [row.description, row.category, row.payment_method, row.frequency, row.notes].filter(Boolean).join(' '),
     toFormValues: (row: RecurringExpense) => ({
       description: row.description ?? '',
       amount: row.amount?.toString() ?? '0',
@@ -633,7 +574,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
           template_name: asString(values.template_name),
           template_language: asOptionalString(values.template_language) ?? 'es',
           template_params: asOptionalString(values.template_params)
-            ? asString(values.template_params).split(',').map((s) => s.trim())
+            ? asString(values.template_params)
+                .split(',')
+                .map((s) => s.trim())
             : [],
           tag_filter: asOptionalString(values.tag_filter),
         });
@@ -647,7 +590,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: WhatsAppCampaign) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.template_name} · {row.tag_filter || 'Todos'}</div>
+            <div className="text-secondary">
+              {row.template_name} · {row.tag_filter || 'Todos'}
+            </div>
           </>
         ),
       },
@@ -685,7 +630,14 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         kind: 'primary',
         isVisible: (row: WhatsAppCampaign) => row.status === 'draft' || row.status === 'scheduled',
         onClick: async (row: WhatsAppCampaign, helpers) => {
-          if (!window.confirm(`¿Enviar campaña "${row.name}" a ${row.total_recipients} destinatarios?`)) return;
+          const confirmed = await confirmAction({
+            title: 'Enviar campaña',
+            description: `¿Enviar campaña "${row.name}" a ${row.total_recipients} destinatarios?`,
+            confirmLabel: 'Enviar',
+            cancelLabel: 'Cancelar',
+            tone: 'danger',
+          });
+          if (!confirmed) return;
           await sendWhatsAppCampaign(row.id);
           await helpers.reload();
         },
@@ -700,9 +652,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       template_params: (row.template_params ?? []).join(', '),
       tag_filter: row.tag_filter ?? '',
     }),
-    isValid: (values) =>
-      asString(values.name).trim().length >= 2 &&
-      asString(values.template_name).trim().length >= 2,
+    isValid: (values) => asString(values.name).trim().length >= 2 && asString(values.template_name).trim().length >= 2,
   },
   whatsappConversations: {
     allowCreate: false,

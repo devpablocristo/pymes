@@ -113,21 +113,46 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 18%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+.confirm-delete-copy {
+  min-width: min(220px, 100%);
+  flex: 1 1 220px;
 }
 
 .confirm-delete-hint {
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text);
+  line-height: var(--leading-normal);
 }
 
 .confirm-delete-input {
-  width: 100px;
+  width: 136px;
+  min-height: 34px;
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-danger, #dc2626);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--text-sm);
+}
+
+.confirm-delete-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-danger) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.confirm-delete-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 
 /* ── Admin / tenant settings ── */

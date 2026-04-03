@@ -17,9 +17,17 @@ type UpdateTenantSettingsRequest struct {
 	BusinessAddress          *string        `json:"business_address,omitempty"`
 	BusinessPhone            *string        `json:"business_phone,omitempty"`
 	BusinessEmail            *string        `json:"business_email,omitempty"`
+	TeamSize                 *string        `json:"team_size,omitempty"`
+	Sells                    *string        `json:"sells,omitempty"`
+	ClientLabel              *string        `json:"client_label,omitempty"`
+	UsesBilling              *bool          `json:"uses_billing,omitempty"`
+	PaymentMethod            *string        `json:"payment_method,omitempty"`
+	Vertical                 *string        `json:"vertical,omitempty"`
+	OnboardingCompletedAt    *string        `json:"onboarding_completed_at,omitempty"`
 	WAQuoteTemplate          *string        `json:"wa_quote_template,omitempty"`
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`
+	SchedulingEnabled        *bool          `json:"scheduling_enabled,omitempty"`
 	AppointmentsEnabled      *bool          `json:"appointments_enabled,omitempty"`
 	AppointmentLabel         *string        `json:"appointment_label,omitempty"`
 	AppointmentReminderHours *int           `json:"appointment_reminder_hours,omitempty"`

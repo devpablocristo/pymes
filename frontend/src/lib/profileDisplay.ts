@@ -46,10 +46,7 @@ export function mergeClerkSessionWithApiUser(
   clerkUser: ClerkUserProfileSource,
   apiUser: MeProfileUser | null | undefined,
 ): MeProfileUser {
-  const email =
-    clerkUser.primaryEmailAddress?.emailAddress?.trim() ||
-    apiUser?.email?.trim() ||
-    '';
+  const email = clerkUser.primaryEmailAddress?.emailAddress?.trim() || apiUser?.email?.trim() || '';
   const givenFromClerk = (typeof clerkUser.firstName === 'string' ? clerkUser.firstName.trim() : '') || '';
   const familyFromClerk = (typeof clerkUser.lastName === 'string' ? clerkUser.lastName.trim() : '') || '';
   const nameFromClerk =
@@ -59,11 +56,7 @@ export function mergeClerkSessionWithApiUser(
     '';
   const given = givenFromClerk || (apiUser ? displayGivenFromUser(apiUser) : '');
   const family = familyFromClerk || (apiUser ? displayFamilyFromUser(apiUser) : '');
-  const name =
-    nameFromClerk ||
-    [given, family].filter(Boolean).join(' ').trim() ||
-    apiUser?.name?.trim() ||
-    '';
+  const name = nameFromClerk || [given, family].filter(Boolean).join(' ').trim() || apiUser?.name?.trim() || '';
   const phoneFromClerk = clerkUser.primaryPhoneNumber?.phoneNumber?.trim() || '';
   const phone = (apiUser?.phone ?? '').trim() || phoneFromClerk || '';
   return {
@@ -86,8 +79,7 @@ export function greetingDisplayName(
   clerkUser: ClerkUserProfileSource | null | undefined,
 ): string {
   const apiUser = me?.user ?? undefined;
-  const merged =
-    clerkUser != null ? mergeClerkSessionWithApiUser(clerkUser, apiUser) : apiUser ?? null;
+  const merged = clerkUser != null ? mergeClerkSessionWithApiUser(clerkUser, apiUser) : (apiUser ?? null);
 
   if (!merged) {
     return (me?.external_id ?? '').trim();

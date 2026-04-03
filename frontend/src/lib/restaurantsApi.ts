@@ -22,7 +22,9 @@ const restaurantsRequest = createVerticalRequest({
 });
 
 export async function getRestaurantDiningAreas(): Promise<{ items: RestaurantDiningArea[] }> {
-  const res = await restaurantsRequest<{ items: RestaurantDiningArea[]; total: number }>('/v1/restaurants/dining-areas');
+  const res = await restaurantsRequest<{ items: RestaurantDiningArea[]; total: number }>(
+    '/v1/restaurants/dining-areas',
+  );
   return { items: res.items ?? [] };
 }
 

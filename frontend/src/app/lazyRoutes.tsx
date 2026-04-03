@@ -35,22 +35,30 @@ export const WorkOrdersEditorPage = lazy(() =>
 export const BeautySalonServicesPage = lazy(() =>
   import('../pages/BeautySalonServicesPage').then((mod) => ({ default: mod.BeautySalonServicesPage })),
 );
-export const BeautyStaffPage = lazy(() => import('../pages/BeautyStaffPage').then((mod) => ({ default: mod.BeautyStaffPage })));
+export const BeautyStaffPage = lazy(() =>
+  import('../pages/BeautyStaffPage').then((mod) => ({ default: mod.BeautyStaffPage })),
+);
 export const UnifiedChatPage = lazy(() =>
   import('../pages/UnifiedChatPage').then((mod) => ({ default: mod.UnifiedChatPage })),
 );
 export const NotificationsCenterPage = lazy(() =>
   import('../pages/NotificationsCenterPage').then((mod) => ({ default: mod.NotificationsCenterPage })),
 );
-export const CustomersPage = lazy(() => import('../pages/CustomersPage').then((mod) => ({ default: mod.CustomersPage })));
+export const CustomersPage = lazy(() =>
+  import('../pages/CustomersPage').then((mod) => ({ default: mod.CustomersPage })),
+);
 export const IntakesPage = lazy(() => import('../pages/IntakesPage').then((mod) => ({ default: mod.IntakesPage })));
 export const LoginPage = lazy(() => import('../pages/LoginPage').then((mod) => ({ default: mod.LoginPage })));
 export const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) => ({ default: mod.ModulePage })));
-export const OnboardingPage = lazy(() => import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })));
+export const OnboardingPage = lazy(() =>
+  import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })),
+);
 export const PublicPreviewPage = lazy(() =>
   import('../pages/PublicPreviewPage').then((mod) => ({ default: mod.PublicPreviewPage })),
 );
-export const PurchasesPage = lazy(() => import('../pages/PurchasesPage').then((mod) => ({ default: mod.PurchasesPage })));
+export const PurchasesPage = lazy(() =>
+  import('../pages/PurchasesPage').then((mod) => ({ default: mod.PurchasesPage })),
+);
 export const RestaurantDiningAreasPage = lazy(() =>
   import('../pages/RestaurantDiningAreasPage').then((mod) => ({ default: mod.RestaurantDiningAreasPage })),
 );
@@ -62,7 +70,9 @@ export const RestaurantTableSessionsPage = lazy(() =>
 );
 export const SessionsPage = lazy(() => import('../pages/SessionsPage').then((mod) => ({ default: mod.SessionsPage })));
 export const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
-export const SpecialtiesPage = lazy(() => import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })));
+export const SpecialtiesPage = lazy(() =>
+  import('../pages/SpecialtiesPage').then((mod) => ({ default: mod.SpecialtiesPage })),
+);
 export const TeachersPage = lazy(() => import('../pages/TeachersPage').then((mod) => ({ default: mod.TeachersPage })));
 export const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 export const WhatsAppCampaignsPage = lazy(() =>
@@ -76,7 +86,9 @@ export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod
 export const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
 );
-export const DashboardPage = lazy(() => import('../pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })));
+export const DashboardPage = lazy(() =>
+  import('../pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })),
+);
 export const InvoicesPage = lazy(() => import('../pages/InvoicesPage').then((mod) => ({ default: mod.InvoicesPage })));
 export const SettingsHubPage = lazy(() =>
   import('../pages/SettingsHubPage').then((mod) => ({ default: mod.SettingsHubPage })),

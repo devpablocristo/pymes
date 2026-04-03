@@ -1,4 +1,5 @@
-import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest } from '../lib/api';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
@@ -198,7 +199,7 @@ function partyFormToBody(values: CrudFormValues): Record<string, unknown> {
   };
 }
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   procurementRequests: {
     supportsArchived: true,
     label: 'solicitud de compra interna',
@@ -214,7 +215,10 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         await apiRequest('/v1/procurement-requests', { method: 'POST', body: toProcurementRequestBody(values) });
       },
       update: async (row, values) => {
-        await apiRequest(`/v1/procurement-requests/${row.id}`, { method: 'PATCH', body: toProcurementRequestBody(values) });
+        await apiRequest(`/v1/procurement-requests/${row.id}`, {
+          method: 'PATCH',
+          body: toProcurementRequestBody(values),
+        });
       },
       deleteItem: async (row) => {
         await apiRequest(`/v1/procurement-requests/${row.id}/archive`, { method: 'POST', body: {} });
@@ -235,7 +239,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
           <>
             <strong>{row.title || row.id}</strong>
             <div className="text-secondary">
-              {row.requester_actor || '—'} · {row.status || 'draft'} · {row.currency || 'ARS'} {Number(row.estimated_total ?? 0).toFixed(2)}
+              {row.requester_actor || '—'} · {row.status || 'draft'} · {row.currency || 'ARS'}{' '}
+              {Number(row.estimated_total ?? 0).toFixed(2)}
             </div>
           </>
         ),
@@ -290,7 +295,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: ProcurementRequest) => [row.title, row.description, row.category, row.status, row.requester_actor].filter(Boolean).join(' '),
+    searchText: (row: ProcurementRequest) =>
+      [row.title, row.description, row.category, row.status, row.requester_actor].filter(Boolean).join(' '),
     toFormValues: (row: ProcurementRequest) => ({
       title: row.title ?? '',
       description: row.description ?? '',
@@ -314,7 +320,10 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyBody(values) });
       },
       update: async (row, values) => {
-        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'PATCH', body: toProcurementPolicyBody(values) });
+        await apiRequest(`/v1/procurement-policies/${row.id}`, {
+          method: 'PATCH',
+          body: toProcurementPolicyBody(values),
+        });
       },
       deleteItem: async (row) => {
         await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'DELETE' });
@@ -346,7 +355,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'action_filter', label: 'Filtro de acción', placeholder: 'procurement.submit' },
       { key: 'system_filter', label: 'Filtro de sistema', placeholder: 'pymes' },
     ],
-    searchText: (row: ProcurementPolicy) => [row.name, row.expression, row.effect, row.action_filter].filter(Boolean).join(' '),
+    searchText: (row: ProcurementPolicy) =>
+      [row.name, row.expression, row.effect, row.action_filter].filter(Boolean).join(' '),
     toFormValues: (row: ProcurementPolicy) => ({
       name: row.name ?? '',
       expression: row.expression ?? '',
@@ -377,12 +387,22 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Account) => (
           <>
             <strong>{row.entity_name}</strong>
-            <div className="text-secondary">{row.type} · {row.entity_type}</div>
+            <div className="text-secondary">
+              {row.type} · {row.entity_type}
+            </div>
           </>
         ),
       },
-      { key: 'balance', header: 'Saldo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
-      { key: 'credit_limit', header: 'Limite', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'balance',
+        header: 'Saldo',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
+      {
+        key: 'credit_limit',
+        header: 'Limite',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'updated_at', header: 'Actualizada', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
@@ -462,14 +482,17 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Role) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.is_system ? 'Sistema' : 'Custom'} · {row.permissions.length} permisos</div>
+            <div className="text-secondary">
+              {row.is_system ? 'Sistema' : 'Custom'} · {row.permissions.length} permisos
+            </div>
           </>
         ),
       },
       {
         key: 'permissions',
         header: 'Permisos',
-        render: (_value, row: Role) => row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ') || '---',
+        render: (_value, row: Role) =>
+          row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ') || '---',
       },
       { key: 'description', header: 'Descripcion', className: 'cell-notes' },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
@@ -487,7 +510,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       },
     ],
     searchText: (row: Role) =>
-      [row.name, row.description, row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ')]
+      [
+        row.name,
+        row.description,
+        row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', '),
+      ]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: Role) => ({
@@ -510,7 +537,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Party) => (
           <>
             <strong>{row.display_name}</strong>
-            <div className="text-secondary">{row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}</div>
+            <div className="text-secondary">
+              {row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}
+            </div>
           </>
         ),
       },
@@ -527,7 +556,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'roles',
         header: 'Roles',
-        render: (_value, row: Party) => row.roles?.filter((role) => role.is_active).map((role) => role.role).join(', ') || '---',
+        render: (_value, row: Party) =>
+          row.roles
+            ?.filter((role) => role.is_active)
+            .map((role) => role.role)
+            .join(', ') || '---',
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -556,7 +589,15 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Party) =>
-      [row.display_name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags), row.roles?.map((role) => role.role).join(', ')]
+      [
+        row.display_name,
+        row.email,
+        row.phone,
+        row.tax_id,
+        row.notes,
+        tagsToText(row.tags),
+        row.roles?.map((role) => role.role).join(', '),
+      ]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: Party) => ({
@@ -574,7 +615,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       notes: row.notes ?? '',
     }),
     toBody: partyFormToBody,
-    isValid: (values) => asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
+    isValid: (values) =>
+      asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
   employees: {
     basePath: '/v1/parties',
@@ -594,7 +636,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: Party) => (
           <>
             <strong>{row.display_name}</strong>
-            <div className="text-secondary">{row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}</div>
+            <div className="text-secondary">
+              {row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}
+            </div>
           </>
         ),
       },
@@ -611,7 +655,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'roles',
         header: 'Roles',
-        render: (_value, row: Party) => row.roles?.filter((role) => role.is_active).map((role) => role.role).join(', ') || '---',
+        render: (_value, row: Party) =>
+          row.roles
+            ?.filter((role) => role.is_active)
+            .map((role) => role.role)
+            .join(', ') || '---',
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -640,7 +688,15 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Party) =>
-      [row.display_name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags), row.roles?.map((role) => role.role).join(', ')]
+      [
+        row.display_name,
+        row.email,
+        row.phone,
+        row.tax_id,
+        row.notes,
+        tagsToText(row.tags),
+        row.roles?.map((role) => role.role).join(', '),
+      ]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: Party) => ({
@@ -661,7 +717,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       ...partyFormToBody(values),
       roles: [{ role: 'employee' }],
     }),
-    isValid: (values) => asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
+    isValid: (values) =>
+      asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
 };
 

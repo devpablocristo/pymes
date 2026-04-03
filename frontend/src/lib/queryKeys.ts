@@ -8,12 +8,19 @@ export const queryKeys = {
       detail: (conversationId: string) => ['ai', 'conversations', 'detail', conversationId] as const,
     },
   },
-  appointments: {
-    list: ['appointments', 'list'] as const,
-  },
   notifications: {
     preferences: ['notifications', 'preferences'] as const,
     inApp: ['notifications', 'in-app'] as const,
+  },
+  scheduling: {
+    branches: ['scheduling', 'branches'] as const,
+    services: ['scheduling', 'services'] as const,
+    resources: (branchId: string | null) => ['scheduling', 'resources', branchId ?? 'all'] as const,
+    dashboard: (branchId: string | null, day: string) => ['scheduling', 'dashboard', branchId ?? 'all', day] as const,
+    slots: (branchId: string | null, serviceId: string | null, resourceId: string | null, day: string) =>
+      ['scheduling', 'slots', branchId ?? 'none', serviceId ?? 'none', resourceId ?? 'any', day] as const,
+    bookingsRange: (branchId: string | null, start: string, end: string) =>
+      ['scheduling', 'bookings-range', branchId ?? 'none', start, end] as const,
   },
   me: {
     current: ['me', 'current'] as const,
@@ -35,10 +42,6 @@ export const queryKeys = {
   },
   session: {
     current: ['session', 'current'] as const,
-  },
-  teachers: {
-    previewBootstrap: ['teachers', 'preview', 'bootstrap'] as const,
-    publicBySlug: (slug: string) => ['teachers', 'public', slug] as const,
   },
   workOrders: {
     kanban: (archived: boolean) => ['work-orders', 'kanban', archived ? 'archived' : 'active'] as const,

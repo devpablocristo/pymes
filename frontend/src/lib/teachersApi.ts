@@ -2,7 +2,6 @@ import { registerTokenProvider } from '@devpablocristo/core-authn/http/fetch';
 import type {
   TeacherIntake,
   TeacherProfile,
-  TeachersPreviewBootstrap,
   TeacherServiceLink,
   TeacherSession,
   TeacherSessionNote,
@@ -121,14 +120,16 @@ export async function updateTeacherServices(id: string, links: TeacherServiceLin
 // ── Intakes ──
 
 export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
-  const response = await teachersRequest<{ items?: Array<{
-    id: string;
-    profile_id: string;
-    status: 'draft' | 'submitted' | 'reviewed';
-    payload?: Record<string, unknown>;
-    created_at: string;
-    updated_at: string;
-  }> }>('/v1/teachers/intakes');
+  const response = await teachersRequest<{
+    items?: Array<{
+      id: string;
+      profile_id: string;
+      status: 'draft' | 'submitted' | 'reviewed';
+      payload?: Record<string, unknown>;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }>('/v1/teachers/intakes');
   return { items: (response.items ?? []).map(mapIntake) };
 }
 
@@ -144,10 +145,7 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   return mapIntake(response);
 }
 
-export async function createTeacherIntake(data: {
-  profile_id: string;
-  notes: string;
-}): Promise<TeacherIntake> {
+export async function createTeacherIntake(data: { profile_id: string; notes: string }): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     profile_id: string;
@@ -162,10 +160,7 @@ export async function createTeacherIntake(data: {
   return mapIntake(response);
 }
 
-export async function updateTeacherIntake(
-  id: string,
-  data: Partial<{ notes: string }>,
-): Promise<TeacherIntake> {
+export async function updateTeacherIntake(id: string, data: Partial<{ notes: string }>): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     profile_id: string;
@@ -194,7 +189,10 @@ export async function submitTeacherIntake(id: string): Promise<TeacherIntake> {
 
 // ── Sessions ──
 
-export async function getTeacherSessions(filters?: { status?: string; profile_id?: string }): Promise<{ items: TeacherSession[] }> {
+export async function getTeacherSessions(filters?: {
+  status?: string;
+  profile_id?: string;
+}): Promise<{ items: TeacherSession[] }> {
   const params = new URLSearchParams();
   if (filters?.status) params.set('status', filters.status);
   if (filters?.profile_id) params.set('profile_id', filters.profile_id);
@@ -226,14 +224,4 @@ export async function addTeacherSessionNote(
   data: { body: string; title?: string; note_type?: string },
 ): Promise<TeacherSessionNote> {
   return teachersRequest(`/v1/teachers/sessions/${id}/notes`, { method: 'POST', body: data });
-}
-
-// ── Public ──
-
-export async function getPublicTeachers(orgSlug: string): Promise<{ items: TeacherProfile[] }> {
-  return teachersRequest(`/v1/public/${orgSlug}/teachers`);
-}
-
-export async function getTeachersPreviewBootstrap(): Promise<TeachersPreviewBootstrap> {
-  return teachersRequest('/v1/teachers/public-preview/bootstrap');
 }

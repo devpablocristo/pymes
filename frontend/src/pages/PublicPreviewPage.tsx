@@ -1,52 +1,44 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { PublicSchedulingFlow, createPublicSchedulingClient } from '@devpablocristo/modules-scheduling';
+import '@devpablocristo/modules-scheduling/styles.css';
 import { PageLayout } from '../components/PageLayout';
+import { getSession, apiRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
-import { getPublicTeachers, getTeachersPreviewBootstrap } from '../lib/teachersApi';
+import { useI18n } from '../lib/i18n';
+
+const publicSchedulingClient = createPublicSchedulingClient(apiRequest);
 
 export function PublicPreviewPage() {
-  const [orgSlug, setOrgSlug] = useState('');
-  const [activeSlug, setActiveSlug] = useState('');
-  const slugInputId = 'public-preview-org-slug';
+  const { language } = useI18n();
+  const [orgRef, setOrgRef] = useState('');
+  const [activeOrgRef, setActiveOrgRef] = useState('');
+  const orgInputId = 'public-preview-org-ref';
 
-  const bootstrapQuery = useQuery({
-    queryKey: queryKeys.teachers.previewBootstrap,
-    queryFn: getTeachersPreviewBootstrap,
-  });
-  const teachersQuery = useQuery({
-    queryKey: queryKeys.teachers.publicBySlug(activeSlug),
-    queryFn: () => getPublicTeachers(activeSlug),
-    enabled: activeSlug.trim().length > 0,
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSession,
   });
 
   useEffect(() => {
-    const slug = bootstrapQuery.data?.slug?.trim();
-    if (!slug) return;
-    setOrgSlug(slug);
-    setActiveSlug(slug);
-  }, [bootstrapQuery.data]);
+    const orgId = sessionQuery.data?.auth.org_id?.trim();
+    if (!orgId) {
+      return;
+    }
+    setOrgRef((current) => current || orgId);
+    setActiveOrgRef((current) => current || orgId);
+  }, [sessionQuery.data]);
 
   function handleLoad() {
-    if (orgSlug.trim()) {
-      setActiveSlug(orgSlug.trim());
+    if (orgRef.trim()) {
+      setActiveOrgRef(orgRef.trim());
     }
   }
 
-  const bootstrapSlugError =
-    bootstrapQuery.isSuccess && !bootstrapQuery.data.slug?.trim()
-      ? 'No se pudo resolver el slug publico de la organizacion.'
-      : '';
-  const error = bootstrapSlugError
-    || (bootstrapQuery.error instanceof Error ? bootstrapQuery.error.message : '')
-    || (teachersQuery.error instanceof Error ? teachersQuery.error.message : '');
-  const items = teachersQuery.data?.items ?? [];
-  const loading = bootstrapQuery.isLoading || teachersQuery.isFetching;
+  const error = sessionQuery.error instanceof Error ? sessionQuery.error.message : '';
 
   return (
-    <PageLayout
-      title="Vista pública"
-      lead="Vista previa de cómo se vería la página pública del módulo teachers"
-    >
+    <PageLayout title="Reserva pública" lead="Vista previa del flujo público de scheduling">
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card u-mb-md">
@@ -55,63 +47,29 @@ export function PublicPreviewPage() {
         </div>
         <div className="form-row">
           <div className="form-group grow">
-            <label htmlFor={slugInputId}>Slug de organización</label>
+            <label htmlFor={orgInputId}>Referencia de organización</label>
             <input
-              id={slugInputId}
-              value={orgSlug}
-              onChange={(e) => setOrgSlug(e.target.value)}
-              placeholder="slug-organizacion"
+              id={orgInputId}
+              value={orgRef}
+              onChange={(e) => setOrgRef(e.target.value)}
+              placeholder="slug-publico-o-uuid"
             />
           </div>
-          <button type="button" className="btn-primary" onClick={handleLoad} disabled={!orgSlug.trim()}>
+          <button type="button" className="btn-primary" onClick={handleLoad} disabled={!orgRef.trim()}>
             Cargar
           </button>
         </div>
       </div>
 
       <div className="alert alert-warning u-mb-md">
-        Esta es una vista previa. La pagina publica real se sirve desde una URL separada.
+        Esta es una vista previa. La página pública real se sirve desde una URL separada y usa el mismo contrato público.
       </div>
 
-      {loading ? (
-        <div className="spinner" />
-      ) : items.length === 0 ? (
-        <div className="card">
-          <div className="empty-state">
-            <p>No hay teachers públicos para esta organización</p>
-          </div>
-        </div>
-      ) : (
-        <div className="grid-cards-auto">
-          {items.map((item) => (
-            <div key={item.id} className="card">
-              <div className="card-header">
-                <h2>{item.headline || item.public_slug || 'Teacher'}</h2>
-                {item.is_bookable && <span className="badge badge-success">Reservable</span>}
-              </div>
-              {item.bio && <p className="text-secondary-lead">{item.bio}</p>}
-              {(item.specialties ?? []).length > 0 && (
-                <div className="actions-row actions-row--wrap">
-                  {item.specialties.map((spec) => (
-                    <span
-                      key={typeof spec === 'string' ? spec : spec.id || spec.code || spec.name}
-                      className="badge badge-neutral"
-                    >
-                      {typeof spec === 'string' ? spec : spec.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {item.public_slug && (
-                <div className="u-mt-sm">
-                  <span className="text-secondary">Slug: </span>
-                  <span className="mono">{item.public_slug}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <PublicSchedulingFlow
+        client={publicSchedulingClient}
+        orgRef={activeOrgRef}
+        locale={language === 'en' ? 'en' : 'es'}
+      />
     </PageLayout>
   );
 }

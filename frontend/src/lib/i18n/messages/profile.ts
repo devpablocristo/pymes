@@ -46,7 +46,8 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.labels.familyName': 'Apellidos',
     'profile.labels.phone': 'Teléfono',
     'profile.labels.phoneHint': 'Opcional. Solo se guarda en esta cuenta de producto.',
-    'profile.personal.readOnlyJwt': 'Para editar nombre y teléfono necesitás una sesión de usuario (JWT), no solo clave API.',
+    'profile.personal.readOnlyJwt':
+      'Para editar nombre y teléfono necesitás una sesión de usuario (JWT), no solo clave API.',
     'profile.personal.edit': 'Editar',
     'profile.personal.cancel': 'Cancelar',
     'profile.personal.save': 'Guardar',
@@ -63,8 +64,7 @@ export const profileMessages: TranslationsByLanguage = {
       'Con solo clave API no hay persona vinculada: es esperado. Para nombre, email y preferencias sincronizadas, usá Clerk en el entorno que corresponda.',
     'profile.account.empty.clerk':
       'No hay sesión Clerk activa y el API no devolvió usuario. Reintentá o volvé a iniciar sesión.',
-    'profile.account.unavailable':
-      'No se pudo cargar la cuenta; revisá el aviso de arriba o reintentá.',
+    'profile.account.unavailable': 'No se pudo cargar la cuenta; revisá el aviso de arriba o reintentá.',
     'profile.error.unreachable':
       'No se pudo conectar con la API. Levantá el stack con contenedores (`make up` o `docker compose up -d --build`), revisá `docker compose ps` y `VITE_API_URL` (p. ej. http://localhost:8100). Si cambiaste el mapeo de puertos, alineá la URL al host/puerto del control plane.',
     'profile.error.meUnreachable':
@@ -131,8 +131,7 @@ export const profileMessages: TranslationsByLanguage = {
     'profile.account.empty.title': 'No user profile in this mode',
     'profile.account.empty.body':
       'With an API key only there is no linked person: that is expected. For name, email and synced preferences, use Clerk in the right environment.',
-    'profile.account.empty.clerk':
-      'No active Clerk session and the API returned no user. Retry or sign in again.',
+    'profile.account.empty.clerk': 'No active Clerk session and the API returned no user. Retry or sign in again.',
     'profile.account.unavailable': 'Could not load account; see the notice above or retry.',
     'profile.error.unreachable':
       'Could not reach the API. Start the stack (`make up` or `docker compose up -d --build`), check `docker compose ps` and VITE_API_URL (e.g. http://localhost:8100). If you changed port mappings, point the URL at the control plane host/port.',

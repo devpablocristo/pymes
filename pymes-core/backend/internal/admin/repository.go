@@ -75,10 +75,21 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	applyString(&m.BusinessAddress, patch.BusinessAddress)
 	applyString(&m.BusinessPhone, patch.BusinessPhone)
 	applyString(&m.BusinessEmail, patch.BusinessEmail)
+	applyString(&m.TeamSize, patch.TeamSize)
+	applyString(&m.Sells, patch.Sells)
+	applyString(&m.ClientLabel, patch.ClientLabel)
+	applyBool(&m.UsesBilling, patch.UsesBilling)
+	applyString(&m.PaymentMethod, patch.PaymentMethod)
+	applyString(&m.Vertical, patch.Vertical)
+	applyTime(&m.OnboardingCompletedAt, patch.OnboardingCompletedAt)
 	applyString(&m.WAQuoteTemplate, patch.WAQuoteTemplate)
 	applyString(&m.WAReceiptTemplate, patch.WAReceiptTemplate)
 	applyString(&m.WADefaultCountryCode, patch.WADefaultCountryCode)
-	applyBool(&m.AppointmentsEnabled, patch.AppointmentsEnabled)
+	if patch.SchedulingEnabled != nil {
+		applyBool(&m.AppointmentsEnabled, patch.SchedulingEnabled)
+	} else {
+		applyBool(&m.AppointmentsEnabled, patch.AppointmentsEnabled)
+	}
 	applyString(&m.AppointmentLabel, patch.AppointmentLabel)
 	applyInt(&m.AppointmentReminderHours, patch.AppointmentReminderHours)
 	applyString(&m.DefaultRateType, patch.DefaultRateType)
@@ -169,9 +180,17 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		BusinessAddress:          m.BusinessAddress,
 		BusinessPhone:            m.BusinessPhone,
 		BusinessEmail:            m.BusinessEmail,
+		TeamSize:                 m.TeamSize,
+		Sells:                    m.Sells,
+		ClientLabel:              m.ClientLabel,
+		UsesBilling:              m.UsesBilling,
+		PaymentMethod:            m.PaymentMethod,
+		Vertical:                 m.Vertical,
+		OnboardingCompletedAt:    m.OnboardingCompletedAt,
 		WAQuoteTemplate:          m.WAQuoteTemplate,
 		WAReceiptTemplate:        m.WAReceiptTemplate,
 		WADefaultCountryCode:     m.WADefaultCountryCode,
+		SchedulingEnabled:        m.AppointmentsEnabled,
 		AppointmentsEnabled:      m.AppointmentsEnabled,
 		AppointmentLabel:         m.AppointmentLabel,
 		AppointmentReminderHours: m.AppointmentReminderHours,
@@ -305,6 +324,14 @@ func applyBool(dst *bool, src *bool) {
 	if src != nil {
 		*dst = *src
 	}
+}
+
+func applyTime(dst **time.Time, src *time.Time) {
+	if src == nil {
+		return
+	}
+	value := src.UTC()
+	*dst = &value
 }
 
 func effectiveSupportedCurrenciesFromModel(m models.TenantSettingsModel) []string {

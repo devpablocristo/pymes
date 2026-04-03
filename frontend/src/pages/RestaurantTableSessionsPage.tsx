@@ -18,7 +18,10 @@ function formatSessionDate(iso: string): string {
 export function RestaurantTableSessionsPage() {
   const [sessions, setSessions] = useState<RestaurantTableSession[]>([]);
   const sessSearch = usePageSearch();
-  const sessTextFn = useCallback((s: RestaurantTableSession) => `${s.table_code ?? ''} ${s.area_name ?? ''} ${s.party_label ?? ''}`, []);
+  const sessTextFn = useCallback(
+    (s: RestaurantTableSession) => `${s.table_code ?? ''} ${s.area_name ?? ''} ${s.party_label ?? ''}`,
+    [],
+  );
   const filteredSessions = useSearch(sessions, sessTextFn, sessSearch);
   const [tables, setTables] = useState<RestaurantDiningTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,7 +160,13 @@ export function RestaurantTableSessionsPage() {
             </div>
             <div className="form-group full-width">
               <label htmlFor="rest-session-notes">Notas</label>
-              <textarea id="rest-session-notes" value={notes} onChange={(ev) => setNotes(ev.target.value)} rows={2} disabled={busy} />
+              <textarea
+                id="rest-session-notes"
+                value={notes}
+                onChange={(ev) => setNotes(ev.target.value)}
+                rows={2}
+                disabled={busy}
+              />
             </div>
           </div>
           <div className="actions-row">
@@ -203,7 +212,12 @@ export function RestaurantTableSessionsPage() {
                     <td>{s.party_label || '—'}</td>
                     <td>{formatSessionDate(s.opened_at)}</td>
                     <td>
-                      <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => void handleClose(s.id)}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        disabled={busy}
+                        onClick={() => void handleClose(s.id)}
+                      >
                         Cerrar cuenta
                       </button>
                     </td>

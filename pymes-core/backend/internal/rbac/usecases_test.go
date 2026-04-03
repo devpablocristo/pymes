@@ -54,6 +54,8 @@ func TestUsecases_HasPermission(t *testing.T) {
 		want       bool
 	}{
 		{name: "jwt admin allows all", role: "admin", resource: "reports", action: "read", want: true},
+		{name: "jwt owner allows all", role: "owner", resource: "reports", action: "read", want: true},
+		{name: "jwt secops allows all", role: "secops", resource: "reports", action: "read", want: true},
 		{name: "api key scoped allow", authMethod: "api_key", scopes: []string{"sales:create"}, resource: "sales", action: "create", want: true},
 		{name: "api key scoped deny", authMethod: "api_key", scopes: []string{"sales:read"}, resource: "sales", action: "create", want: false},
 		{name: "actor permission allow", authMethod: "jwt", resource: "sales", action: "create", want: true},

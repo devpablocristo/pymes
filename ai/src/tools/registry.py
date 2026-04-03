@@ -318,6 +318,7 @@ def build_internal_tools(
         business_phone: str | None = None,
         default_currency: str | None = None,
         default_tax_rate: float | None = None,
+        scheduling_enabled: bool | None = None,
         appointments_enabled: bool | None = None,
     ) -> dict[str, Any]:
         _ = org_id
@@ -329,14 +330,18 @@ def build_internal_tools(
         for key, val in field_map.items():
             if val is not None:
                 update_business_field(dossier, key, val)
-        if appointments_enabled is not None:
-            set_preference(dossier, "appointments_enabled", appointments_enabled)
+        effective_scheduling = scheduling_enabled
+        if effective_scheduling is None:
+            effective_scheduling = appointments_enabled
+        if effective_scheduling is not None:
+            set_preference(dossier, "scheduling_enabled", effective_scheduling)
         result = await settings.update_business_info(
             client, auth,
             business_name=business_name, business_tax_id=business_tax_id,
             business_address=business_address, business_phone=business_phone,
             default_currency=default_currency, default_tax_rate=default_tax_rate,
-            appointments_enabled=appointments_enabled,
+            scheduling_enabled=effective_scheduling,
+            appointments_enabled=effective_scheduling,
         )
         return result
 
@@ -423,7 +428,7 @@ def build_internal_tools(
         modules_active,
         _tool(
             "update_business_info",
-            "Actualizar datos del negocio (nombre, CUIT, direccion, telefono, moneda, impuesto, turnos)",
+            "Actualizar datos del negocio (nombre, CUIT, direccion, telefono, moneda, impuesto, scheduling)",
             {
                 "type": "object",
                 "properties": {
@@ -433,7 +438,7 @@ def build_internal_tools(
                     "business_phone": {"type": "string"},
                     "default_currency": {"type": "string", "description": "ARS, USD, etc"},
                     "default_tax_rate": {"type": "number", "description": "21.0 para IVA standard"},
-                    "appointments_enabled": {"type": "boolean"},
+                    "scheduling_enabled": {"type": "boolean"},
                 },
             },
         ),

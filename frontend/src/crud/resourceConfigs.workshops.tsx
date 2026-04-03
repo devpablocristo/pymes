@@ -1,4 +1,5 @@
-import type { CrudFieldValue, CrudPageConfig } from '../components/CrudPage';
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
+import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
   createWorkOrder,
   createWorkOrderPaymentLink,
@@ -88,7 +89,7 @@ function parseBikeWorkOrderItems(value: CrudFieldValue | undefined): BikeWorkOrd
     .filter((item) => item.description && item.quantity > 0);
 }
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   workshopVehicles: {
     supportsArchived: true,
     label: 'vehículo',
@@ -226,16 +227,24 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: WorkshopService) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.code} · {row.category || 'General'}</div>
+            <div className="text-secondary">
+              {row.code} · {row.category || 'General'}
+            </div>
           </>
         ),
       },
       { key: 'estimated_hours', header: 'Hs.', render: (value) => Number(value ?? 0).toFixed(1) },
-      { key: 'base_price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'base_price',
+        header: 'Precio',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
     ],
     formFields: [
@@ -341,7 +350,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: WorkOrder) => (
           <>
             <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{row.vehicle_plate || row.vehicle_id} · {row.customer_name || 'Sin cliente'}</div>
+            <div className="text-secondary">
+              {row.vehicle_plate || row.vehicle_id} · {row.customer_name || 'Sin cliente'}
+            </div>
           </>
         ),
       },
@@ -357,7 +368,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
           return <span className={`badge ${cls}`}>{canon}</span>;
         },
       },
-      { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'total',
+        header: 'Total',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
@@ -411,7 +426,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         kind: 'secondary',
         isVisible: (row: WorkOrder) => !row.appointment_id,
         onClick: async (row: WorkOrder, helpers) => {
-          const title = (window.prompt('Titulo del turno', row.requested_work || `Servicio ${row.vehicle_plate || row.number}`) ?? '').trim();
+          const title = (
+            window.prompt('Titulo del turno', row.requested_work || `Servicio ${row.vehicle_plate || row.number}`) ?? ''
+          ).trim();
           if (!title) return;
           const startAtInput = (
             window.prompt(
@@ -476,7 +493,16 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       },
     ],
     searchText: (row: WorkOrder) =>
-      [row.number, row.vehicle_plate, row.customer_name, row.status, row.requested_work, row.diagnosis, row.notes, row.internal_notes]
+      [
+        row.number,
+        row.vehicle_plate,
+        row.customer_name,
+        row.status,
+        row.requested_work,
+        row.diagnosis,
+        row.notes,
+        row.internal_notes,
+      ]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: WorkOrder) => ({
@@ -560,7 +586,7 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       },
       { key: 'customer_name', header: 'Dueño' },
       { key: 'size', header: 'Talle' },
-      { key: 'wheel_size_inches', header: 'Rodado', render: (value) => value ? `${value}"` : '—' },
+      { key: 'wheel_size_inches', header: 'Rodado', render: (value) => (value ? `${value}"` : '—') },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
@@ -577,7 +603,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Bicycle) =>
-      [row.frame_number, row.make, row.model, row.bike_type, row.customer_name, row.color, row.notes].filter(Boolean).join(' '),
+      [row.frame_number, row.make, row.model, row.bike_type, row.customer_name, row.color, row.notes]
+        .filter(Boolean)
+        .join(' '),
     toFormValues: (row: Bicycle) => ({
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
@@ -645,16 +673,24 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: BikeShopService) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">{row.code} · {row.category || 'General'}</div>
+            <div className="text-secondary">
+              {row.code} · {row.category || 'General'}
+            </div>
           </>
         ),
       },
       { key: 'estimated_hours', header: 'Hs.', render: (value) => Number(value ?? 0).toFixed(1) },
-      { key: 'base_price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'base_price',
+        header: 'Precio',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
     ],
     formFields: [
@@ -753,7 +789,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         render: (_value, row: BikeWorkOrder) => (
           <>
             <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{row.bicycle_label || row.bicycle_id} · {row.customer_name || 'Sin cliente'}</div>
+            <div className="text-secondary">
+              {row.bicycle_label || row.bicycle_id} · {row.customer_name || 'Sin cliente'}
+            </div>
           </>
         ),
       },
@@ -768,7 +806,11 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
           return <span className={`badge ${cls}`}>{v}</span>;
         },
       },
-      { key: 'total', header: 'Total', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'total',
+        header: 'Total',
+        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+      },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [

@@ -16,7 +16,7 @@ Cómo entra un usuario a la consola y cómo el backend valida identidad. Multi-t
 | **Sync org (Clerk)** | `frontend/src/components/ClerkSessionOrgSync.tsx` | Una sola membresía y sin org activa → `setActive` automático. |
 | **Token HTTP** | `AuthTokenBridge` + `core-authn` | Con Clerk, JWT hacia `VITE_API_URL` y verticales. |
 | **Clerk habilitado** | `frontend/src/lib/auth.ts` | `VITE_CLERK_PUBLISHABLE_KEY` no vacía. |
-| **Rutas protegidas** | `SharedProtectedRoute` | Con Clerk: redirect a `/login` si no hay sesión. Sin Clerk: no bloquea la consola; el API puede exigir API key. |
+| **Rutas protegidas** | `SharedProtectedRoute` | Con Clerk: redirect a `/login` si no hay sesión. El shell resuelve onboarding contra `tenant_settings` antes de entrar. |
 | **Backend** | `pymes-core/backend/wire/saas.go` | JWT (JWKS) + API keys; webhook Clerk opcional. |
 | **JWT org en verticales** | `pymes-core/shared/backend/auth/identity.go` | Claims `org_id`, `tenant_id`, `o.id` (Clerk v2); `org_...` se resuelve a UUID vía core. |
 
@@ -36,9 +36,9 @@ El cliente **no** envía `X-API-KEY` cuando hay Bearer (evita enmascarar un JWT 
 
 ## Desarrollo sin Clerk
 
-1. **API key** contra el control plane es el flujo estable para implementar módulos sin login social.
-2. **`VITE_CLERK_PUBLISHABLE_KEY` vacío** → Clerk desactivado; consola abierta para trabajo técnico.
-3. **Perfil**: muestra `GET /v1/session` y `GET /v1/users/me` si aplica. Claves API: operaciones / contrato `/v1/orgs/{org_id}/api-keys`, no UI self-service en consola.
+1. **API key** contra el control plane es el flujo técnico para desarrollo local e integraciones, no un reemplazo de una sesión humana.
+2. **`VITE_CLERK_PUBLISHABLE_KEY` vacío** → Clerk desactivado; la consola sigue pudiendo levantar, pero la autorización depende de scopes explícitos de la clave.
+3. **Perfil**: muestra `GET /v1/session` y `GET /v1/users/me` si aplica. Claves API: contrato `/v1/orgs/{org_id}/api-keys`, pero su administración queda reservada a sesión humana JWT con permiso de escritura de consola.
 
 ### APIs múltiples (local)
 
@@ -63,11 +63,41 @@ Orígenes por defecto incluyen `localhost:5173` / `5180` y `FRONTEND_URL`. Si ha
 
 ## Sesión y roles (`GET /v1/session`)
 
-- **`auth`**: `org_id`, `tenant_id`, `role`, `product_role`, `scopes`, `actor`, `auth_method`.
-- **`product_role`**: `admin` | `user` para la consola (mapeo en `pymes-core/backend/internal/shared/authz`).
+- **`auth`**: `org_id`, `tenant_id`, `role`, `product_role`, `scopes`, `actor`, `auth_method`, `org_name?`, `vertical?`, `onboarding_completed_at?`.
+- **`product_role`**: `admin` | `user` para la consola (mapeo en `pymes-core/backend/internal/shared/authz`). Las credenciales `service` solo cuentan como `admin` si traen scopes explícitos de consola.
 - **`auth.role`**: valor crudo del JWT / sesión (auditoría).
 
-Claves API (`/v1/orgs/{org_id}/api-keys`): solo admin de producto (`authz.IsAdmin`), política en `wire/saas_http.go`.
+Claves API (`/v1/orgs/{org_id}/api-keys`): solo sesión humana JWT con permiso de escritura de consola (`authz.CanManageAPIKeys`), política en `wire/saas_http.go`.
+
+## Tenant canónico y onboarding
+
+- La fuente de verdad del tenant vive en `tenant_settings`.
+- `vertical` y `onboarding_completed_at` se persisten en backend.
+- El frontend mantiene `tenantProfile` como cache/UI, pero se hidrata desde `tenant_settings` al entrar al shell.
+- El onboarding deja de depender solo del navegador: un tenant completado en un dispositivo puede reconstruir su perfil básico en otro.
+
+Campos de onboarding persistidos en `tenant_settings`:
+
+- `team_size`
+- `sells`
+- `client_label`
+- `uses_billing`
+- `payment_method`
+- `vertical`
+- `onboarding_completed_at`
+
+Campos reutilizados del tenant ya existente:
+
+- `business_name`
+- `currency`
+- `scheduling_enabled`
+
+## Matriz de autorización
+
+- **JWT humano privilegiado** (`owner`, `admin`, `secops`): admin de consola y admin RBAC.
+- **JWT humano con scopes**: puede leer/escribir consola según `admin:console:read` / `admin:console:write`.
+- **API key de integración**: tenant fijo + scopes explícitos; no hereda admin por el solo hecho de ser `service`.
+- **Token interno de servicio**: solo rutas `/v1/internal/v1/*`; no reemplaza JWT de usuario.
 
 ## Relación con `core`
 

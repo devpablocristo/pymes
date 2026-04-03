@@ -34,21 +34,24 @@ export function PageLayout({ title, lead, actions, banner, className, children }
   const pageSearch = usePageSearchShellControl();
   const hasSearch = pageSearch.visible;
   const primitiveLead = lead != null && lead !== false && isPrimitiveLead(lead) ? lead : undefined;
-  const richLead = lead != null && lead !== false && !isPrimitiveLead(lead)
-    ? <div className="text-page-lead">{lead}</div>
-    : undefined;
+  const richLead =
+    lead != null && lead !== false && !isPrimitiveLead(lead) ? <div className="text-page-lead">{lead}</div> : undefined;
   return (
     <div className={stackClass}>
       <CrudPageShell
         title={title}
         subtitle={primitiveLead}
         headerLeadSlot={richLead}
-        search={hasSearch ? {
-          value: pageSearch.query,
-          onChange: pageSearch.setQuery,
-          placeholder: pageSearch.placeholder,
-          clearLabel: 'Limpiar búsqueda',
-        } : undefined}
+        search={
+          hasSearch
+            ? {
+                value: pageSearch.query,
+                onChange: pageSearch.setQuery,
+                placeholder: pageSearch.placeholder,
+                clearLabel: 'Limpiar búsqueda',
+              }
+            : undefined
+        }
         headerActions={actions}
       >
         <>

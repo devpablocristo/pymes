@@ -2,10 +2,11 @@ import { useClerk, useOrganization, useSession } from '@clerk/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
+import { updateTenantSettings } from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import {
-  saveTenantProfile,
+  syncTenantProfileFromSettings,
   type PaymentMethod,
   type SellsType,
   type TeamSize,
@@ -13,26 +14,41 @@ import {
   type VerticalType,
 } from '../lib/tenantProfile';
 
-// Verticales principales (primer selector)
 type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
 
-const VERTICAL_GROUP_OPTIONS: { value: VerticalGroup; label: string; desc: string }[] = [
-  { value: 'commercial', label: 'Solo comercial', desc: 'Ventas, stock y cobros' },
-  { value: 'professionals', label: 'Profesionales / Docentes', desc: 'Sesiones, alumnos y fichas' },
-  { value: 'workshops', label: 'Talleres', desc: 'Vehículos, bicicletas, reparaciones' },
-  { value: 'beauty', label: 'Belleza / Salón', desc: 'Equipo, servicios y agenda' },
-  { value: 'restaurants', label: 'Bares / Restaurantes', desc: 'Salón, mesas y sesiones' },
+const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: string }[] = [
+  { value: 'commercial', labelKey: 'onboarding.vertical.commercial', descKey: 'onboarding.vertical.commercialDesc' },
+  {
+    value: 'professionals',
+    labelKey: 'onboarding.vertical.professionals',
+    descKey: 'onboarding.vertical.professionalsDesc',
+  },
+  { value: 'workshops', labelKey: 'onboarding.vertical.workshops', descKey: 'onboarding.vertical.workshopsDesc' },
+  { value: 'beauty', labelKey: 'onboarding.vertical.beauty', descKey: 'onboarding.vertical.beautyDesc' },
+  {
+    value: 'restaurants',
+    labelKey: 'onboarding.vertical.restaurants',
+    descKey: 'onboarding.vertical.restaurantsDesc',
+  },
 ];
 
-// Sub-verticales por grupo (solo los que tienen más de una opción)
-const SUB_VERTICAL_OPTIONS: Partial<Record<VerticalGroup, { value: VerticalType; label: string; desc: string }[]>> = {
+const SUB_VERTICAL_KEYS: Partial<
+  Record<VerticalGroup, { value: VerticalType; labelKey: string; descKey: string }[]>
+> = {
   workshops: [
-    { value: 'workshops', label: 'Taller mecánico', desc: 'Vehículos, órdenes y servicios' },
-    { value: 'bike_shop', label: 'Bicicletería', desc: 'Bicicletas, reparaciones y servicios' },
+    {
+      value: 'workshops',
+      labelKey: 'onboarding.subVertical.workshops',
+      descKey: 'onboarding.subVertical.workshopsDesc',
+    },
+    {
+      value: 'bike_shop',
+      labelKey: 'onboarding.subVertical.bike_shop',
+      descKey: 'onboarding.subVertical.bike_shopDesc',
+    },
   ],
 };
 
-// Mapeo directo grupo → vertical para los que no tienen sub-verticales
 const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   commercial: 'none',
   professionals: 'professionals',
@@ -40,60 +56,48 @@ const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   restaurants: 'restaurants',
 };
 
-// Para el resumen final
-const ALL_VERTICAL_LABELS: Record<VerticalType, string> = {
-  none: 'Solo comercial',
-  professionals: 'Profesionales / Docentes',
-  workshops: 'Taller mecánico',
-  bike_shop: 'Bicicletería',
-  beauty: 'Belleza / Salón',
-  restaurants: 'Bares / Restaurantes',
+const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
+  none: 'onboarding.vertical.commercial',
+  professionals: 'onboarding.vertical.professionals',
+  workshops: 'onboarding.subVertical.workshops',
+  bike_shop: 'onboarding.subVertical.bike_shop',
+  beauty: 'onboarding.vertical.beauty',
+  restaurants: 'onboarding.vertical.restaurants',
 };
 
 type Step = 1 | 2 | 3 | 4;
 
-const TEAM_OPTIONS: { value: TeamSize; label: string; desc: string }[] = [
-  { value: 'solo', label: 'Solo yo', desc: 'Trabajo por mi cuenta' },
-  { value: 'small', label: '2 a 5', desc: 'Equipo chico' },
-  { value: 'medium', label: '6 a 20', desc: 'Equipo mediano' },
-  { value: 'large', label: 'Más de 20', desc: 'Empresa' },
+const TEAM_KEYS: { value: TeamSize; labelKey: string; descKey: string }[] = [
+  { value: 'solo', labelKey: 'onboarding.team.solo', descKey: 'onboarding.team.soloDesc' },
+  { value: 'small', labelKey: 'onboarding.team.small', descKey: 'onboarding.team.smallDesc' },
+  { value: 'medium', labelKey: 'onboarding.team.medium', descKey: 'onboarding.team.mediumDesc' },
+  { value: 'large', labelKey: 'onboarding.team.large', descKey: 'onboarding.team.largeDesc' },
 ];
 
-const SELLS_OPTIONS: { value: SellsType; label: string; desc: string }[] = [
-  { value: 'products', label: 'Productos', desc: 'Vendo cosas físicas, tengo stock' },
-  { value: 'services', label: 'Servicios', desc: 'Cobro por hora, sesión o proyecto' },
-  { value: 'both', label: 'Ambos', desc: 'Productos y servicios' },
-  { value: 'unsure', label: 'Todavía no sé', desc: 'Estoy explorando' },
+const SELLS_KEYS: { value: SellsType; labelKey: string; descKey: string }[] = [
+  { value: 'products', labelKey: 'onboarding.sells.products', descKey: 'onboarding.sells.productsDesc' },
+  { value: 'services', labelKey: 'onboarding.sells.services', descKey: 'onboarding.sells.servicesDesc' },
+  { value: 'both', labelKey: 'onboarding.sells.both', descKey: 'onboarding.sells.bothDesc' },
+  { value: 'unsure', labelKey: 'onboarding.sells.unsure', descKey: 'onboarding.sells.unsureDesc' },
 ];
 
-const CLIENT_LABELS = ['clientes', 'pacientes', 'alumnos', 'usuarios'];
+const CLIENT_LABEL_KEYS = ['clientes', 'pacientes', 'alumnos', 'usuarios'] as const;
 
-const CURRENCY_OPTIONS = [
-  { value: 'ARS', label: 'Peso argentino (ARS)' },
-  { value: 'USD', label: 'Dólar (USD)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-  { value: 'BRL', label: 'Real (BRL)' },
-  { value: 'MXN', label: 'Peso mexicano (MXN)' },
-  { value: 'CLP', label: 'Peso chileno (CLP)' },
-  { value: 'COP', label: 'Peso colombiano (COP)' },
+const CURRENCY_KEYS = ['ARS', 'USD', 'EUR', 'BRL', 'MXN', 'CLP', 'COP'] as const;
+
+const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
+  { value: 'cash', labelKey: 'onboarding.payment.cash' },
+  { value: 'transfer', labelKey: 'onboarding.payment.transfer' },
+  { value: 'card', labelKey: 'onboarding.payment.card' },
+  { value: 'mixed', labelKey: 'onboarding.payment.mixed' },
 ];
 
-const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Efectivo' },
-  { value: 'transfer', label: 'Transferencia' },
-  { value: 'card', label: 'Tarjeta' },
-  { value: 'mixed', label: 'Mixto (varios)' },
-];
-
-/** Recursos Clerk mínimos para crear la org al terminar el onboarding (si aún no hay una activa). */
 type ClerkOnboardingBridges = {
   loaded: boolean;
   createOrganization: (params: { name: string }) => Promise<{ id: string }>;
   setActive: (params: { organization: string }) => Promise<void>;
-  /** Si ya hay org (p. ej. invitación), no la creamos ni renombramos aquí. */
   organization: { id: string } | null;
   orgLoaded: boolean;
-  /** Tras crear org y setActive, renueva la sesión para que el JWT traiga el claim de organización. */
   afterSetActiveOrg?: () => Promise<void>;
 };
 
@@ -133,7 +137,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
   const [businessName, setBusinessName] = useState('');
   const [teamSize, setTeamSize] = useState<TeamSize | ''>('');
   const [sells, setSells] = useState<SellsType | ''>('');
-  const [clientLabel, setClientLabel] = useState('clientes');
+  const [clientLabel, setClientLabel] = useState<string>('clientes');
   const [customClientLabel, setCustomClientLabel] = useState('');
   const [usesScheduling, setUsesScheduling] = useState<boolean | null>(null);
   const [usesBilling, setUsesBilling] = useState<boolean | null>(null);
@@ -145,16 +149,25 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState('');
 
-  // Resolver vertical final: si el grupo tiene sub-verticales, usar la selección; si no, mapeo directo
   const resolvedVertical: VerticalType | '' = verticalGroup
-    ? (SUB_VERTICAL_OPTIONS[verticalGroup] ? vertical : GROUP_TO_VERTICAL[verticalGroup] ?? '')
+    ? SUB_VERTICAL_KEYS[verticalGroup]
+      ? vertical
+      : (GROUP_TO_VERTICAL[verticalGroup] ?? '')
     : '';
 
-  const needsSubVertical = verticalGroup !== '' && !!SUB_VERTICAL_OPTIONS[verticalGroup];
+  const needsSubVertical = verticalGroup !== '' && !!SUB_VERTICAL_KEYS[verticalGroup];
 
   const canNext: Record<Step, boolean> = {
-    1: businessName.trim().length >= 2 && teamSize !== '' && verticalGroup !== '' && (!needsSubVertical || vertical !== ''),
-    2: sells !== '' && (clientLabel !== '' || customClientLabel.trim() !== '') && usesScheduling !== null && usesBilling !== null,
+    1:
+      businessName.trim().length >= 2 &&
+      teamSize !== '' &&
+      verticalGroup !== '' &&
+      (!needsSubVertical || vertical !== ''),
+    2:
+      sells !== '' &&
+      (clientLabel !== '' || customClientLabel.trim() !== '') &&
+      usesScheduling !== null &&
+      usesBilling !== null,
     3: currency !== '' && paymentMethod !== '',
     4: true,
   };
@@ -185,13 +198,14 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     };
 
     setFinishError('');
+    setFinishing(true);
 
     if (clerkBridges) {
       if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
         setFinishError(t('onboarding.clerk.sessionNotReady'));
+        setFinishing(false);
         return;
       }
-      setFinishing(true);
       try {
         const name = profile.businessName.trim();
         if (!clerkBridges.organization) {
@@ -200,27 +214,47 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
           await clerkBridges.afterSetActiveOrg?.();
         }
       } catch (err) {
-        setFinishError(
-          formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')),
-        );
-        return;
-      } finally {
+        setFinishError(formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')));
         setFinishing(false);
+        return;
       }
     }
 
-    saveTenantProfile(profile);
-    navigate('/', { replace: true });
+    try {
+      const updated = await updateTenantSettings({
+        business_name: profile.businessName,
+        team_size: profile.teamSize,
+        sells: profile.sells,
+        client_label: profile.clientLabel,
+        scheduling_enabled: profile.usesScheduling,
+        uses_billing: profile.usesBilling,
+        currency: profile.currency,
+        payment_method: profile.paymentMethod,
+        vertical: profile.vertical,
+        onboarding_completed_at: profile.completedAt,
+      });
+      syncTenantProfileFromSettings(updated);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setFinishError(
+        err instanceof Error ? err.message : t('profile.error.unreachable'),
+      );
+    } finally {
+      setFinishing(false);
+    }
   }
 
-  const resolvedClientLabel = clientLabel === '__custom' ? (customClientLabel.trim() || 'clientes') : clientLabel;
+  const resolvedClientLabel =
+    clientLabel === '__custom'
+      ? customClientLabel.trim() || t('onboarding.clientLabel.clientes')
+      : t(`onboarding.clientLabel.${clientLabel}`);
 
   return (
     <div className="onboarding-layout">
       <div className="onboarding-container">
         <div className="onboarding-header">
-          <h1>Configurá tu espacio</h1>
-          <p>Unas preguntas rápidas para armar tu panel a medida.</p>
+          <h1>{t('onboarding.header.title')}</h1>
+          <p>{t('onboarding.header.subtitle')}</p>
           <div className="onboarding-progress">
             {[1, 2, 3, 4].map((s) => (
               <span key={s} className={`onboarding-dot${s === step ? ' active' : ''}${s < step ? ' done' : ''}`} />
@@ -231,14 +265,14 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         <div className="onboarding-body">
           {step === 1 && (
             <div className="onboarding-step">
-              <h2>Tu negocio</h2>
+              <h2>{t('onboarding.step1.title')}</h2>
 
               <div className="onboarding-field">
-                <label htmlFor="onboarding-business-name">¿Cómo se llama tu negocio o actividad?</label>
+                <label htmlFor="onboarding-business-name">{t('onboarding.step1.businessName')}</label>
                 <input
                   id="onboarding-business-name"
                   type="text"
-                  placeholder="Ej: Clases de inglés, Estudio López, Mi emprendimiento..."
+                  placeholder={t('onboarding.step1.businessNamePlaceholder')}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   autoFocus
@@ -246,26 +280,26 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               </div>
 
               <div className="onboarding-field">
-                <label>¿Cuántas personas trabajan?</label>
+                <label>{t('onboarding.step1.teamSize')}</label>
                 <div className="onboarding-options">
-                  {TEAM_OPTIONS.map((opt) => (
+                  {TEAM_KEYS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       className={`onboarding-option${teamSize === opt.value ? ' selected' : ''}`}
                       onClick={() => setTeamSize(opt.value)}
                     >
-                      <strong>{opt.label}</strong>
-                      <small>{opt.desc}</small>
+                      <strong>{t(opt.labelKey)}</strong>
+                      <small>{t(opt.descKey)}</small>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label>¿Qué tipo de negocio es?</label>
+                <label>{t('onboarding.step1.verticalGroup')}</label>
                 <div className="onboarding-options onboarding-options-vertical">
-                  {VERTICAL_GROUP_OPTIONS.map((opt) => (
+                  {VERTICAL_GROUP_KEYS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
@@ -275,8 +309,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                         setVertical('');
                       }}
                     >
-                      <strong>{opt.label}</strong>
-                      <small>{opt.desc}</small>
+                      <strong>{t(opt.labelKey)}</strong>
+                      <small>{t(opt.descKey)}</small>
                     </button>
                   ))}
                 </div>
@@ -284,17 +318,17 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
               {needsSubVertical && (
                 <div className="onboarding-field">
-                  <label>¿Qué tipo de taller?</label>
+                  <label>{t('onboarding.step1.subVertical')}</label>
                   <div className="onboarding-options onboarding-options-vertical">
-                    {SUB_VERTICAL_OPTIONS[verticalGroup as VerticalGroup]!.map((opt) => (
+                    {SUB_VERTICAL_KEYS[verticalGroup as VerticalGroup]!.map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
                         className={`onboarding-option${vertical === opt.value ? ' selected' : ''}`}
                         onClick={() => setVertical(opt.value)}
                       >
-                        <strong>{opt.label}</strong>
-                        <small>{opt.desc}</small>
+                        <strong>{t(opt.labelKey)}</strong>
+                        <small>{t(opt.descKey)}</small>
                       </button>
                     ))}
                   </div>
@@ -305,29 +339,29 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
           {step === 2 && (
             <div className="onboarding-step">
-              <h2>Tu actividad</h2>
+              <h2>{t('onboarding.step2.title')}</h2>
 
               <div className="onboarding-field">
-                <label>¿Qué ofrecés?</label>
+                <label>{t('onboarding.step2.sells')}</label>
                 <div className="onboarding-options">
-                  {SELLS_OPTIONS.map((opt) => (
+                  {SELLS_KEYS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       className={`onboarding-option${sells === opt.value ? ' selected' : ''}`}
                       onClick={() => setSells(opt.value)}
                     >
-                      <strong>{opt.label}</strong>
-                      <small>{opt.desc}</small>
+                      <strong>{t(opt.labelKey)}</strong>
+                      <small>{t(opt.descKey)}</small>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label>¿Cómo les decís a las personas que te contratan?</label>
+                <label>{t('onboarding.step2.clientLabel')}</label>
                 <div className="onboarding-chips">
-                  {CLIENT_LABELS.map((lbl) => (
+                  {CLIENT_LABEL_KEYS.map((lbl) => (
                     <button
                       key={lbl}
                       type="button"
@@ -337,7 +371,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                         setCustomClientLabel('');
                       }}
                     >
-                      {lbl}
+                      {t(`onboarding.clientLabel.${lbl}`)}
                     </button>
                   ))}
                   <button
@@ -345,15 +379,15 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                     className={`onboarding-chip${clientLabel === '__custom' ? ' selected' : ''}`}
                     onClick={() => setClientLabel('__custom')}
                   >
-                    otro...
+                    {t('onboarding.step2.clientLabelCustom')}
                   </button>
                 </div>
                 {clientLabel === '__custom' && (
                   <input
                     id="onboarding-custom-client"
                     type="text"
-                    placeholder="¿Cómo les decís?"
-                    aria-label="Nombre personalizado para tus clientes"
+                    placeholder={t('onboarding.step2.clientLabelCustomPlaceholder')}
+                    aria-label={t('onboarding.step2.clientLabelCustomAria')}
                     value={customClientLabel}
                     onChange={(e) => setCustomClientLabel(e.target.value)}
                     autoFocus
@@ -362,41 +396,41 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               </div>
 
               <div className="onboarding-field">
-                <label>¿Agendás turnos o sesiones con tus {resolvedClientLabel}?</label>
+                <label>{t('onboarding.step2.scheduling', { clientLabel: resolvedClientLabel })}</label>
                 <div className="onboarding-chips">
                   <button
                     type="button"
                     className={`onboarding-chip${usesScheduling === true ? ' selected' : ''}`}
                     onClick={() => setUsesScheduling(true)}
                   >
-                    Sí
+                    {t('onboarding.step2.schedulingYes')}
                   </button>
                   <button
                     type="button"
                     className={`onboarding-chip${usesScheduling === false ? ' selected' : ''}`}
                     onClick={() => setUsesScheduling(false)}
                   >
-                    No
+                    {t('onboarding.step2.schedulingNo')}
                   </button>
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label>¿Querés llevar control de cobros y pagos?</label>
+                <label>{t('onboarding.step2.billing')}</label>
                 <div className="onboarding-chips">
                   <button
                     type="button"
                     className={`onboarding-chip${usesBilling === true ? ' selected' : ''}`}
                     onClick={() => setUsesBilling(true)}
                   >
-                    Sí, quiero saber quién me debe y cuánto cobré
+                    {t('onboarding.step2.billingYes')}
                   </button>
                   <button
                     type="button"
                     className={`onboarding-chip${usesBilling === false ? ' selected' : ''}`}
                     onClick={() => setUsesBilling(false)}
                   >
-                    No, por ahora no
+                    {t('onboarding.step2.billingNo')}
                   </button>
                 </div>
               </div>
@@ -405,30 +439,30 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
           {step === 3 && (
             <div className="onboarding-step">
-              <h2>Moneda y cobro</h2>
+              <h2>{t('onboarding.step3.title')}</h2>
 
               <div className="onboarding-field">
-                <label htmlFor="onboarding-currency">¿En qué moneda operás?</label>
+                <label htmlFor="onboarding-currency">{t('onboarding.step3.currency')}</label>
                 <select id="onboarding-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {CURRENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {CURRENCY_KEYS.map((code) => (
+                    <option key={code} value={code}>
+                      {t(`onboarding.currency.${code}`)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="onboarding-field">
-                <label>¿Cómo cobrás principalmente?</label>
+                <label>{t('onboarding.step3.paymentMethod')}</label>
                 <div className="onboarding-options onboarding-options-row">
-                  {PAYMENT_OPTIONS.map((opt) => (
+                  {PAYMENT_KEYS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       className={`onboarding-option compact${paymentMethod === opt.value ? ' selected' : ''}`}
                       onClick={() => setPaymentMethod(opt.value)}
                     >
-                      <strong>{opt.label}</strong>
+                      <strong>{t(opt.labelKey)}</strong>
                     </button>
                   ))}
                 </div>
@@ -438,47 +472,45 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
           {step === 4 && (
             <div className="onboarding-step">
-              <h2>Todo listo</h2>
-              <p className="onboarding-summary-intro">
-                Vamos a configurar tu panel con esta información. Podés cambiarlo cuando quieras.
-              </p>
+              <h2>{t('onboarding.step4.title')}</h2>
+              <p className="onboarding-summary-intro">{t('onboarding.step4.intro')}</p>
 
               <div className="onboarding-summary">
                 <div className="onboarding-summary-row">
-                  <span>Negocio</span>
+                  <span>{t('onboarding.step4.business')}</span>
                   <strong>{businessName}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Equipo</span>
-                  <strong>{TEAM_OPTIONS.find((o) => o.value === teamSize)?.label ?? teamSize}</strong>
+                  <span>{t('onboarding.step4.team')}</span>
+                  <strong>{TEAM_KEYS.find((o) => o.value === teamSize)?.labelKey ? t(TEAM_KEYS.find((o) => o.value === teamSize)!.labelKey) : teamSize}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Tipo de negocio</span>
-                  <strong>{resolvedVertical ? ALL_VERTICAL_LABELS[resolvedVertical] : '-'}</strong>
+                  <span>{t('onboarding.step4.verticalType')}</span>
+                  <strong>{resolvedVertical ? t(ALL_VERTICAL_LABEL_KEYS[resolvedVertical]) : '-'}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Ofrecés</span>
-                  <strong>{SELLS_OPTIONS.find((o) => o.value === sells)?.label ?? sells}</strong>
+                  <span>{t('onboarding.step4.sells')}</span>
+                  <strong>{SELLS_KEYS.find((o) => o.value === sells)?.labelKey ? t(SELLS_KEYS.find((o) => o.value === sells)!.labelKey) : sells}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Les decís</span>
+                  <span>{t('onboarding.step4.clientLabel')}</span>
                   <strong>{resolvedClientLabel}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Agenda turnos</span>
-                  <strong>{usesScheduling ? 'Sí' : 'No'}</strong>
+                  <span>{t('onboarding.step4.scheduling')}</span>
+                  <strong>{usesScheduling ? t('onboarding.step4.yes') : t('onboarding.step4.no')}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Control de cobros</span>
-                  <strong>{usesBilling ? 'Sí' : 'No'}</strong>
+                  <span>{t('onboarding.step4.billing')}</span>
+                  <strong>{usesBilling ? t('onboarding.step4.yes') : t('onboarding.step4.no')}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Moneda</span>
+                  <span>{t('onboarding.step4.currency')}</span>
                   <strong>{currency}</strong>
                 </div>
                 <div className="onboarding-summary-row">
-                  <span>Cobro</span>
-                  <strong>{PAYMENT_OPTIONS.find((o) => o.value === paymentMethod)?.label ?? paymentMethod}</strong>
+                  <span>{t('onboarding.step4.paymentMethod')}</span>
+                  <strong>{PAYMENT_KEYS.find((o) => o.value === paymentMethod)?.labelKey ? t(PAYMENT_KEYS.find((o) => o.value === paymentMethod)!.labelKey) : paymentMethod}</strong>
                 </div>
               </div>
               {finishError && <p className="alert alert-error onboarding-finish-error">{finishError}</p>}
@@ -489,19 +521,14 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         <div className="onboarding-footer">
           {step > 1 ? (
             <button type="button" className="onboarding-btn-back" onClick={back}>
-              Atrás
+              {t('onboarding.nav.back')}
             </button>
           ) : (
             <span />
           )}
           {step < 4 ? (
-            <button
-              type="button"
-              className="onboarding-btn-next"
-              disabled={!canNext[step]}
-              onClick={next}
-            >
-              Siguiente
+            <button type="button" className="onboarding-btn-next" disabled={!canNext[step]} onClick={next}>
+              {t('onboarding.nav.next')}
             </button>
           ) : (
             <button
@@ -510,7 +537,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
               disabled={!canFinishStep4}
               onClick={() => void finish()}
             >
-              {finishing ? t('common.status.saving') : 'Empezar'}
+              {finishing ? t('common.status.saving') : t('onboarding.nav.start')}
             </button>
           )}
         </div>

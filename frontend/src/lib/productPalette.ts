@@ -45,5 +45,7 @@ export function themeHubColorSwatches(): { id: string; label: string; bg: string
 export const DEFAULT_APPOINTMENT_COLOR_HEX = PRODUCT_PALETTE[0].hex;
 
 /** Selector de color del calendario: hex persiste; swatch usa token. */
-export const CALENDAR_APPOINTMENT_COLOR_OPTIONS: { hex: string; swatch: string }[] =
-  PRODUCT_PALETTE.map((p) => ({ hex: p.hex, swatch: p.token }));
+export const CALENDAR_APPOINTMENT_COLOR_OPTIONS: { hex: string; swatch: string }[] = PRODUCT_PALETTE.map((p) => ({
+  hex: p.hex,
+  swatch: p.token,
+}));

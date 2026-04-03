@@ -9,7 +9,11 @@ import { clerkEnabled } from '../lib/auth';
  */
 export function ClerkSessionOrgSync() {
   const { isLoaded: authLoaded, isSignedIn, orgId } = useAuth();
-  const { isLoaded: listLoaded, setActive, userMemberships } = useOrganizationList({
+  const {
+    isLoaded: listLoaded,
+    setActive,
+    userMemberships,
+  } = useOrganizationList({
     userMemberships: { pageSize: 50 },
   });
   const attemptedRef = useRef(false);
@@ -39,16 +43,7 @@ export function ClerkSessionOrgSync() {
     void setActive({ organization: orgID }).catch(() => {
       attemptedRef.current = false;
     });
-  }, [
-    authLoaded,
-    clerkEnabled,
-    listLoaded,
-    isSignedIn,
-    orgId,
-    setActive,
-    userMemberships.data,
-    userMemberships.isLoading,
-  ]);
+  }, [authLoaded, listLoaded, isSignedIn, orgId, setActive, userMemberships.data, userMemberships.isLoading]);
 
   return null;
 }

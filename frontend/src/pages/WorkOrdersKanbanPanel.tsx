@@ -4,7 +4,7 @@ import { normalize } from '@devpablocristo/core-browser/search';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import type { CrudHelpers, CrudPageConfig } from '../components/CrudPage';
+import type { CrudHelpers } from '../components/CrudPage';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
 import { CreatedByPillsBar } from '../components/CreatedByPillsBar';
 import { WorkOrderKanbanDetailModal } from '../components/WorkOrderKanbanDetailModal';
@@ -15,10 +15,7 @@ import {
 } from '../lib/autoRepairApi';
 import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
 import { clerkEnabled } from '../lib/auth';
-import {
-  applyWorkOrderCreatorFilter,
-  type CreatorFilterState,
-} from '../lib/workOrderCreatorFilter';
+import { applyWorkOrderCreatorFilter, type CreatorFilterState } from '../lib/workOrderCreatorFilter';
 import {
   canonicalWorkOrderStatus,
   defaultCanonStatusForKanbanPhase,
@@ -199,11 +196,8 @@ export function WorkOrdersKanbanPanel() {
   const workOrdersQueryKey = queryKeys.workOrders.kanban(showArchived);
   const workOrdersQuery = useQuery({
     queryKey: workOrdersQueryKey,
-    queryFn: async () => (
-      showArchived
-        ? ((await getAutoRepairWorkOrdersArchived()).items ?? [])
-        : getAllAutoRepairWorkOrders()
-    ),
+    queryFn: async () =>
+      showArchived ? ((await getAutoRepairWorkOrdersArchived()).items ?? []) : getAllAutoRepairWorkOrders(),
   });
   const crudConfigQuery = useQuery({
     queryKey: queryKeys.workOrders.crudConfig,
@@ -224,7 +218,9 @@ export function WorkOrdersKanbanPanel() {
       setError(null);
     }
     if (workOrdersQuery.error) {
-      setError(workOrdersQuery.error instanceof Error ? workOrdersQuery.error.message : 'No se pudieron cargar las órdenes');
+      setError(
+        workOrdersQuery.error instanceof Error ? workOrdersQuery.error.message : 'No se pudieron cargar las órdenes',
+      );
     }
   }, [workOrdersQuery.data, workOrdersQuery.error]);
 
@@ -242,7 +238,7 @@ export function WorkOrdersKanbanPanel() {
         selfId,
         creatorFilter,
       }),
-    [items, creatorFilter, clerkEnabled, clerkUserLoaded, selfId],
+    [items, creatorFilter, clerkUserLoaded, selfId],
   );
 
   const handleMoveCard = useCallback(
@@ -250,17 +246,14 @@ export function WorkOrdersKanbanPanel() {
       const phase = targetPhase as WorkOrderKanbanPhase;
       const next = defaultCanonStatusForKanbanPhase(phase);
       if (next == null) return;
-      setItems((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, status: next as AutoRepairWorkOrder['status'] } : x)),
-      );
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: next as AutoRepairWorkOrder['status'] } : x)));
       void (async () => {
         try {
           const updated = await patchWorkOrderMutation.mutateAsync({ id, status: next });
           setItems((prev) => prev.map((x) => (x.id === id ? updated : x)));
           setError(null);
         } catch (e) {
-          const msg =
-            e instanceof Error ? e.message : 'No se pudo guardar el estado de la orden en el servidor';
+          const msg = e instanceof Error ? e.message : 'No se pudo guardar el estado de la orden en el servidor';
           await load();
           setError(msg);
         }
@@ -269,33 +262,33 @@ export function WorkOrdersKanbanPanel() {
     [load, patchWorkOrderMutation],
   );
 
-  const handleModalSaved = useCallback((wo: AutoRepairWorkOrder) => {
-    queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
-      (current ?? []).map((row) => (row.id === wo.id ? wo : row)),
-    );
-    setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
-  }, [queryClient, workOrdersQueryKey]);
+  const handleModalSaved = useCallback(
+    (wo: AutoRepairWorkOrder) => {
+      queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
+        (current ?? []).map((row) => (row.id === wo.id ? wo : row)),
+      );
+      setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
+    },
+    [queryClient, workOrdersQueryKey],
+  );
 
-  const handleOrderRemoved = useCallback((id: string) => {
-    queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
-      (current ?? []).filter((row) => row.id !== id),
-    );
-    setItems((prev) => prev.filter((x) => x.id !== id));
-    setDetailOrderId(null);
-  }, [queryClient, workOrdersQueryKey]);
+  const handleOrderRemoved = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<AutoRepairWorkOrder[]>(workOrdersQueryKey, (current) =>
+        (current ?? []).filter((row) => row.id !== id),
+      );
+      setItems((prev) => prev.filter((x) => x.id !== id));
+      setDetailOrderId(null);
+    },
+    [queryClient, workOrdersQueryKey],
+  );
 
   const filterRow = useCallback((row: AutoRepairWorkOrder, q: string) => {
     const canon = canonicalWorkOrderStatus(row.status);
     const badge = workOrderStatusBadgeLabel(row.status);
-    const hay = normalize([
-      row.number,
-      row.vehicle_plate,
-      row.customer_name,
-      row.requested_work,
-      row.created_by,
-      canon,
-      badge,
-    ].join(' '));
+    const hay = normalize(
+      [row.number, row.vehicle_plate, row.customer_name, row.requested_work, row.created_by, canon, badge].join(' '),
+    );
     return hay.includes(normalize(q));
   }, []);
 
@@ -305,18 +298,13 @@ export function WorkOrdersKanbanPanel() {
         ? `${visible} orden de trabajo${showArchived ? ' archivada' : ''}`
         : `${visible} órdenes de trabajo${showArchived ? ' archivadas' : ''}`;
     },
-    [items.length, showArchived],
+    [showArchived],
   );
 
   const showCreatorBar = clerkEnabled && clerkUserLoaded && user != null;
 
   const afterStats = showCreatorBar ? (
-    <CreatedByPillsBar
-      items={items}
-      creatorFilter={creatorFilter}
-      onFilterChange={setCreatorFilter}
-      selfId={selfId}
-    />
+    <CreatedByPillsBar items={items} creatorFilter={creatorFilter} onFilterChange={setCreatorFilter} selfId={selfId} />
   ) : null;
 
   const toolbarButtonRow = useMemo((): ReactElement => {
@@ -388,12 +376,8 @@ export function WorkOrdersKanbanPanel() {
         resolveDropColumnId={resolveDropColumnId}
         sortInColumn={sortInColumn}
         filterRow={filterRow}
-        isRowDraggable={(row) =>
-          !showArchived && !isWorkOrderKanbanTerminalStatus(row.status)
-        }
-        isColumnDroppable={(columnId) =>
-          !showArchived && columnId !== 'wo_closed'
-        }
+        isRowDraggable={(row) => !showArchived && !isWorkOrderKanbanTerminalStatus(row.status)}
+        isColumnDroppable={(columnId) => !showArchived && columnId !== 'wo_closed'}
         onCardOpen={(row) => setDetailOrderId(row.id)}
         renderCard={({ row, onOpen, suppressOpenRef }) => (
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />

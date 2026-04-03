@@ -97,9 +97,7 @@ describe('SettingsPage (modo clave API)', () => {
     expect(screen.queryByRole('combobox', { name: 'Seleccionar idioma' })).not.toBeInTheDocument();
 
     expect(screen.getByText('Sin perfil de usuario en este modo')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Con solo clave API no hay persona vinculada/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Con solo clave API no hay persona vinculada/i)).toBeInTheDocument();
 
     expect(screen.getByText('00000000-0000-0000-0000-000000000001')).toBeInTheDocument();
   });

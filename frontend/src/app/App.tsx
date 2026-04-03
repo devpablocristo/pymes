@@ -1,18 +1,45 @@
-import { StrictMode, type ReactNode } from 'react';
+import { StrictMode, useEffect, type ReactNode } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
-import { hasCompletedOnboarding } from '../lib/tenantProfile';
+import { getTenantSettings } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
+import { syncTenantProfileFromSettings } from '../lib/tenantProfile';
 import { LoginPage, OnboardingPage, Shell, SignupPage } from './lazyRoutes';
 import { ShellRoutes } from './ShellRoutes';
 import { Suspended } from './suspended';
 
-function RequireOnboarding({ children }: { children: React.ReactNode }) {
-  if (!hasCompletedOnboarding()) {
+function RequireOnboarding({ children }: { children: ReactNode }) {
+  const tenantSettingsQuery = useQuery({
+    queryKey: queryKeys.tenant.settings,
+    queryFn: getTenantSettings,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const tenantSettings = tenantSettingsQuery.data;
+
+  useEffect(() => {
+    if (!tenantSettings?.onboarding_completed_at) {
+      return;
+    }
+    syncTenantProfileFromSettings(tenantSettings);
+  }, [tenantSettings]);
+
+  if (tenantSettingsQuery.isPending) {
+    return <div className="spinner" aria-label="Cargando" />;
+  }
+
+  if (tenantSettingsQuery.isError || !tenantSettings) {
     return <Navigate to="/onboarding" replace />;
   }
+
+  if (!tenantSettings.onboarding_completed_at) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return <>{children}</>;
 }
 

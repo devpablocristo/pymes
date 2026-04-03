@@ -1,5 +1,6 @@
+/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
-import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig } from '../components/CrudPage';
+import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
@@ -64,7 +65,7 @@ function tagsToText(tags?: string[]): string {
   return (tags ?? []).join(', ');
 }
 
-const resourceConfigs: Record<string, CrudPageConfig<any>> = {
+const resourceConfigs: CrudResourceConfigMap = {
   attachments: {
     label: 'adjunto',
     labelPlural: 'adjuntos',
@@ -137,7 +138,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
         },
       },
     ],
-    searchText: (row: AttachmentRow) => [row.file_name, row.content_type, row.uploaded_by, String(row.size_bytes)].filter(Boolean).join(' '),
+    searchText: (row: AttachmentRow) =>
+      [row.file_name, row.content_type, row.uploaded_by, String(row.size_bytes)].filter(Boolean).join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
   },
@@ -190,7 +192,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'created_at', header: 'Fecha', render: (v) => formatDate(String(v ?? '')) },
     ],
     formFields: [],
-    searchText: (row: AuditEntryRow) => [row.action, row.resource_type, row.resource_id, row.actor, row.actor_label].filter(Boolean).join(' '),
+    searchText: (row: AuditEntryRow) =>
+      [row.action, row.resource_type, row.resource_id, row.actor, row.actor_label].filter(Boolean).join(' '),
     toFormValues: () => ({}) as CrudFormValues,
     isValid: () => true,
   },
@@ -256,7 +259,8 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       { key: 'title', label: 'Título', placeholder: 'Nota manual' },
       { key: 'note', label: 'Nota', type: 'textarea', required: true, fullWidth: true },
     ],
-    searchText: (row: TimelineEntryRow) => [row.title, row.description, row.event_type, row.actor, row.entity_type].filter(Boolean).join(' '),
+    searchText: (row: TimelineEntryRow) =>
+      [row.title, row.description, row.event_type, row.actor, row.entity_type].filter(Boolean).join(' '),
     toFormValues: () =>
       ({
         title: '',
@@ -284,7 +288,9 @@ const resourceConfigs: Record<string, CrudPageConfig<any>> = {
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>,
+        render: (value) => (
+          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
+        ),
       },
       { key: 'created_at', header: 'Creado', render: (value) => formatDate(String(value ?? '')) },
       { key: 'secret', header: 'Secret', render: (value) => (String(value ?? '').trim() ? 'Configurado' : '---') },

@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -78,6 +80,22 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	var onboardingCompletedAt *time.Time
+	if req.OnboardingCompletedAt != nil {
+		value := strings.TrimSpace(*req.OnboardingCompletedAt)
+		if value != "" {
+			parsed, err := time.Parse(time.RFC3339, value)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid onboarding_completed_at"})
+				return
+			}
+			onboardingCompletedAt = &parsed
+		}
+	}
+	schedulingEnabled := req.SchedulingEnabled
+	if schedulingEnabled == nil {
+		schedulingEnabled = req.AppointmentsEnabled
+	}
 	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{
 		PlanCode:                 req.PlanCode,
 		HardLimits:               req.HardLimits,
@@ -95,10 +113,18 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		BusinessAddress:          req.BusinessAddress,
 		BusinessPhone:            req.BusinessPhone,
 		BusinessEmail:            req.BusinessEmail,
+		TeamSize:                 req.TeamSize,
+		Sells:                    req.Sells,
+		ClientLabel:              req.ClientLabel,
+		UsesBilling:              req.UsesBilling,
+		PaymentMethod:            req.PaymentMethod,
+		Vertical:                 req.Vertical,
+		OnboardingCompletedAt:    onboardingCompletedAt,
 		WAQuoteTemplate:          req.WAQuoteTemplate,
 		WAReceiptTemplate:        req.WAReceiptTemplate,
 		WADefaultCountryCode:     req.WADefaultCountryCode,
-		AppointmentsEnabled:      req.AppointmentsEnabled,
+		SchedulingEnabled:        schedulingEnabled,
+		AppointmentsEnabled:      schedulingEnabled,
 		AppointmentLabel:         req.AppointmentLabel,
 		AppointmentReminderHours: req.AppointmentReminderHours,
 		SecondaryCurrency:        req.SecondaryCurrency,

@@ -57,6 +57,7 @@ type BusinessInfo struct {
 	BusinessAddress     string    `json:"business_address"`
 	BusinessPhone       string    `json:"business_phone"`
 	BusinessEmail       string    `json:"business_email"`
+	SchedulingEnabled   bool      `json:"scheduling_enabled"`
 	AppointmentsEnabled bool      `json:"appointments_enabled"`
 }
 
@@ -155,6 +156,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 		BusinessAddress:     row.BusinessAddress,
 		BusinessPhone:       row.BusinessPhone,
 		BusinessEmail:       row.BusinessEmail,
+		SchedulingEnabled:   row.AppointmentsEnabled,
 		AppointmentsEnabled: row.AppointmentsEnabled,
 	}, nil
 }

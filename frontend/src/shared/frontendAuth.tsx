@@ -23,11 +23,7 @@ export function SharedAuthTokenBridge({
   return <ClerkAuthTokenBridge registerProviders={registerProviders} />;
 }
 
-function LocalAuthTokenBridge({
-  registerProviders,
-}: {
-  registerProviders: TokenProviderRegistrar[];
-}) {
+function LocalAuthTokenBridge({ registerProviders }: { registerProviders: TokenProviderRegistrar[] }) {
   useEffect(() => {
     const provider = async () => null;
     registerProviders.forEach((registerProvider) => registerProvider(provider));
@@ -36,11 +32,7 @@ function LocalAuthTokenBridge({
   return null;
 }
 
-function ClerkAuthTokenBridge({
-  registerProviders,
-}: {
-  registerProviders: TokenProviderRegistrar[];
-}) {
+function ClerkAuthTokenBridge({ registerProviders }: { registerProviders: TokenProviderRegistrar[] }) {
   const { getToken } = useAuth();
 
   useEffect(() => {

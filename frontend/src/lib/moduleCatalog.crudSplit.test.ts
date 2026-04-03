@@ -8,8 +8,8 @@ describe('moduleCatalog CRUD split', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const src = readFileSync(path.join(dir, 'moduleCatalog.ts'), 'utf8');
 
-    expect(src).toContain("../crud/crudModuleCatalog");
-    expect(src).not.toContain("../crud/resourceConfigs");
+    expect(src).toContain('../crud/crudModuleCatalog');
+    expect(src).not.toContain('../crud/resourceConfigs');
   });
 
   it('keeps work order screens on the lazy CRUD loader', () => {
@@ -17,10 +17,10 @@ describe('moduleCatalog CRUD split', () => {
     const workOrdersListSrc = readFileSync(path.join(dir, '../pages/AutoRepairWorkOrdersPage.tsx'), 'utf8');
     const kanbanSrc = readFileSync(path.join(dir, '../pages/WorkOrdersKanbanPanel.tsx'), 'utf8');
 
-    expect(workOrdersListSrc).toContain("../crud/lazyCrudPage");
-    expect(workOrdersListSrc).not.toContain("../crud/resourceConfigs");
-    expect(kanbanSrc).toContain("../crud/lazyCrudPage");
-    expect(kanbanSrc).not.toContain("../crud/resourceConfigs");
+    expect(workOrdersListSrc).toContain('../crud/lazyCrudPage');
+    expect(workOrdersListSrc).not.toContain('../crud/resourceConfigs');
+    expect(kanbanSrc).toContain('../crud/lazyCrudPage');
+    expect(kanbanSrc).not.toContain('../crud/resourceConfigs');
   });
 
   it('splits operations and control CRUD groups into dedicated lazy modules', () => {

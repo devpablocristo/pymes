@@ -35,7 +35,7 @@ func (u *Usecases) GetBootstrap(ctx context.Context, orgID string, role string, 
 		"auth": map[string]any{
 			"org_id":       orgID,
 			"role":         role,
-			"product_role": authz.ProductRole(role),
+			"product_role": authz.ProductRole(role, scopes),
 			"scopes":       scopes,
 			"actor":        actor,
 			"auth_method":  authMethod,
@@ -59,6 +59,9 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch
 	if err != nil {
 		return domain.TenantSettings{}, domainerr.Validation("invalid org_id")
 	}
+	if patch.SchedulingEnabled != nil {
+		patch.AppointmentsEnabled = patch.SchedulingEnabled
+	}
 	if patch.AppointmentReminderHours != nil && *patch.AppointmentReminderHours < 0 {
 		return domain.TenantSettings{}, domainerr.Validation("appointment_reminder_hours must be >= 0")
 	}
@@ -71,6 +74,41 @@ func (u *Usecases) UpdateTenantSettings(ctx context.Context, orgID string, patch
 			return domain.TenantSettings{}, domainerr.Validation(err.Error())
 		}
 		patch.SupportedCurrencies = &norm
+	}
+	if patch.Vertical != nil {
+		norm, err := domain.NormalizeVertical(*patch.Vertical)
+		if err != nil {
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
+		}
+		patch.Vertical = &norm
+	}
+	if patch.TeamSize != nil {
+		norm, err := domain.NormalizeTeamSize(*patch.TeamSize)
+		if err != nil {
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
+		}
+		patch.TeamSize = &norm
+	}
+	if patch.Sells != nil {
+		norm, err := domain.NormalizeSells(*patch.Sells)
+		if err != nil {
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
+		}
+		patch.Sells = &norm
+	}
+	if patch.PaymentMethod != nil {
+		norm, err := domain.NormalizePaymentMethod(*patch.PaymentMethod)
+		if err != nil {
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
+		}
+		patch.PaymentMethod = &norm
+	}
+	if patch.ClientLabel != nil {
+		norm, err := domain.NormalizeClientLabel(*patch.ClientLabel)
+		if err != nil {
+			return domain.TenantSettings{}, domainerr.Validation(err.Error())
+		}
+		patch.ClientLabel = &norm
 	}
 	return u.repo.UpdateTenantSettings(id, patch, actor), nil
 }

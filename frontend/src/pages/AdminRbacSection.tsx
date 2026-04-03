@@ -7,7 +7,6 @@ import {
   listRbacRoles,
   removeRbacRoleAssignment,
   type OrgMemberRow,
-  type RbacRoleSummary,
 } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { queryKeys } from '../lib/queryKeys';
@@ -108,8 +107,8 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
         <span className="badge badge-neutral">Solo administradores de consola</span>
       </div>
       <p className="admin-settings-hint">
-        Asigná roles personalizados del catálogo <code>/v1/roles</code> a usuarios de la organización y consultá permisos
-        efectivos.
+        Asigná roles personalizados del catálogo <code>/v1/roles</code> a usuarios de la organización y consultá
+        permisos efectivos.
       </p>
       {error ? <p className="form-error">{error}</p> : null}
       {!error && queryError ? (
@@ -165,11 +164,11 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
               </p>
               {permissionsQuery.isLoading ? <p className="text-secondary">Cargando permisos…</p> : null}
               {permissionsQuery.error ? (
-                <p className="form-error">{formatFetchErrorForUser(permissionsQuery.error, 'No se pudieron leer los permisos.')}</p>
+                <p className="form-error">
+                  {formatFetchErrorForUser(permissionsQuery.error, 'No se pudieron leer los permisos.')}
+                </p>
               ) : null}
-              <pre className="admin-textarea admin-pre-permissions">
-                {permLines}
-              </pre>
+              <pre className="admin-textarea admin-pre-permissions">{permLines}</pre>
               <button type="button" className="btn-sm btn-secondary" onClick={() => setPermUserId(null)}>
                 Cerrar
               </button>

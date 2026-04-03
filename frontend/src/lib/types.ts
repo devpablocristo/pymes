@@ -26,10 +26,18 @@ export type TenantSettings = {
   business_address: string;
   business_phone: string;
   business_email: string;
+  team_size: string;
+  sells: string;
+  client_label: string;
+  uses_billing: boolean;
+  payment_method: string;
+  vertical: string;
+  onboarding_completed_at?: string | null;
   wa_quote_template: string;
   wa_receipt_template: string;
   wa_default_country_code: string;
-  appointments_enabled: boolean;
+  scheduling_enabled: boolean;
+  appointments_enabled?: boolean;
   appointment_label: string;
   appointment_reminder_hours: number;
   secondary_currency: string;
@@ -65,9 +73,17 @@ export type TenantSettingsUpdatePayload = {
   business_address?: string;
   business_phone?: string;
   business_email?: string;
+  team_size?: string;
+  sells?: string;
+  client_label?: string;
+  uses_billing?: boolean;
+  payment_method?: string;
+  vertical?: string;
+  onboarding_completed_at?: string;
   wa_quote_template?: string;
   wa_receipt_template?: string;
   wa_default_country_code?: string;
+  scheduling_enabled?: boolean;
   appointments_enabled?: boolean;
   appointment_label?: string;
   appointment_reminder_hours?: number;
@@ -110,6 +126,8 @@ export type BootstrapAuthPayload = {
   scopes: string[];
   actor: string;
   auth_method: string;
+  vertical?: string | null;
+  onboarding_completed_at?: string | null;
 };
 
 /** Auth del tenant vía GET /v1/session. */

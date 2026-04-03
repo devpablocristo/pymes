@@ -36,14 +36,10 @@ export function applyWorkOrderCreatorFilter<T extends { id: string; created_by?:
   });
 }
 
-export function isYoCreatorFilterActive(
-  creatorFilter: CreatorFilterState,
-  selfId: string | undefined,
-): boolean {
+export function isYoCreatorFilterActive(creatorFilter: CreatorFilterState, selfId: string | undefined): boolean {
   return (
     creatorFilter.mode === 'pick' &&
     selfId != null &&
-    (creatorFilter.actors.size === 0 ||
-      (creatorFilter.actors.size === 1 && creatorFilter.actors.has(selfId)))
+    (creatorFilter.actors.size === 0 || (creatorFilter.actors.size === 1 && creatorFilter.actors.has(selfId)))
   );
 }

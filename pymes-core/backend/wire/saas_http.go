@@ -125,7 +125,7 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 		"org_id":       principal.TenantID,
 		"tenant_id":    principal.TenantID,
 		"role":         principal.Role,
-		"product_role": authz.ProductRole(principal.Role),
+		"product_role": authz.ProductRole(principal.Role, principal.Scopes),
 		"scopes":       principal.Scopes,
 		"actor":        principal.Actor,
 		"auth_method":  principal.AuthMethod,
@@ -136,6 +136,16 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 			slog.Warn("session org name lookup", "err", err, "org_id", principal.TenantID)
 		} else if okName && strings.TrimSpace(name) != "" {
 			auth["org_name"] = strings.TrimSpace(name)
+		}
+		if settings, okSettings, err := store.loadTenantSettings(r.Context(), principal.TenantID); err != nil {
+			slog.Warn("session tenant settings lookup", "err", err, "org_id", principal.TenantID)
+		} else if okSettings {
+			if vertical := strings.TrimSpace(settings.Vertical); vertical != "" {
+				auth["vertical"] = vertical
+			}
+			if settings.OnboardingCompletedAt != nil {
+				auth["onboarding_completed_at"] = settings.OnboardingCompletedAt
+			}
 		}
 	}
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{"auth": auth})
@@ -479,7 +489,7 @@ func authorizedOrgID(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 // apiKeyManagementAllowed alinea con la consola: solo privilegiados o scopes admin de consola.
 func apiKeyManagementAllowed(principal kerneldomain.Principal) bool {
-	return authz.IsAdmin(principal.Role, principal.Scopes)
+	return authz.CanManageAPIKeys(principal.Role, principal.Scopes, principal.AuthMethod)
 }
 
 // authorizedOrgIDForAPIKeyManagement exige además de coincidencia de tenant, permisos de admin de producto.

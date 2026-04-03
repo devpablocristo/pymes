@@ -1,8 +1,5 @@
 import { useMemo } from 'react';
-import {
-  CrudPage as ModulesCrudPage,
-  type CrudPageConfig,
-} from '@devpablocristo/modules-crud-ui';
+import { CrudPage as ModulesCrudPage, type CrudPageConfig } from '@devpablocristo/modules-crud-ui';
 import { apiRequest } from '../lib/api';
 import { buildPymesCrudStrings } from '../lib/crudModuleStrings';
 import { useI18n } from '../lib/i18n';
@@ -20,6 +17,9 @@ export type {
   CrudRowAction,
   CrudToolbarAction,
 } from '@devpablocristo/modules-crud-ui';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapa heterogéneo: cada config tiene su propio tipo de record, TS no soporta tipos existenciales
+export type CrudResourceConfigMap = Record<string, CrudPageConfig<any>>;
 
 /**
  * CRUD de consola Pymes: motor en `@devpablocristo/modules-crud-ui`, textos vía i18n y API vía `apiRequest`.

@@ -121,11 +121,7 @@ export default function WatcherConfigPage() {
       for (const tpl of WATCHER_TEMPLATES) {
         const state = draft[tpl.watcherType];
         if (!state || !state.watcherId) continue;
-        await updateWatcher(
-          state.watcherId,
-          { [tpl.thresholdKey]: state.threshold },
-          state.enabled,
-        );
+        await updateWatcher(state.watcherId, { [tpl.thresholdKey]: state.threshold }, state.enabled);
       }
     },
     onSuccess: async () => {
@@ -159,10 +155,7 @@ export default function WatcherConfigPage() {
   };
 
   const wSearch = usePageSearch();
-  const wTextFn = useCallback(
-    (tpl: WatcherTemplate) => `${tpl.name} ${tpl.description} ${tpl.watcherType}`,
-    [],
-  );
+  const wTextFn = useCallback((tpl: WatcherTemplate) => `${tpl.name} ${tpl.description} ${tpl.watcherType}`, []);
   const filteredWatchers = useSearch(WATCHER_TEMPLATES, wTextFn, wSearch);
 
   if (watchersQuery.isLoading) {
@@ -187,10 +180,7 @@ export default function WatcherConfigPage() {
         const state = watchers[tpl.watcherType];
         if (!state) return null;
         return (
-          <div
-            key={tpl.watcherType}
-            className={`watcher-card ${!state.enabled ? 'disabled' : ''}`}
-          >
+          <div key={tpl.watcherType} className={`watcher-card ${!state.enabled ? 'disabled' : ''}`}>
             <input
               type="checkbox"
               className="watcher-toggle"
@@ -209,9 +199,7 @@ export default function WatcherConfigPage() {
                     min={1}
                     aria-label={`${tpl.name}: ${tpl.thresholdLabel}`}
                     value={state.threshold}
-                    onChange={(e) =>
-                      handleThresholdChange(tpl.watcherType, Number(e.target.value))
-                    }
+                    onChange={(e) => handleThresholdChange(tpl.watcherType, Number(e.target.value))}
                     disabled={!state.enabled}
                   />
                   <span>{tpl.thresholdUnit}</span>
@@ -222,7 +210,8 @@ export default function WatcherConfigPage() {
                   Ultimo chequeo: {new Date(state.lastRunAt).toLocaleString('es-AR')}
                   {state.lastResult && (
                     <span>
-                      {' '}— Encontrados: {state.lastResult.found}, Ejecutados: {state.lastResult.executed}
+                      {' '}
+                      — Encontrados: {state.lastResult.found}, Ejecutados: {state.lastResult.executed}
                     </span>
                   )}
                 </div>

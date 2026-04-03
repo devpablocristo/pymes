@@ -121,9 +121,7 @@ describe('UnifiedChatPage', () => {
   it('mantiene limpia la nueva conversación sin rehidratar el último historial', async () => {
     renderUnifiedChat();
 
-    expect(
-      screen.getByRole('textbox', { name: /Ej\.: resumí ventas del mes o preguntá libre/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Ej\.: resumí ventas del mes o preguntá libre/i })).toBeInTheDocument();
     expect(getMessagesPane()).toHaveAttribute('role', 'log');
 
     await waitFor(() => {

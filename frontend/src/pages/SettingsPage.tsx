@@ -24,17 +24,11 @@ function rejectAfterMs(ms: number, message: string): Promise<never> {
 }
 
 async function getSessionWithTimeout(): Promise<SessionResponse> {
-  return Promise.race([
-    getSession(),
-    rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
-  ]);
+  return Promise.race([getSession(), rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout')]);
 }
 
 async function getMeWithTimeout(): Promise<MeProfileResponse> {
-  return Promise.race([
-    getMe(),
-    rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout'),
-  ]);
+  return Promise.race([getMe(), rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout')]);
 }
 
 function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
@@ -87,15 +81,18 @@ function ProfileSessionRows({
 }
 
 function ProfileAccountBlock({ user }: { user: MeProfileUser }) {
-  const initial =
-    user.name?.trim().charAt(0)?.toUpperCase() ||
-    user.email?.trim().charAt(0)?.toUpperCase() ||
-    '?';
+  const initial = user.name?.trim().charAt(0)?.toUpperCase() || user.email?.trim().charAt(0)?.toUpperCase() || '?';
 
   return (
     <div className="profile-account-block">
       {user.avatar_url ? (
-        <img className="profile-account-avatar" src={user.avatar_url} alt={`Avatar de ${user.name ?? user.email ?? 'usuario'}`} width={64} height={64} />
+        <img
+          className="profile-account-avatar"
+          src={user.avatar_url}
+          alt={`Avatar de ${user.name ?? user.email ?? 'usuario'}`}
+          width={64}
+          height={64}
+        />
       ) : (
         <div className="profile-account-avatar profile-account-avatar-placeholder" aria-hidden>
           {initial}
@@ -125,6 +122,7 @@ function ClerkOrganizationNameSection({ t }: { t: (key: string) => string }) {
       return;
     }
     setNameEdit(organization.name.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sincronizar solo cuando cambia id/name, no el objeto entero
   }, [editing, organization?.id, organization?.name]);
 
   function handleCancelEdit(): void {
@@ -284,13 +282,7 @@ function LocalAccountSignOutButton() {
   );
 }
 
-function PersonalDataForm({
-  displayUser,
-  canEdit,
-}: {
-  displayUser: MeProfileUser | null;
-  canEdit: boolean;
-}) {
+function PersonalDataForm({ displayUser, canEdit }: { displayUser: MeProfileUser | null; canEdit: boolean }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -330,6 +322,7 @@ function PersonalDataForm({
       return;
     }
     syncFieldsFromDisplay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sincronizar solo cuando cambian los datos del user, no el objeto/función
   }, [
     editing,
     displayUser?.id,
@@ -463,10 +456,20 @@ function PersonalDataForm({
       />
       {formError && <p className="alert alert-error profile-form-alert">{formError}</p>}
       <p className="profile-form-actions profile-form-actions--edit">
-        <button type="button" className="btn-primary" disabled={saveProfileMutation.isPending} onClick={() => void handleSave()}>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={saveProfileMutation.isPending}
+          onClick={() => void handleSave()}
+        >
           {saveProfileMutation.isPending ? t('profile.personal.saving') : t('profile.personal.save')}
         </button>
-        <button type="button" className="btn-secondary" disabled={saveProfileMutation.isPending} onClick={handleCancelEdit}>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={saveProfileMutation.isPending}
+          onClick={handleCancelEdit}
+        >
           {t('profile.personal.cancel')}
         </button>
       </p>
@@ -489,7 +492,7 @@ function ClerkPersonalDataSection({
     return <p className="text-muted">{t('common.status.loading')}</p>;
   }
 
-  const displayUser = clerkUser ? mergeClerkSessionWithApiUser(clerkUser, apiUser ?? undefined) : apiUser ?? null;
+  const displayUser = clerkUser ? mergeClerkSessionWithApiUser(clerkUser, apiUser ?? undefined) : (apiUser ?? null);
 
   return <PersonalDataForm displayUser={displayUser} canEdit={canEdit} />;
 }
@@ -546,12 +549,11 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
   const me = meQuery.data ?? null;
   const user = me?.user;
   const loading = sessionQuery.isLoading || meQuery.isLoading;
-  const error = sessionQuery.error
-    ? formatFetchErrorForUser(sessionQuery.error, t('profile.error.unreachable'))
-    : '';
-  const meWarning = !sessionQuery.error && meQuery.error
-    ? formatFetchErrorForUser(meQuery.error, t('profile.error.meUnreachable'))
-    : '';
+  const error = sessionQuery.error ? formatFetchErrorForUser(sessionQuery.error, t('profile.error.unreachable')) : '';
+  const meWarning =
+    !sessionQuery.error && meQuery.error
+      ? formatFetchErrorForUser(meQuery.error, t('profile.error.meUnreachable'))
+      : '';
   const accountLoadFailed = Boolean(meWarning);
   const refetchProfile = () => {
     void sessionQuery.refetch();
@@ -625,19 +627,12 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
                 <h2>{t('profile.section.personal')}</h2>
               </div>
               {clerkMode ? (
-                <ClerkPersonalDataSection
-                  apiUser={user ?? undefined}
-                  session={session}
-                />
+                <ClerkPersonalDataSection apiUser={user ?? undefined} session={session} />
               ) : (
-                <PersonalDataForm
-                  displayUser={user ?? null}
-                  canEdit={session.auth.auth_method === 'jwt'}
-                />
+                <PersonalDataForm displayUser={user ?? null} canEdit={session.auth.auth_method === 'jwt'} />
               )}
             </div>
           )}
-
         </>
       )}
     </>
@@ -657,11 +652,7 @@ export function SettingsPage({ embedded = false }: SettingsPageProps = {}) {
   }
 
   return (
-    <PageLayout
-      className="profile-page"
-      title={t('profile.page.title')}
-      lead={t('profile.page.subtitle')}
-    >
+    <PageLayout className="profile-page" title={t('profile.page.title')} lead={t('profile.page.subtitle')}>
       {body}
     </PageLayout>
   );

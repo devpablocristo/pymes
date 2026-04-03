@@ -3,6 +3,7 @@
  * con navegación por estado interno.
  */
 import { useSearch } from '@devpablocristo/modules-search';
+import { confirmAction } from '@devpablocristo/core-browser';
 import { useState, useCallback, useMemo } from 'react';
 import { IconClose, IconEdit, IconEye, IconTrash } from '@devpablocristo/modules-ui-data-display/icons';
 import { PageLayout } from '../components/PageLayout';
@@ -39,36 +40,105 @@ type View = 'list' | 'preview' | 'add' | 'edit';
 // ─── Datos iniciales locales ───
 
 let nextLineId = 200;
-function lineUid() { return String(++nextLineId); }
+function lineUid() {
+  return String(++nextLineId);
+}
 let nextInvId = 20;
-function invUid() { return String(++nextInvId); }
+function invUid() {
+  return String(++nextInvId);
+}
 
 function initials(name: string): string {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 const INITIAL_INVOICES: Invoice[] = [
-  { id: '1', number: 'INV-3492', customer: 'María García', initials: 'MG', issuedDate: '2026-03-10', dueDate: '2026-04-10', status: 'paid', items: [
-    { id: '1', description: 'Diseño de logo', qty: 1, unit: 'unidad', unitPrice: 15000 },
-    { id: '2', description: 'Tarjetas de presentación', qty: 500, unit: 'unidades', unitPrice: 12 },
-  ], discount: 0, tax: 21 },
-  { id: '2', number: 'INV-3493', customer: 'Juan Pérez', initials: 'JP', issuedDate: '2026-03-12', dueDate: '2026-04-12', status: 'pending', items: [
-    { id: '3', description: 'Desarrollo web', qty: 40, unit: 'horas', unitPrice: 5000 },
-  ], discount: 5, tax: 21 },
-  { id: '3', number: 'INV-3494', customer: 'Ana López', initials: 'AL', issuedDate: '2026-03-05', dueDate: '2026-03-20', status: 'overdue', items: [
-    { id: '4', description: 'Consultoría SEO', qty: 10, unit: 'horas', unitPrice: 3500 },
-    { id: '5', description: 'Auditoría técnica', qty: 1, unit: 'unidad', unitPrice: 25000 },
-  ], discount: 10, tax: 21 },
-  { id: '4', number: 'INV-3495', customer: 'Carlos Ruiz', initials: 'CR', issuedDate: '2026-03-15', dueDate: '2026-04-15', status: 'paid', items: [
-    { id: '6', description: 'Hosting anual', qty: 1, unit: 'año', unitPrice: 48000 },
-  ], discount: 0, tax: 21 },
-  { id: '5', number: 'INV-3496', customer: 'Laura Díaz', initials: 'LD', issuedDate: '2026-03-18', dueDate: '2026-04-18', status: 'pending', items: [
-    { id: '7', description: 'Mantenimiento mensual', qty: 3, unit: 'meses', unitPrice: 15000 },
-    { id: '8', description: 'Soporte premium', qty: 3, unit: 'meses', unitPrice: 8000 },
-  ], discount: 0, tax: 21 },
-  { id: '6', number: 'INV-3497', customer: 'Pedro Sánchez', initials: 'PS', issuedDate: '2026-03-20', dueDate: '2026-04-20', status: 'paid', items: [
-    { id: '9', description: 'App mobile MVP', qty: 1, unit: 'proyecto', unitPrice: 350000 },
-  ], discount: 15, tax: 21 },
+  {
+    id: '1',
+    number: 'INV-3492',
+    customer: 'María García',
+    initials: 'MG',
+    issuedDate: '2026-03-10',
+    dueDate: '2026-04-10',
+    status: 'paid',
+    items: [
+      { id: '1', description: 'Diseño de logo', qty: 1, unit: 'unidad', unitPrice: 15000 },
+      { id: '2', description: 'Tarjetas de presentación', qty: 500, unit: 'unidades', unitPrice: 12 },
+    ],
+    discount: 0,
+    tax: 21,
+  },
+  {
+    id: '2',
+    number: 'INV-3493',
+    customer: 'Juan Pérez',
+    initials: 'JP',
+    issuedDate: '2026-03-12',
+    dueDate: '2026-04-12',
+    status: 'pending',
+    items: [{ id: '3', description: 'Desarrollo web', qty: 40, unit: 'horas', unitPrice: 5000 }],
+    discount: 5,
+    tax: 21,
+  },
+  {
+    id: '3',
+    number: 'INV-3494',
+    customer: 'Ana López',
+    initials: 'AL',
+    issuedDate: '2026-03-05',
+    dueDate: '2026-03-20',
+    status: 'overdue',
+    items: [
+      { id: '4', description: 'Consultoría SEO', qty: 10, unit: 'horas', unitPrice: 3500 },
+      { id: '5', description: 'Auditoría técnica', qty: 1, unit: 'unidad', unitPrice: 25000 },
+    ],
+    discount: 10,
+    tax: 21,
+  },
+  {
+    id: '4',
+    number: 'INV-3495',
+    customer: 'Carlos Ruiz',
+    initials: 'CR',
+    issuedDate: '2026-03-15',
+    dueDate: '2026-04-15',
+    status: 'paid',
+    items: [{ id: '6', description: 'Hosting anual', qty: 1, unit: 'año', unitPrice: 48000 }],
+    discount: 0,
+    tax: 21,
+  },
+  {
+    id: '5',
+    number: 'INV-3496',
+    customer: 'Laura Díaz',
+    initials: 'LD',
+    issuedDate: '2026-03-18',
+    dueDate: '2026-04-18',
+    status: 'pending',
+    items: [
+      { id: '7', description: 'Mantenimiento mensual', qty: 3, unit: 'meses', unitPrice: 15000 },
+      { id: '8', description: 'Soporte premium', qty: 3, unit: 'meses', unitPrice: 8000 },
+    ],
+    discount: 0,
+    tax: 21,
+  },
+  {
+    id: '6',
+    number: 'INV-3497',
+    customer: 'Pedro Sánchez',
+    initials: 'PS',
+    issuedDate: '2026-03-20',
+    dueDate: '2026-04-20',
+    status: 'paid',
+    items: [{ id: '9', description: 'App mobile MVP', qty: 1, unit: 'proyecto', unitPrice: 350000 }],
+    discount: 15,
+    tax: 21,
+  },
 ];
 
 function calcSubtotal(items: LineItem[]): number {
@@ -86,7 +156,11 @@ function fmtMoney(n: number): string {
 }
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = { paid: 'Pagada', pending: 'Pendiente', overdue: 'Vencida' };
-const STATUS_CLASSES: Record<InvoiceStatus, string> = { paid: 'badge-success', pending: 'badge-warning', overdue: 'badge-danger' };
+const STATUS_CLASSES: Record<InvoiceStatus, string> = {
+  paid: 'badge-success',
+  pending: 'badge-warning',
+  overdue: 'badge-danger',
+};
 
 // ─── List View ───
 
@@ -108,7 +182,7 @@ function InvoiceList({
 
   const statusFiltered = useMemo(() => {
     if (statusFilter === 'all') return invoices;
-    return invoices.filter(i => i.status === statusFilter);
+    return invoices.filter((i) => i.status === statusFilter);
   }, [invoices, statusFilter]);
 
   const invoiceText = useCallback((i: Invoice) => `${i.number} ${i.customer}`, []);
@@ -121,7 +195,7 @@ function InvoiceList({
           <select
             aria-label="Filtrar facturas por estado"
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
+            onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | 'all')}
           >
             <option value="all">Todas</option>
             <option value="paid">Pagadas</option>
@@ -129,7 +203,9 @@ function InvoiceList({
             <option value="overdue">Vencidas</option>
           </select>
         </div>
-        <button type="button" className="btn-primary btn-sm" onClick={onAdd}>+ Nueva factura</button>
+        <button type="button" className="btn-primary btn-sm" onClick={onAdd}>
+          + Nueva factura
+        </button>
       </div>
 
       <table className="inv__table">
@@ -144,7 +220,7 @@ function InvoiceList({
           </tr>
         </thead>
         <tbody>
-          {filtered.map(inv => (
+          {filtered.map((inv) => (
             <tr key={inv.id}>
               <td className="inv__cell-strong">{inv.number}</td>
               <td>
@@ -153,30 +229,71 @@ function InvoiceList({
                   {inv.customer}
                 </div>
               </td>
-              <td>{new Date(inv.issuedDate).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+              <td>
+                {new Date(inv.issuedDate).toLocaleDateString('es-AR', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </td>
               <td className="inv__cell-strong">{fmtMoney(calcTotal(inv))}</td>
-              <td><span className={`badge ${STATUS_CLASSES[inv.status]}`}>{STATUS_LABELS[inv.status]}</span></td>
+              <td>
+                <span className={`badge ${STATUS_CLASSES[inv.status]}`}>{STATUS_LABELS[inv.status]}</span>
+              </td>
               <td>
                 <div className="inv__actions">
-                  <button type="button" className="inv__action inv__action--view" onClick={() => onView(inv.id)} aria-label="Ver"><IconEye /></button>
-                  <button type="button" className="inv__action inv__action--edit" onClick={() => onEdit(inv.id)} aria-label="Editar"><IconEdit /></button>
-                  <button type="button" className="inv__action inv__action--delete" onClick={() => onDelete(inv.id)} aria-label="Eliminar"><IconTrash /></button>
+                  <button
+                    type="button"
+                    className="inv__action inv__action--view"
+                    onClick={() => onView(inv.id)}
+                    aria-label="Ver"
+                  >
+                    <IconEye />
+                  </button>
+                  <button
+                    type="button"
+                    className="inv__action inv__action--edit"
+                    onClick={() => onEdit(inv.id)}
+                    aria-label="Editar"
+                  >
+                    <IconEdit />
+                  </button>
+                  <button
+                    type="button"
+                    className="inv__action inv__action--delete"
+                    onClick={() => onDelete(inv.id)}
+                    aria-label="Eliminar"
+                  >
+                    <IconTrash />
+                  </button>
                 </div>
               </td>
             </tr>
           ))}
           {filtered.length === 0 && (
-            <tr><td colSpan={6} className="inv__empty-row">Sin resultados</td></tr>
+            <tr>
+              <td colSpan={6} className="inv__empty-row">
+                Sin resultados
+              </td>
+            </tr>
           )}
         </tbody>
       </table>
 
       <div className="inv__pagination">
-        <span>Mostrando {filtered.length} de {invoices.length}</span>
+        <span>
+          Mostrando {filtered.length} de {invoices.length}
+        </span>
         <div className="inv__page-btns">
-          <button type="button" className="inv__page-btn" aria-label="Página anterior">&larr;</button>
-          <button type="button" className="inv__page-btn inv__page-btn--active" aria-current="page">1</button>
-          <button type="button" className="inv__page-btn" aria-label="Página siguiente">&rarr;</button>
+          <button type="button" className="inv__page-btn" aria-label="Página anterior">
+            &larr;
+          </button>
+          <button type="button" className="inv__page-btn inv__page-btn--active" aria-current="page">
+            1
+          </button>
+          <button type="button" className="inv__page-btn" aria-label="Página siguiente">
+            &rarr;
+          </button>
         </div>
       </div>
     </div>
@@ -195,9 +312,15 @@ function InvoicePreview({ invoice, onBack, onEdit }: { invoice: Invoice; onBack:
   return (
     <div className="card">
       <div className="inv__preview-toolbar">
-        <button type="button" className="btn-secondary btn-sm" onClick={onBack}>&larr; Volver</button>
-        <button type="button" className="btn-secondary btn-sm" onClick={onEdit}>Editar</button>
-        <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>Imprimir</button>
+        <button type="button" className="btn-secondary btn-sm" onClick={onBack}>
+          &larr; Volver
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={onEdit}>
+          Editar
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => window.print()}>
+          Imprimir
+        </button>
       </div>
 
       <div className="inv__preview">
@@ -207,8 +330,10 @@ function InvoicePreview({ invoice, onBack, onEdit }: { invoice: Invoice; onBack:
             <span className={`badge ${STATUS_CLASSES[invoice.status]}`}>{STATUS_LABELS[invoice.status]}</span>
           </div>
           <div className="inv__preview-company">
-            <strong>Mi Empresa S.R.L.</strong><br />
-            Av. Corrientes 1234, CABA<br />
+            <strong>Mi Empresa S.R.L.</strong>
+            <br />
+            Av. Corrientes 1234, CABA
+            <br />
             info@miempresa.com
           </div>
         </div>
@@ -258,15 +383,37 @@ function InvoicePreview({ invoice, onBack, onEdit }: { invoice: Invoice; onBack:
         </table>
 
         <div className="inv__totals">
-          <div className="inv__totals-row"><span>Subtotal</span><span>{fmtMoney(sub)}</span></div>
-          {invoice.discount > 0 && <div className="inv__totals-row"><span>Descuento ({invoice.discount}%)</span><span>-{fmtMoney(discountAmt)}</span></div>}
-          <div className="inv__totals-row"><span>IVA ({invoice.tax}%)</span><span>{fmtMoney(taxAmt)}</span></div>
-          <div className="inv__totals-row inv__totals-row--total"><span>Total</span><span>{fmtMoney(total)}</span></div>
+          <div className="inv__totals-row">
+            <span>Subtotal</span>
+            <span>{fmtMoney(sub)}</span>
+          </div>
+          {invoice.discount > 0 && (
+            <div className="inv__totals-row">
+              <span>Descuento ({invoice.discount}%)</span>
+              <span>-{fmtMoney(discountAmt)}</span>
+            </div>
+          )}
+          <div className="inv__totals-row">
+            <span>IVA ({invoice.tax}%)</span>
+            <span>{fmtMoney(taxAmt)}</span>
+          </div>
+          <div className="inv__totals-row inv__totals-row--total">
+            <span>Total</span>
+            <span>{fmtMoney(total)}</span>
+          </div>
         </div>
 
         <div className="inv__signature">
-          <div>________________<br />Cliente</div>
-          <div>________________<br />Autorizado</div>
+          <div>
+            ________________
+            <br />
+            Cliente
+          </div>
+          <div>
+            ________________
+            <br />
+            Autorizado
+          </div>
         </div>
       </div>
     </div>
@@ -296,16 +443,16 @@ function InvoiceForm({
   );
 
   const updateItem = (id: string, field: keyof LineItem, value: string | number) => {
-    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
   };
 
   const removeItem = (id: string) => {
     if (items.length <= 1) return;
-    setItems(prev => prev.filter(it => it.id !== id));
+    setItems((prev) => prev.filter((it) => it.id !== id));
   };
 
   const addItem = () => {
-    setItems(prev => [...prev, { id: lineUid(), description: '', qty: 1, unit: 'unidad', unitPrice: 0 }]);
+    setItems((prev) => [...prev, { id: lineUid(), description: '', qty: 1, unit: 'unidad', unitPrice: 0 }]);
   };
 
   const sub = calcSubtotal(items);
@@ -323,7 +470,7 @@ function InvoiceForm({
       issuedDate,
       dueDate: dueDate || issuedDate,
       status,
-      items: items.filter(it => it.description.trim()),
+      items: items.filter((it) => it.description.trim()),
       discount,
       tax,
     });
@@ -332,18 +479,26 @@ function InvoiceForm({
   return (
     <div className="card">
       <div className="inv__form-back">
-        <button type="button" className="btn-secondary btn-sm" onClick={onBack}>&larr; Volver</button>
+        <button type="button" className="btn-secondary btn-sm" onClick={onBack}>
+          &larr; Volver
+        </button>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="inv__form-grid">
           <div className="form-group">
             <label htmlFor="inv-customer">Cliente</label>
-            <input id="inv-customer" type="text" value={customer} onChange={e => setCustomer(e.target.value)} required />
+            <input
+              id="inv-customer"
+              type="text"
+              value={customer}
+              onChange={(e) => setCustomer(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label htmlFor="inv-status">Estado</label>
-            <select id="inv-status" value={status} onChange={e => setStatus(e.target.value as InvoiceStatus)}>
+            <select id="inv-status" value={status} onChange={(e) => setStatus(e.target.value as InvoiceStatus)}>
               <option value="pending">Pendiente</option>
               <option value="paid">Pagada</option>
               <option value="overdue">Vencida</option>
@@ -351,19 +506,39 @@ function InvoiceForm({
           </div>
           <div className="form-group">
             <label htmlFor="inv-issued">Fecha emisión</label>
-            <input id="inv-issued" type="date" value={issuedDate} onChange={e => setIssuedDate(e.target.value)} required />
+            <input
+              id="inv-issued"
+              type="date"
+              value={issuedDate}
+              onChange={(e) => setIssuedDate(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label htmlFor="inv-due">Vencimiento</label>
-            <input id="inv-due" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            <input id="inv-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
           <div className="form-group">
             <label htmlFor="inv-discount">Descuento (%)</label>
-            <input id="inv-discount" type="number" min={0} max={100} value={discount} onChange={e => setDiscount(Number(e.target.value))} />
+            <input
+              id="inv-discount"
+              type="number"
+              min={0}
+              max={100}
+              value={discount}
+              onChange={(e) => setDiscount(Number(e.target.value))}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="inv-tax">IVA (%)</label>
-            <input id="inv-tax" type="number" min={0} max={100} value={tax} onChange={e => setTax(Number(e.target.value))} />
+            <input
+              id="inv-tax"
+              type="number"
+              min={0}
+              max={100}
+              value={tax}
+              onChange={(e) => setTax(Number(e.target.value))}
+            />
           </div>
         </div>
 
@@ -372,33 +547,84 @@ function InvoiceForm({
           {items.map((item) => (
             <div key={item.id} className="inv__line-row">
               <div className="form-group">
-                <input aria-label="Descripción del ítem" placeholder="Descripción" value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} />
+                <input
+                  aria-label="Descripción del ítem"
+                  placeholder="Descripción"
+                  value={item.description}
+                  onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                />
               </div>
               <div className="form-group inv__line-qty">
-                <input aria-label="Cantidad" type="number" min={1} placeholder="Cant." value={item.qty} onChange={e => updateItem(item.id, 'qty', Number(e.target.value))} />
+                <input
+                  aria-label="Cantidad"
+                  type="number"
+                  min={1}
+                  placeholder="Cant."
+                  value={item.qty}
+                  onChange={(e) => updateItem(item.id, 'qty', Number(e.target.value))}
+                />
               </div>
               <div className="form-group inv__line-unit">
-                <input aria-label="Unidad" placeholder="Unidad" value={item.unit} onChange={e => updateItem(item.id, 'unit', e.target.value)} />
+                <input
+                  aria-label="Unidad"
+                  placeholder="Unidad"
+                  value={item.unit}
+                  onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
+                />
               </div>
               <div className="form-group inv__line-price">
-                <input aria-label="Precio unitario" type="number" min={0} placeholder="Precio" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', Number(e.target.value))} />
+                <input
+                  aria-label="Precio unitario"
+                  type="number"
+                  min={0}
+                  placeholder="Precio"
+                  value={item.unitPrice}
+                  onChange={(e) => updateItem(item.id, 'unitPrice', Number(e.target.value))}
+                />
               </div>
-              <button type="button" className="inv__remove-line" onClick={() => removeItem(item.id)} aria-label="Quitar ítem"><IconClose /></button>
+              <button
+                type="button"
+                className="inv__remove-line"
+                onClick={() => removeItem(item.id)}
+                aria-label="Quitar ítem"
+              >
+                <IconClose />
+              </button>
             </div>
           ))}
-          <button type="button" className="btn-secondary btn-sm inv__add-line" onClick={addItem}>+ Agregar ítem</button>
+          <button type="button" className="btn-secondary btn-sm inv__add-line" onClick={addItem}>
+            + Agregar ítem
+          </button>
         </div>
 
         <div className="inv__totals inv__totals--form">
-          <div className="inv__totals-row"><span>Subtotal</span><span>{fmtMoney(sub)}</span></div>
-          {discount > 0 && <div className="inv__totals-row"><span>Descuento ({discount}%)</span><span>-{fmtMoney(sub * discount / 100)}</span></div>}
-          <div className="inv__totals-row"><span>IVA ({tax}%)</span><span>{fmtMoney(afterDiscount * tax / 100)}</span></div>
-          <div className="inv__totals-row inv__totals-row--total"><span>Total</span><span>{fmtMoney(total)}</span></div>
+          <div className="inv__totals-row">
+            <span>Subtotal</span>
+            <span>{fmtMoney(sub)}</span>
+          </div>
+          {discount > 0 && (
+            <div className="inv__totals-row">
+              <span>Descuento ({discount}%)</span>
+              <span>-{fmtMoney((sub * discount) / 100)}</span>
+            </div>
+          )}
+          <div className="inv__totals-row">
+            <span>IVA ({tax}%)</span>
+            <span>{fmtMoney((afterDiscount * tax) / 100)}</span>
+          </div>
+          <div className="inv__totals-row inv__totals-row--total">
+            <span>Total</span>
+            <span>{fmtMoney(total)}</span>
+          </div>
         </div>
 
         <div className="inv__form-actions">
-          <button type="button" className="btn-secondary btn-sm" onClick={onBack}>Cancelar</button>
-          <button type="submit" className="btn-primary btn-sm">{isEdit ? 'Guardar' : 'Crear factura'}</button>
+          <button type="button" className="btn-secondary btn-sm" onClick={onBack}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn-primary btn-sm">
+            {isEdit ? 'Guardar' : 'Crear factura'}
+          </button>
         </div>
       </form>
     </div>
@@ -412,21 +638,40 @@ export function InvoicesPage() {
   const [view, setView] = useState<View>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectedInvoice = selectedId ? invoices.find(i => i.id === selectedId) ?? null : null;
+  const selectedInvoice = selectedId ? (invoices.find((i) => i.id === selectedId) ?? null) : null;
 
-  const handleView = useCallback((id: string) => { setSelectedId(id); setView('preview'); }, []);
-  const handleEdit = useCallback((id: string) => { setSelectedId(id); setView('edit'); }, []);
-  const handleAdd = useCallback(() => { setSelectedId(null); setView('add'); }, []);
-  const handleBack = useCallback(() => { setSelectedId(null); setView('list'); }, []);
+  const handleView = useCallback((id: string) => {
+    setSelectedId(id);
+    setView('preview');
+  }, []);
+  const handleEdit = useCallback((id: string) => {
+    setSelectedId(id);
+    setView('edit');
+  }, []);
+  const handleAdd = useCallback(() => {
+    setSelectedId(null);
+    setView('add');
+  }, []);
+  const handleBack = useCallback(() => {
+    setSelectedId(null);
+    setView('list');
+  }, []);
 
-  const handleDelete = useCallback((id: string) => {
-    if (!window.confirm('¿Eliminar esta factura?')) return;
-    setInvoices(prev => prev.filter(i => i.id !== id));
+  const handleDelete = useCallback(async (id: string) => {
+    const confirmed = await confirmAction({
+      title: 'Eliminar factura',
+      description: '¿Eliminar esta factura?',
+      confirmLabel: 'Eliminar',
+      cancelLabel: 'Cancelar',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setInvoices((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
   const handleSave = useCallback((inv: Invoice) => {
-    setInvoices(prev => {
-      const idx = prev.findIndex(i => i.id === inv.id);
+    setInvoices((prev) => {
+      const idx = prev.findIndex((i) => i.id === inv.id);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = inv;
@@ -446,7 +691,13 @@ export function InvoicesPage() {
           title="Facturación"
           lead="Facturas de demostración: listado, vista previa y edición."
         >
-          <InvoiceList invoices={invoices} onView={handleView} onEdit={handleEdit} onAdd={handleAdd} onDelete={handleDelete} />
+          <InvoiceList
+            invoices={invoices}
+            onView={handleView}
+            onEdit={handleEdit}
+            onAdd={handleAdd}
+            onDelete={handleDelete}
+          />
         </PageLayout>
       )}
       {view === 'preview' && selectedInvoice && (

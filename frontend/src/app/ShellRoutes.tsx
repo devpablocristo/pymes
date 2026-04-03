@@ -72,7 +72,7 @@ export function ShellRoutes() {
       <Route path="/professionals/teachers/specialties" element={<SpecialtiesPage />} />
       <Route path="/professionals/teachers/intakes" element={<IntakesPage />} />
       <Route path="/professionals/teachers/sessions" element={<SessionsPage />} />
-      <Route path="/professionals/teachers/public" element={<PublicPreviewPage />} />
+      <Route path="/scheduling/public-preview" element={<PublicPreviewPage />} />
       <Route path="/workshops/auto-repair/vehicles" element={<AutoRepairVehiclesPage />} />
       <Route path="/workshops/auto-repair/services" element={<AutoRepairServicesPage />} />
       <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/workOrders" replace />} />
@@ -89,8 +89,22 @@ export function ShellRoutes() {
       <Route path="/whatsapp/inbox" element={<WhatsAppInboxPage />} />
       <Route path="/approvals" element={<Navigate to="/notifications" replace />} />
       <Route path="/watcher-config" element={<WatcherConfigPage />} />
-      <Route path="/audit" element={<Suspended><AdminPage section="audit" /></Suspended>} />
-      <Route path="/roles" element={<Suspended><AdminPage section="rbac" /></Suspended>} />
+      <Route
+        path="/audit"
+        element={
+          <Suspended>
+            <AdminPage section="audit" />
+          </Suspended>
+        }
+      />
+      <Route
+        path="/roles"
+        element={
+          <Suspended>
+            <AdminPage section="rbac" />
+          </Suspended>
+        }
+      />
       <Route path="/dashboard" element={<DashboardVisualPage />} />
       <Route path="/dashboard/widgets" element={<DashboardPage />} />
       <Route path="/calendar" element={<CalendarPage />} />

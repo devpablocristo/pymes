@@ -1,1 +1,1 @@
-export { PageLayout, type PageLayoutProps } from '@devpablocristo/core-browser/crud';
+export { PageLayout, type PageLayoutProps } from '@devpablocristo/modules-ui-page-shell';

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -173,13 +174,7 @@ type ListParams struct {
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
-	limit := p.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ?", p.OrgID)
 	if p.CustomerID != nil && *p.CustomerID != uuid.Nil {

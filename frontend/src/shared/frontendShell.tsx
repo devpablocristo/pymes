@@ -1,11 +1,11 @@
 import { type PropsWithChildren, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  AppShell as ShellSidebar,
+  PageShellFrame,
   type AppShellNavItem,
   type AppShellNavSection,
-} from '@devpablocristo/modules-shell-sidebar';
-import '@devpablocristo/modules-shell-sidebar/styles.css';
+} from '@devpablocristo/modules-ui-page-shell';
+import '@devpablocristo/modules-ui-page-shell/styles.css';
 import { useI18n } from '../lib/i18n';
 
 export type { AppShellNavItem, AppShellNavSection };
@@ -16,23 +16,29 @@ export function AppShell({
   brandSubtitle,
   sections,
   footerContent,
+  searchPlaceholder,
+  skipLinkLabel,
 }: PropsWithChildren<{
   brandTitle: string;
   brandSubtitle: string;
   sections: AppShellNavSection[];
   footerContent?: ReactNode;
+  searchPlaceholder?: string;
+  skipLinkLabel?: string;
 }>) {
   const location = useLocation();
   const { sentenceCase } = useI18n();
 
   return (
-    <ShellSidebar
+    <PageShellFrame
       brandTitle={brandTitle}
       brandSubtitle={brandSubtitle}
       sections={sections}
       footerContent={footerContent}
       pathname={location.pathname}
       formatLabel={sentenceCase}
+      searchPlaceholder={searchPlaceholder}
+      skipLinkLabel={skipLinkLabel}
       renderLink={(item, className) => (
         <NavLink
           key={item.to}
@@ -49,6 +55,6 @@ export function AppShell({
       )}
     >
       {children}
-    </ShellSidebar>
+    </PageShellFrame>
   );
 }

@@ -10,6 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"github.com/devpablocristo/core/http/go/pagination"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 )
 
 type repositoryPort interface {
@@ -75,7 +78,7 @@ func (h *Handler) GetPublicServices(c *gin.Context) {
 		return
 	}
 
-	limit, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("limit", "20")))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.repo.ListPublicServices(c.Request.Context(), orgID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch services"})

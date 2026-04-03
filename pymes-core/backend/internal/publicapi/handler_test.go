@@ -82,12 +82,11 @@ func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &fakeRepo{
 		businessInfo: BusinessInfo{
-			OrgID:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-			Name:                "Demo Org",
-			Slug:                "demo-org",
-			BusinessName:        "Demo Scheduling",
-			SchedulingEnabled:   true,
-			AppointmentsEnabled: true,
+			OrgID:             uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Name:              "Demo Org",
+			Slug:              "demo-org",
+			BusinessName:      "Demo Scheduling",
+			SchedulingEnabled: true,
 		},
 	}
 	handler := NewHandler(repo)
@@ -109,8 +108,5 @@ func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
 	}
 	if body["scheduling_enabled"] != true {
 		t.Fatalf("expected scheduling_enabled=true, got %#v", body["scheduling_enabled"])
-	}
-	if body["appointments_enabled"] != true {
-		t.Fatalf("expected appointments_enabled=true, got %#v", body["appointments_enabled"])
 	}
 }

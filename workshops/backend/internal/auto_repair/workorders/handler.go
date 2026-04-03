@@ -7,15 +7,16 @@ import (
 	"strings"
 	"time"
 
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/handler/dto"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/handler/dto"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -36,15 +37,18 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
-	authGroup.GET("/work-orders", h.List)
-	authGroup.GET("/work-orders/archived", h.ListArchived)
-	authGroup.POST("/work-orders", h.Create)
-	authGroup.GET("/work-orders/:id", h.Get)
-	authGroup.PUT("/work-orders/:id", h.Update)
-	authGroup.PATCH("/work-orders/:id", h.Update)
-	authGroup.DELETE("/work-orders/:id", h.Delete)
-	authGroup.POST("/work-orders/:id/restore", h.Restore)
-	authGroup.DELETE("/work-orders/:id/hard", h.HardDelete)
+	const workOrdersBasePath = "/work-orders"
+	const workOrdersItemPath = workOrdersBasePath + "/:id"
+
+	authGroup.GET(workOrdersBasePath, h.List)
+	authGroup.GET(workOrdersBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
+	authGroup.POST(workOrdersBasePath, h.Create)
+	authGroup.GET(workOrdersItemPath, h.Get)
+	authGroup.PUT(workOrdersItemPath, h.Update)
+	authGroup.PATCH(workOrdersItemPath, h.Update)
+	authGroup.DELETE(workOrdersItemPath, h.Delete)
+	authGroup.POST(workOrdersItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
+	authGroup.DELETE(workOrdersItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -127,7 +131,7 @@ func (h *Handler) Create(c *gin.Context) {
 		VehiclePlate:  req.VehiclePlate,
 		CustomerID:    vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName:  req.CustomerName,
-		BookingID: vertvalues.ParseOptionalUUID(req.BookingID),
+		BookingID:     vertvalues.ParseOptionalUUID(req.BookingID),
 		Status:        req.Status,
 		RequestedWork: req.RequestedWork,
 		Diagnosis:     req.Diagnosis,
@@ -194,7 +198,7 @@ func (h *Handler) Update(c *gin.Context) {
 		VehiclePlate:  req.VehiclePlate,
 		CustomerID:    req.CustomerID,
 		CustomerName:  req.CustomerName,
-		BookingID: req.BookingID,
+		BookingID:     req.BookingID,
 		Status:        req.Status,
 		RequestedWork: req.RequestedWork,
 		Diagnosis:     req.Diagnosis,

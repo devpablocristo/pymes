@@ -4,8 +4,14 @@
  */
 import { useSearch } from '@devpablocristo/modules-search';
 import type { CSSProperties } from 'react';
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import {
+  SectionHubPage,
+  parseSectionHubSelection,
+  type SectionHubSection,
+} from '@devpablocristo/modules-ui-section-hub';
+import '@devpablocristo/modules-ui-section-hub/styles.css';
 import {
   IconAlert,
   IconBell,
@@ -20,7 +26,6 @@ import {
   IconUsers,
 } from '@devpablocristo/modules-ui-data-display/icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
-import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { themeHubColorSwatches } from '../lib/productPalette';
@@ -55,7 +60,7 @@ type Section =
   | 'language'
   | 'workspace';
 
-type SectionCard = { id: Exclude<Section, null>; label: string; desc: string; icon: ReactNode };
+type SectionCard = SectionHubSection<Exclude<Section, null>>;
 
 const SETTING_SECTIONS: SectionCard[] = [
   { id: 'profile', label: 'Perfil', desc: 'Datos personales y cuenta', icon: <IconUsers /> },
@@ -97,11 +102,8 @@ function AutomationHubTab() {
 }
 
 /** Valores válidos de `?section=` para deep link dentro de Ajustes. */
-const ALL_KNOWN_SECTION_IDS: readonly Exclude<Section, null>[] = SETTING_SECTIONS.map((s) => s.id);
-
 function sectionFromSearchParam(raw: string | null): Section {
-  if (!raw) return null;
-  return (ALL_KNOWN_SECTION_IDS as readonly string[]).includes(raw) ? (raw as Exclude<Section, null>) : null;
+  return parseSectionHubSelection(SETTING_SECTIONS, raw);
 }
 
 // ─── Toggle ───
@@ -586,38 +588,22 @@ export function SettingsHubPage() {
 
   const activeSectionCard = SETTING_SECTIONS.find((item) => item.id === section) ?? null;
 
-  if (section === null) {
-    return (
-      <PageLayout
-        className="stg"
-        title="Ajustes"
-        lead="Elegí un área para configurar tu cuenta y tu espacio de trabajo."
-      >
-        <div className="stg__nav-grid">
-          {filteredSections.map((s) => (
-            <button key={s.id} type="button" className="stg__nav-card" onClick={() => openSection(s.id)}>
-              <div className="stg__nav-icon">{s.icon}</div>
-              <div className="stg__nav-info">
-                <div className="stg__nav-title">{s.label}</div>
-                <div className="stg__nav-desc">{s.desc}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </PageLayout>
-    );
-  }
-
   return (
-    <PageLayout
+    <SectionHubPage
       className="stg"
-      title={activeSectionCard?.label ?? 'Ajustes'}
-      lead={activeSectionCard?.desc}
-      actions={
-        <button type="button" className="stg__back" onClick={goBackToGrid}>
-          ← Volver a Ajustes
-        </button>
+      pageTitle="Ajustes"
+      pageLead="Elegí un área para configurar tu cuenta y tu espacio de trabajo."
+      sections={SETTING_SECTIONS}
+      visibleSections={filteredSections}
+      emptyState={
+        <div className="card">
+          <p className="text-secondary u-m-0">No hay secciones de ajustes que coincidan con la búsqueda actual.</p>
+        </div>
       }
+      activeSectionId={section}
+      onOpenSection={openSection}
+      onBack={goBackToGrid}
+      backLabel={activeSectionCard ? '← Volver a Ajustes' : 'Volver'}
     >
       {section === 'profile' && (
         <Suspense fallback={<div className="spinner" />}>
@@ -675,7 +661,7 @@ export function SettingsHubPage() {
           <AdminPage section="workspace" embedded />
         </Suspense>
       )}
-    </PageLayout>
+    </SectionHubPage>
   );
 }
 

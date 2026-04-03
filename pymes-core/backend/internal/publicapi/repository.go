@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -50,15 +51,14 @@ func NewRepository(db *gorm.DB, scheduling schedulingPort) *Repository {
 }
 
 type BusinessInfo struct {
-	OrgID               uuid.UUID `json:"org_id"`
-	Name                string    `json:"name"`
-	Slug                string    `json:"slug"`
-	BusinessName        string    `json:"business_name"`
-	BusinessAddress     string    `json:"business_address"`
-	BusinessPhone       string    `json:"business_phone"`
-	BusinessEmail       string    `json:"business_email"`
-	SchedulingEnabled   bool      `json:"scheduling_enabled"`
-	AppointmentsEnabled bool      `json:"appointments_enabled"`
+	OrgID             uuid.UUID `json:"org_id"`
+	Name              string    `json:"name"`
+	Slug              string    `json:"slug"`
+	BusinessName      string    `json:"business_name"`
+	BusinessAddress   string    `json:"business_address"`
+	BusinessPhone     string    `json:"business_phone"`
+	BusinessEmail     string    `json:"business_email"`
+	SchedulingEnabled bool      `json:"scheduling_enabled"`
 }
 
 type PublicService = schedulingpublic.Service
@@ -111,14 +111,14 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 
 func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error) {
 	var row struct {
-		OrgID               uuid.UUID
-		Name                string
-		Slug                string
-		BusinessName        string
-		BusinessAddress     string
-		BusinessPhone       string
-		BusinessEmail       string
-		AppointmentsEnabled bool
+		OrgID             uuid.UUID
+		Name              string
+		Slug              string
+		BusinessName      string
+		BusinessAddress   string
+		BusinessPhone     string
+		BusinessEmail     string
+		SchedulingEnabled bool
 	}
 
 	err := r.db.WithContext(ctx).
@@ -131,7 +131,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 			COALESCE(ts.business_address, '') as business_address,
 			COALESCE(ts.business_phone, '') as business_phone,
 			COALESCE(ts.business_email, '') as business_email,
-			COALESCE(ts.appointments_enabled, false) as appointments_enabled
+			COALESCE(ts.scheduling_enabled, ts.appointments_enabled, false) as scheduling_enabled
 		`).
 		Joins("LEFT JOIN tenant_settings ts ON ts.org_id = o.id").
 		Where("o.id = ?", orgID).
@@ -149,25 +149,19 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 	}
 
 	return BusinessInfo{
-		OrgID:               row.OrgID,
-		Name:                row.Name,
-		Slug:                row.Slug,
-		BusinessName:        businessName,
-		BusinessAddress:     row.BusinessAddress,
-		BusinessPhone:       row.BusinessPhone,
-		BusinessEmail:       row.BusinessEmail,
-		SchedulingEnabled:   row.AppointmentsEnabled,
-		AppointmentsEnabled: row.AppointmentsEnabled,
+		OrgID:             row.OrgID,
+		Name:              row.Name,
+		Slug:              row.Slug,
+		BusinessName:      businessName,
+		BusinessAddress:   row.BusinessAddress,
+		BusinessPhone:     row.BusinessPhone,
+		BusinessEmail:     row.BusinessEmail,
+		SchedulingEnabled: row.SchedulingEnabled,
 	}, nil
 }
 
 func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, error) {
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	if items, ok, err := r.listSchedulingPublicServices(ctx, orgID, limit); err != nil {
 		return nil, err
 	} else if ok {
@@ -243,12 +237,7 @@ func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[stri
 }
 
 func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error) {
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	phoneDigits := digitsOnly(phone)
 	if phoneDigits == "" {
 		return nil, ErrInvalidInput
@@ -589,7 +578,6 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 	}, nil
 }
 
-
 func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
 	var rows []AppointmentPublic
 	err := r.db.WithContext(ctx).
@@ -618,7 +606,6 @@ func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uu
 	}
 	return rows, nil
 }
-
 
 func mapSchedulingErr(err error) error {
 	if err == nil {

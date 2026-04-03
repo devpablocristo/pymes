@@ -3,10 +3,10 @@ package products
 import (
 	"context"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -34,14 +34,17 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/products", rbac.RequirePermission("products", "read"), h.List)
-	auth.GET("/products/archived", rbac.RequirePermission("products", "read"), h.ListArchived)
-	auth.POST("/products", rbac.RequirePermission("products", "create"), h.Create)
-	auth.GET("/products/:id", rbac.RequirePermission("products", "read"), h.Get)
-	auth.PUT("/products/:id", rbac.RequirePermission("products", "update"), h.Update)
-	auth.DELETE("/products/:id", rbac.RequirePermission("products", "delete"), h.Delete)
-	auth.POST("/products/:id/restore", rbac.RequirePermission("products", "delete"), h.Restore)
-	auth.DELETE("/products/:id/hard", rbac.RequirePermission("products", "delete"), h.HardDelete)
+	const productsBasePath = "/products"
+	const productsItemPath = productsBasePath + "/:id"
+
+	auth.GET(productsBasePath, rbac.RequirePermission("products", "read"), h.List)
+	auth.GET(productsBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("products", "read"), h.ListArchived)
+	auth.POST(productsBasePath, rbac.RequirePermission("products", "create"), h.Create)
+	auth.GET(productsItemPath, rbac.RequirePermission("products", "read"), h.Get)
+	auth.PUT(productsItemPath, rbac.RequirePermission("products", "update"), h.Update)
+	auth.DELETE(productsItemPath, rbac.RequirePermission("products", "delete"), h.Delete)
+	auth.POST(productsItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("products", "delete"), h.Restore)
+	auth.DELETE(productsItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("products", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -51,15 +54,10 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := handlers.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:  orgID,

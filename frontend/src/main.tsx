@@ -13,6 +13,7 @@ import { applyAdminSkin } from './lib/adminSkin';
 import { applyTheme } from './lib/theme';
 import { initSentry, captureError } from './lib/sentry';
 import { commonMessages } from './lib/i18n/messages/common';
+import '@devpablocristo/modules-ui-modal/styles.css';
 import './styles.css';
 
 initSentry();

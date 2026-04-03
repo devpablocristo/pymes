@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	coredomain "github.com/devpablocristo/core/notifications/go/inbox/usecases/domain"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -28,6 +28,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/users"
 	wapdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
@@ -396,7 +397,7 @@ func (h *Handler) ListProducts(c *gin.Context) {
 		return
 	}
 	query := c.Query("q")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit := handlers.ParseLimitQuery(c, "limit", "50", pagination.Config{DefaultLimit: 50, MaxLimit: 100})
 	items, total, hasMore, next, err := h.products.List(c.Request.Context(), products.ListParams{
 		OrgID:  orgID,
 		Search: query,

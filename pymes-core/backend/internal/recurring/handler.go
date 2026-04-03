@@ -3,10 +3,10 @@ package recurring
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -41,7 +41,7 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	activeOnly := strings.ToLower(c.DefaultQuery("active", "true")) != "false"
 	items, err := h.uc.List(c.Request.Context(), orgID, activeOnly, limit)
 	if err != nil {

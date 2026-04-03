@@ -6,15 +6,16 @@ import (
 	"strconv"
 	"time"
 
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/handler/dto"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/handler/dto"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -35,14 +36,17 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
-	authGroup.GET("/vehicles", h.List)
-	authGroup.GET("/vehicles/archived", h.ListArchived)
-	authGroup.POST("/vehicles", h.Create)
-	authGroup.GET("/vehicles/:id", h.Get)
-	authGroup.PUT("/vehicles/:id", h.Update)
-	authGroup.DELETE("/vehicles/:id", h.Delete)
-	authGroup.POST("/vehicles/:id/restore", h.Restore)
-	authGroup.DELETE("/vehicles/:id/hard", h.HardDelete)
+	const vehiclesBasePath = "/vehicles"
+	const vehiclesItemPath = vehiclesBasePath + "/:id"
+
+	authGroup.GET(vehiclesBasePath, h.List)
+	authGroup.GET(vehiclesBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
+	authGroup.POST(vehiclesBasePath, h.Create)
+	authGroup.GET(vehiclesItemPath, h.Get)
+	authGroup.PUT(vehiclesItemPath, h.Update)
+	authGroup.DELETE(vehiclesItemPath, h.Delete)
+	authGroup.POST(vehiclesItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
+	authGroup.DELETE(vehiclesItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {

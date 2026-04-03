@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -91,13 +92,7 @@ func (r *Repository) GetLevel(ctx context.Context, orgID, productID uuid.UUID) (
 }
 
 func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error) {
-	limit := p.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).
 		Table("stock_levels sl").
 		Joins("JOIN products p ON p.id = sl.product_id").
@@ -162,13 +157,7 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 }
 
 func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([]inventorydomain.StockMovement, int64, bool, *uuid.UUID, error) {
-	limit := p.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).
 		Table("stock_movements sm").
 		Joins("JOIN products p ON p.id = sm.product_id").

@@ -4,8 +4,7 @@
 package httperrors
 
 import (
-	"strings"
-
+	corepostgres "github.com/devpablocristo/core/databases/postgres/go"
 	"github.com/gin-gonic/gin"
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
@@ -26,13 +25,7 @@ type ErrorResponse = ginmw.ErrorResponse
 
 // IsUniqueViolation detecta errores de constraint UNIQUE de PostgreSQL.
 func IsUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "23505") ||
-		strings.Contains(msg, "unique") ||
-		strings.Contains(msg, "duplicate")
+	return corepostgres.IsUniqueViolation(err)
 }
 
 // Write escribe un error HTTP a Gin. Delega a ginmw.WriteError.

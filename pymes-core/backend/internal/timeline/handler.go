@@ -3,9 +3,9 @@ package timeline
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -33,7 +33,7 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.uc.List(c.Request.Context(), orgID, entity, entityID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)

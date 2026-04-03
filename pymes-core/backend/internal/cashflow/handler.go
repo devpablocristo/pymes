@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -43,15 +44,10 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := handlers.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	from, err := parseDatePtr(c.Query("from"))
 	if err != nil {

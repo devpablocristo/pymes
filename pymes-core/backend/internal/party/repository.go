@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
@@ -32,13 +33,7 @@ type ListParams struct {
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]partydomain.Party, int64, bool, *uuid.UUID, error) {
-	limit := p.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).
 		Model(&models.PartyModel{}).

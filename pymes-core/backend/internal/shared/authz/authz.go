@@ -1,6 +1,10 @@
 package authz
 
-import "strings"
+import (
+	"strings"
+
+	coreauthz "github.com/devpablocristo/core/authz/go"
+)
 
 // Roles privilegiados alineados con core/saas/go/tenant.NormalizeRole (owner, admin, secops, viewer).
 // La consola usa solo dos niveles de producto: admin | user (ver ProductRole).
@@ -14,7 +18,7 @@ func IsPrivilegedRole(role string) bool {
 }
 
 func isConsoleScoped(scopes []string) bool {
-	return HasScope(scopes, "admin:console:write") || HasScope(scopes, "admin:console:read")
+	return coreauthz.HasAnyScope(scopes, coreauthz.ScopeAdminConsoleWrite, coreauthz.ScopeAdminConsoleRead)
 }
 
 // ProductRole reduce el rol del IdP/core a dos valores para UI y políticas de producto.
@@ -26,14 +30,7 @@ func ProductRole(role string, scopes []string) string {
 	return "user"
 }
 
-func HasScope(scopes []string, target string) bool {
-	for _, s := range scopes {
-		if s == target {
-			return true
-		}
-	}
-	return false
-}
+func HasScope(scopes []string, target string) bool { return coreauthz.HasScope(scopes, target) }
 
 // IsAdmin: acceso a operaciones reservadas al panel (bootstrap admin, RBAC admin, etc.).
 // Las credenciales técnicas no heredan admin por rol: requieren scopes explícitos de consola.
@@ -41,7 +38,7 @@ func IsAdmin(role string, scopes []string) bool {
 	if IsPrivilegedRole(role) {
 		return true
 	}
-	return HasScope(scopes, "admin:console:write")
+	return HasScope(scopes, coreauthz.ScopeAdminConsoleWrite)
 }
 
 // CanReadConsoleSettings: lectura de ajustes del tenant y endpoints admin de solo lectura.
@@ -57,7 +54,7 @@ func CanWriteConsoleSettings(role string, scopes []string) bool {
 	if IsPrivilegedRole(role) {
 		return true
 	}
-	return HasScope(scopes, "admin:console:write")
+	return HasScope(scopes, coreauthz.ScopeAdminConsoleWrite)
 }
 
 func CanManageAPIKeys(role string, scopes []string, authMethod string) bool {
@@ -67,5 +64,5 @@ func CanManageAPIKeys(role string, scopes []string, authMethod string) bool {
 	if IsPrivilegedRole(role) {
 		return true
 	}
-	return HasScope(scopes, "admin:console:write")
+	return HasScope(scopes, coreauthz.ScopeAdminConsoleWrite)
 }

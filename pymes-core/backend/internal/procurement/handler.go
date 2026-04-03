@@ -3,9 +3,10 @@ package procurement
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -39,15 +40,17 @@ type Handler struct{ uc usecasesPort }
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	g := auth.Group("/procurement-requests")
+	const procurementRequestsBasePath = "/procurement-requests"
+
+	g := auth.Group(procurementRequestsBasePath)
 	{
 		g.GET("", rbac.RequirePermission("procurement_requests", "read"), h.List)
 		g.POST("", rbac.RequirePermission("procurement_requests", "create"), h.Create)
 		g.GET("/:id", rbac.RequirePermission("procurement_requests", "read"), h.Get)
 		g.PATCH("/:id", rbac.RequirePermission("procurement_requests", "update"), h.Update)
 		g.DELETE("/:id", rbac.RequirePermission("procurement_requests", "delete"), h.Delete)
-		g.POST("/:id/archive", rbac.RequirePermission("procurement_requests", "update"), h.Archive)
-		g.POST("/:id/restore", rbac.RequirePermission("procurement_requests", "update"), h.Restore)
+		g.POST("/:id/"+crudpaths.SegmentArchive, rbac.RequirePermission("procurement_requests", "update"), h.Archive)
+		g.POST("/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("procurement_requests", "update"), h.Restore)
 		g.POST("/:id/submit", rbac.RequirePermission("procurement_requests", "submit"), h.Submit)
 		g.POST("/:id/approve", rbac.RequirePermission("procurement_requests", "approve"), h.Approve)
 		g.POST("/:id/reject", rbac.RequirePermission("procurement_requests", "reject"), h.Reject)
@@ -69,7 +72,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	archived := strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.uc.List(c.Request.Context(), orgID, archived, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -277,16 +280,16 @@ func (h *Handler) CreatePolicy(c *gin.Context) {
 		return
 	}
 	created, err := h.uc.CreatePolicy(c.Request.Context(), PolicyCreateInput{
-		OrgID:          orgID,
-		Actor:          auth.Actor,
-		Name:           body.Name,
-		Expression:     body.Expression,
-		Effect:         body.Effect,
-		Priority:       body.Priority,
-		Mode:           body.Mode,
-		Enabled:        body.Enabled,
-		ActionFilter:   body.ActionFilter,
-		SystemFilter:   body.SystemFilter,
+		OrgID:        orgID,
+		Actor:        auth.Actor,
+		Name:         body.Name,
+		Expression:   body.Expression,
+		Effect:       body.Effect,
+		Priority:     body.Priority,
+		Mode:         body.Mode,
+		Enabled:      body.Enabled,
+		ActionFilter: body.ActionFilter,
+		SystemFilter: body.SystemFilter,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -307,17 +310,17 @@ func (h *Handler) UpdatePolicy(c *gin.Context) {
 		return
 	}
 	updated, err := h.uc.UpdatePolicy(c.Request.Context(), PolicyUpdateInput{
-		OrgID:          orgID,
-		ID:             id,
-		Actor:          auth.Actor,
-		Name:           body.Name,
-		Expression:     body.Expression,
-		Effect:         body.Effect,
-		Priority:       body.Priority,
-		Mode:           body.Mode,
-		Enabled:        body.Enabled,
-		ActionFilter:   body.ActionFilter,
-		SystemFilter:   body.SystemFilter,
+		OrgID:        orgID,
+		ID:           id,
+		Actor:        auth.Actor,
+		Name:         body.Name,
+		Expression:   body.Expression,
+		Effect:       body.Effect,
+		Priority:     body.Priority,
+		Mode:         body.Mode,
+		Enabled:      body.Enabled,
+		ActionFilter: body.ActionFilter,
+		SystemFilter: body.SystemFilter,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)

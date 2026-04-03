@@ -18,6 +18,7 @@ require (
 	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
+	github.com/devpablocristo/modules/crud/paths/go v0.0.0
 	github.com/devpablocristo/modules/scheduling/go v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
@@ -117,8 +118,12 @@ require (
 
 replace github.com/devpablocristo/core/authz/go => github.com/devpablocristo/core/authz/go v0.0.0-20260328151810-084828e80b26
 
+replace github.com/devpablocristo/core/databases/postgres/go => ../core/databases/postgres/go
+
 replace github.com/devpablocristo/core/notifications/go => ../core/notifications/go
 
 replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
+
+replace github.com/devpablocristo/modules/crud/paths/go => ../modules/crud/paths/go
 
 replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go

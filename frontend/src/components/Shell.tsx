@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
-import { PageSearchProvider } from './PageSearch';
 import {
   adminIcon,
   beautyIcon,
@@ -191,17 +190,14 @@ export function Shell({ children }: { children: ReactNode }) {
   ]);
 
   return (
-    <>
-      <a href="#main-content" className="skip-link">
-        {t('shell.skipLink')}
-      </a>
-      <AppShell brandTitle="Pymes SaaS" brandSubtitle={sentenceCase(t('shell.brand.subtitle'))} sections={sections}>
-        <PageSearchProvider placeholder={t('shell.search.placeholder')}>
-          <main id="main-content" className="app-shell-main" tabIndex={-1}>
-            {children}
-          </main>
-        </PageSearchProvider>
-      </AppShell>
-    </>
+    <AppShell
+      brandTitle="Pymes SaaS"
+      brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
+      sections={sections}
+      searchPlaceholder={t('shell.search.placeholder')}
+      skipLinkLabel={t('shell.skipLink')}
+    >
+      {children}
+    </AppShell>
   );
 }

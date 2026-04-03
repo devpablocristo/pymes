@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -29,13 +30,7 @@ type ListParams struct {
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error) {
-	limit := p.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).Where("org_id = ?", p.OrgID)
 	if t := strings.TrimSpace(p.Type); t != "" {
 		q = q.Where("type = ?", t)
@@ -125,7 +120,7 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, days int
 	if days <= 0 {
 		days = 30
 	}
-	start := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -(days - 1))
+	start := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -(days - 1))
 	cur := r.GetCurrency(ctx, orgID)
 
 	type dailyRow struct {

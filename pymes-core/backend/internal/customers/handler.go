@@ -3,10 +3,11 @@ package customers
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -35,15 +36,18 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/customers", rbac.RequirePermission("customers", "read"), h.List)
-	auth.GET("/customers/archived", rbac.RequirePermission("customers", "read"), h.ListArchived)
-	auth.POST("/customers", rbac.RequirePermission("customers", "create"), h.Create)
-	auth.GET("/customers/:id", rbac.RequirePermission("customers", "read"), h.Get)
-	auth.PUT("/customers/:id", rbac.RequirePermission("customers", "update"), h.Update)
-	auth.DELETE("/customers/:id", rbac.RequirePermission("customers", "delete"), h.Delete)
-	auth.POST("/customers/:id/restore", rbac.RequirePermission("customers", "delete"), h.Restore)
-	auth.DELETE("/customers/:id/hard", rbac.RequirePermission("customers", "delete"), h.HardDelete)
-	auth.GET("/customers/:id/sales", rbac.RequirePermission("customers", "read"), h.SalesHistory)
+	const customersBasePath = "/customers"
+	const customersItemPath = customersBasePath + "/:id"
+
+	auth.GET(customersBasePath, rbac.RequirePermission("customers", "read"), h.List)
+	auth.GET(customersBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("customers", "read"), h.ListArchived)
+	auth.POST(customersBasePath, rbac.RequirePermission("customers", "create"), h.Create)
+	auth.GET(customersItemPath, rbac.RequirePermission("customers", "read"), h.Get)
+	auth.PUT(customersItemPath, rbac.RequirePermission("customers", "update"), h.Update)
+	auth.DELETE(customersItemPath, rbac.RequirePermission("customers", "delete"), h.Delete)
+	auth.POST(customersItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("customers", "delete"), h.Restore)
+	auth.DELETE(customersItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("customers", "delete"), h.HardDelete)
+	auth.GET(customersItemPath+"/sales", rbac.RequirePermission("customers", "read"), h.SalesHistory)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -53,15 +57,10 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := handlers.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:  orgID,

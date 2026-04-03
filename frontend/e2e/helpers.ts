@@ -88,7 +88,7 @@ export async function mockApiWithOnboardingDone(page: Page) {
           team_size: 'solo',
           sells: 'products',
           client_label: 'clientes',
-          appointments_enabled: false,
+          scheduling_enabled: false,
           uses_billing: false,
           currency: 'ARS',
           payment_method: 'cash',

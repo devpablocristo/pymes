@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -56,12 +57,7 @@ func (r *Repository) ApplyRecurringExpense(ctx context.Context, item RecurringDu
 }
 
 func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Time, limit int) ([]SchedulingReminderDue, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 100, MaxLimit: 1000})
 	var rows []SchedulingReminderDue
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT

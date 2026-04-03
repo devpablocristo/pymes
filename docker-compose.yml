@@ -159,14 +159,14 @@ services:
   ai:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./ai/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/ai/Dockerfile.dev
     ports:
       - "8200:8000"
     volumes:
-      - ./ai/src:/workspace/ai/src
-      - ./ai/tests:/workspace/ai/tests
-      - ./ai/pyproject.toml:/workspace/ai/pyproject.toml
+      - ./ai/src:/workspace/pymes/ai/src
+      - ./ai/tests:/workspace/pymes/ai/tests
+      - ./ai/pyproject.toml:/workspace/pymes/ai/pyproject.toml
       - ../core/ai/python/src:/workspace/core/ai/python/src
 
     env_file:
@@ -181,7 +181,7 @@ services:
       RESTAURANTS_BACKEND_URL: http://restaurants-backend:8084
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       REVIEW_URL: http://review:8080
-      PYTHONPATH: /workspace/ai:/workspace/core/ai/python/src
+      PYTHONPATH: /workspace/pymes/ai:/workspace/core/ai/python/src
       # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     depends_on:
@@ -206,7 +206,8 @@ services:
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core/notifications/go:/workspace/core/notifications/go
+      - ../core:/workspace/core
+      - ../modules:/workspace/modules
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -236,7 +237,8 @@ services:
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core/notifications/go:/workspace/core/notifications/go
+      - ../core:/workspace/core
+      - ../modules:/workspace/modules
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
@@ -270,7 +272,8 @@ services:
     volumes:
       - ./beauty/backend:/workspace/pymes/beauty/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core/notifications/go:/workspace/core/notifications/go
+      - ../core:/workspace/core
+      - ../modules:/workspace/modules
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
@@ -300,7 +303,8 @@ services:
     volumes:
       - ./restaurants/backend:/workspace/pymes/restaurants/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core/notifications/go:/workspace/core/notifications/go
+      - ../core:/workspace/core
+      - ../modules:/workspace/modules
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:

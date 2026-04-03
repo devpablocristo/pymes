@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -41,17 +42,20 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/quotes", rbac.RequirePermission("quotes", "read"), h.List)
-	auth.POST("/quotes", rbac.RequirePermission("quotes", "create"), h.Create)
-	auth.GET("/quotes/:id", rbac.RequirePermission("quotes", "read"), h.Get)
-	auth.PUT("/quotes/:id", rbac.RequirePermission("quotes", "update"), h.Update)
-	auth.DELETE("/quotes/:id", rbac.RequirePermission("quotes", "delete"), h.Delete)
-	auth.POST("/quotes/:id/restore", rbac.RequirePermission("quotes", "delete"), h.Restore)
-	auth.DELETE("/quotes/:id/hard", rbac.RequirePermission("quotes", "delete"), h.HardDelete)
-	auth.POST("/quotes/:id/send", rbac.RequirePermission("quotes", "update"), h.Send)
-	auth.POST("/quotes/:id/accept", rbac.RequirePermission("quotes", "update"), h.Accept)
-	auth.POST("/quotes/:id/reject", rbac.RequirePermission("quotes", "update"), h.Reject)
-	auth.POST("/quotes/:id/to-sale", rbac.RequirePermission("quotes", "update"), h.ToSale)
+	const quotesBasePath = "/quotes"
+	const quotesItemPath = quotesBasePath + "/:id"
+
+	auth.GET(quotesBasePath, rbac.RequirePermission("quotes", "read"), h.List)
+	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
+	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
+	auth.PUT(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
+	auth.DELETE(quotesItemPath, rbac.RequirePermission("quotes", "delete"), h.Delete)
+	auth.POST(quotesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("quotes", "delete"), h.Restore)
+	auth.DELETE(quotesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("quotes", "delete"), h.HardDelete)
+	auth.POST(quotesItemPath+"/send", rbac.RequirePermission("quotes", "update"), h.Send)
+	auth.POST(quotesItemPath+"/accept", rbac.RequirePermission("quotes", "update"), h.Accept)
+	auth.POST(quotesItemPath+"/reject", rbac.RequirePermission("quotes", "update"), h.Reject)
+	auth.POST(quotesItemPath+"/to-sale", rbac.RequirePermission("quotes", "update"), h.ToSale)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -62,15 +66,10 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := handlers.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	var customerID *uuid.UUID
 	if v := strings.TrimSpace(c.Query("customer_id")); v != "" {

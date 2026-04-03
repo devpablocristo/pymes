@@ -26,6 +26,11 @@ const modulesSchedulingIndex = fileURLToPath(new URL('../../modules/scheduling/t
 const modulesSchedulingStyles = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.css', import.meta.url));
 const modulesShellSidebarIndex = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
 const modulesShellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
+const modulesUiModalStyles = fileURLToPath(new URL('../../modules/ui/modal/ts/src/styles.css', import.meta.url));
+const modulesUiPageShellIndex = fileURLToPath(new URL('../../modules/ui/page-shell/ts/src/index.ts', import.meta.url));
+const modulesUiPageShellStyles = fileURLToPath(new URL('../../modules/ui/page-shell/ts/src/styles.css', import.meta.url));
+const modulesUiSectionHubIndex = fileURLToPath(new URL('../../modules/ui/section-hub/ts/src/index.tsx', import.meta.url));
+const modulesUiSectionHubStyles = fileURLToPath(new URL('../../modules/ui/section-hub/ts/src/styles.css', import.meta.url));
 
 export default defineConfig({
   envDir: '..',
@@ -56,6 +61,11 @@ export default defineConfig({
       { find: /^@devpablocristo\/modules-scheduling$/, replacement: modulesSchedulingIndex },
       { find: '@devpablocristo/modules-shell-sidebar/styles.css', replacement: modulesShellSidebarStyles },
       { find: '@devpablocristo/modules-shell-sidebar', replacement: modulesShellSidebarIndex },
+      { find: '@devpablocristo/modules-ui-modal/styles.css', replacement: modulesUiModalStyles },
+      { find: '@devpablocristo/modules-ui-page-shell/styles.css', replacement: modulesUiPageShellStyles },
+      { find: '@devpablocristo/modules-ui-page-shell', replacement: modulesUiPageShellIndex },
+      { find: '@devpablocristo/modules-ui-section-hub/styles.css', replacement: modulesUiSectionHubStyles },
+      { find: '@devpablocristo/modules-ui-section-hub', replacement: modulesUiSectionHubIndex },
     ],
   },
   build: {

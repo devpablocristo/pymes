@@ -3,17 +3,18 @@ package suppliers
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/handler/dto"
 	supplierdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type usecasesPort interface {
@@ -34,14 +35,17 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/suppliers", rbac.RequirePermission("suppliers", "read"), h.List)
-	auth.GET("/suppliers/archived", rbac.RequirePermission("suppliers", "read"), h.ListArchived)
-	auth.POST("/suppliers", rbac.RequirePermission("suppliers", "create"), h.Create)
-	auth.GET("/suppliers/:id", rbac.RequirePermission("suppliers", "read"), h.Get)
-	auth.PUT("/suppliers/:id", rbac.RequirePermission("suppliers", "update"), h.Update)
-	auth.DELETE("/suppliers/:id", rbac.RequirePermission("suppliers", "delete"), h.Delete)
-	auth.POST("/suppliers/:id/restore", rbac.RequirePermission("suppliers", "delete"), h.Restore)
-	auth.DELETE("/suppliers/:id/hard", rbac.RequirePermission("suppliers", "delete"), h.HardDelete)
+	const suppliersBasePath = "/suppliers"
+	const suppliersItemPath = suppliersBasePath + "/:id"
+
+	auth.GET(suppliersBasePath, rbac.RequirePermission("suppliers", "read"), h.List)
+	auth.GET(suppliersBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("suppliers", "read"), h.ListArchived)
+	auth.POST(suppliersBasePath, rbac.RequirePermission("suppliers", "create"), h.Create)
+	auth.GET(suppliersItemPath, rbac.RequirePermission("suppliers", "read"), h.Get)
+	auth.PUT(suppliersItemPath, rbac.RequirePermission("suppliers", "update"), h.Update)
+	auth.DELETE(suppliersItemPath, rbac.RequirePermission("suppliers", "delete"), h.Delete)
+	auth.POST(suppliersItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("suppliers", "delete"), h.Restore)
+	auth.DELETE(suppliersItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("suppliers", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -51,15 +55,10 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := handlers.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:  orgID,

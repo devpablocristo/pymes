@@ -3,9 +3,9 @@ package returns
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -80,7 +80,7 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.uc.List(c.Request.Context(), orgID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -121,7 +121,7 @@ func (h *Handler) ListCreditNotes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.uc.ListCreditNotes(c.Request.Context(), orgID, nil, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -148,7 +148,7 @@ func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	items, err := h.uc.ListCreditNotes(c.Request.Context(), orgID, &partyID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)

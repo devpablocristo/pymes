@@ -1,7 +1,7 @@
 import { createVerticalRequest } from './verticalApi';
 import type {
   Bicycle,
-  BikeShopAppointment,
+  BikeShopBooking,
   BikeShopPaymentLink,
   BikeShopService,
   BikeWorkOrder,
@@ -166,7 +166,7 @@ export async function createBikeWorkOrder(data: {
   bicycle_label?: string;
   customer_id?: string;
   customer_name?: string;
-  appointment_id?: string;
+  booking_id?: string;
   status?: string;
   requested_work?: string;
   diagnosis?: string;
@@ -187,7 +187,7 @@ export async function updateBikeWorkOrder(
     bicycle_label: string;
     customer_id: string;
     customer_name: string;
-    appointment_id: string;
+    booking_id: string;
     status: string;
     requested_work: string;
     diagnosis: string;
@@ -229,7 +229,7 @@ export async function getBikeWorkOrdersArchived(): Promise<BikeWorkOrder[]> {
 
 // ── Orchestration ──
 
-export async function createBikeAppointment(data: {
+export async function createBikeBooking(data: {
   customer_id?: string;
   customer_name: string;
   title: string;
@@ -238,8 +238,8 @@ export async function createBikeAppointment(data: {
   end_at?: string;
   duration?: number;
   notes?: string;
-}): Promise<BikeShopAppointment> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-appointments`, { method: 'POST', body: data });
+}): Promise<BikeShopBooking> {
+  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-bookings`, { method: 'POST', body: data });
 }
 
 export async function createBikeQuote(workOrderId: string): Promise<{ id: string }> {

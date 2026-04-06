@@ -21,8 +21,8 @@ from src.localization import LanguageCode
 from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
 
 
-RoutedAgent = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
-ChatRouteHint = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
+RoutedAgent = Literal["general", "copilot", "customers", "products", "sales", "collections", "purchases"]
+ChatRouteHint = Literal["general", "copilot", "customers", "products", "sales", "collections", "purchases"]
 RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback", "ui_hint"]
 
 
@@ -37,7 +37,7 @@ class ChatRequest(BaseChatRequest):
     route_hint: ChatRouteHint | None = Field(
         default=None,
         description=(
-            "Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. "
+            "Hint opcional para forzar el carril del turno actual: general | customers | products | sales | collections | purchases. "
             "`copilot` queda reservado para handoff explícito desde notificaciones."
         ),
     )
@@ -60,7 +60,7 @@ class ChatResponse(BaseChatResponse):
     routed_agent: RoutedAgent = Field(
         ...,
         description=(
-            "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. "
+            "Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | sales | collections | purchases. "
             "`copilot` se usa solo en handoff explícito desde notificaciones."
         ),
     )

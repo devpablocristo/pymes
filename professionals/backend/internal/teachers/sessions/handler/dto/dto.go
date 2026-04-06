@@ -3,7 +3,7 @@ package dto
 type SessionItem struct {
 	ID              string         `json:"id"`
 	OrgID           string         `json:"org_id"`
-	AppointmentID   string         `json:"appointment_id"`
+	BookingID       string         `json:"booking_id"`
 	ProfileID       string         `json:"profile_id"`
 	CustomerPartyID *string        `json:"customer_party_id,omitempty"`
 	ServiceID       *string        `json:"service_id,omitempty"`
@@ -24,7 +24,7 @@ type ListSessionsResponse struct {
 }
 
 type CreateSessionRequest struct {
-	AppointmentID   string         `json:"appointment_id" binding:"required"`
+	BookingID       string         `json:"booking_id" binding:"required"`
 	ProfileID       string         `json:"profile_id" binding:"required"`
 	CustomerPartyID *string        `json:"customer_party_id"`
 	ServiceID       *string        `json:"service_id"`

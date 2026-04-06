@@ -110,18 +110,18 @@ type Msg = {
   badgeTones?: MsgBadgeTone[];
 };
 
-type MsgBadgeTone = 'ventas' | 'cobros' | 'compras' | 'clientes' | 'productos' | 'general' | 'neutral';
+type MsgBadgeTone = 'sales' | 'collections' | 'purchases' | 'customers' | 'products' | 'general' | 'neutral';
 type AssistantReplyRow = Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels' | 'badgeTones'>;
 
 let nextMsgId = 100;
 
 function normalizeManualRouteHint(value: string | null | undefined): ManualRouteHint | undefined {
   if (
-    value === 'clientes' ||
-    value === 'productos' ||
-    value === 'ventas' ||
-    value === 'cobros' ||
-    value === 'compras'
+    value === 'customers' ||
+    value === 'products' ||
+    value === 'sales' ||
+    value === 'collections' ||
+    value === 'purchases'
   ) {
     return value;
   }
@@ -152,11 +152,11 @@ function kpiTrendClassName(trend?: 'up' | 'down' | 'flat' | 'unknown' | null): s
 }
 
 function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
-  if (mode === 'ventas' || mode === 'internal_sales') return 'ventas';
-  if (mode === 'cobros') return 'cobros';
-  if (mode === 'compras' || mode === 'internal_procurement') return 'compras';
-  if (mode === 'clientes') return 'clientes';
-  if (mode === 'productos') return 'productos';
+  if (mode === 'sales' || mode === 'internal_sales') return 'sales';
+  if (mode === 'collections') return 'collections';
+  if (mode === 'purchases' || mode === 'internal_procurement') return 'purchases';
+  if (mode === 'customers') return 'customers';
+  if (mode === 'products') return 'products';
   if (mode === 'general' || mode === 'copilot') return 'general';
   return 'neutral';
 }
@@ -190,11 +190,11 @@ function resolvePreferredLanguage(contentLanguage: string | undefined, fallbackL
 }
 
 function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
-  if (mode === 'clientes') return humanRoutedLabel('clientes', language);
-  if (mode === 'productos') return humanRoutedLabel('productos', language);
-  if (mode === 'ventas') return humanRoutedLabel('ventas', language);
-  if (mode === 'cobros') return humanRoutedLabel('cobros', language);
-  if (mode === 'compras') return humanRoutedLabel('compras', language);
+  if (mode === 'customers') return humanRoutedLabel('customers', language);
+  if (mode === 'products') return humanRoutedLabel('products', language);
+  if (mode === 'sales') return humanRoutedLabel('sales', language);
+  if (mode === 'collections') return humanRoutedLabel('collections', language);
+  if (mode === 'purchases') return humanRoutedLabel('purchases', language);
   return humanRoutedLabel('general', language);
 }
 

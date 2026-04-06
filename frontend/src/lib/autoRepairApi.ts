@@ -1,6 +1,6 @@
 import { createVerticalRequest } from './verticalApi';
 import type {
-  AutoRepairAppointment,
+  AutoRepairBooking,
   AutoRepairPaymentLink,
   AutoRepairService,
   AutoRepairVehicle,
@@ -215,7 +215,7 @@ export async function createAutoRepairWorkOrder(data: {
   vehicle_plate?: string;
   customer_id?: string;
   customer_name?: string;
-  appointment_id?: string;
+  booking_id?: string;
   status?: string;
   requested_work?: string;
   diagnosis?: string;
@@ -236,7 +236,7 @@ export async function updateAutoRepairWorkOrder(
     vehicle_plate: string;
     customer_id: string;
     customer_name: string;
-    appointment_id: string;
+    booking_id: string;
     status: string;
     requested_work: string;
     diagnosis: string;
@@ -278,7 +278,7 @@ export async function hardDeleteAutoRepairWorkOrder(id: string): Promise<void> {
   await workshopWorkOrdersArchivedCrud.hardDelete({ id });
 }
 
-export async function createAutoRepairAppointment(data: {
+export async function createAutoRepairBooking(data: {
   customer_id?: string;
   customer_name: string;
   title: string;
@@ -291,8 +291,8 @@ export async function createAutoRepairAppointment(data: {
   assigned_to?: string;
   notes?: string;
   metadata?: Record<string, unknown>;
-}): Promise<AutoRepairAppointment> {
-  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-appointments`, { method: 'POST', body: data });
+}): Promise<AutoRepairBooking> {
+  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-bookings`, { method: 'POST', body: data });
 }
 
 export async function createAutoRepairQuote(id: string): Promise<{ id: string }> {
@@ -325,7 +325,7 @@ export const getAllWorkOrders = getAllAutoRepairWorkOrders;
 export const createWorkOrder = createAutoRepairWorkOrder;
 export const updateWorkOrder = updateAutoRepairWorkOrder;
 export const patchWorkOrder = patchAutoRepairWorkOrder;
-export const createWorkshopAppointment = createAutoRepairAppointment;
+export const createWorkshopBooking = createAutoRepairBooking;
 export const createWorkOrderQuote = createAutoRepairQuote;
 export const createWorkOrderSale = createAutoRepairSale;
 export const createWorkOrderPaymentLink = createAutoRepairPaymentLink;

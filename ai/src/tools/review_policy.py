@@ -29,7 +29,7 @@ manage_review_policy = ToolDeclaration(
             },
             "action_type": {
                 "type": "string",
-                "description": "Tipo de accion (appointment.book, discount.apply, etc.)",
+                "description": "Tipo de accion (scheduling.book, discount.apply, etc.)",
             },
             "effect": {
                 "type": "string",
@@ -51,9 +51,9 @@ manage_review_policy = ToolDeclaration(
 
 # Nombres amigables para action types
 ACTION_TYPE_DISPLAY: dict[str, str] = {
-    "appointment.book": "Agendar turno",
-    "appointment.reschedule": "Reagendar turno",
-    "appointment.cancel": "Cancelar turno",
+    "scheduling.book": "Agendar turno",
+    "scheduling.reschedule": "Reagendar turno",
+    "scheduling.cancel": "Cancelar turno",
     "discount.apply": "Aplicar descuento",
     "payment_link.generate": "Generar link de pago",
     "sale.create": "Crear venta",

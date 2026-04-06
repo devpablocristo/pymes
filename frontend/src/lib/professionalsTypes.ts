@@ -45,7 +45,7 @@ export type ServiceLink = {
 export type Intake = {
   id: string;
   org_id?: string;
-  appointment_id?: string;
+  booking_id?: string;
   profile_id: string;
   customer_party_id?: string;
   service_id?: string;
@@ -59,7 +59,7 @@ export type Intake = {
 export type Session = {
   id: string;
   org_id?: string;
-  appointment_id: string;
+  booking_id: string;
   profile_id: string;
   customer_party_id?: string;
   service_id?: string;

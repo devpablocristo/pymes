@@ -289,9 +289,9 @@ type remoteRate struct {
 }
 
 type dolarAPIResponse struct {
-	Nombre string  `json:"nombre"`
-	Compra float64 `json:"compra"`
-	Venta  float64 `json:"venta"`
+	Name     string  `json:"nombre"`
+	BuyRate  float64 `json:"compra"`
+	SellRate float64 `json:"venta"`
 }
 
 func (u *Usecases) fetchRates(ctx context.Context) ([]remoteRate, error) {
@@ -318,13 +318,13 @@ func (u *Usecases) fetchRates(ctx context.Context) ([]remoteRate, error) {
 	}
 	mapped := make([]remoteRate, 0, len(payload))
 	for _, item := range payload {
-		switch name := strings.ToLower(strings.TrimSpace(item.Nombre)); {
+		switch name := strings.ToLower(strings.TrimSpace(item.Name)); {
 		case strings.Contains(name, "oficial"):
-			mapped = append(mapped, remoteRate{RateType: "official", BuyRate: item.Compra, SellRate: item.Venta})
+			mapped = append(mapped, remoteRate{RateType: "official", BuyRate: item.BuyRate, SellRate: item.SellRate})
 		case strings.Contains(name, "blue"):
-			mapped = append(mapped, remoteRate{RateType: "blue", BuyRate: item.Compra, SellRate: item.Venta})
+			mapped = append(mapped, remoteRate{RateType: "blue", BuyRate: item.BuyRate, SellRate: item.SellRate})
 		case strings.Contains(name, "bolsa") || strings.Contains(name, "mep"):
-			mapped = append(mapped, remoteRate{RateType: "mep", BuyRate: item.Compra, SellRate: item.Venta})
+			mapped = append(mapped, remoteRate{RateType: "mep", BuyRate: item.BuyRate, SellRate: item.SellRate})
 		}
 	}
 	return mapped, nil

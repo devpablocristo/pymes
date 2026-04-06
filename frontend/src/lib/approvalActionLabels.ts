@@ -1,8 +1,8 @@
 /** Etiquetas para tipos de acción del flujo de review / aprobaciones. */
 export const APPROVAL_ACTION_LABELS: Record<string, string> = {
-  'appointment.book': 'Agendar turno',
-  'appointment.reschedule': 'Reagendar turno',
-  'appointment.cancel': 'Cancelar turno',
+  'scheduling.book': 'Agendar turno',
+  'scheduling.reschedule': 'Reagendar turno',
+  'scheduling.cancel': 'Cancelar turno',
   'discount.apply': 'Aplicar descuento',
   'payment_link.generate': 'Link de pago',
   'refund.create': 'Reembolso',

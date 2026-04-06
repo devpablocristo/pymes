@@ -26,8 +26,8 @@ function buildChatReply(overrides?: Partial<PymesAssistantChatResponse>): PymesA
     chat_id: 'conv-3',
     reply: 'Respuesta del asistente',
     request_id: 'req-1',
-    routed_agent: 'ventas',
-    routed_mode: 'ventas',
+    routed_agent: 'sales',
+    routed_mode: 'sales',
     routing_source: 'llm',
     output_kind: 'chat',
     tokens_used: 10,
@@ -170,7 +170,7 @@ describe('UnifiedChatPage', () => {
         chatContext: {
           suggested_user_message: 'Explicame este cobro pendiente',
         },
-        routedAgent: 'ventas',
+        routedAgent: 'sales',
         contentLanguage: 'es',
       }),
     );

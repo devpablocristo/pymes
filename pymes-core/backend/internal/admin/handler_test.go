@@ -112,8 +112,8 @@ func baseTenantSettings() admindomain.TenantSettings {
 		PaymentMethod:            "mixed",
 		Vertical:                 "workshops",
 		SchedulingEnabled:        false,
-		AppointmentLabel:         "Turno",
-		AppointmentReminderHours: 24,
+		SchedulingLabel:         "Turno",
+		SchedulingReminderHours: 24,
 		DefaultRateType:          "blue",
 		UpdatedAt:                time.Date(2026, 4, 3, 12, 0, 0, 0, time.UTC),
 	}

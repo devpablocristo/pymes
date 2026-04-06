@@ -24,7 +24,7 @@ type bikeShopServicePort interface {
 }
 
 type bookingPort interface {
-	BookAppointment(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
 }
 
 type orgResolver interface {
@@ -49,13 +49,13 @@ func NewHandler(services servicePort, bikeShopServices bikeShopServicePort, book
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/public/:org_slug/auto-repair/services", h.ListServices)
-	group.POST("/public/:org_slug/auto-repair/appointments", h.BookAppointment)
+	group.POST("/public/:org_slug/auto-repair/bookings", h.BookScheduling)
 
 	group.GET("/public/:org_slug/bike-shop/services", h.ListBikeShopServices)
-	group.POST("/public/:org_slug/bike-shop/appointments", h.BookAppointment)
+	group.POST("/public/:org_slug/bike-shop/bookings", h.BookScheduling)
 
 	group.GET("/public/:org_slug/workshops/services", h.ListServices)
-	group.POST("/public/:org_slug/workshops/appointments", h.BookAppointment)
+	group.POST("/public/:org_slug/workshops/bookings", h.BookScheduling)
 }
 
 func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
@@ -147,7 +147,7 @@ func (h *Handler) ListBikeShopServices(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": publicItems})
 }
 
-func (h *Handler) BookAppointment(c *gin.Context) {
+func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
 		return
@@ -165,7 +165,7 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookAppointment(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

@@ -31,7 +31,7 @@ function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWor
     vehicle_plate: 'AAA111',
     customer_id: 'cust-1',
     customer_name: 'Cliente original',
-    appointment_id: undefined,
+    booking_id: undefined,
     quote_id: undefined,
     sale_id: undefined,
     status: 'received',

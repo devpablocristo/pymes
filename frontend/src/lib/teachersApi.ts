@@ -28,7 +28,7 @@ function translateError(message: string): string {
 function mapIntake(item: {
   id: string;
   org_id?: string;
-  appointment_id?: string;
+  booking_id?: string;
   profile_id: string;
   customer_party_id?: string;
   service_id?: string;
@@ -40,7 +40,7 @@ function mapIntake(item: {
   return {
     id: item.id,
     org_id: item.org_id,
-    appointment_id: item.appointment_id,
+    booking_id: item.booking_id,
     profile_id: item.profile_id,
     customer_party_id: item.customer_party_id,
     service_id: item.service_id,
@@ -133,7 +133,7 @@ export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
     items?: Array<{
       id: string;
       org_id?: string;
-      appointment_id?: string;
+      booking_id?: string;
       profile_id: string;
       customer_party_id?: string;
       service_id?: string;
@@ -150,7 +150,7 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
-    appointment_id?: string;
+    booking_id?: string;
     profile_id: string;
     customer_party_id?: string;
     service_id?: string;
@@ -166,7 +166,7 @@ export async function createTeacherIntake(data: { profile_id: string; notes: str
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
-    appointment_id?: string;
+    booking_id?: string;
     profile_id: string;
     customer_party_id?: string;
     service_id?: string;
@@ -185,7 +185,7 @@ export async function updateTeacherIntake(id: string, data: Partial<{ notes: str
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
-    appointment_id?: string;
+    booking_id?: string;
     profile_id: string;
     customer_party_id?: string;
     service_id?: string;
@@ -226,7 +226,7 @@ export async function getTeacherSessions(filters?: {
 }
 
 export async function createTeacherSession(data: {
-  appointment_id: string;
+  booking_id: string;
   profile_id: string;
   customer_party_id?: string;
   service_id?: string;

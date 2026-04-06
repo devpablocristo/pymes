@@ -86,7 +86,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Session) (domain.Sess
 	row := models.SessionModel{
 		ID:              uuid.New(),
 		OrgID:           in.OrgID,
-		AppointmentID:   in.AppointmentID,
+		BookingID:       in.BookingID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
 		ServiceID:       in.ServiceID,
@@ -138,10 +138,10 @@ func (r *Repository) Update(ctx context.Context, in domain.Session) (domain.Sess
 	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) AppointmentSessionExists(ctx context.Context, orgID, appointmentID uuid.UUID) (bool, error) {
+func (r *Repository) BookingSessionExists(ctx context.Context, orgID, bookingID uuid.UUID) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&models.SessionModel{}).
-		Where("org_id = ? AND appointment_id = ?", orgID, appointmentID).
+		Where("org_id = ? AND booking_id = ?", orgID, bookingID).
 		Count(&count).Error
 	return count > 0, err
 }
@@ -183,7 +183,7 @@ func toSessionDomain(row models.SessionModel) domain.Session {
 	return domain.Session{
 		ID:              row.ID,
 		OrgID:           row.OrgID,
-		AppointmentID:   row.AppointmentID,
+		BookingID:       row.BookingID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,
 		ServiceID:       coalesceServiceReference(row.ServiceID),

@@ -13,7 +13,7 @@ from src.tools import inventory, procurement_requests, purchases, suppliers
 from src.agents.sub_agents.common import build_default_limits
 
 DESCRIPTOR = SubAgentDescriptor(
-    name="compras",
+    name="purchases",
     description="Buscar proveedores, crear solicitudes de compra, consultar compras y preparar borradores de orden",
 )
 

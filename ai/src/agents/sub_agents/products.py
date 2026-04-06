@@ -13,7 +13,7 @@ from src.tools import inventory, products
 from src.agents.sub_agents.common import build_default_limits
 
 DESCRIPTOR = SubAgentDescriptor(
-    name="productos",
+    name="products",
     description="Buscar productos, consultar stock actual y detectar stock bajo",
 )
 

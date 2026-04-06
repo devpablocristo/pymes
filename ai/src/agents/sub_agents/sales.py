@@ -13,7 +13,7 @@ from src.tools import quotes, sales
 from src.agents.sub_agents.common import build_default_limits
 
 DESCRIPTOR = SubAgentDescriptor(
-    name="ventas",
+    name="sales",
     description="Crear presupuestos, registrar ventas, consultar ventas recientes y presupuestos",
 )
 

@@ -4,13 +4,13 @@ from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 
 
-async def get_appointments(client: BackendClient, auth: AuthContext, from_date: str | None = None, to_date: str | None = None) -> dict:
+async def get_bookings(client: BackendClient, auth: AuthContext, from_date: str | None = None, to_date: str | None = None) -> dict:
     params = {}
     if from_date:
         params["from"] = from_date
     if to_date:
         params["to"] = to_date
-    return await client.request("GET", "/v1/appointments", auth=auth, params=params)
+    return await client.request("GET", "/v1/scheduling/bookings", auth=auth, params=params)
 
 
 async def check_availability(client: BackendClient, org_id: str, date: str, duration: int = 60) -> dict:
@@ -22,7 +22,7 @@ async def check_availability(client: BackendClient, org_id: str, date: str, dura
     )
 
 
-async def book_appointment(
+async def book_scheduling(
     client: BackendClient,
     org_id: str,
     customer_name: str,
@@ -41,10 +41,10 @@ async def book_appointment(
     return await client.request("POST", f"/v1/public/{org_id}/book", include_internal=True, json=payload)
 
 
-async def get_my_appointments(client: BackendClient, org_id: str, phone: str) -> dict:
+async def get_my_bookings(client: BackendClient, org_id: str, phone: str) -> dict:
     return await client.request(
         "GET",
-        f"/v1/public/{org_id}/my-appointments",
+        f"/v1/public/{org_id}/my-bookings",
         include_internal=True,
         params={"phone": phone},
     )

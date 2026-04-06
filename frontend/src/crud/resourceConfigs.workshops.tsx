@@ -5,7 +5,7 @@ import {
   createWorkOrderPaymentLink,
   createWorkOrderQuote,
   createWorkOrderSale,
-  createWorkshopAppointment,
+  createWorkshopBooking,
   createWorkshopService,
   createWorkshopVehicle,
   getAllWorkOrders,
@@ -309,7 +309,7 @@ const resourceConfigs: CrudResourceConfigMap = {
           vehicle_plate: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
-          appointment_id: asOptionalString(values.appointment_id),
+          booking_id: asOptionalString(values.booking_id),
           status: asOptionalString(values.status) ?? 'received',
           requested_work: asOptionalString(values.requested_work),
           diagnosis: asOptionalString(values.diagnosis),
@@ -327,7 +327,7 @@ const resourceConfigs: CrudResourceConfigMap = {
           vehicle_plate: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
-          appointment_id: asOptionalString(values.appointment_id),
+          booking_id: asOptionalString(values.booking_id),
           status: asOptionalString(values.status),
           requested_work: asOptionalString(values.requested_work),
           diagnosis: asOptionalString(values.diagnosis),
@@ -381,7 +381,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       { key: 'vehicle_plate', label: 'Patente', placeholder: 'Se autocompleta si ya la conoces', createOnly: true },
       { key: 'customer_id', label: 'Customer / Party ID', placeholder: 'UUID del dueño en el core', createOnly: true },
       { key: 'customer_name', label: 'Cliente', placeholder: 'Se autocompleta si el ID existe', createOnly: true },
-      { key: 'appointment_id', label: 'Appointment ID', createOnly: true },
+      { key: 'booking_id', label: 'Booking ID', createOnly: true },
       {
         key: 'status',
         label: 'Estado',
@@ -424,7 +424,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         id: 'schedule',
         label: 'Agendar',
         kind: 'secondary',
-        isVisible: (row: WorkOrder) => !row.appointment_id,
+        isVisible: (row: WorkOrder) => !row.booking_id,
         onClick: async (row: WorkOrder, helpers) => {
           const title = (
             window.prompt('Titulo del turno', row.requested_work || `Servicio ${row.vehicle_plate || row.number}`) ?? ''
@@ -439,7 +439,7 @@ const resourceConfigs: CrudResourceConfigMap = {
           if (!startAtInput) return;
           const durationRaw = (window.prompt('Duracion en minutos', '60') ?? '60').trim();
           const duration = Number(durationRaw || '60');
-          const appointment = await createWorkshopAppointment({
+          const booking = await createWorkshopBooking({
             customer_id: row.customer_id,
             customer_name: row.customer_name || row.vehicle_plate || row.number,
             title,
@@ -454,8 +454,8 @@ const resourceConfigs: CrudResourceConfigMap = {
               vehicle_plate: row.vehicle_plate,
             },
           });
-          if (appointment.id) {
-            await updateWorkOrder(row.id, { appointment_id: appointment.id });
+          if (booking.id) {
+            await updateWorkOrder(row.id, { booking_id: booking.id });
           }
           await helpers.reload();
         },
@@ -511,7 +511,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       vehicle_plate: row.vehicle_plate ?? '',
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
-      appointment_id: row.appointment_id ?? '',
+      booking_id: row.booking_id ?? '',
       status: row.status ?? 'received',
       opened_at: toDateTimeInput(row.opened_at),
       promised_at: toDateTimeInput(row.promised_at),

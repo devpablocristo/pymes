@@ -55,7 +55,7 @@ export type BikeWorkOrder = {
   bicycle_label: string;
   customer_id?: string;
   customer_name: string;
-  appointment_id?: string;
+  booking_id?: string;
   quote_id?: string;
   sale_id?: string;
   status:
@@ -89,7 +89,7 @@ export type BikeWorkOrder = {
   items: BikeWorkOrderItem[];
 };
 
-export type BikeShopAppointment = {
+export type BikeShopBooking = {
   id: string;
   customer_name: string;
   title: string;

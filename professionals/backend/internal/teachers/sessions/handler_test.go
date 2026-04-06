@@ -52,7 +52,7 @@ func TestCreateUsesServiceIDContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	serviceID := uuid.New()
 	profileID := uuid.New()
-	appointmentID := uuid.New()
+	bookingID := uuid.New()
 	uc := &stubSessionsUsecases{}
 	handler := NewHandler(uc)
 
@@ -61,7 +61,7 @@ func TestCreateUsesServiceIDContract(t *testing.T) {
 	group := router.Group("/v1")
 	handler.RegisterRoutes(group)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(`{"appointment_id":"`+appointmentID.String()+`","profile_id":"`+profileID.String()+`","service_id":"`+serviceID.String()+`","summary":"Seguimiento","metadata":{"origin":"test"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(`{"booking_id":"`+bookingID.String()+`","profile_id":"`+profileID.String()+`","service_id":"`+serviceID.String()+`","summary":"Seguimiento","metadata":{"origin":"test"}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)

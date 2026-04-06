@@ -251,7 +251,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 		}
 
 		// Nullify canonical FK references in dependent tables.
-		for _, table := range []string{"quotes", "sales", "returns", "credit_notes", "appointments"} {
+		for _, table := range []string{"quotes", "sales", "returns", "credit_notes", "scheduling_bookings"} {
 			if err := tx.Exec("UPDATE "+table+" SET party_id = NULL WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
 				return err
 			}

@@ -31,8 +31,8 @@ class TeachersBackendClient(HTTPBackendClient):
     async def get_session(self, auth: AuthContext, session_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/v1/teachers/sessions/{session_id}", auth=auth)
 
-    async def book_appointment(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", "/v1/teachers/appointments", auth=auth, json=data)
+    async def book_scheduling(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", "/v1/teachers/bookings", auth=auth, json=data)
 
     async def prepare_quote(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
         return await self.request("POST", "/v1/teachers/quotes", auth=auth, json=data)
@@ -52,5 +52,5 @@ class TeachersBackendClient(HTTPBackendClient):
             params["professional_id"] = professional_id
         return await self.request("GET", f"/v1/public/{org_slug}/teachers/availability", include_internal=True, params=params)
 
-    async def public_book_appointment(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", f"/v1/public/{org_slug}/teachers/appointments", include_internal=True, json=data)
+    async def public_book_scheduling(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", f"/v1/public/{org_slug}/teachers/bookings", include_internal=True, json=data)

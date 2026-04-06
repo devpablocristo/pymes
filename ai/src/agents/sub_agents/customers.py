@@ -13,7 +13,7 @@ from src.tools import customers
 from src.agents.sub_agents.common import build_default_limits
 
 DESCRIPTOR = SubAgentDescriptor(
-    name="clientes",
+    name="customers",
     description="Buscar, consultar y crear clientes del negocio",
 )
 

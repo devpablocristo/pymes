@@ -55,7 +55,7 @@ export type AutoRepairWorkOrder = {
   vehicle_plate: string;
   customer_id?: string;
   customer_name: string;
-  appointment_id?: string;
+  booking_id?: string;
   quote_id?: string;
   sale_id?: string;
   status:
@@ -94,7 +94,7 @@ export type AutoRepairWorkOrder = {
   items: AutoRepairWorkOrderItem[];
 };
 
-export type AutoRepairAppointment = {
+export type AutoRepairBooking = {
   id: string;
   customer_name: string;
   title: string;
@@ -120,5 +120,5 @@ export type WorkshopVehicle = AutoRepairVehicle;
 export type WorkshopService = AutoRepairService;
 export type WorkOrderItem = AutoRepairWorkOrderItem;
 export type WorkOrder = AutoRepairWorkOrder;
-export type WorkshopAppointment = AutoRepairAppointment;
+export type WorkshopBooking = AutoRepairBooking;
 export type WorkshopPaymentLink = AutoRepairPaymentLink;

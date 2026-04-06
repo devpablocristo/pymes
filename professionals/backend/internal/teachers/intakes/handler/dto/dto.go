@@ -3,7 +3,7 @@ package dto
 type IntakeItem struct {
 	ID              string         `json:"id"`
 	OrgID           string         `json:"org_id"`
-	AppointmentID   *string        `json:"appointment_id,omitempty"`
+	BookingID       *string        `json:"booking_id,omitempty"`
 	ProfileID       string         `json:"profile_id"`
 	CustomerPartyID *string        `json:"customer_party_id,omitempty"`
 	ServiceID       *string        `json:"service_id,omitempty"`
@@ -14,7 +14,7 @@ type IntakeItem struct {
 }
 
 type CreateIntakeRequest struct {
-	AppointmentID   *string        `json:"appointment_id"`
+	BookingID       *string        `json:"booking_id"`
 	ProfileID       string         `json:"profile_id" binding:"required"`
 	CustomerPartyID *string        `json:"customer_party_id"`
 	ServiceID       *string        `json:"service_id"`
@@ -22,7 +22,7 @@ type CreateIntakeRequest struct {
 }
 
 type UpdateIntakeRequest struct {
-	AppointmentID   *string         `json:"appointment_id"`
+	BookingID       *string         `json:"booking_id"`
 	CustomerPartyID *string         `json:"customer_party_id"`
 	ServiceID       *string         `json:"service_id"`
 	Payload         *map[string]any `json:"payload"`

@@ -66,7 +66,7 @@ func TestUsecasesUpdateTenantSettingsRejectsNegativeReminderHours(t *testing.T) 
 		context.Background(),
 		"00000000-0000-0000-0000-000000000001",
 		admindomain.TenantSettingsPatch{
-			AppointmentReminderHours: &value,
+			SchedulingReminderHours: &value,
 		},
 		nil,
 	)

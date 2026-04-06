@@ -73,7 +73,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Int
 }
 
 type UpdateInput struct {
-	AppointmentID   *uuid.UUID
+	BookingID   *uuid.UUID
 	CustomerPartyID *uuid.UUID
 	ServiceID       *uuid.UUID
 	Payload         *map[string]any
@@ -92,8 +92,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		return domain.Intake{}, fmt.Errorf("only draft intakes can be updated: %w", httperrors.ErrNotDraft)
 	}
 
-	if in.AppointmentID != nil {
-		current.AppointmentID = in.AppointmentID
+	if in.BookingID != nil {
+		current.BookingID = in.BookingID
 	}
 	if in.CustomerPartyID != nil {
 		current.CustomerPartyID = in.CustomerPartyID

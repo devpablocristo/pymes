@@ -19,10 +19,29 @@ Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/A
 
 ## 2. Idioma
 
-- **Código**: inglés
-- **Comentarios**: español
+### 2.1 Código — siempre inglés
+
+Todo lo que es **código interno** debe estar en inglés sin excepciones:
+- Variables, funciones, métodos, structs, types, interfaces, enums
+- Nombres de tablas, columnas, índices, constraints en SQL
+- Nombres de campos en JSON (API request/response), GORM tags, JSON tags
+- Nombres de roles, permisos, recursos en RBAC
+- Nombres de archivos y directorios
+- Constantes, feature flags, config keys
+- Seeds y fixtures (nombres de entidades de datos como roles, permisos)
+- Endpoints y rutas HTTP
+- Nombres de migraciones
+- Test names y test data identifiers
+
+### 2.2 Español — solo lo que ve el usuario
+
+- **UI visible** (labels, placeholders, mensajes de error de UI, onboarding text): español (producto para LATAM)
+- **Comentarios** en código: español (para aclarar lógica)
+- **Documentación** (`.md`): español
+- **Strings de i18n**: español (ES) e inglés (EN) según el locale
+- **Descripciones de AI** (prompts, respuestas al usuario): español
 - **TODOs**: inglés
-- **Respuestas**: español siempre
+- **Respuestas del asistente**: español siempre
 
 ---
 

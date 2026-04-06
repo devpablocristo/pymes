@@ -42,9 +42,9 @@ type TenantSettingsModel struct {
 	WAQuoteTemplate          string `gorm:"not null;default:''"`
 	WAReceiptTemplate        string `gorm:"not null;default:''"`
 	WADefaultCountryCode     string `gorm:"not null;default:'54'"`
-	AppointmentsEnabled      bool   `gorm:"not null;default:false"`
-	AppointmentLabel         string `gorm:"not null;default:'Turno'"`
-	AppointmentReminderHours int    `gorm:"not null;default:24"`
+	SchedulingEnabled      bool   `gorm:"column:scheduling_enabled;not null;default:false"`
+	SchedulingLabel        string `gorm:"column:scheduling_label;not null;default:'Turno'"`
+	SchedulingReminderHours int   `gorm:"column:scheduling_reminder_hours;not null;default:24"`
 	SecondaryCurrency        string `gorm:"not null;default:''"`
 	DefaultRateType          string `gorm:"not null;default:'blue'"`
 	AutoFetchRates           bool   `gorm:"not null;default:false"`

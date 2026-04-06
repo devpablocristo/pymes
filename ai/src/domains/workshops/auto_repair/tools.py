@@ -114,7 +114,7 @@ def build_internal_tools(
     )
     handlers["get_work_order"] = _get_work_order
 
-    async def _create_appointment(
+    async def _create_booking(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -133,11 +133,11 @@ def build_internal_tools(
         }
         if notes:
             data["notes"] = notes
-        return await client.create_appointment(auth, data=data)
+        return await client.create_booking(auth, data=data)
 
     declarations.append(
         _tool(
-            "create_appointment",
+            "create_booking",
             "Reservar turno para ingreso al taller",
             {
                 "type": "object",
@@ -153,7 +153,7 @@ def build_internal_tools(
             },
         )
     )
-    handlers["create_appointment"] = _create_appointment
+    handlers["create_booking"] = _create_booking
 
     async def _create_quote(org_id: str, work_order_id: str) -> dict[str, Any]:
         _ = org_id
@@ -240,7 +240,7 @@ def build_external_tools(
     )
     handlers["get_public_services"] = _get_public_services
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -249,7 +249,7 @@ def build_external_tools(
         duration: int = 60,
     ) -> dict[str, Any]:
         _ = org_id
-        return await client.public_book_appointment(
+        return await client.public_book_scheduling(
             org_slug,
             data={
                 "party_name": customer_name,
@@ -262,7 +262,7 @@ def build_external_tools(
 
     declarations.append(
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno en el taller",
             {
                 "type": "object",
@@ -277,6 +277,6 @@ def build_external_tools(
             },
         )
     )
-    handlers["book_appointment"] = _book_appointment
+    handlers["book_scheduling"] = _book_scheduling
 
     return declarations, handlers

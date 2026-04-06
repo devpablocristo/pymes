@@ -32,8 +32,8 @@ class AutoRepairBackendClient(HTTPBackendClient):
     async def get_work_order(self, auth: AuthContext, work_order_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/v1/auto-repair/work-orders/{work_order_id}", auth=auth)
 
-    async def create_appointment(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", "/v1/auto-repair/workshop-appointments", auth=auth, json=data)
+    async def create_booking(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", "/v1/auto-repair/workshop-bookings", auth=auth, json=data)
 
     async def create_quote(self, auth: AuthContext, work_order_id: str) -> dict[str, Any]:
         return await self.request("POST", f"/v1/auto-repair/work-orders/{work_order_id}/quote", auth=auth)
@@ -48,5 +48,5 @@ class AutoRepairBackendClient(HTTPBackendClient):
         params = {"search": search} if search else {}
         return await self.request("GET", f"/v1/public/{org_slug}/auto-repair/services", include_internal=True, params=params)
 
-    async def public_book_appointment(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", f"/v1/public/{org_slug}/auto-repair/appointments", include_internal=True, json=data)
+    async def public_book_scheduling(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", f"/v1/public/{org_slug}/auto-repair/bookings", include_internal=True, json=data)

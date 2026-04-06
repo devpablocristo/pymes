@@ -12,16 +12,16 @@ from pydantic import BaseModel, Field
 
 from src.agents.audit import has_processed_request, record_agent_event
 from src.agents.catalog import (
-    CLIENTES_DOMAIN_AGENT_NAME,
-    COBROS_DOMAIN_AGENT_NAME,
-    COMPRAS_DOMAIN_AGENT_NAME,
+    CUSTOMERS_DOMAIN_AGENT_NAME,
+    COLLECTIONS_DOMAIN_AGENT_NAME,
+    PURCHASES_DOMAIN_AGENT_NAME,
     COPILOT_AGENT_NAME,
-    PRODUCTOS_DOMAIN_AGENT_NAME,
+    PRODUCTS_DOMAIN_AGENT_NAME,
     PRODUCT_AGENT_NAME,
     ROUTING_SOURCE_ORCHESTRATOR,
     ROUTING_SOURCE_READ_FALLBACK,
     ROUTING_SOURCE_UI_HINT,
-    VENTAS_DOMAIN_AGENT_NAME,
+    SALES_DOMAIN_AGENT_NAME,
     is_known_routed_agent,
     normalize_routed_agent,
 )
@@ -62,7 +62,7 @@ from src.db.repository import AIRepository
 from runtime.types import LLMProvider, Message
 from runtime.logging import get_logger
 from runtime.text import estimate_tokens
-from src.tools import appointments, payments
+from src.tools import payments, scheduling
 
 logger = get_logger(__name__)
 
@@ -83,11 +83,11 @@ Si el usuario pide una acción concreta del negocio, indicá que puede pedírtel
 Respondé siempre en español."""
 
 _AMBIGUOUS_ROUTE_OPTIONS: tuple[tuple[str, str], ...] = (
-    (VENTAS_DOMAIN_AGENT_NAME, "Ventas"),
-    (COBROS_DOMAIN_AGENT_NAME, "Cobros"),
-    (COMPRAS_DOMAIN_AGENT_NAME, "Compras"),
-    (CLIENTES_DOMAIN_AGENT_NAME, "Clientes"),
-    (PRODUCTOS_DOMAIN_AGENT_NAME, "Productos"),
+    (SALES_DOMAIN_AGENT_NAME, "Ventas"),
+    (COLLECTIONS_DOMAIN_AGENT_NAME, "Cobros"),
+    (PURCHASES_DOMAIN_AGENT_NAME, "Compras"),
+    (CUSTOMERS_DOMAIN_AGENT_NAME, "Clientes"),
+    (PRODUCTS_DOMAIN_AGENT_NAME, "Productos"),
 )
 
 _COLLECTIONS_DOMAIN_HINTS: tuple[str, ...] = (
@@ -684,17 +684,17 @@ def _looks_like_product_low_stock_request(message: str) -> bool:
 
 def _infer_internal_read_route(user_message: str) -> str | None:
     if _looks_like_product_low_stock_request(user_message):
-        return PRODUCTOS_DOMAIN_AGENT_NAME
+        return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_product_catalog_request(user_message):
-        return PRODUCTOS_DOMAIN_AGENT_NAME
+        return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_customer_summary_request(user_message):
-        return CLIENTES_DOMAIN_AGENT_NAME
+        return CUSTOMERS_DOMAIN_AGENT_NAME
     if _looks_like_sales_summary_request(user_message):
-        return VENTAS_DOMAIN_AGENT_NAME
+        return SALES_DOMAIN_AGENT_NAME
     if _looks_like_collections_summary_request(user_message):
-        return COBROS_DOMAIN_AGENT_NAME
+        return COLLECTIONS_DOMAIN_AGENT_NAME
     if _looks_like_procurement_summary_request(user_message):
-        return COMPRAS_DOMAIN_AGENT_NAME
+        return PURCHASES_DOMAIN_AGENT_NAME
     return None
 
 
@@ -702,15 +702,15 @@ def _infer_internal_analysis_route(user_message: str) -> str | None:
     if not _looks_like_internal_analysis_request(user_message):
         return None
     if _looks_like_product_domain_request(user_message):
-        return PRODUCTOS_DOMAIN_AGENT_NAME
+        return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_customer_domain_request(user_message):
-        return CLIENTES_DOMAIN_AGENT_NAME
+        return CUSTOMERS_DOMAIN_AGENT_NAME
     if _looks_like_sales_domain_request(user_message):
-        return VENTAS_DOMAIN_AGENT_NAME
+        return SALES_DOMAIN_AGENT_NAME
     if _looks_like_collections_domain_request(user_message):
-        return COBROS_DOMAIN_AGENT_NAME
+        return COLLECTIONS_DOMAIN_AGENT_NAME
     if _looks_like_procurement_domain_request(user_message):
-        return COMPRAS_DOMAIN_AGENT_NAME
+        return PURCHASES_DOMAIN_AGENT_NAME
     return None
 
 
@@ -1194,11 +1194,11 @@ def _build_product_low_stock_fallback_blocks(result: dict[str, Any]) -> list[dic
 
 def _scope_label_for_agent(routed_agent: str) -> str:
     labels = {
-        CLIENTES_DOMAIN_AGENT_NAME: "Clientes",
-        PRODUCTOS_DOMAIN_AGENT_NAME: "Productos",
-        VENTAS_DOMAIN_AGENT_NAME: "Ventas",
-        COBROS_DOMAIN_AGENT_NAME: "Cobros",
-        COMPRAS_DOMAIN_AGENT_NAME: "Compras",
+        CUSTOMERS_DOMAIN_AGENT_NAME: "Clientes",
+        PRODUCTS_DOMAIN_AGENT_NAME: "Productos",
+        SALES_DOMAIN_AGENT_NAME: "Ventas",
+        COLLECTIONS_DOMAIN_AGENT_NAME: "Cobros",
+        PURCHASES_DOMAIN_AGENT_NAME: "Compras",
     }
     return labels.get(routed_agent, "Negocio")
 
@@ -1215,7 +1215,7 @@ async def _collect_internal_domain_snapshot(
     if agent is None:
         return None
 
-    if routed_agent == CLIENTES_DOMAIN_AGENT_NAME:
+    if routed_agent == CUSTOMERS_DOMAIN_AGENT_NAME:
         should_run = mode == "analysis" or _looks_like_customer_summary_request(user_message, assume_domain_context=True)
         if should_run:
             handler = agent.tool_handlers.get("search_customers")
@@ -1232,7 +1232,7 @@ async def _collect_internal_domain_snapshot(
                     raw_result=result,
                 )
 
-    if routed_agent == VENTAS_DOMAIN_AGENT_NAME:
+    if routed_agent == SALES_DOMAIN_AGENT_NAME:
         should_run = mode == "analysis" or _looks_like_sales_summary_request(user_message, assume_domain_context=True)
         if should_run:
             handler = agent.tool_handlers.get("get_recent_sales")
@@ -1249,7 +1249,7 @@ async def _collect_internal_domain_snapshot(
                     raw_result=result,
                 )
 
-    if routed_agent == PRODUCTOS_DOMAIN_AGENT_NAME:
+    if routed_agent == PRODUCTS_DOMAIN_AGENT_NAME:
         if _looks_like_product_low_stock_request(user_message):
             handler = agent.tool_handlers.get("get_low_stock")
             if handler is None:
@@ -1281,7 +1281,7 @@ async def _collect_internal_domain_snapshot(
                     raw_result=result,
                 )
 
-    if routed_agent == COBROS_DOMAIN_AGENT_NAME:
+    if routed_agent == COLLECTIONS_DOMAIN_AGENT_NAME:
         should_run = mode == "analysis" or _looks_like_collections_summary_request(user_message, assume_domain_context=True)
         if should_run:
             handler = agent.tool_handlers.get("get_account_balances")
@@ -1298,7 +1298,7 @@ async def _collect_internal_domain_snapshot(
                     raw_result=result,
                 )
 
-    if routed_agent == COMPRAS_DOMAIN_AGENT_NAME:
+    if routed_agent == PURCHASES_DOMAIN_AGENT_NAME:
         should_run = mode == "analysis" or _looks_like_procurement_summary_request(user_message, assume_domain_context=True)
         if should_run:
             handler = agent.tool_handlers.get("list_procurement_requests")
@@ -1422,15 +1422,15 @@ def _apply_internal_route_hint(*, routed_agent: str, user_message: str) -> str:
     if routed_agent != PRODUCT_AGENT_NAME:
         return routed_agent
     if _looks_like_product_domain_request(user_message):
-        return PRODUCTOS_DOMAIN_AGENT_NAME
+        return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_sales_summary_request(user_message):
-        return VENTAS_DOMAIN_AGENT_NAME
+        return SALES_DOMAIN_AGENT_NAME
     if _looks_like_collections_summary_request(user_message):
-        return COBROS_DOMAIN_AGENT_NAME
+        return COLLECTIONS_DOMAIN_AGENT_NAME
     if _looks_like_customer_summary_request(user_message):
-        return CLIENTES_DOMAIN_AGENT_NAME
+        return CUSTOMERS_DOMAIN_AGENT_NAME
     if _looks_like_procurement_summary_request(user_message):
-        return COMPRAS_DOMAIN_AGENT_NAME
+        return PURCHASES_DOMAIN_AGENT_NAME
     return routed_agent
 
 
@@ -1447,11 +1447,11 @@ def _normalize_explicit_route_hint(route_hint: str | None) -> str | None:
 
 def _override_explicit_route_hint(*, explicit_route_hint: str, user_message: str) -> str | None:
     explicit_matchers: tuple[tuple[str, Any], ...] = (
-        (PRODUCTOS_DOMAIN_AGENT_NAME, _looks_like_product_domain_request),
-        (VENTAS_DOMAIN_AGENT_NAME, _looks_like_sales_domain_request),
-        (COBROS_DOMAIN_AGENT_NAME, _looks_like_collections_domain_request),
-        (CLIENTES_DOMAIN_AGENT_NAME, _looks_like_customer_domain_request),
-        (COMPRAS_DOMAIN_AGENT_NAME, _looks_like_procurement_domain_request),
+        (PRODUCTS_DOMAIN_AGENT_NAME, _looks_like_product_domain_request),
+        (SALES_DOMAIN_AGENT_NAME, _looks_like_sales_domain_request),
+        (COLLECTIONS_DOMAIN_AGENT_NAME, _looks_like_collections_domain_request),
+        (CUSTOMERS_DOMAIN_AGENT_NAME, _looks_like_customer_domain_request),
+        (PURCHASES_DOMAIN_AGENT_NAME, _looks_like_procurement_domain_request),
     )
     for candidate, matcher in explicit_matchers:
         if candidate == explicit_route_hint:
@@ -2510,7 +2510,7 @@ async def process_contract(
         response_payload = {
             "intent": "availability_response",
             "request_id": contract.request_id,
-            "availability": await appointments.check_availability(backend_client, org_id=org_id, date=date_value, duration=duration),
+            "availability": await scheduling.check_availability(backend_client, org_id=org_id, date=date_value, duration=duration),
         }
     elif contract.intent == "request_quote":
         preview = await _build_quote_preview(
@@ -2535,20 +2535,20 @@ async def process_contract(
             "payment": await payments.get_public_quote_payment_link(backend_client, org_id=org_id, quote_id=quote_id),
         }
     elif contract.intent == "reservation_request":
-        if "book_appointment" not in envelope.confirmed_actions:
+        if "book_scheduling" not in envelope.confirmed_actions:
             status_label = "confirmation_required"
             response_payload = {
                 "intent": "reservation_request",
                 "request_id": contract.request_id,
                 "status": "confirmation_required",
-                "required_action": "book_appointment",
+                "required_action": "book_scheduling",
                 "message": "La reserva requiere confirmacion explicita antes de escribir en el backend.",
             }
         else:
             response_payload = {
                 "intent": "reservation_request",
                 "request_id": contract.request_id,
-                "reservation": await appointments.book_appointment(
+                "reservation": await scheduling.book_scheduling(
                     backend_client,
                     org_id=org_id,
                     customer_name=envelope.contact_name or str(contract.metadata.get("customer_name", "")),
@@ -2577,7 +2577,7 @@ async def process_contract(
         actor_type="external_agent",
         action=f"contract.{contract.intent}",
         result=status_label,
-        confirmed="book_appointment" in envelope.confirmed_actions,
+        confirmed="book_scheduling" in envelope.confirmed_actions,
         request_id=contract.request_id,
         metadata={
             "counterparty_id": contract.counterparty_id,

@@ -14,7 +14,7 @@ from src.tools import accounts, payments
 from src.agents.sub_agents.common import build_default_limits
 
 DESCRIPTOR = SubAgentDescriptor(
-    name="cobros",
+    name="collections",
     description="Generar links de pago, consultar estado de cobros y saldos de cuentas corrientes",
 )
 

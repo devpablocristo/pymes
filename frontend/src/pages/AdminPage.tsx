@@ -34,7 +34,7 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
   if (!Number.isFinite(tax) || tax < 0) {
     return { error: 'El IVA debe ser un número mayor o igual a 0.' };
   }
-  const reminder = Number(f.appointment_reminder_hours);
+  const reminder = Number(f.scheduling_reminder_hours);
   if (!Number.isFinite(reminder) || reminder < 0) {
     return { error: 'Las horas de recordatorio deben ser un número ≥ 0.' };
   }
@@ -71,8 +71,8 @@ function buildPayload(f: TenantFormState): TenantSettingsUpdatePayload | { error
     wa_receipt_template: f.wa_receipt_template,
     wa_default_country_code: f.wa_default_country_code.trim(),
     scheduling_enabled: f.scheduling_enabled,
-    appointment_label: f.appointment_label.trim(),
-    appointment_reminder_hours: reminder,
+    scheduling_label: f.scheduling_label.trim(),
+    scheduling_reminder_hours: reminder,
     default_rate_type: f.default_rate_type.trim(),
     auto_fetch_rates: f.auto_fetch_rates,
     show_dual_prices: f.show_dual_prices,
@@ -114,8 +114,8 @@ type TenantFormState = {
   wa_receipt_template: string;
   wa_default_country_code: string;
   scheduling_enabled: boolean;
-  appointment_label: string;
-  appointment_reminder_hours: string;
+  scheduling_label: string;
+  scheduling_reminder_hours: string;
   default_rate_type: string;
   auto_fetch_rates: boolean;
   show_dual_prices: boolean;
@@ -148,8 +148,8 @@ function settingsToForm(s: TenantSettings): TenantFormState {
     wa_receipt_template: s.wa_receipt_template ?? '',
     wa_default_country_code: s.wa_default_country_code ?? '',
     scheduling_enabled: Boolean(s.scheduling_enabled),
-    appointment_label: s.appointment_label ?? '',
-    appointment_reminder_hours: String(s.appointment_reminder_hours ?? ''),
+    scheduling_label: s.scheduling_label ?? '',
+    scheduling_reminder_hours: String(s.scheduling_reminder_hours ?? ''),
     default_rate_type: s.default_rate_type ?? '',
     auto_fetch_rates: Boolean(s.auto_fetch_rates),
     show_dual_prices: Boolean(s.show_dual_prices),
@@ -606,8 +606,8 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
                     <label>Etiqueta (ej. Turno, Clase)</label>
                     <input
                       type="text"
-                      value={form.appointment_label}
-                      onChange={(e) => updateField('appointment_label', e.target.value)}
+                      value={form.scheduling_label}
+                      onChange={(e) => updateField('scheduling_label', e.target.value)}
                     />
                   </div>
                   <div className="form-group">
@@ -615,8 +615,8 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
                     <input
                       type="number"
                       min={0}
-                      value={form.appointment_reminder_hours}
-                      onChange={(e) => updateField('appointment_reminder_hours', e.target.value)}
+                      value={form.scheduling_reminder_hours}
+                      onChange={(e) => updateField('scheduling_reminder_hours', e.target.value)}
                     />
                   </div>
                 </div>

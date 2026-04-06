@@ -88,14 +88,14 @@ def build_internal_tools(
         org_id: str,
         profile_id: str,
         notes: str = "",
-        appointment_id: str = "",
+        booking_id: str = "",
         customer_party_id: str = "",
         service_id: str = "",
     ) -> dict[str, Any]:
         _ = org_id
         data = {"profile_id": profile_id, "payload": {"notes": notes}}
-        if appointment_id:
-            data["appointment_id"] = appointment_id
+        if booking_id:
+            data["booking_id"] = booking_id
         if customer_party_id:
             data["customer_party_id"] = customer_party_id
         if service_id:
@@ -111,7 +111,7 @@ def build_internal_tools(
                 "properties": {
                     "profile_id": {"type": "string", "description": "UUID del docente o profesional"},
                     "notes": {"type": "string", "description": "Notas adicionales"},
-                    "appointment_id": {"type": "string", "description": "UUID del turno"},
+                    "booking_id": {"type": "string", "description": "UUID del turno"},
                     "customer_party_id": {"type": "string", "description": "UUID del party del cliente"},
                     "service_id": {"type": "string", "description": "UUID del servicio asociado"},
                 },
@@ -167,7 +167,7 @@ def build_internal_tools(
     )
     handlers["get_session_summary"] = _get_session_summary
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -186,11 +186,11 @@ def build_internal_tools(
         }
         if professional_id:
             data["professional_id"] = professional_id
-        return await client.book_appointment(auth, data=data)
+        return await client.book_scheduling(auth, data=data)
 
     declarations.append(
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno para un cliente",
             {
                 "type": "object",
@@ -206,7 +206,7 @@ def build_internal_tools(
             },
         )
     )
-    handlers["book_appointment"] = _book_appointment
+    handlers["book_scheduling"] = _book_scheduling
 
     async def _prepare_quote(
         org_id: str,
@@ -313,7 +313,7 @@ def build_external_tools(
     )
     handlers["check_availability"] = _check_availability
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -332,11 +332,11 @@ def build_external_tools(
         }
         if professional_id:
             data["professional_id"] = professional_id
-        return await client.public_book_appointment(org_slug, data=data)
+        return await client.public_book_scheduling(org_slug, data=data)
 
     declarations.append(
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno",
             {
                 "type": "object",
@@ -352,6 +352,6 @@ def build_external_tools(
             },
         )
     )
-    handlers["book_appointment"] = _book_appointment
+    handlers["book_scheduling"] = _book_scheduling
 
     return declarations, handlers

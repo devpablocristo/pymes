@@ -202,7 +202,7 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
             tool_calls=["lookup_customer"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "respuesta final"}],
-            routed_agent="clientes",
+            routed_agent="customers",
             routing_source="orchestrator",
         )
 
@@ -221,8 +221,8 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
         "tool_calls": ["lookup_customer"],
         "pending_confirmations": [],
         "blocks": [{"type": "text", "text": "respuesta final"}],
-        "routed_agent": "clientes",
-        "routed_mode": "clientes",
+        "routed_agent": "customers",
+        "routed_mode": "customers",
         "routing_source": "orchestrator",
     }
     assert captured["route_hint"] is None
@@ -301,7 +301,7 @@ def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
                     "empty_state": None,
                 },
             ],
-            routed_agent="ventas",
+            routed_agent="sales",
             routing_source="copilot_agent",
         )
 
@@ -318,7 +318,7 @@ def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
     assert payload["blocks"][0]["type"] == "insight_card"
     assert payload["blocks"][1]["type"] == "kpi_group"
     assert payload["blocks"][2]["type"] == "table"
-    assert payload["routed_agent"] == "ventas"
+    assert payload["routed_agent"] == "sales"
     assert payload["routing_source"] == "copilot_agent"
 
 
@@ -369,7 +369,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
             tool_calls=["search_customers"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "Tenés 2 clientes registrados. Algunos son: Acme, Beta."}],
-            routed_agent="clientes",
+            routed_agent="customers",
             routing_source="read_fallback",
         )
 
@@ -382,7 +382,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
     assert payload["request_id"] == "req-chat-4"
     assert payload["output_kind"] == "chat_reply"
     assert payload["content_language"] == "es"
-    assert payload["routed_agent"] == "clientes"
+    assert payload["routed_agent"] == "customers"
     assert payload["routing_source"] == "read_fallback"
 
 
@@ -403,7 +403,7 @@ def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
             tool_calls=["list_procurement_requests"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "Tenés 1 solicitud en borrador."}],
-            routed_agent="compras",
+            routed_agent="purchases",
             routing_source="ui_hint",
         )
 
@@ -411,15 +411,15 @@ def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
 
     response = client.post(
         "/v1/chat",
-        json={"message": "estado compras", "route_hint": "compras", "preferred_language": "en"},
+        json={"message": "estado compras", "route_hint": "purchases", "preferred_language": "en"},
     )
 
     assert response.status_code == 200
     assert response.json()["request_id"] == "req-chat-5"
     assert response.json()["content_language"] == "es"
-    assert response.json()["routed_agent"] == "compras"
+    assert response.json()["routed_agent"] == "purchases"
     assert response.json()["routing_source"] == "ui_hint"
-    assert captured["route_hint"] == "compras"
+    assert captured["route_hint"] == "purchases"
     assert captured["preferred_language"] == "en"
 
 
@@ -450,7 +450,7 @@ def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypa
                             "label": "Ventas",
                             "kind": "send_message",
                             "message": "cuánto hay?",
-                            "route_hint": "ventas",
+                            "route_hint": "sales",
                             "selection_behavior": "route_and_resend",
                             "style": "secondary",
                             "confirmed_actions": [],
@@ -469,7 +469,7 @@ def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypa
     assert response.status_code == 200
     payload = response.json()
     assert payload["request_id"] == "req-chat-6"
-    assert payload["blocks"][1]["actions"][0]["route_hint"] == "ventas"
+    assert payload["blocks"][1]["actions"][0]["route_hint"] == "sales"
     assert payload["blocks"][1]["actions"][0]["selection_behavior"] == "route_and_resend"
 
 

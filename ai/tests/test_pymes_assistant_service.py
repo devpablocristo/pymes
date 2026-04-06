@@ -52,17 +52,17 @@ class CustomersRegistry:
         self.agent = CustomersAgent()
 
     def names(self) -> list[str]:
-        return ["clientes"]
+        return ["customers"]
 
     def get(self, name: str):
-        if name == "clientes":
+        if name == "customers":
             return self.agent
         return None
 
 
 class ProcurementAgent:
     def __init__(self) -> None:
-        self.descriptor = SimpleNamespace(name="compras")
+        self.descriptor = SimpleNamespace(name="purchases")
         self.tools = []
         self.tool_handlers = {"list_procurement_requests": self.list_procurement_requests}
         self.system_prompt = "Sos el agente de compras."
@@ -84,17 +84,17 @@ class ProcurementRegistry:
         self.agent = ProcurementAgent()
 
     def names(self) -> list[str]:
-        return ["compras"]
+        return ["purchases"]
 
     def get(self, name: str):
-        if name == "compras":
+        if name == "purchases":
             return self.agent
         return None
 
 
 class SalesAgent:
     def __init__(self) -> None:
-        self.descriptor = SimpleNamespace(name="ventas")
+        self.descriptor = SimpleNamespace(name="sales")
         self.tools = []
         self.tool_handlers = {"get_recent_sales": self.get_recent_sales}
         self.system_prompt = "Sos el agente de ventas."
@@ -115,17 +115,17 @@ class SalesRegistry:
         self.agent = SalesAgent()
 
     def names(self) -> list[str]:
-        return ["ventas"]
+        return ["sales"]
 
     def get(self, name: str):
-        if name == "ventas":
+        if name == "sales":
             return self.agent
         return None
 
 
 class CollectionsAgent:
     def __init__(self) -> None:
-        self.descriptor = SimpleNamespace(name="cobros")
+        self.descriptor = SimpleNamespace(name="collections")
         self.tools = []
         self.tool_handlers = {"get_account_balances": self.get_account_balances}
         self.system_prompt = "Sos el agente de cobros."
@@ -145,17 +145,17 @@ class CollectionsRegistry:
         self.agent = CollectionsAgent()
 
     def names(self) -> list[str]:
-        return ["cobros"]
+        return ["collections"]
 
     def get(self, name: str):
-        if name == "cobros":
+        if name == "collections":
             return self.agent
         return None
 
 
 class ProductsAgent:
     def __init__(self) -> None:
-        self.descriptor = SimpleNamespace(name="productos")
+        self.descriptor = SimpleNamespace(name="products")
         self.tools = []
         self.tool_handlers = {
             "search_products": self.search_products,
@@ -189,21 +189,21 @@ class ProductsRegistry:
         self.agent = ProductsAgent()
 
     def names(self) -> list[str]:
-        return ["productos"]
+        return ["products"]
 
     def get(self, name: str):
-        if name == "productos":
+        if name == "products":
             return self.agent
         return None
 
 
 def _registry_for_agent(name: str):
     registries = {
-        "clientes": CustomersRegistry,
-        "ventas": SalesRegistry,
-        "cobros": CollectionsRegistry,
-        "compras": ProcurementRegistry,
-        "productos": ProductsRegistry,
+        "customers": CustomersRegistry,
+        "sales": SalesRegistry,
+        "collections": CollectionsRegistry,
+        "purchases": ProcurementRegistry,
+        "products": ProductsRegistry,
     }
     return registries[name]()
 
@@ -229,17 +229,17 @@ def test_summarize_procurement_requests_uses_singular_copy() -> None:
 @pytest.mark.parametrize(
     ("route_hint", "message", "expected_tool", "expected_text"),
     [
-        ("clientes", "dame la lista", "search_customers", "Tenés 2 clientes registrados"),
-        ("clientes", "quiero toda la info disponible", "search_customers", "Tenés 2 clientes registrados"),
-        ("ventas", "dame la lista", "get_recent_sales", "Tenés 2 ventas registradas"),
-        ("ventas", "dame toda la info disponible", "get_recent_sales", "Tenés 2 ventas registradas"),
-        ("cobros", "dame la lista", "get_account_balances", "Tenés 2 cuentas con saldo abierto"),
-        ("cobros", "quiero toda la info disponible", "get_account_balances", "Tenés 2 cuentas con saldo abierto"),
-        ("compras", "dame la lista", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
-        ("compras", "cuáles fueron?", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
-        ("compras", "dame toda la info disponible", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
-        ("productos", "dame la lista", "search_products", "Tenés 3 productos disponibles"),
-        ("productos", "dame toda la info disponible", "search_products", "Tenés 3 productos disponibles"),
+        ("customers", "dame la lista", "search_customers", "Tenés 2 clientes registrados"),
+        ("customers", "quiero toda la info disponible", "search_customers", "Tenés 2 clientes registrados"),
+        ("sales", "dame la lista", "get_recent_sales", "Tenés 2 ventas registradas"),
+        ("sales", "dame toda la info disponible", "get_recent_sales", "Tenés 2 ventas registradas"),
+        ("collections", "dame la lista", "get_account_balances", "Tenés 2 cuentas con saldo abierto"),
+        ("collections", "quiero toda la info disponible", "get_account_balances", "Tenés 2 cuentas con saldo abierto"),
+        ("purchases", "dame la lista", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
+        ("purchases", "cuáles fueron?", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
+        ("purchases", "dame toda la info disponible", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
+        ("products", "dame la lista", "search_products", "Tenés 3 productos disponibles"),
+        ("products", "dame toda la info disponible", "search_products", "Tenés 3 productos disponibles"),
     ],
 )
 async def test_run_internal_orchestrated_chat_uses_selected_category_context_for_generic_list_request(
@@ -293,8 +293,8 @@ async def test_run_internal_orchestrated_chat_uses_selected_category_context_for
 @pytest.mark.parametrize(
     ("message", "expected_agent", "expected_tool", "expected_text"),
     [
-        ("dame toda info disponible de compras", "compras", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
-        ("dame toda la info disponible de ventas", "ventas", "get_recent_sales", "Tenés 2 ventas registradas"),
+        ("dame toda info disponible de compras", "purchases", "list_procurement_requests", "Tenés 3 solicitudes de compra activas"),
+        ("dame toda la info disponible de ventas", "sales", "get_recent_sales", "Tenés 2 ventas registradas"),
     ],
 )
 async def test_run_internal_orchestrated_chat_routes_broad_info_requests_without_llm(
@@ -369,7 +369,7 @@ async def test_run_internal_orchestrated_chat_bypasses_llm_for_clear_read_reques
         ),
     )
 
-    assert result.routed_agent == "clientes"
+    assert result.routed_agent == "customers"
     assert result.routing_source == "read_fallback"
     assert result.tool_calls == ["search_customers"]
     assert "Tenés 2 clientes registrados" in result.reply
@@ -391,7 +391,7 @@ async def test_run_internal_orchestrated_chat_does_not_treat_procurement_create_
         return conversation
 
     async def fake_run_routed_agent(**_kwargs):
-        yield SimpleNamespace(type="route", text="compras", tool_call=None)
+        yield SimpleNamespace(type="route", text="purchases", tool_call=None)
 
     monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
     monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
@@ -413,7 +413,7 @@ async def test_run_internal_orchestrated_chat_does_not_treat_procurement_create_
         ),
     )
 
-    assert result.routed_agent == "compras"
+    assert result.routed_agent == "purchases"
     assert result.routing_source == "orchestrator"
     assert result.tool_calls == []
     assert "Tenés 3 solicitudes de compra activas" not in result.reply
@@ -463,10 +463,10 @@ async def test_run_internal_orchestrated_chat_uses_structured_analysis_for_activ
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="ventas",
+        route_hint="sales",
     )
 
-    assert result.routed_agent == "ventas"
+    assert result.routed_agent == "sales"
     assert result.routing_source == "ui_hint"
     assert result.tool_calls == ["get_recent_sales"]
     assert result.reply == "Ventas firmes este mes."
@@ -509,10 +509,10 @@ async def test_run_internal_orchestrated_chat_allows_explicit_message_to_change_
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="compras",
+        route_hint="purchases",
     )
 
-    assert result.routed_agent == "ventas"
+    assert result.routed_agent == "sales"
     assert result.routing_source == "ui_hint"
     assert result.tool_calls == ["get_recent_sales"]
     assert "Tenés 2 ventas registradas" in result.reply
@@ -527,7 +527,7 @@ async def test_run_internal_orchestrated_chat_persists_routed_agent(monkeypatch)
         return conversation
 
     async def fake_run_routed_agent(**_kwargs):
-        yield SimpleNamespace(type="route", text="clientes", tool_call=None)
+        yield SimpleNamespace(type="route", text="customers", tool_call=None)
         yield SimpleNamespace(type="tool_call", text=None, tool_call=SimpleNamespace(name="search_customers"))
         yield SimpleNamespace(type="text", text="Encontré 3 clientes.", tool_call=None)
 
@@ -551,17 +551,17 @@ async def test_run_internal_orchestrated_chat_persists_routed_agent(monkeypatch)
         ),
     )
 
-    assert result.routed_agent == "clientes"
+    assert result.routed_agent == "customers"
     assert result.tool_calls == ["search_customers"]
     assert result.blocks == [{"type": "text", "text": "Encontré 3 clientes."}]
     assert repo.append_calls
     assistant_message = repo.append_calls[0]["new_messages"][1]
-    assert assistant_message["routed_agent"] == "clientes"
-    assert assistant_message["routed_mode"] == "clientes"
+    assert assistant_message["routed_agent"] == "customers"
+    assert assistant_message["routed_mode"] == "customers"
     assert assistant_message["blocks"] == [{"type": "text", "text": "Encontré 3 clientes."}]
     assert repo.track_calls == [{"org_id": "org-123", "tokens_in": result.tokens_input, "tokens_out": result.tokens_output}]
     assert repo.agent_events[-1]["action"] == "chat.completed"
-    assert repo.agent_events[-1]["agent_mode"] == "clientes"
+    assert repo.agent_events[-1]["agent_mode"] == "customers"
 
 
 @pytest.mark.asyncio
@@ -644,7 +644,7 @@ async def test_run_internal_orchestrated_chat_offers_clarification_for_ambiguous
         "Productos",
     ]
     assert result.blocks[1]["actions"][0]["message"] == message
-    assert result.blocks[1]["actions"][0]["route_hint"] == "ventas"
+    assert result.blocks[1]["actions"][0]["route_hint"] == "sales"
     assert result.blocks[1]["actions"][0]["selection_behavior"] == "route_and_resend"
 
 
@@ -723,7 +723,7 @@ async def test_run_internal_orchestrated_chat_offers_menu_even_with_active_route
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="ventas",
+        route_hint="sales",
     )
 
     assert result.routed_agent == "general"
@@ -831,7 +831,7 @@ async def test_run_internal_orchestrated_chat_routes_operational_prompt_without_
         return conversation
 
     async def fake_run_routed_agent(**_kwargs):
-        yield SimpleNamespace(type="route", text="ventas", tool_call=None)
+        yield SimpleNamespace(type="route", text="sales", tool_call=None)
         yield SimpleNamespace(type="text", text="Puedo ayudarte a registrar esa venta.", tool_call=None)
 
     monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
@@ -854,7 +854,7 @@ async def test_run_internal_orchestrated_chat_routes_operational_prompt_without_
         ),
     )
 
-    assert result.routed_agent == "ventas"
+    assert result.routed_agent == "sales"
     assert result.reply == "Puedo ayudarte a registrar esa venta."
     assert result.blocks == [{"type": "text", "text": "Puedo ayudarte a registrar esa venta."}]
 
@@ -868,7 +868,7 @@ async def test_run_internal_orchestrated_chat_requires_confirmation_for_sensitiv
         return conversation
 
     async def fake_run_routed_agent(**_kwargs):
-        yield SimpleNamespace(type="route", text="ventas", tool_call=None)
+        yield SimpleNamespace(type="route", text="sales", tool_call=None)
         yield SimpleNamespace(type="tool_call", text=None, tool_call=SimpleNamespace(name="create_sale"))
         yield SimpleNamespace(
             type="tool_result",
@@ -935,7 +935,7 @@ async def test_run_internal_orchestrated_chat_marks_read_fallback_source(monkeyp
         return conversation
 
     async def fake_run_routed_agent(**_kwargs):
-        yield SimpleNamespace(type="route", text="clientes", tool_call=None)
+        yield SimpleNamespace(type="route", text="customers", tool_call=None)
 
     monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
     monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
@@ -957,7 +957,7 @@ async def test_run_internal_orchestrated_chat_marks_read_fallback_source(monkeyp
         ),
     )
 
-    assert result.routed_agent == "clientes"
+    assert result.routed_agent == "customers"
     assert result.reply == "Tenés 2 clientes registrados. Algunos son: Acme, Beta."
     assert result.tool_calls == ["search_customers"]
     assistant_message = repo.append_calls[0]["new_messages"][1]
@@ -997,7 +997,7 @@ async def test_run_internal_orchestrated_chat_applies_customer_hint_when_llm_rou
         ),
     )
 
-    assert result.routed_agent == "clientes"
+    assert result.routed_agent == "customers"
     assert result.routing_source == "read_fallback"
     assert result.reply == "Tenés 2 clientes registrados. Algunos son: Acme, Beta."
     assert result.tool_calls == ["search_customers"]
@@ -1035,7 +1035,7 @@ async def test_run_internal_orchestrated_chat_applies_sales_hint_when_llm_routes
         ),
     )
 
-    assert result.routed_agent == "ventas"
+    assert result.routed_agent == "sales"
     assert result.routing_source == "read_fallback"
     assert result.tool_calls == ["get_recent_sales"]
     assert "Tenés 2 ventas registradas" in result.reply
@@ -1074,7 +1074,7 @@ async def test_run_internal_orchestrated_chat_applies_collections_hint_when_llm_
         ),
     )
 
-    assert result.routed_agent == "cobros"
+    assert result.routed_agent == "collections"
     assert result.routing_source == "read_fallback"
     assert result.tool_calls == ["get_account_balances"]
     assert "Tenés 2 cuentas con saldo abierto" in result.reply
@@ -1113,7 +1113,7 @@ async def test_run_internal_orchestrated_chat_applies_products_hint_when_llm_rou
         ),
     )
 
-    assert result.routed_agent == "productos"
+    assert result.routed_agent == "products"
     assert result.routing_source == "read_fallback"
     assert result.tool_calls == ["search_products"]
     assert "Tenés 3 productos disponibles" in result.reply
@@ -1154,10 +1154,10 @@ async def test_run_internal_orchestrated_chat_resolves_explicit_products_hint_wi
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="productos",
+        route_hint="products",
     )
 
-    assert result.routed_agent == "productos"
+    assert result.routed_agent == "products"
     assert result.routing_source == "ui_hint"
     assert result.tool_calls == ["search_products"]
     assert "Tenés 3 productos disponibles" in result.reply
@@ -1195,7 +1195,7 @@ async def test_run_internal_orchestrated_chat_applies_procurement_hint_when_llm_
         ),
     )
 
-    assert result.routed_agent == "compras"
+    assert result.routed_agent == "purchases"
     assert result.routing_source == "read_fallback"
     assert result.tool_calls == ["list_procurement_requests"]
     assert "Tenés 3 solicitudes de compra activas" in result.reply
@@ -1236,10 +1236,10 @@ async def test_run_internal_orchestrated_chat_respects_explicit_route_hint(monke
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="compras",
+        route_hint="purchases",
     )
 
-    assert result.routed_agent == "compras"
+    assert result.routed_agent == "purchases"
     assert result.routing_source == "ui_hint"
     assert result.tool_calls == ["list_procurement_requests"]
     assert "Tenés 3 solicitudes de compra activas" in result.reply

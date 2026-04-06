@@ -10,12 +10,12 @@ src/agents/review_gate.py
 src/agents/service.py
 src/agents/service_support.py
 src/agents/sub_agents/__init__.py
-src/agents/sub_agents/clientes.py
-src/agents/sub_agents/cobros.py
+src/agents/sub_agents/collections.py
 src/agents/sub_agents/common.py
-src/agents/sub_agents/compras.py
-src/agents/sub_agents/productos.py
-src/agents/sub_agents/ventas.py
+src/agents/sub_agents/customers.py
+src/agents/sub_agents/products.py
+src/agents/sub_agents/purchases.py
+src/agents/sub_agents/sales.py
 src/api/__init__.py
 src/api/chat_contract.py
 src/api/chat_stream.py
@@ -74,7 +74,7 @@ src/pymes_ai.egg-info/requires.txt
 src/pymes_ai.egg-info/top_level.txt
 src/tools/__init__.py
 src/tools/accounts.py
-src/tools/appointments.py
+src/tools/scheduling.py
 src/tools/cashflow.py
 src/tools/currency.py
 src/tools/customers.py

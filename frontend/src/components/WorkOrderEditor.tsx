@@ -48,7 +48,7 @@ type Draft = {
   vehicle_plate: string;
   customer_id: string;
   customer_name: string;
-  appointment_id: string;
+  booking_id: string;
   requested_work: string;
   diagnosis: string;
   notes: string;
@@ -76,7 +76,7 @@ function woToDraft(wo: AutoRepairWorkOrder): Draft {
     vehicle_plate: wo.vehicle_plate ?? '',
     customer_id: wo.customer_id ?? '',
     customer_name: wo.customer_name ?? '',
-    appointment_id: wo.appointment_id ?? '',
+    booking_id: wo.booking_id ?? '',
     requested_work: wo.requested_work ?? '',
     diagnosis: wo.diagnosis ?? '',
     notes: wo.notes ?? '',
@@ -147,7 +147,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
       draft.vehicle_plate !== (wo.vehicle_plate ?? '') ||
       draft.customer_id !== (wo.customer_id ?? '') ||
       draft.customer_name !== (wo.customer_name ?? '') ||
-      draft.appointment_id !== (wo.appointment_id ?? '') ||
+      draft.booking_id !== (wo.booking_id ?? '') ||
       draft.requested_work !== (wo.requested_work ?? '') ||
       draft.diagnosis !== (wo.diagnosis ?? '') ||
       draft.notes !== (wo.notes ?? '') ||
@@ -275,9 +275,9 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         body.customer_id = c.length > 0 ? c : undefined;
       }
       if (draft.customer_name !== (wo.customer_name ?? '')) body.customer_name = draft.customer_name;
-      if (draft.appointment_id.trim() !== (wo.appointment_id ?? '').trim()) {
-        const a = draft.appointment_id.trim();
-        body.appointment_id = a.length > 0 ? a : undefined;
+      if (draft.booking_id.trim() !== (wo.booking_id ?? '').trim()) {
+        const a = draft.booking_id.trim();
+        body.booking_id = a.length > 0 ? a : undefined;
       }
       if (draft.requested_work !== (wo.requested_work ?? '')) body.requested_work = draft.requested_work;
       if (draft.diagnosis !== (wo.diagnosis ?? '')) body.diagnosis = draft.diagnosis;
@@ -410,14 +410,14 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
               />
             </div>
             <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-appointment-id">
-                Turno (Appointment UUID)
+              <label className="wo-modal__label" htmlFor="wo-booking-id">
+                Turno (Booking UUID)
               </label>
               <input
-                id="wo-appointment-id"
+                id="wo-booking-id"
                 className="wo-modal__input"
-                value={draft.appointment_id}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, appointment_id: ev.target.value } : d))}
+                value={draft.booking_id}
+                onChange={(ev) => setDraft((d) => (d ? { ...d, booking_id: ev.target.value } : d))}
               />
             </div>
             <div className="wo-modal__field">

@@ -147,7 +147,7 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.vertical.workshops': 'Workshops',
     'onboarding.vertical.workshopsDesc': 'Vehicles, bikes, repairs',
     'onboarding.vertical.beauty': 'Beauty / Salon',
-    'onboarding.vertical.beautyDesc': 'Team, services and appointments',
+    'onboarding.vertical.beautyDesc': 'Team, services and bookings',
     'onboarding.vertical.restaurants': 'Bars / Restaurants',
     'onboarding.vertical.restaurantsDesc': 'Dining, tables and sessions',
 
@@ -162,7 +162,7 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.step2.clientLabelCustom': 'other...',
     'onboarding.step2.clientLabelCustomPlaceholder': 'What do you call them?',
     'onboarding.step2.clientLabelCustomAria': 'Custom name for your clients',
-    'onboarding.step2.scheduling': 'Do you schedule appointments with your {clientLabel}?',
+    'onboarding.step2.scheduling': 'Do you schedule bookings with your {clientLabel}?',
     'onboarding.step2.schedulingYes': 'Yes',
     'onboarding.step2.schedulingNo': 'No',
     'onboarding.step2.billing': 'Do you want to track payments and collections?',

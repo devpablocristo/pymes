@@ -142,7 +142,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/products", h.ListProducts)
 	internal.GET("/products/:id", h.GetProduct)
 	internal.GET("/services/:id", h.GetService)
-	// Legacy appointment routes removidos — verticales usan /scheduling/bookings via schedulingHandler
+	// Verticales usan /scheduling/bookings via schedulingHandler
 	internal.POST("/in-app-notifications", h.CreateInAppNotification)
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)

@@ -18,6 +18,7 @@ import (
 type usecasesPort interface {
 	SalesSummary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.SalesSummary, error)
 	SalesByProduct(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByProductItem, error)
+	SalesByService(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error)
 	SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error)
 	SalesByPayment(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByPaymentItem, error)
 	InventoryValuation(ctx context.Context, orgID uuid.UUID) ([]reportdomain.InventoryValuationItem, float64, error)
@@ -35,6 +36,7 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/reports/sales-summary", rbac.RequirePermission("reports", "read"), h.SalesSummary)
 	auth.GET("/reports/sales-by-product", rbac.RequirePermission("reports", "read"), h.SalesByProduct)
+	auth.GET("/reports/sales-by-service", rbac.RequirePermission("reports", "read"), h.SalesByService)
 	auth.GET("/reports/sales-by-customer", rbac.RequirePermission("reports", "read"), h.SalesByCustomer)
 	auth.GET("/reports/sales-by-payment", rbac.RequirePermission("reports", "read"), h.SalesByPayment)
 	auth.GET("/reports/inventory-valuation", rbac.RequirePermission("reports", "read"), h.InventoryValuation)
@@ -71,6 +73,23 @@ func (h *Handler) SalesByProduct(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.SalesByProductResponse{
+		From:  from.Format("2006-01-02"),
+		To:    to.Format("2006-01-02"),
+		Items: items,
+	})
+}
+
+func (h *Handler) SalesByService(c *gin.Context) {
+	orgID, from, to, ok := h.readAuthAndRange(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.SalesByService(c.Request.Context(), orgID, from, to)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.SalesByServiceResponse{
 		From:  from.Format("2006-01-02"),
 		To:    to.Format("2006-01-02"),
 		Items: items,

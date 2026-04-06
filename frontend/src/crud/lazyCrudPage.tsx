@@ -18,7 +18,7 @@ type CrudModule =
 const crudModulePromises = new Map<string, Promise<CrudModule>>();
 
 function resolveCrudModuleGroup(resourceId: string): string {
-  if (['customers', 'suppliers', 'products', 'priceLists', 'quotes', 'sales', 'purchases'].includes(resourceId)) {
+  if (['customers', 'suppliers', 'products', 'services', 'priceLists', 'quotes', 'sales', 'purchases'].includes(resourceId)) {
     return 'commercial';
   }
   if (
@@ -26,8 +26,6 @@ function resolveCrudModuleGroup(resourceId: string): string {
       'returns',
       'creditNotes',
       'cashflow',
-      'inventory',
-      'inventoryMovements',
       'payments',
       'recurring',
     ].includes(resourceId)

@@ -50,6 +50,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/services"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
@@ -123,6 +124,7 @@ func InitializeApp() *app.App {
 	customersRepo := customers.NewRepository(db)
 	suppliersRepo := suppliers.NewRepository(db)
 	productsRepo := products.NewRepository(db)
+	servicesRepo := services.NewRepository(db)
 	inventoryRepo := inventory.NewRepository(db)
 	cashflowRepo := cashflow.NewRepository(db)
 	salesRepo := sales.NewRepository(db)
@@ -155,6 +157,7 @@ func InitializeApp() *app.App {
 	customersUC := customers.NewUsecases(customersRepo, auditUC)
 	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
 	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
+	servicesUC := services.NewUsecases(servicesRepo, auditUC)
 	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC, sales.WithTimeline(timelineUC), sales.WithWebhooks(outwebhooksUC))
 	accountsUC := accounts.NewUsecases(accountsRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
@@ -233,6 +236,7 @@ func InitializeApp() *app.App {
 	customersHandler := customers.NewHandler(customersUC)
 	suppliersHandler := suppliers.NewHandler(suppliersUC)
 	productsHandler := products.NewHandler(productsUC)
+	servicesHandler := services.NewHandler(servicesUC)
 	inventoryHandler := inventory.NewHandler(inventoryUC)
 	cashflowHandler := cashflow.NewHandler(cashflowUC)
 	salesHandler := sales.NewHandler(salesUC)
@@ -266,7 +270,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -321,6 +325,7 @@ func InitializeApp() *app.App {
 	priceListsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	suppliersHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	productsHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	servicesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	inventoryHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	procurementHandler.RegisterRoutes(authGroup, rbacMiddleware)

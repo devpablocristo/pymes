@@ -138,15 +138,16 @@ func (h *Handler) ListCatalog(c *gin.Context) {
 	}
 	items := make([]map[string]any, 0, len(links))
 	for _, l := range links {
-		items = append(items, map[string]any{
+		item := map[string]any{
 			"id":                 l.ID.String(),
 			"profile_id":         l.ProfileID.String(),
-			"product_id":         l.ProductID.String(),
+			"service_id":         l.ServiceID.String(),
 			"public_description": l.PublicDescription,
 			"display_order":      l.DisplayOrder,
 			"is_featured":        l.IsFeatured,
 			"metadata":           l.Metadata,
-		})
+		}
+		items = append(items, item)
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }

@@ -13,8 +13,8 @@ DECLARE
     p1 uuid;
     p2 uuid;
     p3 uuid;
-    p4 uuid;
-    p5 uuid;
+    svc1 uuid;
+    svc2 uuid;
     q1 uuid;
     sale1 uuid;
     sale2 uuid;
@@ -69,42 +69,49 @@ BEGIN
     -- Índice único (org_id, sku) es parcial → no sirve para ON CONFLICT; upsert manual.
     SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
     IF p1 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags)
-        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/1'), v_org, 'product', 'DEMO-PROD-001', 'Producto Demo A', 'Producto físico A', 'unit', 15000, 9000, 21, true, ARRAY['demo']);
+        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/1'), v_org, 'product', 'DEMO-PROD-001', 'Producto Demo A', 'Producto físico A', 'unit', 15000, 'ARS', 9000, 21, true, true, ARRAY['demo']);
         SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
     SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
     IF p2 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags)
-        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/2'), v_org, 'product', 'DEMO-PROD-002', 'Producto Demo B', 'Producto físico B', 'unit', 9500, 6000, 21, true, ARRAY['demo']);
+        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/2'), v_org, 'product', 'DEMO-PROD-002', 'Producto Demo B', 'Producto físico B', 'unit', 9500, 'ARS', 6000, 21, true, true, ARRAY['demo']);
         SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
     SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
     IF p3 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags)
-        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/3'), v_org, 'product', 'DEMO-PROD-003', 'Producto Demo C', 'Producto físico C', 'unit', 7300, 4200, 21, true, ARRAY['demo']);
+        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/3'), v_org, 'product', 'DEMO-PROD-003', 'Producto Demo C', 'Producto físico C', 'unit', 7300, 'ARS', 4200, 21, true, true, ARRAY['demo']);
         SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p4 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
-    IF p4 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags)
-        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/4'), v_org, 'service', 'DEMO-SVC-001', 'Servicio Demo Instalación', 'Servicio de instalación', 'hr', 25000, 12000, 21, false, ARRAY['demo']);
-        SELECT id INTO p4 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    IF svc1 IS NULL THEN
+        INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
+        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/4'), v_org, 'DEMO-SVC-001', 'Servicio Demo Instalación', 'Servicio de instalación', 'general', 25000, 12000, 21, 'ARS', 60, true, ARRAY['demo'], '{}'::jsonb);
+        SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p5 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
-    IF p5 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags)
-        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/5'), v_org, 'service', 'DEMO-SVC-002', 'Servicio Demo Mantenimiento', 'Servicio de mantenimiento', 'hr', 12000, 7000, 21, false, ARRAY['demo']);
-        SELECT id INTO p5 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    IF svc2 IS NULL THEN
+        INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
+        VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/5'), v_org, 'DEMO-SVC-002', 'Servicio Demo Mantenimiento', 'Servicio de mantenimiento', 'general', 12000, 7000, 21, 'ARS', 45, true, ARRAY['demo'], '{}'::jsonb);
+        SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    IF p1 IS NULL OR p2 IS NULL OR p3 IS NULL OR p4 IS NULL OR p5 IS NULL THEN
-        RAISE EXCEPTION 'pymes seed: missing product ids after upsert for org %', v_org;
+    IF p1 IS NULL OR p2 IS NULL OR p3 IS NULL OR svc1 IS NULL OR svc2 IS NULL THEN
+        RAISE EXCEPTION 'pymes seed: missing catalog ids after upsert for org %', v_org;
     END IF;
+
+    UPDATE products
+       SET deleted_at = COALESCE(deleted_at, now()),
+           updated_at = now()
+     WHERE org_id = v_org
+       AND type = 'service'
+       AND sku IN ('DEMO-SVC-001', 'DEMO-SVC-002');
 
     INSERT INTO stock_levels (org_id, product_id, quantity, min_quantity)
     VALUES
@@ -125,11 +132,19 @@ BEGIN
         RAISE EXCEPTION 'pymes seed: missing quote PRE-00001 for org %', v_org;
     END IF;
 
-    INSERT INTO quote_items (id, quote_id, product_id, description, quantity, unit_price, tax_rate, subtotal, sort_order)
+    INSERT INTO quote_items (id, quote_id, product_id, service_id, description, quantity, unit_price, tax_rate, subtotal, sort_order)
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/quote-item/1'), q1, p1, 'Producto Demo A', 1, 15000, 21, 15000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/quote-item/2'), q1, p4, 'Servicio Demo Instalación', 1, 25000, 21, 25000, 2)
-    ON CONFLICT (id) DO NOTHING;
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/quote-item/1'), q1, p1, NULL, 'Producto Demo A', 1, 15000, 21, 15000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/quote-item/2'), q1, NULL, svc1, 'Servicio Demo Instalación', 1, 25000, 21, 25000, 2)
+    ON CONFLICT (id) DO UPDATE
+        SET product_id = EXCLUDED.product_id,
+            service_id = EXCLUDED.service_id,
+            description = EXCLUDED.description,
+            quantity = EXCLUDED.quantity,
+            unit_price = EXCLUDED.unit_price,
+            tax_rate = EXCLUDED.tax_rate,
+            subtotal = EXCLUDED.subtotal,
+            sort_order = EXCLUDED.sort_order;
 
     INSERT INTO sales (id, org_id, number, party_id, party_name, quote_id, status, payment_method, subtotal, tax_total, total, currency, notes, created_by)
     VALUES
@@ -143,12 +158,21 @@ BEGIN
         RAISE EXCEPTION 'pymes seed: missing sale rows for org %', v_org;
     END IF;
 
-    INSERT INTO sale_items (id, sale_id, product_id, description, quantity, unit_price, cost_price, tax_rate, subtotal, sort_order)
+    INSERT INTO sale_items (id, sale_id, product_id, service_id, description, quantity, unit_price, cost_price, tax_rate, subtotal, sort_order)
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/1'), sale1, p1, 'Producto Demo A', 1, 15000, 9000, 21, 15000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/2'), sale1, p4, 'Servicio Demo Instalación', 1, 25000, 12000, 21, 25000, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/3'), sale2, p2, 'Producto Demo B', 1, 9500, 6000, 21, 9500, 1)
-    ON CONFLICT (id) DO NOTHING;
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/1'), sale1, p1, NULL, 'Producto Demo A', 1, 15000, 9000, 21, 15000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/2'), sale1, NULL, svc1, 'Servicio Demo Instalación', 1, 25000, 12000, 21, 25000, 2),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/3'), sale2, p2, NULL, 'Producto Demo B', 1, 9500, 6000, 21, 9500, 1)
+    ON CONFLICT (id) DO UPDATE
+        SET product_id = EXCLUDED.product_id,
+            service_id = EXCLUDED.service_id,
+            description = EXCLUDED.description,
+            quantity = EXCLUDED.quantity,
+            unit_price = EXCLUDED.unit_price,
+            cost_price = EXCLUDED.cost_price,
+            tax_rate = EXCLUDED.tax_rate,
+            subtotal = EXCLUDED.subtotal,
+            sort_order = EXCLUDED.sort_order;
 
     INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by)
     VALUES

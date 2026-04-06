@@ -64,7 +64,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 			if id == uuid.Nil {
 				id = uuid.New()
 			}
-			items = append(items, models.PurchaseItemModel{ID: id, PurchaseID: purchaseRow.ID, ProductID: pid, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
+			items = append(items, models.PurchaseItemModel{ID: id, PurchaseID: purchaseRow.ID, ProductID: pid, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 		}
 		if len(items) > 0 {
 			if err := tx.Create(&items).Error; err != nil {
@@ -124,7 +124,7 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 			if id == uuid.Nil {
 				id = uuid.New()
 			}
-			items = append(items, models.PurchaseItemModel{ID: id, PurchaseID: in.ID, ProductID: item.ProductID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
+			items = append(items, models.PurchaseItemModel{ID: id, PurchaseID: in.ID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 		}
 		if len(items) > 0 {
 			if err := tx.Create(&items).Error; err != nil {
@@ -247,7 +247,7 @@ func totals(items []purchasesdomain.PurchaseItem) (float64, float64, float64) {
 func toDomain(row models.PurchaseModel, items []models.PurchaseItemModel) purchasesdomain.Purchase {
 	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range items {
-		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
+		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 	}
 	return out
 }

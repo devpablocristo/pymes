@@ -34,6 +34,7 @@ type ModuleListItem = {
   group: string;
   navLabel: string;
   icon: string;
+  customRoute?: string;
 };
 function Glyph({ label }: { label: string }) {
   return <span className="sidebar-token">{label}</span>;
@@ -57,6 +58,7 @@ export function Shell({ children }: { children: ReactNode }) {
             group: module.group,
             navLabel: module.navLabel,
             icon: module.icon,
+            customRoute: module.customRoute,
           })),
         });
       }
@@ -84,18 +86,18 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const professionalsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/professionals/teachers', label: t('shell.nav.teachers'), icon: teachersIcon },
-      { to: '/professionals/teachers/specialties', label: t('shell.nav.teachersSpecialties'), icon: specialtiesIcon },
-      { to: '/professionals/teachers/intakes', label: t('shell.nav.teachersIntakes'), icon: documentIcon },
-      { to: '/professionals/teachers/sessions', label: t('shell.nav.teachersSessions'), icon: clockIcon },
+      { to: '/modules/teachers', label: t('shell.nav.teachers'), icon: teachersIcon },
+      { to: '/modules/specialties', label: t('shell.nav.teachersSpecialties'), icon: specialtiesIcon },
+      { to: '/modules/intakes', label: t('shell.nav.teachersIntakes'), icon: documentIcon },
+      { to: '/modules/sessions', label: t('shell.nav.teachersSessions'), icon: clockIcon },
     ],
     [t],
   );
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/workshops/auto-repair/vehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
-      { to: '/workshops/auto-repair/services', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
+      { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
+      { to: '/modules/workshopServices', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
       { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
     ],
     [t],
@@ -103,8 +105,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/workshops/bike-shop/bicycles', label: t('shell.nav.bikeBicycles'), icon: bikeIcon },
-      { to: '/workshops/bike-shop/services', label: t('shell.nav.bikeServices'), icon: wrenchIcon },
+      { to: '/modules/bikeBicycles', label: t('shell.nav.bikeBicycles'), icon: bikeIcon },
+      { to: '/modules/bikeShopServices', label: t('shell.nav.bikeServices'), icon: wrenchIcon },
       { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: documentIcon },
     ],
     [t],
@@ -112,16 +114,16 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/beauty/salon/staff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
-      { to: '/beauty/salon/services', label: t('shell.nav.beautyServices'), icon: beautyIcon },
+      { to: '/modules/beautyStaff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
+      { to: '/modules/beautySalonServices', label: t('shell.nav.beautyServices'), icon: beautyIcon },
     ],
     [t],
   );
 
   const restaurantsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/restaurants/dining/areas', label: t('shell.nav.restaurantAreas'), icon: dashboardIcon },
-      { to: '/restaurants/dining/tables', label: t('shell.nav.restaurantTables'), icon: utensilsIcon },
+      { to: '/modules/restaurantDiningAreas', label: t('shell.nav.restaurantAreas'), icon: dashboardIcon },
+      { to: '/modules/restaurantDiningTables', label: t('shell.nav.restaurantTables'), icon: utensilsIcon },
       { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: clockIcon },
     ],
     [t],
@@ -150,7 +152,7 @@ export function Shell({ children }: { children: ReactNode }) {
             localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
           )
           .map((module) => ({
-            to: `/modules/${module.id}`,
+            to: module.customRoute ?? `/modules/${module.id}`,
             label: localizeUiText(vocab(module.navLabel)),
             icon: <Glyph label={module.icon} />,
           })),

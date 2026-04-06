@@ -30,6 +30,7 @@ type QuoteItem struct {
 	ID          uuid.UUID  `json:"id"`
 	QuoteID     uuid.UUID  `json:"quote_id"`
 	ProductID   *uuid.UUID `json:"product_id,omitempty"`
+	ServiceID   *uuid.UUID `json:"service_id,omitempty"`
 	Description string     `json:"description"`
 	Quantity    float64    `json:"quantity"`
 	UnitPrice   float64    `json:"unit_price"`

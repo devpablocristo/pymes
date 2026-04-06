@@ -60,7 +60,7 @@ describe('defaultCanonStatusForKanbanPhase', () => {
     ['wo_quote', 'quote_pending'],
     ['wo_shop', 'in_progress'],
     ['wo_exit', 'ready_for_pickup'],
-    ['wo_closed', null],
+    ['wo_closed', 'invoiced'],
   ])('phase %j defaults to %j', (phase, status) => {
     expect(defaultCanonStatusForKanbanPhase(phase)).toBe(status);
   });

@@ -32,6 +32,14 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 - una vertical no importa `usecases`, `repositories` ni `handlers` internos de otra
 - `shared` no es un atajo para mezclar dominio
 
+## Catálogo comercial horizontal
+
+- `products` y `services` son catálogos horizontales distintos dentro de `pymes-core`.
+- `products` modela bienes con lógica de stock; `services` modela vendibles no inventariables.
+- La persistencia del catálogo horizontal de servicios vive en `services`.
+- Las verticales extienden por referencia (`linked_service_id`) en sus propios perfiles, no embebiendo campos verticales en el catálogo horizontal.
+- `scheduling_services` no es el catálogo maestro: es una capa operativa de agenda con vínculo opcional a `services`.
+
 ## Reglas de backend vertical
 
 - los modulos de vertical siguen la misma forma interna: `handler.go`, `repository.go`, `usecases.go`

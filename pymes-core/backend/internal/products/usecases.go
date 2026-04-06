@@ -15,13 +15,12 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error)
 	Create(ctx context.Context, in productdomain.Product) (productdomain.Product, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 	Update(ctx context.Context, in productdomain.Product) (productdomain.Product, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
 	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type InventoryPort interface {
@@ -51,41 +50,39 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if in.Type == "" {
-		in.Type = "product"
-	}
-	if in.Type != "product" && in.Type != "service" {
-		return productdomain.Product{}, fmt.Errorf("invalid type: %w", httperrors.ErrBadInput)
-	}
-	if in.Type == "service" {
-		in.TrackStock = false
-	}
 	if in.Unit == "" {
 		in.Unit = "unit"
 	}
+	if strings.TrimSpace(in.Currency) == "" {
+		in.Currency = "ARS"
+	}
 	out, err := u.repo.Create(ctx, in)
 	if err != nil {
+		if errors.Is(err, ErrAlreadyExists) {
+			return productdomain.Product{}, fmt.Errorf("product already exists: %w", httperrors.ErrConflict)
+		}
 		return productdomain.Product{}, err
 	}
 	if out.TrackStock && u.inventory != nil {
 		_ = u.inventory.EnsureStockLevel(ctx, out.OrgID, out.ID)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "product.created", "product", out.ID.String(), map[string]any{"name": out.Name, "type": out.Type})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "product.created", "product", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
 
 type UpdateInput struct {
-	Type        *string
 	SKU         *string
 	Name        *string
 	Description *string
 	Unit        *string
 	Price       *float64
+	Currency    *string
 	CostPrice   *float64
 	TaxRate     *float64
 	TrackStock  *bool
+	IsActive    *bool
 	Tags        *[]string
 	Metadata    *map[string]any
 }
@@ -97,9 +94,6 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return productdomain.Product{}, err
-	}
-	if in.Type != nil {
-		current.Type = strings.TrimSpace(*in.Type)
 	}
 	if in.SKU != nil {
 		current.SKU = strings.TrimSpace(*in.SKU)
@@ -116,6 +110,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.Price != nil {
 		current.Price = *in.Price
 	}
+	if in.Currency != nil {
+		current.Currency = strings.TrimSpace(*in.Currency)
+	}
 	if in.CostPrice != nil {
 		current.CostPrice = *in.CostPrice
 	}
@@ -125,6 +122,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.TrackStock != nil {
 		current.TrackStock = *in.TrackStock
+	}
+	if in.IsActive != nil {
+		current.IsActive = *in.IsActive
 	}
 	if in.Tags != nil {
 		current.Tags = append([]string(nil), (*in.Tags)...)
@@ -136,17 +136,17 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if current.Type != "product" && current.Type != "service" {
-		return productdomain.Product{}, fmt.Errorf("invalid type: %w", httperrors.ErrBadInput)
-	}
-	if current.Type == "service" {
-		current.TrackStock = false
+	if strings.TrimSpace(current.Currency) == "" {
+		current.Currency = "ARS"
 	}
 
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
+		}
+		if errors.Is(err, ErrAlreadyExists) {
+			return productdomain.Product{}, fmt.Errorf("product already exists: %w", httperrors.ErrConflict)
 		}
 		return productdomain.Product{}, err
 	}
@@ -154,7 +154,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		_ = u.inventory.EnsureStockLevel(ctx, out.OrgID, out.ID)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "product.updated", "product", out.ID.String(), map[string]any{"name": out.Name, "type": out.Type})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "product.updated", "product", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
@@ -162,7 +162,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
 	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return productdomain.Product{}, err
@@ -170,26 +170,22 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdom
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "product.deleted", "product", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "product.archived", "product", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error) {
-	return u.repo.ListArchived(ctx, orgID)
-}
-
 func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
 	if err := u.repo.Restore(ctx, orgID, id); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return err
@@ -200,15 +196,15 @@ func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor strin
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "product.hard_deleted", "product", id.String(), map[string]any{})
+		u.audit.Log(ctx, orgID.String(), actor, "product.deleted", "product", id.String(), map[string]any{})
 	}
 	return nil
 }

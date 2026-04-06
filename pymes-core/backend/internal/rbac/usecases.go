@@ -387,7 +387,7 @@ func memberDefaultAllows(resource, action string) bool {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(resource)) {
-	case "customers", "suppliers", "products", "inventory", "sales", "quotes":
+	case "customers", "suppliers", "products", "services", "inventory", "sales", "quotes":
 		return true
 	default:
 		return false

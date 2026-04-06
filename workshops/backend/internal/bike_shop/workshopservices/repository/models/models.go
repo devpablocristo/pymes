@@ -18,7 +18,7 @@ type ServiceModel struct {
 	BasePrice       float64    `gorm:"not null;default:0"`
 	Currency        string     `gorm:"not null;default:'ARS'"`
 	TaxRate         float64    `gorm:"not null;default:21"`
-	LinkedProductID *uuid.UUID `gorm:"type:uuid"`
+	LinkedServiceID *uuid.UUID `gorm:"type:uuid"`
 	IsActive        bool       `gorm:"not null;default:true"`
 	ArchivedAt      *time.Time `gorm:"column:archived_at"`
 	CreatedAt       time.Time

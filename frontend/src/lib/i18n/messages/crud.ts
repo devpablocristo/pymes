@@ -18,6 +18,7 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.confirm.hint': 'Escribí {{word}} para confirmar',
     'crud.confirm.word': 'eliminar',
     'crud.confirm.placeholder': 'eliminar',
+    'crud.loadMore': 'Cargar más',
   },
   en: {
     'crud.title.archived': 'Archived {{labelPluralCap}}',
@@ -36,5 +37,6 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.confirm.hint': 'Type {{word}} to confirm',
     'crud.confirm.word': 'delete',
     'crud.confirm.placeholder': 'delete',
+    'crud.loadMore': 'Load more',
   },
 };

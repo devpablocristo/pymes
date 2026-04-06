@@ -90,7 +90,7 @@ def build_internal_tools(
         notes: str = "",
         appointment_id: str = "",
         customer_party_id: str = "",
-        product_id: str = "",
+        service_id: str = "",
     ) -> dict[str, Any]:
         _ = org_id
         data = {"profile_id": profile_id, "payload": {"notes": notes}}
@@ -98,8 +98,8 @@ def build_internal_tools(
             data["appointment_id"] = appointment_id
         if customer_party_id:
             data["customer_party_id"] = customer_party_id
-        if product_id:
-            data["product_id"] = product_id
+        if service_id:
+            data["service_id"] = service_id
         return await client.create_intake(auth, data=data)
 
     declarations.append(
@@ -113,7 +113,7 @@ def build_internal_tools(
                     "notes": {"type": "string", "description": "Notas adicionales"},
                     "appointment_id": {"type": "string", "description": "UUID del turno"},
                     "customer_party_id": {"type": "string", "description": "UUID del party del cliente"},
-                    "product_id": {"type": "string", "description": "UUID del producto asociado"},
+                    "service_id": {"type": "string", "description": "UUID del servicio asociado"},
                 },
                 "required": ["profile_id"],
             },

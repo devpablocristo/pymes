@@ -3,27 +3,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
+import { formatFetchErrorForUser } from '../lib/formatFetchError';
+import { useI18n } from '../lib/i18n';
 import { getNotificationPreferences, updateNotificationPreference } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import type { NotificationPreference } from '../lib/types';
 
-const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
-  welcome: 'Bienvenida',
-  plan_upgraded: 'Cambio de plan',
-  payment_failed: 'Fallo de pago',
-  subscription_canceled: 'Suscripción cancelada',
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  email: 'Correo',
-};
-
-function labelForType(code: string): string {
-  return NOTIFICATION_TYPE_LABELS[code] ?? code;
+function labelForType(code: string, t: (key: string, variables?: Record<string, string | number>) => string): string {
+  const key = `ai.notifications.preferences.types.${code}`;
+  const translated = t(key);
+  return translated === key ? code : translated;
 }
 
-function labelForChannel(code: string): string {
-  return CHANNEL_LABELS[code] ?? code;
+function labelForChannel(code: string, t: (key: string, variables?: Record<string, string | number>) => string): string {
+  const key = `ai.notifications.preferences.channels.${code}`;
+  const translated = t(key);
+  return translated === key ? code : translated;
 }
 
 type NotificationPreferencesPageProps = {
@@ -32,8 +27,13 @@ type NotificationPreferencesPageProps = {
 };
 
 export function NotificationPreferencesPage({ embedded = false }: NotificationPreferencesPageProps) {
+  const { t } = useI18n();
   const npSearch = usePageSearch();
-  const npTextFn = useCallback((p: NotificationPreference) => `${p.notification_type} ${p.channel}`, []);
+  const npTextFn = useCallback(
+    (p: NotificationPreference) =>
+      `${p.notification_type} ${p.channel} ${labelForType(p.notification_type, t)} ${labelForChannel(p.channel, t)}`,
+    [t],
+  );
   const queryClient = useQueryClient();
   const preferencesQuery = useQuery({
     queryKey: queryKeys.notifications.preferences,
@@ -52,12 +52,15 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
       await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences });
     },
   });
-  const error =
+  const rawError =
     preferencesQuery.error instanceof Error
-      ? preferencesQuery.error.message
+      ? preferencesQuery.error
       : toggleMutation.error instanceof Error
-        ? toggleMutation.error.message
-        : '';
+        ? toggleMutation.error
+        : null;
+  const error = rawError
+    ? formatFetchErrorForUser(rawError, t('ai.notifications.preferences.error.load'))
+    : '';
 
   const body = (
     <>
@@ -66,34 +69,41 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
       <div className="card">
         {preferencesQuery.isLoading ? (
           <div className="empty-state">
-            <p>Cargando…</p>
+            <p>{t('ai.notifications.preferences.loading')}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="empty-state">
-            <p>No hay tipos de notificación disponibles. Actualizá el backend o contactá soporte.</p>
+            <p>{t('ai.notifications.preferences.empty')}</p>
+          </div>
+        ) : filteredPrefs.length === 0 ? (
+          <div className="empty-state">
+            <p>{t('ai.notifications.preferences.emptySearch')}</p>
           </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Tipo</th>
-                  <th>Canal</th>
-                  <th>Activo</th>
+                  <th>{t('ai.notifications.preferences.table.type')}</th>
+                  <th>{t('ai.notifications.preferences.table.channel')}</th>
+                  <th>{t('ai.notifications.preferences.table.active')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPrefs.map((item) => (
                   <tr key={`${item.notification_type}-${item.channel}`}>
-                    <td className="text-semibold">{labelForType(item.notification_type)}</td>
+                    <td className="text-semibold">{labelForType(item.notification_type, t)}</td>
                     <td>
-                      <span className="badge badge-neutral">{labelForChannel(item.channel)}</span>
+                      <span className="badge badge-neutral">{labelForChannel(item.channel, t)}</span>
                     </td>
                     <td>
                       <label className="toggle" onClick={() => void toggleMutation.mutateAsync(item)}>
                         <input
                           type="checkbox"
-                          aria-label={`Activar ${labelForType(item.notification_type)} por ${labelForChannel(item.channel)}`}
+                          aria-label={`${t('ai.notifications.preferences.toggleAction')} ${labelForType(
+                            item.notification_type,
+                            t,
+                          )} ${t('ai.notifications.preferences.toggleVia')} ${labelForChannel(item.channel, t)}`}
                           checked={item.enabled}
                           disabled={toggleMutation.isPending}
                           readOnly
@@ -117,7 +127,10 @@ export function NotificationPreferencesPage({ embedded = false }: NotificationPr
   }
 
   return (
-    <PageLayout title="Preferencias de notificación" lead="Elegí qué avisos recibís por canal.">
+    <PageLayout
+      title={t('ai.notifications.preferences.pageTitle')}
+      lead={t('ai.notifications.preferences.pageLead')}
+    >
       {body}
     </PageLayout>
   );

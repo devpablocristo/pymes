@@ -10,12 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/handler/dto"
+	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/handler/dto"
-	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -139,10 +139,10 @@ func (h *Handler) Create(c *gin.Context) {
 			return
 		}
 	}
-	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		session.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
-		if session.ProductID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+	if req.ServiceID != nil && strings.TrimSpace(*req.ServiceID) != "" {
+		session.ServiceID = vertvalues.ParseOptionalUUID(*req.ServiceID)
+		if session.ServiceID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
 			return
 		}
 	}
@@ -235,9 +235,9 @@ func toSessionItem(in domain.Session) dto.SessionItem {
 		s := in.CustomerPartyID.String()
 		item.CustomerPartyID = &s
 	}
-	if in.ProductID != nil {
-		s := in.ProductID.String()
-		item.ProductID = &s
+	if in.ServiceID != nil {
+		s := in.ServiceID.String()
+		item.ServiceID = &s
 	}
 	if in.StartedAt != nil {
 		s := in.StartedAt.UTC().Format(time.RFC3339)

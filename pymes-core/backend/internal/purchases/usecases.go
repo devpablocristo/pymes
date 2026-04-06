@@ -179,7 +179,7 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 		if description == "" {
 			description = "Item"
 		}
-		items = append(items, purchasesdomain.PurchaseItem{ID: item.ID, ProductID: item.ProductID, Description: description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate, Subtotal: item.Quantity * item.UnitCost, SortOrder: idx + 1})
+		items = append(items, purchasesdomain.PurchaseItem{ID: item.ID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate, Subtotal: item.Quantity * item.UnitCost, SortOrder: idx + 1})
 	}
 	_ = currency
 	in.Items = items

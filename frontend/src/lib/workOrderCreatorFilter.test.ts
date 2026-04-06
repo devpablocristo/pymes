@@ -38,12 +38,12 @@ describe('formatWorkOrderActorLabel', () => {
 });
 
 describe('applyWorkOrderCreatorFilter', () => {
-  const baseOpts = { clerkEnabled: true, clerkUserLoaded: true, selfId: 'user_alice' };
+  const baseOpts = { authEnabled: true, authUserLoaded: true, selfId: 'user_alice' };
 
   it('returns all rows when clerk is disabled', () => {
     const result = applyWorkOrderCreatorFilter(ROWS, {
       ...baseOpts,
-      clerkEnabled: false,
+      authEnabled: false,
       creatorFilter: { mode: 'pick', actors: new Set(['user_bob']) },
     });
     expect(result).toHaveLength(4);
@@ -52,7 +52,7 @@ describe('applyWorkOrderCreatorFilter', () => {
   it('returns all rows when clerk user not loaded', () => {
     const result = applyWorkOrderCreatorFilter(ROWS, {
       ...baseOpts,
-      clerkUserLoaded: false,
+      authUserLoaded: false,
       creatorFilter: { mode: 'pick', actors: new Set(['user_bob']) },
     });
     expect(result).toHaveLength(4);

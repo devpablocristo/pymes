@@ -7,8 +7,6 @@ import {
   pymesAssistantChat,
   listConversations,
   getConversation,
-  type CommercialChatRequest,
-  type PymesAssistantAction,
   type ConversationSummary,
 } from '../lib/aiApi';
 import { humanInsightScopeLabel, humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
@@ -19,7 +17,7 @@ import {
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
-import type { PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
+import type { CommercialChatRequest, PymesAssistantAction, PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { queryKeys } from '../lib/queryKeys';
@@ -109,7 +107,11 @@ type Msg = {
   routedLabel?: string;
   metaLabel?: string;
   badgeLabels?: string[];
+  badgeTones?: MsgBadgeTone[];
 };
+
+type MsgBadgeTone = 'ventas' | 'cobros' | 'compras' | 'clientes' | 'productos' | 'general' | 'neutral';
+type AssistantReplyRow = Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels' | 'badgeTones'>;
 
 let nextMsgId = 100;
 
@@ -149,19 +151,18 @@ function kpiTrendClassName(trend?: 'up' | 'down' | 'flat' | 'unknown' | null): s
   return 'cht__kpi-item-trend';
 }
 
-function badgeClassName(label: string): string {
-  if (label === 'Ventas') return 'cht__msg-badge cht__msg-badge--ventas';
-  if (label === 'Sales') return 'cht__msg-badge cht__msg-badge--ventas';
-  if (label === 'Cobros') return 'cht__msg-badge cht__msg-badge--cobros';
-  if (label === 'Collections') return 'cht__msg-badge cht__msg-badge--cobros';
-  if (label === 'Compras') return 'cht__msg-badge cht__msg-badge--compras';
-  if (label === 'Purchases') return 'cht__msg-badge cht__msg-badge--compras';
-  if (label === 'Clientes') return 'cht__msg-badge cht__msg-badge--clientes';
-  if (label === 'Customers') return 'cht__msg-badge cht__msg-badge--clientes';
-  if (label === 'Productos') return 'cht__msg-badge cht__msg-badge--productos';
-  if (label === 'Products') return 'cht__msg-badge cht__msg-badge--productos';
-  if (label === 'General') return 'cht__msg-badge cht__msg-badge--general';
-  return 'cht__msg-badge cht__msg-badge--neutral';
+function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
+  if (mode === 'ventas' || mode === 'internal_sales') return 'ventas';
+  if (mode === 'cobros') return 'cobros';
+  if (mode === 'compras' || mode === 'internal_procurement') return 'compras';
+  if (mode === 'clientes') return 'clientes';
+  if (mode === 'productos') return 'productos';
+  if (mode === 'general' || mode === 'copilot') return 'general';
+  return 'neutral';
+}
+
+function badgeClassName(tone: MsgBadgeTone): string {
+  return `cht__msg-badge cht__msg-badge--${tone}`;
 }
 
 function localeForLanguage(language: LanguageCode): string {
@@ -179,6 +180,13 @@ function formatIsoTime(iso: string | null | undefined, language: LanguageCode): 
   } catch {
     return '';
   }
+}
+
+function resolvePreferredLanguage(contentLanguage: string | undefined, fallbackLanguage: LanguageCode): LanguageCode {
+  if (contentLanguage === 'en' || contentLanguage === 'es') {
+    return contentLanguage;
+  }
+  return fallbackLanguage;
 }
 
 function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
@@ -232,11 +240,15 @@ function buildAssistantBadgeLabels(reply: PymesAssistantChatResponse, language: 
   return [humanBadgeCategoryLabel(reply.routed_agent || reply.routed_mode, language)];
 }
 
+function buildAssistantBadgeTones(reply: PymesAssistantChatResponse): MsgBadgeTone[] {
+  return [badgeToneForRoute(reply.routed_agent || reply.routed_mode)];
+}
+
 function applyPymesReply(
   reply: PymesAssistantChatResponse,
   language: LanguageCode,
   t: (key: string, variables?: Record<string, string | number>) => string,
-): Array<Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels'>> {
+): AssistantReplyRow[] {
   const agentLabel = humanRoutedLabel(reply.routed_agent || reply.routed_mode, language);
   const sourceLabel = humanRoutingSourceLabel(reply.routing_source, language);
   const routedLabel = agentLabel === sourceLabel ? agentLabel : `${agentLabel} · ${sourceLabel}`;
@@ -247,9 +259,52 @@ function applyPymesReply(
       routedLabel,
       metaLabel: buildAssistantMetaLabel(reply, language, t),
       badgeLabels: buildAssistantBadgeLabels(reply, language),
+      badgeTones: buildAssistantBadgeTones(reply),
       blocks: reply.blocks ?? [],
     },
   ];
+}
+
+function materializeAssistantReplyRows(contactId: string, rows: AssistantReplyRow[], language: LanguageCode): Msg[] {
+  const time = formatChatTime(language);
+  return rows.map((row) => ({
+    id: String(++nextMsgId),
+    contactId,
+    text: row.text,
+    blocks: row.blocks,
+    fromMe: row.fromMe,
+    time,
+    routedLabel: row.routedLabel,
+    metaLabel: row.metaLabel,
+    badgeLabels: row.badgeLabels,
+    badgeTones: row.badgeTones,
+  }));
+}
+
+function buildAssistantMessages(
+  contactId: string,
+  reply: PymesAssistantChatResponse,
+  language: LanguageCode,
+  t: (key: string, variables?: Record<string, string | number>) => string,
+): Msg[] {
+  return materializeAssistantReplyRows(contactId, applyPymesReply(reply, language, t), language);
+}
+
+function resolveInputPrompt(
+  kind: ContactKind,
+  routeHint: ManualRouteHint | undefined,
+  language: LanguageCode,
+  t: (key: string, variables?: Record<string, string | number>) => string,
+): string {
+  if (kind === 'human') {
+    return t('ai.chat.input.humanPlaceholder');
+  }
+  if (routeHint) {
+    return t('ai.chat.input.routePlaceholder', {
+      label: humanRoutedLabel(routeHint, language),
+    });
+  }
+  return t('ai.chat.input.defaultPlaceholder');
 }
 
 export function UnifiedChatPage() {
@@ -290,6 +345,9 @@ export function UnifiedChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const notificationHandoffInFlightRef = useRef(false);
   const initialConversationHydratedRef = useRef(false);
+  const skipInitialAiHydrationRef = useRef(
+    typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem(NOTIFICATION_CHAT_HANDOFF_KEY)),
+  );
   const [historyConversationId, setHistoryConversationId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -318,6 +376,10 @@ export function UnifiedChatPage() {
 
   useEffect(() => {
     if (initialConversationHydratedRef.current) return;
+    if (skipInitialAiHydrationRef.current) {
+      initialConversationHydratedRef.current = true;
+      return;
+    }
     if (savedConversations.length > 0 && !chatIds[AI_PYMES_ID]) {
       const latest = savedConversations[0];
       initialConversationHydratedRef.current = true;
@@ -360,6 +422,10 @@ export function UnifiedChatPage() {
     [pendingConfirmationsByContact, active],
   );
   const activePendingRouteHint = pendingRouteHintsByContact[active];
+  const inputPrompt = useMemo(
+    () => resolveInputPrompt(activeDef.kind, activePendingRouteHint, language, t),
+    [activeDef.kind, activePendingRouteHint, language, t],
+  );
 
   const contactsView = useMemo(() => {
     return contactDefs.map((c) => {
@@ -397,10 +463,28 @@ export function UnifiedChatPage() {
       return;
     }
     notificationHandoffInFlightRef.current = true;
+    skipInitialAiHydrationRef.current = true;
+    initialConversationHydratedRef.current = true;
     sessionStorage.removeItem(NOTIFICATION_CHAT_HANDOFF_KEY);
 
     const text = buildHandoffUserMessage(handoff);
     setActive(AI_PYMES_ID);
+    setHistoryConversationId(null);
+    setChatIds((prev) => {
+      const next = { ...prev };
+      delete next[AI_PYMES_ID];
+      return next;
+    });
+    setPendingConfirmationsByContact((prev) => {
+      const next = { ...prev };
+      delete next[AI_PYMES_ID];
+      return next;
+    });
+    setPendingRouteHintsByContact((prev) => {
+      const next = { ...prev };
+      delete next[AI_PYMES_ID];
+      return next;
+    });
 
     const time = formatChatTime(language);
     const userMsg: Msg = {
@@ -411,7 +495,7 @@ export function UnifiedChatPage() {
       time,
       metaLabel: buildNotificationHandoffMetaLabel(handoff, language, t) ?? undefined,
     };
-    setMsgs((p) => [...p, userMsg]);
+    setMsgs((prev) => [...prev.filter((msg) => msg.contactId !== AI_PYMES_ID), userMsg]);
 
     setError('');
     const run = async () => {
@@ -421,26 +505,14 @@ export function UnifiedChatPage() {
           chat_id: null,
           confirmed_actions: [],
           route_hint: handoff.routedAgent === 'copilot' ? 'copilot' : undefined,
-          preferred_language: language,
+          preferred_language: resolvePreferredLanguage(handoff.contentLanguage, language),
         });
         setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.chat_id }));
         setPendingConfirmationsByContact((prev) => ({
           ...prev,
           [AI_PYMES_ID]: reply.pending_confirmations ?? [],
         }));
-        const additions = applyPymesReply(reply, language, t).map(
-          (row): Msg => ({
-            id: String(++nextMsgId),
-            contactId: AI_PYMES_ID,
-            text: row.text,
-            blocks: row.blocks,
-            fromMe: row.fromMe,
-            time: formatChatTime(language),
-            routedLabel: row.routedLabel,
-            metaLabel: row.metaLabel,
-            badgeLabels: row.badgeLabels,
-          }),
-        );
+        const additions = buildAssistantMessages(AI_PYMES_ID, reply, language, t);
         setMsgs((p) => [...p, ...additions]);
       } catch (err) {
         setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
@@ -533,19 +605,7 @@ export function UnifiedChatPage() {
             }));
           }
         }
-        const additions = applyPymesReply(reply, language, t).map(
-          (row): Msg => ({
-            id: String(++nextMsgId),
-            contactId: active,
-            text: row.text,
-            blocks: row.blocks,
-            fromMe: row.fromMe,
-            time: formatChatTime(language),
-            routedLabel: row.routedLabel,
-            metaLabel: row.metaLabel,
-            badgeLabels: row.badgeLabels,
-          }),
-        );
+        const additions = buildAssistantMessages(active, reply, language, t);
         setMsgs((p) => [...p, ...additions]);
       } catch (err) {
         setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
@@ -626,6 +686,7 @@ export function UnifiedChatPage() {
               fromMe: false,
               time: now,
               badgeLabels: [routeLabel],
+              badgeTones: [badgeToneForRoute(routeHint)],
             },
           ]);
           return;
@@ -724,8 +785,8 @@ export function UnifiedChatPage() {
               <div key={m.id} className={`cht__msg ${m.fromMe ? 'cht__msg--me' : 'cht__msg--them'}`}>
                 {m.badgeLabels && m.badgeLabels.length > 0 ? (
                   <div className="cht__msg-badges">
-                    {m.badgeLabels.map((badge) => (
-                      <span key={`${m.id}-${badge}`} className={badgeClassName(badge)}>
+                    {m.badgeLabels.map((badge, index) => (
+                      <span key={`${m.id}-${badge}`} className={badgeClassName(m.badgeTones?.[index] ?? 'neutral')}>
                         {badge}
                       </span>
                     ))}
@@ -865,24 +926,8 @@ export function UnifiedChatPage() {
           ) : null}
           <div className="cht__input-bar">
             <input
-              aria-label={
-                activeDef.kind === 'human'
-                  ? t('ai.chat.input.humanPlaceholder')
-                  : activePendingRouteHint
-                    ? t('ai.chat.input.routePlaceholder', {
-                        label: humanRoutedLabel(activePendingRouteHint, language),
-                      })
-                    : t('ai.chat.input.defaultPlaceholder')
-              }
-              placeholder={
-                activeDef.kind === 'human'
-                  ? t('ai.chat.input.humanPlaceholder')
-                  : activePendingRouteHint
-                    ? t('ai.chat.input.routePlaceholder', {
-                        label: humanRoutedLabel(activePendingRouteHint, language),
-                      })
-                    : t('ai.chat.input.defaultPlaceholder')
-              }
+              aria-label={inputPrompt}
+              placeholder={inputPrompt}
               value={input}
               disabled={busy}
               onChange={(e) => setInput(e.target.value)}
@@ -907,5 +952,3 @@ export function UnifiedChatPage() {
     </PageLayout>
   );
 }
-
-export default UnifiedChatPage;

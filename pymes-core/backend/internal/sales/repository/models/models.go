@@ -32,6 +32,7 @@ type SaleItemModel struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	SaleID      uuid.UUID  `gorm:"type:uuid;index;not null"`
 	ProductID   *uuid.UUID `gorm:"type:uuid"`
+	ServiceID   *uuid.UUID `gorm:"type:uuid"`
 	Description string
 	Quantity    float64 `gorm:"type:numeric(15,2)"`
 	UnitPrice   float64 `gorm:"type:numeric(15,2)"`

@@ -1,3 +1,4 @@
+// Package sales implements sales persistence and domain adapters.
 package sales
 
 import (
@@ -38,15 +39,36 @@ type ProductSnapshot struct {
 	TrackStock bool
 }
 
+type ServiceSnapshot struct {
+	ID        uuid.UUID
+	Name      string
+	Price     float64
+	CostPrice float64
+	TaxRate   *float64
+}
+
 func (r *Repository) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 	var row ProductSnapshot
 	err := r.db.WithContext(ctx).
 		Table("products").
 		Select("id, name, price, cost_price, tax_rate, track_stock").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, productID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, productID).
 		Take(&row).Error
 	if err != nil {
 		return ProductSnapshot{}, err
+	}
+	return row, nil
+}
+
+func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+	var row ServiceSnapshot
+	err := r.db.WithContext(ctx).
+		Table("services").
+		Select("id, name, sale_price as price, cost_price, tax_rate").
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, serviceID).
+		Take(&row).Error
+	if err != nil {
+		return ServiceSnapshot{}, err
 	}
 	return row, nil
 }
@@ -69,6 +91,7 @@ func (r *Repository) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (cu
 
 type CreateItemInput struct {
 	ProductID   *uuid.UUID
+	ServiceID   *uuid.UUID
 	Description string
 	Quantity    float64
 	UnitPrice   float64
@@ -130,6 +153,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 				ID:          uuid.New(),
 				SaleID:      saleRow.ID,
 				ProductID:   item.ProductID,
+				ServiceID:   item.ServiceID,
 				Description: strings.TrimSpace(item.Description),
 				Quantity:    item.Quantity,
 				UnitPrice:   item.UnitPrice,
@@ -343,6 +367,7 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 			ID:          row.ID,
 			SaleID:      row.SaleID,
 			ProductID:   row.ProductID,
+			ServiceID:   row.ServiceID,
 			Description: row.Description,
 			Quantity:    row.Quantity,
 			UnitPrice:   row.UnitPrice,

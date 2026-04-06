@@ -2,6 +2,7 @@ package dto
 
 type QuoteItemPayload struct {
 	ProductID   *string  `json:"product_id"`
+	ServiceID   *string  `json:"service_id"`
 	Description string   `json:"description"`
 	Quantity    float64  `json:"quantity" binding:"required"`
 	UnitPrice   float64  `json:"unit_price" binding:"required"`
@@ -34,6 +35,7 @@ type QuoteItemResponse struct {
 	ID          string  `json:"id"`
 	QuoteID     string  `json:"quote_id"`
 	ProductID   string  `json:"product_id,omitempty"`
+	ServiceID   string  `json:"service_id,omitempty"`
 	Description string  `json:"description"`
 	Quantity    float64 `json:"quantity"`
 	UnitPrice   float64 `json:"unit_price"`

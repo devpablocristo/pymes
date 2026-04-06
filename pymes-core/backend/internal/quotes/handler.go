@@ -416,6 +416,9 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 		if item.ProductID != nil {
 			out.ProductID = item.ProductID.String()
 		}
+		if item.ServiceID != nil {
+			out.ServiceID = item.ServiceID.String()
+		}
 		resp.Items = append(resp.Items, out)
 	}
 	return resp
@@ -432,8 +435,17 @@ func parseItemInputs(items []dto.QuoteItemPayload) ([]QuoteItemInput, error) {
 			}
 			productID = &id
 		}
+		var serviceID *uuid.UUID
+		if item.ServiceID != nil && strings.TrimSpace(*item.ServiceID) != "" {
+			id, err := uuid.Parse(strings.TrimSpace(*item.ServiceID))
+			if err != nil {
+				return nil, fmt.Errorf("invalid service_id")
+			}
+			serviceID = &id
+		}
 		out = append(out, QuoteItemInput{
 			ProductID:   productID,
+			ServiceID:   serviceID,
 			Description: item.Description,
 			Quantity:    item.Quantity,
 			UnitPrice:   item.UnitPrice,

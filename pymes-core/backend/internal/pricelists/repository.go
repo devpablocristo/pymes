@@ -28,7 +28,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, activeOnly bool,
 	}
 	out := make([]pricelistdomain.PriceList, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, modelToDomain(row, nil))
+		out = append(out, modelToDomain(row, nil, nil))
 	}
 	return out, nil
 }
@@ -45,13 +45,18 @@ func (r *Repository) Create(ctx context.Context, in pricelistdomain.PriceList) (
 		if err := tx.Create(&row).Error; err != nil {
 			return err
 		}
-		items := toItemModels(in.ID, in.Items)
-		if len(items) > 0 {
-			if err := tx.Create(&items).Error; err != nil {
+		productItems, serviceItems := toItemModels(in.ID, in.Items)
+		if len(productItems) > 0 {
+			if err := tx.Create(&productItems).Error; err != nil {
 				return err
 			}
 		}
-		out = modelToDomain(row, items)
+		if len(serviceItems) > 0 {
+			if err := tx.Create(&serviceItems).Error; err != nil {
+				return err
+			}
+		}
+		out = modelToDomain(row, productItems, serviceItems)
 		return nil
 	})
 	if err != nil {
@@ -69,7 +74,11 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelis
 	if err := r.db.WithContext(ctx).Where("price_list_id = ?", id).Find(&items).Error; err != nil {
 		return pricelistdomain.PriceList{}, err
 	}
-	return modelToDomain(row, items), nil
+	var serviceItems []models.ServicePriceListItemModel
+	if err := r.db.WithContext(ctx).Where("price_list_id = ?", id).Find(&serviceItems).Error; err != nil {
+		return pricelistdomain.PriceList{}, err
+	}
+	return modelToDomain(row, items, serviceItems), nil
 }
 
 func (r *Repository) Update(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error) {
@@ -86,9 +95,17 @@ func (r *Repository) Update(ctx context.Context, in pricelistdomain.PriceList) (
 		if err := tx.Where("price_list_id = ?", in.ID).Delete(&models.PriceListItemModel{}).Error; err != nil {
 			return err
 		}
-		items := toItemModels(in.ID, in.Items)
-		if len(items) > 0 {
-			if err := tx.Create(&items).Error; err != nil {
+		if err := tx.Where("price_list_id = ?", in.ID).Delete(&models.ServicePriceListItemModel{}).Error; err != nil {
+			return err
+		}
+		productItems, serviceItems := toItemModels(in.ID, in.Items)
+		if len(productItems) > 0 {
+			if err := tx.Create(&productItems).Error; err != nil {
+				return err
+			}
+		}
+		if len(serviceItems) > 0 {
+			if err := tx.Create(&serviceItems).Error; err != nil {
 				return err
 			}
 		}
@@ -116,18 +133,29 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func toItemModels(priceListID uuid.UUID, items []pricelistdomain.PriceListItem) []models.PriceListItemModel {
-	rows := make([]models.PriceListItemModel, 0, len(items))
+func toItemModels(priceListID uuid.UUID, items []pricelistdomain.PriceListItem) ([]models.PriceListItemModel, []models.ServicePriceListItemModel) {
+	productRows := make([]models.PriceListItemModel, 0, len(items))
+	serviceRows := make([]models.ServicePriceListItemModel, 0, len(items))
 	for _, item := range items {
-		rows = append(rows, models.PriceListItemModel{PriceListID: priceListID, ProductID: item.ProductID, Price: item.Price})
+		if item.ProductID != nil {
+			productRows = append(productRows, models.PriceListItemModel{PriceListID: priceListID, ProductID: *item.ProductID, Price: item.Price})
+		}
+		if item.ServiceID != nil {
+			serviceRows = append(serviceRows, models.ServicePriceListItemModel{PriceListID: priceListID, ServiceID: *item.ServiceID, Price: item.Price})
+		}
 	}
-	return rows
+	return productRows, serviceRows
 }
 
-func modelToDomain(row models.PriceListModel, items []models.PriceListItemModel) pricelistdomain.PriceList {
+func modelToDomain(row models.PriceListModel, items []models.PriceListItemModel, serviceItems []models.ServicePriceListItemModel) pricelistdomain.PriceList {
 	out := pricelistdomain.PriceList{ID: row.ID, OrgID: row.OrgID, Name: row.Name, Description: row.Description, IsDefault: row.IsDefault, Markup: row.Markup, IsActive: row.IsActive, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range items {
-		out.Items = append(out.Items, pricelistdomain.PriceListItem{ProductID: item.ProductID, Price: item.Price})
+		productID := item.ProductID
+		out.Items = append(out.Items, pricelistdomain.PriceListItem{ProductID: &productID, Price: item.Price})
+	}
+	for _, item := range serviceItems {
+		serviceID := item.ServiceID
+		out.Items = append(out.Items, pricelistdomain.PriceListItem{ServiceID: &serviceID, Price: item.Price})
 	}
 	return out
 }

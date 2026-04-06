@@ -128,11 +128,19 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 			}
 			productID = &parsed
 		}
+		var serviceID *uuid.UUID
+		if item.ServiceID != nil && strings.TrimSpace(*item.ServiceID) != "" {
+			parsed, err := uuid.Parse(strings.TrimSpace(*item.ServiceID))
+			if err != nil {
+				return CreateInput{}, httperrors.ErrBadInput
+			}
+			serviceID = &parsed
+		}
 		taxRate := 0.0
 		if item.TaxRate != nil {
 			taxRate = *item.TaxRate
 		}
-		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
+		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
 	return CreateInput{OrgID: orgID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }

@@ -142,7 +142,7 @@ export async function createAutoRepairService(data: {
   base_price?: number;
   currency?: string;
   tax_rate?: number;
-  linked_product_id?: string;
+  linked_service_id?: string;
   is_active?: boolean;
 }): Promise<AutoRepairService> {
   return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services`, { method: 'POST', body: data });
@@ -159,7 +159,7 @@ export async function updateAutoRepairService(
     base_price: number;
     currency: string;
     tax_rate: number;
-    linked_product_id: string;
+    linked_service_id: string;
     is_active: boolean;
   }>,
 ): Promise<AutoRepairService> {

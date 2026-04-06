@@ -142,8 +142,18 @@ func (h *Handler) Create(c *gin.Context) {
 			}
 			productID = &id
 		}
+		var serviceID *uuid.UUID
+		if it.ServiceID != nil && strings.TrimSpace(*it.ServiceID) != "" {
+			id, err := uuid.Parse(strings.TrimSpace(*it.ServiceID))
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
+				return
+			}
+			serviceID = &id
+		}
 		items = append(items, CreateSaleItemInput{
 			ProductID:   productID,
+			ServiceID:   serviceID,
 			Description: it.Description,
 			Quantity:    it.Quantity,
 			UnitPrice:   it.UnitPrice,
@@ -247,6 +257,9 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 		}
 		if item.ProductID != nil {
 			out.ProductID = item.ProductID.String()
+		}
+		if item.ServiceID != nil {
+			out.ServiceID = item.ServiceID.String()
 		}
 		resp.Items = append(resp.Items, out)
 	}

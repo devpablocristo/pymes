@@ -2,6 +2,7 @@ package dto
 
 type PurchaseItemPayload struct {
 	ProductID   *string  `json:"product_id,omitempty"`
+	ServiceID   *string  `json:"service_id,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Quantity    float64  `json:"quantity" binding:"required"`
 	UnitCost    float64  `json:"unit_cost" binding:"required"`

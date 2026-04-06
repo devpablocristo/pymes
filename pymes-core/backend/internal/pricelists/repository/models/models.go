@@ -27,3 +27,11 @@ type PriceListItemModel struct {
 }
 
 func (PriceListItemModel) TableName() string { return "price_list_items" }
+
+type ServicePriceListItemModel struct {
+	PriceListID uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ServiceID   uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Price       float64
+}
+
+func (ServicePriceListItemModel) TableName() string { return "service_price_list_items" }

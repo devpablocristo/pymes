@@ -1,8 +1,8 @@
 package workorders
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,8 +11,9 @@ import (
 	"gorm.io/gorm"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders/usecases/domain"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
 )
 
 type ListParams struct {
@@ -158,7 +159,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Status != nil {
 		nextRaw := strings.TrimSpace(*in.Status)
-		if err := validateWorkOrderStatusTransition(current.Status, nextRaw); err != nil {
+		if err := workshops.ValidateStatusTransition(current.Status, nextRaw); err != nil {
 			return domain.WorkOrder{}, err
 		}
 		current.Status = nextRaw

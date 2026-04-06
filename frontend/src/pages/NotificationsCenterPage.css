@@ -1,0 +1,95 @@
+/* Notifications center — incluye avisos normales y aprobaciones en el feed unificado. */
+
+.risk-badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.risk-badge.low {
+  background: var(--color-success-subtle);
+  color: var(--color-alert-success-text);
+}
+
+.risk-badge.medium {
+  background: var(--color-warning-subtle);
+  color: var(--color-alert-warning-text);
+}
+
+.risk-badge.high {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.approval-reason {
+  font-size: var(--text-role-body);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}
+
+.approval-summary {
+  font-size: var(--text-role-body);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.note-input {
+  flex: 1;
+  min-width: 16rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.btn-approve {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-success);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.btn-approve:hover {
+  filter: brightness(0.95);
+}
+
+.btn-reject {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-role-body);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.btn-reject:hover {
+  background: var(--color-danger-hover);
+}
+
+.btn-approve:disabled,
+.btn-reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

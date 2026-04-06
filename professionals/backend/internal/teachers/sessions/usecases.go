@@ -1,8 +1,8 @@
 package sessions
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/sessions/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -62,6 +62,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 	if in.Metadata == nil {
 		in.Metadata = map[string]any{}
 	}
+	in.ServiceID = normalizeServiceID(in.ServiceID)
 
 	out, err := u.repo.Create(ctx, in)
 	if err != nil {
@@ -71,6 +72,14 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 		u.audit.Log(ctx, out.OrgID.String(), actor, "session.created", "session", out.ID.String(), map[string]any{"appointment_id": out.AppointmentID.String()})
 	}
 	return out, nil
+}
+
+func normalizeServiceID(serviceID *uuid.UUID) *uuid.UUID {
+	if serviceID != nil && *serviceID != uuid.Nil {
+		canonical := *serviceID
+		return &canonical
+	}
+	return nil
 }
 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error) {

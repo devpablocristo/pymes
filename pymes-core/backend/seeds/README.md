@@ -16,10 +16,10 @@
 ## Cómo aplicar
 
 - **Docker Compose:** `PYMES_SEED_DEMO=true` en `cp-backend` — el binario ejecuta estos scripts embebidos tras `migrations.Run` (ver `wire/bootstrap.go` y `seeds/runner.go`).
-- **Host / psql:** desde la raíz del monorepo, con migraciones ya aplicadas:
+- **Reaplicar demo con Docker:** desde la raíz del monorepo, con el stack levantado:
 
 ```bash
-DATABASE_URL='postgres://postgres:postgres@localhost:5434/pymes?sslmode=disable' make seed-core-demo
+make seed
 ```
 
 Variables:

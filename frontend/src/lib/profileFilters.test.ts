@@ -12,7 +12,7 @@ vi.mock('@devpablocristo/core-browser/storage', () => ({
   createBrowserStorageNamespace: () => mockStorage,
 }));
 
-import { getVisibleModuleIds, getVisibleWidgetKeys } from './profileFilters';
+import { getVisibleModuleIds } from './profileFilters';
 import type { TenantProfile } from './tenantProfile';
 
 function makeProfile(overrides: Partial<TenantProfile> = {}): TenantProfile {
@@ -67,21 +67,26 @@ describe('getVisibleModuleIds', () => {
     expect(ids.has('inventory')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
     expect(ids.has('priceLists')).toBe(true);
+    expect(ids.has('services')).toBe(false);
   });
 
   it('includes product modules when sells both', () => {
     mockStorage.getJSON.mockReturnValue(makeProfile({ sells: 'both' }));
     const ids = getVisibleModuleIds();
     expect(ids.has('products')).toBe(true);
+    expect(ids.has('services')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
   });
 
-  it('excludes product modules when sells services only', () => {
+  it('shows the service catalog when sells services only', () => {
     mockStorage.getJSON.mockReturnValue(makeProfile({ sells: 'services' }));
     const ids = getVisibleModuleIds();
     expect(ids.has('products')).toBe(false);
+    expect(ids.has('services')).toBe(true);
     expect(ids.has('inventory')).toBe(false);
-    expect(ids.has('quotes')).toBe(false);
+    expect(ids.has('priceLists')).toBe(true);
+    expect(ids.has('quotes')).toBe(true);
+    expect(ids.has('purchases')).toBe(true);
   });
 
   it('includes billing modules when usesBilling', () => {
@@ -112,45 +117,9 @@ describe('getVisibleModuleIds', () => {
     mockStorage.getJSON.mockReturnValue(makeProfile({ sells: 'unsure' }));
     const ids = getVisibleModuleIds();
     expect(ids.has('products')).toBe(true);
+    expect(ids.has('services')).toBe(true);
     expect(ids.has('sales')).toBe(true);
     expect(ids.has('whatsapp')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
-  });
-});
-
-describe('getVisibleWidgetKeys', () => {
-  it('returns empty set when no profile', () => {
-    mockStorage.getJSON.mockReturnValue(null);
-    expect(getVisibleWidgetKeys().size).toBe(0);
-  });
-
-  it('always includes billing.subscription and audit.activity', () => {
-    mockStorage.getJSON.mockReturnValue(makeProfile());
-    const keys = getVisibleWidgetKeys();
-    expect(keys.has('billing.subscription')).toBe(true);
-    expect(keys.has('audit.activity')).toBe(true);
-  });
-
-  it('includes sales widgets when usesBilling', () => {
-    mockStorage.getJSON.mockReturnValue(makeProfile({ usesBilling: true }));
-    const keys = getVisibleWidgetKeys();
-    expect(keys.has('sales.summary')).toBe(true);
-    expect(keys.has('cashflow.summary')).toBe(true);
-    expect(keys.has('sales.recent')).toBe(true);
-  });
-
-  it('excludes sales widgets when usesBilling is false', () => {
-    mockStorage.getJSON.mockReturnValue(makeProfile({ usesBilling: false }));
-    const keys = getVisibleWidgetKeys();
-    expect(keys.has('sales.summary')).toBe(false);
-    expect(keys.has('cashflow.summary')).toBe(false);
-  });
-
-  it('includes product widgets when sells products', () => {
-    mockStorage.getJSON.mockReturnValue(makeProfile({ sells: 'products' }));
-    const keys = getVisibleWidgetKeys();
-    expect(keys.has('quotes.pipeline')).toBe(true);
-    expect(keys.has('inventory.low_stock')).toBe(true);
-    expect(keys.has('products.top')).toBe(true);
   });
 });

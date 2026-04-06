@@ -10,7 +10,7 @@ type ServiceLink struct {
 	ID                uuid.UUID
 	OrgID             uuid.UUID
 	ProfileID         uuid.UUID
-	ProductID         uuid.UUID
+	ServiceID         uuid.UUID
 	PublicDescription string
 	DisplayOrder      int
 	IsFeatured        bool

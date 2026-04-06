@@ -13,83 +13,18 @@ type Viewer struct {
 	Scopes []string
 }
 
-type WidgetSize struct {
-	W int `json:"w"`
-	H int `json:"h"`
-}
-
 type WidgetDefinition struct {
 	WidgetKey         string         `json:"widget_key"`
 	Title             string         `json:"title"`
 	Description       string         `json:"description"`
 	Domain            string         `json:"domain"`
 	Kind              string         `json:"kind"`
-	DefaultSize       WidgetSize     `json:"default_size"`
-	MinW              int            `json:"min_w"`
-	MinH              int            `json:"min_h"`
-	MaxW              int            `json:"max_w"`
-	MaxH              int            `json:"max_h"`
 	SupportedContexts []string       `json:"supported_contexts"`
 	AllowedRoles      []string       `json:"allowed_roles"`
 	RequiredScopes    []string       `json:"required_scopes,omitempty"`
 	SettingsSchema    map[string]any `json:"settings_schema"`
 	DataEndpoint      string         `json:"data_endpoint"`
 	Status            string         `json:"status"`
-}
-
-type LayoutItem struct {
-	WidgetKey  string         `json:"widget_key"`
-	InstanceID string         `json:"instance_id"`
-	X          int            `json:"x"`
-	Y          int            `json:"y"`
-	W          int            `json:"w"`
-	H          int            `json:"h"`
-	Visible    bool           `json:"visible"`
-	Settings   map[string]any `json:"settings"`
-	Pinned     bool           `json:"pinned"`
-	OrderHint  int            `json:"order_hint"`
-}
-
-type DashboardLayout struct {
-	Source    string       `json:"source"`
-	LayoutKey string       `json:"layout_key"`
-	Version   int          `json:"version"`
-	Items     []LayoutItem `json:"items"`
-}
-
-type Dashboard struct {
-	Context          string             `json:"context"`
-	Layout           DashboardLayout    `json:"layout"`
-	AvailableWidgets []WidgetDefinition `json:"available_widgets"`
-}
-
-type WidgetCatalog struct {
-	Context string             `json:"context"`
-	Items   []WidgetDefinition `json:"items"`
-}
-
-type SaveDashboardInput struct {
-	Viewer  Viewer
-	Context string
-	Items   []LayoutItem
-}
-
-type DefaultLayout struct {
-	LayoutKey string
-	Context   string
-	Name      string
-	Items     []LayoutItem
-}
-
-type UserLayout struct {
-	UserID                      *uuid.UUID
-	UserActor                   string
-	Context                     string
-	LayoutVersion               int
-	Items                       []LayoutItem
-	LastAppliedDefaultLayoutKey string
-	CreatedAt                   time.Time
-	UpdatedAt                   time.Time
 }
 
 type SalesSummaryData struct {
@@ -150,6 +85,18 @@ type TopProduct struct {
 type TopProductsData struct {
 	Period string       `json:"period"`
 	Items  []TopProduct `json:"items"`
+}
+
+type TopService struct {
+	ServiceID string  `json:"service_id"`
+	Name      string  `json:"name"`
+	Quantity  float64 `json:"quantity"`
+	Total     float64 `json:"total"`
+}
+
+type TopServicesData struct {
+	Period string       `json:"period"`
+	Items  []TopService `json:"items"`
 }
 
 type BillingStatusData struct {

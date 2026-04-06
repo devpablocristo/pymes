@@ -30,6 +30,7 @@ type SaleItem struct {
 	ID          uuid.UUID  `json:"id"`
 	SaleID      uuid.UUID  `json:"sale_id"`
 	ProductID   *uuid.UUID `json:"product_id,omitempty"`
+	ServiceID   *uuid.UUID `json:"service_id,omitempty"`
 	Description string     `json:"description"`
 	Quantity    float64    `json:"quantity"`
 	UnitPrice   float64    `json:"unit_price"`

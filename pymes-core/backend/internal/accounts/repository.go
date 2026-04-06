@@ -24,7 +24,9 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, accountType, ent
 		q = q.Where("type = ?", accountType)
 	}
 	if entityType != "" {
-		q = q.Where("entity_type = ?", entityType)
+		if mappedType := accountTypeFromEntityType(entityType); mappedType != "" {
+			q = q.Where("type = ?", mappedType)
+		}
 	}
 	if onlyNonZero {
 		q = q.Where("balance != 0")
@@ -57,18 +59,28 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 	var out accountsdomain.Account
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row models.AccountModel
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND entity_type = ? AND entity_id = ?", in.OrgID, in.EntityType, in.EntityID).Take(&row).Error
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND type = ? AND party_id = ?", in.OrgID, in.Type, in.EntityID).Take(&row).Error
 		now := time.Now().UTC()
 		if err != nil {
 			if err != gorm.ErrRecordNotFound {
 				return err
 			}
-			row = models.AccountModel{ID: uuid.New(), OrgID: in.OrgID, Type: in.Type, EntityType: in.EntityType, EntityID: in.EntityID, EntityName: in.EntityName, Currency: defaultString(in.Currency, "ARS"), CreditLimit: in.CreditLimit, Balance: 0, UpdatedAt: now}
+			row = models.AccountModel{
+				ID:          uuid.New(),
+				OrgID:       in.OrgID,
+				Type:        in.Type,
+				PartyID:     in.EntityID,
+				PartyName:   in.EntityName,
+				Currency:    defaultString(in.Currency, "ARS"),
+				CreditLimit: in.CreditLimit,
+				Balance:     0,
+				UpdatedAt:   now,
+			}
 			if err := tx.Create(&row).Error; err != nil {
 				return err
 			}
 		}
-		row.EntityName = in.EntityName
+		row.PartyName = in.EntityName
 		if in.CreditLimit > 0 {
 			row.CreditLimit = in.CreditLimit
 		}
@@ -94,7 +106,18 @@ func (r *Repository) CreateOrAdjust(ctx context.Context, in accountsdomain.Accou
 }
 
 func toAccountDomain(row models.AccountModel, movements []models.MovementModel) accountsdomain.Account {
-	out := accountsdomain.Account{ID: row.ID, OrgID: row.OrgID, Type: row.Type, EntityType: row.EntityType, EntityID: row.EntityID, EntityName: row.EntityName, Balance: row.Balance, Currency: row.Currency, CreditLimit: row.CreditLimit, UpdatedAt: row.UpdatedAt}
+	out := accountsdomain.Account{
+		ID:          row.ID,
+		OrgID:       row.OrgID,
+		Type:        row.Type,
+		EntityType:  entityTypeFromAccountType(row.Type),
+		EntityID:    row.PartyID,
+		EntityName:  row.PartyName,
+		Balance:     row.Balance,
+		Currency:    row.Currency,
+		CreditLimit: row.CreditLimit,
+		UpdatedAt:   row.UpdatedAt,
+	}
 	for _, mv := range movements {
 		out.Movements = append(out.Movements, toMovementDomain(mv))
 	}

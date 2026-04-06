@@ -1,8 +1,11 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { WorkOrdersHeaderLead } from '../components/WorkOrdersHeaderLead';
 import { PageLayout } from '../components/PageLayout';
 import { WorkOrderEditor } from '../components/WorkOrderEditor';
 import { useI18n } from '../lib/i18n';
-import { WorkOrdersHeaderLead } from './WorkOrdersHeaderLead';
+
+const BOARD_PATH = '/modules/workOrders/board';
+const LIST_PATH = '/modules/workOrders/list';
 
 /**
  * Misma UI que el modal del Kanban: un solo editor de OT por ruta.
@@ -23,7 +26,7 @@ export function WorkOrdersEditorPage() {
     <WorkOrderEditor
       variant="page"
       orderId={orderId}
-      onClose={() => navigate('/modules/workOrders/list')}
+      onClose={() => navigate(LIST_PATH)}
       onSaved={() => {
         /* lista se refresca al volver */
       }}
@@ -31,7 +34,11 @@ export function WorkOrdersEditorPage() {
   );
 
   return (
-    <PageLayout className="wo-mod-orders" title={t('shell.workOrders.pageTitle')} lead={<WorkOrdersHeaderLead />}>
+    <PageLayout
+      className="wo-mod-orders"
+      title={t('shell.workOrders.pageTitle')}
+      lead={<WorkOrdersHeaderLead boardPath={BOARD_PATH} listPath={LIST_PATH} editPattern="/modules/workOrders/edit/:orderId" />}
+    >
       {content}
     </PageLayout>
   );

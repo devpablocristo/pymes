@@ -13,6 +13,7 @@ import (
 type mockRepo struct {
 	getTenantSettingsFn func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error)
 	getProductFn        func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
+	getServiceFn        func(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
 	createFn            func(ctx context.Context, in CreateInput) (saledomain.Sale, error)
 	getByIDFn           func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	voidFn              func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
@@ -35,6 +36,12 @@ func (m *mockRepo) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (stri
 }
 func (m *mockRepo) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 	return m.getProductFn(ctx, orgID, productID)
+}
+func (m *mockRepo) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+	if m.getServiceFn == nil {
+		return ServiceSnapshot{}, nil
+	}
+	return m.getServiceFn(ctx, orgID, serviceID)
 }
 
 type mockInventory struct {

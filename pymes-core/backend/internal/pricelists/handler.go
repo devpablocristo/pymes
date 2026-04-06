@@ -120,8 +120,15 @@ func requestToDomain(orgID uuid.UUID, req dto.CreatePriceListRequest) pricelistd
 	}
 	items := make([]pricelistdomain.PriceListItem, 0, len(req.Items))
 	for _, item := range req.Items {
-		if productID, err := uuid.Parse(strings.TrimSpace(item.ProductID)); err == nil {
-			items = append(items, pricelistdomain.PriceListItem{ProductID: productID, Price: item.Price})
+		if item.ProductID != nil {
+			if productID, err := uuid.Parse(strings.TrimSpace(*item.ProductID)); err == nil {
+				items = append(items, pricelistdomain.PriceListItem{ProductID: &productID, Price: item.Price})
+			}
+		}
+		if item.ServiceID != nil {
+			if serviceID, err := uuid.Parse(strings.TrimSpace(*item.ServiceID)); err == nil {
+				items = append(items, pricelistdomain.PriceListItem{ServiceID: &serviceID, Price: item.Price})
+			}
 		}
 	}
 	return pricelistdomain.PriceList{OrgID: orgID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, Items: items}

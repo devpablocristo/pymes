@@ -129,6 +129,7 @@ func (u *Usecases) Preview(ctx context.Context, entity, filename string, fileDat
 		FileName: filename,
 		Format:   format,
 		Columns:  columns,
+		Errors:   []ImportError{},
 	}
 	job := previewJob{Entity: entity, Format: format, FileName: filename, Columns: columns, CreatedAt: time.Now().UTC()}
 	for idx, row := range rows {

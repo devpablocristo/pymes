@@ -116,7 +116,7 @@ export async function createBikeShopService(data: {
   base_price?: number;
   currency?: string;
   tax_rate?: number;
-  linked_product_id?: string;
+  linked_service_id?: string;
   is_active?: boolean;
 }): Promise<BikeShopService> {
   return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-services`, { method: 'POST', body: data });
@@ -133,7 +133,7 @@ export async function updateBikeShopService(
     base_price: number;
     currency: string;
     tax_rate: number;
-    linked_product_id: string;
+    linked_service_id: string;
     is_active: boolean;
   }>,
 ): Promise<BikeShopService> {
@@ -201,6 +201,30 @@ export async function updateBikeWorkOrder(
   }>,
 ): Promise<BikeWorkOrder> {
   return bikeShopRequest(`${BIKE_SHOP_PREFIX}/work-orders/${id}`, { method: 'PUT', body: data });
+}
+
+export async function patchBikeWorkOrder(
+  id: string,
+  data: Partial<{ status: string; promised_at: string }>,
+): Promise<BikeWorkOrder> {
+  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/work-orders/${id}`, { method: 'PUT', body: data });
+}
+
+export async function getAllBikeWorkOrders(): Promise<BikeWorkOrder[]> {
+  const all: BikeWorkOrder[] = [];
+  let after: string | undefined;
+  for (;;) {
+    const page = await getBikeWorkOrders({ limit: 250, after });
+    all.push(...(page.items ?? []));
+    if (!page.has_more || !page.next_cursor) break;
+    after = page.next_cursor;
+  }
+  return all;
+}
+
+export async function getBikeWorkOrdersArchived(): Promise<BikeWorkOrder[]> {
+  const data = await bikeShopRequest<{ items?: BikeWorkOrder[] }>(`${BIKE_SHOP_PREFIX}/work-orders/archived`);
+  return data.items ?? [];
 }
 
 // ── Orchestration ──

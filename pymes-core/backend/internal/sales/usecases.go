@@ -21,6 +21,7 @@ type RepositoryPort interface {
 	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
+	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
 }
 
 type InventoryPort interface {
@@ -69,6 +70,7 @@ func NewUsecases(repo RepositoryPort, inventory InventoryPort, cashflow Cashflow
 
 type CreateSaleItemInput struct {
 	ProductID   *uuid.UUID
+	ServiceID   *uuid.UUID
 	Description string
 	Quantity    float64
 	UnitPrice   float64
@@ -119,6 +121,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		costPrice := 0.0
 		taxRate := defaultTaxRate
 		var pid *uuid.UUID
+		var sid *uuid.UUID
 
 		if item.ProductID != nil && *item.ProductID != uuid.Nil {
 			snapshot, err := u.repo.GetProductSnapshot(ctx, in.OrgID, *item.ProductID)
@@ -130,6 +133,26 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 			}
 			id := snapshot.ID
 			pid = &id
+			if desc == "" {
+				desc = snapshot.Name
+			}
+			if unitPrice <= 0 {
+				unitPrice = snapshot.Price
+			}
+			costPrice = snapshot.CostPrice
+			if snapshot.TaxRate != nil {
+				taxRate = *snapshot.TaxRate
+			}
+		} else if item.ServiceID != nil && *item.ServiceID != uuid.Nil {
+			snapshot, err := u.repo.GetServiceSnapshot(ctx, in.OrgID, *item.ServiceID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return saledomain.Sale{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
+				}
+				return saledomain.Sale{}, err
+			}
+			id := snapshot.ID
+			sid = &id
 			if desc == "" {
 				desc = snapshot.Name
 			}
@@ -159,6 +182,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 
 		createItems = append(createItems, CreateItemInput{
 			ProductID:   pid,
+			ServiceID:   sid,
 			Description: desc,
 			Quantity:    item.Quantity,
 			UnitPrice:   unitPrice,

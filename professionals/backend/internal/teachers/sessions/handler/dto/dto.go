@@ -6,7 +6,7 @@ type SessionItem struct {
 	AppointmentID   string         `json:"appointment_id"`
 	ProfileID       string         `json:"profile_id"`
 	CustomerPartyID *string        `json:"customer_party_id,omitempty"`
-	ProductID       *string        `json:"product_id,omitempty"`
+	ServiceID       *string        `json:"service_id,omitempty"`
 	Status          string         `json:"status"`
 	StartedAt       *string        `json:"started_at,omitempty"`
 	EndedAt         *string        `json:"ended_at,omitempty"`
@@ -27,7 +27,7 @@ type CreateSessionRequest struct {
 	AppointmentID   string         `json:"appointment_id" binding:"required"`
 	ProfileID       string         `json:"profile_id" binding:"required"`
 	CustomerPartyID *string        `json:"customer_party_id"`
-	ProductID       *string        `json:"product_id"`
+	ServiceID       *string        `json:"service_id"`
 	StartedAt       *string        `json:"started_at"`
 	Summary         string         `json:"summary"`
 	Metadata        map[string]any `json:"metadata"`

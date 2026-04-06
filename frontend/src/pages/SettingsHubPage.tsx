@@ -2,9 +2,10 @@
  * Ajustes — solo configuración del producto (preferencias, apariencia, integraciones, etc.).
  * El trabajo operativo del negocio vive en el menú lateral / módulos, no acá.
  */
+import { useQuery } from '@tanstack/react-query';
 import { useSearch } from '@devpablocristo/modules-search';
 import type { CSSProperties } from 'react';
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   SectionHubPage,
@@ -28,7 +29,9 @@ import {
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
 import { usePageSearch } from '../components/PageSearch';
 import { LanguageSelector } from '../components/LanguageSelector';
+import { getSession } from '../lib/api';
 import { themeHubColorSwatches } from '../lib/productPalette';
+import { queryKeys } from '../lib/queryKeys';
 import './SettingsHubPage.css';
 
 function SettingsDeepLink({ to, title, desc }: { to: string; title: string; desc: string }) {
@@ -50,6 +53,8 @@ const NotificationPreferencesPage = lazy(() =>
 type Section =
   | null
   | 'profile'
+  | 'rbac'
+  | 'audit'
   | 'notifications'
   | 'automation'
   | 'company'
@@ -65,6 +70,8 @@ type SectionCard = SectionHubSection<Exclude<Section, null>>;
 const SETTING_SECTIONS: SectionCard[] = [
   { id: 'profile', label: 'Perfil', desc: 'Datos personales y cuenta', icon: <IconUsers /> },
   { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: <IconBuilding /> },
+  { id: 'rbac', label: 'Roles y permisos', desc: 'Accesos administrativos y catálogo RBAC', icon: <IconEdit /> },
+  { id: 'audit', label: 'Auditoría', desc: 'Actividad del espacio y exportación CSV', icon: <IconTrash /> },
   { id: 'appearance', label: 'Apariencia', desc: 'Tema, skin, logos y colores', icon: <IconPalette /> },
   { id: 'language', label: 'Idioma', desc: 'Idioma de la plataforma', icon: <IconGlobe /> },
   {
@@ -79,6 +86,7 @@ const SETTING_SECTIONS: SectionCard[] = [
   { id: 'company', label: 'Empresa', desc: 'Datos de contacto y dirección', icon: <IconBuilding /> },
   { id: 'firebaseNotif', label: 'Firebase', desc: 'Configuración push notifications', icon: <IconSettings /> },
 ];
+const NON_ADMIN_SECTIONS = SETTING_SECTIONS.filter((item) => item.id !== 'rbac' && item.id !== 'audit');
 
 // ─── Automatización (solo pantallas de configuración del asistente) ───
 
@@ -102,8 +110,8 @@ function AutomationHubTab() {
 }
 
 /** Valores válidos de `?section=` para deep link dentro de Ajustes. */
-function sectionFromSearchParam(raw: string | null): Section {
-  return parseSectionHubSelection(SETTING_SECTIONS, raw);
+function sectionFromSearchParam(sections: SectionCard[], raw: string | null): Section {
+  return parseSectionHubSelection(sections, raw);
 }
 
 // ─── Toggle ───
@@ -566,13 +574,38 @@ function GatewayTab() {
 export function SettingsHubPage() {
   const settingsSearch = usePageSearch();
   const sectionTextFn = useCallback((s: SectionCard) => `${s.label} ${s.desc}`, []);
-  const filteredSections = useSearch(SETTING_SECTIONS, sectionTextFn, settingsSearch);
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: getSession,
+    staleTime: 5 * 60_000,
+  });
   const [searchParams, setSearchParams] = useSearchParams();
-  const [section, setSection] = useState<Section>(() => sectionFromSearchParam(searchParams.get('section')));
+  const requestedSection = searchParams.get('section');
+  const waitingForAdminSection = !sessionQuery.data && (requestedSection === 'rbac' || requestedSection === 'audit');
+  const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
+  const availableSections = useMemo(() => {
+    if (!sessionQuery.data) {
+      return NON_ADMIN_SECTIONS;
+    }
+    if (isConsoleAdmin) {
+      return SETTING_SECTIONS;
+    }
+    return NON_ADMIN_SECTIONS;
+  }, [isConsoleAdmin, sessionQuery.data]);
+  const filteredSections = useSearch(availableSections, sectionTextFn, settingsSearch);
+  const [section, setSection] = useState<Section>(() => sectionFromSearchParam(NON_ADMIN_SECTIONS, requestedSection));
 
   useEffect(() => {
-    setSection(sectionFromSearchParam(searchParams.get('section')));
-  }, [searchParams]);
+    if (waitingForAdminSection) {
+      setSection(null);
+      return;
+    }
+    const nextSection = sectionFromSearchParam(availableSections, requestedSection);
+    setSection(nextSection);
+    if (requestedSection && !nextSection) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [availableSections, requestedSection, setSearchParams, waitingForAdminSection]);
 
   function openSection(id: Exclude<Section, null>): void {
     setSection(id);
@@ -586,14 +619,14 @@ export function SettingsHubPage() {
     }
   }
 
-  const activeSectionCard = SETTING_SECTIONS.find((item) => item.id === section) ?? null;
+  const activeSectionCard = availableSections.find((item) => item.id === section) ?? null;
 
   return (
     <SectionHubPage
       className="stg"
       pageTitle="Ajustes"
       pageLead="Elegí un área para configurar tu cuenta y tu espacio de trabajo."
-      sections={SETTING_SECTIONS}
+      sections={availableSections}
       visibleSections={filteredSections}
       emptyState={
         <div className="card">
@@ -659,6 +692,16 @@ export function SettingsHubPage() {
       {section === 'workspace' && (
         <Suspense fallback={<div className="spinner" />}>
           <AdminPage section="workspace" embedded />
+        </Suspense>
+      )}
+      {section === 'rbac' && isConsoleAdmin && (
+        <Suspense fallback={<div className="spinner" />}>
+          <AdminPage section="rbac" embedded />
+        </Suspense>
+      )}
+      {section === 'audit' && isConsoleAdmin && (
+        <Suspense fallback={<div className="spinner" />}>
+          <AdminPage section="audit" embedded />
         </Suspense>
       )}
     </SectionHubPage>

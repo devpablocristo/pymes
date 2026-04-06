@@ -1,6 +1,6 @@
 /**
  * Fases del tablero Kanban de OT (macro-columnas) y etiquetas finas para badges.
- * El estado canónico sigue siendo el de API/DB; la fase es solo presentación y drop target.
+ * Lógica idéntica a @devpablocristo/modules-work-orders/kanbanConfig.
  */
 
 export type WorkOrderKanbanPhase = 'wo_intake' | 'wo_quote' | 'wo_shop' | 'wo_exit' | 'wo_closed';
@@ -62,7 +62,6 @@ export function workOrderKanbanPhaseFromStatus(raw: string): WorkOrderKanbanPhas
   }
 }
 
-/** Estado API al soltar en una fase (transiciones operativas son libres entre los 9 no terminales). */
 export function defaultCanonStatusForKanbanPhase(phase: WorkOrderKanbanPhase): string | null {
   switch (phase) {
     case 'wo_intake':
@@ -74,7 +73,7 @@ export function defaultCanonStatusForKanbanPhase(phase: WorkOrderKanbanPhase): s
     case 'wo_exit':
       return 'ready_for_pickup';
     case 'wo_closed':
-      return null;
+      return 'invoiced';
     default:
       return 'received';
   }

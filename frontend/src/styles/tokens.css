@@ -63,9 +63,28 @@
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.08);
+  /* Sombras — escala de elevación z1→z24 (inspirada en TQ/Material) */
+  --shadow-z1: 0px 7px 14px -6px rgba(0, 0, 0, 0.07);
+  --shadow-z4: 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-z8: 0 8px 16px 0 rgba(0, 0, 0, 0.08);
+  --shadow-z12: 0 12px 24px 0 rgba(0, 0, 0, 0.08), 0 6px 12px 0 rgba(0, 0, 0, 0.04);
+  --shadow-z16: 0 0 3px 0 rgba(0, 0, 0, 0.06), 0 14px 28px -5px rgba(0, 0, 0, 0.1);
+  --shadow-z20: 0 0 3px 0 rgba(0, 0, 0, 0.06), 0 18px 36px -5px rgba(0, 0, 0, 0.12);
+  --shadow-z24: 0 0 6px 0 rgba(0, 0, 0, 0.06), 0 21px 44px 0 rgba(0, 0, 0, 0.14);
+
+  /* Sombras coloreadas (hover, focus, acento) */
+  --shadow-primary: 0px 8px 16px -4px rgba(59, 130, 246, 0.25);
+  --shadow-success: 0px 8px 16px -4px rgba(16, 185, 129, 0.25);
+  --shadow-warning: 0px 8px 16px -4px rgba(245, 158, 11, 0.25);
+  --shadow-danger: 0px 8px 16px -4px rgba(239, 68, 68, 0.25);
+
+  /* Sombra interna sutil (inputs focus, cards activas) */
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  /* Aliases semánticos (retrocompat) */
+  --shadow-sm: var(--shadow-z1);
+  --shadow-md: var(--shadow-z8);
+  --shadow-lg: var(--shadow-z16);
 
   --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -164,9 +183,24 @@
   --color-accent-pink: #f472b6;
   --color-accent-cyan: #22d3ee;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-z1: 0px 7px 14px -6px rgba(0, 0, 0, 0.35);
+  --shadow-z4: 0 4px 8px -2px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-z8: 0 8px 16px 0 rgba(0, 0, 0, 0.4);
+  --shadow-z12: 0 12px 24px 0 rgba(0, 0, 0, 0.35), 0 6px 12px 0 rgba(0, 0, 0, 0.2);
+  --shadow-z16: 0 0 3px 0 rgba(0, 0, 0, 0.3), 0 14px 28px -5px rgba(0, 0, 0, 0.4);
+  --shadow-z20: 0 0 3px 0 rgba(0, 0, 0, 0.3), 0 18px 36px -5px rgba(0, 0, 0, 0.5);
+  --shadow-z24: 0 0 6px 0 rgba(0, 0, 0, 0.3), 0 21px 44px 0 rgba(0, 0, 0, 0.55);
+
+  --shadow-primary: 0px 8px 16px -4px rgba(96, 165, 250, 0.3);
+  --shadow-success: 0px 8px 16px -4px rgba(52, 211, 153, 0.3);
+  --shadow-warning: 0px 8px 16px -4px rgba(251, 191, 36, 0.3);
+  --shadow-danger: 0px 8px 16px -4px rgba(248, 113, 113, 0.3);
+
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+
+  --shadow-sm: var(--shadow-z1);
+  --shadow-md: var(--shadow-z8);
+  --shadow-lg: var(--shadow-z16);
 
   --color-accent-indigo: #818cf8;
   --color-dev-error-pre-bg: #020617;

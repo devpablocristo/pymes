@@ -9,15 +9,16 @@ import (
 type Product struct {
 	ID          uuid.UUID
 	OrgID       uuid.UUID
-	Type        string
 	SKU         string
 	Name        string
 	Description string
 	Unit        string
 	Price       float64
+	Currency    string
 	CostPrice   float64
 	TaxRate     *float64
 	TrackStock  bool
+	IsActive    bool
 	Tags        []string
 	Metadata    map[string]any
 	CreatedAt   time.Time

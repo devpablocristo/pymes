@@ -1,8 +1,8 @@
 package workshopservices
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,8 +10,8 @@ import (
 	"gorm.io/gorm"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
 )
 
 type ListParams struct {
@@ -30,7 +30,7 @@ type UpdateInput struct {
 	BasePrice       *float64
 	Currency        *string
 	TaxRate         *float64
-	LinkedProductID *string
+	LinkedServiceID *string
 	IsActive        *bool
 }
 
@@ -50,7 +50,7 @@ type AuditPort interface {
 }
 
 type controlPlanePort interface {
-	GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error)
+	GetService(ctx context.Context, orgID, serviceID string) (map[string]any, error)
 }
 
 type Usecases struct {
@@ -72,7 +72,7 @@ func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Service, actor string) (domain.Service, error) {
-	if err := u.enrichLinkedProduct(ctx, &in); err != nil {
+	if err := u.enrichLinkedService(ctx, &in); err != nil {
 		return domain.Service{}, err
 	}
 	if err := validateService(&in); err != nil {
@@ -134,13 +134,13 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.TaxRate != nil {
 		current.TaxRate = *in.TaxRate
 	}
-	if in.LinkedProductID != nil {
-		current.LinkedProductID = vertvalues.ParseOptionalUUID(*in.LinkedProductID)
+	if in.LinkedServiceID != nil {
+		current.LinkedServiceID = vertvalues.ParseOptionalUUID(*in.LinkedServiceID)
 	}
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
 	}
-	if err := u.enrichLinkedProduct(ctx, &current); err != nil {
+	if err := u.enrichLinkedService(ctx, &current); err != nil {
 		return domain.Service{}, err
 	}
 	if err := validateService(&current); err != nil {
@@ -222,24 +222,24 @@ func validateService(in *domain.Service) error {
 	return nil
 }
 
-func (u *Usecases) enrichLinkedProduct(ctx context.Context, in *domain.Service) error {
-	if in.LinkedProductID == nil || u.cp == nil {
+func (u *Usecases) enrichLinkedService(ctx context.Context, in *domain.Service) error {
+	if in.LinkedServiceID == nil || u.cp == nil {
 		return nil
 	}
-	product, err := u.cp.GetProduct(ctx, in.OrgID.String(), in.LinkedProductID.String())
+	service, err := u.cp.GetService(ctx, in.OrgID.String(), in.LinkedServiceID.String())
 	if err != nil {
-		return fmt.Errorf("linked_product_id is invalid: %w", httperrors.ErrBadInput)
+		return fmt.Errorf("linked_service_id is invalid: %w", httperrors.ErrBadInput)
 	}
 	if strings.TrimSpace(in.Description) == "" {
-		if description, ok := product["description"].(string); ok && strings.TrimSpace(description) != "" {
+		if description, ok := service["description"].(string); ok && strings.TrimSpace(description) != "" {
 			in.Description = strings.TrimSpace(description)
 		}
 	}
 	if in.BasePrice == 0 {
-		in.BasePrice = vertvalues.ParseFloat(product["price"])
+		in.BasePrice = vertvalues.ParseFloat(service["sale_price"])
 	}
 	if in.TaxRate == 0 {
-		if value, ok := product["tax_rate"]; ok && value != nil {
+		if value, ok := service["tax_rate"]; ok && value != nil {
 			in.TaxRate = vertvalues.ParseFloat(value)
 		}
 	}

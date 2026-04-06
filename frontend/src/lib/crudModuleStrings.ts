@@ -36,5 +36,6 @@ export function buildPymesCrudStrings(language: LanguageCode): CrudStrings {
     confirmHint: r['crud.confirm.hint'],
     confirmPlaceholder: r['crud.confirm.placeholder'],
     confirmWord: r['crud.confirm.word'],
+    loadMore: r['crud.loadMore'],
   };
 }

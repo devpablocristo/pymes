@@ -1,27 +1,5 @@
 import { getTenantProfile } from './tenantProfile';
 
-export function getVisibleWidgetKeys(): Set<string> {
-  const profile = getTenantProfile();
-  if (!profile) return new Set();
-
-  const vis: Record<string, boolean> = {
-    'sales.summary': profile.usesBilling,
-    'cashflow.summary': profile.usesBilling,
-    'sales.recent': profile.usesBilling,
-    'quotes.pipeline': profile.sells === 'products' || profile.sells === 'both',
-    'inventory.low_stock': profile.sells === 'products' || profile.sells === 'both',
-    'products.top': profile.sells === 'products' || profile.sells === 'both',
-    'billing.subscription': true,
-    'audit.activity': true,
-  };
-
-  return new Set(
-    Object.entries(vis)
-      .filter(([, show]) => show)
-      .map(([key]) => key),
-  );
-}
-
 export function getVisibleModuleIds(): Set<string> {
   const profile = getTenantProfile();
   if (!profile) return new Set();
@@ -29,6 +7,8 @@ export function getVisibleModuleIds(): Set<string> {
   const visible = new Set<string>();
 
   const sellsProducts = profile.sells === 'products' || profile.sells === 'both';
+  const sellsServices = profile.sells === 'services' || profile.sells === 'both';
+  const sellsCatalog = sellsProducts || sellsServices;
   const exploring = profile.sells === 'unsure';
 
   // Core: always show
@@ -40,21 +20,25 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('roles');
   }
 
-  // Products, inventory, price lists, purchases: only if sells products
+  // Inventory remains product-only.
   if (sellsProducts || exploring) {
     visible.add('products');
     visible.add('inventory');
     visible.add('inventoryMovements');
+  }
+
+  if (sellsServices || exploring) {
+    visible.add('services');
+  }
+
+  // Commercial catalog modules apply to both products and services.
+  if (sellsCatalog || exploring) {
     visible.add('priceLists');
     visible.add('suppliers');
     visible.add('purchases');
     // Solicitudes internas + políticas (governance / CEL); backend: /v1/procurement-*
     visible.add('procurementRequests');
     visible.add('procurementPolicies');
-  }
-
-  // Quotes: only if sells products (services usually don't quote)
-  if (sellsProducts || exploring) {
     visible.add('quotes');
   }
 

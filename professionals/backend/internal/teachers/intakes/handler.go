@@ -10,12 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/handler/dto"
+	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/handler/dto"
-	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -106,10 +106,10 @@ func (h *Handler) Create(c *gin.Context) {
 			return
 		}
 	}
-	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		intake.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
-		if intake.ProductID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+	if req.ServiceID != nil && strings.TrimSpace(*req.ServiceID) != "" {
+		intake.ServiceID = vertvalues.ParseOptionalUUID(*req.ServiceID)
+		if intake.ServiceID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
 			return
 		}
 	}
@@ -147,10 +147,10 @@ func (h *Handler) Update(c *gin.Context) {
 			return
 		}
 	}
-	if req.ProductID != nil && strings.TrimSpace(*req.ProductID) != "" {
-		input.ProductID = vertvalues.ParseOptionalUUID(*req.ProductID)
-		if input.ProductID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+	if req.ServiceID != nil && strings.TrimSpace(*req.ServiceID) != "" {
+		input.ServiceID = vertvalues.ParseOptionalUUID(*req.ServiceID)
+		if input.ServiceID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
 			return
 		}
 	}
@@ -194,9 +194,9 @@ func toIntakeItem(in domain.Intake) dto.IntakeItem {
 		s := in.CustomerPartyID.String()
 		item.CustomerPartyID = &s
 	}
-	if in.ProductID != nil {
-		s := in.ProductID.String()
-		item.ProductID = &s
+	if in.ServiceID != nil {
+		s := in.ServiceID.String()
+		item.ServiceID = &s
 	}
 	return item
 }

@@ -1,3 +1,4 @@
+// Package dataio implements import/export persistence for CSV and bulk operations.
 package dataio
 
 import (
@@ -92,31 +93,55 @@ func (r *Repository) ImportProducts(ctx context.Context, orgID uuid.UUID, rows [
 	result := ImportResult{TotalRows: len(rows)}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for idx, row := range rows {
-			existingID, err := r.findProduct(ctx, tx, orgID, row)
-			if err != nil {
-				return err
-			}
-			if existingID != nil {
-				if mode == "create_only" {
-					result.Skipped++
-					continue
-				}
-				if err := upsertProduct(ctx, tx, orgID, *existingID, row); err != nil {
-					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
-					continue
-				}
-				result.Updated++
-				continue
-			}
-			if err := createProduct(ctx, tx, orgID, row); err != nil {
+			if err := importProductRow(ctx, tx, orgID, row, mode, idx, &result); err != nil {
 				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
-				continue
 			}
-			result.Created++
 		}
 		return nil
 	})
 	return result, err
+}
+
+func importProductRow(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string, mode string, idx int, result *ImportResult) error {
+	return tx.WithContext(ctx).Transaction(func(sp *gorm.DB) error {
+		q := sp.Table("products").Select("id::text").Where("org_id = ? AND deleted_at IS NULL", orgID)
+		sku := strings.TrimSpace(row["sku"])
+		name := strings.TrimSpace(row["name"])
+		switch {
+		case sku != "":
+			q = q.Where("sku = ?", sku)
+		case name != "":
+			q = q.Where("LOWER(name) = LOWER(?)", name)
+		default:
+			result.Skipped++
+			return nil
+		}
+		var idStr string
+		err := q.Take(&idStr).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			existingID, parseErr := uuid.Parse(idStr)
+			if parseErr != nil {
+				return parseErr
+			}
+			if mode == "create_only" {
+				result.Skipped++
+				return nil
+			}
+			if err := upsertProduct(ctx, sp, orgID, existingID, row); err != nil {
+				return err
+			}
+			result.Updated++
+			return nil
+		}
+		if err := createProduct(ctx, sp, orgID, row); err != nil {
+			return err
+		}
+		result.Created++
+		return nil
+	})
 }
 
 func (r *Repository) ExportCustomers(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error) {
@@ -235,7 +260,7 @@ func (r *Repository) ExportCashflow(ctx context.Context, orgID uuid.UUID, from, 
 func (r *Repository) findPartyByRole(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, role, email, taxID string) (*uuid.UUID, error) {
 	query := tx.WithContext(ctx).
 		Table("parties p").
-		Select("p.id").
+		Select("p.id::text").
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = ? AND pr.is_active = true", role).
 		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
 	if strings.TrimSpace(taxID) != "" {
@@ -245,34 +270,16 @@ func (r *Repository) findPartyByRole(ctx context.Context, tx *gorm.DB, orgID uui
 	} else {
 		return nil, nil
 	}
-	var id uuid.UUID
-	if err := query.Take(&id).Error; err != nil {
+	var idStr string
+	if err := query.Take(&idStr).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &id, nil
-}
-
-func (r *Repository) findProduct(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string) (*uuid.UUID, error) {
-	q := tx.WithContext(ctx).Table("products").Select("id").Where("org_id = ? AND deleted_at IS NULL", orgID)
-	sku := strings.TrimSpace(row["sku"])
-	name := strings.TrimSpace(row["name"])
-	switch {
-	case sku != "":
-		q = q.Where("sku = ?", sku)
-	case name != "":
-		q = q.Where("LOWER(name) = LOWER(?)", name)
-	default:
-		return nil, nil
-	}
-	var id uuid.UUID
-	if err := q.Take(&id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse party id: %w", err)
 	}
 	return &id, nil
 }

@@ -7,6 +7,7 @@
 | Documento | Contenido |
 |-----------|-----------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Ownership, shared, bordes HTTP entre bounded contexts |
+| [V2_INTERNAL.md](./V2_INTERNAL.md) | Camino canónico actual, desvíos detectados y criterio de convergencia incremental |
 | [AI_OWNERSHIP.md](./AI_OWNERSHIP.md) | Ownership IA del ecosistema: categorías `Agent`/`Service`, runtime reusable, `ProductAgent`, `DomainAgent`, `CopilotAgent`, `InsightService`, `GovernanceService` |
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
@@ -61,7 +62,7 @@ make test    # incluye ruff + pytest en ai/, tests Go y frontend
 make down
 ```
 
-Sin Docker: tras migrar, `DATABASE_URL=... make seed-core-demo` (y `make seed-workshops-demo` si usás talleres).
+Si necesitás resembrar datos demo con el stack levantado: `make seed`.
 
 ## Frontend CRUD
 

@@ -6,6 +6,7 @@ DECLARE
     v_org uuid := '00000000-0000-0000-0000-000000000001';
     c1 uuid;
     p1 uuid;
+    svc1 uuid;
     veh1 uuid;
     srv1 uuid;
     srv2 uuid;
@@ -31,13 +32,24 @@ BEGIN
     )
     ON CONFLICT (id) DO NOTHING;
     SELECT id INTO veh1 FROM workshops.vehicles WHERE org_id = v_org AND license_plate = 'AB 123 CD' LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
 
     -- Índice único activo: (org_id, code, segment) WHERE archived_at IS NULL (migración 0006).
-    INSERT INTO workshops.services (id, org_id, segment, code, name, description, category, estimated_hours, base_price, currency, tax_rate, linked_product_id, is_active)
+    INSERT INTO workshops.services (id, org_id, segment, code, name, description, category, estimated_hours, base_price, currency, tax_rate, linked_service_id, is_active)
     VALUES
         (srv1, v_org, 'auto_repair', 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estándar', 'mantenimiento', 0.5, 25000, 'ARS', 21, NULL, true),
-        (srv2, v_org, 'auto_repair', 'SRV-BRAKE', 'Revisión de frenos', 'Inspección y ajuste', 'frenos', 1.5, 45000, 'ARS', 21, p1, true)
-    ON CONFLICT (org_id, code, segment) WHERE archived_at IS NULL DO NOTHING;
+        (srv2, v_org, 'auto_repair', 'SRV-BRAKE', 'Revisión de frenos', 'Inspección y ajuste', 'frenos', 1.5, 45000, 'ARS', 21, svc1, true)
+    ON CONFLICT (org_id, code, segment) WHERE archived_at IS NULL DO UPDATE
+        SET name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            category = EXCLUDED.category,
+            estimated_hours = EXCLUDED.estimated_hours,
+            base_price = EXCLUDED.base_price,
+            currency = EXCLUDED.currency,
+            tax_rate = EXCLUDED.tax_rate,
+            linked_service_id = EXCLUDED.linked_service_id,
+            is_active = EXCLUDED.is_active,
+            updated_at = now();
     SELECT id INTO srv1 FROM workshops.services WHERE org_id = v_org AND segment = 'auto_repair' AND code = 'SRV-OIL' LIMIT 1;
     SELECT id INTO srv2 FROM workshops.services WHERE org_id = v_org AND segment = 'auto_repair' AND code = 'SRV-BRAKE' LIMIT 1;
 

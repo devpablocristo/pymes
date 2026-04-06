@@ -21,7 +21,18 @@ type Usecases struct{ repo RepositoryPort }
 func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
-	return u.repo.List(ctx, orgID, strings.TrimSpace(accountType), strings.TrimSpace(entityType), onlyNonZero, limit)
+	accountType = normalizeAccountType(accountType)
+	entityType = normalizeEntityType(entityType)
+	if accountType != "" && !isSupportedAccountType(accountType) {
+		return nil, domainerr.Validation("invalid type")
+	}
+	if entityType != "" && !isSupportedEntityType(entityType) {
+		return nil, domainerr.Validation("invalid entity_type")
+	}
+	if accountType != "" && entityType != "" && !isCompatibleAccountTypeAndEntityType(accountType, entityType) {
+		return nil, domainerr.Validation("type and entity_type are inconsistent")
+	}
+	return u.repo.List(ctx, orgID, accountType, entityType, onlyNonZero, limit)
 }
 
 func (u *Usecases) Debtors(ctx context.Context, orgID uuid.UUID, limit int) ([]accountsdomain.Account, error) {
@@ -36,10 +47,15 @@ func (u *Usecases) CreateOrAdjust(ctx context.Context, in accountsdomain.Account
 	if in.OrgID == uuid.Nil {
 		return accountsdomain.Account{}, domainerr.Validation("org_id is required")
 	}
-	if strings.TrimSpace(in.Type) != "receivable" && strings.TrimSpace(in.Type) != "payable" {
+	in.Type = normalizeAccountType(in.Type)
+	if !isSupportedAccountType(in.Type) {
 		return accountsdomain.Account{}, domainerr.Validation("invalid type")
 	}
-	if strings.TrimSpace(in.EntityType) != "customer" && strings.TrimSpace(in.EntityType) != "supplier" {
+	in.EntityType = normalizeEntityType(in.EntityType)
+	if in.EntityType == "" {
+		in.EntityType = entityTypeFromAccountType(in.Type)
+	}
+	if !isSupportedEntityType(in.EntityType) || !isCompatibleAccountTypeAndEntityType(in.Type, in.EntityType) {
 		return accountsdomain.Account{}, domainerr.Validation("invalid entity_type")
 	}
 	if in.EntityID == uuid.Nil {
@@ -52,4 +68,46 @@ func (u *Usecases) CreateOrAdjust(ctx context.Context, in accountsdomain.Account
 		return accountsdomain.Account{}, domainerr.Validation("amount must be > 0")
 	}
 	return u.repo.CreateOrAdjust(ctx, in, amount, description, actor)
+}
+
+func normalizeAccountType(value string) string {
+	return strings.TrimSpace(strings.ToLower(value))
+}
+
+func normalizeEntityType(value string) string {
+	return strings.TrimSpace(strings.ToLower(value))
+}
+
+func isSupportedAccountType(value string) bool {
+	return value == "receivable" || value == "payable"
+}
+
+func isSupportedEntityType(value string) bool {
+	return value == "customer" || value == "supplier"
+}
+
+func entityTypeFromAccountType(accountType string) string {
+	switch normalizeAccountType(accountType) {
+	case "receivable":
+		return "customer"
+	case "payable":
+		return "supplier"
+	default:
+		return ""
+	}
+}
+
+func accountTypeFromEntityType(entityType string) string {
+	switch normalizeEntityType(entityType) {
+	case "customer":
+		return "receivable"
+	case "supplier":
+		return "payable"
+	default:
+		return ""
+	}
+}
+
+func isCompatibleAccountTypeAndEntityType(accountType, entityType string) bool {
+	return entityTypeFromAccountType(accountType) == normalizeEntityType(entityType)
 }

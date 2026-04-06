@@ -1,65 +1,4 @@
-export type DashboardContext = 'home' | 'commercial' | 'operations' | 'control' | string;
-
-export type DashboardWidgetSize = {
-  w: number;
-  h: number;
-};
-
-export type DashboardWidgetDefinition = {
-  widget_key: string;
-  title: string;
-  description: string;
-  domain: string;
-  kind: string;
-  default_size: DashboardWidgetSize;
-  min_w: number;
-  min_h: number;
-  max_w: number;
-  max_h: number;
-  supported_contexts: string[];
-  allowed_roles: string[];
-  required_scopes?: string[];
-  settings_schema?: Record<string, unknown>;
-  data_endpoint: string;
-  status: string;
-};
-
-export type DashboardLayoutItem = {
-  widget_key: string;
-  instance_id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  visible: boolean;
-  settings: Record<string, unknown>;
-  pinned: boolean;
-  order_hint: number;
-};
-
-export type DashboardLayout = {
-  source: string;
-  layout_key: string;
-  version: number;
-  items: DashboardLayoutItem[];
-};
-
-export type DashboardResponse = {
-  context: DashboardContext;
-  layout: DashboardLayout;
-  available_widgets: DashboardWidgetDefinition[];
-};
-
-export type DashboardSavePayload = {
-  context: DashboardContext;
-  items: DashboardLayoutItem[];
-};
-
-export type DashboardWidgetRendererProps = {
-  context: DashboardContext;
-  item: DashboardLayoutItem;
-  widget: DashboardWidgetDefinition;
-};
+export const HOME_DASHBOARD_CONTEXT = 'home';
 
 export type SalesSummaryData = {
   period: string;
@@ -119,6 +58,18 @@ export type TopProduct = {
 export type TopProductsData = {
   period: string;
   items: TopProduct[];
+};
+
+export type TopService = {
+  service_id: string;
+  name: string;
+  quantity: number;
+  total: number;
+};
+
+export type TopServicesData = {
+  period: string;
+  items: TopService[];
 };
 
 export type BillingStatusData = {

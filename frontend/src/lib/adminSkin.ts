@@ -1,14 +1,14 @@
 import { createBrowserStorageNamespace } from '@devpablocristo/core-browser/storage';
 
-export type AdminSkinId = 'classic' | 'wowdash';
+export type AdminSkinId = 'classic' | 'modern';
 
 const STORAGE_KEY = 'pymes:admin-skin';
-const DEFAULT_SKIN: AdminSkinId = 'wowdash';
+const DEFAULT_SKIN: AdminSkinId = 'modern';
 const storage = createBrowserStorageNamespace({ namespace: 'pymes-ui', hostAware: false });
 
 export function getAdminSkin(): AdminSkinId {
   const raw = storage.getString(STORAGE_KEY);
-  if (raw === 'classic' || raw === 'wowdash') return raw;
+  if (raw === 'classic' || raw === 'modern') return raw;
   return DEFAULT_SKIN;
 }
 

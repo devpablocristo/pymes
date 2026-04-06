@@ -12,5 +12,5 @@ ALTER TABLE tenant_settings DROP COLUMN IF EXISTS appointments_enabled;
 DROP TABLE IF EXISTS appointment_slots;
 DROP TABLE IF EXISTS appointments;
 
--- 4. Actualizar permisos RBAC: 'appointments' → 'scheduling'.
-UPDATE role_permissions SET resource = 'scheduling' WHERE resource = 'appointments';
+-- 4. Eliminar permisos RBAC legacy de 'appointments' (ya existen como 'scheduling').
+DELETE FROM role_permissions WHERE resource = 'appointments';

@@ -17,7 +17,7 @@ type Service struct {
 	BasePrice       float64
 	Currency        string
 	TaxRate         float64
-	LinkedProductID *uuid.UUID
+	LinkedServiceID *uuid.UUID
 	IsActive        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

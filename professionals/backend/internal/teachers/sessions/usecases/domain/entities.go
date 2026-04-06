@@ -12,7 +12,7 @@ type Session struct {
 	AppointmentID   uuid.UUID
 	ProfileID       uuid.UUID
 	CustomerPartyID *uuid.UUID
-	ProductID       *uuid.UUID
+	ServiceID       *uuid.UUID
 	Status          string
 	StartedAt       *time.Time
 	EndedAt         *time.Time

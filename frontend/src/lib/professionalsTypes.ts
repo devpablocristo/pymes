@@ -30,27 +30,39 @@ export type Specialty = {
 };
 
 export type ServiceLink = {
-  specialty_id: string;
-  specialty_code: string;
-  specialty_name: string;
-  enabled: boolean;
+  id: string;
+  org_id: string;
+  profile_id: string;
+  service_id: string;
+  public_description: string;
+  display_order: number;
+  is_featured: boolean;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Intake = {
   id: string;
+  org_id?: string;
+  appointment_id?: string;
   profile_id: string;
+  customer_party_id?: string;
+  service_id?: string;
   status: 'draft' | 'submitted' | 'reviewed';
   notes: string;
+  payload?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
 
 export type Session = {
   id: string;
+  org_id?: string;
   appointment_id: string;
   profile_id: string;
   customer_party_id?: string;
-  product_id?: string;
+  service_id?: string;
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
   started_at?: string;
   ended_at?: string;

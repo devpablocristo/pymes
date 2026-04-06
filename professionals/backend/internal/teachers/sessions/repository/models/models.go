@@ -12,7 +12,7 @@ type SessionModel struct {
 	AppointmentID   uuid.UUID  `gorm:"type:uuid;not null"`
 	ProfileID       uuid.UUID  `gorm:"type:uuid;not null"`
 	CustomerPartyID *uuid.UUID `gorm:"type:uuid"`
-	ProductID       *uuid.UUID `gorm:"type:uuid"`
+	ServiceID       *uuid.UUID `gorm:"type:uuid"`
 	Status          string     `gorm:"not null;default:scheduled"`
 	StartedAt       *time.Time
 	EndedAt         *time.Time

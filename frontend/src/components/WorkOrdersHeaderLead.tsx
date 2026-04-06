@@ -1,5 +1,4 @@
 import { NavLink, useMatch } from 'react-router-dom';
-import { useI18n } from '../lib/i18n';
 import '../pages/WorkOrdersModuleSection.css';
 
 type Props = {
@@ -13,7 +12,6 @@ type Props = {
  * Switch Board/Lista genérico para OT de cualquier vertical.
  */
 export function WorkOrdersHeaderLead({ boardPath, listPath, editPattern, description }: Props) {
-  const { t } = useI18n();
   const isBoardActive = useMatch(boardPath);
   const isListMatch = useMatch(listPath);
   const isEditMatch = useMatch(editPattern ?? `${listPath}/edit/:orderId`);

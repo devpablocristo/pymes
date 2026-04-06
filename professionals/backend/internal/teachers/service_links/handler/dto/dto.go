@@ -4,7 +4,7 @@ type ServiceLinkItem struct {
 	ID                string         `json:"id"`
 	OrgID             string         `json:"org_id"`
 	ProfileID         string         `json:"profile_id"`
-	ProductID         string         `json:"product_id"`
+	ServiceID         string         `json:"service_id"`
 	PublicDescription string         `json:"public_description"`
 	DisplayOrder      int            `json:"display_order"`
 	IsFeatured        bool           `json:"is_featured"`
@@ -18,7 +18,7 @@ type ListServiceLinksResponse struct {
 }
 
 type ServiceLinkInput struct {
-	ProductID         string         `json:"product_id" binding:"required"`
+	ServiceID         string         `json:"service_id"`
 	PublicDescription string         `json:"public_description"`
 	DisplayOrder      int            `json:"display_order"`
 	IsFeatured        bool           `json:"is_featured"`
@@ -26,5 +26,6 @@ type ServiceLinkInput struct {
 }
 
 type ReplaceServiceLinksRequest struct {
-	Links []ServiceLinkInput `json:"links" binding:"required"`
+	Links []ServiceLinkInput `json:"links"`
+	Items []ServiceLinkInput `json:"items"`
 }

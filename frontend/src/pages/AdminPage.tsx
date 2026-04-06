@@ -591,7 +591,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
               </section>
 
               <section className="admin-settings-section">
-                <h3>Scheduling</h3>
+                <h3>Agenda</h3>
                 <div className="admin-settings-grid">
                   <div className="form-group admin-checkbox-row">
                     <input
@@ -600,7 +600,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
                       checked={form.scheduling_enabled}
                       onChange={(e) => updateField('scheduling_enabled', e.target.checked)}
                     />
-                    <label htmlFor="scheduling_enabled">Scheduling habilitado</label>
+                    <label htmlFor="scheduling_enabled">Agenda habilitada</label>
                   </div>
                   <div className="form-group">
                     <label>Etiqueta (ej. Turno, Clase)</label>

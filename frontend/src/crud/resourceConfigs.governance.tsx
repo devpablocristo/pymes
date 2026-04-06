@@ -407,7 +407,7 @@ const resourceConfigs: CrudResourceConfigMap = {
     ],
     formFields: [
       { key: 'type', label: 'Tipo', required: true, placeholder: 'receivable, payable' },
-      { key: 'entity_type', label: 'Entity type', required: true, placeholder: 'customer, supplier, party' },
+      { key: 'entity_type', label: 'Entity type', required: true, placeholder: 'customer, supplier' },
       { key: 'entity_id', label: 'Entity ID', required: true, placeholder: 'UUID de la entidad' },
       { key: 'entity_name', label: 'Nombre', required: true, placeholder: 'Nombre visible' },
       { key: 'amount', label: 'Ajuste inicial', type: 'number', required: true, placeholder: '0.00' },

@@ -28,6 +28,7 @@ type RepositoryPort interface {
 	SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
+	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
 }
 
 type SalesPort interface {
@@ -50,6 +51,7 @@ func NewUsecases(repo RepositoryPort, salesUC SalesPort, audit AuditPort) *Useca
 
 type QuoteItemInput struct {
 	ProductID   *uuid.UUID
+	ServiceID   *uuid.UUID
 	Description string
 	Quantity    float64
 	UnitPrice   float64
@@ -156,6 +158,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 			t := item.TaxRate
 			itemInputs = append(itemInputs, QuoteItemInput{
 				ProductID:   item.ProductID,
+				ServiceID:   item.ServiceID,
 				Description: item.Description,
 				Quantity:    item.Quantity,
 				UnitPrice:   item.UnitPrice,
@@ -326,6 +329,7 @@ func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, payment
 		t := item.TaxRate
 		saleItems = append(saleItems, sales.CreateSaleItemInput{
 			ProductID:   item.ProductID,
+			ServiceID:   item.ServiceID,
 			Description: item.Description,
 			Quantity:    item.Quantity,
 			UnitPrice:   item.UnitPrice,
@@ -370,6 +374,7 @@ func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRa
 		unitPrice := item.UnitPrice
 		taxRate := defaultTaxRate
 		var productID *uuid.UUID
+		var serviceID *uuid.UUID
 
 		if item.ProductID != nil && *item.ProductID != uuid.Nil {
 			snapshot, err := u.repo.GetProductSnapshot(ctx, orgID, *item.ProductID)
@@ -381,6 +386,25 @@ func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRa
 			}
 			pid := snapshot.ID
 			productID = &pid
+			if desc == "" {
+				desc = snapshot.Name
+			}
+			if unitPrice <= 0 {
+				unitPrice = snapshot.Price
+			}
+			if snapshot.TaxRate != nil {
+				taxRate = *snapshot.TaxRate
+			}
+		} else if item.ServiceID != nil && *item.ServiceID != uuid.Nil {
+			snapshot, err := u.repo.GetServiceSnapshot(ctx, orgID, *item.ServiceID)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil, 0, 0, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
+				}
+				return nil, 0, 0, err
+			}
+			sid := snapshot.ID
+			serviceID = &sid
 			if desc == "" {
 				desc = snapshot.Name
 			}
@@ -412,6 +436,7 @@ func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRa
 		}
 		items = append(items, CreateItemInput{
 			ProductID:   productID,
+			ServiceID:   serviceID,
 			Description: desc,
 			Quantity:    item.Quantity,
 			UnitPrice:   unitPrice,

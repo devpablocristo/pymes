@@ -21,6 +21,7 @@ import (
 	productdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/products/usecases/domain"
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	saledomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
+	servicedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/services/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
@@ -53,6 +54,10 @@ type productPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 }
 
+type servicePort interface {
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error)
+}
+
 type quotePort interface {
 	Create(ctx context.Context, in quotes.CreateQuoteInput) (quotedomain.Quote, error)
 }
@@ -83,6 +88,7 @@ type Handler struct {
 	parties           partyPort
 	customers         customerPort
 	products          productPort
+	services          servicePort
 	quotes            quotePort
 	sales             salePort
 	gateway           paymentGatewayPort
@@ -98,6 +104,7 @@ func NewHandler(
 	parties partyPort,
 	customers customerPort,
 	products productPort,
+	services servicePort,
 	quotes quotePort,
 	sales salePort,
 	gateway paymentGatewayPort,
@@ -111,6 +118,7 @@ func NewHandler(
 		parties:           parties,
 		customers:         customers,
 		products:          products,
+		services:          services,
 		quotes:            quotes,
 		sales:             sales,
 		gateway:           gateway,
@@ -133,6 +141,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/customers/resolve", h.ResolveCustomer)
 	internal.GET("/products", h.ListProducts)
 	internal.GET("/products/:id", h.GetProduct)
+	internal.GET("/services/:id", h.GetService)
 	// Legacy appointment routes removidos — verticales usan /scheduling/bookings via schedulingHandler
 	internal.POST("/in-app-notifications", h.CreateInAppNotification)
 	internal.POST("/quotes", h.CreateQuote)
@@ -438,7 +447,6 @@ func (h *Handler) GetProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":          item.ID.String(),
 		"org_id":      item.OrgID.String(),
-		"type":        item.Type,
 		"sku":         item.SKU,
 		"name":        item.Name,
 		"description": item.Description,
@@ -451,6 +459,41 @@ func (h *Handler) GetProduct(c *gin.Context) {
 		"metadata":    item.Metadata,
 		"created_at":  item.CreatedAt.UTC().Format(time.RFC3339),
 		"updated_at":  item.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+func (h *Handler) GetService(c *gin.Context) {
+	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
+		return
+	}
+	serviceID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	item, err := h.services.GetByID(c.Request.Context(), orgID, serviceID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":                       item.ID.String(),
+		"org_id":                   item.OrgID.String(),
+		"code":                     item.Code,
+		"name":                     item.Name,
+		"description":              item.Description,
+		"category_code":            item.CategoryCode,
+		"sale_price":               item.SalePrice,
+		"cost_price":               item.CostPrice,
+		"tax_rate":                 item.TaxRate,
+		"currency":                 item.Currency,
+		"default_duration_minutes": item.DefaultDurationMinutes,
+		"tags":                     item.Tags,
+		"metadata":                 item.Metadata,
+		"created_at":               item.CreatedAt.UTC().Format(time.RFC3339),
+		"updated_at":               item.UpdatedAt.UTC().Format(time.RFC3339),
 	})
 }
 

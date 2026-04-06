@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck — vitest mocks use dynamic types that tsc cannot verify
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HttpError } from '@devpablocristo/core-authn/http/fetch';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -61,7 +62,7 @@ vi.mock('@devpablocristo/modules-scheduling', () => ({
   },
 }));
 
-async function renderDashboardVisualPage() {
+async function renderDashboardVisualPage(initialLanguage: 'es' | 'en' = 'es') {
   const { DashboardVisualPage } = await import('./DashboardVisualPage');
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -73,7 +74,7 @@ async function renderDashboardVisualPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <LanguageProvider initialLanguage="es">
+        <LanguageProvider initialLanguage={initialLanguage}>
           <DashboardVisualPage />
         </LanguageProvider>
       </MemoryRouter>
@@ -109,8 +110,47 @@ describe('DashboardVisualPage', () => {
     expect(schedulingMocks.capturedProps.at(-1)).toEqual(
       expect.objectContaining({
         client: schedulingMocks.client,
-        locale: 'es',
+        locale: 'es-AR',
       }),
     );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/recent-sales?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-products?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/top-services?context=home');
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/dashboard-data/low-stock?context=home');
+  });
+
+  it('does not crash when dashboard payloads are incomplete', async () => {
+    apiMocks.apiRequest.mockImplementation((path: string) => {
+      if (String(path).includes('/v1/dashboard-data/sales-summary')) {
+        return Promise.resolve({});
+      }
+      if (String(path).includes('/v1/accounts/debtors')) {
+        return Promise.resolve({ items: [] });
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    await renderDashboardVisualPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Ventas')).toBeInTheDocument();
+      expect(screen.queryByText('undefined')).not.toBeInTheDocument();
+    });
+  });
+
+  it('treats debtors server failures as an empty state', async () => {
+    apiMocks.apiRequest.mockImplementation((path: string) => {
+      if (String(path).includes('/v1/accounts/debtors')) {
+        return Promise.reject(new HttpError('boom', 500, '{"error":"boom"}'));
+      }
+      return Promise.resolve({ items: [] });
+    });
+
+    await renderDashboardVisualPage();
+
+    await waitFor(() => {
+      expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/accounts/debtors');
+      expect(screen.queryByText('No pudimos cargar el dashboard.')).not.toBeInTheDocument();
+    });
   });
 });

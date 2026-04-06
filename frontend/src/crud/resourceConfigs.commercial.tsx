@@ -48,7 +48,6 @@ type Supplier = {
 
 type Product = {
   id: string;
-  type?: string;
   sku?: string;
   name: string;
   description?: string;
@@ -60,6 +59,20 @@ type Product = {
   tags?: string[];
 };
 
+type Service = {
+  id: string;
+  code?: string;
+  name: string;
+  description?: string;
+  category_code?: string;
+  sale_price?: number;
+  cost_price?: number;
+  tax_rate?: number | null;
+  currency?: string;
+  default_duration_minutes?: number | null;
+  tags?: string[];
+};
+
 type PriceList = {
   id: string;
   name: string;
@@ -67,7 +80,7 @@ type PriceList = {
   is_default: boolean;
   markup?: number;
   is_active: boolean;
-  items?: Array<{ product_id: string; price: number }>;
+  items?: Array<{ product_id?: string; service_id?: string; price: number }>;
 };
 
 type Quote = {
@@ -82,6 +95,7 @@ type Quote = {
   notes?: string;
   items?: Array<{
     product_id?: string;
+    service_id?: string;
     description: string;
     quantity: number;
     unit_price: number;
@@ -103,6 +117,7 @@ type Sale = {
   notes?: string;
   items?: Array<{
     product_id?: string;
+    service_id?: string;
     description: string;
     quantity: number;
     unit_price: number;
@@ -123,6 +138,7 @@ type Purchase = {
   notes?: string;
   items?: Array<{
     product_id?: string;
+    service_id?: string;
     description: string;
     quantity: number;
     unit_cost: number;
@@ -145,18 +161,23 @@ function formatAddress(address?: Address): string {
   return [address?.street, address?.city, address?.state, address?.country].filter(Boolean).join(', ') || '---';
 }
 
-function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id: string; price: number }> {
-  const parsed = parseJSONArray<{ product_id: string; price: number }>(value, 'Los items deben ser un arreglo JSON');
+function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id?: string; service_id?: string; price: number }> {
+  const parsed = parseJSONArray<{ product_id?: string; service_id?: string; price: number }>(
+    value,
+    'Los items deben ser un arreglo JSON',
+  );
   return parsed
     .map((item) => ({
-      product_id: String(item.product_id ?? '').trim(),
+      product_id: item.product_id ? String(item.product_id).trim() : undefined,
+      service_id: item.service_id ? String(item.service_id).trim() : undefined,
       price: Number(item.price ?? 0),
     }))
-    .filter((item) => item.product_id);
+    .filter((item) => item.product_id || item.service_id);
 }
 
 function parsePricedLineItems(value: CrudFieldValue | undefined): Array<{
   product_id?: string;
+  service_id?: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -167,6 +188,7 @@ function parsePricedLineItems(value: CrudFieldValue | undefined): Array<{
   return parsed
     .map((item, index) => ({
       product_id: asOptionalString(item.product_id as CrudFieldValue),
+      service_id: asOptionalString(item.service_id as CrudFieldValue),
       description: String(item.description ?? '').trim(),
       quantity: Number(item.quantity ?? 0),
       unit_price: Number(item.unit_price ?? 0),
@@ -178,6 +200,7 @@ function parsePricedLineItems(value: CrudFieldValue | undefined): Array<{
 
 function parseCostLineItems(value: CrudFieldValue | undefined): Array<{
   product_id?: string;
+  service_id?: string;
   description: string;
   quantity: number;
   unit_cost: number;
@@ -187,6 +210,7 @@ function parseCostLineItems(value: CrudFieldValue | undefined): Array<{
   return parsed
     .map((item) => ({
       product_id: asOptionalString(item.product_id as CrudFieldValue),
+      service_id: asOptionalString(item.service_id as CrudFieldValue),
       description: String(item.description ?? '').trim(),
       quantity: Number(item.quantity ?? 0),
       unit_cost: Number(item.unit_cost ?? 0),
@@ -380,9 +404,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
         render: (_value, row: Product) => (
           <>
             <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.sku || 'Sin SKU'} · {row.type || 'general'}
-            </div>
+            <div className="text-secondary">{row.sku || 'Sin SKU'} · {row.unit || 'unidad'}</div>
           </>
         ),
       },
@@ -401,7 +423,6 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
       { key: 'sku', label: 'SKU', placeholder: 'SKU-001' },
-      { key: 'type', label: 'Tipo', placeholder: 'fisico, servicio, combo' },
       { key: 'unit', label: 'Unidad', placeholder: 'unidad, kg, hora' },
       { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
       { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
@@ -411,11 +432,10 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Product) =>
-      [row.name, row.sku, row.type, row.description, row.unit, tagsToText(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.sku, row.description, row.unit, tagsToText(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Product) => ({
       name: row.name ?? '',
       sku: row.sku ?? '',
-      type: row.type ?? '',
       unit: row.unit ?? '',
       price: row.price?.toString() ?? '0',
       cost_price: row.cost_price?.toString() ?? '',
@@ -427,7 +447,6 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     toBody: (values) => ({
       name: asString(values.name),
       sku: asOptionalString(values.sku),
-      type: asOptionalString(values.type),
       unit: asOptionalString(values.unit),
       price: asNumber(values.price),
       cost_price: asNumber(values.cost_price),
@@ -437,6 +456,74 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       description: asOptionalString(values.description),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.price) || '0') >= 0,
+  },
+  services: {
+    basePath: '/v1/services',
+    supportsArchived: true,
+    label: 'servicio',
+    labelPlural: 'servicios',
+    labelPluralCap: 'Servicios',
+    columns: [
+      {
+        key: 'name',
+        header: 'Servicio',
+        className: 'cell-name',
+        render: (_value, row: Service) => (
+          <>
+            <strong>{row.name}</strong>
+            <div className="text-secondary">
+              {row.code || 'Sin codigo'} · {row.category_code || 'general'}
+            </div>
+          </>
+        ),
+      },
+      { key: 'sale_price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'default_duration_minutes',
+        header: 'Duracion',
+        render: (value) => (value ? `${Number(value)} min` : '---'),
+      },
+    ],
+    formFields: [
+      { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del servicio' },
+      { key: 'code', label: 'Codigo', placeholder: 'SVC-001' },
+      { key: 'category_code', label: 'Categoria', placeholder: 'estetica, diagnostico, consultoria' },
+      { key: 'sale_price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
+      { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
+      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
+      { key: 'default_duration_minutes', label: 'Duracion por defecto (min)', type: 'number', placeholder: '60' },
+      { key: 'tags', label: 'Tags', placeholder: 'premium, online, recurrente' },
+      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
+    ],
+    searchText: (row: Service) =>
+      [row.name, row.code, row.category_code, row.description, row.currency, tagsToText(row.tags)].filter(Boolean).join(' '),
+    toFormValues: (row: Service) => ({
+      name: row.name ?? '',
+      code: row.code ?? '',
+      category_code: row.category_code ?? '',
+      sale_price: row.sale_price?.toString() ?? '0',
+      cost_price: row.cost_price?.toString() ?? '',
+      tax_rate: row.tax_rate?.toString() ?? '',
+      currency: row.currency ?? 'ARS',
+      default_duration_minutes: row.default_duration_minutes?.toString() ?? '',
+      tags: tagsToText(row.tags),
+      description: row.description ?? '',
+    }),
+    toBody: (values) => ({
+      name: asString(values.name),
+      code: asOptionalString(values.code),
+      category_code: asOptionalString(values.category_code),
+      sale_price: asNumber(values.sale_price),
+      cost_price: asNumber(values.cost_price),
+      tax_rate: asOptionalNumber(values.tax_rate),
+      currency: asOptionalString(values.currency) ?? 'ARS',
+      default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
+      tags: parseCSV(values.tags),
+      description: asOptionalString(values.description),
+    }),
+    isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
   },
   priceLists: {
     basePath: '/v1/price-lists',
@@ -810,6 +897,7 @@ export const commercialCsvStrategies: Record<string, CSVToolbarOptions> = {
   customers: { mode: 'server', entity: 'customers' },
   suppliers: { mode: 'server', entity: 'suppliers' },
   products: { mode: 'server', entity: 'products' },
+  services: { mode: 'server', entity: 'services' },
 };
 
 const resourceConfigs = Object.fromEntries(

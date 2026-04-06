@@ -25,19 +25,19 @@ describe('getAdminSkin', () => {
     expect(getAdminSkin()).toBe('classic');
   });
 
-  it('returns stored wowdash skin', () => {
-    mockStorage.getString.mockReturnValue('wowdash');
-    expect(getAdminSkin()).toBe('wowdash');
+  it('returns stored modern skin', () => {
+    mockStorage.getString.mockReturnValue('modern');
+    expect(getAdminSkin()).toBe('modern');
   });
 
-  it('defaults to wowdash for unknown value', () => {
+  it('defaults to modern for unknown value', () => {
     mockStorage.getString.mockReturnValue('unknown');
-    expect(getAdminSkin()).toBe('wowdash');
+    expect(getAdminSkin()).toBe('modern');
   });
 
-  it('defaults to wowdash when nothing stored', () => {
+  it('defaults to modern when nothing stored', () => {
     mockStorage.getString.mockReturnValue(null);
-    expect(getAdminSkin()).toBe('wowdash');
+    expect(getAdminSkin()).toBe('modern');
   });
 });
 
@@ -51,8 +51,8 @@ describe('setAdminSkin', () => {
 
 describe('applyAdminSkin', () => {
   it('sets data-admin-skin attribute', () => {
-    applyAdminSkin('wowdash');
-    expect(document.documentElement.getAttribute('data-admin-skin')).toBe('wowdash');
+    applyAdminSkin('modern');
+    expect(document.documentElement.getAttribute('data-admin-skin')).toBe('modern');
   });
 
   it('uses getAdminSkin default when no argument', () => {

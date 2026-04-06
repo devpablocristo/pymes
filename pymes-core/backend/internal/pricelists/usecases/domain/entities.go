@@ -20,6 +20,7 @@ type PriceList struct {
 }
 
 type PriceListItem struct {
-	ProductID uuid.UUID `json:"product_id"`
-	Price     float64   `json:"price"`
+	ProductID *uuid.UUID `json:"product_id,omitempty"`
+	ServiceID *uuid.UUID `json:"service_id,omitempty"`
+	Price     float64    `json:"price"`
 }

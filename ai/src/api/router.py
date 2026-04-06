@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
@@ -13,7 +12,7 @@ from src.api.deps import get_auth_context, get_backend_client, get_llm_provider,
 from src.api.quota import check_quota
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.config import get_settings
+from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from src.db.repository import AIRepository
 from runtime.logging import get_logger, get_request_id
 from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
@@ -63,7 +62,12 @@ async def list_conversations(
     limit: int = Query(default=50, ge=1, le=200),
 ):
     """Lista conversaciones internas del usuario autenticado."""
-    rows = await repo.list_conversations(auth.org_id, mode="internal", user_id=auth.actor, limit=limit)
+    rows = await repo.list_conversations(
+        auth.org_id,
+        mode="internal",
+        user_id=get_internal_conversation_user_id(auth),
+        limit=limit,
+    )
     return ConversationListResponse(
         items=[
             ConversationSummary(
@@ -86,7 +90,7 @@ async def get_conversation(
 ):
     """Devuelve una conversación con su historial de mensajes."""
     row = await repo.get_conversation(auth.org_id, conversation_id)
-    if row is None:
+    if row is None or row.mode != "internal" or not can_access_internal_conversation(auth, row.user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
     return ConversationDetail(
         id=row.id,

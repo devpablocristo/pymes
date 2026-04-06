@@ -12,7 +12,7 @@ type Intake struct {
 	AppointmentID   *uuid.UUID
 	ProfileID       uuid.UUID
 	CustomerPartyID *uuid.UUID
-	ProductID       *uuid.UUID
+	ServiceID       *uuid.UUID
 	Status          string
 	Payload         map[string]any
 	CreatedAt       time.Time

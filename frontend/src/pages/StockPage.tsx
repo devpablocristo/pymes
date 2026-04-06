@@ -191,7 +191,6 @@ export function StockPage() {
                     key={row.product_id}
                     row={row}
                     isExpanded={isExpanded}
-                    isAdjusting={isAdjusting}
                     onToggle={() => toggleExpand(row.product_id)}
                     onAdjust={() => startAdjust(row.product_id)}
                     adjustForm={
@@ -235,7 +234,6 @@ type AdjustForm = {
 function StockRow({
   row,
   isExpanded,
-  isAdjusting,
   onToggle,
   onAdjust,
   adjustForm,
@@ -244,7 +242,6 @@ function StockRow({
 }: {
   row: StockLevel;
   isExpanded: boolean;
-  isAdjusting: boolean;
   onToggle: () => void;
   onAdjust: () => void;
   adjustForm: AdjustForm | null;

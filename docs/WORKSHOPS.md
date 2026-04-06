@@ -26,7 +26,7 @@ Rutas bajo `/v1/auto-repair/...` exigen JWT (o API key si el servicio lo permite
 
 - Servicio: **`work-backend`**, puerto host **8282** (`docker-compose.yml` en la raíz del monorepo).
 - Frontend: `VITE_WORKSHOPS_API_URL=http://localhost:8282`.
-- **Seed SQL** (`workshops/backend/seeds/auto_repair_demo.sql`): vehículo patente `AB 123 CD`, servicios `SRV-OIL` / `SRV-BRAKE`, órdenes `OT-SEED-001` y `OT-SEED-002` (requiere seeds del core en la misma base). En Compose: `PYMES_SEED_DEMO=true` en `work-backend`; manual: `make seed-workshops-demo` tras `make seed-core-demo`.
+- **Seed SQL** (`workshops/backend/seeds/*.sql`): vehículo patente `AB 123 CD`, servicios `SRV-OIL` / `SRV-BRAKE`, órdenes `OT-SEED-001` y `OT-SEED-002` (requiere seeds del core en la misma base). En Compose: `PYMES_SEED_DEMO=true` en `work-backend`; para resembrar manualmente: `make seed`.
 
 Entry point:
 
@@ -87,7 +87,7 @@ Eso deja una base uniforme para sumar despues `truck_repair` o `moto_repair` sin
 
 - codigo y nombre comercial del servicio
 - precio base, horas estimadas, IVA, moneda
-- `linked_product_id` opcional para reutilizar un `product` del core
+- `linked_service_id` opcional para reutilizar un `service` del core
 
 ### Ordenes de trabajo
 

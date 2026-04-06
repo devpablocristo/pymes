@@ -3,7 +3,6 @@ package dto
 type ProductItem struct {
 	ID          string         `json:"id"`
 	OrgID       string         `json:"org_id"`
-	Type        string         `json:"type"`
 	SKU         string         `json:"sku,omitempty"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
@@ -26,7 +25,6 @@ type ListProductsResponse struct {
 }
 
 type CreateProductRequest struct {
-	Type        string         `json:"type"`
 	SKU         string         `json:"sku"`
 	Name        string         `json:"name" binding:"required"`
 	Description string         `json:"description"`
@@ -40,7 +38,6 @@ type CreateProductRequest struct {
 }
 
 type UpdateProductRequest struct {
-	Type        *string         `json:"type"`
 	SKU         *string         `json:"sku"`
 	Name        *string         `json:"name"`
 	Description *string         `json:"description"`

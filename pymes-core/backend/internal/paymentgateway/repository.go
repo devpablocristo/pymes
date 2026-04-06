@@ -152,7 +152,7 @@ func (r *Repository) GetServiceIDByName(ctx context.Context, name string) (uuid.
 		ID uuid.UUID
 	}
 	err := r.db.WithContext(ctx).
-		Table("services").
+		Table("system_services").
 		Select("id").
 		Where("name = ? AND is_active = true", strings.TrimSpace(name)).
 		Take(&row).Error

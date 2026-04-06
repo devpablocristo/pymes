@@ -1,3 +1,4 @@
+// Package dataio implements import/export persistence for CSV and bulk operations.
 package dataio
 
 import (
@@ -279,32 +280,6 @@ func (r *Repository) findPartyByRole(ctx context.Context, tx *gorm.DB, orgID uui
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse party id: %w", err)
-	}
-	return &id, nil
-}
-
-func (r *Repository) findProduct(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[string]string) (*uuid.UUID, error) {
-	q := tx.WithContext(ctx).Table("products").Select("id::text").Where("org_id = ? AND deleted_at IS NULL", orgID)
-	sku := strings.TrimSpace(row["sku"])
-	name := strings.TrimSpace(row["name"])
-	switch {
-	case sku != "":
-		q = q.Where("sku = ?", sku)
-	case name != "":
-		q = q.Where("LOWER(name) = LOWER(?)", name)
-	default:
-		return nil, nil
-	}
-	var idStr string
-	if err := q.Take(&idStr).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		return nil, fmt.Errorf("parse product id: %w", err)
 	}
 	return &id, nil
 }

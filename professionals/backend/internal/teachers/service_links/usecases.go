@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -36,8 +36,8 @@ func (u *Usecases) ListByProfile(ctx context.Context, orgID, profileID uuid.UUID
 
 func (u *Usecases) ReplaceForProfile(ctx context.Context, orgID, profileID uuid.UUID, links []domain.ServiceLink, actor string) ([]domain.ServiceLink, error) {
 	for i, link := range links {
-		if link.ProductID == uuid.Nil {
-			return nil, fmt.Errorf("product_id is required for link at position %d: %w", i, httperrors.ErrBadInput)
+		if link.ServiceID == uuid.Nil {
+			return nil, fmt.Errorf("service_id is required for link at position %d: %w", i, httperrors.ErrBadInput)
 		}
 		links[i].PublicDescription = strings.TrimSpace(link.PublicDescription)
 		if links[i].Metadata == nil {

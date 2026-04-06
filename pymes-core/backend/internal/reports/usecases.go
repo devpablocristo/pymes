@@ -12,6 +12,7 @@ import (
 type RepositoryPort interface {
 	SalesSummary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.SalesSummary, error)
 	SalesByProduct(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByProductItem, error)
+	SalesByService(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error)
 	SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error)
 	SalesByPayment(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByPaymentItem, error)
 	InventoryValuation(ctx context.Context, orgID uuid.UUID) ([]reportdomain.InventoryValuationItem, float64, error)
@@ -32,6 +33,10 @@ func (u *Usecases) SalesSummary(ctx context.Context, orgID uuid.UUID, from, to t
 
 func (u *Usecases) SalesByProduct(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByProductItem, error) {
 	return u.repo.SalesByProduct(ctx, orgID, from, to)
+}
+
+func (u *Usecases) SalesByService(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error) {
+	return u.repo.SalesByService(ctx, orgID, from, to)
 }
 
 func (u *Usecases) SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error) {

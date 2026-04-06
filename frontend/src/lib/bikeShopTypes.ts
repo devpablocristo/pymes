@@ -27,7 +27,7 @@ export type BikeShopService = {
   base_price: number;
   currency: string;
   tax_rate: number;
-  linked_product_id?: string;
+  linked_service_id?: string;
   is_active: boolean;
   archived_at?: string | null;
   created_at: string;

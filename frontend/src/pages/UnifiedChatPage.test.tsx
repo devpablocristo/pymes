@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageSearchProvider } from '../components/PageSearch';
 import { LanguageProvider } from '../lib/i18n';
+import { NOTIFICATION_CHAT_HANDOFF_KEY } from '../lib/notificationChatHandoff';
 import { UnifiedChatPage } from './UnifiedChatPage';
 import type { ConversationDetail, ConversationSummary } from '../lib/aiApi';
 import type { PymesAssistantChatResponse } from '../types/aiChat';
@@ -156,6 +157,42 @@ describe('UnifiedChatPage', () => {
     expect(await within(getMessagesPane()).findByText('Historial B')).toBeInTheDocument();
     expect(within(getMessagesPane()).queryByText('Consulta nueva')).not.toBeInTheDocument();
     expect(within(getMessagesPane()).queryByText('Respuesta del asistente')).not.toBeInTheDocument();
+    expect(within(getMessagesPane()).queryByText('Historial A')).not.toBeInTheDocument();
+  });
+
+  it('prioriza el handoff desde notificaciones sobre la rehidratación automática del último historial', async () => {
+    window.sessionStorage.setItem(
+      NOTIFICATION_CHAT_HANDOFF_KEY,
+      JSON.stringify({
+        notificationId: 'notif-1',
+        title: 'Cobro pendiente',
+        body: 'Hay un cobro para revisar.',
+        chatContext: {
+          suggested_user_message: 'Explicame este cobro pendiente',
+        },
+        routedAgent: 'ventas',
+        contentLanguage: 'es',
+      }),
+    );
+
+    renderUnifiedChat();
+
+    await waitFor(() => {
+      expect(aiMocks.listConversations).toHaveBeenCalledWith(30);
+      expect(aiMocks.pymesAssistantChat).toHaveBeenCalled();
+    });
+
+    const chatCalls = aiMocks.pymesAssistantChat.mock.calls as unknown[][];
+    expect(chatCalls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        message: 'Explicame este cobro pendiente',
+        chat_id: null,
+        preferred_language: 'es',
+      }),
+    );
+    expect(aiMocks.getConversation).not.toHaveBeenCalled();
+    expect(await within(getMessagesPane()).findByText('Explicame este cobro pendiente')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('Respuesta del asistente')).toBeInTheDocument();
     expect(within(getMessagesPane()).queryByText('Historial A')).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ DECLARE
     c1 uuid;
     c2 uuid;
     p1 uuid;
+    svc1 uuid;
     bk1 uuid;
     bk2 uuid;
     bk3 uuid;
@@ -52,15 +53,26 @@ BEGIN
     SELECT id INTO bk1 FROM workshops.bicycles WHERE org_id = v_org AND frame_number = 'SN-MTB-2024-001' LIMIT 1;
     SELECT id INTO bk2 FROM workshops.bicycles WHERE org_id = v_org AND frame_number = 'SN-ROAD-2023-042' LIMIT 1;
     SELECT id INTO bk3 FROM workshops.bicycles WHERE org_id = v_org AND frame_number = 'SN-EBIKE-2025-007' LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
 
     -- Servicios (segment = bike_shop)
-    INSERT INTO workshops.services (id, org_id, segment, code, name, description, category, estimated_hours, base_price, currency, tax_rate, linked_product_id, is_active)
+    INSERT INTO workshops.services (id, org_id, segment, code, name, description, category, estimated_hours, base_price, currency, tax_rate, linked_service_id, is_active)
     VALUES
         (srv1, v_org, 'bike_shop', 'SRV-TUNE', 'Puesta a punto completa', 'Ajuste de cambios, frenos, dirección, lubricación de cadena y revisión general', 'mantenimiento', 2.0, 18000, 'ARS', 21, NULL, true),
         (srv2, v_org, 'bike_shop', 'SRV-BRAKE', 'Cambio de pastillas de freno', 'Reemplazo de pastillas y sangrado de sistema hidráulico', 'frenos', 1.0, 12000, 'ARS', 21, NULL, true),
         (srv3, v_org, 'bike_shop', 'SRV-WHEEL', 'Centrado y tensado de rueda', 'Centrado lateral y radial, verificación de tensión de rayos', 'ruedas', 1.0, 8000, 'ARS', 21, NULL, true),
-        (srv4, v_org, 'bike_shop', 'SRV-EBIKE', 'Diagnóstico sistema eléctrico', 'Lectura de errores, verificación de batería, motor y display', 'electrico', 1.5, 15000, 'ARS', 21, NULL, true)
-    ON CONFLICT (org_id, code, segment) WHERE archived_at IS NULL DO NOTHING;
+        (srv4, v_org, 'bike_shop', 'SRV-EBIKE', 'Diagnóstico sistema eléctrico', 'Lectura de errores, verificación de batería, motor y display', 'electrico', 1.5, 15000, 'ARS', 21, svc1, true)
+    ON CONFLICT (org_id, code, segment) WHERE archived_at IS NULL DO UPDATE
+        SET name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            category = EXCLUDED.category,
+            estimated_hours = EXCLUDED.estimated_hours,
+            base_price = EXCLUDED.base_price,
+            currency = EXCLUDED.currency,
+            tax_rate = EXCLUDED.tax_rate,
+            linked_service_id = EXCLUDED.linked_service_id,
+            is_active = EXCLUDED.is_active,
+            updated_at = now();
     SELECT id INTO srv1 FROM workshops.services WHERE org_id = v_org AND segment = 'bike_shop' AND code = 'SRV-TUNE' LIMIT 1;
     SELECT id INTO srv2 FROM workshops.services WHERE org_id = v_org AND segment = 'bike_shop' AND code = 'SRV-BRAKE' LIMIT 1;
     SELECT id INTO srv3 FROM workshops.services WHERE org_id = v_org AND segment = 'bike_shop' AND code = 'SRV-WHEEL' LIMIT 1;

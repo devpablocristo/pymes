@@ -1,12 +1,10 @@
-// Package dashboard provides persistence for dashboard layouts and widget data.
+// Package dashboard provides persistence for dashboard data endpoints.
 package dashboard
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,174 +17,14 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-type widgetRow struct {
-	WidgetKey             string `gorm:"column:widget_key"`
-	Title                 string `gorm:"column:title"`
-	Description           string `gorm:"column:description"`
-	Domain                string `gorm:"column:domain"`
-	Kind                  string `gorm:"column:kind"`
-	DefaultWidth          int    `gorm:"column:default_width"`
-	DefaultHeight         int    `gorm:"column:default_height"`
-	MinWidth              int    `gorm:"column:min_width"`
-	MinHeight             int    `gorm:"column:min_height"`
-	MaxWidth              int    `gorm:"column:max_width"`
-	MaxHeight             int    `gorm:"column:max_height"`
-	AllowedRolesJSON      []byte `gorm:"column:allowed_roles_json"`
-	RequiredScopesJSON    []byte `gorm:"column:required_scopes_json"`
-	SupportedContextsJSON []byte `gorm:"column:supported_contexts_json"`
-	SettingsSchemaJSON    []byte `gorm:"column:settings_schema_json"`
-	DataEndpoint          string `gorm:"column:data_endpoint"`
-	IsActive              bool   `gorm:"column:is_active"`
-}
-
-type defaultLayoutRow struct {
-	LayoutKey string `gorm:"column:layout_key"`
-	Context   string `gorm:"column:context"`
-	Name      string `gorm:"column:name"`
-	ItemsJSON []byte `gorm:"column:items_json"`
-}
-
-type userLayoutRow struct {
-	UserID                      *uuid.UUID `gorm:"column:user_id"`
-	UserActor                   string     `gorm:"column:user_actor"`
-	Context                     string     `gorm:"column:context"`
-	LayoutVersion               int        `gorm:"column:layout_version"`
-	ItemsJSON                   []byte     `gorm:"column:items_json"`
-	LastAppliedDefaultLayoutKey string     `gorm:"column:last_applied_default_layout_key"`
-	CreatedAt                   time.Time  `gorm:"column:created_at"`
-	UpdatedAt                   time.Time  `gorm:"column:updated_at"`
-}
-
 func (r *Repository) ListWidgets(ctx context.Context) ([]dashboarddomain.WidgetDefinition, error) {
-	var rows []widgetRow
-	if err := r.db.WithContext(ctx).
-		Table("dashboard_widgets_catalog").
-		Where("is_active = ?", true).
-		Order("title ASC").
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-
-	out := make([]dashboarddomain.WidgetDefinition, 0, len(rows))
-	for _, row := range rows {
-		widget := dashboarddomain.WidgetDefinition{
-			WidgetKey:    row.WidgetKey,
-			Title:        row.Title,
-			Description:  row.Description,
-			Domain:       row.Domain,
-			Kind:         row.Kind,
-			DefaultSize:  dashboarddomain.WidgetSize{W: row.DefaultWidth, H: row.DefaultHeight},
-			MinW:         row.MinWidth,
-			MinH:         row.MinHeight,
-			MaxW:         row.MaxWidth,
-			MaxH:         row.MaxHeight,
-			DataEndpoint: row.DataEndpoint,
-			Status:       boolStatus(row.IsActive),
-		}
-		widget.AllowedRoles = decodeStringSlice(row.AllowedRolesJSON)
-		widget.RequiredScopes = decodeStringSlice(row.RequiredScopesJSON)
-		widget.SupportedContexts = decodeStringSlice(row.SupportedContextsJSON)
-		widget.SettingsSchema = decodeObject(row.SettingsSchemaJSON)
+	_ = ctx
+	catalog := fixedDashboardWidgets()
+	out := make([]dashboarddomain.WidgetDefinition, 0, len(catalog))
+	for _, widget := range catalog {
 		out = append(out, widget)
 	}
 	return out, nil
-}
-
-func (r *Repository) GetDefaultLayout(ctx context.Context, contextKey string) (dashboarddomain.DefaultLayout, error) {
-	var row defaultLayoutRow
-	if err := r.db.WithContext(ctx).
-		Table("dashboard_default_layouts").
-		Where("context = ? AND is_active = ?", contextKey, true).
-		Take(&row).Error; err != nil {
-		return dashboarddomain.DefaultLayout{}, err
-	}
-	return dashboarddomain.DefaultLayout{
-		LayoutKey: row.LayoutKey,
-		Context:   row.Context,
-		Name:      row.Name,
-		Items:     decodeLayoutItems(row.ItemsJSON),
-	}, nil
-}
-
-func (r *Repository) GetUserLayout(ctx context.Context, actor, contextKey string) (dashboarddomain.UserLayout, bool, error) {
-	var row userLayoutRow
-	err := r.db.WithContext(ctx).
-		Table("user_dashboard_layouts").
-		Where("user_actor = ? AND context = ?", actor, contextKey).
-		Take(&row).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return dashboarddomain.UserLayout{}, false, nil
-		}
-		return dashboarddomain.UserLayout{}, false, err
-	}
-	return dashboarddomain.UserLayout{
-		UserID:                      row.UserID,
-		UserActor:                   row.UserActor,
-		Context:                     row.Context,
-		LayoutVersion:               row.LayoutVersion,
-		Items:                       decodeLayoutItems(row.ItemsJSON),
-		LastAppliedDefaultLayoutKey: row.LastAppliedDefaultLayoutKey,
-		CreatedAt:                   row.CreatedAt,
-		UpdatedAt:                   row.UpdatedAt,
-	}, true, nil
-}
-
-func (r *Repository) SaveUserLayout(ctx context.Context, in dashboarddomain.UserLayout) error {
-	itemsJSON, err := json.Marshal(in.Items)
-	if err != nil {
-		return fmt.Errorf("marshal layout items: %w", err)
-	}
-	now := time.Now().UTC()
-	updates := map[string]any{
-		"user_id":                         in.UserID,
-		"items_json":                      itemsJSON,
-		"layout_version":                  in.LayoutVersion,
-		"last_applied_default_layout_key": in.LastAppliedDefaultLayoutKey,
-		"updated_at":                      now,
-	}
-	result := r.db.WithContext(ctx).
-		Table("user_dashboard_layouts").
-		Where("user_actor = ? AND context = ?", in.UserActor, in.Context).
-		Updates(updates)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected > 0 {
-		return nil
-	}
-	return r.db.WithContext(ctx).Table("user_dashboard_layouts").Create(map[string]any{
-		"id":                              uuid.New(),
-		"user_id":                         in.UserID,
-		"user_actor":                      in.UserActor,
-		"context":                         in.Context,
-		"layout_version":                  in.LayoutVersion,
-		"items_json":                      itemsJSON,
-		"last_applied_default_layout_key": in.LastAppliedDefaultLayoutKey,
-		"created_at":                      now,
-		"updated_at":                      now,
-	}).Error
-}
-
-func (r *Repository) ResetUserLayout(ctx context.Context, actor, contextKey string) error {
-	return r.db.WithContext(ctx).Table("user_dashboard_layouts").Where("user_actor = ? AND context = ?", actor, contextKey).Delete(nil).Error
-}
-
-func (r *Repository) ResolveUserID(ctx context.Context, actor string) (*uuid.UUID, error) {
-	if strings.TrimSpace(actor) == "" {
-		return nil, nil
-	}
-	var row struct {
-		ID uuid.UUID `gorm:"column:id"`
-	}
-	err := r.db.WithContext(ctx).Table("users").Select("id").Where("external_id = ? AND deleted_at IS NULL", actor).Take(&row).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &row.ID, nil
 }
 
 func (r *Repository) LoadSalesSummary(ctx context.Context, orgID uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
@@ -234,7 +72,7 @@ func (r *Repository) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID) (d
 	}
 	out := dashboarddomain.QuotesPipelineData{}
 	for _, row := range rows {
-		switch strings.ToLower(strings.TrimSpace(row.Status)) {
+		switch row.Status {
 		case "draft":
 			out.Draft = row.Count
 		case "sent":
@@ -312,6 +150,25 @@ func (r *Repository) LoadTopProducts(ctx context.Context, orgID uuid.UUID) (dash
 	return out, err
 }
 
+func (r *Repository) LoadTopServices(ctx context.Context, orgID uuid.UUID) (dashboarddomain.TopServicesData, error) {
+	out := dashboarddomain.TopServicesData{Period: currentPeriodLabel()}
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			COALESCE(si.service_id::text, '') AS service_id,
+			COALESCE(sv.name, si.description) AS name,
+			SUM(si.quantity) AS quantity,
+			SUM(si.subtotal) AS total
+		FROM sale_items si
+		JOIN sales s ON s.id = si.sale_id
+		LEFT JOIN services sv ON sv.id = si.service_id
+		WHERE s.org_id = ? AND s.created_at >= ? AND s.status = 'completed' AND si.service_id IS NOT NULL
+		GROUP BY si.service_id, COALESCE(sv.name, si.description)
+		ORDER BY SUM(si.subtotal) DESC
+		LIMIT 5
+	`, orgID, currentMonthStart()).Scan(&out.Items).Error
+	return out, err
+}
+
 func (r *Repository) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
 	var row struct {
 		PlanCode   string    `gorm:"column:plan_code"`
@@ -352,33 +209,6 @@ func (r *Repository) LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (da
 	return out, err
 }
 
-func decodeLayoutItems(raw []byte) []dashboarddomain.LayoutItem {
-	if len(raw) == 0 {
-		return []dashboarddomain.LayoutItem{}
-	}
-	var items []dashboarddomain.LayoutItem
-	if err := json.Unmarshal(raw, &items); err != nil {
-		return []dashboarddomain.LayoutItem{}
-	}
-	for idx := range items {
-		if items[idx].Settings == nil {
-			items[idx].Settings = map[string]any{}
-		}
-	}
-	return items
-}
-
-func decodeStringSlice(raw []byte) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	var out []string
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil
-	}
-	return out
-}
-
 func decodeObject(raw []byte) map[string]any {
 	if len(raw) == 0 {
 		return map[string]any{}
@@ -388,13 +218,6 @@ func decodeObject(raw []byte) map[string]any {
 		return map[string]any{}
 	}
 	return out
-}
-
-func boolStatus(active bool) string {
-	if active {
-		return "active"
-	}
-	return "inactive"
 }
 
 func currentMonthStart() time.Time {

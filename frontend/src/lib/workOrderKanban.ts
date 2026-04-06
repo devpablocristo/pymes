@@ -73,7 +73,7 @@ export function defaultCanonStatusForKanbanPhase(phase: WorkOrderKanbanPhase): s
     case 'wo_exit':
       return 'ready_for_pickup';
     case 'wo_closed':
-      return null;
+      return 'invoiced';
     default:
       return 'received';
   }

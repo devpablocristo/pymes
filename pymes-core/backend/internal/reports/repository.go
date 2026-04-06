@@ -81,6 +81,46 @@ func (r *Repository) SalesByProduct(ctx context.Context, orgID uuid.UUID, from, 
 	return out, nil
 }
 
+func (r *Repository) SalesByService(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error) {
+	type row struct {
+		ServiceID   *uuid.UUID `gorm:"column:service_id"`
+		ServiceName string     `gorm:"column:service_name"`
+		Quantity    float64    `gorm:"column:quantity"`
+		Revenue     float64    `gorm:"column:revenue"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).
+		Table("sale_items si").
+		Select(`
+			si.service_id,
+			COALESCE(sv.name, si.description) AS service_name,
+			COALESCE(SUM(si.quantity), 0) AS quantity,
+			COALESCE(SUM(si.subtotal), 0) AS revenue
+		`).
+		Joins("JOIN sales s ON s.id = si.sale_id").
+		Joins("LEFT JOIN services sv ON sv.id = si.service_id").
+		Where("s.org_id = ? AND s.status = 'completed' AND s.created_at >= ? AND s.created_at <= ? AND si.service_id IS NOT NULL", orgID, from, to).
+		Group("si.service_id, COALESCE(sv.name, si.description)").
+		Order("revenue DESC").
+		Limit(100).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]reportdomain.SalesByServiceItem, 0, len(rows))
+	for _, row := range rows {
+		item := reportdomain.SalesByServiceItem{
+			ServiceName: row.ServiceName,
+			Quantity:    row.Quantity,
+			Revenue:     row.Revenue,
+		}
+		if row.ServiceID != nil {
+			item.ServiceID = row.ServiceID.String()
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (r *Repository) SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error) {
 	type row struct {
 		CustomerID   *uuid.UUID `gorm:"column:customer_id"`

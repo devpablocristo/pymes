@@ -25,6 +25,22 @@ Además:
 - `shared/authz` — helpers de autorización.
 - `verticals` — metadatos o convenciones; no sustituye las verticales desplegables (`professionals/`, `workshops/`, `beauty/`, `restaurants/`).
 
+## Dashboard fijo
+
+- `internal/dashboard` expone solo `GET /v1/dashboard-data/:widget_key`.
+- El dashboard de consola es fijo y vive en `frontend/src/pages/DashboardVisualPage.tsx`.
+- Ya no existe personalización por usuario ni catálogo dinámico persistido en base.
+- Las tablas legacy `dashboard_default_layouts`, `user_dashboard_layouts`, `dashboard_widgets_catalog` y `user_dashboard_preferences` quedaron removidas por migraciones históricas de cleanup; el set de widgets permitido se define en código.
+
+## Split horizontal `products` / `services`
+
+- `internal/products` queda para bienes inventariables o vendibles físicos/digitales; el API de `products` ya no acepta `type='service'`.
+- la base valida que toda fila activa en `products` tenga `type='product'`; cualquier servicio legado queda archivado y el alta nueva se hace en `services`.
+- `internal/services` expone el catálogo comercial horizontal de servicios en `/v1/services`, persistido en `services`.
+- `sales`, `quotes` y `purchases` soportan líneas con `product_id` o `service_id`; `pricelists` mantiene precios separados para productos y servicios.
+- `modules/scheduling` conserva `scheduling_services` como capa operativa y ahora puede enlazar opcionalmente `commercial_service_id` hacia `services.id`.
+- Las verticales (`workshops.services`, `beauty.salon_services`) agregan `linked_service_id` para referenciar el catálogo horizontal.
+
 ## Integración externa librería `core`
 
 El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). El runtime reusable de AI también vive en `../../core/ai/python/src/runtime/`. Detalle de criterios y `replace` locales: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.
@@ -57,7 +73,7 @@ El control plane registra acciones sensibles en **`audit_log`** (cadena con hash
 
 ## Seeds de desarrollo
 
-**Regla:** las migraciones solo versionan **esquema**. Los datos de demo están en `pymes-core/backend/seeds/` y se aplican con **`PYMES_SEED_DEMO=true`** (Compose ya lo pone en `cp-backend`) o con `make seed-core-demo` + `DATABASE_URL`.
+**Regla:** las migraciones solo versionan **esquema**. Los datos de demo están en `pymes-core/backend/seeds/` y se aplican con **`PYMES_SEED_DEMO=true`** (Compose ya lo pone en `cp-backend`) o con `make seed` si necesitás resembrar.
 
 | Script (orden) | Contenido |
 |----------------|-----------|
@@ -68,14 +84,14 @@ El control plane registra acciones sensibles en **`audit_log`** (cadena con hash
 
 Los archivos `0004_local_seed`, `0007_core_seed`, `0013_rbac_seed` y `0030_transversal_modules_seed` en `migrations/` conservan el **número de versión** pero su `up`/`down` es no-op (`SELECT 1`).
 
-**Workshops:** `workshops/backend/seeds/auto_repair_demo.sql` — mismo patrón; `PYMES_SEED_DEMO` en `work-backend` o `make seed-workshops-demo` (después del seed del core).
+**Workshops:** `workshops/backend/seeds/*.sql` — mismo patrón; `PYMES_SEED_DEMO` en `work-backend` o `make seed` para resembrar junto con el core.
 
 ## Migraciones
 
 - Directorio: `pymes-core/backend/migrations/`.
 - Runner: `pymes-core/backend/migrations/runner.go`.
 - **No** editar migraciones ya aplicadas; nuevas `NNNN_*.up.sql` solo para **DDL / constraints**.
-- **No** añadir migraciones que solo inserten datos de demo; usar `seeds/` + `PYMES_SEED_DEMO` o `make seed-core-demo`.
+- **No** añadir migraciones que solo inserten datos de demo; usar `seeds/` + `PYMES_SEED_DEMO` o `make seed`.
 
 ## Cómo ejecutar y probar
 

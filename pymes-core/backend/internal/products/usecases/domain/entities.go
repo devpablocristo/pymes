@@ -9,7 +9,6 @@ import (
 type Product struct {
 	ID          uuid.UUID
 	OrgID       uuid.UUID
-	Type        string
 	SKU         string
 	Name        string
 	Description string

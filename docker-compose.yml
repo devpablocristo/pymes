@@ -168,17 +168,19 @@ services:
       - ./ai/tests:/workspace/pymes/ai/tests
       - ./ai/pyproject.toml:/workspace/pymes/ai/pyproject.toml
       - ../core/ai/python/src:/workspace/core/ai/python/src
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     env_file:
       - .env
     environment:
       AI_ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
-      BACKEND_URL: http://cp-backend:8080
-      PROFESSIONALS_BACKEND_URL: http://prof-backend:8081
-      WORKSHOPS_BACKEND_URL: http://work-backend:8082
-      BEAUTY_BACKEND_URL: http://beauty-backend:8083
-      RESTAURANTS_BACKEND_URL: http://restaurants-backend:8084
+      BACKEND_URL: http://host.docker.internal:8100
+      PROFESSIONALS_BACKEND_URL: http://host.docker.internal:8181
+      WORKSHOPS_BACKEND_URL: http://host.docker.internal:8282
+      BEAUTY_BACKEND_URL: http://host.docker.internal:8383
+      RESTAURANTS_BACKEND_URL: http://host.docker.internal:8484
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       REVIEW_URL: http://review:8080
       PYTHONPATH: /workspace/pymes/ai:/workspace/core/ai/python/src

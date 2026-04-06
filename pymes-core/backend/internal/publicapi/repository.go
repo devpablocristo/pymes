@@ -170,8 +170,8 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 
 	var rows []PublicService
 	err := r.db.WithContext(ctx).
-		Table("products").
-		Select("id, name, type, description, unit, price, COALESCE(price_currency, 'ARS') as currency").
+		Table("services").
+		Select("id, name, 'service' as type, description, '' as unit, sale_price as price, currency").
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Order("name ASC").
 		Limit(limit).

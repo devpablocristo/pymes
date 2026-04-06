@@ -51,15 +51,6 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if in.Type == "" {
-		in.Type = "product"
-	}
-	if in.Type != "product" && in.Type != "service" {
-		return productdomain.Product{}, fmt.Errorf("invalid type: %w", httperrors.ErrBadInput)
-	}
-	if in.Type == "service" {
-		in.TrackStock = false
-	}
 	if in.Unit == "" {
 		in.Unit = "unit"
 	}
@@ -71,13 +62,12 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 		_ = u.inventory.EnsureStockLevel(ctx, out.OrgID, out.ID)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "product.created", "product", out.ID.String(), map[string]any{"name": out.Name, "type": out.Type})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "product.created", "product", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
 
 type UpdateInput struct {
-	Type        *string
 	SKU         *string
 	Name        *string
 	Description *string
@@ -97,9 +87,6 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return productdomain.Product{}, err
-	}
-	if in.Type != nil {
-		current.Type = strings.TrimSpace(*in.Type)
 	}
 	if in.SKU != nil {
 		current.SKU = strings.TrimSpace(*in.SKU)
@@ -136,12 +123,6 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if current.Type != "product" && current.Type != "service" {
-		return productdomain.Product{}, fmt.Errorf("invalid type: %w", httperrors.ErrBadInput)
-	}
-	if current.Type == "service" {
-		current.TrackStock = false
-	}
 
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {
@@ -154,7 +135,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		_ = u.inventory.EnsureStockLevel(ctx, out.OrgID, out.ID)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "product.updated", "product", out.ID.String(), map[string]any{"name": out.Name, "type": out.Type})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "product.updated", "product", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }

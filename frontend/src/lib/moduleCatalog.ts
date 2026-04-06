@@ -59,6 +59,14 @@ const staticModuleCatalog: Record<string, ModuleDefinition> = {
         autoLoad: true,
       },
       {
+        id: 'report-sales-service',
+        title: 'Ventas por servicio',
+        description: 'Ranking y performance por servicio.',
+        path: '/v1/reports/sales-by-service',
+        fields: [fromField, toField],
+        autoLoad: true,
+      },
+      {
         id: 'report-sales-customer',
         title: 'Ventas por cliente',
         description: 'Concentración y recurrencia de clientes.',

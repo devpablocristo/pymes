@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/handler/dto"
+	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/handler/dto"
-	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -59,11 +59,19 @@ func (h *Handler) Replace(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	links := make([]domain.ServiceLink, 0, len(req.Links))
-	for _, l := range req.Links {
-		productID, err := uuid.Parse(l.ProductID)
+	inputs := req.Links
+	if inputs == nil {
+		inputs = req.Items
+	}
+	if inputs == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "links or items is required"})
+		return
+	}
+	links := make([]domain.ServiceLink, 0, len(inputs))
+	for _, l := range inputs {
+		serviceID, err := uuid.Parse(l.ServiceID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id: " + l.ProductID})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id: " + l.ServiceID})
 			return
 		}
 		meta := l.Metadata
@@ -71,7 +79,7 @@ func (h *Handler) Replace(c *gin.Context) {
 			meta = map[string]any{}
 		}
 		links = append(links, domain.ServiceLink{
-			ProductID:         productID,
+			ServiceID:         serviceID,
 			PublicDescription: l.PublicDescription,
 			DisplayOrder:      l.DisplayOrder,
 			IsFeatured:        l.IsFeatured,
@@ -91,11 +99,11 @@ func (h *Handler) Replace(c *gin.Context) {
 }
 
 func toServiceLinkItem(in domain.ServiceLink) dto.ServiceLinkItem {
-	return dto.ServiceLinkItem{
+	item := dto.ServiceLinkItem{
 		ID:                in.ID.String(),
 		OrgID:             in.OrgID.String(),
 		ProfileID:         in.ProfileID.String(),
-		ProductID:         in.ProductID.String(),
+		ServiceID:         in.ServiceID.String(),
 		PublicDescription: in.PublicDescription,
 		DisplayOrder:      in.DisplayOrder,
 		IsFeatured:        in.IsFeatured,
@@ -103,4 +111,5 @@ func toServiceLinkItem(in domain.ServiceLink) dto.ServiceLinkItem {
 		CreatedAt:         in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:         in.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+	return item
 }

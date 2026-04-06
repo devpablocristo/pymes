@@ -9,7 +9,6 @@
  * - Perfil / cuenta: `src/styles/profile.css`.
  * - Onboarding: `src/styles/onboarding.css`; calendario semanal: `src/styles/weekly-calendar.css`.
  * - Auth / planes / spinner / error boundary: `src/styles/auth.css`.
- * - Dashboard + responsive módulos: `src/styles/dashboard.css`.
  * - Tema, dark, CRUD y admin/tenant/API keys: `src/styles/admin-crud-theme.css`.
  * - Primitivas UI (cards, tablas, formularios, botones…): `src/styles/components.css`.
  * - Página de módulo / explorador de API: `src/styles/module-page.css`.
@@ -27,7 +26,6 @@
 @import './styles/onboarding.css';
 @import './styles/weekly-calendar.css';
 @import './styles/auth.css';
-@import './styles/dashboard.css';
 @import './styles/admin-crud-theme.css';
 @import './styles/components.css';
 @import './styles/module-page.css';

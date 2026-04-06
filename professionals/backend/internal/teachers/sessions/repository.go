@@ -89,7 +89,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Session) (domain.Sess
 		AppointmentID:   in.AppointmentID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
-		ProductID:       in.ProductID,
+		ServiceID:       in.ServiceID,
 		Status:          in.Status,
 		StartedAt:       in.StartedAt,
 		EndedAt:         in.EndedAt,
@@ -186,7 +186,7 @@ func toSessionDomain(row models.SessionModel) domain.Session {
 		AppointmentID:   row.AppointmentID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,
-		ProductID:       row.ProductID,
+		ServiceID:       coalesceServiceReference(row.ServiceID),
 		Status:          row.Status,
 		StartedAt:       row.StartedAt,
 		EndedAt:         row.EndedAt,
@@ -195,4 +195,12 @@ func toSessionDomain(row models.SessionModel) domain.Session {
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}
+}
+
+func coalesceServiceReference(primary *uuid.UUID) *uuid.UUID {
+	if primary != nil && *primary != uuid.Nil {
+		value := *primary
+		return &value
+	}
+	return nil
 }

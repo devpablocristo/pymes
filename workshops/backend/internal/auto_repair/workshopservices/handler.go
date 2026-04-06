@@ -11,10 +11,10 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/handler/dto"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/handler/dto"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -112,7 +112,7 @@ func (h *Handler) Create(c *gin.Context) {
 		BasePrice:       req.BasePrice,
 		Currency:        req.Currency,
 		TaxRate:         req.TaxRate,
-		LinkedProductID: vertvalues.ParseOptionalUUID(req.LinkedProductID),
+		LinkedServiceID: vertvalues.ParseOptionalUUID(req.LinkedServiceID),
 		IsActive:        isActive,
 	}, authCtx.Actor)
 	if err != nil {
@@ -154,7 +154,7 @@ func (h *Handler) Update(c *gin.Context) {
 		BasePrice:       req.BasePrice,
 		Currency:        req.Currency,
 		TaxRate:         req.TaxRate,
-		LinkedProductID: req.LinkedProductID,
+		LinkedServiceID: req.LinkedServiceID,
 		IsActive:        req.IsActive,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
@@ -224,9 +224,9 @@ func toServiceItem(item domain.Service) dto.ServiceItem {
 		CreatedAt:      item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:      item.UpdatedAt.UTC().Format(time.RFC3339),
 	}
-	if item.LinkedProductID != nil {
-		value := item.LinkedProductID.String()
-		result.LinkedProductID = &value
+	if item.LinkedServiceID != nil {
+		value := item.LinkedServiceID.String()
+		result.LinkedServiceID = &value
 	}
 	if item.ArchivedAt != nil {
 		s := item.ArchivedAt.UTC().Format(time.RFC3339)

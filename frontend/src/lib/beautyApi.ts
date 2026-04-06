@@ -61,7 +61,7 @@ export async function createBeautySalonService(data: {
   base_price?: number;
   currency?: string;
   tax_rate?: number;
-  linked_product_id?: string;
+  linked_service_id?: string;
   is_active?: boolean;
 }): Promise<BeautySalonService> {
   return beautyRequest('/v1/beauty/salon-services', { method: 'POST', body: data });
@@ -78,7 +78,7 @@ export async function updateBeautySalonService(
     base_price: number;
     currency: string;
     tax_rate: number;
-    linked_product_id: string;
+    linked_service_id: string;
     is_active: boolean;
   }>,
 ): Promise<BeautySalonService> {

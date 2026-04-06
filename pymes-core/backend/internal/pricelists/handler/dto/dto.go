@@ -1,7 +1,8 @@
 package dto
 
 type PriceListItemPayload struct {
-	ProductID string  `json:"product_id" binding:"required"`
+	ProductID *string `json:"product_id,omitempty"`
+	ServiceID *string `json:"service_id,omitempty"`
 	Price     float64 `json:"price" binding:"required"`
 }
 

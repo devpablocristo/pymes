@@ -160,7 +160,6 @@ describe('OnboardingPage scheduling setup', () => {
       );
     });
 
-    const payload = apiMocks.updateTenantSettings.mock.calls[0][0] as Record<string, unknown>;
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
   });

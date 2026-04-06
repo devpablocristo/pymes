@@ -25,7 +25,7 @@ export function AdminSkinSelector({ className }: { className?: string }) {
           setSkin(next);
         }}
       >
-        <option value="wowdash">{t('profile.consoleSkin.wowdash')}</option>
+        <option value="modern">{t('profile.consoleSkin.modern')}</option>
         <option value="classic">{t('profile.consoleSkin.classic')}</option>
       </select>
       <p className="text-muted profile-field-hint">{t('profile.consoleSkin.hint')}</p>

@@ -39,7 +39,7 @@ La consola web y el AI especializado viven dentro de los deployables unificados:
 
 - bootstrap y settings de organizacion
 - customers y parties
-- products
+- services
 - appointments
 - quotes, sales y payment links
 

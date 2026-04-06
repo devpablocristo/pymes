@@ -23,7 +23,7 @@ import {
   buildInAppNotificationShareText,
   openWhatsAppPrefilledShare,
 } from '../lib/whatsappPrefillShare';
-import './ApprovalInboxPage.css';
+import './NotificationsCenterPage.css';
 
 type NotificationsCenterPageProps = {
   /** Dentro de Ajustes: sin cabecera de página completa. */
@@ -133,6 +133,13 @@ function toneForApproval(riskLevel: string): NotificationFeedTone {
   }
 }
 
+function labelForRiskLevel(riskLevel: string, t: (key: string, variables?: Record<string, string | number>) => string): string {
+  if (riskLevel === 'high') return t('ai.notifications.approval.risk.high');
+  if (riskLevel === 'medium') return t('ai.notifications.approval.risk.medium');
+  if (riskLevel === 'low') return t('ai.notifications.approval.risk.low');
+  return riskLevel;
+}
+
 export function NotificationsCenterPage({ embedded = false }: NotificationsCenterPageProps) {
   const { language, t } = useI18n();
   const navigate = useNavigate();
@@ -171,12 +178,16 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
 
   const summaryBadge = useMemo(() => {
     const parts: string[] = [];
-    if (unreadCount > 0) parts.push(`${unreadCount} sin leer`);
+    if (unreadCount > 0) parts.push(`${unreadCount} ${t('ai.notifications.summary.unreadSuffix')}`);
     if (pendingApprovalsCount > 0)
-      parts.push(`${pendingApprovalsCount} decisión${pendingApprovalsCount === 1 ? '' : 'es'}`);
-    if (parts.length === 0) return 'Al día';
+      parts.push(
+        pendingApprovalsCount === 1
+          ? `${pendingApprovalsCount} ${t('ai.notifications.summary.decision')}`
+          : `${pendingApprovalsCount} ${t('ai.notifications.summary.decisions')}`,
+      );
+    if (parts.length === 0) return t('ai.notifications.summary.allCaughtUp');
     return parts.join(' · ');
-  }, [pendingApprovalsCount, unreadCount]);
+  }, [pendingApprovalsCount, t, unreadCount]);
 
   async function openInChat(n: InAppNotificationItem): Promise<void> {
     const scope = getNotificationScope(n.chat_context);
@@ -229,6 +240,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     if (approval) {
       const isProcessing = approvalProcessing[approval.id] ?? false;
       const displayAction = labelForApprovalAction(approval.action_type);
+      const riskLabel = labelForRiskLevel(approval.risk_level, t);
 
       return {
         id: `a-${n.id}`,
@@ -239,7 +251,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
             {approval.target_resource ? ` — ${approval.target_resource}` : ''}
           </>
         ),
-        badge: <span className={`risk-badge ${approval.risk_level}`}>{approval.risk_level}</span>,
+        badge: <span className={`risk-badge ${approval.risk_level}`}>{riskLabel}</span>,
         body: (
           <>
             <div className="approval-reason">{approval.reason}</div>
@@ -269,7 +281,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
           <div className="approval-actions">
             <input
               className="note-input"
-              aria-label={`Nota para ${displayAction}`}
+              aria-label={`${t('ai.notifications.approval.noteLabelPrefix')} ${displayAction}`}
               placeholder={t('ai.notifications.approval.notePlaceholder')}
               value={approvalNotes[approval.id] ?? ''}
               onChange={(e) => setApprovalNotes((prev) => ({ ...prev, [approval.id]: e.target.value }))}
@@ -365,5 +377,3 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
     </PageLayout>
   );
 }
-
-export default NotificationsCenterPage;

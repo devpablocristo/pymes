@@ -14,6 +14,12 @@ type SalesByProductResponse struct {
 	Items []reportdomain.SalesByProductItem `json:"items"`
 }
 
+type SalesByServiceResponse struct {
+	From  string                            `json:"from"`
+	To    string                            `json:"to"`
+	Items []reportdomain.SalesByServiceItem `json:"items"`
+}
+
 type SalesByCustomerResponse struct {
 	From  string                             `json:"from"`
 	To    string                             `json:"to"`

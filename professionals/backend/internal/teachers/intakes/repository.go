@@ -42,7 +42,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intak
 		AppointmentID:   in.AppointmentID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
-		ProductID:       in.ProductID,
+		ServiceID:       in.ServiceID,
 		Status:          in.Status,
 		Payload:         payload,
 		CreatedAt:       time.Now().UTC(),
@@ -71,7 +71,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intak
 	updates := map[string]any{
 		"appointment_id":    in.AppointmentID,
 		"customer_party_id": in.CustomerPartyID,
-		"product_id":        in.ProductID,
+		"service_id":        in.ServiceID,
 		"status":            in.Status,
 		"payload":           payload,
 		"updated_at":        time.Now().UTC(),
@@ -102,10 +102,18 @@ func toDomain(row models.IntakeModel) domain.Intake {
 		AppointmentID:   row.AppointmentID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,
-		ProductID:       row.ProductID,
+		ServiceID:       coalesceServiceReference(row.ServiceID),
 		Status:          row.Status,
 		Payload:         payload,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}
+}
+
+func coalesceServiceReference(primary *uuid.UUID) *uuid.UUID {
+	if primary != nil && *primary != uuid.Nil {
+		value := *primary
+		return &value
+	}
+	return nil
 }

@@ -21,7 +21,7 @@ export type BeautySalonService = {
   base_price: number;
   currency: string;
   tax_rate: number;
-  linked_product_id?: string;
+  linked_service_id?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

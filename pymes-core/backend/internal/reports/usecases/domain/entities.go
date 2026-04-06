@@ -13,6 +13,13 @@ type SalesByProductItem struct {
 	Revenue     float64 `json:"revenue"`
 }
 
+type SalesByServiceItem struct {
+	ServiceID   string  `json:"service_id,omitempty"`
+	ServiceName string  `json:"service_name"`
+	Quantity    float64 `json:"quantity"`
+	Revenue     float64 `json:"revenue"`
+}
+
 type SalesByCustomerItem struct {
 	CustomerID   string  `json:"customer_id,omitempty"`
 	CustomerName string  `json:"customer_name"`

@@ -28,7 +28,6 @@ type ListParams struct {
 	Limit  int
 	After  *uuid.UUID
 	Search string
-	Type   string
 	Tag    string
 	Sort   string
 	Order  string
@@ -36,10 +35,7 @@ type ListParams struct {
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
-	if t := strings.TrimSpace(p.Type); t != "" {
-		q = q.Where("type = ?", t)
-	}
+	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND deleted_at IS NULL AND type = 'product'", p.OrgID)
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(tags)", tag)
 	}
@@ -88,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 	row := models.ProductModel{
 		ID:          uuid.New(),
 		OrgID:       in.OrgID,
-		Type:        strings.TrimSpace(in.Type),
+		Type:        "product",
 		SKU:         strings.TrimSpace(in.SKU),
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
@@ -110,7 +106,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
 	var row models.ProductModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return productdomain.Product{}, gorm.ErrRecordNotFound
@@ -123,7 +119,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productd
 func (r *Repository) Update(ctx context.Context, in productdomain.Product) (productdomain.Product, error) {
 	meta, _ := json.Marshal(in.Metadata)
 	updates := map[string]any{
-		"type":        strings.TrimSpace(in.Type),
+		"type":        "product",
 		"sku":         strings.TrimSpace(in.SKU),
 		"name":        strings.TrimSpace(in.Name),
 		"description": strings.TrimSpace(in.Description),
@@ -137,7 +133,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return productdomain.Product{}, res.Error
@@ -150,7 +146,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -164,7 +160,7 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error) {
 	var rows []models.ProductModel
 	err := r.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
+		Where("org_id = ? AND deleted_at IS NOT NULL AND type = 'product'", orgID).
 		Order("updated_at DESC").
 		Limit(200).
 		Find(&rows).Error
@@ -180,7 +176,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]produ
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL AND type = 'product'", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -195,7 +191,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	// Verificar que esté archivado antes de eliminar permanentemente.
 	var count int64
 	if err := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL AND type = 'product'", orgID, id).
 		Count(&count).Error; err != nil {
 		return err
 	}
@@ -203,7 +199,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 		return gorm.ErrRecordNotFound
 	}
 	return r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ?", orgID, id).
+		Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).
 		Delete(&models.ProductModel{}).Error
 }
 
@@ -218,7 +214,6 @@ func toDomain(row models.ProductModel) productdomain.Product {
 	return productdomain.Product{
 		ID:          row.ID,
 		OrgID:       row.OrgID,
-		Type:        row.Type,
 		SKU:         row.SKU,
 		Name:        row.Name,
 		Description: row.Description,

@@ -148,7 +148,7 @@ describe('AdminPage scheduling settings', () => {
 
     renderAdminPage();
 
-    const checkbox = await screen.findByLabelText('Scheduling habilitado');
+    const checkbox = await screen.findByLabelText('Agenda habilitada');
     fireEvent.click(checkbox);
     fireEvent.click(screen.getAllByRole('button', { name: 'Guardar cambios' })[0]);
 

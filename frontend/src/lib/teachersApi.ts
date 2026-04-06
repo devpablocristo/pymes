@@ -27,7 +27,11 @@ function translateError(message: string): string {
 
 function mapIntake(item: {
   id: string;
+  org_id?: string;
+  appointment_id?: string;
   profile_id: string;
+  customer_party_id?: string;
+  service_id?: string;
   status: 'draft' | 'submitted' | 'reviewed';
   payload?: Record<string, unknown>;
   created_at: string;
@@ -35,9 +39,14 @@ function mapIntake(item: {
 }): TeacherIntake {
   return {
     id: item.id,
+    org_id: item.org_id,
+    appointment_id: item.appointment_id,
     profile_id: item.profile_id,
+    customer_party_id: item.customer_party_id,
+    service_id: item.service_id,
     status: item.status,
     notes: typeof item.payload?.notes === 'string' ? item.payload.notes : '',
+    payload: item.payload,
     created_at: item.created_at,
     updated_at: item.updated_at,
   };
@@ -114,7 +123,7 @@ export async function getTeacherServices(id: string): Promise<{ items: TeacherSe
 }
 
 export async function updateTeacherServices(id: string, links: TeacherServiceLink[]): Promise<void> {
-  return teachersRequest(`/v1/teachers/professionals/${id}/services`, { method: 'PUT', body: { items: links } });
+  return teachersRequest(`/v1/teachers/professionals/${id}/services`, { method: 'PUT', body: { links } });
 }
 
 // ── Intakes ──
@@ -123,7 +132,11 @@ export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
   const response = await teachersRequest<{
     items?: Array<{
       id: string;
+      org_id?: string;
+      appointment_id?: string;
       profile_id: string;
+      customer_party_id?: string;
+      service_id?: string;
       status: 'draft' | 'submitted' | 'reviewed';
       payload?: Record<string, unknown>;
       created_at: string;
@@ -136,7 +149,11 @@ export async function getTeacherIntakes(): Promise<{ items: TeacherIntake[] }> {
 export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
+    org_id?: string;
+    appointment_id?: string;
     profile_id: string;
+    customer_party_id?: string;
+    service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
     payload?: Record<string, unknown>;
     created_at: string;
@@ -148,7 +165,11 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
 export async function createTeacherIntake(data: { profile_id: string; notes: string }): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
+    org_id?: string;
+    appointment_id?: string;
     profile_id: string;
+    customer_party_id?: string;
+    service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
     payload?: Record<string, unknown>;
     created_at: string;
@@ -163,7 +184,11 @@ export async function createTeacherIntake(data: { profile_id: string; notes: str
 export async function updateTeacherIntake(id: string, data: Partial<{ notes: string }>): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
+    org_id?: string;
+    appointment_id?: string;
     profile_id: string;
+    customer_party_id?: string;
+    service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
     payload?: Record<string, unknown>;
     created_at: string;
@@ -204,7 +229,7 @@ export async function createTeacherSession(data: {
   appointment_id: string;
   profile_id: string;
   customer_party_id?: string;
-  product_id?: string;
+  service_id?: string;
   started_at: string;
   summary?: string;
 }): Promise<TeacherSession> {

@@ -6,7 +6,7 @@ import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { normalize } from '@devpablocristo/core-browser/search';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState, type ReactElement, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CreatedByPillsBar } from './CreatedByPillsBar';
 import { clerkEnabled } from '../lib/auth';
@@ -19,7 +19,6 @@ import {
   workOrderStatusBadgeLabel,
   type WorkOrderKanbanPhase,
 } from '../lib/workOrderKanban';
-import { useI18n } from '../lib/i18n';
 import '../pages/WorkOrdersKanbanPanel.css';
 
 /** Tipo mínimo que una OT debe cumplir para funcionar en el tablero. */
@@ -50,7 +49,12 @@ export type GenericWorkOrdersBoardProps<T extends GenericWorkOrder> = {
   /** Path a la vista lista */
   listPath: string;
   /** Botones extra (nuevo, exportar, etc.) */
-  extraToolbar?: ReactNode;
+  renderExtraToolbar?: (props: {
+    items: T[];
+    reload: () => Promise<void>;
+    setError: (message: string | null) => void;
+    showArchived: boolean;
+  }) => ReactNode;
   /** Modal de detalle — recibe orderId y callbacks */
   renderDetailModal?: (props: {
     orderId: string | null;
@@ -186,12 +190,11 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   title,
   headerLeadSlot,
   listPath,
-  extraToolbar,
+  renderExtraToolbar,
   renderDetailModal,
 }: GenericWorkOrdersBoardProps<T>) {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
-  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchived = searchParams.get('archived') === '1';
 
@@ -203,23 +206,46 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   );
 
   const queryClient = useQueryClient();
+  const boardQueryKey = useMemo(
+    () => [...queryKey, showArchived ? 'archived' : 'active'] as const,
+    [queryKey, showArchived],
+  );
   const woQuery = useQuery({
-    queryKey: [...queryKey, showArchived ? 'archived' : 'active'],
+    queryKey: boardQueryKey,
     queryFn: () => (showArchived ? listArchived() : listAll()),
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
 
   const patchMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchStatus(id, status),
   });
 
+  const initialLoadDone = useRef(false);
   useEffect(() => {
-    if (woQuery.data) { setItems(woQuery.data); setError(null); }
-    if (woQuery.error) { setError(woQuery.error instanceof Error ? woQuery.error.message : 'Error al cargar órdenes'); }
+    if (woQuery.data && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      setItems(woQuery.data);
+      setError(null);
+    }
+    if (woQuery.error) {
+      setError(woQuery.error instanceof Error ? woQuery.error.message : 'Error al cargar órdenes');
+    }
   }, [woQuery.data, woQuery.error]);
 
+  // Reset al cambiar vista activas/archivadas
+  useEffect(() => {
+    initialLoadDone.current = false;
+  }, [showArchived]);
+
   const reload = useCallback(async () => {
+    initialLoadDone.current = false;
     await queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
+
+  const setBoardError = useCallback((message: string | null) => {
+    setError(message);
+  }, []);
 
   const boardItems = useMemo(
     () => applyWorkOrderCreatorFilter(items, { authEnabled: clerkEnabled, authUserLoaded: clerkUserLoaded, selfId, creatorFilter }),
@@ -227,14 +253,61 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   );
 
   const handleMoveCard = useCallback(
-    (id: string, targetPhase: string) => {
+    (id: string, targetPhase: string, overItemId?: string) => {
+      const card = items.find((x) => x.id === id);
+      if (!card) return;
+      const currentPhase = workOrderKanbanPhaseFromStatus(card.status);
+      const sameColumn = currentPhase === targetPhase;
+
+      if (sameColumn) {
+        // Reorder dentro de la misma columna (solo local, sin API)
+        if (!overItemId) return;
+        setItems((prev) => {
+          const idx = prev.findIndex((x) => x.id === id);
+          if (idx === -1) return prev;
+          const moved = prev[idx];
+          const without = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+          const targetIdx = without.findIndex((x) => x.id === overItemId);
+          if (targetIdx === -1) return prev;
+          without.splice(targetIdx, 0, moved);
+          return without;
+        });
+        return;
+      }
+
+      // Cross-column: cambiar status + reposicionar
       const next = defaultCanonStatusForKanbanPhase(targetPhase as WorkOrderKanbanPhase);
       if (next == null) return;
-      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: next } as T : x)));
+      setItems((prev) => {
+        const c = prev.find((x) => x.id === id);
+        if (!c) return prev;
+        const updated = { ...c, status: next } as T;
+        const without = prev.filter((x) => x.id !== id);
+        if (overItemId) {
+          const idx = without.findIndex((x) => x.id === overItemId);
+          if (idx !== -1) {
+            without.splice(idx, 0, updated);
+            return without;
+          }
+        }
+        let lastIdx = -1;
+        for (let i = without.length - 1; i >= 0; i -= 1) {
+          if (workOrderKanbanPhaseFromStatus(without[i].status) === targetPhase) {
+            lastIdx = i;
+            break;
+          }
+        }
+        if (lastIdx !== -1) {
+          without.splice(lastIdx + 1, 0, updated);
+        } else {
+          without.push(updated);
+        }
+        return without;
+      });
       void (async () => {
         try {
-          const updated = await patchMutation.mutateAsync({ id, status: next });
-          setItems((prev) => prev.map((x) => (x.id === id ? updated : x)));
+          const serverUpdated = await patchMutation.mutateAsync({ id, status: next });
+          setItems((prev) => prev.map((x) => (x.id === id ? { ...serverUpdated, status: next } as T : x)));
           setError(null);
         } catch (e) {
           await reload();
@@ -242,17 +315,19 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         }
       })();
     },
-    [reload, patchMutation],
+    [items, reload, patchMutation],
   );
 
   const handleModalSaved = useCallback((wo: T) => {
+    queryClient.setQueryData<T[]>(boardQueryKey, (current) => (current ?? []).map((row) => (row.id === wo.id ? wo : row)));
     setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
-  }, []);
+  }, [boardQueryKey, queryClient]);
 
   const handleOrderRemoved = useCallback((id: string) => {
+    queryClient.setQueryData<T[]>(boardQueryKey, (current) => (current ?? []).filter((row) => row.id !== id));
     setItems((prev) => prev.filter((x) => x.id !== id));
     setDetailOrderId(null);
-  }, []);
+  }, [boardQueryKey, queryClient]);
 
   const filterRow = useCallback((row: T, q: string) => {
     const hay = normalize(
@@ -283,10 +358,9 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         error={error}
         onMoveCard={handleMoveCard}
         resolveDropColumnId={(overId) => resolveDropColumnId(overId, items)}
-        sortInColumn={(a, b) => (b.opened_at || '').localeCompare(a.opened_at || '')}
         filterRow={filterRow}
         isRowDraggable={(row) => !showArchived && !isWorkOrderKanbanTerminalStatus(row.status)}
-        isColumnDroppable={(columnId) => !showArchived && columnId !== 'wo_closed'}
+        isColumnDroppable={() => !showArchived}
         onCardOpen={(row) => setDetailOrderId(row.id)}
         renderCard={({ row, onOpen, suppressOpenRef }) => (
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
@@ -301,7 +375,12 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         ) : null}
         toolbarButtonRow={
           <>
-            {extraToolbar}
+            {renderExtraToolbar?.({
+              items,
+              reload,
+              setError: setBoardError,
+              showArchived,
+            })}
             <button
               type="button"
               className="btn-secondary btn-sm"

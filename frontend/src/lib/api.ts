@@ -1,5 +1,4 @@
 import { request, requestResponse, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
-import type { DashboardResponse, DashboardSavePayload } from '../dashboard/types';
 import type {
   APIKeyItem,
   BillingStatus,
@@ -172,21 +171,6 @@ export async function patchMeProfile(payload: {
   phone?: string;
 }): Promise<MeProfileResponse> {
   return request('/v1/users/me/profile', { method: 'PATCH', body: payload });
-}
-
-export async function getDashboard(context = 'home'): Promise<DashboardResponse> {
-  return request(`/v1/dashboard?context=${encodeURIComponent(context)}`);
-}
-
-export async function saveDashboard(payload: DashboardSavePayload): Promise<DashboardResponse> {
-  return request('/v1/dashboard', { method: 'PUT', body: payload });
-}
-
-export async function resetDashboard(context = 'home'): Promise<DashboardResponse> {
-  return request(`/v1/dashboard/reset?context=${encodeURIComponent(context)}`, {
-    method: 'POST',
-    body: {},
-  });
 }
 
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {

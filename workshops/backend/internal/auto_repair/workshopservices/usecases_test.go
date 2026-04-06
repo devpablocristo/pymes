@@ -66,38 +66,38 @@ func (f *fakeRepo) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 type fakeCP struct {
-	product map[string]any
+	service map[string]any
 }
 
-func (f *fakeCP) GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error) {
+func (f *fakeCP) GetService(ctx context.Context, orgID, serviceID string) (map[string]any, error) {
 	_ = ctx
 	_ = orgID
-	_ = productID
-	return f.product, nil
+	_ = serviceID
+	return f.service, nil
 }
 
-func TestCreateEnrichesLinkedProductDefaults(t *testing.T) {
+func TestCreateEnrichesLinkedServiceDefaults(t *testing.T) {
 	repo := &fakeRepo{}
-	cp := &fakeCP{product: map[string]any{
-		"description": "Servicio basado en producto",
-		"price":       25000.0,
+	cp := &fakeCP{service: map[string]any{
+		"description": "Servicio base del catálogo",
+		"sale_price":  25000.0,
 		"tax_rate":    10.5,
 	}}
 	uc := NewUsecases(repo, nil, cp)
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	productID := uuid.MustParse("00000000-0000-0000-0000-000000000010")
+	serviceID := uuid.MustParse("00000000-0000-0000-0000-000000000010")
 
 	out, err := uc.Create(context.Background(), domain.Service{
 		OrgID:           orgID,
 		Code:            "ACEITE",
 		Name:            "Cambio de aceite",
-		LinkedProductID: &productID,
+		LinkedServiceID: &serviceID,
 	}, "tester")
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	if out.Description != "Servicio basado en producto" {
+	if out.Description != "Servicio base del catálogo" {
 		t.Fatalf("Create().Description = %q, want enriched description", out.Description)
 	}
 	if out.BasePrice != 25000 {

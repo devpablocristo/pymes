@@ -1,15 +1,15 @@
 package intakes
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -49,6 +49,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Intake, actor string) (
 	if in.Payload == nil {
 		in.Payload = map[string]any{}
 	}
+	in.ServiceID = normalizeServiceID(in.ServiceID)
 
 	out, err := u.repo.Create(ctx, in)
 	if err != nil {
@@ -74,7 +75,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Int
 type UpdateInput struct {
 	AppointmentID   *uuid.UUID
 	CustomerPartyID *uuid.UUID
-	ProductID       *uuid.UUID
+	ServiceID       *uuid.UUID
 	Payload         *map[string]any
 }
 
@@ -97,8 +98,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.CustomerPartyID != nil {
 		current.CustomerPartyID = in.CustomerPartyID
 	}
-	if in.ProductID != nil {
-		current.ProductID = in.ProductID
+	if in.ServiceID != nil {
+		current.ServiceID = normalizeServiceID(in.ServiceID)
 	}
 	if in.Payload != nil {
 		current.Payload = *in.Payload
@@ -115,6 +116,14 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "intake.updated", "intake", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	return out, nil
+}
+
+func normalizeServiceID(serviceID *uuid.UUID) *uuid.UUID {
+	if serviceID != nil && *serviceID != uuid.Nil {
+		canonical := *serviceID
+		return &canonical
+	}
+	return nil
 }
 
 func (u *Usecases) Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Intake, error) {

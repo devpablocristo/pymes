@@ -1,8 +1,12 @@
 package products
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/devpablocristo/core/http/go/pagination"
@@ -54,6 +58,10 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return
 	}
+	if strings.TrimSpace(c.Query("type")) != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "products no longer accept type filters; use /v1/services for services"})
+		return
+	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	after, ok := handlers.ParseAfterUUIDQuery(c)
 	if !ok {
@@ -64,7 +72,6 @@ func (h *Handler) List(c *gin.Context) {
 		Limit:  limit,
 		After:  after,
 		Search: c.Query("search"),
-		Type:   c.Query("type"),
 		Tag:    c.Query("tag"),
 		Sort:   c.Query("sort"),
 		Order:  c.Query("order"),
@@ -91,6 +98,9 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	var req dto.CreateProductRequest
+	if !rejectLegacyProductTypeField(c) {
+		return
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -101,7 +111,6 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	out, err := h.uc.Create(c.Request.Context(), productdomain.Product{
 		OrgID:       orgID,
-		Type:        req.Type,
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
@@ -158,12 +167,14 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	var req dto.UpdateProductRequest
+	if !rejectLegacyProductTypeField(c) {
+		return
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
-		Type:        req.Type,
 		SKU:         req.SKU,
 		Name:        req.Name,
 		Description: req.Description,
@@ -262,7 +273,6 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 	return dto.ProductItem{
 		ID:          in.ID.String(),
 		OrgID:       in.OrgID.String(),
-		Type:        in.Type,
 		SKU:         in.SKU,
 		Name:        in.Name,
 		Description: in.Description,
@@ -276,4 +286,26 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+func rejectLegacyProductTypeField(c *gin.Context) bool {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return false
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	if len(bytes.TrimSpace(body)) == 0 {
+		return true
+	}
+
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err == nil {
+		if _, ok := payload["type"]; ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "products no longer accept type; use /v1/services for services"})
+			return false
+		}
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	return true
 }

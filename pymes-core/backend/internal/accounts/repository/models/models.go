@@ -10,9 +10,8 @@ type AccountModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
 	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
 	Type        string
-	EntityType  string
-	EntityID    uuid.UUID
-	EntityName  string
+	PartyID     uuid.UUID
+	PartyName   string
 	Balance     float64
 	Currency    string
 	CreditLimit float64

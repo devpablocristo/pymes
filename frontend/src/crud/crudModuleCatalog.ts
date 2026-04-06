@@ -4,6 +4,7 @@ type CrudModuleId =
   | 'customers'
   | 'suppliers'
   | 'products'
+  | 'services'
   | 'priceLists'
   | 'quotes'
   | 'sales'
@@ -52,6 +53,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   customers: { title: 'Clientes', navLabel: 'Clientes', labelPlural: 'clientes' },
   suppliers: { title: 'Proveedores', navLabel: 'Proveedores', labelPlural: 'proveedores' },
   products: { title: 'Productos', navLabel: 'Productos', labelPlural: 'productos' },
+  services: { title: 'Servicios', navLabel: 'Servicios', labelPlural: 'servicios' },
   priceLists: { title: 'Listas de precios', navLabel: 'Listas de precios', labelPlural: 'listas de precios' },
   quotes: { title: 'Presupuestos', navLabel: 'Presupuestos', labelPlural: 'presupuestos' },
   sales: { title: 'Ventas', navLabel: 'Ventas', labelPlural: 'ventas' },
@@ -142,6 +144,11 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'commercial',
     icon: 'PD',
     summary: 'Catálogo de productos, precios, costos y stock.',
+  },
+  services: {
+    group: 'commercial',
+    icon: 'SV',
+    summary: 'Catálogo horizontal de servicios comerciales con precio y duración base.',
   },
   priceLists: {
     group: 'commercial',

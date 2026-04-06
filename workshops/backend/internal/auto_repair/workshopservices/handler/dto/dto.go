@@ -11,7 +11,7 @@ type ServiceItem struct {
 	BasePrice       float64 `json:"base_price"`
 	Currency        string  `json:"currency"`
 	TaxRate         float64 `json:"tax_rate"`
-	LinkedProductID *string `json:"linked_product_id,omitempty"`
+	LinkedServiceID *string `json:"linked_service_id,omitempty"`
 	IsActive        bool    `json:"is_active"`
 	ArchivedAt      *string `json:"archived_at,omitempty"`
 	CreatedAt       string  `json:"created_at"`
@@ -34,7 +34,7 @@ type CreateServiceRequest struct {
 	BasePrice       float64 `json:"base_price"`
 	Currency        string  `json:"currency"`
 	TaxRate         float64 `json:"tax_rate"`
-	LinkedProductID string  `json:"linked_product_id"`
+	LinkedServiceID string  `json:"linked_service_id"`
 	IsActive        *bool   `json:"is_active"`
 }
 
@@ -47,6 +47,6 @@ type UpdateServiceRequest struct {
 	BasePrice       *float64 `json:"base_price"`
 	Currency        *string  `json:"currency"`
 	TaxRate         *float64 `json:"tax_rate"`
-	LinkedProductID *string  `json:"linked_product_id"`
+	LinkedServiceID *string  `json:"linked_service_id"`
 	IsActive        *bool    `json:"is_active"`
 }

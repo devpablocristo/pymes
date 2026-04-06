@@ -12,10 +12,12 @@ type ServiceItem struct {
 	TaxRate                *float64       `json:"tax_rate,omitempty"`
 	Currency               string         `json:"currency"`
 	DefaultDurationMinutes *int           `json:"default_duration_minutes,omitempty"`
+	IsActive               bool           `json:"is_active"`
 	Tags                   []string       `json:"tags"`
 	Metadata               map[string]any `json:"metadata"`
 	CreatedAt              string         `json:"created_at"`
 	UpdatedAt              string         `json:"updated_at"`
+	DeletedAt              *string        `json:"deleted_at,omitempty"`
 }
 
 type ListServicesResponse struct {
@@ -35,6 +37,7 @@ type CreateServiceRequest struct {
 	TaxRate                *float64       `json:"tax_rate"`
 	Currency               string         `json:"currency"`
 	DefaultDurationMinutes *int           `json:"default_duration_minutes"`
+	IsActive               *bool          `json:"is_active"`
 	Tags                   []string       `json:"tags"`
 	Metadata               map[string]any `json:"metadata"`
 }
@@ -49,6 +52,7 @@ type UpdateServiceRequest struct {
 	TaxRate                *float64        `json:"tax_rate"`
 	Currency               *string         `json:"currency"`
 	DefaultDurationMinutes *int            `json:"default_duration_minutes"`
+	IsActive               *bool           `json:"is_active"`
 	Tags                   *[]string       `json:"tags"`
 	Metadata               *map[string]any `json:"metadata"`
 }

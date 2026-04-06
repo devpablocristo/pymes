@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/devpablocristo/core/http/go/pagination"
@@ -18,13 +19,12 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]servicedomain.Service, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]servicedomain.Service, error)
 	Create(ctx context.Context, in servicedomain.Service, actor string) (servicedomain.Service, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (servicedomain.Service, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -38,20 +38,19 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	const servicesItemPath = servicesBasePath + "/:id"
 
 	auth.GET(servicesBasePath, rbac.RequirePermission("services", "read"), h.List)
-	auth.GET(servicesBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("services", "read"), h.ListArchived)
 	auth.POST(servicesBasePath, rbac.RequirePermission("services", "create"), h.Create)
 	auth.GET(servicesItemPath, rbac.RequirePermission("services", "read"), h.Get)
-	auth.PUT(servicesItemPath, rbac.RequirePermission("services", "update"), h.Update)
+	auth.PATCH(servicesItemPath, rbac.RequirePermission("services", "update"), h.Update)
 	auth.DELETE(servicesItemPath, rbac.RequirePermission("services", "delete"), h.Delete)
-	auth.POST(servicesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("services", "delete"), h.Restore)
-	auth.DELETE(servicesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("services", "delete"), h.HardDelete)
+	auth.POST(servicesItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("services", "update"), h.Archive)
+	auth.POST(servicesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("services", "update"), h.Restore)
 }
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -60,13 +59,14 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:  orgID,
-		Limit:  limit,
-		After:  after,
-		Search: c.Query("search"),
-		Tag:    c.Query("tag"),
-		Sort:   c.Query("sort"),
-		Order:  c.Query("order"),
+		OrgID:    orgID,
+		Limit:    limit,
+		After:    after,
+		Search:   c.Query("search"),
+		Tag:      c.Query("tag"),
+		Sort:     c.Query("sort"),
+		Order:    c.Query("order"),
+		Archived: strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -86,13 +86,17 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateServiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeValidation(c, "invalid request body")
 		return
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
 	}
 	out, err := h.uc.Create(c.Request.Context(), servicedomain.Service{
 		OrgID:                  orgID,
@@ -105,6 +109,7 @@ func (h *Handler) Create(c *gin.Context) {
 		TaxRate:                req.TaxRate,
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
+		IsActive:               isActive,
 		Tags:                   req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
@@ -124,12 +129,12 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -144,17 +149,17 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	var req dto.UpdateServiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
@@ -167,6 +172,7 @@ func (h *Handler) Update(c *gin.Context) {
 		TaxRate:                req.TaxRate,
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
+		IsActive:               req.IsActive,
 		Tags:                   req.Tags,
 		Metadata:               req.Metadata,
 	}, a.Actor)
@@ -181,72 +187,53 @@ func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) ListArchived(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
+		writeValidation(c, "invalid id")
+		return
+	}
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	resp := dto.ListServicesResponse{Items: make([]dto.ServiceItem, 0, len(items)), Total: int64(len(items))}
-	for _, it := range items {
-		resp.Items = append(resp.Items, toServiceItem(it))
-	}
-	c.JSON(http.StatusOK, resp)
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-func (h *Handler) HardDelete(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -266,9 +253,23 @@ func toServiceItem(in servicedomain.Service) dto.ServiceItem {
 		TaxRate:                in.TaxRate,
 		Currency:               in.Currency,
 		DefaultDurationMinutes: in.DefaultDurationMinutes,
+		IsActive:               in.IsActive,
 		Tags:                   in.Tags,
 		Metadata:               in.Metadata,
 		CreatedAt:              in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:              in.UpdatedAt.UTC().Format(time.RFC3339),
+		DeletedAt:              formatOptionalTime(in.DeletedAt),
 	}
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
+}
+
+func writeValidation(c *gin.Context, message string) {
+	httperrors.Write(c, http.StatusBadRequest, "VALIDATION", message)
 }

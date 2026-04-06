@@ -18,15 +18,13 @@ type stubUsecases struct {
 	listCalls   int
 	createCalls int
 	updateCalls int
+	lastList    ListParams
 }
 
-func (s *stubUsecases) List(_ context.Context, _ ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
+func (s *stubUsecases) List(_ context.Context, params ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
 	s.listCalls++
+	s.lastList = params
 	return nil, 0, false, nil, nil
-}
-
-func (s *stubUsecases) ListArchived(_ context.Context, _ uuid.UUID) ([]productdomain.Product, error) {
-	return nil, nil
 }
 
 func (s *stubUsecases) Create(_ context.Context, _ productdomain.Product, _ string) (productdomain.Product, error) {
@@ -43,9 +41,9 @@ func (s *stubUsecases) Update(_ context.Context, _, _ uuid.UUID, _ UpdateInput, 
 	return productdomain.Product{}, nil
 }
 
-func (s *stubUsecases) SoftDelete(_ context.Context, _, _ uuid.UUID, _ string) error { return nil }
-func (s *stubUsecases) Restore(_ context.Context, _, _ uuid.UUID, _ string) error    { return nil }
-func (s *stubUsecases) HardDelete(_ context.Context, _, _ uuid.UUID, _ string) error { return nil }
+func (s *stubUsecases) Archive(_ context.Context, _, _ uuid.UUID, _ string) error { return nil }
+func (s *stubUsecases) Restore(_ context.Context, _, _ uuid.UUID, _ string) error { return nil }
+func (s *stubUsecases) Delete(_ context.Context, _, _ uuid.UUID, _ string) error  { return nil }
 
 func TestCreateRejectsLegacyTypeField(t *testing.T) {
 	t.Parallel()
@@ -78,9 +76,9 @@ func TestUpdateRejectsLegacyTypeField(t *testing.T) {
 	handler := NewHandler(uc)
 	router := gin.New()
 	router.Use(testProductAuthMiddleware())
-	router.PUT("/products/:id", handler.Update)
+	router.PATCH("/products/:id", handler.Update)
 
-	req := httptest.NewRequest(http.MethodPut, "/products/"+uuid.NewString(), strings.NewReader(`{"type":"service"}`))
+	req := httptest.NewRequest(http.MethodPatch, "/products/"+uuid.NewString(), strings.NewReader(`{"type":"service"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -112,6 +110,31 @@ func TestListRejectsLegacyTypeFilter(t *testing.T) {
 	}
 	if uc.listCalls != 0 {
 		t.Fatalf("expected list usecase not to be called, got %d", uc.listCalls)
+	}
+}
+
+func TestListPassesArchivedFlag(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	uc := &stubUsecases{}
+	handler := NewHandler(uc)
+	router := gin.New()
+	router.Use(testProductAuthMiddleware())
+	router.GET("/products", handler.List)
+
+	req := httptest.NewRequest(http.MethodGet, "/products?archived=true", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if uc.listCalls != 1 {
+		t.Fatalf("expected list usecase to be called once, got %d", uc.listCalls)
+	}
+	if !uc.lastList.Archived {
+		t.Fatalf("expected archived flag to be true")
 	}
 }
 

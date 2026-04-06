@@ -8,15 +8,20 @@
 ## `products`
 
 - `id`, `org_id`, `sku`, `name`, `description`
-- `unit`, `price`, `cost_price`, `tax_rate`, `track_stock`
+- `unit`, `price`, `currency`, `cost_price`, `tax_rate`, `track_stock`
+- `is_active` para desactivar comercialmente sin archivar
 - `tags`, `metadata`, `created_at`, `updated_at`, `deleted_at`
 - el API ya no acepta `type` y la base impide filas activas con `type <> 'product'`
+- CRUD canónico: `PATCH /v1/products/:id`, `POST /v1/products/:id/archive`, `POST /v1/products/:id/restore`, `DELETE /v1/products/:id`
+- `GET /v1/products` excluye archivados por default; `?archived=true` los incluye
 
 ## `services`
 
 - `id`, `org_id`, `code`, `name`, `description`
 - `category_code`, `sale_price`, `cost_price`, `tax_rate`, `currency`
-- `default_duration_minutes`, `tags`, `metadata`, `created_at`, `updated_at`, `deleted_at`
+- `default_duration_minutes`, `is_active`, `tags`, `metadata`, `created_at`, `updated_at`, `deleted_at`
+- CRUD canónico: `PATCH /v1/services/:id`, `POST /v1/services/:id/archive`, `POST /v1/services/:id/restore`, `DELETE /v1/services/:id`
+- `GET /v1/services` excluye archivados por default; `?archived=true` los incluye
 
 ## `system_services`
 

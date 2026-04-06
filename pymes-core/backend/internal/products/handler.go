@@ -22,13 +22,12 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]productdomain.Product, error)
 	Create(ctx context.Context, in productdomain.Product, actor string) (productdomain.Product, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (productdomain.Product, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
 	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -42,24 +41,23 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	const productsItemPath = productsBasePath + "/:id"
 
 	auth.GET(productsBasePath, rbac.RequirePermission("products", "read"), h.List)
-	auth.GET(productsBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("products", "read"), h.ListArchived)
 	auth.POST(productsBasePath, rbac.RequirePermission("products", "create"), h.Create)
 	auth.GET(productsItemPath, rbac.RequirePermission("products", "read"), h.Get)
-	auth.PUT(productsItemPath, rbac.RequirePermission("products", "update"), h.Update)
+	auth.PATCH(productsItemPath, rbac.RequirePermission("products", "update"), h.Update)
 	auth.DELETE(productsItemPath, rbac.RequirePermission("products", "delete"), h.Delete)
-	auth.POST(productsItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("products", "delete"), h.Restore)
-	auth.DELETE(productsItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("products", "delete"), h.HardDelete)
+	auth.POST(productsItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("products", "update"), h.Archive)
+	auth.POST(productsItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("products", "update"), h.Restore)
 }
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	if strings.TrimSpace(c.Query("type")) != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "products no longer accept type filters; use /v1/services for services"})
+		writeValidation(c, "products no longer accept type filters; use /v1/services for services")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -68,13 +66,14 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:  orgID,
-		Limit:  limit,
-		After:  after,
-		Search: c.Query("search"),
-		Tag:    c.Query("tag"),
-		Sort:   c.Query("sort"),
-		Order:  c.Query("order"),
+		OrgID:    orgID,
+		Limit:    limit,
+		After:    after,
+		Search:   c.Query("search"),
+		Tag:      c.Query("tag"),
+		Sort:     c.Query("sort"),
+		Order:    c.Query("order"),
+		Archived: strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -94,7 +93,7 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateProductRequest
@@ -102,12 +101,16 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeValidation(c, "invalid request body")
 		return
 	}
 	trackStock := true
 	if req.TrackStock != nil {
 		trackStock = *req.TrackStock
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
 	}
 	out, err := h.uc.Create(c.Request.Context(), productdomain.Product{
 		OrgID:       orgID,
@@ -116,9 +119,11 @@ func (h *Handler) Create(c *gin.Context) {
 		Description: req.Description,
 		Unit:        req.Unit,
 		Price:       req.Price,
+		Currency:    req.Currency,
 		CostPrice:   req.CostPrice,
 		TaxRate:     req.TaxRate,
 		TrackStock:  trackStock,
+		IsActive:    isActive,
 		Tags:        req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
@@ -138,12 +143,12 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -158,12 +163,12 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	var req dto.UpdateProductRequest
@@ -171,7 +176,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
@@ -180,9 +185,11 @@ func (h *Handler) Update(c *gin.Context) {
 		Description: req.Description,
 		Unit:        req.Unit,
 		Price:       req.Price,
+		Currency:    req.Currency,
 		CostPrice:   req.CostPrice,
 		TaxRate:     req.TaxRate,
 		TrackStock:  req.TrackStock,
+		IsActive:    req.IsActive,
 		Tags:        req.Tags,
 		Metadata:    req.Metadata,
 	}, a.Actor)
@@ -197,72 +204,53 @@ func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) ListArchived(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
+		writeValidation(c, "invalid id")
+		return
+	}
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	resp := dto.ListProductsResponse{Items: make([]dto.ProductItem, 0, len(items)), Total: int64(len(items))}
-	for _, it := range items {
-		resp.Items = append(resp.Items, toProductItem(it))
-	}
-	c.JSON(http.StatusOK, resp)
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		writeValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-func (h *Handler) HardDelete(c *gin.Context) {
-	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
-		return
-	}
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -278,20 +266,23 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		Description: in.Description,
 		Unit:        in.Unit,
 		Price:       in.Price,
+		Currency:    in.Currency,
 		CostPrice:   in.CostPrice,
 		TaxRate:     in.TaxRate,
 		TrackStock:  in.TrackStock,
+		IsActive:    in.IsActive,
 		Tags:        in.Tags,
 		Metadata:    in.Metadata,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
+		DeletedAt:   formatOptionalTime(in.DeletedAt),
 	}
 }
 
 func rejectLegacyProductTypeField(c *gin.Context) bool {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		writeValidation(c, "invalid request body")
 		return false
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
@@ -302,10 +293,22 @@ func rejectLegacyProductTypeField(c *gin.Context) bool {
 	var payload map[string]json.RawMessage
 	if err := json.Unmarshal(body, &payload); err == nil {
 		if _, ok := payload["type"]; ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "products no longer accept type; use /v1/services for services"})
+			writeValidation(c, "products no longer accept type; use /v1/services for services")
 			return false
 		}
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	return true
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
+}
+
+func writeValidation(c *gin.Context, message string) {
+	httperrors.Write(c, http.StatusBadRequest, "VALIDATION", message)
 }

@@ -19,6 +19,7 @@ type ServiceModel struct {
 	TaxRate                *float64       `gorm:"type:numeric(5,2)"`
 	Currency               string         `gorm:"not null"`
 	DefaultDurationMinutes *int           `gorm:"column:default_duration_minutes"`
+	IsActive               bool           `gorm:"column:is_active;not null"`
 	Tags                   pq.StringArray `gorm:"type:text[]"`
 	Metadata               []byte         `gorm:"type:jsonb"`
 	CreatedAt              time.Time

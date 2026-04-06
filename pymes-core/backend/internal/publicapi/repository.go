@@ -172,7 +172,7 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, 'service' as type, description, '' as unit, sale_price as price, currency").
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID).
 		Order("name ASC").
 		Limit(limit).
 		Scan(&rows).Error

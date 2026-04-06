@@ -15,6 +15,7 @@ import (
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/services/repository/models"
 	servicedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/services/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type Repository struct {
@@ -23,19 +24,29 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
+var (
+	ErrNotFound      = errors.New("service not found")
+	ErrAlreadyExists = errors.New("service already exists")
+	ErrArchived      = errors.New("service archived")
+)
+
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
-	Tag    string
-	Sort   string
-	Order  string
+	OrgID    uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
+	Tag      string
+	Sort     string
+	Order    string
+	Archived bool
 }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]servicedomain.Service, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ?", p.OrgID)
+	if !p.Archived {
+		q = q.Where("deleted_at IS NULL")
+	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(tags)", tag)
 	}
@@ -97,12 +108,16 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 		TaxRate:                in.TaxRate,
 		Currency:               strings.TrimSpace(in.Currency),
 		DefaultDurationMinutes: in.DefaultDurationMinutes,
+		IsActive:               in.IsActive,
 		Tags:                   pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Metadata:               meta,
 		CreatedAt:              time.Now().UTC(),
 		UpdatedAt:              time.Now().UTC(),
 	}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
+		if httperrors.IsUniqueViolation(err) {
+			return servicedomain.Service{}, ErrAlreadyExists
+		}
 		return servicedomain.Service{}, err
 	}
 	return toDomain(row), nil
@@ -113,7 +128,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (serviced
 	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return servicedomain.Service{}, gorm.ErrRecordNotFound
+			return servicedomain.Service{}, ErrNotFound
 		}
 		return servicedomain.Service{}, err
 	}
@@ -132,6 +147,7 @@ func (r *Repository) Update(ctx context.Context, in servicedomain.Service) (serv
 		"tax_rate":                 in.TaxRate,
 		"currency":                 strings.TrimSpace(in.Currency),
 		"default_duration_minutes": in.DefaultDurationMinutes,
+		"is_active":                in.IsActive,
 		"tags":                     pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"metadata":                 meta,
 		"updated_at":               time.Now().UTC(),
@@ -140,70 +156,77 @@ func (r *Repository) Update(ctx context.Context, in servicedomain.Service) (serv
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
+		if httperrors.IsUniqueViolation(res.Error) {
+			return servicedomain.Service{}, ErrAlreadyExists
+		}
 		return servicedomain.Service{}, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return servicedomain.Service{}, gorm.ErrRecordNotFound
+		return servicedomain.Service{}, ErrNotFound
 	}
 	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt != nil {
+		return nil
+	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
 		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
 	return nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]servicedomain.Service, error) {
-	var rows []models.ServiceModel
-	err := r.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
-		Order("updated_at DESC").
-		Limit(200).
-		Find(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	out := make([]servicedomain.Service, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, toDomain(row))
-	}
-	return out, nil
-}
-
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt == nil {
+		return nil
+	}
 	res := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
 		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
 	}
+	return nil
+}
+
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ?", orgID, id).
+		Delete(&models.ServiceModel{})
+	if res.Error != nil {
+		return res.Error
+	}
 	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		return ErrNotFound
 	}
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
-	var count int64
-	if err := r.db.WithContext(ctx).Model(&models.ServiceModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
-		Count(&count).Error; err != nil {
-		return err
-	}
-	if count == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return r.db.WithContext(ctx).
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ServiceModel, error) {
+	var row models.ServiceModel
+	err := r.db.WithContext(ctx).
+		Select("id, deleted_at").
 		Where("org_id = ? AND id = ?", orgID, id).
-		Delete(&models.ServiceModel{}).Error
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.ServiceModel{}, ErrNotFound
+		}
+		return models.ServiceModel{}, err
+	}
+	return row, nil
 }
 
 func toDomain(row models.ServiceModel) servicedomain.Service {
@@ -226,6 +249,7 @@ func toDomain(row models.ServiceModel) servicedomain.Service {
 		TaxRate:                row.TaxRate,
 		Currency:               row.Currency,
 		DefaultDurationMinutes: row.DefaultDurationMinutes,
+		IsActive:               row.IsActive,
 		Tags:                   append([]string(nil), row.Tags...),
 		Metadata:               meta,
 		CreatedAt:              row.CreatedAt,

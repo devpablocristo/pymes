@@ -8,13 +8,16 @@ type ProductItem struct {
 	Description string         `json:"description"`
 	Unit        string         `json:"unit"`
 	Price       float64        `json:"price"`
+	Currency    string         `json:"currency"`
 	CostPrice   float64        `json:"cost_price"`
 	TaxRate     *float64       `json:"tax_rate,omitempty"`
 	TrackStock  bool           `json:"track_stock"`
+	IsActive    bool           `json:"is_active"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 	CreatedAt   string         `json:"created_at"`
 	UpdatedAt   string         `json:"updated_at"`
+	DeletedAt   *string        `json:"deleted_at,omitempty"`
 }
 
 type ListProductsResponse struct {
@@ -30,9 +33,11 @@ type CreateProductRequest struct {
 	Description string         `json:"description"`
 	Unit        string         `json:"unit"`
 	Price       float64        `json:"price"`
+	Currency    string         `json:"currency"`
 	CostPrice   float64        `json:"cost_price"`
 	TaxRate     *float64       `json:"tax_rate"`
 	TrackStock  *bool          `json:"track_stock"`
+	IsActive    *bool          `json:"is_active"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 }
@@ -43,9 +48,11 @@ type UpdateProductRequest struct {
 	Description *string         `json:"description"`
 	Unit        *string         `json:"unit"`
 	Price       *float64        `json:"price"`
+	Currency    *string         `json:"currency"`
 	CostPrice   *float64        `json:"cost_price"`
 	TaxRate     *float64        `json:"tax_rate"`
 	TrackStock  *bool           `json:"track_stock"`
+	IsActive    *bool           `json:"is_active"`
 	Tags        *[]string       `json:"tags"`
 	Metadata    *map[string]any `json:"metadata"`
 }

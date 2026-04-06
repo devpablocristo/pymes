@@ -18,6 +18,7 @@ type Service struct {
 	TaxRate                *float64
 	Currency               string
 	DefaultDurationMinutes *int
+	IsActive               bool
 	Tags                   []string
 	Metadata               map[string]any
 	CreatedAt              time.Time

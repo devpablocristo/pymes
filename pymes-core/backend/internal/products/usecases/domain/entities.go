@@ -14,9 +14,11 @@ type Product struct {
 	Description string
 	Unit        string
 	Price       float64
+	Currency    string
 	CostPrice   float64
 	TaxRate     *float64
 	TrackStock  bool
+	IsActive    bool
 	Tags        []string
 	Metadata    map[string]any
 	CreatedAt   time.Time

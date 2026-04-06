@@ -53,7 +53,7 @@ func (r *Repository) GetProductSnapshot(ctx context.Context, orgID, productID uu
 	err := r.db.WithContext(ctx).
 		Table("products").
 		Select("id, name, price, tax_rate").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, productID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, productID).
 		Take(&row).Error
 	if err != nil {
 		return ProductSnapshot{}, err
@@ -66,7 +66,7 @@ func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uu
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, sale_price as price, cost_price, tax_rate").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, serviceID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, serviceID).
 		Take(&row).Error
 	if err != nil {
 		return ServiceSnapshot{}, err

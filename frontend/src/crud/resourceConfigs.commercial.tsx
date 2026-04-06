@@ -53,9 +53,12 @@ type Product = {
   description?: string;
   unit?: string;
   price?: number;
+  currency?: string;
   cost_price?: number;
   tax_rate?: number | null;
   track_stock: boolean;
+  is_active: boolean;
+  deleted_at?: string | null;
   tags?: string[];
 };
 
@@ -70,6 +73,8 @@ type Service = {
   tax_rate?: number | null;
   currency?: string;
   default_duration_minutes?: number | null;
+  is_active: boolean;
+  deleted_at?: string | null;
   tags?: string[];
 };
 
@@ -160,6 +165,33 @@ function tagsToText(tags?: string[]): string {
 function formatAddress(address?: Address): string {
   return [address?.street, address?.city, address?.state, address?.country].filter(Boolean).join(', ') || '---';
 }
+
+function renderActiveBadge(value: boolean, activeLabel = 'Activo', inactiveLabel = 'Inactivo') {
+  return <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? activeLabel : inactiveLabel}</span>;
+}
+
+function buildCanonicalArchivedCrud<T extends { id: string; deleted_at?: string | null }>(basePath: string) {
+  return {
+    list: async ({ archived }: { archived: boolean }) => {
+      const suffix = archived ? '?archived=true' : '';
+      const data = await apiRequest<{ items: T[] }>(`${basePath}${suffix}`);
+      const items = data.items ?? [];
+      return archived ? items.filter((item) => Boolean(item.deleted_at)) : items.filter((item) => !item.deleted_at);
+    },
+    deleteItem: async (row: T) => {
+      await apiRequest(`${basePath}/${row.id}/archive`, { method: 'POST', body: {} });
+    },
+    restore: async (row: T) => {
+      await apiRequest(`${basePath}/${row.id}/restore`, { method: 'POST', body: {} });
+    },
+    hardDelete: async (row: T) => {
+      await apiRequest(`${basePath}/${row.id}`, { method: 'DELETE' });
+    },
+  };
+}
+
+const productsArchivedCrud = buildCanonicalArchivedCrud<Product>('/v1/products');
+const servicesArchivedCrud = buildCanonicalArchivedCrud<Service>('/v1/services');
 
 function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id?: string; service_id?: string; price: number }> {
   const parsed = parseJSONArray<{ product_id?: string; service_id?: string; price: number }>(
@@ -396,6 +428,48 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
+    dataSource: {
+      list: async (opts) => productsArchivedCrud.list(opts),
+      create: async (values) => {
+        await apiRequest('/v1/products', {
+          method: 'POST',
+          body: {
+            name: asString(values.name),
+            sku: asOptionalString(values.sku),
+            unit: asOptionalString(values.unit),
+            price: asNumber(values.price),
+            currency: asOptionalString(values.currency) ?? 'ARS',
+            cost_price: asNumber(values.cost_price),
+            tax_rate: asOptionalNumber(values.tax_rate),
+            track_stock: asBoolean(values.track_stock),
+            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+            tags: parseCSV(values.tags),
+            description: asOptionalString(values.description),
+          },
+        });
+      },
+      update: async (row, values) => {
+        await apiRequest(`/v1/products/${row.id}`, {
+          method: 'PATCH',
+          body: {
+            name: asString(values.name),
+            sku: asOptionalString(values.sku),
+            unit: asOptionalString(values.unit),
+            price: asNumber(values.price),
+            currency: asOptionalString(values.currency) ?? 'ARS',
+            cost_price: asNumber(values.cost_price),
+            tax_rate: asOptionalNumber(values.tax_rate),
+            track_stock: asBoolean(values.track_stock),
+            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+            tags: parseCSV(values.tags),
+            description: asOptionalString(values.description),
+          },
+        });
+      },
+      deleteItem: productsArchivedCrud.deleteItem,
+      restore: productsArchivedCrud.restore,
+      hardDelete: productsArchivedCrud.hardDelete,
+    },
     columns: [
       {
         key: 'name',
@@ -408,8 +482,8 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'price', header: 'Precio', render: (value) => `$${Number(value ?? 0).toFixed(2)}` },
-      { key: 'cost_price', header: 'Costo', render: (value) => `$${Number(value ?? 0).toFixed(2)}` },
+      { key: 'price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
       {
         key: 'track_stock',
         header: 'Stock',
@@ -419,28 +493,45 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </span>
         ),
       },
+      {
+        key: 'is_active',
+        header: 'Estado',
+        render: (value) => renderActiveBadge(Boolean(value)),
+      },
     ],
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
       { key: 'sku', label: 'SKU', placeholder: 'SKU-001' },
       { key: 'unit', label: 'Unidad', placeholder: 'unidad, kg, hora' },
       { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
       { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
       { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
       { key: 'track_stock', label: 'Controla stock', type: 'checkbox' },
+      {
+        key: 'is_active',
+        label: 'Estado comercial',
+        type: 'select',
+        options: [
+          { label: 'Activo', value: 'true' },
+          { label: 'Inactivo', value: 'false' },
+        ],
+      },
       { key: 'tags', label: 'Tags', placeholder: 'nuevo, combo, premium' },
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Product) =>
-      [row.name, row.sku, row.description, row.unit, tagsToText(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.sku, row.description, row.unit, row.currency, tagsToText(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Product) => ({
       name: row.name ?? '',
       sku: row.sku ?? '',
       unit: row.unit ?? '',
       price: row.price?.toString() ?? '0',
+      currency: row.currency ?? 'ARS',
       cost_price: row.cost_price?.toString() ?? '',
       tax_rate: row.tax_rate?.toString() ?? '',
       track_stock: row.track_stock ?? true,
+      is_active: row.is_active ? 'true' : 'false',
       tags: tagsToText(row.tags),
       description: row.description ?? '',
     }),
@@ -449,9 +540,11 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       sku: asOptionalString(values.sku),
       unit: asOptionalString(values.unit),
       price: asNumber(values.price),
+      currency: asOptionalString(values.currency) ?? 'ARS',
       cost_price: asNumber(values.cost_price),
       tax_rate: asOptionalNumber(values.tax_rate),
       track_stock: asBoolean(values.track_stock),
+      is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
       tags: parseCSV(values.tags),
       description: asOptionalString(values.description),
     }),
@@ -463,6 +556,48 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
+    dataSource: {
+      list: async (opts) => servicesArchivedCrud.list(opts),
+      create: async (values) => {
+        await apiRequest('/v1/services', {
+          method: 'POST',
+          body: {
+            name: asString(values.name),
+            code: asOptionalString(values.code),
+            category_code: asOptionalString(values.category_code),
+            sale_price: asNumber(values.sale_price),
+            cost_price: asNumber(values.cost_price),
+            tax_rate: asOptionalNumber(values.tax_rate),
+            currency: asOptionalString(values.currency) ?? 'ARS',
+            default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
+            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+            tags: parseCSV(values.tags),
+            description: asOptionalString(values.description),
+          },
+        });
+      },
+      update: async (row, values) => {
+        await apiRequest(`/v1/services/${row.id}`, {
+          method: 'PATCH',
+          body: {
+            name: asString(values.name),
+            code: asOptionalString(values.code),
+            category_code: asOptionalString(values.category_code),
+            sale_price: asNumber(values.sale_price),
+            cost_price: asNumber(values.cost_price),
+            tax_rate: asOptionalNumber(values.tax_rate),
+            currency: asOptionalString(values.currency) ?? 'ARS',
+            default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
+            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+            tags: parseCSV(values.tags),
+            description: asOptionalString(values.description),
+          },
+        });
+      },
+      deleteItem: servicesArchivedCrud.deleteItem,
+      restore: servicesArchivedCrud.restore,
+      hardDelete: servicesArchivedCrud.hardDelete,
+    },
     columns: [
       {
         key: 'name',
@@ -484,6 +619,11 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
         header: 'Duracion',
         render: (value) => (value ? `${Number(value)} min` : '---'),
       },
+      {
+        key: 'is_active',
+        header: 'Estado',
+        render: (value) => renderActiveBadge(Boolean(value)),
+      },
     ],
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del servicio' },
@@ -494,6 +634,15 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
       { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
       { key: 'default_duration_minutes', label: 'Duracion por defecto (min)', type: 'number', placeholder: '60' },
+      {
+        key: 'is_active',
+        label: 'Estado comercial',
+        type: 'select',
+        options: [
+          { label: 'Activo', value: 'true' },
+          { label: 'Inactivo', value: 'false' },
+        ],
+      },
       { key: 'tags', label: 'Tags', placeholder: 'premium, online, recurrente' },
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
@@ -508,6 +657,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_rate: row.tax_rate?.toString() ?? '',
       currency: row.currency ?? 'ARS',
       default_duration_minutes: row.default_duration_minutes?.toString() ?? '',
+      is_active: row.is_active ? 'true' : 'false',
       tags: tagsToText(row.tags),
       description: row.description ?? '',
     }),
@@ -520,6 +670,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_rate: asOptionalNumber(values.tax_rate),
       currency: asOptionalString(values.currency) ?? 'ARS',
       default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
+      is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
       tags: parseCSV(values.tags),
       description: asOptionalString(values.description),
     }),

@@ -36,6 +36,8 @@ Además:
 
 - `internal/products` queda para bienes inventariables o vendibles físicos/digitales; el API de `products` ya no acepta `type='service'`.
 - la base valida que toda fila activa en `products` tenga `type='product'`; cualquier servicio legado queda archivado y el alta nueva se hace en `services`.
+- `products` y `services` usan CRUD canónico: `PATCH`, `POST /archive`, `POST /restore` y `DELETE` duro; `?archived=true` amplía el listado.
+- `products` expone `currency` e `is_active`; `services` expone `currency`, `default_duration_minutes` e `is_active`.
 - `internal/services` expone el catálogo comercial horizontal de servicios en `/v1/services`, persistido en `services`.
 - `sales`, `quotes` y `purchases` soportan líneas con `product_id` o `service_id`; `pricelists` mantiene precios separados para productos y servicios.
 - `modules/scheduling` conserva `scheduling_services` como capa operativa y ahora puede enlazar opcionalmente `commercial_service_id` hacia `services.id`.

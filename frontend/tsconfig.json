@@ -18,6 +18,9 @@
       "@fullcalendar/interaction": ["./node_modules/@fullcalendar/interaction"],
       "@fullcalendar/react": ["./node_modules/@fullcalendar/react"],
       "@fullcalendar/timegrid": ["./node_modules/@fullcalendar/timegrid"],
+      "@fullcalendar/list": ["./node_modules/@fullcalendar/list"],
+      "@dnd-kit/core": ["./node_modules/@dnd-kit/core"],
+      "@dnd-kit/utilities": ["./node_modules/@dnd-kit/utilities"],
       "@tanstack/react-query": ["./node_modules/@tanstack/react-query"],
       "@devpablocristo/core-authn/errors": [
         "../core/authn/ts/src/errors.ts",
@@ -56,30 +59,33 @@
         "../../core/browser/ts/src/i18n/index.ts"
       ],
       "@devpablocristo/modules-calendar-board": [
+        "./node_modules/@devpablocristo/modules-calendar-board/src/index.ts",
         "../modules/calendar/board/ts/src/index.ts",
         "../../modules/calendar/board/ts/src/index.ts"
       ],
       "@devpablocristo/modules-calendar-board/styles.css": [
+        "./node_modules/@devpablocristo/modules-calendar-board/src/styles.css",
         "../modules/calendar/board/ts/src/styles.css",
         "../../modules/calendar/board/ts/src/styles.css"
       ],
       "@devpablocristo/modules-crud-ui": [
-        "../modules/crud/ui/ts/src/index.ts",
-        "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts"
+        "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts",
+        "../modules/crud/ui/ts/src/index.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv": [
-        "../modules/crud/ui/ts/src/csv.ts",
-        "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts"
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts",
+        "../modules/crud/ui/ts/src/csv.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv-toolbar": [
-        "../modules/crud/ui/ts/src/csvToolbarMerge.ts",
-        "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts"
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts",
+        "../modules/crud/ui/ts/src/csvToolbarMerge.ts"
       ],
       "@devpablocristo/modules-crud-ui/surface": [
-        "../modules/crud/ui/ts/src/crudCanonicalSurface.tsx",
-        "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx"
+        "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx",
+        "../modules/crud/ui/ts/src/crudCanonicalSurface.tsx"
       ],
       "@devpablocristo/modules-kanban-board": [
+        "./node_modules/@devpablocristo/modules-kanban-board/src/index.ts",
         "../modules/kanban/board/ts/src/index.ts",
         "../../modules/kanban/board/ts/src/index.ts"
       ],

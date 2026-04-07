@@ -7,9 +7,9 @@ export function AutoRepairWorkOrdersPage() {
   const navigate = useNavigate();
   const mergeConfig = useMemo(
     () => ({
-      onExternalEdit: (row: WorkOrder) => navigate(`/modules/workOrders/edit/${row.id}`),
+      onExternalEdit: (row: WorkOrder) => navigate(`/modules/carWorkOrders/edit/${row.id}`),
     }),
     [navigate],
   );
-  return <LazyConfiguredCrudPage resourceId="workOrders" mergeConfig={mergeConfig} />;
+  return <LazyConfiguredCrudPage resourceId="carWorkOrders" mergeConfig={mergeConfig} />;
 }

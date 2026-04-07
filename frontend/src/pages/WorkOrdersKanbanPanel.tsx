@@ -16,8 +16,8 @@ import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import './WorkOrdersKanbanPanel.css';
 
-const listPath = '/modules/workOrders/list';
-const boardPath = '/modules/workOrders/board';
+const listPath = '/modules/carWorkOrders/list';
+const boardPath = '/modules/carWorkOrders/board';
 
 /**
  * Tablero Kanban de OT: fases macro vía `StatusKanbanBoard` (modules-crud).
@@ -48,8 +48,8 @@ export function WorkOrdersKanbanPanel() {
   const { localizeText: formatFieldText } = useI18n();
   const navigate = useNavigate();
   const crudConfigQuery = useQuery({
-    queryKey: queryKeys.workOrders.crudConfig,
-    queryFn: () => loadLazyCrudPageConfig<AutoRepairWorkOrder>('workOrders'),
+    queryKey: queryKeys.carWorkOrders.crudConfig,
+    queryFn: () => loadLazyCrudPageConfig<AutoRepairWorkOrder>('carWorkOrders'),
   });
   const crudConfig = crudConfigQuery.data ?? null;
 
@@ -108,7 +108,7 @@ export function WorkOrdersKanbanPanel() {
       listAll={async () => (await getAllWorkOrders({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
       listArchived={async () => (await getWorkOrdersArchived({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
       patchStatus={async (id, status) => toGenericWorkOrder(await patchWorkOrder(id, { status }))}
-      queryKey={['work-orders', 'kanban']}
+      queryKey={['car-work-orders', 'kanban']}
       title="Órdenes de trabajo"
       listPath={listPath}
       renderExtraToolbar={renderExtraToolbar}

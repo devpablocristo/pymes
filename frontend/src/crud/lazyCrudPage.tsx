@@ -46,7 +46,7 @@ function resolveCrudModuleGroup(resourceId: string): string {
   if (
     [
       'workshopVehicles',
-      'workOrders',
+      'carWorkOrders',
       'bikeWorkOrders',
     ].includes(resourceId)
   ) {

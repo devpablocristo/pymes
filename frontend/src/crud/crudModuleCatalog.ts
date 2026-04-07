@@ -30,7 +30,7 @@ type CrudModuleId =
   | 'intakes'
   | 'sessions'
   | 'workshopVehicles'
-  | 'workOrders'
+  | 'carWorkOrders'
   | 'bikeWorkOrders'
   | 'restaurantDiningAreas'
   | 'restaurantDiningTables';
@@ -82,7 +82,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   intakes: { title: 'Ingresos', navLabel: 'Ingresos', labelPlural: 'ingresos' },
   sessions: { title: 'Sesiones', navLabel: 'Sesiones', labelPlural: 'sesiones' },
   workshopVehicles: { title: 'Vehículos', navLabel: 'Vehículos', labelPlural: 'vehículos' },
-  workOrders: { title: 'Órdenes de trabajo', navLabel: 'Órdenes trabajo', labelPlural: 'órdenes de trabajo' },
+  carWorkOrders: { title: 'Órdenes de trabajo (auto)', navLabel: 'OT auto', labelPlural: 'órdenes de trabajo' },
   bikeWorkOrders: {
     title: 'Órdenes de bicicletería',
     navLabel: 'Órdenes bici',
@@ -320,11 +320,11 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'WH',
     summary: 'Endpoints, entregas y replay de eventos outbound.',
   },
-  workOrders: {
+  carWorkOrders: {
     group: 'operations',
     icon: 'OT',
     summary:
-      'Taller auto-repair: tablero por estado y lista administrativa en /modules/workOrders (selector Tablero / Lista).',
+      'Taller auto-repair: tablero por estado y lista administrativa en /modules/carWorkOrders (selector Tablero / Lista).',
   },
   bikeWorkOrders: {
     group: 'operations',

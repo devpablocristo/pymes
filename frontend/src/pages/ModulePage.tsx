@@ -736,7 +736,7 @@ export function ModulePage() {
   });
 
   if (moduleId === 'workOrders') {
-    return <Navigate to="/modules/workOrders" replace />;
+    return <Navigate to="/modules/carWorkOrders" replace />;
   }
 
   if (crudModuleQuery.isError) {

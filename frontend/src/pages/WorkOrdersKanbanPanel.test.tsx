@@ -166,7 +166,7 @@ describe('WorkOrdersKanbanPanel', () => {
       expect(screen.getByRole('button', { name: 'OT-001 - Cliente actualizado' })).toBeInTheDocument();
     });
 
-    const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.workOrders.kanban(false)) ?? [];
+    const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.carWorkOrders.kanban(false)) ?? [];
     expect(cached.find((row) => row.id === 'wo-1')?.customer_name).toBe('Cliente actualizado');
   });
 
@@ -182,7 +182,7 @@ describe('WorkOrdersKanbanPanel', () => {
       expect(screen.queryByRole('button', { name: 'OT-001 - Cliente original' })).not.toBeInTheDocument();
     });
 
-    const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.workOrders.kanban(false)) ?? [];
+    const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.carWorkOrders.kanban(false)) ?? [];
     expect(cached.some((row) => row.id === 'wo-1')).toBe(false);
   });
 });

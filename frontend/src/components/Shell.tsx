@@ -97,7 +97,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
-      { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+      { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
     ],
     [t],
   );

@@ -171,7 +171,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       asString(values.make).trim().length >= 2 &&
       asString(values.model).trim().length >= 1,
   },
-  workOrders: {
+  carWorkOrders: {
     supportsArchived: true,
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',

@@ -5,7 +5,7 @@ import './WorkOrdersModuleSection.css';
 export function WorkOrdersModuleSection() {
   return (
     <div className="wo-mod-orders">
-      <WorkOrdersHeaderLead boardPath="/modules/workOrders/board" listPath="/modules/workOrders/list" />
+      <WorkOrdersHeaderLead boardPath="/modules/carWorkOrders/board" listPath="/modules/carWorkOrders/list" />
       <Outlet />
     </div>
   );

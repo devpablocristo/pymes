@@ -17,8 +17,8 @@ DECLARE
     wo1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/1');
     wo2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/2');
 BEGIN
-    DELETE FROM workshops.work_order_items_v2 WHERE work_order_id IN (wo1, wo2);
-    DELETE FROM workshops.work_orders_v2 WHERE id IN (wo1, wo2);
+    DELETE FROM workshops.work_order_items WHERE work_order_id IN (wo1, wo2);
+    DELETE FROM workshops.work_orders WHERE id IN (wo1, wo2);
     DELETE FROM workshops.vehicles WHERE id = veh1;
     DELETE FROM services WHERE org_id = v_org AND id IN (srv1, srv2);
 END \$\$;

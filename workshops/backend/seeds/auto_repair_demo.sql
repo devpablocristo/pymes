@@ -60,43 +60,43 @@ BEGIN
         RAISE EXCEPTION 'workshops seed: missing vehicle or services for org %', v_org;
     END IF;
 
-    INSERT INTO workshops.work_orders_v2 (
-        id, org_id, number, target_type, target_id, target_label, customer_id, customer_name, status,
-        requested_work, diagnosis, notes, internal_notes, currency, metadata,
+    INSERT INTO workshops.work_orders (
+        id, org_id, number, vehicle_id, vehicle_plate, customer_id, customer_name, status,
+        requested_work, diagnosis, notes, internal_notes, currency,
         subtotal_services, subtotal_parts, tax_total, total, created_by
     )
     VALUES (
-        wo1, v_org, 'OT-SEED-001', 'vehicle', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'received',
-        'Cambio de aceite y ruido al frenar', '', 'Orden abierta (semilla)', '', 'ARS', jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'),
+        wo1, v_org, 'OT-SEED-001', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'received',
+        'Cambio de aceite y ruido al frenar', '', 'Orden abierta (semilla)', '', 'ARS',
         25000, 15000, 8400, 48400, 'seed'
     )
     ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
-    SELECT id INTO wo1 FROM workshops.work_orders_v2 WHERE org_id = v_org AND number = 'OT-SEED-001' LIMIT 1;
+    SELECT id INTO wo1 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-001' LIMIT 1;
 
-    INSERT INTO workshops.work_orders_v2 (
-        id, org_id, number, target_type, target_id, target_label, customer_id, customer_name, status,
-        requested_work, diagnosis, notes, internal_notes, currency, metadata,
+    INSERT INTO workshops.work_orders (
+        id, org_id, number, vehicle_id, vehicle_plate, customer_id, customer_name, status,
+        requested_work, diagnosis, notes, internal_notes, currency,
         subtotal_services, subtotal_parts, tax_total, total, created_by
     )
     VALUES (
-        wo2, v_org, 'OT-SEED-002', 'vehicle', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'in_progress',
-        'Service 20.000 km', 'Pastillas delanteras al límite', 'En taller', 'Prioridad media', 'ARS', jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'),
+        wo2, v_org, 'OT-SEED-002', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'in_progress',
+        'Service 20.000 km', 'Pastillas delanteras al límite', 'En taller', 'Prioridad media', 'ARS',
         45000, 0, 9450, 54450, 'seed'
     )
     ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
-    SELECT id INTO wo2 FROM workshops.work_orders_v2 WHERE org_id = v_org AND number = 'OT-SEED-002' LIMIT 1;
+    SELECT id INTO wo2 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-002' LIMIT 1;
 
     IF wo1 IS NULL OR wo2 IS NULL THEN
         RAISE EXCEPTION 'workshops seed: missing work orders for org %', v_org;
     END IF;
 
-    INSERT INTO workshops.work_order_items_v2 (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
+    INSERT INTO workshops.work_order_items (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
     VALUES
         (woi1, v_org, wo1, 'service', srv1, NULL, 'Cambio de aceite y filtro', 1, 25000, 21, 0, '{}'::jsonb),
         (woi2, v_org, wo1, 'part', NULL, p1, 'Producto Demo A (repuesto)', 1, 15000, 21, 1, '{}'::jsonb)
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO workshops.work_order_items_v2 (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
+    INSERT INTO workshops.work_order_items (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
     VALUES
         (uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/3'), v_org, wo2, 'service', srv2, NULL, 'Revisión de frenos', 1, 45000, 21, 0, '{}'::jsonb)
     ON CONFLICT (id) DO NOTHING;

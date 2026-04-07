@@ -1,12 +1,14 @@
 -- Migración: deprecar sistema legacy de appointments en favor del módulo scheduling.
 -- 1. Copiar datos de appointments → scheduling_bookings (si no existen ya)
--- 2. Renombrar tenant_settings.appointments_enabled → scheduling_enabled (si aún no existe)
+-- 2. Asegurar columna tenant_settings.scheduling_enabled y reflejar appointments_enabled
 -- 3. Mantener tabla appointments como referencia histórica (no se elimina aún)
 
--- Asegurar que scheduling_enabled existe y tiene el valor de appointments_enabled como fallback
+-- Debe existir antes del UPDATE (bases nuevas no tenían esta columna hasta esta migración).
+ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS scheduling_enabled boolean NOT NULL DEFAULT false;
+
+-- Heredar el flag legacy sin pisar un true ya persistido en scheduling_enabled.
 UPDATE tenant_settings
-SET scheduling_enabled = COALESCE(scheduling_enabled, appointments_enabled, false)
-WHERE scheduling_enabled IS NULL OR scheduling_enabled = false;
+SET scheduling_enabled = scheduling_enabled OR COALESCE(appointments_enabled, false);
 
 -- Migrar appointments legacy a scheduling_bookings
 -- Solo inserta los que no existen (usando idempotency_key basado en appointment ID)

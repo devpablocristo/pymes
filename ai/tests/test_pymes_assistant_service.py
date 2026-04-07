@@ -641,6 +641,7 @@ async def test_run_internal_orchestrated_chat_offers_clarification_for_ambiguous
         "Compras",
         "Clientes",
         "Productos",
+        "Servicios",
     ]
     assert result.blocks[1]["actions"][0]["message"] == message
     assert result.blocks[1]["actions"][0]["route_hint"] == "sales"
@@ -688,6 +689,7 @@ async def test_run_internal_orchestrated_chat_offers_clarification_for_menu_requ
         "Compras",
         "Clientes",
         "Productos",
+        "Servicios",
     ]
     assert result.blocks[1]["actions"][0]["message"] == "mostrame el menú"
     assert result.blocks[1]["actions"][0]["selection_behavior"] == "prompt_for_query"

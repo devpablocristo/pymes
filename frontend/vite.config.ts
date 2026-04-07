@@ -51,6 +51,7 @@ const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
 const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/react', import.meta.url));
 const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
+const fullCalendarList = fileURLToPath(new URL('./node_modules/@fullcalendar/list', import.meta.url));
 const tanstackReactQuery = fileURLToPath(new URL('./node_modules/@tanstack/react-query', import.meta.url));
 const coreBrowserIndex = monorepoPackageDir('core', 'browser/ts/src/index.ts');
 const coreBrowserCrud = monorepoPackageDir('core', 'browser/ts/src/crud/index.ts');
@@ -104,6 +105,7 @@ export default defineConfig({
       { find: '@fullcalendar/interaction', replacement: fullCalendarInteraction },
       { find: '@fullcalendar/react', replacement: fullCalendarReact },
       { find: '@fullcalendar/timegrid', replacement: fullCalendarTimeGrid },
+      { find: '@fullcalendar/list', replacement: fullCalendarList },
       { find: '@tanstack/react-query', replacement: tanstackReactQuery },
       { find: '@devpablocristo/core-authn/errors', replacement: coreAuthnErrors },
       { find: '@devpablocristo/core-browser/crud', replacement: coreBrowserCrud },

@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from src.api import chat_stream
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.api.public_router import router as public_chat_router
 import src.api.quota as quota_module
@@ -483,7 +482,7 @@ def test_public_chat_failure_does_not_persist_or_finish(monkeypatch) -> None:
 
         yield to_sse_event("error", {"message": "error processing request"})
 
-    monkeypatch.setattr(chat_stream, "stream_orchestrated_chat", fake_stream)
+    monkeypatch.setattr(public_router_module, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})
@@ -522,7 +521,7 @@ def test_public_chat_success_persists_and_finishes(monkeypatch) -> None:
             payload.update(done_payload)
         yield to_sse_event("done", payload)
 
-    monkeypatch.setattr(chat_stream, "stream_orchestrated_chat", fake_stream)
+    monkeypatch.setattr(public_router_module, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})

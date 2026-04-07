@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
@@ -57,9 +56,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
-	"github.com/devpablocristo/pymes/pymes-core/backend/seeds"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/seedtarget"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 )
 
@@ -74,22 +71,6 @@ func InitializeApp() *app.App {
 
 	if err := migrations.Run(db, logger); err != nil {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
-	}
-
-	if cfg.SeedDemoData {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		seedOrg, err := seedtarget.ResolveDemoOrgUUID(ctx, db, cfg.SeedDemoOrgExternalID)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("demo seed org resolution failed")
-		}
-		clerkMode := cfg.SeedDemoOrgExternalID != ""
-		if err := seeds.Run(ctx, db, logger, seeds.Params{
-			TargetOrgUUID: seedOrg,
-			ClerkMode:     clerkMode,
-		}); err != nil {
-			logger.Fatal().Err(err).Msg("demo seeds failed (set PYMES_SEED_DEMO=false to skip)")
-		}
 	}
 
 	saasSvc, err := SetupSaaS(db, SaaSConfig{

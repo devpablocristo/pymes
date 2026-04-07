@@ -138,6 +138,31 @@ func TestListPassesArchivedFlag(t *testing.T) {
 	}
 }
 
+func TestListArchivedRoutePassesArchivedFlag(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	uc := &stubUsecases{}
+	handler := NewHandler(uc)
+	router := gin.New()
+	router.Use(testProductAuthMiddleware())
+	router.GET("/products/archived", handler.ListArchived)
+
+	req := httptest.NewRequest(http.MethodGet, "/products/archived", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if uc.listCalls != 1 {
+		t.Fatalf("expected list usecase to be called once, got %d", uc.listCalls)
+	}
+	if !uc.lastList.Archived {
+		t.Fatalf("expected archived flag to be true")
+	}
+}
+
 func testProductAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set(ctxkeys.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")

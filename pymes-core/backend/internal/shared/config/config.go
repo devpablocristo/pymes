@@ -59,11 +59,6 @@ type Config struct {
 	MPRedirectURI               string
 	PaymentGatewayMode          string
 	PaymentGatewayEncryptionKey string
-	// SeedDemoData aplica SQL embebido en backend/seeds/ tras migrar (solo desarrollo / compose).
-	SeedDemoData bool
-	// SeedDemoOrgExternalID: si está definido (ej. org_xxx de Clerk), los seeds usan esa fila en orgs.external_id
-	// y no crean la org local fija. La fila debe existir antes del arranque (login o webhook).
-	SeedDemoOrgExternalID string
 }
 
 // LoadFromEnv carga valores con defaults seguros para desarrollo local.
@@ -114,8 +109,6 @@ func LoadFromEnv() Config {
 		MPRedirectURI:               envconfig.Get("MP_REDIRECT_URI", ""),
 		PaymentGatewayMode:          envconfig.Get("PAYMENT_GATEWAY_MODE", "mercadopago"),
 		PaymentGatewayEncryptionKey: envconfig.Get("PAYMENT_GATEWAY_ENCRYPTION_KEY", ""),
-		SeedDemoData:                envconfig.Bool("PYMES_SEED_DEMO", false),
-		SeedDemoOrgExternalID:       strings.TrimSpace(envconfig.Get("PYMES_SEED_DEMO_ORG_EXTERNAL_ID", "")),
 	}
 	if err := validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken); err != nil {
 		log.Fatal(err)

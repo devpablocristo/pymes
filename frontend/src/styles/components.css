@@ -483,6 +483,14 @@ button.crud-creator-badge.crud-creator-badge--active {
   align-items: center;
 }
 
+.crud-cell-tag-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  max-width: 28ch;
+}
+
 /* ── Toggle switch ── */
 .toggle {
   position: relative;

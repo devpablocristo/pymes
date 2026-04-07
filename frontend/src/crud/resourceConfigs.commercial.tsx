@@ -11,6 +11,7 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
+import { renderTagBadges } from './crudTagBadges';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
 
@@ -170,14 +171,9 @@ function renderActiveBadge(value: boolean, activeLabel = 'Activo', inactiveLabel
   return <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? activeLabel : inactiveLabel}</span>;
 }
 
-function buildCanonicalArchivedCrud<T extends { id: string; deleted_at?: string | null }>(basePath: string) {
+/** Archive/restore/hard delete: el listado paginado va por `basePath` + httpClient del shell. */
+function buildArchivedMutationsOnly<T extends { id: string }>(basePath: string) {
   return {
-    list: async ({ archived }: { archived: boolean }) => {
-      const suffix = archived ? '?archived=true' : '';
-      const data = await apiRequest<{ items: T[] }>(`${basePath}${suffix}`);
-      const items = data.items ?? [];
-      return archived ? items.filter((item) => Boolean(item.deleted_at)) : items.filter((item) => !item.deleted_at);
-    },
     deleteItem: async (row: T) => {
       await apiRequest(`${basePath}/${row.id}/archive`, { method: 'POST', body: {} });
     },
@@ -190,8 +186,8 @@ function buildCanonicalArchivedCrud<T extends { id: string; deleted_at?: string 
   };
 }
 
-const productsArchivedCrud = buildCanonicalArchivedCrud<Product>('/v1/products');
-const servicesArchivedCrud = buildCanonicalArchivedCrud<Service>('/v1/services');
+const productsArchivedMutations = buildArchivedMutationsOnly<Product>('/v1/products');
+const servicesArchivedMutations = buildArchivedMutationsOnly<Service>('/v1/services');
 
 function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id?: string; service_id?: string; price: number }> {
   const parsed = parseJSONArray<{ product_id?: string; service_id?: string; price: number }>(
@@ -430,7 +426,6 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
     dataSource: {
-      list: async (opts) => productsArchivedCrud.list(opts),
       create: async (values) => {
         await apiRequest('/v1/products', {
           method: 'POST',
@@ -467,9 +462,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           },
         });
       },
-      deleteItem: productsArchivedCrud.deleteItem,
-      restore: productsArchivedCrud.restore,
-      hardDelete: productsArchivedCrud.hardDelete,
+      ...productsArchivedMutations,
     },
     columns: [
       {
@@ -485,6 +478,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       },
       { key: 'price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
       { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'tags',
+        header: 'Tags',
+        className: 'cell-tags',
+        render: (_value, row: Product) => renderTagBadges(row.tags),
+      },
       {
         key: 'track_stock',
         header: 'Stock',

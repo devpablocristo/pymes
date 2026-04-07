@@ -36,6 +36,7 @@ export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {
         </div>
       );
     }
-    return <CrudPage {...config} {...createdByMerge} {...mergeConfig} />;
+    const creatorProps = config.featureFlags?.creatorFilter === false ? {} : createdByMerge;
+    return <CrudPage {...config} {...creatorProps} {...mergeConfig} />;
   };
 }

@@ -4,10 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
-PYMES_DB_ADMIN_NAME="${PYMES_DB_ADMIN_NAME:-postgres}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 REVIEW_DB_NAME="${REVIEW_DB_NAME:-nexus_review}"
-REVIEW_DB_ADMIN_NAME="${REVIEW_DB_ADMIN_NAME:-postgres}"
 REVIEW_DB_USER="${REVIEW_DB_USER:-postgres}"
 LEGACY_DEMO_ORG_UUID="00000000-0000-0000-0000-000000000001"
 
@@ -31,37 +29,10 @@ wait_for_pg() {
   return 1
 }
 
-wait_for_http() {
-  local service="$1"
-  local url="$2"
-  local tries="${3:-60}"
-  local i
-  for ((i = 1; i <= tries; i++)); do
-    if dc exec -T "$service" sh -lc "curl -fsS '$url' >/dev/null" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "Servicio HTTP no quedó listo: $service $url" >&2
-  return 1
-}
-
-ensure_services_up() {
-  dc up -d "$@"
-}
-
-stop_services_if_running() {
-  local services=("$@")
-  local running=()
-  local service
-  for service in "${services[@]}"; do
-    if dc ps -q "$service" | grep -q .; then
-      running+=("$service")
-    fi
-  done
-  if ((${#running[@]} > 0)); then
-    dc stop "${running[@]}"
-  fi
+ensure_seed_dbs_ready() {
+  dc up -d postgres review-postgres
+  wait_for_pg postgres "$PYMES_DB_NAME" "$PYMES_DB_USER"
+  wait_for_pg review-postgres "$REVIEW_DB_NAME" "$REVIEW_DB_USER"
 }
 
 resolve_target_org_uuid() {
@@ -108,13 +79,13 @@ run_pymes_sql_file() {
 
 run_pymes_sql_inline() {
   local sql="$1"
-  printf '%s\n' "$sql" | dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_ADMIN_NAME" -v ON_ERROR_STOP=1
+  printf '%s\n' "$sql" | dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -v ON_ERROR_STOP=1
 }
 
 run_review_sql_inline() {
   local sql="$1"
-  printf '%s\n' "$sql" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_ADMIN_NAME" -v ON_ERROR_STOP=1
+  printf '%s\n' "$sql" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
 }
 
-export ROOT_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_ADMIN_NAME PYMES_DB_USER
-export REVIEW_DB_NAME REVIEW_DB_ADMIN_NAME REVIEW_DB_USER LEGACY_DEMO_ORG_UUID
+export ROOT_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER
+export REVIEW_DB_NAME REVIEW_DB_USER LEGACY_DEMO_ORG_UUID

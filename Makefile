@@ -25,13 +25,13 @@ lint: staticcheck ruff
 
 # Seeds y utilidades
 
-# Carga todos los seeds sin limpiar antes; asegura migraciones y luego siembra en orden.
+# Carga seeds demo por el flujo único soportado (`scripts/seeds/load.sh`).
 seed:
-	bash scripts/seed-all.sh
+	bash scripts/seeds/load.sh
 
-# Elimina todos los datos seed reseteando las bases y recreando solo esquema.
+# Limpia seeds demo por el flujo único soportado (`scripts/seeds/clear.sh`).
 seed-clear:
-	bash scripts/seeds/clear-all.sh
+	bash scripts/seeds/clear.sh
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
 # Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`

@@ -107,7 +107,7 @@ services:
       FRONTEND_URL: http://localhost:5180
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
-      PYMES_SEED_DEMO: "true"
+      PYMES_SEED_DEMO: "false"
       # Sobrescribe .env: un org_... de Clerk que aún no está en `orgs` hace fallar el arranque. Vacío = org demo fija (01_local_org).
       # Para sembrar contra Clerk en Docker, usá docker-compose.override.yml con PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_..."
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""

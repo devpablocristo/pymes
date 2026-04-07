@@ -1,50 +1,81 @@
-import type { CrudFormField, CrudFormValues, CrudPageConfig } from '../components/CrudPage';
+import type { CrudFormValues, CrudPageConfig } from '../components/CrudPage';
 import { confirmAction } from '@devpablocristo/core-browser';
+import type { CSVColumn } from '@devpablocristo/modules-crud-ui/csv';
 import {
-  buildCSV,
-  downloadCSVFile,
-  normalizeCSVFieldValue,
-  parseCSV,
-  pickCSVFile,
-  type CSVColumn,
-} from '@devpablocristo/modules-crud-ui/csv';
+  mergeCsvToolbarConfig,
+  type CrudCsvServerExportPort,
+  type CrudCsvServerImportPort,
+  type CrudCsvToolbarUiPort,
+  type CsvToolbarMergeMode,
+} from '@devpablocristo/modules-crud-ui';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 
-type CSVMode = 'client' | 'server';
-
 export type CSVToolbarOptions = {
-  mode?: CSVMode;
+  mode?: CsvToolbarMergeMode;
   entity?: string;
   allowImport?: boolean;
   allowExport?: boolean;
   importMode?: 'create_only' | 'upsert';
   fileName?: string;
   columns?: CSVColumn[];
+  /** Sustituye el export dataio del core (p. ej. auditoría). */
+  serverExport?: CrudCsvServerExportPort;
+  /** Sustituye import dataio del core. */
+  serverImport?: CrudCsvServerImportPort;
 };
 
-type ImportPreview = {
-  preview_id: string;
-  total_rows: number;
-  valid_rows: number;
-  error_rows: number;
-  errors: Array<{ row: number; message: string; column?: string }>;
+const pymesCsvUi: CrudCsvToolbarUiPort = {
+  confirmClientImport: (fileName, rowCount) =>
+    confirmAction({
+      title: 'Importar CSV',
+      description: `Se importaran ${rowCount} filas de ${fileName}. ¿Continuar?`,
+      confirmLabel: 'Importar',
+      cancelLabel: 'Cancelar',
+    }).then(Boolean),
+  confirmServerImport: (description) =>
+    confirmAction({
+      title: 'Confirmar importación',
+      description,
+      confirmLabel: 'Continuar',
+      cancelLabel: 'Cancelar',
+    }).then(Boolean),
+  notify: (message) => {
+    window.alert(message);
+  },
 };
 
-function defaultColumns<T extends { id: string }>(config: CrudPageConfig<T>): CSVColumn[] {
-  return config.formFields.map((field) => ({ key: field.key, label: field.label }));
+const spanishCsvMessages = {
+  importClientDone: (r: { created: number; failed: number }) =>
+    `Importacion completada. Creados: ${r.created}. Fallidos: ${r.failed}.`,
+  importServerDone: (r: { created: number; updated: number; skipped: number }) =>
+    `Importacion completada. Creados: ${r.created}. Actualizados: ${r.updated}. Omitidos: ${r.skipped}.`,
+};
+
+function createCoreDataioServerImportPort(): CrudCsvServerImportPort {
+  return {
+    preview: (entity, file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return apiRequest(`/v1/import/${entity}/preview`, {
+        method: 'POST',
+        rawBody: formData,
+        skipJSONContentType: true,
+      });
+    },
+    confirm: (entity, previewId, mode) =>
+      apiRequest(`/v1/import/${entity}/confirm`, {
+        method: 'POST',
+        body: { preview_id: previewId, mode },
+      }),
+  };
 }
 
-function valuesFromRow<T extends { id: string }>(
-  config: CrudPageConfig<T>,
-  row: T,
-  columns: CSVColumn[],
-): Record<string, string> {
-  const values = config.toFormValues(row);
-  return columns.reduce<Record<string, string>>((accumulator, column) => {
-    const rawValue = values[column.key];
-    accumulator[column.key] = typeof rawValue === 'boolean' ? (rawValue ? 'true' : 'false') : String(rawValue ?? '');
-    return accumulator;
-  }, {});
+function createCoreDataioServerExportPort(): CrudCsvServerExportPort {
+  return {
+    download: async (entity) => {
+      await downloadAPIFile(`/v1/export/${entity}?format=csv`);
+    },
+  };
 }
 
 async function createFromValues<T extends { id: string }>(
@@ -64,99 +95,6 @@ async function createFromValues<T extends { id: string }>(
   });
 }
 
-function fieldMap(fields: CrudFormField[]): Map<string, CrudFormField> {
-  return new Map(fields.map((field) => [field.key, field]));
-}
-
-async function importClientCSV<T extends { id: string }>(
-  config: CrudPageConfig<T>,
-  columns: CSVColumn[],
-): Promise<{ created: number; failed: number }> {
-  const file = await pickCSVFile();
-  if (!file) {
-    return { created: 0, failed: 0 };
-  }
-  const rows = parseCSV(await file.text());
-  if (rows.length === 0) {
-    throw new Error('El archivo CSV no tiene filas para importar');
-  }
-
-  const fieldsByKey = fieldMap(config.formFields);
-  const summary = await confirmAction({
-    title: 'Importar CSV',
-    description: `Se importaran ${rows.length} filas de ${file.name}. ¿Continuar?`,
-    confirmLabel: 'Importar',
-    cancelLabel: 'Cancelar',
-  });
-  if (!summary) {
-    return { created: 0, failed: 0 };
-  }
-
-  let created = 0;
-  let failed = 0;
-  for (const row of rows) {
-    const values = columns.reduce<CrudFormValues>((accumulator, column) => {
-      const field = fieldsByKey.get(column.key);
-      accumulator[column.key] = normalizeCSVFieldValue(row[column.key] ?? '', field?.type);
-      return accumulator;
-    }, {});
-    try {
-      await createFromValues(config, values);
-      created += 1;
-    } catch {
-      failed += 1;
-    }
-  }
-  return { created, failed };
-}
-
-async function importServerCSV(
-  entity: string,
-  importMode: 'create_only' | 'upsert',
-): Promise<{ created: number; updated: number; skipped: number }> {
-  const file = await pickCSVFile();
-  if (!file) {
-    return { created: 0, updated: 0, skipped: 0 };
-  }
-  const formData = new FormData();
-  formData.append('file', file);
-  const preview = await apiRequest<ImportPreview>(`/v1/import/${entity}/preview`, {
-    method: 'POST',
-    rawBody: formData,
-    skipJSONContentType: true,
-  });
-  const firstErrors = (preview.errors ?? [])
-    .slice(0, 3)
-    .map((error) => `fila ${error.row}: ${error.message}`)
-    .join('\n');
-  const confirmed = await confirmAction({
-    title: 'Confirmar importación',
-    description: [
-      `Archivo: ${file.name}`,
-      `Total: ${preview.total_rows}`,
-      `Validas: ${preview.valid_rows}`,
-      `Con errores: ${preview.error_rows}`,
-      firstErrors ? `Errores:\n${firstErrors}` : '',
-      '¿Continuar con la importacion?',
-    ]
-      .filter(Boolean)
-      .join('\n\n'),
-    confirmLabel: 'Continuar',
-    cancelLabel: 'Cancelar',
-  });
-  if (!confirmed) {
-    return { created: 0, updated: 0, skipped: 0 };
-  }
-  const result = await apiRequest<{ created: number; updated: number; skipped: number }>(
-    `/v1/import/${entity}/confirm`,
-    {
-      method: 'POST',
-      body: { preview_id: preview.preview_id, mode: importMode },
-    },
-  );
-  return result;
-}
-
 export function withCSVToolbar<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T>,
@@ -164,48 +102,28 @@ export function withCSVToolbar<T extends { id: string }>(
 ): CrudPageConfig<T> {
   const mode = options.mode ?? 'client';
   const entity = options.entity ?? resourceId;
-  const columns = options.columns ?? defaultColumns(config);
-  const toolbarActions = [...(config.toolbarActions ?? [])];
+  const defaultAllowImport = Boolean(config.dataSource?.create || config.basePath);
+  const allowImport = options.allowImport ?? defaultAllowImport;
 
-  if (options.allowImport ?? Boolean(config.dataSource?.create || config.basePath)) {
-    toolbarActions.unshift({
-      id: 'csv-import',
-      label: 'Importar CSV',
-      kind: 'secondary',
-      onClick: async ({ reload }) => {
-        if (mode === 'server') {
-          const result = await importServerCSV(entity, options.importMode ?? 'upsert');
-          await reload();
-          window.alert(
-            `Importacion completada. Creados: ${result.created}. Actualizados: ${result.updated}. Omitidos: ${result.skipped}.`,
-          );
-          return;
-        }
-        const result = await importClientCSV(config, columns);
-        await reload();
-        window.alert(`Importacion completada. Creados: ${result.created}. Fallidos: ${result.failed}.`);
-      },
-    });
-  }
+  const serverImport =
+    options.serverImport ??
+    (mode === 'server' && allowImport ? createCoreDataioServerImportPort() : undefined);
+  const serverExport =
+    options.serverExport ?? (mode === 'server' ? createCoreDataioServerExportPort() : undefined);
 
-  if (options.allowExport ?? true) {
-    toolbarActions.unshift({
-      id: 'csv-export',
-      label: 'Exportar CSV',
-      kind: 'secondary',
-      onClick: async ({ items }) => {
-        if (mode === 'server') {
-          await downloadAPIFile(`/v1/export/${entity}?format=csv`);
-          return;
-        }
-        const content = buildCSV(
-          columns,
-          items.map((row) => valuesFromRow(config, row, columns)),
-        );
-        downloadCSVFile(options.fileName ?? `${entity}.csv`, content);
-      },
-    });
-  }
-
-  return { ...config, toolbarActions };
+  return mergeCsvToolbarConfig({
+    config,
+    entity,
+    mode,
+    columns: options.columns,
+    allowImport: options.allowImport,
+    allowExport: options.allowExport,
+    importMode: options.importMode ?? 'upsert',
+    fileName: options.fileName,
+    serverImport,
+    serverExport,
+    ui: pymesCsvUi,
+    importClientRow: (values) => createFromValues(config, values),
+    messages: spanishCsvMessages,
+  });
 }

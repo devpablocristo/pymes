@@ -17,6 +17,7 @@ import {
   type WhatsAppCampaign,
   type WhatsAppConversation,
 } from '../lib/api';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
   asBoolean,
@@ -89,7 +90,7 @@ function searchParam(name: string): string | undefined {
   return t || undefined;
 }
 
-const resourceConfigs: CrudResourceConfigMap = {
+const operationsResourceConfigs: CrudResourceConfigMap = {
   returns: {
     basePath: '/v1/returns',
     label: 'devolución',
@@ -612,6 +613,13 @@ const resourceConfigs: CrudResourceConfigMap = {
     isValid: () => false,
   },
 };
+
+const resourceConfigs = Object.fromEntries(
+  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

@@ -17,10 +17,11 @@ import {
   updateTeacherSpecialty,
 } from '../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../lib/teachersTypes';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from './resourceConfigs.shared';
 
-const resourceConfigs: CrudResourceConfigMap = {
+const professionalsResourceConfigs: CrudResourceConfigMap = {
   professionals: {
     label: 'teacher',
     labelPlural: 'teachers',
@@ -340,6 +341,12 @@ const resourceConfigs: CrudResourceConfigMap = {
   },
 };
 
+const resourceConfigs = Object.fromEntries(
+  Object.entries(professionalsResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 resourceConfigs.teachers = resourceConfigs.professionals;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);

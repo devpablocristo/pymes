@@ -32,7 +32,6 @@ type CrudModuleId =
   | 'workshopVehicles'
   | 'workOrders'
   | 'bikeWorkOrders'
-  | 'beautyStaff'
   | 'restaurantDiningAreas'
   | 'restaurantDiningTables';
 
@@ -89,7 +88,6 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     navLabel: 'Órdenes bici',
     labelPlural: 'órdenes de bicicletería',
   },
-  beautyStaff: { title: 'Equipo', navLabel: 'Equipo', labelPlural: 'equipo' },
   restaurantDiningAreas: {
     title: 'Zonas del salón',
     navLabel: 'Zonas salón',

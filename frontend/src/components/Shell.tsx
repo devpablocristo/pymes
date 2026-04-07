@@ -111,7 +111,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/beautyStaff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
+      { to: '/modules/employees', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
     ],
     [t],
   );

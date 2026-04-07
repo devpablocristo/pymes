@@ -14,7 +14,6 @@ import (
 
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/orchestration"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/public"
-	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/staff"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/beauty/backend/migrations"
@@ -40,13 +39,10 @@ func InitializeApp() *app.App {
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
+	_ = auditLog // audit queda disponible para futuros módulos locales
 
-	staffRepo := staff.NewRepository(db)
-
-	staffUC := staff.NewUsecases(staffRepo, auditLog)
 	orchestrationUC := orchestration.NewUsecases(cpClient)
 
-	staffHandler := staff.NewHandler(staffUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
 	publicHandler := public.NewHandler(cpClient, cpClient)
 
@@ -75,7 +71,6 @@ func InitializeApp() *app.App {
 	authGroup.Use(authMiddleware.RequireAuth())
 
 	beautyGroup := authGroup.Group("/beauty")
-	staffHandler.RegisterRoutes(beautyGroup)
 	orchestrationHandler.RegisterRoutes(beautyGroup)
 
 	return &app.App{Router: router}

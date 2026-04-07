@@ -1,11 +1,3 @@
-export type BeautyStaffMember = {
-  id: string;
-  org_id: string;
-  display_name: string;
-  role: string;
-  color: string;
-  is_active: boolean;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-};
+// Placeholder: beauty ya no tiene tipos propios.
+// Staff → parties (role=employee), services → services del core.
+export {};

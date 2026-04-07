@@ -52,9 +52,6 @@ function resolveCrudModuleGroup(resourceId: string): string {
   ) {
     return 'workshops';
   }
-  if (['beautyStaff'].includes(resourceId)) {
-    return 'beauty';
-  }
   if (['restaurantDiningAreas', 'restaurantDiningTables'].includes(resourceId)) {
     return 'restaurants';
   }

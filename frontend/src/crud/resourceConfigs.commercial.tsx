@@ -553,12 +553,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   services: {
     basePath: '/v1/services',
     supportsArchived: true,
+    renderTagsCell: (row: Service) => renderTagBadges(row.tags),
     searchPlaceholder: 'Buscar...',
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
     dataSource: {
-      list: async (opts) => servicesArchivedCrud.list(opts),
       create: async (values) => {
         await apiRequest('/v1/services', {
           method: 'POST',
@@ -595,9 +595,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           },
         });
       },
-      deleteItem: servicesArchivedCrud.deleteItem,
-      restore: servicesArchivedCrud.restore,
-      hardDelete: servicesArchivedCrud.hardDelete,
+      ...servicesArchivedMutations,
     },
     columns: [
       {

@@ -22,10 +22,13 @@ import (
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
+	autoRepairWoExt "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders_ext"
 	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
 	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
+	bikeShopWoExt "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders_ext"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
+	unifiedworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
 	workshopseeds "github.com/devpablocristo/pymes/workshops/backend/seeds"
 )
@@ -78,6 +81,20 @@ func InitializeApp() *app.App {
 	bikeWorkOrdersHandler := bikeworkorders.NewHandler(bikeWorkOrdersUC)
 	bikeOrchestrationHandler := bikeorchestration.NewHandler(bikeOrchestrationUC)
 
+	// Módulo unificado de work orders (workshops/internal/workorders) — coexiste con los
+	// módulos legacy auto_repair/workorders y bike_shop/workorders. La migración a este
+	// endpoint se hace pantalla por pantalla en pasos posteriores.
+	unifiedWoRepo := unifiedworkorders.NewRepository(db)
+	unifiedWoUC := unifiedworkorders.NewUsecases(
+		unifiedWoRepo,
+		auditLog,
+		cpClient,
+		cpClient,
+		autoRepairWoExt.New(),
+		bikeShopWoExt.New(),
+	)
+	unifiedWoHandler := unifiedworkorders.NewHandler(unifiedWoUC)
+
 	publicHandler := public.NewHandler(cpClient, cpClient)
 
 	router := gin.New()
@@ -113,6 +130,10 @@ func InitializeApp() *app.App {
 	bikeShopGroup := authGroup.Group("/bike-shop")
 	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
 	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
+
+	// Endpoint unificado: /v1/work-orders (filtrable por ?target_type=vehicle|bicycle).
+	// Coexiste con los endpoints legacy /v1/auto-repair/work-orders y /v1/bike-shop/work-orders.
+	unifiedWoHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }

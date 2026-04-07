@@ -117,9 +117,6 @@ export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { 
   return mod.getCrudPageConfig<TRecord>(resourceId);
 }
 
-// Resources con vista alternativa (toggle table/gallery, etc.) gestionada por un wrapper propio.
-const RESOURCES_WITH_VIEW_MODES = new Set(['products']);
-
 export function LazyConfiguredCrudPage({
   resourceId,
   mergeConfig,
@@ -131,27 +128,11 @@ export function LazyConfiguredCrudPage({
     resourceId: string;
     mergeConfig?: Record<string, unknown>;
   }> | null>(null);
-  const [WrapperPage, setWrapperPage] = useState<ComponentType | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const useWrapper = mergeConfig == null && RESOURCES_WITH_VIEW_MODES.has(resourceId);
 
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
-    if (useWrapper && resourceId === 'products') {
-      void import('../components/ProductsCrudPage')
-        .then((mod) => {
-          if (!cancelled) setWrapperPage(() => mod.ProductsCrudPage);
-        })
-        .catch((err: unknown) => {
-          if (!cancelled) {
-            setLoadError(err instanceof Error ? err.message : String(err));
-          }
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
     void loadCrudModule(resourceId)
       .then((mod) => {
         if (cancelled) return;
@@ -170,7 +151,7 @@ export function LazyConfiguredCrudPage({
     return () => {
       cancelled = true;
     };
-  }, [resourceId, useWrapper]);
+  }, [resourceId]);
 
   if (loadError != null) {
     return (
@@ -184,17 +165,6 @@ export function LazyConfiguredCrudPage({
         </div>
       </PageLayout>
     );
-  }
-
-  if (useWrapper) {
-    if (WrapperPage == null) {
-      return (
-        <PageLayout title="Módulo" lead="Cargando superficie del módulo.">
-          <div className="card"><p>Cargando módulo…</p></div>
-        </PageLayout>
-      );
-    }
-    return <WrapperPage />;
   }
 
   if (ConfiguredCrudPage == null) {

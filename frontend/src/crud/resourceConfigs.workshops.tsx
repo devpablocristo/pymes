@@ -22,6 +22,7 @@ import {
   createBikePaymentLink,
   createBikeWorkOrder,
   getBikeWorkOrders,
+  getBikeWorkOrdersArchived,
   updateBikeWorkOrder,
 } from '../lib/bikeShopApi';
 import type { BikeWorkOrder, BikeWorkOrderItem } from '../lib/bikeShopTypes';
@@ -171,9 +172,6 @@ const resourceConfigs: CrudResourceConfigMap = {
   },
   workOrders: {
     supportsArchived: true,
-    allowDelete: false,
-    allowRestore: false,
-    allowHardDelete: false,
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo',
@@ -416,16 +414,17 @@ const resourceConfigs: CrudResourceConfigMap = {
   // ── Bicicletería ──
 
   bikeWorkOrders: {
-    allowDelete: false,
-    allowRestore: false,
-    allowHardDelete: false,
+    supportsArchived: true,
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo (bicicletería)',
     createLabel: '+ Nueva orden',
     searchPlaceholder: 'Buscar...',
     dataSource: {
-      list: async () => {
+      list: async ({ archived }) => {
+        if (archived) {
+          return getBikeWorkOrdersArchived();
+        }
         const data = await getBikeWorkOrders({ limit: 250 });
         return data.items ?? [];
       },

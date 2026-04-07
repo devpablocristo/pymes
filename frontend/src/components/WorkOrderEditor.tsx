@@ -411,7 +411,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
             </div>
             <div className="wo-modal__field wo-modal__field--full">
               <label className="wo-modal__label" htmlFor="wo-booking-id">
-                Turno (Booking UUID)
+                Turno (Appointment UUID)
               </label>
               <input
                 id="wo-booking-id"

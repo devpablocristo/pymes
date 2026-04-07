@@ -1,6 +1,6 @@
 /**
  * Tablero Kanban genérico para órdenes de trabajo.
- * Reutilizable por cualquier vertical (auto-repair, etc.).
+ * Reutilizable por cualquier vertical (auto-repair, bike-shop, etc.).
  */
 import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
@@ -201,9 +201,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   const [items, setItems] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() =>
-    clerkEnabled ? { mode: 'pick', actors: new Set() } : { mode: 'all' },
-  );
+  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
   const queryClient = useQueryClient();
   const boardQueryKey = useMemo(

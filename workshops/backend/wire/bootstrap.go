@@ -22,7 +22,6 @@ import (
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
-	bikebicycles "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles"
 	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
 	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
@@ -63,14 +62,12 @@ func InitializeApp() *app.App {
 	vehiclesRepo := vehicles.NewRepository(db)
 	workOrdersRepo := workorders.NewRepository(db)
 
-	bikeBicyclesRepo := bikebicycles.NewRepository(db)
 	bikeWorkOrdersRepo := bikeworkorders.NewRepository(db)
 
 	vehiclesUC := vehicles.NewUsecases(vehiclesRepo, auditLog, cpClient)
 	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient, cpClient)
 	orchestrationUC := orchestration.NewUsecases(cpClient, workOrdersRepo, auditLog)
 
-	bikeBicyclesUC := bikebicycles.NewUsecases(bikeBicyclesRepo, auditLog, cpClient)
 	bikeWorkOrdersUC := bikeworkorders.NewUsecases(bikeWorkOrdersRepo, auditLog, cpClient)
 	bikeOrchestrationUC := bikeorchestration.NewUsecases(cpClient, bikeWorkOrdersRepo, auditLog)
 
@@ -78,7 +75,6 @@ func InitializeApp() *app.App {
 	workOrdersHandler := workorders.NewHandler(workOrdersUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
 
-	bikeBicyclesHandler := bikebicycles.NewHandler(bikeBicyclesUC)
 	bikeWorkOrdersHandler := bikeworkorders.NewHandler(bikeWorkOrdersUC)
 	bikeOrchestrationHandler := bikeorchestration.NewHandler(bikeOrchestrationUC)
 
@@ -115,7 +111,6 @@ func InitializeApp() *app.App {
 	orchestrationHandler.RegisterRoutes(autoRepairGroup)
 
 	bikeShopGroup := authGroup.Group("/bike-shop")
-	bikeBicyclesHandler.RegisterRoutes(bikeShopGroup)
 	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
 	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
 

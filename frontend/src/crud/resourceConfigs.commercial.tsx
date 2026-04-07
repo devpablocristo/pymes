@@ -359,6 +359,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   suppliers: {
     basePath: '/v1/suppliers',
     supportsArchived: true,
+    searchPlaceholder: 'Buscar...',
     label: 'proveedor',
     labelPlural: 'proveedores',
     labelPluralCap: 'Proveedores',
@@ -553,6 +554,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   services: {
     basePath: '/v1/services',
     supportsArchived: true,
+    searchPlaceholder: 'Buscar...',
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
@@ -678,6 +680,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
   priceLists: {
     basePath: '/v1/price-lists',
+    searchPlaceholder: 'Buscar...',
     label: 'lista de precios',
     labelPlural: 'listas de precios',
     labelPluralCap: 'Listas de precios',
@@ -745,6 +748,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   quotes: {
     basePath: '/v1/quotes',
     supportsArchived: true,
+    searchPlaceholder: 'Buscar...',
     label: 'presupuesto',
     labelPlural: 'presupuestos',
     labelPluralCap: 'Presupuestos',
@@ -836,6 +840,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     basePath: '/v1/sales',
     allowEdit: false,
     allowDelete: false,
+    searchPlaceholder: 'Buscar...',
     label: 'venta',
     labelPlural: 'ventas',
     labelPluralCap: 'Ventas',
@@ -981,6 +986,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   purchases: {
     basePath: '/v1/purchases',
     allowDelete: false,
+    searchPlaceholder: 'Buscar...',
     label: 'compra',
     labelPlural: 'compras',
     labelPluralCap: 'Compras',

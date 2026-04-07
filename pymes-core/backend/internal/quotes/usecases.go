@@ -18,6 +18,7 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error)
 	Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error)
@@ -71,6 +72,10 @@ type CreateQuoteInput struct {
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error) {
+	return u.repo.ListArchived(ctx, orgID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error) {

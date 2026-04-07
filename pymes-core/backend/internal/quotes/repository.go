@@ -242,6 +242,23 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 	return out, total, hasMore, next, nil
 }
 
+// ListArchived devuelve presupuestos con archivo lógico (misma convención que clientes/proveedores).
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error) {
+	var rows []models.QuoteModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Order("updated_at DESC").
+		Limit(200).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]quotedomain.Quote, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, quoteToDomain(row, nil))
+	}
+	return out, nil
+}
+
 func (r *Repository) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
 	var quoteRow models.QuoteModel
 	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, quoteID).Take(&quoteRow).Error; err != nil {

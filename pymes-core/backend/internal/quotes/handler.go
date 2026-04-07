@@ -23,6 +23,7 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error)
 	Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error)
@@ -46,6 +47,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	const quotesItemPath = quotesBasePath + "/:id"
 
 	auth.GET(quotesBasePath, rbac.RequirePermission("quotes", "read"), h.List)
+	auth.GET(quotesBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("quotes", "read"), h.ListArchived)
 	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
 	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
 	auth.PUT(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
@@ -111,6 +113,29 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	if next != nil {
 		resp.NextCursor = next.String()
+	}
+	for _, item := range items {
+		resp.Items = append(resp.Items, toQuoteResponse(item))
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	resp := dto.ListQuotesResponse{
+		Items:   make([]dto.QuoteResponse, 0, len(items)),
+		Total:   int64(len(items)),
+		HasMore: false,
 	}
 	for _, item := range items {
 		resp.Items = append(resp.Items, toQuoteResponse(item))

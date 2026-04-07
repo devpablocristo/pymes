@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	returndto "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/handler/dto"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
@@ -22,6 +23,7 @@ type usecasesPort interface {
 	ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error)
 	GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (returndomain.CreditNote, error)
 	ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error)
+	CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error)
 }
 
 type createReturnRequestItem struct {
@@ -51,6 +53,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/returns/:id", rbac.RequirePermission("returns", "read"), h.Get)
 	auth.POST("/returns/:id/void", rbac.RequirePermission("returns", "create"), h.Void)
 	auth.GET("/credit-notes", rbac.RequirePermission("returns", "read"), h.ListCreditNotes)
+	auth.POST("/credit-notes", rbac.RequirePermission("returns", "create"), h.CreateCreditNote)
 	auth.GET("/credit-notes/:id", rbac.RequirePermission("returns", "read"), h.GetCreditNote)
 	auth.GET("/parties/:id/credit-notes", rbac.RequirePermission("returns", "read"), h.ListPartyCreditNotes)
 	auth.POST("/sales/:id/apply-credit", rbac.RequirePermission("payments", "create"), h.ApplyCredit)
@@ -137,6 +140,35 @@ func (h *Handler) ListCreditNotes(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *Handler) CreateCreditNote(c *gin.Context) {
+	orgID, ok := parseOrg(c)
+	if !ok {
+		return
+	}
+	var req returndto.CreateCreditNoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	partyID, err := uuid.Parse(strings.TrimSpace(req.PartyID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
+		return
+	}
+	auth := handlers.GetAuthContext(c)
+	out, err := h.uc.CreateManualCreditNote(c.Request.Context(), CreateManualCreditNoteInput{
+		OrgID:   orgID,
+		PartyID: partyID,
+		Amount:  req.Amount,
+		Actor:   auth.Actor,
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, out)
 }
 
 func (h *Handler) GetCreditNote(c *gin.Context) {

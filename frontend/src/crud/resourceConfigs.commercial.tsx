@@ -1050,17 +1050,25 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
 };
 
-export const commercialCsvStrategies: Record<string, CSVToolbarOptions> = {
-  customers: { mode: 'server', entity: 'customers' },
-  suppliers: { mode: 'server', entity: 'suppliers' },
-  products: { mode: 'server', entity: 'products' },
-  services: { mode: 'server', entity: 'services' },
-};
+function commercialCsvToolbarOptions(resourceId: string): CSVToolbarOptions {
+  switch (resourceId) {
+    case 'customers':
+      return { mode: 'server', entity: 'customers' };
+    case 'suppliers':
+      return { mode: 'server', entity: 'suppliers' };
+    case 'products':
+      return { mode: 'server', entity: 'products' };
+    case 'services':
+      return { mode: 'server', entity: 'services' };
+    default:
+      return { mode: 'client' };
+  }
+}
 
 const resourceConfigs = Object.fromEntries(
   Object.entries(commercialResourceConfigs).map(([resourceId, config]) => [
     resourceId,
-    withCSVToolbar(resourceId, config, commercialCsvStrategies[resourceId]),
+    withCSVToolbar(resourceId, config, commercialCsvToolbarOptions(resourceId)),
   ]),
 ) as CrudResourceConfigMap;
 

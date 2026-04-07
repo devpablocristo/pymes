@@ -90,6 +90,15 @@ type ApplyCreditInput struct {
 	Actor        string
 }
 
+// CreateManualCreditNoteInput registra una nota de crédito sin devolución (party + monto).
+type CreateManualCreditNoteInput struct {
+	OrgID     uuid.UUID
+	PartyID   uuid.UUID
+	Amount    float64
+	Actor     string
+	ExpiresAt *time.Time
+}
+
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
@@ -208,7 +217,8 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
 				return err
 			}
-			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), OrgID: in.OrgID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: returnID, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
+			rid := returnID
+			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), OrgID: in.OrgID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: &rid, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
 			if err := tx.Create(&creditRow).Error; err != nil {
 				return err
 			}
@@ -410,8 +420,56 @@ func toReturnDomain(row returnmodels.ReturnModel, items []returnmodels.ReturnIte
 	return out
 }
 
+func creditNoteReturnID(row returnmodels.CreditNoteModel) uuid.UUID {
+	if row.ReturnID == nil {
+		return uuid.Nil
+	}
+	return *row.ReturnID
+}
+
 func toCreditDomain(row returnmodels.CreditNoteModel) returndomain.CreditNote {
-	return returndomain.CreditNote{ID: row.ID, OrgID: row.OrgID, Number: row.Number, PartyID: row.PartyID, ReturnID: row.ReturnID, Amount: row.Amount, UsedAmount: row.UsedAmount, Balance: row.Balance, ExpiresAt: row.ExpiresAt, Status: row.Status, CreatedAt: row.CreatedAt}
+	return returndomain.CreditNote{
+		ID: row.ID, OrgID: row.OrgID, Number: row.Number, PartyID: row.PartyID, ReturnID: creditNoteReturnID(row),
+		Amount: row.Amount, UsedAmount: row.UsedAmount, Balance: row.Balance, ExpiresAt: row.ExpiresAt, Status: row.Status, CreatedAt: row.CreatedAt,
+	}
+}
+
+func (r *Repository) CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error) {
+	if in.Amount <= 0 {
+		return returndomain.CreditNote{}, domainerr.Validation("amount must be positive")
+	}
+	var out returndomain.CreditNote
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var partyCount int64
+		if err := tx.Table("parties").Where("id = ? AND org_id = ?", in.PartyID, in.OrgID).Count(&partyCount).Error; err != nil {
+			return err
+		}
+		if partyCount == 0 {
+			return domainerr.NotFoundf("party", in.PartyID.String())
+		}
+		var settings tenantReturnSettingsRow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+			return err
+		}
+		noteID := uuid.New()
+		creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
+		if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+			return err
+		}
+		row := returnmodels.CreditNoteModel{
+			ID: noteID, OrgID: in.OrgID, Number: creditNumber, PartyID: in.PartyID, ReturnID: nil,
+			Amount: in.Amount, UsedAmount: 0, Balance: in.Amount, ExpiresAt: in.ExpiresAt, Status: "active", CreatedAt: time.Now().UTC(),
+		}
+		if err := tx.Create(&row).Error; err != nil {
+			return err
+		}
+		out = toCreditDomain(row)
+		return nil
+	})
+	if err != nil {
+		return returndomain.CreditNote{}, err
+	}
+	return out, nil
 }
 
 func paymentStatus(amountPaid, total float64) string {

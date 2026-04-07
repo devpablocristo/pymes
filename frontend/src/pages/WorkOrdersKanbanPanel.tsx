@@ -111,7 +111,6 @@ export function WorkOrdersKanbanPanel() {
       queryKey={['work-orders', 'kanban']}
       title="Órdenes de trabajo"
       listPath={listPath}
-      headerLeadSlot={<WorkOrdersHeaderLead boardPath={boardPath} listPath={listPath} />}
       renderExtraToolbar={renderExtraToolbar}
       renderDetailModal={({ orderId, onClose, onSaved, onRecordRemoved }) => (
         <WorkOrderKanbanDetailModal

@@ -1,10 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { WorkOrdersHeaderLead } from '../components/WorkOrdersHeaderLead';
 import { PageLayout } from '../components/PageLayout';
 import { WorkOrderEditor } from '../components/WorkOrderEditor';
 import { useI18n } from '../lib/i18n';
 
-const BOARD_PATH = '/modules/workOrders/board';
 const LIST_PATH = '/modules/workOrders/list';
 
 /**
@@ -37,7 +35,6 @@ export function WorkOrdersEditorPage() {
     <PageLayout
       className="wo-mod-orders"
       title={t('shell.workOrders.pageTitle')}
-      lead={<WorkOrdersHeaderLead boardPath={BOARD_PATH} listPath={LIST_PATH} editPattern="/modules/workOrders/edit/:orderId" />}
     >
       {content}
     </PageLayout>

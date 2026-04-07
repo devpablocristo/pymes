@@ -19,12 +19,6 @@ export function BikeShopWorkOrdersBoard() {
       queryKey={['bike-shop', 'work-orders', 'kanban']}
       title="Órdenes de trabajo (bicicletería)"
       listPath={LIST_PATH}
-      headerLeadSlot={
-        <WorkOrdersHeaderLead
-          boardPath={BOARD_PATH}
-          listPath={LIST_PATH}
-        />
-      }
     />
   );
 }

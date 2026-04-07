@@ -450,6 +450,39 @@ a.btn-success:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* Badges interactivos (filtro creador en listados CRUD) */
+button.crud-creator-badge {
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+
+button.crud-creator-badge:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+button.crud-creator-badge.crud-creator-badge--active {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.crud-creator-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 /* ── Toggle switch ── */
 .toggle {
   position: relative;

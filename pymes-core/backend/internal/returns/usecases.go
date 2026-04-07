@@ -21,6 +21,7 @@ type RepositoryPort interface {
 	ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error)
 	GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (returndomain.CreditNote, error)
 	ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error)
+	CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error)
 }
 
 type AuditPort interface {
@@ -113,6 +114,26 @@ func (u *Usecases) GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (retu
 			return returndomain.CreditNote{}, domainerr.NotFoundf("credit_note", id.String())
 		}
 		return returndomain.CreditNote{}, err
+	}
+	return out, nil
+}
+
+func (u *Usecases) CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error) {
+	if in.OrgID == uuid.Nil || in.PartyID == uuid.Nil {
+		return returndomain.CreditNote{}, domainerr.Validation("org_id and party_id are required")
+	}
+	out, err := u.repo.CreateManualCreditNote(ctx, in)
+	if err != nil {
+		return returndomain.CreditNote{}, translate(err, "credit_note", "")
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "credit_note.created_manual", "credit_note", out.ID.String(), map[string]any{"number": out.Number, "amount": out.Amount, "party_id": out.PartyID.String()})
+	}
+	if u.timeline != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", in.PartyID, "credit_note.created", "Nota de credito manual", out.Number, in.Actor, map[string]any{"credit_note_id": out.ID.String()})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "credit_note.created", map[string]any{"credit_note_id": out.ID.String(), "party_id": out.PartyID.String(), "amount": out.Amount})
 	}
 	return out, nil
 }

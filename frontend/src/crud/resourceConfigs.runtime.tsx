@@ -1,4 +1,5 @@
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
+import { mergeCanonicalCrudDefaults } from './crudCanonicalSurface';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
 type ResourceConfigMap = CrudResourceConfigMap;
@@ -15,7 +16,7 @@ export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: 
   if (!config) {
     return null;
   }
-  return config as CrudPageConfig<TRecord>;
+  return mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>);
 }
 
 export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {
@@ -26,8 +27,8 @@ export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {
     resourceId: string;
     mergeConfig?: Record<string, unknown>;
   }) {
-    const config = resourceConfigs[resourceId] as ResourceConfigMap[string] | undefined;
     const createdByMerge = useCrudListCreatedByMerge();
+    const config = getCrudPageConfigFromMap(resourceConfigs, resourceId);
     if (!config) {
       return (
         <div className="empty-state">

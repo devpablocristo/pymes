@@ -3,7 +3,7 @@
 .PHONY: \
 	up down ps logs \
 	staticcheck ruff lint \
-	seed modules-check cleanup-pablo e2e-review-notifications \
+	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
@@ -25,9 +25,13 @@ lint: staticcheck ruff
 
 # Seeds y utilidades
 
-# Seeds demo completos en Docker: delega a scripts especializados por parte.
+# Carga todos los seeds sin limpiar antes; asegura migraciones y luego siembra en orden.
 seed:
 	bash scripts/seed-all.sh
+
+# Elimina todos los datos seed reseteando las bases y recreando solo esquema.
+seed-clear:
+	bash scripts/seeds/clear-all.sh
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
 # Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`

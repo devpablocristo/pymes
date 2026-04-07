@@ -3,5 +3,4 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-bash "$ROOT_DIR/scripts/seed-core-demo.sh"
-bash "$ROOT_DIR/scripts/seed-workshops-demo.sh"
+bash "$ROOT_DIR/scripts/seeds/run-all.sh"

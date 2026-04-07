@@ -375,11 +375,14 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
   },
   accounts: {
     basePath: '/v1/accounts',
+    allowCreate: true,
     allowEdit: false,
     allowDelete: false,
     label: 'cuenta corriente',
     labelPlural: 'cuentas corrientes',
     labelPluralCap: 'Cuentas corrientes',
+    createLabel: '+ Nueva cuenta corriente',
+    searchPlaceholder: 'Buscar...',
     columns: [
       {
         key: 'entity_name',

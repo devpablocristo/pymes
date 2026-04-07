@@ -1,29 +1,28 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
-  createWorkOrder,
   createWorkOrderPaymentLink,
   createWorkOrderQuote,
   createWorkOrderSale,
   createWorkshopBooking,
   createWorkshopVehicle,
-  getAllWorkOrders,
-  getAutoRepairWorkOrdersArchived,
-  updateWorkOrder,
   updateWorkshopVehicle,
   workshopVehiclesArchivedCrud,
-  workshopWorkOrdersArchivedCrud,
 } from '../lib/autoRepairApi';
 import type { WorkOrder, WorkOrderItem, WorkshopVehicle } from '../lib/autoRepairTypes';
 import {
-  bikeWorkOrdersArchivedCrud,
+  archiveWorkOrder as archiveUnifiedWorkOrder,
+  createWorkOrder as createUnifiedWorkOrder,
+  getAllWorkOrders as getAllUnifiedWorkOrders,
+  getWorkOrdersArchived as getUnifiedWorkOrdersArchived,
+  hardDeleteWorkOrder as hardDeleteUnifiedWorkOrder,
+  restoreWorkOrder as restoreUnifiedWorkOrder,
+  updateWorkOrder as updateUnifiedWorkOrder,
+} from '../lib/workOrdersApi';
+import {
   createBikeQuote,
   createBikeSale,
   createBikePaymentLink,
-  createBikeWorkOrder,
-  getBikeWorkOrders,
-  getBikeWorkOrdersArchived,
-  updateBikeWorkOrder,
 } from '../lib/bikeShopApi';
 import type { BikeWorkOrder, BikeWorkOrderItem } from '../lib/bikeShopTypes';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
@@ -178,18 +177,19 @@ const resourceConfigs: CrudResourceConfigMap = {
     createLabel: '+ Nueva orden de trabajo',
     searchPlaceholder: 'Buscar...',
     dataSource: {
+      // Auto-repair pasa al endpoint unificado /v1/work-orders con target_type='vehicle'.
       list: async ({ archived }) => {
         if (archived) {
-          const data = await getAutoRepairWorkOrdersArchived();
-          return data.items ?? [];
+          return (await getUnifiedWorkOrdersArchived({ target_type: 'vehicle' })) as unknown as WorkOrder[];
         }
-        return getAllWorkOrders();
+        return (await getAllUnifiedWorkOrders({ target_type: 'vehicle' })) as unknown as WorkOrder[];
       },
       create: async (values) => {
-        await createWorkOrder({
+        await createUnifiedWorkOrder({
           number: asOptionalString(values.number),
-          vehicle_id: asString(values.vehicle_id),
-          vehicle_plate: asOptionalString(values.vehicle_plate),
+          target_type: 'vehicle',
+          target_id: asString(values.vehicle_id),
+          target_label: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           booking_id: asOptionalString(values.booking_id),
@@ -205,9 +205,9 @@ const resourceConfigs: CrudResourceConfigMap = {
         });
       },
       update: async (row: WorkOrder, values) => {
-        await updateWorkOrder(row.id, {
-          vehicle_id: asOptionalString(values.vehicle_id),
-          vehicle_plate: asOptionalString(values.vehicle_plate),
+        await updateUnifiedWorkOrder(row.id, {
+          target_id: asOptionalString(values.vehicle_id),
+          target_label: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           booking_id: asOptionalString(values.booking_id),
@@ -221,9 +221,9 @@ const resourceConfigs: CrudResourceConfigMap = {
           items: parseWorkOrderItems(values.items_json),
         });
       },
-      deleteItem: workshopWorkOrdersArchivedCrud.deleteItem,
-      restore: workshopWorkOrdersArchivedCrud.restore,
-      hardDelete: workshopWorkOrdersArchivedCrud.hardDelete,
+      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
+      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
+      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
     },
     columns: [
       {
@@ -338,7 +338,7 @@ const resourceConfigs: CrudResourceConfigMap = {
             },
           });
           if (booking.id) {
-            await updateWorkOrder(row.id, { booking_id: booking.id });
+            await updateUnifiedWorkOrder(row.id, { booking_id: booking.id });
           }
           await helpers.reload();
         },
@@ -421,17 +421,18 @@ const resourceConfigs: CrudResourceConfigMap = {
     createLabel: '+ Nueva orden',
     searchPlaceholder: 'Buscar...',
     dataSource: {
+      // Bike-shop pasa al endpoint unificado /v1/work-orders con target_type='bicycle'.
       list: async ({ archived }) => {
         if (archived) {
-          return getBikeWorkOrdersArchived();
+          return (await getUnifiedWorkOrdersArchived({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
         }
-        const data = await getBikeWorkOrders({ limit: 250 });
-        return data.items ?? [];
+        return (await getAllUnifiedWorkOrders({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
       },
       create: async (values) => {
-        await createBikeWorkOrder({
-          bicycle_id: asString(values.bicycle_id),
-          bicycle_label: asOptionalString(values.bicycle_label),
+        await createUnifiedWorkOrder({
+          target_type: 'bicycle',
+          target_id: asString(values.bicycle_id),
+          target_label: asOptionalString(values.bicycle_label),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           status: asOptionalString(values.status) ?? 'received',
@@ -446,9 +447,9 @@ const resourceConfigs: CrudResourceConfigMap = {
         });
       },
       update: async (row: BikeWorkOrder, values) => {
-        await updateBikeWorkOrder(row.id, {
-          bicycle_id: asOptionalString(values.bicycle_id),
-          bicycle_label: asOptionalString(values.bicycle_label),
+        await updateUnifiedWorkOrder(row.id, {
+          target_id: asOptionalString(values.bicycle_id),
+          target_label: asOptionalString(values.bicycle_label),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           status: asOptionalString(values.status),
@@ -461,9 +462,9 @@ const resourceConfigs: CrudResourceConfigMap = {
           items: parseBikeWorkOrderItems(values.items_json),
         });
       },
-      deleteItem: bikeWorkOrdersArchivedCrud.deleteItem,
-      restore: bikeWorkOrdersArchivedCrud.restore,
-      hardDelete: bikeWorkOrdersArchivedCrud.hardDelete,
+      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
+      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
+      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
     },
     columns: [
       {

@@ -306,3 +306,152 @@
   font-size: var(--text-sm);
 }
 
+/* ── Índice de operaciones (reportes, pasarela, etc.) ── */
+.module-ops-index-card {
+  margin-bottom: var(--space-5);
+}
+
+.module-ops-index-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.module-ops-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+a.module-ops-badge-link {
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: var(--font-weight-medium);
+}
+
+a.module-ops-badge-link:hover {
+  filter: brightness(1.08);
+}
+
+.module-ops-index-table-wrap {
+  overflow-x: auto;
+}
+
+.module-ops-index-table-wrap table {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.module-ops-index-table-wrap th,
+.module-ops-index-table-wrap td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.module-endpoint-anchor {
+  scroll-margin-top: var(--space-6);
+}
+
+/* ── Reportes: vista enriquecida ── */
+.report-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.report-result-period {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.report-kpi-grid {
+  margin-top: var(--space-1);
+}
+
+.report-kpi-card .report-kpi-value {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.report-highlight-card.report-inventory-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: linear-gradient(135deg, var(--color-primary-subtle) 0%, var(--color-surface) 100%);
+  border: 1px solid var(--color-border);
+}
+
+.report-inventory-total-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.report-table-wrap {
+  margin-top: var(--space-1);
+}
+
+table.report-data-table {
+  font-size: var(--text-sm);
+}
+
+.report-data-table th.report-col-num,
+.report-data-table td.report-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-data-table td.report-col-strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.report-data-table th.report-col-bar,
+.report-data-table td.report-col-bar {
+  width: 120px;
+  min-width: 100px;
+  vertical-align: middle;
+}
+
+.report-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.report-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent-indigo, var(--color-primary)));
+  min-width: 2px;
+  transition: width var(--transition);
+}
+
+.report-raw-json {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.report-raw-json summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.report-raw-json summary:hover {
+  color: var(--color-text);
+}
+
+.report-raw-json pre {
+  margin-top: var(--space-2);
+  max-height: 240px;
+  overflow: auto;
+  font-size: var(--text-2xs);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+

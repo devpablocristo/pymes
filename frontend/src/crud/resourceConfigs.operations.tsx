@@ -96,11 +96,16 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     label: 'devolución',
     labelPlural: 'devoluciones',
     labelPluralCap: 'Devoluciones',
-    allowCreate: false,
+    supportsArchived: false,
+    allowRestore: false,
+    allowHardDelete: false,
+    allowCreate: true,
+    createLabel: '+ Nueva devolución',
     allowEdit: false,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
-    emptyState: 'No hay devoluciones. Las altas se registran desde la venta (API POST /v1/sales/:id/return).',
+    emptyState:
+      'No hay devoluciones. Podés registrar una con «Nueva devolución» (venta, ítems en JSON) o desde la venta en la API.',
     columns: [
       {
         key: 'number',
@@ -121,11 +126,98 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       { key: 'refund_method', header: 'Medio', render: (_v, row: ReturnRow) => row.refund_method || '---' },
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
-    formFields: [],
+    formFields: [
+      {
+        key: 'sale_id',
+        label: 'ID de venta (UUID)',
+        required: true,
+        placeholder: 'UUID de la venta',
+      },
+      {
+        key: 'refund_method',
+        label: 'Medio de reembolso',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Efectivo / similar', value: 'cash' },
+          { label: 'Nota de crédito', value: 'credit_note' },
+          { label: 'Método original', value: 'original_method' },
+        ],
+      },
+      {
+        key: 'reason',
+        label: 'Motivo',
+        type: 'select',
+        options: [
+          { label: 'Defectuoso', value: 'defective' },
+          { label: 'Artículo incorrecto', value: 'wrong_item' },
+          { label: 'Arrepentimiento', value: 'changed_mind' },
+          { label: 'Otro', value: 'other' },
+        ],
+      },
+      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      {
+        key: 'items_json',
+        label: 'Ítems (JSON)',
+        type: 'textarea',
+        fullWidth: true,
+        required: true,
+        placeholder: '[{"sale_item_id":"<uuid>","quantity":1}]',
+      },
+    ],
+    dataSource: {
+      create: async (values) => {
+        const saleId = asString(values.sale_id).trim();
+        const refund_method = asString(values.refund_method).trim().toLowerCase();
+        const reason = asString(values.reason).trim().toLowerCase() || 'other';
+        const notes = asString(values.notes).trim();
+        const raw = asString(values.items_json).trim();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw) as unknown;
+        } catch {
+          throw new Error('El campo «Ítems» debe ser JSON válido.');
+        }
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          throw new Error('Ítems: se requiere un array con al menos un elemento.');
+        }
+        const items = parsed.map((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            throw new Error('Cada ítem debe ser un objeto con sale_item_id y quantity.');
+          }
+          const o = entry as Record<string, unknown>;
+          const sale_item_id = String(o.sale_item_id ?? '').trim();
+          const quantity = Number(o.quantity);
+          if (!sale_item_id || Number.isNaN(quantity) || quantity <= 0) {
+            throw new Error('Cada ítem necesita sale_item_id (UUID) y quantity > 0.');
+          }
+          return { sale_item_id, quantity };
+        });
+        await apiRequest(`/v1/sales/${saleId}/return`, {
+          method: 'POST',
+          body: {
+            refund_method,
+            reason,
+            notes: notes || undefined,
+            items,
+          },
+        });
+      },
+    },
     searchText: (row: ReturnRow) =>
       [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
-    toFormValues: () => ({}) as CrudFormValues,
-    isValid: () => true,
+    toFormValues: () =>
+      ({
+        sale_id: '',
+        refund_method: 'cash',
+        reason: 'other',
+        notes: '',
+        items_json: '[{"sale_item_id":"","quantity":1}]',
+      }) as CrudFormValues,
+    isValid: (values) =>
+      asString(values.sale_id).trim().length >= 32 &&
+      ['cash', 'credit_note', 'original_method'].includes(asString(values.refund_method).trim().toLowerCase()) &&
+      asString(values.items_json).trim().length >= 2,
     rowActions: [
       {
         id: 'void',
@@ -143,7 +235,11 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     label: 'nota de crédito',
     labelPlural: 'notas de crédito',
     labelPluralCap: 'Notas de crédito',
-    allowCreate: false,
+    supportsArchived: false,
+    allowRestore: false,
+    allowHardDelete: false,
+    allowCreate: true,
+    createLabel: '+ Nueva nota de crédito',
     allowEdit: false,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
@@ -163,20 +259,48 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       { key: 'balance', header: 'Saldo', render: (value) => String(value ?? '') },
       { key: 'amount', header: 'Monto', render: (value) => String(value ?? '') },
       { key: 'used_amount', header: 'Usado', render: (value) => String(value ?? '') },
-      { key: 'return_id', header: 'Devolución', render: (value) => String(value ?? '').slice(0, 8) + '…' },
+      {
+        key: 'return_id',
+        header: 'Devolución',
+        render: (value) => {
+          const v = String(value ?? '').trim().toLowerCase();
+          if (!v || v.startsWith('00000000-0000-0000-0000')) {
+            return '—';
+          }
+          return `${v.slice(0, 8)}…`;
+        },
+      },
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
-    formFields: [],
+    formFields: [
+      { key: 'party_id', label: 'ID de entidad / cliente (UUID party)', required: true, placeholder: 'UUID party_id' },
+      { key: 'amount', label: 'Monto', type: 'number', required: true, placeholder: '0.00' },
+    ],
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: CreditNoteRow[] | null }>('/v1/credit-notes');
         return parseListItemsFromResponse<CreditNoteRow>(data);
       },
+      create: async (values) => {
+        const party_id = asString(values.party_id).trim();
+        const amount = Number(asString(values.amount).trim());
+        await apiRequest('/v1/credit-notes', {
+          method: 'POST',
+          body: { party_id, amount },
+        });
+      },
     },
     searchText: (row: CreditNoteRow) =>
       [row.number, row.party_id, row.return_id, row.status, String(row.amount), String(row.balance)].join(' '),
-    toFormValues: () => ({}) as CrudFormValues,
-    isValid: () => true,
+    toFormValues: () =>
+      ({
+        party_id: '',
+        amount: '',
+      }) as CrudFormValues,
+    isValid: (values) =>
+      asString(values.party_id).trim().length >= 32 &&
+      Number.isFinite(Number(asString(values.amount).trim())) &&
+      Number(asString(values.amount).trim()) > 0,
   },
   cashflow: {
     basePath: '/v1/cashflow',
@@ -615,10 +739,18 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
 };
 
 const resourceConfigs = Object.fromEntries(
-  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => [
-    resourceId,
-    withCSVToolbar(resourceId, config, {}),
-  ]),
+  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => {
+    const csvOpts =
+      resourceId === 'creditNotes'
+        ? {
+            columns: [
+              { key: 'party_id', label: 'party_id (UUID)' },
+              { key: 'amount', label: 'amount' },
+            ],
+          }
+        : {};
+    return [resourceId, withCSVToolbar(resourceId, config, csvOpts)];
+  }),
 ) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);

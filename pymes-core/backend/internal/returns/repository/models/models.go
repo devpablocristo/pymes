@@ -43,7 +43,7 @@ type CreditNoteModel struct {
 	OrgID      uuid.UUID `gorm:"type:uuid;index;not null"`
 	Number     string    `gorm:"not null"`
 	PartyID    uuid.UUID `gorm:"column:party_id;type:uuid;not null"`
-	ReturnID   uuid.UUID `gorm:"type:uuid;not null"`
+	ReturnID   *uuid.UUID `gorm:"type:uuid"`
 	Amount     float64   `gorm:"type:numeric(15,2);not null"`
 	UsedAmount float64   `gorm:"type:numeric(15,2);not null"`
 	Balance    float64   `gorm:"type:numeric(15,2);not null"`

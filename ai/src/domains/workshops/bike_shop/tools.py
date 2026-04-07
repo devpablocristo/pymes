@@ -21,43 +21,6 @@ def build_internal_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _list_bicycles(org_id: str, search: str = "") -> dict[str, Any]:
-        _ = org_id
-        return await client.list_bicycles(auth, search=search)
-
-    declarations.append(
-        _tool(
-            "list_bicycles",
-            "Listar bicicletas de la bicicleteria por marca, modelo, cliente o texto libre",
-            {
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "Marca, modelo, cliente o texto libre"},
-                },
-            },
-        )
-    )
-    handlers["list_bicycles"] = _list_bicycles
-
-    async def _get_bicycle(org_id: str, bicycle_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await client.get_bicycle(auth, bicycle_id=bicycle_id)
-
-    declarations.append(
-        _tool(
-            "get_bicycle",
-            "Ver detalle de una bicicleta",
-            {
-                "type": "object",
-                "properties": {
-                    "bicycle_id": {"type": "string", "description": "UUID de la bicicleta"},
-                },
-                "required": ["bicycle_id"],
-            },
-        )
-    )
-    handlers["get_bicycle"] = _get_bicycle
-
     async def _list_work_orders(org_id: str, status: str = "", search: str = "") -> dict[str, Any]:
         _ = org_id
         return await client.list_work_orders(auth, status=status, search=search)

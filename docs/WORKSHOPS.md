@@ -29,16 +29,15 @@ Entry point:
 
 Recursos propios:
 
-- `GET/POST/PUT /v1/auto-repair/vehicles`
-- `GET/POST/PUT /v1/auto-repair/workshop-services`
-- `GET/POST/PUT /v1/auto-repair/work-orders`
+- `GET/POST/PUT /v1/auto-repair/vehicles` (vehículos: específico de auto_repair)
+- `GET/POST/PATCH/DELETE /v1/work-orders?target_type=vehicle` (módulo unificado: filtra por `target_type` para auto-repair vs bike-shop)
 
-Orquestacion:
+Orquestacion (módulo unificado, monta en `/v1`):
 
-- `POST /v1/auto-repair/workshop-appointments`
-- `POST /v1/auto-repair/work-orders/:id/quote`
-- `POST /v1/auto-repair/work-orders/:id/sale`
-- `POST /v1/auto-repair/work-orders/:id/payment-link`
+- `POST /v1/workshop-bookings`
+- `POST /v1/work-orders/:id/quote`
+- `POST /v1/work-orders/:id/sale`
+- `POST /v1/work-orders/:id/payment-link`
 
 Superficie publica:
 

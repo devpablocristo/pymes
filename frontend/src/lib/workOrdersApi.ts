@@ -1,11 +1,9 @@
 /**
  * Cliente unificado de work orders del backend de workshops.
  *
- * Apunta al endpoint nuevo /v1/work-orders con polimorfismo target_type.
- * Conviven con los clientes legacy autoRepairApi.ts y bikeShopApi.ts hasta
- * que las pantallas migren a este cliente (paso 6) y los legacy se borren (paso 7).
- *
- * Soporta filtrar por target_type ('vehicle' | 'bicycle' | etc.) en list/listArchived.
+ * Apunta al endpoint /v1/work-orders con polimorfismo target_type ('vehicle' | 'bicycle' | …).
+ * Es la única vía para CRUD/orquestación de OT; auto_repair/bike_shop solo conservan recursos
+ * propios (vehículos, etc.) en sus respectivos clientes.
  */
 import { createVerticalRequest } from './verticalApi';
 

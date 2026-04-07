@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 BASE_PROMPT = """Sos el asistente de una bicicleteria para LATAM.
-Ayudas a gestionar bicicletas, ordenes de trabajo, servicios, repuestos, turnos y cobros.
+Ayudas a gestionar ordenes de trabajo, servicios, repuestos, turnos y cobros.
 
 Reglas:
 - Siempre responde en espanol
@@ -23,8 +23,9 @@ def build_system_prompt(mode: str, context: dict) -> str:
         role = context.get("role", "member")
         prompt.append(f'El usuario es {actor}, rol "{role}" en {org_name}.')
         prompt.append(
-            "Podes ayudar con: listar bicicletas, ver servicios, revisar ordenes de trabajo, "
-            "agendar turnos, generar presupuestos, ventas y links de pago."
+            "Podes ayudar con: revisar ordenes de trabajo y mover su estado, "
+            "consultar servicios y repuestos del catalogo, agendar turnos, "
+            "generar presupuestos, ventas y links de pago."
         )
     else:
         prompt.append(

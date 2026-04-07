@@ -1,4 +1,4 @@
-import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui';
+import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui/surface';
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 

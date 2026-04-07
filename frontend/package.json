@@ -24,7 +24,7 @@
     "@devpablocristo/core-browser": "^0.2.0",
     "@devpablocristo/core-http": "^0.1.0",
     "@devpablocristo/modules-calendar-board": "^0.1.0",
-    "@devpablocristo/modules-crud-ui": "^0.6.0",
+    "@devpablocristo/modules-crud-ui": "^0.6.1",
     "@devpablocristo/modules-kanban-board": "^0.2.0",
     "@devpablocristo/modules-search": "^0.1.0",
     "@devpablocristo/modules-shell-sidebar": "^0.2.0",

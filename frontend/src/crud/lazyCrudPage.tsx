@@ -94,6 +94,10 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
       promise = import('./resourceConfigs');
       break;
   }
+  promise = promise.catch((err: unknown) => {
+    crudModulePromises.delete(group);
+    throw err;
+  });
   crudModulePromises.set(group, promise);
   return promise;
 }
@@ -128,27 +132,59 @@ export function LazyConfiguredCrudPage({
     mergeConfig?: Record<string, unknown>;
   }> | null>(null);
   const [WrapperPage, setWrapperPage] = useState<ComponentType | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const useWrapper = mergeConfig == null && RESOURCES_WITH_VIEW_MODES.has(resourceId);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     if (useWrapper && resourceId === 'products') {
-      void import('../components/ProductsCrudPage').then((mod) => {
-        if (!cancelled) setWrapperPage(() => mod.ProductsCrudPage);
-      });
+      void import('../components/ProductsCrudPage')
+        .then((mod) => {
+          if (!cancelled) setWrapperPage(() => mod.ProductsCrudPage);
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            setLoadError(err instanceof Error ? err.message : String(err));
+          }
+        });
       return () => {
         cancelled = true;
       };
     }
-    void loadCrudModule(resourceId).then((mod) => {
-      if (!cancelled) {
-        setConfiguredCrudPage(() => mod.ConfiguredCrudPage);
-      }
-    });
+    void loadCrudModule(resourceId)
+      .then((mod) => {
+        if (cancelled) return;
+        const C = mod.ConfiguredCrudPage;
+        if (C == null) {
+          setLoadError('El bundle del módulo no exporta ConfiguredCrudPage.');
+          return;
+        }
+        setConfiguredCrudPage(() => C);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : String(err));
+        }
+      });
     return () => {
       cancelled = true;
     };
   }, [resourceId, useWrapper]);
+
+  if (loadError != null) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo cargar la superficie CRUD.">
+        <div className="alert alert-error">
+          <p>{loadError}</p>
+          <p className="text-secondary text-sm">
+            Revisá la consola del navegador y que exista <code>pymes/modules/crud/ui/ts</code> o que{' '}
+            <code>@devpablocristo/modules-crud-ui</code> esté instalado en <code>node_modules</code>.
+          </p>
+        </div>
+      </PageLayout>
+    );
+  }
 
   if (useWrapper) {
     if (WrapperPage == null) {

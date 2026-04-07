@@ -20,7 +20,30 @@ function monorepoPackageDir(kind: 'core' | 'modules', ...segments: string[]): st
   if (fs.existsSync(nested)) {
     return nested;
   }
+  if (fs.existsSync(sibling)) {
+    return sibling;
+  }
   return sibling;
+}
+
+/**
+ * Igual que monorepoPackageDir pero si no hay checkout local, usa el paquete publicado en node_modules.
+ * Evita alias a rutas inexistentes cuando solo se usa npm (sin carpeta `pymes/modules`).
+ */
+function monorepoPackageDirOrNodeModule(
+  kind: 'core' | 'modules',
+  segments: string[],
+  nodeModulesSpecifier: string,
+): string {
+  const nested = path.join(pymesRepoRoot, kind, ...segments);
+  const sibling = path.join(pymesParentDir, kind, ...segments);
+  if (fs.existsSync(nested)) {
+    return nested;
+  }
+  if (fs.existsSync(sibling)) {
+    return sibling;
+  }
+  return fileURLToPath(new URL(nodeModulesSpecifier, import.meta.url));
 }
 
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
@@ -38,8 +61,21 @@ const coreBrowserStorage = monorepoPackageDir('core', 'browser/ts/src/storage.ts
 const coreBrowserTheme = monorepoPackageDir('core', 'browser/ts/src/theme.ts');
 const coreBrowserObservability = monorepoPackageDir('core', 'browser/ts/src/observability.ts');
 const coreBrowserI18n = monorepoPackageDir('core', 'browser/ts/src/i18n/index.ts');
-const modulesCrudUiIndex = monorepoPackageDir('modules', 'crud/ui/ts/src/index.ts');
-const modulesCrudUiCsv = monorepoPackageDir('modules', 'crud/ui/ts/src/csv.ts');
+const modulesCrudUiIndex = monorepoPackageDirOrNodeModule(
+  'modules',
+  ['crud/ui/ts/src/index.ts'],
+  './node_modules/@devpablocristo/modules-crud-ui/src/index.ts',
+);
+const modulesCrudUiCsv = monorepoPackageDirOrNodeModule(
+  'modules',
+  ['crud/ui/ts/src/csv.ts'],
+  './node_modules/@devpablocristo/modules-crud-ui/src/csv.ts',
+);
+const modulesCrudUiSurface = monorepoPackageDirOrNodeModule(
+  'modules',
+  ['crud/ui/ts/src/crudCanonicalSurface.tsx'],
+  './node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx',
+);
 const modulesCalendarBoardIndex = monorepoPackageDir('modules', 'calendar/board/ts/src/index.ts');
 const modulesCalendarBoardStyles = monorepoPackageDir('modules', 'calendar/board/ts/src/styles.css');
 const modulesKanbanBoardIndex = monorepoPackageDir('modules', 'kanban/board/ts/src/index.ts');
@@ -81,6 +117,7 @@ export default defineConfig({
       { find: '@devpablocristo/modules-calendar-board/styles.css', replacement: modulesCalendarBoardStyles },
       { find: '@devpablocristo/modules-calendar-board', replacement: modulesCalendarBoardIndex },
       { find: '@devpablocristo/modules-crud-ui/csv', replacement: modulesCrudUiCsv },
+      { find: '@devpablocristo/modules-crud-ui/surface', replacement: modulesCrudUiSurface },
       { find: '@devpablocristo/modules-crud-ui', replacement: modulesCrudUiIndex },
       { find: '@devpablocristo/modules-kanban-board', replacement: modulesKanbanBoardIndex },
       { find: /^@devpablocristo\/modules-scheduling\/styles\.next\.css$/, replacement: modulesSchedulingStylesNext },

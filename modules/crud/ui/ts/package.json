@@ -1,6 +1,6 @@
 {
   "name": "@devpablocristo/modules-crud-ui",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": false,
   "type": "module",
   "files": [
@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./csv": "./src/csv.ts",
-    "./csv-toolbar": "./src/csvToolbarMerge.ts"
+    "./csv-toolbar": "./src/csvToolbarMerge.ts",
+    "./surface": "./src/crudCanonicalSurface.tsx"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",

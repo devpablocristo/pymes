@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders/usecases/domain"
+	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
 
 type controlPlanePort interface {
@@ -20,7 +20,7 @@ type controlPlanePort interface {
 
 type workOrderPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
-	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error)
+	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error)
 }
 
 type auditPort interface {
@@ -57,7 +57,7 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 	}
 	payload := map[string]any{
 		"org_id":        orgID,
-		"customer_name": fallback(order.CustomerName, order.BicycleLabel),
+		"customer_name": fallback(order.CustomerName, order.TargetLabel),
 		"notes":         order.Notes,
 		"items":         toCommercialItems(order.Items),
 	}
@@ -69,10 +69,10 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 		return nil, err
 	}
 	if quoteID := parseResultID(result["id"]); quoteID != nil {
-		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, quoteID, nil, nil)
+		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, quoteID, nil, nil, actor)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID, actor, "bike_shop.work_order.quote_created", "bike_work_order", workOrderID.String(), map[string]any{"quote": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.quote_created", "work_order", workOrderID.String(), map[string]any{"quote": result})
 	}
 	return result, nil
 }
@@ -88,7 +88,7 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 	}
 	payload := map[string]any{
 		"org_id":         orgID,
-		"customer_name":  fallback(order.CustomerName, order.BicycleLabel),
+		"customer_name":  fallback(order.CustomerName, order.TargetLabel),
 		"payment_method": "transfer",
 		"notes":          order.Notes,
 		"items":          toCommercialItems(order.Items),
@@ -104,10 +104,10 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 	if parsed := parseResultID(result["id"]); parsed != nil {
 		saleID = parsed
 		status := "invoiced"
-		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, nil, saleID, &status)
+		_, _ = u.orders.SaveIntegrations(ctx, orgUUID, workOrderID, nil, saleID, &status, actor)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID, actor, "bike_shop.work_order.sale_created", "bike_work_order", workOrderID.String(), map[string]any{"sale": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.sale_created", "work_order", workOrderID.String(), map[string]any{"sale": result})
 	}
 	return result, nil
 }
@@ -137,7 +137,7 @@ func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, orgID str
 		return nil, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID, actor, "bike_shop.work_order.payment_link_created", "bike_work_order", workOrderID.String(), map[string]any{"payment_link": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.payment_link_created", "work_order", workOrderID.String(), map[string]any{"payment_link": result})
 	}
 	return result, nil
 }

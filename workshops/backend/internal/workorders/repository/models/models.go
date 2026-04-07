@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// WorkOrderModel mapea workshops.work_orders_v2 (tabla unificada con polimorfismo target_type/target_id).
+// WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
 type WorkOrderModel struct {
 	ID     uuid.UUID `gorm:"type:uuid;primaryKey"`
 	OrgID  uuid.UUID `gorm:"type:uuid;index;not null"`
@@ -47,9 +47,9 @@ type WorkOrderModel struct {
 	UpdatedAt  time.Time
 }
 
-func (WorkOrderModel) TableName() string { return "workshops.work_orders_v2" }
+func (WorkOrderModel) TableName() string { return "workshops.work_orders" }
 
-// WorkOrderItemModel mapea workshops.work_order_items_v2.
+// WorkOrderItemModel mapea workshops.work_order_items.
 type WorkOrderItemModel struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID       uuid.UUID  `gorm:"type:uuid;index;not null"`
@@ -67,4 +67,4 @@ type WorkOrderItemModel struct {
 	UpdatedAt   time.Time
 }
 
-func (WorkOrderItemModel) TableName() string { return "workshops.work_order_items_v2" }
+func (WorkOrderItemModel) TableName() string { return "workshops.work_order_items" }

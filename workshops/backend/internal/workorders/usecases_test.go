@@ -12,7 +12,7 @@ import (
 )
 
 // fakeRepo es un stub in-memory para tests del módulo base.
-// (En producción la implementación es GORM contra workshops.work_orders_v2.)
+// (En producción la implementación es GORM contra workshops.work_orders.)
 type fakeRepo struct {
 	store map[uuid.UUID]domain.WorkOrder
 }

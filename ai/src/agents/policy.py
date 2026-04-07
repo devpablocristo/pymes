@@ -42,6 +42,8 @@ INTERNAL_SALES_BASE_TOOLS = frozenset(
     {
         "search_customers",
         "search_products",
+        "search_services",
+        "get_service",
         "get_low_stock",
         "get_stock_level",
         "get_quotes",
@@ -85,6 +87,8 @@ ROLE_INTERNAL_SALES: dict[str, frozenset[str]] = {
         {
             "search_customers",
             "search_products",
+            "search_services",
+            "get_service",
             "get_low_stock",
             "get_stock_level",
             "get_quotes",
@@ -120,6 +124,8 @@ ROLE_INTERNAL_PROCUREMENT: dict[str, frozenset[str]] = {
 MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "search_customers": frozenset({"customers"}),
     "search_products": frozenset({"products"}),
+    "search_services": frozenset({"services"}),
+    "get_service": frozenset({"services"}),
     "get_low_stock": frozenset({"inventory", "products"}),
     "get_stock_level": frozenset({"inventory", "products"}),
     "get_quotes": frozenset({"quotes"}),

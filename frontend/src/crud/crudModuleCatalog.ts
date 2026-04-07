@@ -30,13 +30,9 @@ type CrudModuleId =
   | 'intakes'
   | 'sessions'
   | 'workshopVehicles'
-  | 'workshopServices'
   | 'workOrders'
-  | 'bikeBicycles'
-  | 'bikeShopServices'
   | 'bikeWorkOrders'
   | 'beautyStaff'
-  | 'beautySalonServices'
   | 'restaurantDiningAreas'
   | 'restaurantDiningTables';
 
@@ -87,29 +83,13 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   intakes: { title: 'Ingresos', navLabel: 'Ingresos', labelPlural: 'ingresos' },
   sessions: { title: 'Sesiones', navLabel: 'Sesiones', labelPlural: 'sesiones' },
   workshopVehicles: { title: 'Vehículos', navLabel: 'Vehículos', labelPlural: 'vehículos' },
-  workshopServices: {
-    title: 'Servicios de taller',
-    navLabel: 'Servicios taller',
-    labelPlural: 'servicios de taller',
-  },
   workOrders: { title: 'Órdenes de trabajo', navLabel: 'Órdenes trabajo', labelPlural: 'órdenes de trabajo' },
-  bikeBicycles: { title: 'Bicis en taller', navLabel: 'Bicis en taller', labelPlural: 'bicis en taller' },
-  bikeShopServices: {
-    title: 'Servicios de bicicletería',
-    navLabel: 'Servicios bici',
-    labelPlural: 'servicios de bicicletería',
-  },
   bikeWorkOrders: {
     title: 'Órdenes de bicicletería',
     navLabel: 'Órdenes bici',
     labelPlural: 'órdenes de bicicletería',
   },
   beautyStaff: { title: 'Equipo', navLabel: 'Equipo', labelPlural: 'equipo' },
-  beautySalonServices: {
-    title: 'Servicios de salón',
-    navLabel: 'Servicios salón',
-    labelPlural: 'servicios de salón',
-  },
   restaurantDiningAreas: {
     title: 'Zonas del salón',
     navLabel: 'Zonas salón',
@@ -347,16 +327,6 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'OT',
     summary:
       'Taller auto-repair: tablero por estado y lista administrativa en /modules/workOrders (selector Tablero / Lista).',
-  },
-  bikeBicycles: {
-    group: 'operations',
-    icon: 'BC',
-    summary: 'Catálogo de bicicletas del cliente con datos técnicos.',
-  },
-  bikeShopServices: {
-    group: 'operations',
-    icon: 'BS',
-    summary: 'Servicios de bicicletería (reparación, mantenimiento, ajustes).',
   },
   bikeWorkOrders: {
     group: 'operations',

@@ -22,7 +22,6 @@ var seedFiles = []struct {
 	name string
 }{
 	{"auto_repair_demo.sql", "auto_repair"},
-	{"bike_shop_demo.sql", "bike_shop"},
 }
 
 // Run idempotente (ON CONFLICT en el script). targetOrg debe coincidir con el tenant usado en seeds del core.

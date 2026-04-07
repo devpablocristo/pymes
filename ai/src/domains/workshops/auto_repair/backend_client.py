@@ -14,13 +14,6 @@ class AutoRepairBackendClient(HTTPBackendClient):
     async def get_vehicle(self, auth: AuthContext, vehicle_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/v1/auto-repair/vehicles/{vehicle_id}", auth=auth)
 
-    async def list_services(self, auth: AuthContext, search: str = "") -> dict[str, Any]:
-        params = {"search": search} if search else {}
-        return await self.request("GET", "/v1/auto-repair/workshop-services", auth=auth, params=params)
-
-    async def get_service(self, auth: AuthContext, service_id: str) -> dict[str, Any]:
-        return await self.request("GET", f"/v1/auto-repair/workshop-services/{service_id}", auth=auth)
-
     async def list_work_orders(self, auth: AuthContext, status: str = "", search: str = "") -> dict[str, Any]:
         params: dict[str, str] = {}
         if status:
@@ -52,10 +45,6 @@ class AutoRepairBackendClient(HTTPBackendClient):
 
     async def create_payment_link(self, auth: AuthContext, work_order_id: str) -> dict[str, Any]:
         return await self.request("POST", f"/v1/auto-repair/work-orders/{work_order_id}/payment-link", auth=auth)
-
-    async def get_public_services(self, org_slug: str, search: str = "") -> dict[str, Any]:
-        params = {"search": search} if search else {}
-        return await self.request("GET", f"/v1/public/{org_slug}/auto-repair/services", include_internal=True, params=params)
 
     async def public_book_scheduling(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
         return await self.request("POST", f"/v1/public/{org_slug}/auto-repair/bookings", include_internal=True, json=data)

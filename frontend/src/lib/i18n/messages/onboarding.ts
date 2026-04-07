@@ -35,17 +35,11 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.vertical.professionals': 'Profesionales / Docentes',
     'onboarding.vertical.professionalsDesc': 'Sesiones, alumnos y fichas',
     'onboarding.vertical.workshops': 'Talleres',
-    'onboarding.vertical.workshopsDesc': 'Vehículos, bicicletas, reparaciones',
+    'onboarding.vertical.workshopsDesc': 'Vehículos, órdenes de trabajo, reparaciones',
     'onboarding.vertical.beauty': 'Belleza / Salón',
     'onboarding.vertical.beautyDesc': 'Equipo, servicios y agenda',
     'onboarding.vertical.restaurants': 'Bares / Restaurantes',
     'onboarding.vertical.restaurantsDesc': 'Salón, mesas y sesiones',
-
-    // Sub-verticals
-    'onboarding.subVertical.workshops': 'Taller mecánico',
-    'onboarding.subVertical.workshopsDesc': 'Vehículos, órdenes y servicios',
-    'onboarding.subVertical.bike_shop': 'Bicicletería',
-    'onboarding.subVertical.bike_shopDesc': 'Bicicletas, reparaciones y servicios',
 
     // Step 2 — Tu actividad
     'onboarding.step2.title': 'Tu actividad',
@@ -145,16 +139,11 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.vertical.professionals': 'Professionals / Teachers',
     'onboarding.vertical.professionalsDesc': 'Sessions, students and files',
     'onboarding.vertical.workshops': 'Workshops',
-    'onboarding.vertical.workshopsDesc': 'Vehicles, bikes, repairs',
+    'onboarding.vertical.workshopsDesc': 'Vehicles, work orders, repairs',
     'onboarding.vertical.beauty': 'Beauty / Salon',
     'onboarding.vertical.beautyDesc': 'Team, services and bookings',
     'onboarding.vertical.restaurants': 'Bars / Restaurants',
     'onboarding.vertical.restaurantsDesc': 'Dining, tables and sessions',
-
-    'onboarding.subVertical.workshops': 'Auto repair shop',
-    'onboarding.subVertical.workshopsDesc': 'Vehicles, work orders and services',
-    'onboarding.subVertical.bike_shop': 'Bike shop',
-    'onboarding.subVertical.bike_shopDesc': 'Bikes, repairs and services',
 
     'onboarding.step2.title': 'Your activity',
     'onboarding.step2.sells': 'What do you offer?',

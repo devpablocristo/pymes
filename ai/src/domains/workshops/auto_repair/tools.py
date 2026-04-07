@@ -117,43 +117,6 @@ def build_internal_tools(
     )
     handlers["create_vehicle"] = _create_vehicle
 
-    async def _list_services(org_id: str, search: str = "") -> dict[str, Any]:
-        _ = org_id
-        return await client.list_services(auth, search=search)
-
-    declarations.append(
-        _tool(
-            "list_services",
-            "Listar servicios y reparaciones del taller",
-            {
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "Codigo, nombre o categoria"},
-                },
-            },
-        )
-    )
-    handlers["list_services"] = _list_services
-
-    async def _get_service(org_id: str, service_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await client.get_service(auth, service_id=service_id)
-
-    declarations.append(
-        _tool(
-            "get_service",
-            "Ver detalle de un servicio del taller",
-            {
-                "type": "object",
-                "properties": {
-                    "service_id": {"type": "string", "description": "UUID del servicio"},
-                },
-                "required": ["service_id"],
-            },
-        )
-    )
-    handlers["get_service"] = _get_service
-
     async def _list_work_orders(org_id: str, status: str = "", search: str = "") -> dict[str, Any]:
         _ = org_id
         return await client.list_work_orders(auth, status=status, search=search)
@@ -328,24 +291,6 @@ def build_external_tools(
 ) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
-
-    async def _get_public_services(org_id: str, search: str = "") -> dict[str, Any]:
-        _ = org_id
-        return await client.get_public_services(org_slug, search=search)
-
-    declarations.append(
-        _tool(
-            "get_public_services",
-            "Listar servicios publicos del taller",
-            {
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "Filtro por texto"},
-                },
-            },
-        )
-    )
-    handlers["get_public_services"] = _get_public_services
 
     async def _book_scheduling(
         org_id: str,

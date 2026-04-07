@@ -226,7 +226,7 @@ Los **mappers** viven en el adapter que los necesita:
 ### 6.1 Selección de vertical
 
 - Cada tenant elige **una sola vertical** (o ninguna) durante el onboarding.
-- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'bike_shop' | 'beauty' | 'restaurants'`).
+- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants'`).
 - El sidebar solo muestra la sección de la vertical elegida. Sin vertical = solo módulos comerciales/operaciones.
 - Las rutas de verticales no elegidas siguen existiendo (no se bloquean) pero no aparecen en la navegación.
 

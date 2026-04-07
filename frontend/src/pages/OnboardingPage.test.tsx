@@ -134,7 +134,6 @@ describe('OnboardingPage scheduling setup', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Taller mecánico/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
     fireEvent.click(screen.getByRole('button', { name: /^Ambos/i }));

@@ -22,6 +22,7 @@ from src.tools import (
     recurring,
     sales,
     scheduling,
+    services,
     settings,
 )
 
@@ -32,6 +33,8 @@ ROLE_TOOL_ACCESS: dict[str, str | list[str]] = {
     "seller": [
         "search_customers",
         "search_products",
+        "search_services",
+        "get_service",
         "get_bookings",
         "check_availability",
         "book_scheduling",
@@ -84,6 +87,8 @@ TOOL_MODULES: dict[str, set[str]] = {
     "get_top_customers": {"customers", "sales"},
     "search_customers": {"customers"},
     "search_products": {"products"},
+    "search_services": {"services"},
+    "get_service": {"services"},
     "get_low_stock": {"inventory", "products"},
     "get_stock_level": {"inventory", "products"},
     "get_cashflow_summary": {"cashflow"},
@@ -178,6 +183,14 @@ def build_internal_tools(
     async def _search_products(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
         _ = org_id
         return await products.search_products(client, auth, query=query, limit=limit)
+
+    async def _search_services(org_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
+        _ = org_id
+        return await services.search_services(client, auth, query=query, limit=limit)
+
+    async def _get_service(org_id: str, service_id: str) -> dict[str, Any]:
+        _ = org_id
+        return await services.get_service(client, auth, service_id=service_id)
 
     async def _get_low_stock(org_id: str) -> dict[str, Any]:
         _ = org_id
@@ -549,6 +562,40 @@ def build_internal_tools(
             },
         ),
         _search_products,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "search_services",
+            "Buscar servicios del catalogo",
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "texto a buscar (nombre, codigo o categoria)"},
+                    "limit": {"type": "integer", "description": "max 100"},
+                },
+            },
+        ),
+        _search_services,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "get_service",
+            "Detalle de un servicio del catalogo",
+            {
+                "type": "object",
+                "properties": {"service_id": {"type": "string", "description": "UUID del servicio"}},
+                "required": ["service_id"],
+            },
+        ),
+        _get_service,
     )
     _maybe_add(
         declarations,

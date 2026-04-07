@@ -1,6 +1,6 @@
 /**
  * Tablero Kanban genérico para órdenes de trabajo.
- * Reutilizable por cualquier vertical (auto-repair, bike-shop, etc.).
+ * Reutilizable por cualquier vertical (auto-repair, etc.).
  */
 import { useUser } from '@clerk/react';
 import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';

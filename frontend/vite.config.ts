@@ -1,7 +1,27 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+
+/** Repo pymes (directorio que contiene `frontend/`). */
+const pymesRepoRoot = fileURLToPath(new URL('..', import.meta.url));
+/** Directorio padre del repo (core/modules como hermanos de pymes — layout local típico). */
+const pymesParentDir = fileURLToPath(new URL('../..', import.meta.url));
+
+/**
+ * Resuelve `core/...` o `modules/...` desde layout anidado (`pymes/modules`) o hermano (`../modules`).
+ * CI puede clonar dentro del workspace; desarrollo local suele tener clones junto al repo.
+ */
+function monorepoPackageDir(kind: 'core' | 'modules', ...segments: string[]): string {
+  const nested = path.join(pymesRepoRoot, kind, ...segments);
+  const sibling = path.join(pymesParentDir, kind, ...segments);
+  if (fs.existsSync(nested)) {
+    return nested;
+  }
+  return sibling;
+}
 
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
 const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/daygrid', import.meta.url));
@@ -9,33 +29,33 @@ const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalen
 const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/react', import.meta.url));
 const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
 const tanstackReactQuery = fileURLToPath(new URL('./node_modules/@tanstack/react-query', import.meta.url));
-const coreBrowserIndex = fileURLToPath(new URL('../../core/browser/ts/src/index.ts', import.meta.url));
-const coreBrowserCrud = fileURLToPath(new URL('../../core/browser/ts/src/crud/index.ts', import.meta.url));
-const coreBrowserSearch = fileURLToPath(new URL('../../core/browser/ts/src/search/index.ts', import.meta.url));
-const coreAuthnErrors = fileURLToPath(new URL('../../core/authn/ts/src/errors.ts', import.meta.url));
-const coreFsmIndex = fileURLToPath(new URL('../../core/concurrency/fsm/ts/src/index.ts', import.meta.url));
-const coreBrowserStorage = fileURLToPath(new URL('../../core/browser/ts/src/storage.ts', import.meta.url));
-const coreBrowserTheme = fileURLToPath(new URL('../../core/browser/ts/src/theme.ts', import.meta.url));
-const coreBrowserObservability = fileURLToPath(new URL('../../core/browser/ts/src/observability.ts', import.meta.url));
-const coreBrowserI18n = fileURLToPath(new URL('../../core/browser/ts/src/i18n/index.ts', import.meta.url));
-const modulesCrudUiIndex = fileURLToPath(new URL('../../modules/crud/ui/ts/src/index.ts', import.meta.url));
-const modulesCrudUiCsv = fileURLToPath(new URL('../../modules/crud/ui/ts/src/csv.ts', import.meta.url));
-const modulesCalendarBoardIndex = fileURLToPath(new URL('../../modules/calendar/board/ts/src/index.ts', import.meta.url));
-const modulesCalendarBoardStyles = fileURLToPath(new URL('../../modules/calendar/board/ts/src/styles.css', import.meta.url));
-const modulesKanbanBoardIndex = fileURLToPath(new URL('../../modules/kanban/board/ts/src/index.ts', import.meta.url));
-const modulesSchedulingIndex = fileURLToPath(new URL('../../modules/scheduling/ts/src/index.ts', import.meta.url));
-const modulesSchedulingNext = fileURLToPath(new URL('../../modules/scheduling/ts/src/next.ts', import.meta.url));
-const modulesSchedulingStyles = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.css', import.meta.url));
-const modulesSchedulingStylesNext = fileURLToPath(new URL('../../modules/scheduling/ts/src/styles.next.css', import.meta.url));
-const modulesWorkOrdersIndex = fileURLToPath(new URL('../../modules/work-orders/ts/src/index.ts', import.meta.url));
-const modulesWorkOrdersStyles = fileURLToPath(new URL('../../modules/work-orders/ts/src/styles.css', import.meta.url));
-const modulesShellSidebarIndex = fileURLToPath(new URL('../../modules/sidebar/ts/src/index.ts', import.meta.url));
-const modulesShellSidebarStyles = fileURLToPath(new URL('../../modules/sidebar/ts/src/styles.css', import.meta.url));
-const modulesUiModalStyles = fileURLToPath(new URL('../../modules/ui/modal/ts/src/styles.css', import.meta.url));
-const modulesUiPageShellIndex = fileURLToPath(new URL('../../modules/ui/page-shell/ts/src/index.ts', import.meta.url));
-const modulesUiPageShellStyles = fileURLToPath(new URL('../../modules/ui/page-shell/ts/src/styles.css', import.meta.url));
-const modulesUiSectionHubIndex = fileURLToPath(new URL('../../modules/ui/section-hub/ts/src/index.tsx', import.meta.url));
-const modulesUiSectionHubStyles = fileURLToPath(new URL('../../modules/ui/section-hub/ts/src/styles.css', import.meta.url));
+const coreBrowserIndex = monorepoPackageDir('core', 'browser/ts/src/index.ts');
+const coreBrowserCrud = monorepoPackageDir('core', 'browser/ts/src/crud/index.ts');
+const coreBrowserSearch = monorepoPackageDir('core', 'browser/ts/src/search/index.ts');
+const coreAuthnErrors = monorepoPackageDir('core', 'authn/ts/src/errors.ts');
+const coreFsmIndex = monorepoPackageDir('core', 'concurrency/fsm/ts/src/index.ts');
+const coreBrowserStorage = monorepoPackageDir('core', 'browser/ts/src/storage.ts');
+const coreBrowserTheme = monorepoPackageDir('core', 'browser/ts/src/theme.ts');
+const coreBrowserObservability = monorepoPackageDir('core', 'browser/ts/src/observability.ts');
+const coreBrowserI18n = monorepoPackageDir('core', 'browser/ts/src/i18n/index.ts');
+const modulesCrudUiIndex = monorepoPackageDir('modules', 'crud/ui/ts/src/index.ts');
+const modulesCrudUiCsv = monorepoPackageDir('modules', 'crud/ui/ts/src/csv.ts');
+const modulesCalendarBoardIndex = monorepoPackageDir('modules', 'calendar/board/ts/src/index.ts');
+const modulesCalendarBoardStyles = monorepoPackageDir('modules', 'calendar/board/ts/src/styles.css');
+const modulesKanbanBoardIndex = monorepoPackageDir('modules', 'kanban/board/ts/src/index.ts');
+const modulesSchedulingIndex = monorepoPackageDir('modules', 'scheduling/ts/src/index.ts');
+const modulesSchedulingNext = monorepoPackageDir('modules', 'scheduling/ts/src/next.ts');
+const modulesSchedulingStyles = monorepoPackageDir('modules', 'scheduling/ts/src/styles.css');
+const modulesSchedulingStylesNext = monorepoPackageDir('modules', 'scheduling/ts/src/styles.next.css');
+const modulesWorkOrdersIndex = monorepoPackageDir('modules', 'work-orders/ts/src/index.ts');
+const modulesWorkOrdersStyles = monorepoPackageDir('modules', 'work-orders/ts/src/styles.css');
+const modulesShellSidebarIndex = monorepoPackageDir('modules', 'sidebar/ts/src/index.ts');
+const modulesShellSidebarStyles = monorepoPackageDir('modules', 'sidebar/ts/src/styles.css');
+const modulesUiModalStyles = monorepoPackageDir('modules', 'ui/modal/ts/src/styles.css');
+const modulesUiPageShellIndex = monorepoPackageDir('modules', 'ui/page-shell/ts/src/index.ts');
+const modulesUiPageShellStyles = monorepoPackageDir('modules', 'ui/page-shell/ts/src/styles.css');
+const modulesUiSectionHubIndex = monorepoPackageDir('modules', 'ui/section-hub/ts/src/index.tsx');
+const modulesUiSectionHubStyles = monorepoPackageDir('modules', 'ui/section-hub/ts/src/styles.css');
 
 export default defineConfig({
   envDir: '..',

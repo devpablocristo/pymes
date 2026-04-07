@@ -24,8 +24,6 @@
 - `frontend/src/pages/SessionsPage.tsx`
 - `frontend/src/pages/AutoRepairVehiclesPage.tsx`
 - `frontend/src/pages/AutoRepairServicesPage.tsx`
-- `frontend/src/pages/BikeShopBicyclesPage.tsx`
-- `frontend/src/pages/BikeShopServicesPage.tsx`
 - `frontend/src/pages/BeautyStaffPage.tsx`
 - `frontend/src/pages/BeautySalonServicesPage.tsx`
 - `frontend/src/pages/RestaurantDiningAreasPage.tsx`

@@ -22,6 +22,7 @@ from src.agents.catalog import (
     ROUTING_SOURCE_READ_FALLBACK,
     ROUTING_SOURCE_UI_HINT,
     SALES_DOMAIN_AGENT_NAME,
+    SERVICES_DOMAIN_AGENT_NAME,
     is_known_routed_agent,
     normalize_routed_agent,
 )
@@ -88,6 +89,7 @@ _AMBIGUOUS_ROUTE_OPTIONS: tuple[tuple[str, str], ...] = (
     (PURCHASES_DOMAIN_AGENT_NAME, "Compras"),
     (CUSTOMERS_DOMAIN_AGENT_NAME, "Clientes"),
     (PRODUCTS_DOMAIN_AGENT_NAME, "Productos"),
+    (SERVICES_DOMAIN_AGENT_NAME, "Servicios"),
 )
 
 _COLLECTIONS_DOMAIN_HINTS: tuple[str, ...] = (
@@ -109,6 +111,14 @@ _PRODUCT_DOMAIN_HINTS: tuple[str, ...] = (
     "inventario",
     "catálogo",
     "catalogo",
+)
+_SERVICE_DOMAIN_HINTS: tuple[str, ...] = (
+    "servicio",
+    "servicios",
+    "service",
+    "services",
+    "catalogo de servicios",
+    "catálogo de servicios",
 )
 _ANALYTICS_HINTS: tuple[str, ...] = (
     "como viene",
@@ -640,6 +650,33 @@ def _looks_like_product_domain_request(message: str) -> bool:
     return any(hint in text for hint in _PRODUCT_DOMAIN_HINTS)
 
 
+def _looks_like_service_domain_request(message: str) -> bool:
+    text = message.strip().lower()
+    return any(hint in text for hint in _SERVICE_DOMAIN_HINTS)
+
+
+def _looks_like_service_catalog_request(message: str, *, assume_domain_context: bool = False) -> bool:
+    text = message.strip().lower()
+    if not assume_domain_context and not any(hint in text for hint in _SERVICE_DOMAIN_HINTS):
+        return False
+    hints = (
+        "servicio",
+        "servicios",
+        "lista",
+        "listar",
+        "listame",
+        "cuales",
+        "cuáles",
+        "disponible",
+        "disponibles",
+        "mostrar",
+        "mostra",
+        "catalogo",
+        "catálogo",
+    )
+    return any(hint in text for hint in hints) or _looks_like_broad_information_request(text)
+
+
 def _looks_like_product_catalog_request(message: str, *, assume_domain_context: bool = False) -> bool:
     text = message.strip().lower()
     if not assume_domain_context and not any(hint in text for hint in _PRODUCT_DOMAIN_HINTS):
@@ -687,6 +724,8 @@ def _infer_internal_read_route(user_message: str) -> str | None:
         return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_product_catalog_request(user_message):
         return PRODUCTS_DOMAIN_AGENT_NAME
+    if _looks_like_service_catalog_request(user_message):
+        return SERVICES_DOMAIN_AGENT_NAME
     if _looks_like_customer_summary_request(user_message):
         return CUSTOMERS_DOMAIN_AGENT_NAME
     if _looks_like_sales_summary_request(user_message):
@@ -1196,6 +1235,7 @@ def _scope_label_for_agent(routed_agent: str) -> str:
     labels = {
         CUSTOMERS_DOMAIN_AGENT_NAME: "Clientes",
         PRODUCTS_DOMAIN_AGENT_NAME: "Productos",
+        SERVICES_DOMAIN_AGENT_NAME: "Servicios",
         SALES_DOMAIN_AGENT_NAME: "Ventas",
         COLLECTIONS_DOMAIN_AGENT_NAME: "Cobros",
         PURCHASES_DOMAIN_AGENT_NAME: "Compras",
@@ -1278,6 +1318,23 @@ async def _collect_internal_domain_snapshot(
                     summary=_summarize_product_search(result) or "No encontré productos disponibles con ese criterio.",
                     tool_calls=["search_products"],
                     blocks=_build_product_catalog_fallback_blocks(result),
+                    raw_result=result,
+                )
+
+    if routed_agent == SERVICES_DOMAIN_AGENT_NAME:
+        should_run = mode == "analysis" or _looks_like_service_catalog_request(user_message, assume_domain_context=True)
+        if should_run:
+            handler = agent.tool_handlers.get("search_services")
+            if handler is None:
+                return None
+            result = await handler(org_id=org_id, query="", limit=20)
+            if isinstance(result, dict):
+                return _InternalDomainSnapshot(
+                    routed_agent=routed_agent,
+                    scope="Servicios · Catálogo",
+                    summary="Catálogo de servicios disponibles.",
+                    tool_calls=["search_services"],
+                    blocks=[],
                     raw_result=result,
                 )
 
@@ -1423,6 +1480,8 @@ def _apply_internal_route_hint(*, routed_agent: str, user_message: str) -> str:
         return routed_agent
     if _looks_like_product_domain_request(user_message):
         return PRODUCTS_DOMAIN_AGENT_NAME
+    if _looks_like_service_domain_request(user_message):
+        return SERVICES_DOMAIN_AGENT_NAME
     if _looks_like_sales_summary_request(user_message):
         return SALES_DOMAIN_AGENT_NAME
     if _looks_like_collections_summary_request(user_message):
@@ -1448,6 +1507,7 @@ def _normalize_explicit_route_hint(route_hint: str | None) -> str | None:
 def _override_explicit_route_hint(*, explicit_route_hint: str, user_message: str) -> str | None:
     explicit_matchers: tuple[tuple[str, Any], ...] = (
         (PRODUCTS_DOMAIN_AGENT_NAME, _looks_like_product_domain_request),
+        (SERVICES_DOMAIN_AGENT_NAME, _looks_like_service_domain_request),
         (SALES_DOMAIN_AGENT_NAME, _looks_like_sales_domain_request),
         (COLLECTIONS_DOMAIN_AGENT_NAME, _looks_like_collections_domain_request),
         (CUSTOMERS_DOMAIN_AGENT_NAME, _looks_like_customer_domain_request),

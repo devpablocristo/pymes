@@ -24,9 +24,6 @@ from src.domains.professionals.teachers.public_router import router as teachers_
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 from src.domains.workshops.auto_repair.internal_router import router as auto_repair_chat_router
 from src.domains.workshops.auto_repair.public_router import router as auto_repair_public_router
-from src.domains.workshops.bike_shop.backend_client import BikeShopBackendClient
-from src.domains.workshops.bike_shop.internal_router import router as bike_shop_chat_router
-from src.domains.workshops.bike_shop.public_router import router as bike_shop_public_router
 from runtime.provider_factory import create_provider
 from runtime.auth import AuthMiddleware, AuthSettings, AuthContext
 from runtime.rate_limit import RateLimitMiddleware, RateLimitSettings
@@ -104,10 +101,6 @@ async def lifespan(app: FastAPI):
         base_url=settings.workshops_backend_url,
         internal_token=settings.internal_service_token,
     )
-    app.state.bike_shop_backend_client = BikeShopBackendClient(
-        base_url=settings.workshops_backend_url,
-        internal_token=settings.internal_service_token,
-    )
     app.state.llm_provider = create_provider(settings)
     # Nexus Review — gobernanza de acciones (opcional)
     if settings.review_enabled:
@@ -137,7 +130,6 @@ async def lifespan(app: FastAPI):
     await app.state.backend_client.close()
     await app.state.teachers_backend_client.close()
     await app.state.auto_repair_backend_client.close()
-    await app.state.bike_shop_backend_client.close()
     if app.state.review_client is not None:
         await app.state.review_client.close()
 
@@ -177,8 +169,6 @@ app.include_router(teachers_chat_router)
 app.include_router(teachers_public_router)
 app.include_router(auto_repair_chat_router)
 app.include_router(auto_repair_public_router)
-app.include_router(bike_shop_chat_router)
-app.include_router(bike_shop_public_router)
 app.include_router(review_callback_router)
 register_common_exception_handlers(app, logger)
 

@@ -16,24 +16,6 @@ export type AutoRepairVehicle = {
   updated_at: string;
 };
 
-export type AutoRepairService = {
-  id: string;
-  org_id: string;
-  code: string;
-  name: string;
-  description: string;
-  category: string;
-  estimated_hours: number;
-  base_price: number;
-  currency: string;
-  tax_rate: number;
-  linked_service_id?: string;
-  is_active: boolean;
-  archived_at?: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type AutoRepairWorkOrderItem = {
   id?: string;
   item_type: 'service' | 'part';
@@ -117,7 +99,6 @@ export type AutoRepairPaymentLink = {
 };
 
 export type WorkshopVehicle = AutoRepairVehicle;
-export type WorkshopService = AutoRepairService;
 export type WorkOrderItem = AutoRepairWorkOrderItem;
 export type WorkOrder = AutoRepairWorkOrder;
 export type WorkshopBooking = AutoRepairBooking;

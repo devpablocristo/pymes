@@ -25,7 +25,7 @@ func (f *fakeRepo) GetBusinessInfo(_ context.Context, _ uuid.UUID) (BusinessInfo
 	return f.businessInfo, nil
 }
 
-func (f *fakeRepo) ListPublicServices(_ context.Context, _ uuid.UUID, _ int) ([]PublicService, error) {
+func (f *fakeRepo) ListPublicServiceCatalog(_ context.Context, _ uuid.UUID, _, _, _ string, _ int) ([]PublicServiceCatalogItem, error) {
 	return nil, nil
 }
 

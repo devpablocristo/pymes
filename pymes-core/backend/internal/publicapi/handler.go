@@ -18,7 +18,7 @@ import (
 type repositoryPort interface {
 	ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error)
 	GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error)
-	ListPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, error)
+	ListPublicServiceCatalog(ctx context.Context, orgID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error)
 	GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error)
 	Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (BookingPublic, error)
 	ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]BookingPublic, error)
@@ -34,7 +34,7 @@ func NewHandler(repo repositoryPort) *Handler {
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/info", h.GetBusinessInfo)
-	group.GET("/services", h.GetPublicServices)
+	group.GET("/catalog/services", h.GetPublicServiceCatalog)
 	group.GET("/availability", h.GetAvailability)
 	group.POST("/book", h.BookScheduling)
 	group.GET("/my-bookings", h.GetMyBookings)
@@ -72,19 +72,26 @@ func (h *Handler) GetBusinessInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, info)
 }
 
-func (h *Handler) GetPublicServices(c *gin.Context) {
+// GetPublicServiceCatalog devuelve el catálogo rico desde public.services con filtros
+// opcionales por vertical/segment (almacenados en metadata jsonb).
+func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
 	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
-
-	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.repo.ListPublicServices(c.Request.Context(), orgID, limit)
+	limit := handlers.ParseLimitQuery(c, "limit", "100", pagination.Config{DefaultLimit: 100, MaxLimit: 200})
+	items, err := h.repo.ListPublicServiceCatalog(
+		c.Request.Context(),
+		orgID,
+		strings.TrimSpace(c.Query("vertical")),
+		strings.TrimSpace(c.Query("segment")),
+		strings.TrimSpace(c.Query("search")),
+		limit,
+	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch services"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch service catalog"})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 

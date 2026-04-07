@@ -1,39 +1,3 @@
-export type Bicycle = {
-  id: string;
-  org_id: string;
-  customer_id?: string;
-  customer_name: string;
-  frame_number: string;
-  make: string;
-  model: string;
-  bike_type: string;
-  size: string;
-  wheel_size_inches: number;
-  color: string;
-  ebike_notes: string;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type BikeShopService = {
-  id: string;
-  org_id: string;
-  code: string;
-  name: string;
-  description: string;
-  category: string;
-  estimated_hours: number;
-  base_price: number;
-  currency: string;
-  tax_rate: number;
-  linked_service_id?: string;
-  is_active: boolean;
-  archived_at?: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type BikeWorkOrderItem = {
   id?: string;
   item_type: 'service' | 'part';

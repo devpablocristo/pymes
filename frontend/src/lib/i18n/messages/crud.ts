@@ -19,6 +19,10 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.confirm.word': 'eliminar',
     'crud.confirm.placeholder': 'eliminar',
     'crud.loadMore': 'Cargar más',
+    'crud.viewMode.table': 'Tabla',
+    'crud.viewMode.gallery': 'Galería',
+    'crud.viewMode.gallery.empty': 'Sin productos para mostrar.',
+    'crud.viewMode.gallery.loading': 'Cargando productos...',
   },
   en: {
     'crud.title.archived': 'Archived {{labelPluralCap}}',
@@ -38,5 +42,9 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.confirm.word': 'delete',
     'crud.confirm.placeholder': 'delete',
     'crud.loadMore': 'Load more',
+    'crud.viewMode.table': 'Table',
+    'crud.viewMode.gallery': 'Gallery',
+    'crud.viewMode.gallery.empty': 'No products to display.',
+    'crud.viewMode.gallery.loading': 'Loading products...',
   },
 };

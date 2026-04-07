@@ -12,7 +12,7 @@ from runtime.domain.agent import AgentRegistry
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 
-from . import collections, customers, products, purchases, sales
+from . import collections, customers, products, purchases, sales, services
 
 
 def build_registry(client: BackendClient, auth: AuthContext) -> AgentRegistry:
@@ -20,6 +20,7 @@ def build_registry(client: BackendClient, auth: AuthContext) -> AgentRegistry:
     registry = AgentRegistry()
     registry.register(customers.build(client, auth))
     registry.register(products.build(client, auth))
+    registry.register(services.build(client, auth))
     registry.register(sales.build(client, auth))
     registry.register(collections.build(client, auth))
     registry.register(purchases.build(client, auth))

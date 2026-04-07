@@ -11,6 +11,7 @@ type ProductItem struct {
 	Currency    string         `json:"currency"`
 	CostPrice   float64        `json:"cost_price"`
 	TaxRate     *float64       `json:"tax_rate,omitempty"`
+	ImageURL    string         `json:"image_url"`
 	TrackStock  bool           `json:"track_stock"`
 	IsActive    bool           `json:"is_active"`
 	Tags        []string       `json:"tags"`
@@ -36,6 +37,7 @@ type CreateProductRequest struct {
 	Currency    string         `json:"currency"`
 	CostPrice   float64        `json:"cost_price"`
 	TaxRate     *float64       `json:"tax_rate"`
+	ImageURL    string         `json:"image_url"`
 	TrackStock  *bool          `json:"track_stock"`
 	IsActive    *bool          `json:"is_active"`
 	Tags        []string       `json:"tags"`
@@ -51,6 +53,7 @@ type UpdateProductRequest struct {
 	Currency    *string         `json:"currency"`
 	CostPrice   *float64        `json:"cost_price"`
 	TaxRate     *float64        `json:"tax_rate"`
+	ImageURL    *string         `json:"image_url"`
 	TrackStock  *bool           `json:"track_stock"`
 	IsActive    *bool           `json:"is_active"`
 	Tags        *[]string       `json:"tags"`

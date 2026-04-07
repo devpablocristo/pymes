@@ -50,6 +50,10 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
+	in.ImageURL = strings.TrimSpace(in.ImageURL)
+	if len(in.ImageURL) > 2048 {
+		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
+	}
 	if in.Unit == "" {
 		in.Unit = "unit"
 	}
@@ -81,6 +85,7 @@ type UpdateInput struct {
 	Currency    *string
 	CostPrice   *float64
 	TaxRate     *float64
+	ImageURL    *string
 	TrackStock  *bool
 	IsActive    *bool
 	Tags        *[]string
@@ -120,6 +125,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		v := *in.TaxRate
 		current.TaxRate = &v
 	}
+	if in.ImageURL != nil {
+		current.ImageURL = strings.TrimSpace(*in.ImageURL)
+	}
 	if in.TrackStock != nil {
 		current.TrackStock = *in.TrackStock
 	}
@@ -135,6 +143,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
+	}
+	if len(current.ImageURL) > 2048 {
+		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if strings.TrimSpace(current.Currency) == "" {
 		current.Currency = "ARS"

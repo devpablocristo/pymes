@@ -36,24 +36,12 @@ const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: st
 
 const SUB_VERTICAL_KEYS: Partial<
   Record<VerticalGroup, { value: VerticalType; labelKey: string; descKey: string }[]>
-> = {
-  workshops: [
-    {
-      value: 'workshops',
-      labelKey: 'onboarding.subVertical.workshops',
-      descKey: 'onboarding.subVertical.workshopsDesc',
-    },
-    {
-      value: 'bike_shop',
-      labelKey: 'onboarding.subVertical.bike_shop',
-      descKey: 'onboarding.subVertical.bike_shopDesc',
-    },
-  ],
-};
+> = {};
 
 const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   commercial: 'none',
   professionals: 'professionals',
+  workshops: 'workshops',
   beauty: 'beauty',
   restaurants: 'restaurants',
 };
@@ -61,8 +49,8 @@ const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
 const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
   none: 'onboarding.vertical.commercial',
   professionals: 'onboarding.vertical.professionals',
-  workshops: 'onboarding.subVertical.workshops',
-  bike_shop: 'onboarding.subVertical.bike_shop',
+  workshops: 'onboarding.vertical.workshops',
+  bike_shop: 'onboarding.vertical.bikeShop',
   beauty: 'onboarding.vertical.beauty',
   restaurants: 'onboarding.vertical.restaurants',
 };

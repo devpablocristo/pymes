@@ -2,7 +2,6 @@ package wire
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -10,13 +9,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/orchestration"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/public"
-	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/salonservices"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/salon/staff"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
@@ -45,16 +42,13 @@ func InitializeApp() *app.App {
 	auditLog := &logAudit{logger: logger}
 
 	staffRepo := staff.NewRepository(db)
-	salonServicesRepo := salonservices.NewRepository(db)
 
 	staffUC := staff.NewUsecases(staffRepo, auditLog)
-	salonServicesUC := salonservices.NewUsecases(salonServicesRepo, auditLog, cpClient)
 	orchestrationUC := orchestration.NewUsecases(cpClient)
 
 	staffHandler := staff.NewHandler(staffUC)
-	salonServicesHandler := salonservices.NewHandler(salonServicesUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
-	publicHandler := public.NewHandler(salonServicesUC, cpClient, &cpOrgResolver{client: cpClient})
+	publicHandler := public.NewHandler(cpClient, cpClient)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -82,26 +76,9 @@ func InitializeApp() *app.App {
 
 	beautyGroup := authGroup.Group("/beauty")
 	staffHandler.RegisterRoutes(beautyGroup)
-	salonServicesHandler.RegisterRoutes(beautyGroup)
 	orchestrationHandler.RegisterRoutes(beautyGroup)
 
 	return &app.App{Router: router}
-}
-
-type cpOrgResolver struct {
-	client *pymescore.Client
-}
-
-func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	orgIDStr, ok := result["org_id"].(string)
-	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
-	}
-	return uuid.Parse(orgIDStr)
 }
 
 func setupLogger() zerolog.Logger {

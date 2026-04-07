@@ -2,7 +2,6 @@ import { createVerticalRequest } from './verticalApi';
 import type {
   AutoRepairBooking,
   AutoRepairPaymentLink,
-  AutoRepairService,
   AutoRepairVehicle,
   AutoRepairWorkOrder,
 } from './autoRepairTypes';
@@ -66,10 +65,7 @@ export function workshopsArchivedCrudFragment(entityPath: string) {
 /** Vehículos: usar este fragmento en resourceConfigs para no duplicar rutas. */
 export const workshopVehiclesArchivedCrud = workshopsArchivedCrudFragment('/vehicles');
 
-/** Servicios de taller (auto-repair): archivo / restaurar / borrado duro, misma UX que clientes. */
-export const workshopServicesArchivedCrud = workshopsArchivedCrudFragment('/workshop-services');
-
-/** Órdenes de trabajo: mismas rutas de archivo que vehículos/servicios. */
+/** Órdenes de trabajo: mismas rutas de archivo que vehículos. */
 export const workshopWorkOrdersArchivedCrud = workshopsArchivedCrudFragment('/work-orders');
 
 export async function getAutoRepairWorkOrdersArchived(): Promise<{ items: AutoRepairWorkOrder[] }> {
@@ -127,43 +123,6 @@ export async function updateAutoRepairVehicle(
   }>,
 ): Promise<AutoRepairVehicle> {
   return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/${id}`, { method: 'PUT', body: data });
-}
-
-export async function getAutoRepairServices(): Promise<{ items: AutoRepairService[] }> {
-  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services`);
-}
-
-export async function createAutoRepairService(data: {
-  code: string;
-  name: string;
-  description?: string;
-  category?: string;
-  estimated_hours?: number;
-  base_price?: number;
-  currency?: string;
-  tax_rate?: number;
-  linked_service_id?: string;
-  is_active?: boolean;
-}): Promise<AutoRepairService> {
-  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services`, { method: 'POST', body: data });
-}
-
-export async function updateAutoRepairService(
-  id: string,
-  data: Partial<{
-    code: string;
-    name: string;
-    description: string;
-    category: string;
-    estimated_hours: number;
-    base_price: number;
-    currency: string;
-    tax_rate: number;
-    linked_service_id: string;
-    is_active: boolean;
-  }>,
-): Promise<AutoRepairService> {
-  return autoRepairRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/workshop-services/${id}`, { method: 'PUT', body: data });
 }
 
 export async function getAutoRepairWorkOrder(id: string): Promise<AutoRepairWorkOrder> {
@@ -317,9 +276,6 @@ export const updateWorkshopVehicle = updateAutoRepairVehicle;
 export const archiveWorkshopVehicle = archiveAutoRepairVehicle;
 export const restoreWorkshopVehicle = restoreAutoRepairVehicle;
 export const hardDeleteWorkshopVehicle = hardDeleteAutoRepairVehicle;
-export const getWorkshopServices = getAutoRepairServices;
-export const createWorkshopService = createAutoRepairService;
-export const updateWorkshopService = updateAutoRepairService;
 export const getWorkOrders = getAutoRepairWorkOrders;
 export const getAllWorkOrders = getAllAutoRepairWorkOrders;
 export const createWorkOrder = createAutoRepairWorkOrder;

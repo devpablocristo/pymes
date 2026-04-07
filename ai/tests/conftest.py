@@ -33,6 +33,9 @@ def _ensure_runtime_package_stub() -> None:
             "normalize_routing_source",
         ):
             setattr(runtime_pkg, attr, getattr(contracts_mod, attr))
+        completions_mod = importlib.import_module("runtime.completions")
+        for attr in ("LLMError", "build_llm_client", "validate_json_completion"):
+            setattr(runtime_pkg, attr, getattr(completions_mod, attr))
 
     if "runtime.logging" not in sys.modules:
         logging_mod = _t.ModuleType("runtime.logging")

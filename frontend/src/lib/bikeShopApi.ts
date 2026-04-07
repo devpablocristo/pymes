@@ -1,9 +1,7 @@
 import { createVerticalRequest } from './verticalApi';
 import type {
-  Bicycle,
   BikeShopBooking,
   BikeShopPaymentLink,
-  BikeShopService,
   BikeWorkOrder,
 } from './bikeShopTypes';
 
@@ -56,89 +54,7 @@ export function bikeShopArchivedCrudFragment(entityPath: string) {
   };
 }
 
-export const bikeBicyclesArchivedCrud = bikeShopArchivedCrudFragment('/bicycles');
-export const bikeServicesArchivedCrud = bikeShopArchivedCrudFragment('/workshop-services');
 export const bikeWorkOrdersArchivedCrud = bikeShopArchivedCrudFragment('/work-orders');
-
-// ── Bicicletas ──
-
-export async function getBicycles(): Promise<{ items: Bicycle[] }> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/bicycles`);
-}
-
-export async function createBicycle(data: {
-  customer_id?: string;
-  customer_name?: string;
-  frame_number: string;
-  make: string;
-  model: string;
-  bike_type?: string;
-  size?: string;
-  wheel_size_inches?: number;
-  color?: string;
-  ebike_notes?: string;
-  notes?: string;
-}): Promise<Bicycle> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/bicycles`, { method: 'POST', body: data });
-}
-
-export async function updateBicycle(
-  id: string,
-  data: Partial<{
-    customer_id: string;
-    customer_name: string;
-    frame_number: string;
-    make: string;
-    model: string;
-    bike_type: string;
-    size: string;
-    wheel_size_inches: number;
-    color: string;
-    ebike_notes: string;
-    notes: string;
-  }>,
-): Promise<Bicycle> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/bicycles/${id}`, { method: 'PUT', body: data });
-}
-
-// ── Servicios ──
-
-export async function getBikeShopServices(): Promise<{ items: BikeShopService[] }> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-services`);
-}
-
-export async function createBikeShopService(data: {
-  code: string;
-  name: string;
-  description?: string;
-  category?: string;
-  estimated_hours?: number;
-  base_price?: number;
-  currency?: string;
-  tax_rate?: number;
-  linked_service_id?: string;
-  is_active?: boolean;
-}): Promise<BikeShopService> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-services`, { method: 'POST', body: data });
-}
-
-export async function updateBikeShopService(
-  id: string,
-  data: Partial<{
-    code: string;
-    name: string;
-    description: string;
-    category: string;
-    estimated_hours: number;
-    base_price: number;
-    currency: string;
-    tax_rate: number;
-    linked_service_id: string;
-    is_active: boolean;
-  }>,
-): Promise<BikeShopService> {
-  return bikeShopRequest(`${BIKE_SHOP_PREFIX}/workshop-services/${id}`, { method: 'PUT', body: data });
-}
 
 // ── Órdenes de trabajo ──
 

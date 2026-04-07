@@ -111,12 +111,15 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      # vite.config.ts alias @devpablocristo/* → ../../core y ../../modules (padre del repo pymes).
-      - name: Clone core and modules for Vite resolve
-        run: |
-          PARENT="$(dirname "$GITHUB_WORKSPACE")"
-          git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/devpablocristo/core.git" "$PARENT/core"
-          git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/devpablocristo/modules.git" "$PARENT/modules"
+      # core/modules dentro del workspace: vite.config.ts los resuelve vía monorepoPackageDir (anidado o hermano).
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'

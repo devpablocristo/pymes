@@ -6,44 +6,28 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
-	svcdomain "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices/usecases/domain"
-	bikeservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
-	bikesvcdomain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices/usecases/domain"
+	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
 )
 
-type servicePort interface {
-	List(ctx context.Context, p workshopservices.ListParams) ([]svcdomain.Service, int64, bool, *uuid.UUID, error)
-}
-
-type bikeShopServicePort interface {
-	List(ctx context.Context, p bikeservices.ListParams) ([]bikesvcdomain.Service, int64, bool, *uuid.UUID, error)
+// coreServicesPort expone el catálogo público de servicios servido por pymes-core.
+type coreServicesPort interface {
+	ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }
 
 type bookingPort interface {
 	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
 }
 
-type orgResolver interface {
-	ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error)
-}
-
 type Handler struct {
-	services         servicePort
-	bikeShopServices bikeShopServicePort
-	bookings         bookingPort
-	orgs             orgResolver
+	coreServices coreServicesPort
+	bookings     bookingPort
 }
 
-func NewHandler(services servicePort, bikeShopServices bikeShopServicePort, bookings bookingPort, orgs orgResolver) *Handler {
+func NewHandler(coreServices coreServicesPort, bookings bookingPort) *Handler {
 	return &Handler{
-		services:         services,
-		bikeShopServices: bikeShopServices,
-		bookings:         bookings,
-		orgs:             orgs,
+		coreServices: coreServices,
+		bookings:     bookings,
 	}
 }
 
@@ -51,100 +35,72 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/public/:org_slug/auto-repair/services", h.ListServices)
 	group.POST("/public/:org_slug/auto-repair/bookings", h.BookScheduling)
 
-	group.GET("/public/:org_slug/bike-shop/services", h.ListBikeShopServices)
-	group.POST("/public/:org_slug/bike-shop/bookings", h.BookScheduling)
-
 	group.GET("/public/:org_slug/workshops/services", h.ListServices)
 	group.POST("/public/:org_slug/workshops/bookings", h.BookScheduling)
 }
 
-func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
+func (h *Handler) resolveOrgRef(c *gin.Context) (string, bool) {
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
-		return uuid.Nil, false
+		return "", false
 	}
-	if orgID, err := uuid.Parse(orgSlug); err == nil {
-		return orgID, true
+	return orgSlug, true
+}
+
+func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
+	orgRef, ok := h.resolveOrgRef(c)
+	if !ok {
+		return
 	}
-	if h.orgs == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org identifier"})
-		return uuid.Nil, false
+	if h.coreServices == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core services not configured"})
+		return
 	}
-	orgID, err := h.orgs.ResolveOrgID(c.Request.Context(), orgSlug)
+	items, err := h.coreServices.ListPublicServices(
+		c.Request.Context(),
+		orgRef,
+		"workshops",
+		segment,
+		strings.TrimSpace(c.Query("search")),
+	)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
-		return uuid.Nil, false
+		httperrors.Respond(c, err)
+		return
 	}
-	return orgID, true
+	publicItems := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		publicItems = append(publicItems, map[string]any{
+			"id":              item.ID,
+			"code":            item.Code,
+			"name":            item.Name,
+			"description":     item.Description,
+			"category":        item.CategoryCode,
+			"estimated_hours": estimatedHoursFromMetadata(item),
+			"base_price":      item.SalePrice,
+			"currency":        item.Currency,
+			"tax_rate":        item.TaxRate,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": publicItems})
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
-	orgID, ok := h.resolveOrgID(c)
-	if !ok {
-		return
-	}
-	items, _, _, _, err := h.services.List(c.Request.Context(), workshopservices.ListParams{
-		OrgID:  orgID,
-		Limit:  100,
-		Search: strings.TrimSpace(c.Query("search")),
-	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	publicItems := make([]map[string]any, 0, len(items))
-	for _, item := range items {
-		if !item.IsActive {
-			continue
-		}
-		publicItems = append(publicItems, map[string]any{
-			"id":              item.ID.String(),
-			"code":            item.Code,
-			"name":            item.Name,
-			"description":     item.Description,
-			"category":        item.Category,
-			"estimated_hours": item.EstimatedHours,
-			"base_price":      item.BasePrice,
-			"currency":        item.Currency,
-			"tax_rate":        item.TaxRate,
-		})
-	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	h.listSegmentServices(c, "auto_repair")
 }
 
-func (h *Handler) ListBikeShopServices(c *gin.Context) {
-	orgID, ok := h.resolveOrgID(c)
-	if !ok {
-		return
-	}
-	items, _, _, _, err := h.bikeShopServices.List(c.Request.Context(), bikeservices.ListParams{
-		OrgID:  orgID,
-		Limit:  100,
-		Search: strings.TrimSpace(c.Query("search")),
-	})
-	if err != nil {
-		httperrors.Respond(c, err)
-		return
-	}
-	publicItems := make([]map[string]any, 0, len(items))
-	for _, item := range items {
-		if !item.IsActive {
-			continue
+// estimatedHoursFromMetadata convierte metadata.estimated_hours (si existe) a float;
+// si no, deriva desde DefaultDurationMinutes / 60.
+func estimatedHoursFromMetadata(svc pymescore.CoreService) float64 {
+	if svc.Metadata != nil {
+		if v, ok := svc.Metadata["estimated_hours"].(float64); ok {
+			return v
 		}
-		publicItems = append(publicItems, map[string]any{
-			"id":              item.ID.String(),
-			"code":            item.Code,
-			"name":            item.Name,
-			"description":     item.Description,
-			"category":        item.Category,
-			"estimated_hours": item.EstimatedHours,
-			"base_price":      item.BasePrice,
-			"currency":        item.Currency,
-			"tax_rate":        item.TaxRate,
-		})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	if svc.DefaultDurationMinutes != nil && *svc.DefaultDurationMinutes > 0 {
+		return float64(*svc.DefaultDurationMinutes) / 60.0
+	}
+	return 0
 }
 
 func (h *Handler) BookScheduling(c *gin.Context) {
@@ -152,9 +108,8 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
 		return
 	}
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+	orgSlug, ok := h.resolveOrgRef(c)
+	if !ok {
 		return
 	}
 	var payload map[string]any

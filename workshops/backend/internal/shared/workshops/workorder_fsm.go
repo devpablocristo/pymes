@@ -1,4 +1,4 @@
-// Package workshops contiene primitivas compartidas entre auto_repair y bike_shop.
+// Package workshops contiene primitivas compartidas entre subdominios del vertical workshops.
 package workshops
 
 import (
@@ -12,7 +12,6 @@ import (
 )
 
 // WorkOrderFSM define las transiciones válidas para órdenes de trabajo.
-// Compartida entre auto_repair y bike_shop.
 // Los 9 estados operativos permiten transición libre (kanban); invoiced/cancelled son terminales.
 var WorkOrderFSM = fsm.NewBuilder().
 	Terminal("invoiced", "cancelled").

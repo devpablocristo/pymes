@@ -1,24 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CSSProperties } from 'react';
 import type { CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
-import {
-  createBeautySalonService,
-  createBeautyStaff,
-  getBeautySalonServices,
-  getBeautyStaff,
-  updateBeautySalonService,
-  updateBeautyStaff,
-} from '../lib/beautyApi';
-import type { BeautySalonService, BeautyStaffMember } from '../lib/beautyTypes';
+import { createBeautyStaff, getBeautyStaff, updateBeautyStaff } from '../lib/beautyApi';
+import type { BeautyStaffMember } from '../lib/beautyTypes';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
-import {
-  asBoolean,
-  asNumber,
-  asOptionalNumber,
-  asOptionalString,
-  asString,
-  formatDate,
-} from './resourceConfigs.shared';
+import { asBoolean, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
 
 const resourceConfigs: CrudResourceConfigMap = {
   beautyStaff: {
@@ -95,107 +81,6 @@ const resourceConfigs: CrudResourceConfigMap = {
       notes: row.notes ?? '',
     }),
     isValid: (values) => asString(values.display_name).trim().length >= 2,
-  },
-  beautySalonServices: {
-    label: 'servicio de salón',
-    labelPlural: 'servicios de salón',
-    labelPluralCap: 'Servicios de salón',
-    dataSource: {
-      list: async () => (await getBeautySalonServices()).items ?? [],
-      create: async (values) => {
-        await createBeautySalonService({
-          code: asString(values.code),
-          name: asString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          duration_minutes: asNumber(values.duration_minutes),
-          base_price: asNumber(values.base_price),
-          currency: asOptionalString(values.currency) ?? 'ARS',
-          tax_rate: asOptionalNumber(values.tax_rate) ?? 21,
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-      update: async (row: BeautySalonService, values) => {
-        await updateBeautySalonService(row.id, {
-          code: asOptionalString(values.code),
-          name: asOptionalString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          duration_minutes: asOptionalNumber(values.duration_minutes),
-          base_price: asOptionalNumber(values.base_price),
-          currency: asOptionalString(values.currency),
-          tax_rate: asOptionalNumber(values.tax_rate),
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Servicio',
-        className: 'cell-name',
-        render: (_value, row: BeautySalonService) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.code} · {row.category || 'General'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'duration_minutes', header: 'Min', render: (value) => `${Number(value ?? 0)} min` },
-      {
-        key: 'base_price',
-        header: 'Precio',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
-      },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
-        ),
-      },
-    ],
-    formFields: [
-      { key: 'code', label: 'Codigo', required: true, placeholder: 'CORTE-D' },
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'Corte dama' },
-      { key: 'category', label: 'Categoria', placeholder: 'Corte, color, tratamiento...' },
-      { key: 'duration_minutes', label: 'Duracion (min)', type: 'number', placeholder: '45' },
-      { key: 'base_price', label: 'Precio base', type: 'number', placeholder: '15000' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
-      { key: 'linked_service_id', label: 'Service ID vinculado', placeholder: 'UUID del servicio del core' },
-      { key: 'is_active', label: 'Activo', type: 'checkbox' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-    ],
-    rowActions: [
-      {
-        id: 'toggle-active',
-        label: 'Activar / pausar',
-        kind: 'secondary',
-        onClick: async (row: BeautySalonService) => {
-          await updateBeautySalonService(row.id, { is_active: !row.is_active });
-        },
-      },
-    ],
-    searchText: (row: BeautySalonService) =>
-      [row.code, row.name, row.category, row.description].filter(Boolean).join(' '),
-    toFormValues: (row: BeautySalonService) => ({
-      code: row.code ?? '',
-      name: row.name ?? '',
-      description: row.description ?? '',
-      category: row.category ?? '',
-      duration_minutes: String(row.duration_minutes ?? 30),
-      base_price: String(row.base_price ?? ''),
-      currency: row.currency ?? 'ARS',
-      tax_rate: String(row.tax_rate ?? 21),
-      linked_service_id: row.linked_service_id ?? '',
-      is_active: row.is_active ?? true,
-    }),
-    isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
   },
 };
 

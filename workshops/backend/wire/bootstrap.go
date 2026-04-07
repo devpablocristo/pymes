@@ -2,7 +2,6 @@ package wire
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -24,11 +22,9 @@ import (
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
 	bikebicycles "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles"
 	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
 	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
-	bikeshopservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
@@ -65,34 +61,28 @@ func InitializeApp() *app.App {
 	auditLog := &logAudit{logger: logger}
 
 	vehiclesRepo := vehicles.NewRepository(db)
-	servicesRepo := workshopservices.NewRepository(db)
 	workOrdersRepo := workorders.NewRepository(db)
 
 	bikeBicyclesRepo := bikebicycles.NewRepository(db)
-	bikeServicesRepo := bikeshopservices.NewRepository(db)
 	bikeWorkOrdersRepo := bikeworkorders.NewRepository(db)
 
 	vehiclesUC := vehicles.NewUsecases(vehiclesRepo, auditLog, cpClient)
-	servicesUC := workshopservices.NewUsecases(servicesRepo, auditLog, cpClient)
 	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient, cpClient)
 	orchestrationUC := orchestration.NewUsecases(cpClient, workOrdersRepo, auditLog)
 
 	bikeBicyclesUC := bikebicycles.NewUsecases(bikeBicyclesRepo, auditLog, cpClient)
-	bikeServicesUC := bikeshopservices.NewUsecases(bikeServicesRepo, auditLog, cpClient)
 	bikeWorkOrdersUC := bikeworkorders.NewUsecases(bikeWorkOrdersRepo, auditLog, cpClient)
 	bikeOrchestrationUC := bikeorchestration.NewUsecases(cpClient, bikeWorkOrdersRepo, auditLog)
 
 	vehiclesHandler := vehicles.NewHandler(vehiclesUC)
-	servicesHandler := workshopservices.NewHandler(servicesUC)
 	workOrdersHandler := workorders.NewHandler(workOrdersUC)
 	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
 
 	bikeBicyclesHandler := bikebicycles.NewHandler(bikeBicyclesUC)
-	bikeServicesHandler := bikeshopservices.NewHandler(bikeServicesUC)
 	bikeWorkOrdersHandler := bikeworkorders.NewHandler(bikeWorkOrdersUC)
 	bikeOrchestrationHandler := bikeorchestration.NewHandler(bikeOrchestrationUC)
 
-	publicHandler := public.NewHandler(servicesUC, bikeServicesUC, cpClient, &cpOrgResolver{client: cpClient})
+	publicHandler := public.NewHandler(cpClient, cpClient)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -121,33 +111,15 @@ func InitializeApp() *app.App {
 
 	autoRepairGroup := authGroup.Group("/auto-repair")
 	vehiclesHandler.RegisterRoutes(autoRepairGroup)
-	servicesHandler.RegisterRoutes(autoRepairGroup)
 	workOrdersHandler.RegisterRoutes(autoRepairGroup)
 	orchestrationHandler.RegisterRoutes(autoRepairGroup)
 
 	bikeShopGroup := authGroup.Group("/bike-shop")
 	bikeBicyclesHandler.RegisterRoutes(bikeShopGroup)
-	bikeServicesHandler.RegisterRoutes(bikeShopGroup)
 	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
 	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
 
 	return &app.App{Router: router}
-}
-
-type cpOrgResolver struct {
-	client *pymescore.Client
-}
-
-func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	orgIDStr, ok := result["org_id"].(string)
-	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
-	}
-	return uuid.Parse(orgIDStr)
 }
 
 func setupLogger() zerolog.Logger {

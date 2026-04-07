@@ -1,5 +1,5 @@
 import { createVerticalRequest } from './verticalApi';
-import type { BeautySalonService, BeautyStaffMember } from './beautyTypes';
+import type { BeautyStaffMember } from './beautyTypes';
 
 function translateBeautyError(message: string): string {
   const trimmed = message.trim();
@@ -47,40 +47,3 @@ export async function updateBeautyStaff(
   return beautyRequest(`/v1/beauty/staff/${id}`, { method: 'PUT', body: data });
 }
 
-export async function getBeautySalonServices(): Promise<{ items: BeautySalonService[] }> {
-  const res = await beautyRequest<{ items: BeautySalonService[]; total: number }>('/v1/beauty/salon-services');
-  return { items: res.items ?? [] };
-}
-
-export async function createBeautySalonService(data: {
-  code: string;
-  name: string;
-  description?: string;
-  category?: string;
-  duration_minutes?: number;
-  base_price?: number;
-  currency?: string;
-  tax_rate?: number;
-  linked_service_id?: string;
-  is_active?: boolean;
-}): Promise<BeautySalonService> {
-  return beautyRequest('/v1/beauty/salon-services', { method: 'POST', body: data });
-}
-
-export async function updateBeautySalonService(
-  id: string,
-  data: Partial<{
-    code: string;
-    name: string;
-    description: string;
-    category: string;
-    duration_minutes: number;
-    base_price: number;
-    currency: string;
-    tax_rate: number;
-    linked_service_id: string;
-    is_active: boolean;
-  }>,
-): Promise<BeautySalonService> {
-  return beautyRequest(`/v1/beauty/salon-services/${id}`, { method: 'PUT', body: data });
-}

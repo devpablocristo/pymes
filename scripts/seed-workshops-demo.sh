@@ -48,4 +48,3 @@ run_sql() {
 TARGET_ORG_UUID="$(resolve_target_org_uuid)"
 
 run_sql "workshops/backend/seeds/auto_repair_demo.sql"
-run_sql "workshops/backend/seeds/bike_shop_demo.sql"

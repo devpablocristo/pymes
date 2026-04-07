@@ -19,6 +19,7 @@ type ProductModel struct {
 	Currency    string   `gorm:"column:price_currency;not null"`
 	CostPrice   float64  `gorm:"type:numeric(15,2)"`
 	TaxRate     *float64 `gorm:"type:numeric(5,2)"`
+	ImageURL    string   `gorm:"column:image_url;not null;default:''"`
 	TrackStock  bool
 	IsActive    bool           `gorm:"column:is_active;not null"`
 	Tags        pq.StringArray `gorm:"type:text[]"`

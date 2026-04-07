@@ -111,7 +111,6 @@ var validVerticals = map[string]struct{}{
 	"none":          {},
 	"professionals": {},
 	"workshops":     {},
-	"bike_shop":     {},
 	"beauty":        {},
 	"restaurants":   {},
 }

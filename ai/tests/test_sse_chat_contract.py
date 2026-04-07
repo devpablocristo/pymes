@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from src.api import chat_stream
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.api.public_router import router as public_chat_router
+import src.api.quota as quota_module
 from src.api.router import router as internal_chat_router
 from src.agents.service_support import CommercialChatResult
 import src.api.public_router as public_router_module
@@ -74,21 +75,6 @@ class StubRepo:
     async def update_dossier(self, org_id: str, patch: dict[str, object]) -> dict[str, object]:
         self.update_calls.append({"org_id": org_id, "patch": patch})
         return patch
-
-
-def chunk(kind: str, *, text: str | None = None, tool_name: str | None = None):
-    tool_call = {"name": tool_name} if tool_name is not None else None
-    return SimpleNamespace(type=kind, text=text, tool_call=tool_call)
-
-
-def make_orchestrate(script):
-    async def fake_orchestrate(**_kwargs):
-        for item in script:
-            if isinstance(item, Exception):
-                raise item
-            yield item
-
-    return fake_orchestrate
 
 
 def parse_sse_events(body: str) -> list[tuple[str, dict[str, object]]]:
@@ -248,7 +234,7 @@ def test_internal_chat_bypasses_quota_when_plan_limits_are_disabled(monkeypatch)
         )
 
     monkeypatch.setattr(repo, "get_month_usage", fake_get_month_usage)
-    monkeypatch.setattr(router_module, "get_settings", lambda: SimpleNamespace(ai_enforce_plan_limits=False))
+    monkeypatch.setattr(quota_module, "get_settings", lambda: SimpleNamespace(ai_enforce_plan_limits=False))
     monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
 
     response = client.post("/v1/chat", json={"message": "hola"})
@@ -492,7 +478,12 @@ def test_public_chat_failure_does_not_persist_or_finish(monkeypatch) -> None:
     repo = StubRepo(plan_code="growth")
     client = create_public_client(repo, monkeypatch)
 
-    monkeypatch.setattr(chat_stream, "orchestrate", make_orchestrate([RuntimeError("boom")]))
+    async def fake_stream(**_kwargs):
+        from runtime.api.events import to_sse_event
+
+        yield to_sse_event("error", {"message": "error processing request"})
+
+    monkeypatch.setattr(chat_stream, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})
@@ -508,7 +499,30 @@ def test_public_chat_success_persists_and_finishes(monkeypatch) -> None:
     repo = StubRepo(plan_code="growth")
     client = create_public_client(repo, monkeypatch)
 
-    monkeypatch.setattr(chat_stream, "orchestrate", make_orchestrate([chunk("text", text="respuesta externa")]))
+    async def fake_stream(**kwargs):
+        from runtime.api.events import to_sse_event
+        from runtime.chat.stream import StreamChatResult
+        from runtime.text import estimate_tokens
+
+        llm_messages = kwargs["llm_messages"]
+        on_success = kwargs.get("on_success")
+        tokens_in = estimate_tokens("\n".join(m.content for m in llm_messages))
+        yield to_sse_event("text", {"content": "respuesta externa"})
+        reply_text = "respuesta externa"
+        tokens_out = estimate_tokens(reply_text)
+        result = StreamChatResult(
+            assistant_text=reply_text,
+            tool_calls=[],
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+        )
+        done_payload = await on_success(result) if on_success is not None else None
+        payload: dict[str, object] = {"tokens_used": result.tokens_used}
+        if done_payload:
+            payload.update(done_payload)
+        yield to_sse_event("done", payload)
+
+    monkeypatch.setattr(chat_stream, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})

@@ -582,7 +582,6 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
                       <option value="none">Solo comercial</option>
                       <option value="professionals">Profesionales</option>
                       <option value="workshops">Talleres</option>
-                      <option value="bike_shop">Bicicletería</option>
                       <option value="beauty">Belleza</option>
                       <option value="restaurants">Restaurantes</option>
                     </select>

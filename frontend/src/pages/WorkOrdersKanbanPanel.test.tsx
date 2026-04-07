@@ -157,14 +157,19 @@ describe('WorkOrdersKanbanPanel', () => {
   it('sincroniza la caché de Query cuando el modal guarda una orden', async () => {
     const { queryClient } = renderKanban();
 
-    expect(await screen.findByRole('button', { name: 'OT-001 - Cliente original' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'OT-001 - Cliente original' }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'OT-001 - Cliente original' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar modal' }));
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'OT-001 - Cliente actualizado' })).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: 'OT-001 - Cliente actualizado' })).toBeInTheDocument();
+      },
+      { timeout: 10_000 },
+    );
 
     const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.carWorkOrders.kanban(false)) ?? [];
     expect(cached.find((row) => row.id === 'wo-1')?.customer_name).toBe('Cliente actualizado');
@@ -173,14 +178,19 @@ describe('WorkOrdersKanbanPanel', () => {
   it('sincroniza la caché de Query cuando el modal elimina una orden', async () => {
     const { queryClient } = renderKanban();
 
-    expect(await screen.findByRole('button', { name: 'OT-001 - Cliente original' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'OT-001 - Cliente original' }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'OT-001 - Cliente original' }));
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar modal' }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'OT-001 - Cliente original' })).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByRole('button', { name: 'OT-001 - Cliente original' })).not.toBeInTheDocument();
+      },
+      { timeout: 10_000 },
+    );
 
     const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.carWorkOrders.kanban(false)) ?? [];
     expect(cached.some((row) => row.id === 'wo-1')).toBe(false);

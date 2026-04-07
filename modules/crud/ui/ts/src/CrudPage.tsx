@@ -392,16 +392,17 @@ export function CrudPage<T extends { id: string }>(props: CrudPageProps<T>): Rea
           ? str.statusLoading
           : `${filtered.length} ${filtered.length === 1 ? label : labelPlural}`
       }
-      headerBeforeTitleSlot={
-        listHeaderSlotPlacement === "aboveTitle" && listHeaderInlineSlot != null ? (
-          <div className="crud-list-header-lead crud-list-header-lead--above-title">
+      headerLeadSlot={
+        listHeaderInlineSlot != null ? (
+          <div
+            className={
+              listHeaderSlotPlacement === "aboveTitle"
+                ? "crud-list-header-lead crud-list-header-lead--above-title"
+                : "crud-list-header-lead"
+            }
+          >
             {listHeaderInlineSlot({ items })}
           </div>
-        ) : undefined
-      }
-      headerLeadSlot={
-        listHeaderSlotPlacement !== "aboveTitle" && listHeaderInlineSlot != null ? (
-          <div className="crud-list-header-lead">{listHeaderInlineSlot({ items })}</div>
         ) : undefined
       }
       search={externalSearch == null ? {

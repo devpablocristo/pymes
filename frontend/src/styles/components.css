@@ -48,6 +48,25 @@
   min-width: 0;
 }
 
+/* Slot encima del título sin API nueva en CrudPageShell (solo flex order + :has). */
+.page-header.crud-page-shell__header
+  .crud-page-shell__header-main:has(.crud-list-header-lead--above-title)
+  > .crud-list-header-lead--above-title {
+  order: 1;
+}
+
+.page-header.crud-page-shell__header
+  .crud-page-shell__header-main:has(.crud-list-header-lead--above-title)
+  > h1.crud-page-shell__title {
+  order: 2;
+}
+
+.page-header.crud-page-shell__header
+  .crud-page-shell__header-main:has(.crud-list-header-lead--above-title)
+  > p.text-secondary {
+  order: 3;
+}
+
 /* Columna derecha: búsqueda arriba, botones debajo (paridad con toolbar Kanban). */
 .page-header.crud-page-shell__header .crud-page-shell__header-actions {
   display: flex;

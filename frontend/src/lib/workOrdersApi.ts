@@ -195,6 +195,11 @@ export async function createWorkOrder(data: CreateWorkOrderInput): Promise<WorkO
 export type UpdateWorkOrderInput = Partial<{
   target_id: string;
   target_label: string;
+  // Aliases legacy aceptados por el backend (mapean a target_id/target_label).
+  vehicle_id: string;
+  vehicle_plate: string;
+  bicycle_id: string;
+  bicycle_label: string;
   customer_id: string;
   customer_name: string;
   booking_id: string;
@@ -240,6 +245,35 @@ export async function hardDeleteWorkOrder(id: string): Promise<void> {
  *
  * Uso: workOrdersArchivedCrud('vehicle') / workOrdersArchivedCrud('bicycle').
  */
+// ── Orquestación (booking → quote → sale → payment-link) ──────────────────
+
+export type WorkOrderPaymentLink = {
+  id?: string;
+  url?: string;
+  [key: string]: unknown;
+};
+
+export async function createWorkshopBooking(
+  data: Record<string, unknown>,
+): Promise<{ id: string; [key: string]: unknown }> {
+  return workOrdersRequest('/v1/workshop-bookings', { method: 'POST', body: data });
+}
+
+export async function createWorkOrderQuote(workOrderId: string): Promise<{ id: string }> {
+  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/quote`, { method: 'POST', body: {} });
+}
+
+export async function createWorkOrderSale(workOrderId: string): Promise<{ id: string }> {
+  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/sale`, { method: 'POST', body: {} });
+}
+
+export async function createWorkOrderPaymentLink(workOrderId: string): Promise<WorkOrderPaymentLink> {
+  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/payment-link`, {
+    method: 'POST',
+    body: {},
+  });
+}
+
 export function workOrdersArchivedCrud(targetType: WorkOrderTargetType) {
   return {
     list: async <T>(params?: { archived?: boolean }): Promise<T[]> => {

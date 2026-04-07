@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
-import type { BikeWorkOrder } from '../lib/bikeShopTypes';
+import type { WorkOrder as BikeWorkOrder } from '../lib/workOrdersApi';
 
 const LIST_PATH = '/workshops/bike-shop/orders/list';
 

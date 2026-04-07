@@ -7,11 +7,11 @@ import { WorkOrdersHeaderLead } from '../components/WorkOrdersHeaderLead';
 import { WorkOrderKanbanDetailModal } from '../components/WorkOrderKanbanDetailModal';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
 import {
-  getAllAutoRepairWorkOrders,
-  getAutoRepairWorkOrdersArchived,
-  patchAutoRepairWorkOrder,
-} from '../lib/autoRepairApi';
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+  getAllWorkOrders,
+  getWorkOrdersArchived,
+  patchWorkOrder,
+  type WorkOrder as AutoRepairWorkOrder,
+} from '../lib/workOrdersApi';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import './WorkOrdersKanbanPanel.css';
@@ -40,7 +40,7 @@ type AutoRepairKanbanWorkOrder = AutoRepairWorkOrder & GenericWorkOrder;
 function toGenericWorkOrder(row: AutoRepairWorkOrder): AutoRepairKanbanWorkOrder {
   return {
     ...row,
-    asset_label: row.vehicle_plate,
+    asset_label: row.vehicle_plate ?? row.target_label,
   };
 }
 
@@ -105,9 +105,9 @@ export function WorkOrdersKanbanPanel() {
 
   return (
     <GenericWorkOrdersBoard<AutoRepairKanbanWorkOrder>
-      listAll={async () => (await getAllAutoRepairWorkOrders()).map(toGenericWorkOrder)}
-      listArchived={async () => ((await getAutoRepairWorkOrdersArchived()).items ?? []).map(toGenericWorkOrder)}
-      patchStatus={async (id, status) => toGenericWorkOrder(await patchAutoRepairWorkOrder(id, { status }))}
+      listAll={async () => (await getAllWorkOrders({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
+      listArchived={async () => (await getWorkOrdersArchived({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
+      patchStatus={async (id, status) => toGenericWorkOrder(await patchWorkOrder(id, { status }))}
       queryKey={['work-orders', 'kanban']}
       title="Órdenes de trabajo"
       listPath={listPath}

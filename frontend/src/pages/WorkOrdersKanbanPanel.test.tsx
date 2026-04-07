@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageSearchProvider } from '../components/PageSearch';
 import { LanguageProvider } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
 import { WorkOrdersKanbanPanel } from './WorkOrdersKanbanPanel';
 
 const apiMocks = vi.hoisted(() => ({
-  getAllAutoRepairWorkOrders: vi.fn<[], Promise<AutoRepairWorkOrder[]>>(),
-  getAutoRepairWorkOrdersArchived: vi.fn<[], Promise<{ items: AutoRepairWorkOrder[] }>>(),
-  patchAutoRepairWorkOrder: vi.fn(),
+  getAllWorkOrders: vi.fn<[], Promise<AutoRepairWorkOrder[]>>(),
+  getWorkOrdersArchived: vi.fn<[], Promise<AutoRepairWorkOrder[]>>(),
+  patchWorkOrder: vi.fn(),
   loadLazyCrudPageConfig: vi.fn(),
 }));
 
@@ -24,10 +24,10 @@ vi.mock('../lib/auth', () => ({
   clerkEnabled: false,
 }));
 
-vi.mock('../lib/autoRepairApi', () => ({
-  getAllAutoRepairWorkOrders: () => apiMocks.getAllAutoRepairWorkOrders(),
-  getAutoRepairWorkOrdersArchived: () => apiMocks.getAutoRepairWorkOrdersArchived(),
-  patchAutoRepairWorkOrder: (...args: unknown[]) => apiMocks.patchAutoRepairWorkOrder(...args),
+vi.mock('../lib/workOrdersApi', () => ({
+  getAllWorkOrders: () => apiMocks.getAllWorkOrders(),
+  getWorkOrdersArchived: () => apiMocks.getWorkOrdersArchived(),
+  patchWorkOrder: (...args: unknown[]) => apiMocks.patchWorkOrder(...args),
 }));
 
 vi.mock('../crud/lazyCrudPage', () => ({
@@ -78,6 +78,10 @@ function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWor
     id: 'wo-1',
     org_id: 'org-1',
     number: 'OT-001',
+    target_type: 'vehicle',
+    target_id: 'veh-1',
+    target_label: 'AAA111',
+    metadata: {},
     vehicle_id: 'veh-1',
     vehicle_plate: 'AAA111',
     customer_id: 'cust-1',
@@ -132,16 +136,16 @@ function renderKanban() {
 
 describe('WorkOrdersKanbanPanel', () => {
   beforeEach(() => {
-    apiMocks.getAllAutoRepairWorkOrders.mockReset();
-    apiMocks.getAutoRepairWorkOrdersArchived.mockReset();
-    apiMocks.patchAutoRepairWorkOrder.mockReset();
+    apiMocks.getAllWorkOrders.mockReset();
+    apiMocks.getWorkOrdersArchived.mockReset();
+    apiMocks.patchWorkOrder.mockReset();
     apiMocks.loadLazyCrudPageConfig.mockReset();
 
-    apiMocks.getAllAutoRepairWorkOrders.mockResolvedValue([
+    apiMocks.getAllWorkOrders.mockResolvedValue([
       buildWorkOrder(),
       buildWorkOrder({ id: 'wo-2', number: 'OT-002', customer_name: 'Cliente secundario' }),
     ]);
-    apiMocks.getAutoRepairWorkOrdersArchived.mockResolvedValue({ items: [] });
+    apiMocks.getWorkOrdersArchived.mockResolvedValue([]);
     apiMocks.loadLazyCrudPageConfig.mockResolvedValue({
       toolbarActions: [],
       formFields: [],

@@ -1,10 +1,13 @@
 import { GenericWorkOrdersBoard, type GenericWorkOrder } from '../components/GenericWorkOrdersBoard';
-import { WorkOrdersHeaderLead } from '../components/WorkOrdersHeaderLead';
-import { getAllBikeWorkOrders, getBikeWorkOrdersArchived, patchBikeWorkOrder } from '../lib/bikeShopApi';
-import type { BikeWorkOrder } from '../lib/bikeShopTypes';
+import {
+  getAllWorkOrders,
+  getWorkOrdersArchived,
+  patchWorkOrder,
+  type WorkOrder as BikeWorkOrder,
+} from '../lib/workOrdersApi';
 
 function toGeneric(wo: BikeWorkOrder): BikeWorkOrder & GenericWorkOrder {
-  return { ...wo, asset_label: wo.bicycle_label };
+  return { ...wo, asset_label: wo.bicycle_label ?? wo.target_label };
 }
 
 const BOARD_PATH = '/workshops/bike-shop/orders/board';
@@ -13,9 +16,9 @@ const LIST_PATH = '/workshops/bike-shop/orders/list';
 export function BikeShopWorkOrdersBoard() {
   return (
     <GenericWorkOrdersBoard<BikeWorkOrder & GenericWorkOrder>
-      listAll={async () => (await getAllBikeWorkOrders()).map(toGeneric)}
-      listArchived={async () => (await getBikeWorkOrdersArchived()).map(toGeneric)}
-      patchStatus={async (id, status) => toGeneric(await patchBikeWorkOrder(id, { status }))}
+      listAll={async () => (await getAllWorkOrders({ target_type: 'bicycle' })).map(toGeneric)}
+      listArchived={async () => (await getWorkOrdersArchived({ target_type: 'bicycle' })).map(toGeneric)}
+      patchStatus={async (id, status) => toGeneric(await patchWorkOrder(id, { status }))}
       queryKey={['bike-shop', 'work-orders', 'kanban']}
       title="Órdenes de trabajo (bicicletería)"
       listPath={LIST_PATH}

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
-import type { WorkOrder } from '../lib/autoRepairTypes';
+import type { WorkOrder } from '../lib/workOrdersApi';
 
 export function AutoRepairWorkOrdersPage() {
   const navigate = useNavigate();

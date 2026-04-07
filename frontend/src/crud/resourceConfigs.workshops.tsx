@@ -1,30 +1,32 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
-  createWorkOrderPaymentLink,
-  createWorkOrderQuote,
-  createWorkOrderSale,
-  createWorkshopBooking,
   createWorkshopVehicle,
   updateWorkshopVehicle,
   workshopVehiclesArchivedCrud,
 } from '../lib/autoRepairApi';
-import type { WorkOrder, WorkOrderItem, WorkshopVehicle } from '../lib/autoRepairTypes';
+import type { WorkshopVehicle } from '../lib/autoRepairTypes';
 import {
   archiveWorkOrder as archiveUnifiedWorkOrder,
   createWorkOrder as createUnifiedWorkOrder,
+  createWorkOrderPaymentLink,
+  createWorkOrderQuote,
+  createWorkOrderSale,
+  createWorkshopBooking,
   getAllWorkOrders as getAllUnifiedWorkOrders,
   getWorkOrdersArchived as getUnifiedWorkOrdersArchived,
   hardDeleteWorkOrder as hardDeleteUnifiedWorkOrder,
   restoreWorkOrder as restoreUnifiedWorkOrder,
   updateWorkOrder as updateUnifiedWorkOrder,
+  type WorkOrder,
+  type WorkOrderLineItem as WorkOrderItem,
 } from '../lib/workOrdersApi';
-import {
-  createBikeQuote,
-  createBikeSale,
-  createBikePaymentLink,
-} from '../lib/bikeShopApi';
-import type { BikeWorkOrder, BikeWorkOrderItem } from '../lib/bikeShopTypes';
+
+type BikeWorkOrder = WorkOrder;
+type BikeWorkOrderItem = WorkOrderItem;
+const createBikeQuote = createWorkOrderQuote;
+const createBikeSale = createWorkOrderSale;
+const createBikePaymentLink = createWorkOrderPaymentLink;
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
   asBoolean,
@@ -370,7 +372,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         isVisible: (row: WorkOrder) => row.status !== 'cancelled',
         onClick: async (row: WorkOrder, helpers) => {
           const link = await createWorkOrderPaymentLink(row.id);
-          openExternalURL(link.payment_url);
+          openExternalURL(link.payment_url as string | undefined);
           await helpers.reload();
         },
       },
@@ -568,7 +570,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         isVisible: (row: BikeWorkOrder) => row.status !== 'cancelled',
         onClick: async (row: BikeWorkOrder, helpers) => {
           const link = await createBikePaymentLink(row.id);
-          openExternalURL(link.payment_url);
+          openExternalURL(link.payment_url as string | undefined);
           await helpers.reload();
         },
       },

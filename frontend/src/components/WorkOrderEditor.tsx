@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmAction } from '@devpablocristo/core-browser';
 import { createPortal } from 'react-dom';
 import {
-  archiveAutoRepairWorkOrder,
-  getAutoRepairWorkOrder,
-  restoreAutoRepairWorkOrder,
-  updateAutoRepairWorkOrder,
-} from '../lib/autoRepairApi';
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+  archiveWorkOrder,
+  getWorkOrder,
+  restoreWorkOrder,
+  updateWorkOrder,
+  type WorkOrder as UnifiedWorkOrder,
+} from '../lib/workOrdersApi';
+
+type AutoRepairWorkOrder = UnifiedWorkOrder;
 import { parseWorkOrderItemsJson, stringifyWorkOrderItems } from '../lib/workOrderItemsJson';
 import './WorkOrderKanbanDetailModal.css';
 import './WorkOrderEditor.css';
@@ -115,7 +117,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setLoading(true);
     setError(null);
     try {
-      const data = await getAutoRepairWorkOrder(id);
+      const data = await getWorkOrder(id);
       setWo(data);
       setDraft(woToDraft(data));
     } catch (e) {
@@ -225,7 +227,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setArchiveBusy(true);
     setError(null);
     try {
-      await archiveAutoRepairWorkOrder(wo.id);
+      await archiveWorkOrder(wo.id);
       onRecordRemoved?.(wo.id);
       onClose();
     } catch (e) {
@@ -247,8 +249,8 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setRestoreBusy(true);
     setError(null);
     try {
-      await restoreAutoRepairWorkOrder(wo.id);
-      const data = await getAutoRepairWorkOrder(wo.id);
+      await restoreWorkOrder(wo.id);
+      const data = await getWorkOrder(wo.id);
       setWo(data);
       setDraft(woToDraft(data));
       onSaved(data);
@@ -264,7 +266,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setSaving(true);
     setError(null);
     try {
-      const body: Parameters<typeof updateAutoRepairWorkOrder>[1] = {};
+      const body: Parameters<typeof updateWorkOrder>[1] = {};
       if (draft.status !== wo.status) body.status = draft.status;
       if (draft.vehicle_id.trim() !== (wo.vehicle_id ?? '').trim()) {
         body.vehicle_id = draft.vehicle_id.trim();
@@ -310,7 +312,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         return;
       }
 
-      const updated = await updateAutoRepairWorkOrder(orderId, body);
+      const updated = await updateWorkOrder(orderId, body);
       setWo(updated);
       setDraft(woToDraft(updated));
       onSaved(updated);

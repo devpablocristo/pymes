@@ -1,0 +1,11 @@
+/* Layout modo galería (toggle + grid); la tabla usa el shell CRUD estándar */
+.products-crud-page {
+  padding: var(--space-6) var(--space-8);
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.products-crud-page__toolbar {
+  margin-bottom: var(--space-4);
+}

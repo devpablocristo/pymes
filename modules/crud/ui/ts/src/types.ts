@@ -117,9 +117,15 @@ export type CrudPageConfig<T extends { id: string }> = {
    */
   preSearchFilter?: (items: T[]) => T[];
   /**
-   * Contenido entre la búsqueda y la fila de botones de cabecera (p. ej. filtros tipo píldora).
+   * Contenido extra en la columna izquierda de cabecera (p. ej. filtros tipo píldora, toggle de vista).
+   * La posición vertical respecto al título la controla `listHeaderSlotPlacement`.
    */
   listHeaderInlineSlot?: (ctx: CrudListHeaderSlotContext<T>) => ReactNode;
+  /**
+   * Dónde renderizar `listHeaderInlineSlot` en la cabecera (el shell coloca título y subtítulo en columna).
+   * @default 'belowSubtitle' — debajo del subtítulo (conteo / estado de carga).
+   */
+  listHeaderSlotPlacement?: "belowSubtitle" | "aboveTitle";
   /**
    * Búsqueda controlada desde afuera (p. ej. un buscador global de la página).
    * Si está definido, oculta el input de búsqueda interno y usa este valor.

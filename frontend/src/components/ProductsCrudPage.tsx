@@ -1,14 +1,16 @@
 /**
  * Productos: CRUD genérico con toggle de modo de visualización (tabla / galería).
- * El toggle se inyecta dentro del header de la lista del CRUD via listHeaderInlineSlot,
- * para no romper el orden visual del PageLayout.
+ * El toggle va en la cabecera del CRUD (`listHeaderInlineSlot` + `listHeaderSlotPlacement: 'aboveTitle'`),
+ * encima del título de página.
  * El modo se controla por query string ?view=gallery|table (default: table).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import '../styles/viewModeSegmentedSwitch.css';
+import './ProductsCrudPage.css';
 import { ProductGalleryView, type ProductGalleryItem } from './ProductGalleryView';
 
 type ProductRow = ProductGalleryItem & { deleted_at?: string | null };
@@ -25,37 +27,38 @@ function ViewModeToggle({
   mode,
   onChange,
   labels,
+  ariaLabel,
 }: {
   mode: ViewMode;
   onChange: (next: ViewMode) => void;
   labels: { table: string; gallery: string };
+  ariaLabel: string;
 }) {
-  const baseStyle = {
-    padding: '6px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    border: '1px solid var(--border, #d1d5db)',
-    background: 'var(--surface, #fff)',
-  } as const;
-  const activeStyle = { background: 'var(--primary, #2563eb)', color: '#fff', borderColor: 'var(--primary, #2563eb)' } as const;
+  const isTable = mode === 'table';
   return (
-    <div role="group" aria-label="Modo de vista" style={{ display: 'inline-flex', gap: 0 }}>
-      <button
-        type="button"
-        style={{ ...baseStyle, borderRadius: '6px 0 0 6px', ...(mode === 'table' ? activeStyle : null) }}
-        aria-pressed={mode === 'table'}
-        onClick={() => onChange('table')}
-      >
-        {labels.table}
-      </button>
-      <button
-        type="button"
-        style={{ ...baseStyle, borderRadius: '0 6px 6px 0', borderLeft: 'none', ...(mode === 'gallery' ? activeStyle : null) }}
-        aria-pressed={mode === 'gallery'}
-        onClick={() => onChange('gallery')}
-      >
-        {labels.gallery}
-      </button>
+    <div className="m-seg-switch" role="group" aria-label={ariaLabel}>
+      <div className="m-seg-switch__track" role="presentation">
+        <button
+          type="button"
+          className={`m-seg-switch__label${isTable ? ' m-seg-switch__label--active' : ''}`}
+          aria-pressed={isTable}
+          onClick={() => onChange('table')}
+        >
+          {labels.table}
+        </button>
+        <button
+          type="button"
+          className={`m-seg-switch__label${!isTable ? ' m-seg-switch__label--active' : ''}`}
+          aria-pressed={!isTable}
+          onClick={() => onChange('gallery')}
+        >
+          {labels.gallery}
+        </button>
+        <span
+          className={`m-seg-switch__thumb${isTable ? ' m-seg-switch__thumb--left' : ' m-seg-switch__thumb--right'}`}
+          aria-hidden
+        />
+      </div>
     </div>
   );
 }
@@ -107,34 +110,43 @@ export function ProductsCrudPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = readViewMode(searchParams.get('view'));
 
-  const setMode = (next: ViewMode) => {
-    setSearchParams(
-      (prev) => {
-        const p = new URLSearchParams(prev);
-        if (next === 'table') p.delete('view');
-        else p.set('view', next);
-        return p;
-      },
-      { replace: true },
-    );
-  };
+  const setMode = useCallback(
+    (next: ViewMode) => {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === 'table') p.delete('view');
+          else p.set('view', next);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
-  const labels = { table: t('crud.viewMode.table'), gallery: t('crud.viewMode.gallery') };
+  const labels = useMemo(
+    () => ({ table: t('crud.viewMode.table'), gallery: t('crud.viewMode.gallery') }),
+    [t],
+  );
+  const ariaViewMode = t('crud.viewMode.aria');
 
   const mergeConfig = useMemo(
     () => ({
-      listHeaderInlineSlot: () => <ViewModeToggle mode="table" onChange={setMode} labels={labels} />,
+      listHeaderSlotPlacement: 'aboveTitle' as const,
+      listHeaderInlineSlot: () => (
+        <ViewModeToggle mode="table" onChange={setMode} labels={labels} ariaLabel={ariaViewMode} />
+      ),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [labels.table, labels.gallery],
+    [ariaViewMode, labels, setMode],
   );
 
   if (mode === 'gallery') {
     // En modo galería usamos un layout propio: toggle arriba + grid de cards.
     return (
-      <div className="products-crud-page" style={{ padding: '24px 32px' }}>
-        <div style={{ marginBottom: 16 }}>
-          <ViewModeToggle mode={mode} onChange={setMode} labels={labels} />
+      <div className="products-crud-page">
+        <div className="products-crud-page__toolbar">
+          <ViewModeToggle mode={mode} onChange={setMode} labels={labels} ariaLabel={ariaViewMode} />
         </div>
         <ProductsGallery onSelect={() => setMode('table')} />
       </div>

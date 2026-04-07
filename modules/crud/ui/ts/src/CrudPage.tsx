@@ -80,6 +80,7 @@ export function CrudPage<T extends { id: string }>(props: CrudPageProps<T>): Rea
     onExternalEdit,
     preSearchFilter,
     listHeaderInlineSlot,
+    listHeaderSlotPlacement = "belowSubtitle",
     externalSearch,
     featureFlags: featureFlagsProp,
     renderTagsCell: _omitRenderTagsCell,
@@ -391,8 +392,15 @@ export function CrudPage<T extends { id: string }>(props: CrudPageProps<T>): Rea
           ? str.statusLoading
           : `${filtered.length} ${filtered.length === 1 ? label : labelPlural}`
       }
+      headerBeforeTitleSlot={
+        listHeaderSlotPlacement === "aboveTitle" && listHeaderInlineSlot != null ? (
+          <div className="crud-list-header-lead crud-list-header-lead--above-title">
+            {listHeaderInlineSlot({ items })}
+          </div>
+        ) : undefined
+      }
       headerLeadSlot={
-        listHeaderInlineSlot != null ? (
+        listHeaderSlotPlacement !== "aboveTitle" && listHeaderInlineSlot != null ? (
           <div className="crud-list-header-lead">{listHeaderInlineSlot({ items })}</div>
         ) : undefined
       }

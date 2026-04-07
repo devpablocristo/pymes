@@ -2,8 +2,6 @@ import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui/surf
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
-const CRUD_CANONICAL_EXCLUDED_RESOURCE_IDS = ['workOrders', 'bikeWorkOrders'] as const;
-
 type ResourceConfigMap = CrudResourceConfigMap;
 
 export function hasCrudResourceInMap(resourceConfigs: ResourceConfigMap, resourceId: string): boolean {
@@ -18,9 +16,7 @@ export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: 
   if (!config) {
     return null;
   }
-  return mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>, {
-    excludedResourceIds: CRUD_CANONICAL_EXCLUDED_RESOURCE_IDS,
-  });
+  return mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>);
 }
 
 export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {

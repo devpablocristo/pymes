@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -116,16 +117,19 @@ func LoadFromEnv() Config {
 		SeedDemoData:                envconfig.Bool("PYMES_SEED_DEMO", false),
 		SeedDemoOrgExternalID:       strings.TrimSpace(envconfig.Get("PYMES_SEED_DEMO_ORG_EXTERNAL_ID", "")),
 	}
-	validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken)
+	if err := validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken); err != nil {
+		log.Fatal(err)
+	}
 	return cfg
 }
 
-func validateInternalServiceToken(environment, token string) {
+func validateInternalServiceToken(environment, token string) error {
 	normalizedToken := strings.TrimSpace(token)
 	if envconfig.IsLocal(environment) {
-		return
+		return nil
 	}
 	if normalizedToken == "" || strings.EqualFold(normalizedToken, localInternalServiceToken) {
-		panic(fmt.Sprintf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment)))
+		return fmt.Errorf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment))
 	}
+	return nil
 }

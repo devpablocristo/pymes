@@ -17,6 +17,52 @@ import (
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )
 
+type returnWithPartyRow struct {
+	returnmodels.ReturnModel
+	PartyID   *uuid.UUID `gorm:"column:party_id"`
+	PartyName string     `gorm:"column:party_name"`
+}
+
+type saleForReturnRow struct {
+	Number        string
+	PartyID       *uuid.UUID `gorm:"column:party_id"`
+	PartyName     string     `gorm:"column:party_name"`
+	AmountPaid    float64    `gorm:"column:amount_paid"`
+	Total         float64
+	Currency      string
+	PaymentMethod string `gorm:"column:payment_method"`
+}
+
+type tenantReturnSettingsRow struct {
+	ReturnPrefix string `gorm:"column:return_prefix"`
+	NextReturn   int    `gorm:"column:next_return_number"`
+	CreditPrefix string `gorm:"column:credit_note_prefix"`
+	NextCredit   int    `gorm:"column:next_credit_note_number"`
+}
+
+type saleItemForReturnRow struct {
+	ID          uuid.UUID
+	ProductID   *uuid.UUID `gorm:"column:product_id"`
+	Description string
+	Quantity    float64
+	UnitPrice   float64 `gorm:"column:unit_price"`
+	TaxRate     float64 `gorm:"column:tax_rate"`
+	TrackStock  bool    `gorm:"column:track_stock"`
+}
+
+type saleForVoidRow struct {
+	AmountPaid    float64 `gorm:"column:amount_paid"`
+	Total         float64
+	Currency      string
+	PaymentMethod string `gorm:"column:payment_method"`
+}
+
+type saleForCreditRow struct {
+	Total      float64
+	AmountPaid float64    `gorm:"column:amount_paid"`
+	PartyID    *uuid.UUID `gorm:"column:party_id"`
+}
+
 type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
@@ -54,11 +100,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	if err != nil {
 		return nil, err
 	}
-	var rows []struct {
-		returnmodels.ReturnModel
-		PartyID   *uuid.UUID `gorm:"column:party_id"`
-		PartyName string     `gorm:"column:party_name"`
-	}
+	var rows []returnWithPartyRow
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
@@ -85,11 +127,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndo
 	if err != nil {
 		return returndomain.Return{}, err
 	}
-	var row struct {
-		returnmodels.ReturnModel
-		PartyID   *uuid.UUID `gorm:"column:party_id"`
-		PartyName string     `gorm:"column:party_name"`
-	}
+	var row returnWithPartyRow
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
@@ -117,15 +155,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		if err != nil {
 			return err
 		}
-		var sale struct {
-			Number        string
-			PartyID       *uuid.UUID `gorm:"column:party_id"`
-			PartyName     string     `gorm:"column:party_name"`
-			AmountPaid    float64    `gorm:"column:amount_paid"`
-			Total         float64
-			Currency      string
-			PaymentMethod string `gorm:"column:payment_method"`
-		}
+		var sale saleForReturnRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
@@ -133,12 +163,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			return domainerr.Validation("items are required")
 		}
 
-		var settings struct {
-			ReturnPrefix string `gorm:"column:return_prefix"`
-			NextReturn   int    `gorm:"column:next_return_number"`
-			CreditPrefix string `gorm:"column:credit_note_prefix"`
-			NextCredit   int    `gorm:"column:next_credit_note_number"`
-		}
+		var settings tenantReturnSettingsRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
 			return err
 		}
@@ -152,15 +177,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		subtotal, taxTotal := 0.0, 0.0
 		itemModels := make([]returnmodels.ReturnItemModel, 0, len(in.Items))
 		for _, item := range in.Items {
-			var saleItem struct {
-				ID          uuid.UUID
-				ProductID   *uuid.UUID `gorm:"column:product_id"`
-				Description string
-				Quantity    float64
-				UnitPrice   float64 `gorm:"column:unit_price"`
-				TaxRate     float64 `gorm:"column:tax_rate"`
-				TrackStock  bool    `gorm:"column:track_stock"`
-			}
+			var saleItem saleItemForReturnRow
 			if err := tx.Table("sale_items si").Select("si.id, si.product_id, si.description, si.quantity, si.unit_price, si.tax_rate, COALESCE(p.track_stock, false) as track_stock").Joins("LEFT JOIN products p ON p.id = si.product_id").Where("si.sale_id = ? AND si.id = ?", in.SaleID, item.SaleItemID).Take(&saleItem).Error; err != nil {
 				return err
 			}
@@ -255,12 +272,7 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			out = item
 			return nil
 		}
-		var sale struct {
-			AmountPaid    float64 `gorm:"column:amount_paid"`
-			Total         float64
-			Currency      string
-			PaymentMethod string `gorm:"column:payment_method"`
-		}
+		var sale saleForVoidRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", orgID, item.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
@@ -349,11 +361,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 		if note.Status != "active" {
 			return domainerr.BusinessRule("credit note is not active")
 		}
-		var sale struct {
-			Total      float64
-			AmountPaid float64    `gorm:"column:amount_paid"`
-			PartyID    *uuid.UUID `gorm:"column:party_id"`
-		}
+		var sale saleForCreditRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("total, amount_paid, %s", salePartyIDExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}

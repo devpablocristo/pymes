@@ -32,6 +32,15 @@ class AutoRepairBackendClient(HTTPBackendClient):
     async def get_work_order(self, auth: AuthContext, work_order_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/v1/auto-repair/work-orders/{work_order_id}", auth=auth)
 
+    async def create_vehicle(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", "/v1/auto-repair/vehicles", auth=auth, json=data)
+
+    async def update_vehicle(self, auth: AuthContext, vehicle_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("PUT", f"/v1/auto-repair/vehicles/{vehicle_id}", auth=auth, json=data)
+
+    async def update_work_order(self, auth: AuthContext, work_order_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("PATCH", f"/v1/auto-repair/work-orders/{work_order_id}", auth=auth, json=data)
+
     async def create_booking(self, auth: AuthContext, data: dict[str, Any]) -> dict[str, Any]:
         return await self.request("POST", "/v1/auto-repair/workshop-bookings", auth=auth, json=data)
 

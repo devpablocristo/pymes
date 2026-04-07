@@ -24,6 +24,23 @@ type usecasesPort interface {
 	ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error)
 }
 
+type createReturnRequestItem struct {
+	SaleItemID string  `json:"sale_item_id" binding:"required"`
+	Quantity   float64 `json:"quantity" binding:"required"`
+}
+
+type createReturnRequest struct {
+	Reason       string                    `json:"reason"`
+	RefundMethod string                    `json:"refund_method" binding:"required"`
+	Notes        string                    `json:"notes"`
+	Items        []createReturnRequestItem `json:"items" binding:"required"`
+}
+
+type applyCreditRequest struct {
+	CreditNoteID string  `json:"credit_note_id" binding:"required"`
+	Amount       float64 `json:"amount"`
+}
+
 type Handler struct{ uc usecasesPort }
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
@@ -44,15 +61,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct {
-		Reason       string `json:"reason"`
-		RefundMethod string `json:"refund_method" binding:"required"`
-		Notes        string `json:"notes"`
-		Items        []struct {
-			SaleItemID string  `json:"sale_item_id" binding:"required"`
-			Quantity   float64 `json:"quantity" binding:"required"`
-		} `json:"items" binding:"required"`
-	}
+	var req createReturnRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -162,10 +171,7 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct {
-		CreditNoteID string  `json:"credit_note_id" binding:"required"`
-		Amount       float64 `json:"amount"`
-	}
+	var req applyCreditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return

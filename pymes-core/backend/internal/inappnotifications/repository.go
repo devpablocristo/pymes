@@ -17,6 +17,18 @@ import (
 
 var ErrNotFound = errors.New("in_app_notification not found")
 
+type userIDRow struct {
+	ID uuid.UUID `gorm:"column:id"`
+}
+
+type orgMemberUserIDRow struct {
+	UserID uuid.UUID `gorm:"column:user_id"`
+}
+
+type orgIDRow struct {
+	OrgID uuid.UUID `gorm:"column:org_id"`
+}
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -26,9 +38,7 @@ func NewRepository(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) GetUserIDByExternalID(externalID string) (uuid.UUID, bool) {
-	var row struct {
-		ID uuid.UUID `gorm:"column:id"`
-	}
+	var row userIDRow
 	err := r.db.Table("users").
 		Select("id").
 		Where("external_id = ? AND deleted_at IS NULL", externalID).
@@ -40,9 +50,7 @@ func (r *Repository) GetUserIDByExternalID(externalID string) (uuid.UUID, bool) 
 }
 
 func (r *Repository) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
-	var rows []struct {
-		UserID uuid.UUID `gorm:"column:user_id"`
-	}
+	var rows []orgMemberUserIDRow
 	err := r.db.Table("org_members AS om").
 		Select("om.user_id").
 		Joins("JOIN users AS u ON u.id = om.user_id").
@@ -60,9 +68,7 @@ func (r *Repository) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
 }
 
 func (r *Repository) ListUserIDsByOrg(orgID uuid.UUID) ([]uuid.UUID, error) {
-	var rows []struct {
-		UserID uuid.UUID `gorm:"column:user_id"`
-	}
+	var rows []orgMemberUserIDRow
 	err := r.db.Table("org_members AS om").
 		Select("DISTINCT om.user_id").
 		Joins("JOIN users AS u ON u.id = om.user_id").
@@ -80,9 +86,7 @@ func (r *Repository) ListUserIDsByOrg(orgID uuid.UUID) ([]uuid.UUID, error) {
 }
 
 func (r *Repository) ListOrgIDsWithUsers() ([]uuid.UUID, error) {
-	var rows []struct {
-		OrgID uuid.UUID `gorm:"column:org_id"`
-	}
+	var rows []orgIDRow
 	err := r.db.Table("org_members AS om").
 		Select("DISTINCT om.org_id").
 		Joins("JOIN users AS u ON u.id = om.user_id").

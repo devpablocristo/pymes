@@ -46,6 +46,33 @@ type PaymentDetail struct {
 	PayerEmail        string
 }
 
+type mpTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	UserID       int64  `json:"user_id"`
+}
+
+type mpPreferenceResponse struct {
+	ID                 string `json:"id"`
+	InitPoint          string `json:"init_point"`
+	PointOfInteraction struct {
+		TransactionData struct {
+			QRCode string `json:"qr_code"`
+		} `json:"transaction_data"`
+	} `json:"point_of_interaction"`
+}
+
+type mpPaymentDetailResponse struct {
+	ID                any     `json:"id"`
+	Status            string  `json:"status"`
+	TransactionAmount float64 `json:"transaction_amount"`
+	ExternalReference string  `json:"external_reference"`
+	Payer             struct {
+		Email string `json:"email"`
+	} `json:"payer"`
+}
+
 type MercadoPagoGateway struct {
 	caller *httpclient.Caller
 }
@@ -87,12 +114,7 @@ func (g *MercadoPagoGateway) oauthToken(ctx context.Context, form url.Values) (O
 		return OAuthTokens{}, fmt.Errorf("mercadopago oauth error: status=%d body=%s", st, string(body))
 	}
 
-	var out struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int    `json:"expires_in"`
-		UserID       int64  `json:"user_id"`
-	}
+	var out mpTokenResponse
 	if err := json.Unmarshal(body, &out); err != nil {
 		return OAuthTokens{}, err
 	}
@@ -129,15 +151,7 @@ func (g *MercadoPagoGateway) CreatePreference(ctx context.Context, accessToken s
 		return PreferenceOutput{}, fmt.Errorf("mercadopago preference error: status=%d body=%s", st, string(body))
 	}
 
-	var out struct {
-		ID        string `json:"id"`
-		InitPoint string `json:"init_point"`
-		PointOfInteraction struct {
-			TransactionData struct {
-				QRCode string `json:"qr_code"`
-			} `json:"transaction_data"`
-		} `json:"point_of_interaction"`
-	}
+	var out mpPreferenceResponse
 	if err := json.Unmarshal(body, &out); err != nil {
 		return PreferenceOutput{}, err
 	}
@@ -161,15 +175,7 @@ func (g *MercadoPagoGateway) GetPaymentDetail(ctx context.Context, accessToken, 
 		return PaymentDetail{}, fmt.Errorf("mercadopago payment detail error: status=%d body=%s", st, string(body))
 	}
 
-	var out struct {
-		ID                any     `json:"id"`
-		Status            string  `json:"status"`
-		TransactionAmount float64 `json:"transaction_amount"`
-		ExternalReference string  `json:"external_reference"`
-		Payer             struct {
-			Email string `json:"email"`
-		} `json:"payer"`
-	}
+	var out mpPaymentDetailResponse
 	if err := json.Unmarshal(body, &out); err != nil {
 		return PaymentDetail{}, err
 	}

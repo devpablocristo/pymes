@@ -206,7 +206,7 @@ function buildAssistantMetaLabel(
   const parts = [
     `${t('ai.chat.meta.request')} ${reply.request_id}`,
     reply.output_kind,
-    humanRoutedLabel(reply.routed_agent || reply.routed_mode, language),
+    humanRoutedLabel(reply.routed_agent, language),
     humanRoutingSourceLabel(reply.routing_source, language),
   ];
   return parts.join(' · ');
@@ -237,11 +237,11 @@ function buildRouteHintMetaLabel(
 }
 
 function buildAssistantBadgeLabels(reply: PymesAssistantChatResponse, language: LanguageCode): string[] {
-  return [humanBadgeCategoryLabel(reply.routed_agent || reply.routed_mode, language)];
+  return [humanBadgeCategoryLabel(reply.routed_agent, language)];
 }
 
 function buildAssistantBadgeTones(reply: PymesAssistantChatResponse): MsgBadgeTone[] {
-  return [badgeToneForRoute(reply.routed_agent || reply.routed_mode)];
+  return [badgeToneForRoute(reply.routed_agent)];
 }
 
 function applyPymesReply(
@@ -249,7 +249,7 @@ function applyPymesReply(
   language: LanguageCode,
   t: (key: string, variables?: Record<string, string | number>) => string,
 ): AssistantReplyRow[] {
-  const agentLabel = humanRoutedLabel(reply.routed_agent || reply.routed_mode, language);
+  const agentLabel = humanRoutedLabel(reply.routed_agent, language);
   const sourceLabel = humanRoutingSourceLabel(reply.routing_source, language);
   const routedLabel = agentLabel === sourceLabel ? agentLabel : `${agentLabel} · ${sourceLabel}`;
   return [
@@ -597,7 +597,7 @@ export function UnifiedChatPage() {
           }));
         } else {
           const nextStickyRouteHint =
-            normalizeManualRouteHint(reply.routed_agent || reply.routed_mode) ?? apiRouteHint ?? undefined;
+            normalizeManualRouteHint(reply.routed_agent) ?? apiRouteHint ?? undefined;
           if (nextStickyRouteHint) {
             setPendingRouteHintsByContact((prev) => ({
               ...prev,

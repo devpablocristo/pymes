@@ -27,7 +27,6 @@ function buildChatReply(overrides?: Partial<PymesAssistantChatResponse>): PymesA
     reply: 'Respuesta del asistente',
     request_id: 'req-1',
     routed_agent: 'sales',
-    routed_mode: 'sales',
     routing_source: 'llm',
     output_kind: 'chat',
     tokens_used: 10,

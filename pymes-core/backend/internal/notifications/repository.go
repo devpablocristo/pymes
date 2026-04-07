@@ -18,11 +18,13 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+type userByExternalIDRow struct {
+	ID    uuid.UUID `gorm:"column:id"`
+	Email string    `gorm:"column:email"`
+}
+
 func (r *Repository) GetUserByExternalID(externalID string) (uuid.UUID, string, bool) {
-	var row struct {
-		ID    uuid.UUID `gorm:"column:id"`
-		Email string    `gorm:"column:email"`
-	}
+	var row userByExternalIDRow
 	err := r.db.Table("users").
 		Select("id, email").
 		Where("external_id = ? AND deleted_at IS NULL", externalID).

@@ -20,6 +20,16 @@ import (
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 )
 
+type webhookPayloadData struct {
+	ID any `json:"id"`
+}
+
+type webhookPayload struct {
+	Type   string             `json:"type"`
+	Action string             `json:"action"`
+	Data   webhookPayloadData `json:"data"`
+}
+
 const (
 	providerMercadoPago     = "mercadopago"
 	mpOAuthBaseURL          = "https://auth.mercadopago.com/authorization"
@@ -470,13 +480,7 @@ func (u *Usecases) ProcessWebhook(ctx context.Context, provider string, headers 
 		return ErrInvalidWebhookSignature
 	}
 
-	var in struct {
-		Type   string `json:"type"`
-		Action string `json:"action"`
-		Data   struct {
-			ID any `json:"id"`
-		} `json:"data"`
-	}
+	var in webhookPayload
 	if err := json.Unmarshal(body, &in); err != nil {
 		return err
 	}

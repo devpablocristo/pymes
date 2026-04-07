@@ -66,6 +66,25 @@ type AvailabilitySlot = schedulingpublic.AvailabilitySlot
 type AvailabilityQuery = schedulingpublic.AvailabilityQuery
 type BookingPublic = schedulingpublic.Booking
 
+type orgResolveByIDRow struct {
+	ID uuid.UUID `gorm:"column:id"`
+}
+
+type orgResolveBySlugRow struct {
+	ID uuid.UUID
+}
+
+type businessInfoRow struct {
+	OrgID             uuid.UUID
+	Name              string
+	Slug              string
+	BusinessName      string
+	BusinessAddress   string
+	BusinessPhone     string
+	BusinessEmail     string
+	SchedulingEnabled bool
+}
+
 type schedulingSelection struct {
 	Branch   schedulingdomain.Branch
 	Service  schedulingdomain.Service
@@ -79,9 +98,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 	}
 
 	if parsed, err := uuid.Parse(trimmed); err == nil {
-		var row struct {
-			ID uuid.UUID `gorm:"column:id"`
-		}
+		var row orgResolveByIDRow
 		err = r.db.WithContext(ctx).
 			Table("orgs").
 			Select("id").
@@ -92,9 +109,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 		}
 	}
 
-	var row struct {
-		ID uuid.UUID
-	}
+	var row orgResolveBySlugRow
 	err := r.db.WithContext(ctx).
 		Table("orgs").
 		Select("id").
@@ -110,16 +125,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 }
 
 func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error) {
-	var row struct {
-		OrgID             uuid.UUID
-		Name              string
-		Slug              string
-		BusinessName      string
-		BusinessAddress   string
-		BusinessPhone     string
-		BusinessEmail     string
-		SchedulingEnabled bool
-	}
+	var row businessInfoRow
 
 	err := r.db.WithContext(ctx).
 		Table("orgs o").

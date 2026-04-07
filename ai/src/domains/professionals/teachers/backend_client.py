@@ -16,6 +16,33 @@ class TeachersBackendClient(HTTPBackendClient):
     async def get_specialties(self, auth: AuthContext) -> dict[str, Any]:
         return await self.request("GET", "/v1/teachers/specialties", auth=auth)
 
+    async def update_professional_profile(
+        self, auth: AuthContext, profile_id: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self.request(
+            "PUT", f"/v1/teachers/professionals/{profile_id}", auth=auth, json=data
+        )
+
+    async def assign_specialty_professionals(
+        self, auth: AuthContext, specialty_id: str, profile_ids: list[str]
+    ) -> dict[str, Any]:
+        return await self.request(
+            "POST",
+            f"/v1/teachers/specialties/{specialty_id}/assign-professionals",
+            auth=auth,
+            json={"profile_ids": profile_ids},
+        )
+
+    async def list_intakes(self, auth: AuthContext) -> dict[str, Any]:
+        return await self.request("GET", "/v1/teachers/intakes", auth=auth)
+
+    async def add_session_note(
+        self, auth: AuthContext, session_id: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self.request(
+            "POST", f"/v1/teachers/sessions/{session_id}/notes", auth=auth, json=data
+        )
+
     async def get_teacher_services(self, auth: AuthContext, profile_id: str) -> dict[str, Any]:
         return await self.request("GET", f"/v1/teachers/professionals/{profile_id}/services", auth=auth)
 

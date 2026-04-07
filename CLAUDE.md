@@ -66,14 +66,13 @@ Todo lo que es **código interno** debe estar en inglés sin excepciones:
 
 ---
 
-## 5. Arquitectura Go — Hexagonal (Gin + GORM + Lambda)
+## 5. Arquitectura Go — Hexagonal (Gin + GORM)
 
 ### 5.1 Estructura de proyecto
 
 ```
 {vertical}/
 ├── backend/
-│   ├── cmd/lambda/main.go
 │   ├── cmd/local/main.go
 │   ├── internal/
 │   │   ├── {modulo}/               # un dir por dominio de negocio

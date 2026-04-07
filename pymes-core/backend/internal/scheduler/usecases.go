@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -109,74 +110,106 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 	if task == "all" || task == "exchange_rates" {
 		updated, err := u.syncRates(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "exchange_rates", "error", err.Error(), time.Now().UTC().Add(1*time.Hour))
+			if recErr := u.repo.RecordRun(ctx, "exchange_rates", "error", err.Error(), time.Now().UTC().Add(1*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.RatesUpdated = updated
-		_ = u.repo.RecordRun(ctx, "exchange_rates", "ok", "", time.Now().UTC().Add(1*time.Hour))
+		if recErr := u.repo.RecordRun(ctx, "exchange_rates", "ok", "", time.Now().UTC().Add(1*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if task == "all" || task == "recurring_expenses" {
 		applied, err := u.applyRecurring(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "recurring_expenses", "error", err.Error(), time.Now().UTC().Add(24*time.Hour))
+			if recErr := u.repo.RecordRun(ctx, "recurring_expenses", "error", err.Error(), time.Now().UTC().Add(24*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.RecurringApplied = applied
-		_ = u.repo.RecordRun(ctx, "recurring_expenses", "ok", "", time.Now().UTC().Add(24*time.Hour))
+		if recErr := u.repo.RecordRun(ctx, "recurring_expenses", "ok", "", time.Now().UTC().Add(24*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.webhooks != nil && (task == "all" || task == "retry_webhooks") {
 		retried, err := u.webhooks.RetryPending(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "retry_webhooks", "error", err.Error(), time.Now().UTC().Add(5*time.Minute))
+			if recErr := u.repo.RecordRun(ctx, "retry_webhooks", "error", err.Error(), time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["webhooks_processed"] = retried
-		_ = u.repo.RecordRun(ctx, "retry_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute))
+		if recErr := u.repo.RecordRun(ctx, "retry_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.webhooks != nil && (task == "all" || task == "cleanup_webhook_deliveries") {
 		removed, err := u.webhooks.CleanupOldDeliveries(ctx, 30)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "error", err.Error(), time.Now().UTC().Add(24*time.Hour))
+			if recErr := u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "error", err.Error(), time.Now().UTC().Add(24*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["webhooks_deleted"] = removed
-		_ = u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "ok", "", time.Now().UTC().Add(24*time.Hour))
+		if recErr := u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "ok", "", time.Now().UTC().Add(24*time.Hour)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.paymentGateways != nil && (task == "all" || task == "payment_gateway_webhooks") {
 		processed, err := u.paymentGateways.ProcessPendingWebhookEvents(ctx, 100)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "payment_gateway_webhooks", "error", err.Error(), time.Now().UTC().Add(5*time.Minute))
+			if recErr := u.repo.RecordRun(ctx, "payment_gateway_webhooks", "error", err.Error(), time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["payment_gateway_events_processed"] = processed
-		_ = u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute))
+		if recErr := u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.scheduling != nil && (task == "all" || task == "scheduling_holds") {
 		expired, err := u.runSchedulingHoldExpiration(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "scheduling_holds", "error", err.Error(), time.Now().UTC().Add(5*time.Minute))
+			if recErr := u.repo.RecordRun(ctx, "scheduling_holds", "error", err.Error(), time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["scheduling_holds_expired"] = expired
-		_ = u.repo.RecordRun(ctx, "scheduling_holds", "ok", "", time.Now().UTC().Add(5*time.Minute))
+		if recErr := u.repo.RecordRun(ctx, "scheduling_holds", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_reminders") {
 		sent, err := u.sendSchedulingReminders(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "scheduling_reminders", "error", err.Error(), time.Now().UTC().Add(10*time.Minute))
+			if recErr := u.repo.RecordRun(ctx, "scheduling_reminders", "error", err.Error(), time.Now().UTC().Add(10*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["scheduling_reminders_sent"] = sent
-		_ = u.repo.RecordRun(ctx, "scheduling_reminders", "ok", "", time.Now().UTC().Add(10*time.Minute))
+		if recErr := u.repo.RecordRun(ctx, "scheduling_reminders", "ok", "", time.Now().UTC().Add(10*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_waitlist") {
 		notified, err := u.notifySchedulingWaitlist(ctx)
 		if err != nil {
-			_ = u.repo.RecordRun(ctx, "scheduling_waitlist", "error", err.Error(), time.Now().UTC().Add(10*time.Minute))
+			if recErr := u.repo.RecordRun(ctx, "scheduling_waitlist", "error", err.Error(), time.Now().UTC().Add(10*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 			return schedulerdomain.RunResult{}, err
 		}
 		result.Metadata["scheduling_waitlist_notified"] = notified
-		_ = u.repo.RecordRun(ctx, "scheduling_waitlist", "ok", "", time.Now().UTC().Add(10*time.Minute))
+		if recErr := u.repo.RecordRun(ctx, "scheduling_waitlist", "ok", "", time.Now().UTC().Add(10*time.Minute)); recErr != nil {
+				slog.Error("failed to record scheduler run", "error", recErr)
+			}
 	}
 	return result, nil
 }

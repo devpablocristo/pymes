@@ -369,12 +369,6 @@ export interface components {
              */
             routed_agent: "general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases";
             /**
-             * Routed Mode
-             * @description Alias legacy de `routed_agent` para compatibilidad hacia atrás.
-             * @enum {string}
-             */
-            routed_mode: "general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases";
-            /**
              * Routing Source
              * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint
              * @enum {string}

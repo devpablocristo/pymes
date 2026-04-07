@@ -3,6 +3,7 @@ package verticalconfig
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -53,7 +54,9 @@ func Load(opts Options) Config {
 		SeedDemoData:          envconfig.Bool("PYMES_SEED_DEMO", false),
 		SeedDemoOrgExternalID: strings.TrimSpace(os.Getenv("PYMES_SEED_DEMO_ORG_EXTERNAL_ID")),
 	}
-	validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken)
+	if err := validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken); err != nil {
+		log.Fatal(err)
+	}
 	return cfg
 }
 
@@ -62,12 +65,13 @@ func IsLocalEnvironment(environment string) bool {
 	return envconfig.IsLocal(environment)
 }
 
-func validateInternalServiceToken(environment, token string) {
+func validateInternalServiceToken(environment, token string) error {
 	normalizedToken := strings.TrimSpace(token)
 	if envconfig.IsLocal(environment) {
-		return
+		return nil
 	}
 	if normalizedToken == "" || strings.EqualFold(normalizedToken, localInternalServiceToken) {
-		panic(fmt.Sprintf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment)))
+		return fmt.Errorf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment))
 	}
+	return nil
 }

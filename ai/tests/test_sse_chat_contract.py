@@ -222,7 +222,6 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
         "pending_confirmations": [],
         "blocks": [{"type": "text", "text": "respuesta final"}],
         "routed_agent": "customers",
-        "routed_mode": "customers",
         "routing_source": "orchestrator",
     }
     assert captured["route_hint"] is None
@@ -350,7 +349,6 @@ def test_internal_chat_normalizes_unknown_route_to_general(monkeypatch) -> None:
     assert response.json()["output_kind"] == "chat_reply"
     assert response.json()["content_language"] == "es"
     assert response.json()["routed_agent"] == "general"
-    assert response.json()["routed_mode"] == "general"
     assert response.json()["routing_source"] == "orchestrator"
 
 

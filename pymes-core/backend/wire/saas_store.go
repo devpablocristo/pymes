@@ -149,16 +149,18 @@ func joinDisplayName(given, family string) string {
 }
 
 // GetUserProfileExtrasByExternalID devuelve campos de perfil extendidos (Pymes) para enriquecer GET /users/me.
+type userProfileExtrasRow struct {
+	Phone      string
+	GivenName  string `gorm:"column:given_name"`
+	FamilyName string `gorm:"column:family_name"`
+}
+
 func (s *pymesSaaSStore) GetUserProfileExtrasByExternalID(ctx context.Context, externalID string) (phone, givenName, familyName string, ok bool, err error) {
 	externalID = strings.TrimSpace(externalID)
 	if externalID == "" {
 		return "", "", "", false, nil
 	}
-	var row struct {
-		Phone      string
-		GivenName  string `gorm:"column:given_name"`
-		FamilyName string `gorm:"column:family_name"`
-	}
+	var row userProfileExtrasRow
 	e := s.db.WithContext(ctx).
 		Table("users").
 		Select("phone", "given_name", "family_name").

@@ -64,10 +64,6 @@ class ChatResponse(BaseChatResponse):
             "`copilot` se usa solo en handoff explícito desde notificaciones."
         ),
     )
-    routed_mode: RoutedAgent = Field(
-        ...,
-        description="Alias legacy de `routed_agent` para compatibilidad hacia atrás.",
-    )
     routing_source: RoutingSource = Field(
         ...,
         description="Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint",

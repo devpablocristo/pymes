@@ -5,7 +5,7 @@ from typing import Any
 
 from runtime.contexts import AuthContext
 from runtime.types import ToolDeclaration
-from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
+from src.domains.workshops.bike_shop.backend_client import BikeShopBackendClient
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 
@@ -15,107 +15,48 @@ def _tool(name: str, description: str, parameters: dict[str, Any]) -> ToolDeclar
 
 
 def build_internal_tools(
-    client: AutoRepairBackendClient,
+    client: BikeShopBackendClient,
     auth: AuthContext,
 ) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _list_vehicles(org_id: str, search: str = "") -> dict[str, Any]:
+    async def _list_bicycles(org_id: str, search: str = "") -> dict[str, Any]:
         _ = org_id
-        return await client.list_vehicles(auth, search=search)
+        return await client.list_bicycles(auth, search=search)
 
     declarations.append(
         _tool(
-            "list_vehicles",
-            "Listar vehiculos del taller por patente, cliente o texto libre",
+            "list_bicycles",
+            "Listar bicicletas de la bicicleteria por marca, modelo, cliente o texto libre",
             {
                 "type": "object",
                 "properties": {
-                    "search": {"type": "string", "description": "Patente, VIN, cliente o texto libre"},
+                    "search": {"type": "string", "description": "Marca, modelo, cliente o texto libre"},
                 },
             },
         )
     )
-    handlers["list_vehicles"] = _list_vehicles
+    handlers["list_bicycles"] = _list_bicycles
 
-    async def _get_vehicle(org_id: str, vehicle_id: str) -> dict[str, Any]:
+    async def _get_bicycle(org_id: str, bicycle_id: str) -> dict[str, Any]:
         _ = org_id
-        return await client.get_vehicle(auth, vehicle_id=vehicle_id)
+        return await client.get_bicycle(auth, bicycle_id=bicycle_id)
 
     declarations.append(
         _tool(
-            "get_vehicle",
-            "Ver detalle de un vehiculo",
+            "get_bicycle",
+            "Ver detalle de una bicicleta",
             {
                 "type": "object",
                 "properties": {
-                    "vehicle_id": {"type": "string", "description": "UUID del vehiculo"},
+                    "bicycle_id": {"type": "string", "description": "UUID de la bicicleta"},
                 },
-                "required": ["vehicle_id"],
+                "required": ["bicycle_id"],
             },
         )
     )
-    handlers["get_vehicle"] = _get_vehicle
-
-    async def _create_vehicle(
-        org_id: str,
-        license_plate: str,
-        make: str,
-        model: str,
-        customer_name: str = "",
-        customer_id: str = "",
-        year: int = 0,
-        vin: str = "",
-        color: str = "",
-        notes: str = "",
-        kilometers: int = 0,
-    ) -> dict[str, Any]:
-        _ = org_id
-        data: dict[str, Any] = {
-            "license_plate": license_plate,
-            "make": make,
-            "model": model,
-        }
-        if customer_name:
-            data["customer_name"] = customer_name
-        if customer_id:
-            data["customer_id"] = customer_id
-        if year:
-            data["year"] = year
-        if vin:
-            data["vin"] = vin
-        if color:
-            data["color"] = color
-        if notes:
-            data["notes"] = notes
-        if kilometers:
-            data["kilometers"] = kilometers
-        return await client.create_vehicle(auth, data=data)
-
-    declarations.append(
-        _tool(
-            "create_vehicle",
-            "Registrar un nuevo vehiculo que ingresa al taller",
-            {
-                "type": "object",
-                "properties": {
-                    "license_plate": {"type": "string", "description": "Patente del vehiculo"},
-                    "make": {"type": "string", "description": "Marca"},
-                    "model": {"type": "string", "description": "Modelo"},
-                    "customer_name": {"type": "string", "description": "Nombre del cliente"},
-                    "customer_id": {"type": "string", "description": "UUID del cliente si ya existe"},
-                    "year": {"type": "integer", "description": "Anio de fabricacion"},
-                    "vin": {"type": "string", "description": "Numero de chasis"},
-                    "color": {"type": "string"},
-                    "notes": {"type": "string"},
-                    "kilometers": {"type": "integer", "description": "Kilometraje actual"},
-                },
-                "required": ["license_plate", "make", "model"],
-            },
-        )
-    )
-    handlers["create_vehicle"] = _create_vehicle
+    handlers["get_bicycle"] = _get_bicycle
 
     async def _list_services(org_id: str, search: str = "") -> dict[str, Any]:
         _ = org_id
@@ -124,7 +65,7 @@ def build_internal_tools(
     declarations.append(
         _tool(
             "list_services",
-            "Listar servicios y reparaciones del taller",
+            "Listar servicios y reparaciones de la bicicleteria",
             {
                 "type": "object",
                 "properties": {
@@ -134,25 +75,6 @@ def build_internal_tools(
         )
     )
     handlers["list_services"] = _list_services
-
-    async def _get_service(org_id: str, service_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await client.get_service(auth, service_id=service_id)
-
-    declarations.append(
-        _tool(
-            "get_service",
-            "Ver detalle de un servicio del taller",
-            {
-                "type": "object",
-                "properties": {
-                    "service_id": {"type": "string", "description": "UUID del servicio"},
-                },
-                "required": ["service_id"],
-            },
-        )
-    )
-    handlers["get_service"] = _get_service
 
     async def _list_work_orders(org_id: str, status: str = "", search: str = "") -> dict[str, Any]:
         _ = org_id
@@ -166,7 +88,7 @@ def build_internal_tools(
                 "type": "object",
                 "properties": {
                     "status": {"type": "string", "description": "ingresado, en_reparacion, listo, entregado, facturado"},
-                    "search": {"type": "string", "description": "Numero de orden, patente o cliente"},
+                    "search": {"type": "string", "description": "Numero de orden, marca o cliente"},
                 },
             },
         )
@@ -192,35 +114,6 @@ def build_internal_tools(
     )
     handlers["get_work_order"] = _get_work_order
 
-    async def _update_work_order_status(
-        org_id: str,
-        work_order_id: str,
-        status: str,
-        notes: str = "",
-    ) -> dict[str, Any]:
-        _ = org_id
-        data: dict[str, Any] = {"status": status}
-        if notes:
-            data["notes"] = notes
-        return await client.update_work_order(auth, work_order_id=work_order_id, data=data)
-
-    declarations.append(
-        _tool(
-            "update_work_order_status",
-            "Mover una orden de trabajo por el pipeline (ingresado, en_reparacion, listo, entregado, facturado)",
-            {
-                "type": "object",
-                "properties": {
-                    "work_order_id": {"type": "string", "description": "UUID de la orden"},
-                    "status": {"type": "string", "description": "ingresado, en_reparacion, listo, entregado, facturado"},
-                    "notes": {"type": "string", "description": "Notas opcionales del cambio de estado"},
-                },
-                "required": ["work_order_id", "status"],
-            },
-        )
-    )
-    handlers["update_work_order_status"] = _update_work_order_status
-
     async def _create_booking(
         org_id: str,
         customer_name: str,
@@ -245,7 +138,7 @@ def build_internal_tools(
     declarations.append(
         _tool(
             "create_booking",
-            "Reservar turno para ingreso al taller",
+            "Reservar turno para ingreso a la bicicleteria",
             {
                 "type": "object",
                 "properties": {
@@ -323,7 +216,7 @@ def build_internal_tools(
 
 
 def build_external_tools(
-    client: AutoRepairBackendClient,
+    client: BikeShopBackendClient,
     org_slug: str,
 ) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
     declarations: list[ToolDeclaration] = []
@@ -336,7 +229,7 @@ def build_external_tools(
     declarations.append(
         _tool(
             "get_public_services",
-            "Listar servicios publicos del taller",
+            "Listar servicios publicos de la bicicleteria",
             {
                 "type": "object",
                 "properties": {
@@ -370,7 +263,7 @@ def build_external_tools(
     declarations.append(
         _tool(
             "book_scheduling",
-            "Reservar turno en el taller",
+            "Reservar turno en la bicicleteria",
             {
                 "type": "object",
                 "properties": {

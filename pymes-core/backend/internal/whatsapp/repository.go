@@ -23,6 +23,38 @@ var (
 	ErrAlreadyOptedIn = errors.New("whatsapp: already opted in")
 )
 
+type quoteSnapshotRow struct {
+	ID           uuid.UUID
+	Number       string
+	PartyID      *uuid.UUID `gorm:"column:party_id"`
+	CustomerName string     `gorm:"column:customer_name"`
+	Total        float64
+}
+
+type saleSnapshotRow struct {
+	ID           uuid.UUID
+	Number       string
+	PartyID      *uuid.UUID `gorm:"column:party_id"`
+	CustomerName string     `gorm:"column:customer_name"`
+	Total        float64
+}
+
+type partyPhoneRow struct {
+	Phone string
+	Name  string `gorm:"column:name"`
+}
+
+type partyByPhoneRow struct {
+	ID   uuid.UUID `gorm:"column:id"`
+	Name string    `gorm:"column:name"`
+}
+
+type waTemplatesRow struct {
+	QuoteTemplate      string `gorm:"column:wa_quote_template"`
+	ReceiptTemplate    string `gorm:"column:wa_receipt_template"`
+	DefaultCountryCode string `gorm:"column:wa_default_country_code"`
+}
+
 type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
@@ -30,13 +62,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 // --- Snapshots (existentes) ---
 
 func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
-	var row struct {
-		ID           uuid.UUID
-		Number       string
-		PartyID      *uuid.UUID `gorm:"column:party_id"`
-		CustomerName string     `gorm:"column:customer_name"`
-		Total        float64
-	}
+	var row quoteSnapshotRow
 	err := r.db.WithContext(ctx).Table("quotes").
 		Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").
 		Where("org_id = ? AND id = ?", orgID, quoteID).Take(&row).Error
@@ -46,17 +72,17 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 		}
 		return QuoteSnapshot{}, err
 	}
-	return QuoteSnapshot(row), nil
+	return QuoteSnapshot{
+		ID:           row.ID,
+		Number:       row.Number,
+		PartyID:      row.PartyID,
+		CustomerName: row.CustomerName,
+		Total:        row.Total,
+	}, nil
 }
 
 func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (SaleSnapshot, error) {
-	var row struct {
-		ID           uuid.UUID
-		Number       string
-		PartyID      *uuid.UUID `gorm:"column:party_id"`
-		CustomerName string     `gorm:"column:customer_name"`
-		Total        float64
-	}
+	var row saleSnapshotRow
 	err := r.db.WithContext(ctx).Table("sales").
 		Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").
 		Where("org_id = ? AND id = ?", orgID, saleID).Take(&row).Error
@@ -66,14 +92,17 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUI
 		}
 		return SaleSnapshot{}, err
 	}
-	return SaleSnapshot(row), nil
+	return SaleSnapshot{
+		ID:           row.ID,
+		Number:       row.Number,
+		PartyID:      row.PartyID,
+		CustomerName: row.CustomerName,
+		Total:        row.Total,
+	}, nil
 }
 
 func (r *Repository) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID) (string, string, error) {
-	var row struct {
-		Phone string
-		Name  string `gorm:"column:name"`
-	}
+	var row partyPhoneRow
 	err := r.db.WithContext(ctx).Table("parties").
 		Select("COALESCE(phone,'') as phone, COALESCE(display_name,'') as name").
 		Where("org_id = ? AND id = ?", orgID, partyID).Take(&row).Error
@@ -91,10 +120,7 @@ func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone
 	if phone == "" {
 		return uuid.Nil, "", ErrNotFound
 	}
-	var row struct {
-		ID   uuid.UUID `gorm:"column:id"`
-		Name string    `gorm:"column:name"`
-	}
+	var row partyByPhoneRow
 	// Buscar teléfono exacto o con variantes (+54, sin +, etc.)
 	err := r.db.WithContext(ctx).Table("parties").
 		Select("id, COALESCE(display_name,'') as name").
@@ -110,11 +136,7 @@ func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone
 }
 
 func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error) {
-	var row struct {
-		QuoteTemplate      string `gorm:"column:wa_quote_template"`
-		ReceiptTemplate    string `gorm:"column:wa_receipt_template"`
-		DefaultCountryCode string `gorm:"column:wa_default_country_code"`
-	}
+	var row waTemplatesRow
 	err := r.db.WithContext(ctx).Table("tenant_settings").
 		Select("wa_quote_template, wa_receipt_template, wa_default_country_code").
 		Where("org_id = ?", orgID).Take(&row).Error

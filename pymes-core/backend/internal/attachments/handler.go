@@ -26,6 +26,23 @@ type usecasesPort interface {
 	ListByEntity(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error)
 }
 
+type requestUploadRequest struct {
+	EntityType  string `json:"entity_type" binding:"required"`
+	EntityID    string `json:"entity_id" binding:"required"`
+	FileName    string `json:"file_name" binding:"required"`
+	ContentType string `json:"content_type"`
+	SizeBytes   int64  `json:"size_bytes"`
+}
+
+type confirmUploadRequest struct {
+	EntityType  string `json:"entity_type" binding:"required"`
+	EntityID    string `json:"entity_id" binding:"required"`
+	FileName    string `json:"file_name" binding:"required"`
+	ContentType string `json:"content_type"`
+	SizeBytes   int64  `json:"size_bytes"`
+	StorageKey  string `json:"storage_key" binding:"required"`
+}
+
 type Handler struct{ uc usecasesPort }
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
@@ -45,13 +62,7 @@ func (h *Handler) RequestUpload(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct {
-		EntityType  string `json:"entity_type" binding:"required"`
-		EntityID    string `json:"entity_id" binding:"required"`
-		FileName    string `json:"file_name" binding:"required"`
-		ContentType string `json:"content_type"`
-		SizeBytes   int64  `json:"size_bytes"`
-	}
+	var req requestUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -87,14 +98,7 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct {
-		EntityType  string `json:"entity_type" binding:"required"`
-		EntityID    string `json:"entity_id" binding:"required"`
-		FileName    string `json:"file_name" binding:"required"`
-		ContentType string `json:"content_type"`
-		SizeBytes   int64  `json:"size_bytes"`
-		StorageKey  string `json:"storage_key" binding:"required"`
-	}
+	var req confirmUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return

@@ -148,6 +148,126 @@ def build_internal_tools(
     )
     handlers["update_intake"] = _update_intake
 
+    async def _update_professional_profile(
+        org_id: str,
+        profile_id: str,
+        headline: str = "",
+        bio: str = "",
+        accept_new_clients: bool | None = None,
+    ) -> dict[str, Any]:
+        _ = org_id
+        data: dict[str, Any] = {}
+        if headline:
+            data["headline"] = headline
+        if bio:
+            data["bio"] = bio
+        if accept_new_clients is not None:
+            data["accepts_new_clients"] = accept_new_clients
+        return await client.update_professional_profile(auth, profile_id=profile_id, data=data)
+
+    declarations.append(
+        _tool(
+            "update_professional_profile",
+            "Actualizar el perfil de un docente o profesional (titular, bio, acepta nuevos clientes)",
+            {
+                "type": "object",
+                "properties": {
+                    "profile_id": {"type": "string", "description": "UUID del perfil"},
+                    "headline": {"type": "string", "description": "Titular del perfil"},
+                    "bio": {"type": "string", "description": "Biografia"},
+                    "accept_new_clients": {"type": "boolean", "description": "Si acepta nuevos clientes"},
+                },
+                "required": ["profile_id"],
+            },
+        )
+    )
+    handlers["update_professional_profile"] = _update_professional_profile
+
+    async def _assign_specialty_to_professional(
+        org_id: str, profile_id: str, specialty_id: str
+    ) -> dict[str, Any]:
+        _ = org_id
+        return await client.assign_specialty_professionals(
+            auth, specialty_id=specialty_id, profile_ids=[profile_id]
+        )
+
+    declarations.append(
+        _tool(
+            "assign_specialty_to_professional",
+            "Asignar una especialidad a un docente o profesional",
+            {
+                "type": "object",
+                "properties": {
+                    "profile_id": {"type": "string", "description": "UUID del perfil"},
+                    "specialty_id": {"type": "string", "description": "UUID de la especialidad"},
+                },
+                "required": ["profile_id", "specialty_id"],
+            },
+        )
+    )
+    handlers["assign_specialty_to_professional"] = _assign_specialty_to_professional
+
+    async def _list_intakes(
+        org_id: str, profile_id: str = "", search: str = ""
+    ) -> dict[str, Any]:
+        _ = org_id
+        result = await client.list_intakes(auth)
+        items = result.get("items", []) if isinstance(result, dict) else []
+        if profile_id:
+            items = [it for it in items if it.get("profile_id") == profile_id]
+        if search:
+            needle = search.lower()
+            items = [
+                it
+                for it in items
+                if needle in str(it.get("payload", "")).lower()
+            ]
+        return {"items": items}
+
+    declarations.append(
+        _tool(
+            "list_intakes",
+            "Listar fichas de intake, opcionalmente filtradas por perfil o texto",
+            {
+                "type": "object",
+                "properties": {
+                    "profile_id": {"type": "string", "description": "UUID del docente o profesional (opcional)"},
+                    "search": {"type": "string", "description": "Texto a buscar en el payload (opcional)"},
+                },
+            },
+        )
+    )
+    handlers["list_intakes"] = _list_intakes
+
+    async def _add_session_note(
+        org_id: str,
+        session_id: str,
+        note: str,
+        note_type: str = "",
+    ) -> dict[str, Any]:
+        _ = org_id
+        data: dict[str, Any] = {"body": note}
+        if note_type:
+            data["note_type"] = note_type
+        return await client.add_session_note(auth, session_id=session_id, data=data)
+
+    declarations.append(
+        _tool(
+            "add_session_note",
+            "Agregar una nota a una sesion existente",
+            {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "UUID de la sesion"},
+                    "note": {"type": "string", "description": "Texto de la nota"},
+                    "note_type": {"type": "string", "description": "Tipo de nota (opcional)"},
+                },
+                "required": ["session_id", "note"],
+            },
+        )
+    )
+    handlers["add_session_note"] = _add_session_note
+
     async def _get_session_summary(org_id: str, session_id: str) -> dict[str, Any]:
         _ = org_id
         return await client.get_session(auth, session_id=session_id)

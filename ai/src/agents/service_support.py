@@ -65,10 +65,6 @@ class CommercialChatResult:
     def tokens_used(self) -> int:
         return self.tokens_input + self.tokens_output
 
-    @property
-    def routed_mode(self) -> str | None:
-        """Alias legacy para compatibilidad con clientes existentes."""
-        return self.routed_agent
 
 def sanitize_message(text: str, limit: int = 4000) -> str:
     cleaned = "".join(ch for ch in text if ch == "\n" or 32 <= ord(ch) <= 126 or ord(ch) >= 160)

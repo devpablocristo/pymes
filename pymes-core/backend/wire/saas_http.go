@@ -87,12 +87,29 @@ func registerPublic(mux *http.ServeMux, pattern string, next http.HandlerFunc) {
 	mux.HandleFunc(pattern, next)
 }
 
+type createOrgRequest struct {
+	Name  string `json:"name"`
+	Slug  string `json:"slug"`
+	Actor string `json:"actor"`
+}
+
+type createAPIKeyRequest struct {
+	Name   string   `json:"name"`
+	Scopes []string `json:"scopes"`
+}
+
+type billingCheckoutRequest struct {
+	PlanCode   string `json:"plan_code"`
+	SuccessURL string `json:"success_url"`
+	CancelURL  string `json:"cancel_url"`
+}
+
+type billingPortalRequest struct {
+	ReturnURL string `json:"return_url"`
+}
+
 func handleCreateOrg(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	var req struct {
-		Name  string `json:"name"`
-		Slug  string `json:"slug"`
-		Actor string `json:"actor"`
-	}
+	var req createOrgRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
 		return
@@ -273,12 +290,14 @@ func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSa
 	}
 	if err != nil {
 		msg := err.Error()
-		if msg == "name cannot be empty" || msg == "name too long" || msg == "phone too long" ||
-			msg == "given name too long" || msg == "family name too long" {
+		switch msg {
+		case "name cannot be empty", "name too long", "phone too long",
+			"given name too long", "family name too long":
 			httperr.BadRequest(w, msg)
-			return
+		default:
+			slog.Error("patch user profile failed", "error", err)
+			httperr.WriteFrom(w, err)
 		}
-		httperr.WriteFrom(w, err)
 		return
 	}
 	profile, err := loadMeProfile(r.Context(), r, principal, store, httpAuth)
@@ -335,10 +354,7 @@ func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 	if !ok {
 		return
 	}
-	var req struct {
-		Name   string   `json:"name"`
-		Scopes []string `json:"scopes"`
-	}
+	var req createAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
 		return
@@ -421,11 +437,7 @@ func handleBillingCheckout(w http.ResponseWriter, r *http.Request, runtime *saas
 		httperr.Unauthorized(w, "principal not found")
 		return
 	}
-	var req struct {
-		PlanCode   string `json:"plan_code"`
-		SuccessURL string `json:"success_url"`
-		CancelURL  string `json:"cancel_url"`
-	}
+	var req billingCheckoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
 		return
@@ -450,9 +462,7 @@ func handleBillingPortal(w http.ResponseWriter, r *http.Request, runtime *saasbi
 		httperr.Unauthorized(w, "principal not found")
 		return
 	}
-	var req struct {
-		ReturnURL string `json:"return_url"`
-	}
+	var req billingPortalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
 		return

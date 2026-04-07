@@ -557,7 +557,6 @@ async def test_run_internal_orchestrated_chat_persists_routed_agent(monkeypatch)
     assert repo.append_calls
     assistant_message = repo.append_calls[0]["new_messages"][1]
     assert assistant_message["routed_agent"] == "customers"
-    assert assistant_message["routed_mode"] == "customers"
     assert assistant_message["blocks"] == [{"type": "text", "text": "Encontré 3 clientes."}]
     assert repo.track_calls == [{"org_id": "org-123", "tokens_in": result.tokens_input, "tokens_out": result.tokens_output}]
     assert repo.agent_events[-1]["action"] == "chat.completed"

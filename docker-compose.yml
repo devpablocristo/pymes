@@ -59,7 +59,7 @@ services:
     restart: unless-stopped
     build:
       context: ..
-      dockerfile: nexus/v3/review/Dockerfile.dev
+      dockerfile: pymes/docker/review.Dockerfile.dev
     ports:
       - "18084:8080"
     volumes:

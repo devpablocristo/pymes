@@ -3,12 +3,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@devpablocristo/modules-search';
-import {
-  pymesAssistantChat,
-  listConversations,
-  getConversation,
-  type ConversationSummary,
-} from '../lib/aiApi';
+import { pymesAssistantChat, listConversations, getConversation } from '../lib/aiApi';
 import { humanInsightScopeLabel, humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
@@ -408,13 +403,6 @@ export function UnifiedChatPage() {
     }
   }, [conversationDetailQuery.data, historyConversationId, language]);
 
-  function selectSavedConversation(conv: ConversationSummary) {
-    setActive(AI_PYMES_ID);
-    setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: conv.id }));
-    setHistoryConversationId(conv.id);
-    setError('');
-  }
-
   const activeDef = useMemo(() => contactDefs.find((c) => c.id === active)!, [active, contactDefs]);
   const thread = useMemo(() => msgs.filter((m) => m.contactId === active), [msgs, active]);
   const activePendingConfirmations = useMemo(
@@ -730,30 +718,6 @@ export function UnifiedChatPage() {
                 </div>
               </button>
             ))}
-            {/* Conversaciones previas guardadas */}
-            {savedConversations.length > 0 && (
-              <>
-                <div className="cht__conversations-divider">
-                  {t('ai.chat.previousConversations') || 'Conversaciones anteriores'}
-                </div>
-                {savedConversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    type="button"
-                    className={`cht__contact ${chatIds[AI_PYMES_ID] === conv.id ? 'cht__contact--active' : ''}`}
-                    aria-pressed={chatIds[AI_PYMES_ID] === conv.id}
-                    aria-label={`${conv.title || 'Sin título'}. ${conv.message_count} mensajes`}
-                    onClick={() => selectSavedConversation(conv)}
-                  >
-                    <div className="cht__contact-avatar cht__contact-avatar--saved">AP</div>
-                    <div className="cht__contact-info">
-                      <div className="cht__contact-name">{conv.title || 'Sin título'}</div>
-                      <div className="cht__contact-preview">{conv.message_count} mensajes</div>
-                    </div>
-                  </button>
-                ))}
-              </>
-            )}
           </nav>
         </div>
         <div className="cht__main">

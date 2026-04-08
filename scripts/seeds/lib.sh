@@ -2,6 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# `make seed` y los scripts hijo corren en bash sin pasar por docker compose: leen `.env` de la raíz del monorepo.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
@@ -41,11 +50,12 @@ resolve_target_org_uuid() {
     exit 1
   fi
 
+  # psql no sustituye :'var' en -c de modo no interactivo; por stdin sí (PG 16 en imagen oficial).
   local org_uuid
   org_uuid="$(
-    dc exec -T postgres \
-      psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v external_id="$external_id" \
-      -c "SELECT id::text FROM orgs WHERE external_id = :'external_id';"
+    printf '%s\n' "SELECT cast(id as text) FROM orgs WHERE external_id = :'external_id';" \
+      | dc exec -T postgres \
+        psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -z "$org_uuid" ]]; then

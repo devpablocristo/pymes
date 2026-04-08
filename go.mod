@@ -118,3 +118,5 @@ require (
 // latest version is published. Remove this replace once
 // `github.com/devpablocristo/modules/scheduling/go` >= v0.4.0 is tagged.
 replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go
+
+replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go

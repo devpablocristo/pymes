@@ -108,9 +108,9 @@ services:
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
       PYMES_SEED_DEMO: "false"
-      # Sobrescribe .env: un org_... de Clerk que aún no está en `orgs` hace fallar el arranque. Vacío = org demo fija (01_local_org).
-      # Para sembrar contra Clerk en Docker, usá docker-compose.override.yml con PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_..."
-      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
+      # Tomado de .env (`PYMES_SEED_DEMO_ORG_EXTERNAL_ID`). Debe ser el `external_id` de la org en `orgs` (p. ej. org_... de Clerk).
+      # Vacío: cp-backend no recibe org de seed explícita (útil si solo usás org local embebida en seeds).
+      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}
       REVIEW_URL: http://review:8080
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
@@ -253,7 +253,7 @@ services:
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       PYMES_SEED_DEMO: "false"
-      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
+      PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}
     depends_on:
       postgres:
         condition: service_healthy

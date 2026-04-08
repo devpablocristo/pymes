@@ -8,7 +8,8 @@ source "$ROOT_DIR/scripts/seeds/lib.sh"
 ensure_seed_dbs_ready
 
 if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
-  echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required (Clerk org external_id, e.g. org_xxx). Set it in .env before running seeds." >&2
+  echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required (Clerk org external_id, e.g. org_xxx)." >&2
+  echo "Definilo en $ROOT_DIR/.env (scripts/seeds/lib.sh lo carga al correr make seed)." >&2
   exit 1
 fi
 

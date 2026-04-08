@@ -7,7 +7,6 @@ PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 REVIEW_DB_NAME="${REVIEW_DB_NAME:-nexus_review}"
 REVIEW_DB_USER="${REVIEW_DB_USER:-postgres}"
-LEGACY_DEMO_ORG_UUID="00000000-0000-0000-0000-000000000001"
 
 dc() {
   (cd "$ROOT_DIR" && ${DOCKER_COMPOSE} "$@")
@@ -38,8 +37,8 @@ ensure_seed_dbs_ready() {
 resolve_target_org_uuid() {
   local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
   if [[ -z "$external_id" ]]; then
-    printf '%s\n' "$LEGACY_DEMO_ORG_UUID"
-    return
+    echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required" >&2
+    exit 1
   fi
 
   local org_uuid
@@ -58,16 +57,14 @@ resolve_target_org_uuid() {
 
 render_seed_sql() {
   local file="$1"
-  python3 - "$ROOT_DIR/$file" "$TARGET_ORG_UUID" "$LEGACY_DEMO_ORG_UUID" <<'PY'
+  python3 - "$ROOT_DIR/$file" "$TARGET_ORG_UUID" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 target_org_uuid = sys.argv[2]
-legacy_org_uuid = sys.argv[3]
 body = path.read_text()
 body = body.replace("__SEED_ORG_ID__", target_org_uuid)
-body = body.replace(legacy_org_uuid, target_org_uuid)
 sys.stdout.write(body)
 PY
 }
@@ -88,4 +85,4 @@ run_review_sql_inline() {
 }
 
 export ROOT_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER
-export REVIEW_DB_NAME REVIEW_DB_USER LEGACY_DEMO_ORG_UUID
+export REVIEW_DB_NAME REVIEW_DB_USER

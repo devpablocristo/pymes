@@ -86,11 +86,14 @@ const modulesCrudUiSurface = modulesPackagePreferNodeModules(
   ['crud/ui/ts/src/crudCanonicalSurface.tsx'],
   './node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx',
 );
-const modulesCalendarBoardIndex = modulesPackagePreferNodeModules(
+/** Checkout local `modules/` primero; si no existe (CI sin monorepo), tarball npm. */
+const modulesCalendarBoardIndex = monorepoPackageDirOrNodeModule(
+  'modules',
   ['calendar/board/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-calendar-board/src/index.ts',
 );
-const modulesCalendarBoardStyles = modulesPackagePreferNodeModules(
+const modulesCalendarBoardStyles = monorepoPackageDirOrNodeModule(
+  'modules',
   ['calendar/board/ts/src/styles.css'],
   './node_modules/@devpablocristo/modules-calendar-board/src/styles.css',
 );

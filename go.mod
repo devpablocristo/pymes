@@ -113,3 +113,8 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 )
+
+// Local development: consume scheduling module from sibling worktree until the
+// latest version is published. Remove this replace once
+// `github.com/devpablocristo/modules/scheduling/go` >= v0.4.0 is tagged.
+replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go

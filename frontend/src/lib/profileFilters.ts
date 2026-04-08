@@ -58,7 +58,7 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('recurring');
   }
 
-  // Scheduling now lives in dedicated routes (`/calendar`, `/scheduling/public-preview`)
+  // Scheduling: operación interna en `/agenda`, flujo cliente (preview en consola) en `/web-clientes`
   // instead of the legacy CRUD module.
 
   // Integrations: only if billing or products

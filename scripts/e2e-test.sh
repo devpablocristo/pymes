@@ -8,8 +8,8 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 
 BASE_URL="${1:-http://localhost:8100}"
-API_KEY="psk_local_admin"
-ORG_ID="00000000-0000-0000-0000-000000000001"
+API_KEY="${API_KEY:-psk_local_admin}"
+ORG_ID="${ORG_ID:?ORG_ID is required (UUID interno de la org demo cargada por seeds; obtenela con 'docker compose exec postgres psql -U postgres -d pymes -c "SELECT id FROM orgs WHERE external_id = '\''$PYMES_SEED_DEMO_ORG_EXTERNAL_ID'\'';"')}"
 
 PASS=0
 FAIL=0

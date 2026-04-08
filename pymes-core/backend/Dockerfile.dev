@@ -11,6 +11,9 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GOPROXY=direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
+# Local replace target for modules/scheduling/go (see pymes/go.mod replace
+# directive). Remove once the module is published as v0.4.0.
+COPY modules/scheduling/go /workspace/modules/scheduling/go
 
 WORKDIR /workspace/pymes/pymes-core/backend
 

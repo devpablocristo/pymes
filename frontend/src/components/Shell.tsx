@@ -71,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const mainNav = useMemo<AppShellNavItem[]>(() => {
     const items: AppShellNavItem[] = [
       { to: '/dashboard', label: t('shell.nav.dashboard'), icon: chartIcon },
-      { to: '/calendar', label: t('shell.nav.calendar'), icon: calendarIcon },
+      { to: '/agenda', label: t('shell.nav.calendar'), icon: calendarIcon },
       { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
       { to: '/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
       { to: '/invoices', label: t('shell.nav.invoices'), icon: documentIcon },
@@ -131,10 +131,11 @@ export function Shell({ children }: { children: ReactNode }) {
     const vertical = profile?.vertical ?? 'none';
     const baseNav: AppShellNavItem[] = [...mainNav];
 
+    const webClientesItems: AppShellNavItem[] = [];
     if (profile?.usesScheduling) {
-      baseNav.splice(2, 0, {
-        to: '/scheduling/public-preview',
-        label: t('shell.nav.schedulingPublic'),
+      webClientesItems.push({
+        to: '/web-clientes',
+        label: t('shell.nav.webClientesReservas'),
         icon: globeIcon,
       });
     }
@@ -156,6 +157,12 @@ export function Shell({ children }: { children: ReactNode }) {
       .filter((section) => section.items.length > 0);
 
     const result: AppShellNavSection[] = [{ label: sentenceCase(t('shell.sections.base')), items: baseNav }];
+    if (webClientesItems.length > 0) {
+      result.push({
+        label: sentenceCase(t('shell.sections.webClientes')),
+        items: webClientesItems,
+      });
+    }
     if (vertical === 'professionals') {
       result.push({ label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav });
     }

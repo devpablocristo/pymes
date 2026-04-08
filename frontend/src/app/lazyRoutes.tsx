@@ -41,8 +41,8 @@ export const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) =>
 export const OnboardingPage = lazy(() =>
   import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })),
 );
-export const PublicPreviewPage = lazy(() =>
-  import('../pages/PublicPreviewPage').then((mod) => ({ default: mod.PublicPreviewPage })),
+export const WebClientesPage = lazy(() =>
+  import('../pages/WebClientesPage').then((mod) => ({ default: mod.WebClientesPage })),
 );
 export const RestaurantTableSessionsPage = lazy(() =>
   import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })),

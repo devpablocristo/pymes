@@ -36,7 +36,8 @@
       "/home/pablo/Projects/Pablo/nexus/v3/companion",
       "/home/pablo/Projects/Pablo/core/ai/python/src/runtime",
       "/home/pablo/Projects/Pablo/core/backend/gin/go",
-      "/home/pablo/Projects/Pablo/core/backend/go/validate"
+      "/home/pablo/Projects/Pablo/core/backend/go/validate",
+      "/home/pablo/Projects/Pablo/modules/scheduling/go"
     ]
   }
 }

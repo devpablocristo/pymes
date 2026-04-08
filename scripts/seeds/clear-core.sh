@@ -85,19 +85,34 @@ BEGIN
     DELETE FROM role_permissions WHERE role_id IN (r_admin, r_seller, r_cashier, r_accountant, r_warehouse);
     DELETE FROM roles WHERE id IN (r_admin, r_seller, r_cashier, r_accountant, r_warehouse);
 
+    DELETE FROM scheduling_queue_tickets WHERE id IN (
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-1'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-2'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-3')
+    );
+    DELETE FROM scheduling_bookings WHERE id IN (
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-1'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-2'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-3'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-4')
+    );
     DELETE FROM scheduling_service_resources WHERE service_id = sched_service OR resource_id = sched_resource;
     DELETE FROM scheduling_availability_rules
     WHERE id IN (
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/0'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/1'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/2'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/3'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/4'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/5'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/6'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/0'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/1'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/2'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/3'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/4'),
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/5')
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/5'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/6')
     );
     DELETE FROM scheduling_queues WHERE id = sched_queue;
     DELETE FROM scheduling_resources WHERE id = sched_resource;

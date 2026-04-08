@@ -208,6 +208,13 @@ func (r *Repository) listSchedulingPublicServices(ctx context.Context, orgID uui
 		if !service.Active {
 			continue
 		}
+		// Catch-all services (used by the SMB owner from the internal calendar
+		// to anote ad-hoc bookings) must never appear in the public catalog —
+		// clients booking through PublicSchedulingFlow should only see real
+		// catalog services with meaningful names and durations.
+		if isCatchAllService(service.Metadata) {
+			continue
+		}
 		unit := "booking"
 		if service.FulfillmentMode == schedulingdomain.FulfillmentModeQueue {
 			unit = "ticket"
@@ -865,4 +872,22 @@ func digitsOnly(v string) string {
 		}
 	}
 	return b.String()
+}
+
+// isCatchAllService reports whether a scheduling service is the owner-side
+// catch-all (used to anote ad-hoc bookings from the internal calendar). Such
+// services are flagged with metadata.catchall = true at seed time and must be
+// hidden from the public catalog.
+func isCatchAllService(metadata map[string]any) bool {
+	if metadata == nil {
+		return false
+	}
+	switch v := metadata["catchall"].(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(v, "true")
+	default:
+		return false
+	}
 }

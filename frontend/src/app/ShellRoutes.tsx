@@ -13,7 +13,7 @@ import {
   ProductsGalleryPage,
   ProductsListPage,
   ProductsModuleSection,
-  PublicPreviewPage,
+  WebClientesPage,
   RestaurantTableSessionsPage,
   SettingsHubPage,
   StockPage,
@@ -59,7 +59,8 @@ export function ShellRoutes() {
       <Route path="/settings" element={<SettingsHubPage />} />
       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
       <Route path="/settings/notifications" element={<Navigate to="/settings?section=notifications" replace />} />
-      <Route path="/scheduling/public-preview" element={<PublicPreviewPage />} />
+      <Route path="/web-clientes" element={<WebClientesPage />} />
+      <Route path="/scheduling/public-preview" element={<Navigate to="/web-clientes" replace />} />
       <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/carWorkOrders" replace />} />
       <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersSection />}>
         <Route index element={<Navigate to="board" replace />} />
@@ -78,7 +79,8 @@ export function ShellRoutes() {
       <Route path="/stock" element={<StockPage />} />
       <Route path="/modules/inventory" element={<Navigate to="/stock" replace />} />
       <Route path="/modules/inventoryMovements" element={<Navigate to="/stock" replace />} />
-      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/agenda" element={<CalendarPage />} />
+      <Route path="/calendar" element={<Navigate to="/agenda" replace />} />
     </Routes>
   );
 }

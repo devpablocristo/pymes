@@ -203,3 +203,32 @@ func derefUUID(v *uuid.UUID) uuid.UUID {
 	}
 	return *v
 }
+
+func TestIsCatchAllService(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   map[string]any
+		want bool
+	}{
+		{name: "nil metadata", in: nil, want: false},
+		{name: "empty metadata", in: map[string]any{}, want: false},
+		{name: "catchall true bool", in: map[string]any{"catchall": true}, want: true},
+		{name: "catchall false bool", in: map[string]any{"catchall": false}, want: false},
+		{name: "catchall true string", in: map[string]any{"catchall": "true"}, want: true},
+		{name: "catchall TRUE string", in: map[string]any{"catchall": "TRUE"}, want: true},
+		{name: "catchall false string", in: map[string]any{"catchall": "false"}, want: false},
+		{name: "catchall other type", in: map[string]any{"catchall": 1}, want: false},
+		{name: "no catchall key", in: map[string]any{"other": true}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := isCatchAllService(tt.in); got != tt.want {
+				t.Fatalf("isCatchAllService() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

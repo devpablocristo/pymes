@@ -285,7 +285,6 @@ func InitializeApp() *app.App {
 
 	authGroup := v1.Group("")
 	authGroup.Use(GinSaaSAuthMiddleware(saasSvc))
-	authGroup.Use(NewGinDevForceOrgMiddleware(cfg.Environment, os.Getenv("PYMES_DEV_FORCE_ORG_UUID")))
 	adminHandler.RegisterRoutes(authGroup)
 	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)

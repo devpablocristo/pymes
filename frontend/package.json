@@ -27,6 +27,7 @@
     "@devpablocristo/modules-crud-ui": "^0.6.1",
     "@devpablocristo/modules-kanban-board": "^0.2.0",
     "@devpablocristo/modules-search": "^0.1.0",
+    "@devpablocristo/modules-scheduling": "^0.4.0",
     "@devpablocristo/modules-shell-sidebar": "^0.2.0",
     "@devpablocristo/modules-ui-data-display": "^0.2.0",
     "@devpablocristo/modules-ui-notification-feed": "^0.1.0",

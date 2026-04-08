@@ -3,7 +3,7 @@
 
 DO $$
 DECLARE
-    v_org uuid := '00000000-0000-0000-0000-000000000001';
+    v_org uuid := '__SEED_ORG_ID__';
     pl_default uuid;
     c1 uuid;
     c2 uuid;

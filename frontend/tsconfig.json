@@ -59,14 +59,14 @@
         "../../core/browser/ts/src/i18n/index.ts"
       ],
       "@devpablocristo/modules-calendar-board": [
-        "./node_modules/@devpablocristo/modules-calendar-board/src/index.ts",
         "../modules/calendar/board/ts/src/index.ts",
-        "../../modules/calendar/board/ts/src/index.ts"
+        "../../modules/calendar/board/ts/src/index.ts",
+        "./node_modules/@devpablocristo/modules-calendar-board/src/index.ts"
       ],
       "@devpablocristo/modules-calendar-board/styles.css": [
-        "./node_modules/@devpablocristo/modules-calendar-board/src/styles.css",
         "../modules/calendar/board/ts/src/styles.css",
-        "../../modules/calendar/board/ts/src/styles.css"
+        "../../modules/calendar/board/ts/src/styles.css",
+        "./node_modules/@devpablocristo/modules-calendar-board/src/styles.css"
       ],
       "@devpablocristo/modules-crud-ui": [
         "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts",

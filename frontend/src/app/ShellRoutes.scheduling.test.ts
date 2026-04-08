@@ -8,7 +8,7 @@ describe('ShellRoutes scheduling paths', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const src = readFileSync(path.join(dir, 'ShellRoutes.tsx'), 'utf8');
 
-    expect(src).toMatch(/path="\/scheduling\/public-preview"/);
+    expect(src).toMatch(/path="\/web-clientes"/);
     expect(src).not.toMatch(/path="\/modules\/appointments"/);
     expect(src).not.toMatch(/path="\/professionals\/teachers\/public"/);
   });

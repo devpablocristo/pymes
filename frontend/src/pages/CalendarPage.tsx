@@ -7,6 +7,7 @@ import { useI18n } from '../lib/i18n';
 
 const schedulingClient = createSchedulingClient(apiRequest);
 
+/** Agenda interna: calendario operativo y cola para usuarios de la org. El flujo para clientes finales está en `/web-clientes`. */
 export function CalendarPage() {
   const { t, language } = useI18n();
   const search = usePageSearch();

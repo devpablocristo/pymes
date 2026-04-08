@@ -1,4 +1,4 @@
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
 import { WorkOrderEditor } from './WorkOrderEditor';
 
 export type WorkOrderKanbanDetailModalProps = {

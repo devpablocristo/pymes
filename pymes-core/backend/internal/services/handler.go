@@ -38,6 +38,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	const servicesItemPath = servicesBasePath + "/:id"
 
 	auth.GET(servicesBasePath, rbac.RequirePermission("services", "read"), h.List)
+	auth.GET(servicesBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("services", "read"), h.ListArchived)
 	auth.POST(servicesBasePath, rbac.RequirePermission("services", "create"), h.Create)
 	auth.GET(servicesItemPath, rbac.RequirePermission("services", "read"), h.Get)
 	auth.PATCH(servicesItemPath, rbac.RequirePermission("services", "update"), h.Update)
@@ -47,6 +48,15 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
+	h.listServices(c, false)
+}
+
+// ListArchived lista archivados con paginación (ruta canónica CRUD UI: GET /services/archived).
+func (h *Handler) ListArchived(c *gin.Context) {
+	h.listServices(c, true)
+}
+
+func (h *Handler) listServices(c *gin.Context, forceArchived bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
@@ -58,6 +68,7 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
+	archived := forceArchived || strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:    orgID,
 		Limit:    limit,
@@ -66,7 +77,7 @@ func (h *Handler) List(c *gin.Context) {
 		Tag:      c.Query("tag"),
 		Sort:     c.Query("sort"),
 		Order:    c.Query("order"),
-		Archived: strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true"),
+		Archived: archived,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)

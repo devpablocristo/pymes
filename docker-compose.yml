@@ -59,7 +59,7 @@ services:
     restart: unless-stopped
     build:
       context: ..
-      dockerfile: nexus/v3/review/Dockerfile.dev
+      dockerfile: pymes/docker/review.Dockerfile.dev
     ports:
       - "18084:8080"
     volumes:
@@ -99,13 +99,15 @@ services:
     env_file:
       - .env
     environment:
+      # Debe coincidir con el mapeo host 8100:8080, healthcheck y URLs internas (review → cp-backend:8080).
+      PORT: "8080"
       ENVIRONMENT: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       SMTP_HOST: mailhog
       FRONTEND_URL: http://localhost:5180
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
-      PYMES_SEED_DEMO: "true"
+      PYMES_SEED_DEMO: "false"
       # Sobrescribe .env: un org_... de Clerk que aún no está en `orgs` hace fallar el arranque. Vacío = org demo fija (01_local_org).
       # Para sembrar contra Clerk en Docker, usá docker-compose.override.yml con PYMES_SEED_DEMO_ORG_EXTERNAL_ID: "org_..."
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
@@ -252,7 +254,7 @@ services:
       PYMES_CORE_URL: http://cp-backend:8080
       FRONTEND_URL: http://localhost:5180
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
-      PYMES_SEED_DEMO: "true"
+      PYMES_SEED_DEMO: "false"
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ""
       # Clerk resuelve otra org que la demo seed (000...001); sin esto la lista de OT queda vacía.
       PYMES_DEV_FORCE_ORG_UUID: "00000000-0000-0000-0000-000000000001"

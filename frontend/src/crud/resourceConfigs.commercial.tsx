@@ -11,6 +11,7 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
+import { renderTagBadges } from './crudTagBadges';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
 
@@ -170,14 +171,9 @@ function renderActiveBadge(value: boolean, activeLabel = 'Activo', inactiveLabel
   return <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? activeLabel : inactiveLabel}</span>;
 }
 
-function buildCanonicalArchivedCrud<T extends { id: string; deleted_at?: string | null }>(basePath: string) {
+/** Archive/restore/hard delete: el listado paginado va por `basePath` + httpClient del shell. */
+function buildArchivedMutationsOnly<T extends { id: string }>(basePath: string) {
   return {
-    list: async ({ archived }: { archived: boolean }) => {
-      const suffix = archived ? '?archived=true' : '';
-      const data = await apiRequest<{ items: T[] }>(`${basePath}${suffix}`);
-      const items = data.items ?? [];
-      return archived ? items.filter((item) => Boolean(item.deleted_at)) : items.filter((item) => !item.deleted_at);
-    },
     deleteItem: async (row: T) => {
       await apiRequest(`${basePath}/${row.id}/archive`, { method: 'POST', body: {} });
     },
@@ -190,8 +186,8 @@ function buildCanonicalArchivedCrud<T extends { id: string; deleted_at?: string 
   };
 }
 
-const productsArchivedCrud = buildCanonicalArchivedCrud<Product>('/v1/products');
-const servicesArchivedCrud = buildCanonicalArchivedCrud<Service>('/v1/services');
+const productsArchivedMutations = buildArchivedMutationsOnly<Product>('/v1/products');
+const servicesArchivedMutations = buildArchivedMutationsOnly<Service>('/v1/services');
 
 function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id?: string; service_id?: string; price: number }> {
   const parsed = parseJSONArray<{ product_id?: string; service_id?: string; price: number }>(
@@ -359,6 +355,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   suppliers: {
     basePath: '/v1/suppliers',
     supportsArchived: true,
+    searchPlaceholder: 'Buscar...',
     label: 'proveedor',
     labelPlural: 'proveedores',
     labelPluralCap: 'Proveedores',
@@ -429,7 +426,6 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
     dataSource: {
-      list: async (opts) => productsArchivedCrud.list(opts),
       create: async (values) => {
         await apiRequest('/v1/products', {
           method: 'POST',
@@ -466,9 +462,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           },
         });
       },
-      deleteItem: productsArchivedCrud.deleteItem,
-      restore: productsArchivedCrud.restore,
-      hardDelete: productsArchivedCrud.hardDelete,
+      ...productsArchivedMutations,
     },
     columns: [
       {
@@ -484,6 +478,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       },
       { key: 'price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
       { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      {
+        key: 'tags',
+        header: 'Tags',
+        className: 'cell-tags',
+        render: (_value, row: Product) => renderTagBadges(row.tags),
+      },
       {
         key: 'track_stock',
         header: 'Stock',
@@ -553,11 +553,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   services: {
     basePath: '/v1/services',
     supportsArchived: true,
+    renderTagsCell: (row: Service) => renderTagBadges(row.tags),
+    searchPlaceholder: 'Buscar...',
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
     dataSource: {
-      list: async (opts) => servicesArchivedCrud.list(opts),
       create: async (values) => {
         await apiRequest('/v1/services', {
           method: 'POST',
@@ -594,9 +595,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           },
         });
       },
-      deleteItem: servicesArchivedCrud.deleteItem,
-      restore: servicesArchivedCrud.restore,
-      hardDelete: servicesArchivedCrud.hardDelete,
+      ...servicesArchivedMutations,
     },
     columns: [
       {
@@ -678,6 +677,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
   priceLists: {
     basePath: '/v1/price-lists',
+    searchPlaceholder: 'Buscar...',
     label: 'lista de precios',
     labelPlural: 'listas de precios',
     labelPluralCap: 'Listas de precios',
@@ -745,6 +745,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   quotes: {
     basePath: '/v1/quotes',
     supportsArchived: true,
+    searchPlaceholder: 'Buscar...',
     label: 'presupuesto',
     labelPlural: 'presupuestos',
     labelPluralCap: 'Presupuestos',
@@ -836,6 +837,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     basePath: '/v1/sales',
     allowEdit: false,
     allowDelete: false,
+    searchPlaceholder: 'Buscar...',
     label: 'venta',
     labelPlural: 'ventas',
     labelPluralCap: 'Ventas',
@@ -981,6 +983,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   purchases: {
     basePath: '/v1/purchases',
     allowDelete: false,
+    searchPlaceholder: 'Buscar...',
     label: 'compra',
     labelPlural: 'compras',
     labelPluralCap: 'Compras',
@@ -1044,17 +1047,25 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
 };
 
-export const commercialCsvStrategies: Record<string, CSVToolbarOptions> = {
-  customers: { mode: 'server', entity: 'customers' },
-  suppliers: { mode: 'server', entity: 'suppliers' },
-  products: { mode: 'server', entity: 'products' },
-  services: { mode: 'server', entity: 'services' },
-};
+function commercialCsvToolbarOptions(resourceId: string): CSVToolbarOptions {
+  switch (resourceId) {
+    case 'customers':
+      return { mode: 'server', entity: 'customers' };
+    case 'suppliers':
+      return { mode: 'server', entity: 'suppliers' };
+    case 'products':
+      return { mode: 'server', entity: 'products' };
+    case 'services':
+      return { mode: 'server', entity: 'services' };
+    default:
+      return { mode: 'client' };
+  }
+}
 
 const resourceConfigs = Object.fromEntries(
   Object.entries(commercialResourceConfigs).map(([resourceId, config]) => [
     resourceId,
-    withCSVToolbar(resourceId, config, commercialCsvStrategies[resourceId]),
+    withCSVToolbar(resourceId, config, commercialCsvToolbarOptions(resourceId)),
   ]),
 ) as CrudResourceConfigMap;
 

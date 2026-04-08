@@ -30,10 +30,10 @@ const WATCHER_TEMPLATES: WatcherTemplate[] = [
     hasThreshold: true,
   },
   {
-    watcherType: 'unconfirmed_appointments',
+    watcherType: 'unconfirmed_bookings',
     name: 'Recordar turnos no confirmados',
     description: 'Envia recordatorio el dia anterior al turno si no fue confirmado',
-    thresholdKey: 'hours_before_appointment',
+    thresholdKey: 'hours_before_booking',
     thresholdLabel: '',
     thresholdUnit: '',
     defaultThreshold: 24,

@@ -17,10 +17,11 @@ import {
   updateTeacherSpecialty,
 } from '../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../lib/teachersTypes';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from './resourceConfigs.shared';
 
-const resourceConfigs: CrudResourceConfigMap = {
+const professionalsResourceConfigs: CrudResourceConfigMap = {
   professionals: {
     label: 'teacher',
     labelPlural: 'teachers',
@@ -256,7 +257,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       list: async () => (await getTeacherSessions()).items ?? [],
       create: async (values) => {
         await createTeacherSession({
-          appointment_id: asString(values.appointment_id),
+          booking_id: asString(values.booking_id),
           profile_id: asString(values.profile_id),
           customer_party_id: asOptionalString(values.customer_party_id),
           service_id: asOptionalString(values.service_id),
@@ -274,7 +275,7 @@ const resourceConfigs: CrudResourceConfigMap = {
           <>
             <strong>{row.profile_id}</strong>
             <div className="text-secondary">
-              {row.appointment_id} · {row.summary || 'Sin resumen'}
+              {row.booking_id} · {row.summary || 'Sin resumen'}
             </div>
           </>
         ),
@@ -294,7 +295,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       { key: 'ended_at', header: 'Fin', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
-      { key: 'appointment_id', label: 'Appointment ID', required: true, placeholder: 'UUID del turno' },
+      { key: 'booking_id', label: 'Booking ID', required: true, placeholder: 'UUID del turno' },
       { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
       { key: 'customer_party_id', label: 'Customer party ID' },
       { key: 'service_id', label: 'Service ID' },
@@ -324,9 +325,9 @@ const resourceConfigs: CrudResourceConfigMap = {
       },
     ],
     searchText: (row: TeacherSession) =>
-      [row.appointment_id, row.profile_id, row.status, row.summary].filter(Boolean).join(' '),
+      [row.booking_id, row.profile_id, row.status, row.summary].filter(Boolean).join(' '),
     toFormValues: () => ({
-      appointment_id: '',
+      booking_id: '',
       profile_id: '',
       customer_party_id: '',
       service_id: '',
@@ -334,12 +335,18 @@ const resourceConfigs: CrudResourceConfigMap = {
       summary: '',
     }),
     isValid: (values) =>
-      asString(values.appointment_id).trim().length > 0 &&
+      asString(values.booking_id).trim().length > 0 &&
       asString(values.profile_id).trim().length > 0 &&
       Boolean(toRFC3339(values.started_at)),
   },
 };
 
+const resourceConfigs = Object.fromEntries(
+  Object.entries(professionalsResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 resourceConfigs.teachers = resourceConfigs.professionals;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);

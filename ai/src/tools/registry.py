@@ -10,7 +10,6 @@ from src.core.onboarding import BUSINESS_PROFILES, apply_profile, complete_step,
 from runtime.types import ToolDeclaration
 from src.tools import (
     accounts,
-    appointments,
     cashflow,
     currency,
     customers,
@@ -22,6 +21,8 @@ from src.tools import (
     quotes,
     recurring,
     sales,
+    scheduling,
+    services,
     settings,
 )
 
@@ -29,12 +30,14 @@ ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 
 ROLE_TOOL_ACCESS: dict[str, str | list[str]] = {
     "admin": "*",
-    "vendedor": [
+    "seller": [
         "search_customers",
         "search_products",
-        "get_appointments",
+        "search_services",
+        "get_service",
+        "get_bookings",
         "check_availability",
-        "book_appointment",
+        "book_scheduling",
         "get_quotes",
         "create_quote",
         "create_sale",
@@ -45,20 +48,20 @@ ROLE_TOOL_ACCESS: dict[str, str | list[str]] = {
         "send_payment_info",
         "search_help",
     ],
-    "cajero": [
+    "cashier": [
         "get_recent_sales",
         "create_sale",
         "get_cashflow_summary",
         "create_cash_movement",
         "search_customers",
         "get_account_balances",
-        "get_appointments",
+        "get_bookings",
         "generate_payment_link",
         "get_payment_status",
         "send_payment_info",
         "search_help",
     ],
-    "contador": [
+    "accountant": [
         "get_sales_summary",
         "get_cashflow_summary",
         "get_account_balances",
@@ -69,7 +72,7 @@ ROLE_TOOL_ACCESS: dict[str, str | list[str]] = {
         "get_payment_status",
         "search_help",
     ],
-    "almacenero": [
+    "warehouse": [
         "search_products",
         "get_low_stock",
         "get_stock_level",
@@ -84,20 +87,22 @@ TOOL_MODULES: dict[str, set[str]] = {
     "get_top_customers": {"customers", "sales"},
     "search_customers": {"customers"},
     "search_products": {"products"},
+    "search_services": {"services"},
+    "get_service": {"services"},
     "get_low_stock": {"inventory", "products"},
     "get_stock_level": {"inventory", "products"},
     "get_cashflow_summary": {"cashflow"},
     "get_account_balances": {"accounts"},
     "get_debtors": {"accounts"},
-    "get_appointments": {"appointments"},
-    "check_availability": {"appointments"},
+    "get_bookings": {"scheduling"},
+    "check_availability": {"scheduling"},
     "get_quotes": {"quotes"},
     "get_purchases": {"purchases"},
     "get_recurring_expenses": {"recurring"},
     "get_exchange_rates": {"currency"},
     "create_quote": {"quotes"},
     "create_sale": {"sales"},
-    "book_appointment": {"appointments"},
+    "book_scheduling": {"scheduling"},
     "create_cash_movement": {"cashflow"},
     "generate_payment_link": {"sales"},
     "get_payment_status": {"sales"},
@@ -179,6 +184,14 @@ def build_internal_tools(
         _ = org_id
         return await products.search_products(client, auth, query=query, limit=limit)
 
+    async def _search_services(org_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
+        _ = org_id
+        return await services.search_services(client, auth, query=query, limit=limit)
+
+    async def _get_service(org_id: str, service_id: str) -> dict[str, Any]:
+        _ = org_id
+        return await services.get_service(client, auth, service_id=service_id)
+
     async def _get_low_stock(org_id: str) -> dict[str, Any]:
         _ = org_id
         return await inventory.get_low_stock(client, auth)
@@ -199,12 +212,12 @@ def build_internal_tools(
         _ = org_id
         return await accounts.get_debtors(client, auth)
 
-    async def _get_appointments(org_id: str, from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
+    async def _get_bookings(org_id: str, from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
         _ = org_id
-        return await appointments.get_appointments(client, auth, from_date=from_date, to_date=to_date)
+        return await scheduling.get_bookings(client, auth, from_date=from_date, to_date=to_date)
 
     async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await appointments.check_availability(client, org_id=org_id, date=date, duration=duration)
+        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
 
     async def _get_quotes(org_id: str, status: str | None = None) -> dict[str, Any]:
         _ = org_id
@@ -255,7 +268,7 @@ def build_internal_tools(
         _ = org_id
         return await payments.send_payment_info(client, auth, sale_id=sale_id)
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -263,7 +276,7 @@ def build_internal_tools(
         start_at: str,
         duration: int = 60,
     ) -> dict[str, Any]:
-        return await appointments.book_appointment(
+        return await scheduling.book_scheduling(
             client,
             org_id=org_id,
             customer_name=customer_name,
@@ -319,7 +332,6 @@ def build_internal_tools(
         default_currency: str | None = None,
         default_tax_rate: float | None = None,
         scheduling_enabled: bool | None = None,
-        appointments_enabled: bool | None = None,
     ) -> dict[str, Any]:
         _ = org_id
         field_map = {
@@ -330,18 +342,14 @@ def build_internal_tools(
         for key, val in field_map.items():
             if val is not None:
                 update_business_field(dossier, key, val)
-        effective_scheduling = scheduling_enabled
-        if effective_scheduling is None:
-            effective_scheduling = appointments_enabled
-        if effective_scheduling is not None:
-            set_preference(dossier, "scheduling_enabled", effective_scheduling)
+        if scheduling_enabled is not None:
+            set_preference(dossier, "scheduling_enabled", scheduling_enabled)
         result = await settings.update_business_info(
             client, auth,
             business_name=business_name, business_tax_id=business_tax_id,
             business_address=business_address, business_phone=business_phone,
             default_currency=default_currency, default_tax_rate=default_tax_rate,
-            scheduling_enabled=effective_scheduling,
-            appointments_enabled=effective_scheduling,
+            scheduling_enabled=scheduling_enabled,
         )
         return result
 
@@ -560,6 +568,40 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
+        _tool(
+            "search_services",
+            "Buscar servicios del catalogo",
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "texto a buscar (nombre, codigo o categoria)"},
+                    "limit": {"type": "integer", "description": "max 100"},
+                },
+            },
+        ),
+        _search_services,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
+        _tool(
+            "get_service",
+            "Detalle de un servicio del catalogo",
+            {
+                "type": "object",
+                "properties": {"service_id": {"type": "string", "description": "UUID del servicio"}},
+                "required": ["service_id"],
+            },
+        ),
+        _get_service,
+    )
+    _maybe_add(
+        declarations,
+        handlers,
+        role,
+        modules_active,
         _tool("get_low_stock", "Productos con stock bajo", {"type": "object", "properties": {}}),
         _get_low_stock,
     )
@@ -620,7 +662,7 @@ def build_internal_tools(
         role,
         modules_active,
         _tool(
-            "get_appointments",
+            "get_bookings",
             "Listar turnos",
             {
                 "type": "object",
@@ -630,7 +672,7 @@ def build_internal_tools(
                 },
             },
         ),
-        _get_appointments,
+        _get_bookings,
     )
     _maybe_add(
         declarations,
@@ -790,7 +832,7 @@ def build_internal_tools(
         role,
         modules_active,
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno",
             {
                 "type": "object",
@@ -804,7 +846,7 @@ def build_internal_tools(
                 "required": ["customer_name", "customer_phone", "title", "start_at"],
             },
         ),
-        _book_appointment,
+        _book_scheduling,
     )
     _maybe_add(
         declarations,
@@ -852,9 +894,9 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
     handlers: dict[str, ToolHandler] = {}
 
     async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await appointments.check_availability(client, org_id=org_id, date=date, duration=duration)
+        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -862,7 +904,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
         start_at: str,
         duration: int = 60,
     ) -> dict[str, Any]:
-        return await appointments.book_appointment(
+        return await scheduling.book_scheduling(
             client,
             org_id=org_id,
             customer_name=customer_name,
@@ -878,8 +920,8 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
     async def _get_business_info(org_id: str) -> dict[str, Any]:
         return await client.request("GET", f"/v1/public/{org_id}/info", include_internal=True)
 
-    async def _get_my_appointments(org_id: str, phone: str) -> dict[str, Any]:
-        return await appointments.get_my_appointments(client, org_id=org_id, phone=phone)
+    async def _get_my_bookings(org_id: str, phone: str) -> dict[str, Any]:
+        return await scheduling.get_my_bookings(client, org_id=org_id, phone=phone)
 
     async def _get_payment_link(org_id: str, quote_id: str) -> dict[str, Any]:
         return await payments.get_public_quote_payment_link(client, org_id=org_id, quote_id=quote_id)
@@ -902,7 +944,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
 
     declarations.append(
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno",
             {
                 "type": "object",
@@ -917,7 +959,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
             },
         )
     )
-    handlers["book_appointment"] = _book_appointment
+    handlers["book_scheduling"] = _book_scheduling
 
     declarations.append(
         _tool(
@@ -936,7 +978,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
 
     declarations.append(
         _tool(
-            "get_my_appointments",
+            "get_my_bookings",
             "Consultar turnos de un cliente por telefono",
             {
                 "type": "object",
@@ -945,7 +987,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
             },
         )
     )
-    handlers["get_my_appointments"] = _get_my_appointments
+    handlers["get_my_bookings"] = _get_my_bookings
 
     declarations.append(
         _tool(

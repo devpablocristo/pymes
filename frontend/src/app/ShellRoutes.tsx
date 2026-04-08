@@ -10,6 +10,9 @@ import {
   InvoicesPage,
   ModulePage,
   NotificationsCenterPage,
+  ProductsGalleryPage,
+  ProductsListPage,
+  ProductsModuleSection,
   PublicPreviewPage,
   RestaurantTableSessionsPage,
   SettingsHubPage,
@@ -41,18 +44,23 @@ export function ShellRoutes() {
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/crypto" element={<CryptoPage />} />
       <Route path="/ui" element={<UIComponentsPage />} />
-      <Route path="/modules/workOrders" element={<WorkOrdersModuleSection />}>
+      <Route path="/modules/carWorkOrders" element={<WorkOrdersModuleSection />}>
         <Route index element={<Navigate to="board" replace />} />
         <Route path="board" element={<WorkOrdersKanbanPanel />} />
         <Route path="list" element={<AutoRepairWorkOrdersPage />} />
         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
+      </Route>
+      <Route path="/modules/products" element={<ProductsModuleSection />}>
+        <Route index element={<Navigate to="list" replace />} />
+        <Route path="list" element={<ProductsListPage />} />
+        <Route path="gallery" element={<ProductsGalleryPage />} />
       </Route>
       <Route path="/modules/:moduleId" element={<ModulePage />} />
       <Route path="/settings" element={<SettingsHubPage />} />
       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
       <Route path="/settings/notifications" element={<Navigate to="/settings?section=notifications" replace />} />
       <Route path="/scheduling/public-preview" element={<PublicPreviewPage />} />
-      <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/workOrders" replace />} />
+      <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/carWorkOrders" replace />} />
       <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersSection />}>
         <Route index element={<Navigate to="board" replace />} />
         <Route path="board" element={<BikeShopWorkOrdersBoard />} />

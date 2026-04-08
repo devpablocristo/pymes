@@ -20,7 +20,7 @@ Escenarios típicos que el producto puede **atenuar** con datos y permisos:
 | Cobro no registrado o mal registrado | Tabla `payments` + movimiento de caja + evento **`payment.created`** en `audit_log` |
 | Venta anulada para encubrir faltante | Evento **`sale.voided`** en auditoría + reversión de stock/caja según lógica de dominio |
 | Ajuste de stock opaco | Evento **`inventory.adjusted`** en auditoría |
-| Exceso de privilegios | RBAC por recurso/acción; roles semilla `cajero`, `vendedor`, `contador`, `almacenero` (ver migración `0013_rbac_seed.up.sql`) |
+| Exceso de privilegios | RBAC por recurso/acción; roles semilla `cashier`, `seller`, `accountant`, `warehouse` (ver migración `0013_rbac_seed.up.sql` + `0051_english_role_names.up.sql`) |
 | Repudio | Cadena de hash en `audit_log` (`prev_hash`, `hash`) por org |
 
 ---
@@ -41,7 +41,7 @@ Código principal: `pymes-core/backend/internal/audit/` (repositorio, use cases,
 | `GET` | `/v1/audit` | Listado reciente (límite definido en backend) |
 | `GET` | `/v1/audit/export?format=csv` | Export CSV para análisis externo |
 
-Los permisos efectivos dependen del rol RBAC (ej. rol semilla **contador** incluye `audit:read` y `audit:export` en el seed de referencia).
+Los permisos efectivos dependen del rol RBAC (ej. rol semilla **accountant** incluye `audit:read` y `audit:export` en el seed de referencia).
 
 ### 3.3 Consola (frontend)
 

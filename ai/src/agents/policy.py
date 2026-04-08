@@ -31,10 +31,10 @@ EXTERNAL_SALES_TOOLS = frozenset(
         "get_business_info",
         "get_public_services",
         "check_availability",
-        "get_my_appointments",
+        "get_my_bookings",
         "request_quote",
         "get_quote_payment_link",
-        "book_appointment",
+        "book_scheduling",
     }
 )
 
@@ -42,6 +42,8 @@ INTERNAL_SALES_BASE_TOOLS = frozenset(
     {
         "search_customers",
         "search_products",
+        "search_services",
+        "get_service",
         "get_low_stock",
         "get_stock_level",
         "get_quotes",
@@ -81,10 +83,12 @@ INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS = frozenset(
 
 ROLE_INTERNAL_SALES: dict[str, frozenset[str]] = {
     "admin": INTERNAL_SALES_BASE_TOOLS,
-    "vendedor": frozenset(
+    "seller": frozenset(
         {
             "search_customers",
             "search_products",
+            "search_services",
+            "get_service",
             "get_low_stock",
             "get_stock_level",
             "get_quotes",
@@ -96,7 +100,7 @@ ROLE_INTERNAL_SALES: dict[str, frozenset[str]] = {
             "get_recent_sales",
         }
     ),
-    "cajero": frozenset(
+    "cashier": frozenset(
         {
             "search_customers",
             "search_products",
@@ -113,13 +117,15 @@ ROLE_INTERNAL_SALES: dict[str, frozenset[str]] = {
 
 ROLE_INTERNAL_PROCUREMENT: dict[str, frozenset[str]] = {
     "admin": INTERNAL_PROCUREMENT_BASE_TOOLS,
-    "almacenero": INTERNAL_PROCUREMENT_BASE_TOOLS,
-    "contador": INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS,
+    "warehouse": INTERNAL_PROCUREMENT_BASE_TOOLS,
+    "accountant": INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS,
 }
 
 MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "search_customers": frozenset({"customers"}),
     "search_products": frozenset({"products"}),
+    "search_services": frozenset({"services"}),
+    "get_service": frozenset({"services"}),
     "get_low_stock": frozenset({"inventory", "products"}),
     "get_stock_level": frozenset({"inventory", "products"}),
     "get_quotes": frozenset({"quotes"}),
@@ -139,7 +145,7 @@ MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "submit_procurement_request": frozenset({"purchases"}),
 }
 
-EXTERNAL_CONFIRM_REQUIRED = frozenset({"book_appointment"})
+EXTERNAL_CONFIRM_REQUIRED = frozenset({"book_scheduling"})
 INTERNAL_SALES_CONFIRM_REQUIRED = frozenset({"create_quote", "create_sale", "generate_payment_link"})
 INTERNAL_PROCUREMENT_CONFIRM_REQUIRED = frozenset()
 

@@ -1,5 +1,5 @@
--- Roles, permisos, user_roles, lista de precios default (demo).
--- IDs de roles/lista por org (uuid v5) para multi-tenant.
+-- Roles, permissions, user_roles, default price list (demo).
+-- Role/list IDs per org (uuid v5) for multi-tenant.
 
 DO $$
 DECLARE
@@ -7,10 +7,10 @@ DECLARE
     v_user uuid := '00000000-0000-0000-0000-000000000002';
 
     r_admin uuid;
-    r_vendedor uuid;
-    r_cajero uuid;
-    r_contador uuid;
-    r_almacenero uuid;
+    r_seller uuid;
+    r_cashier uuid;
+    r_accountant uuid;
+    r_warehouse uuid;
 
     pl_default uuid;
 BEGIN
@@ -19,91 +19,87 @@ BEGIN
     END IF;
 
     r_admin := uuid_generate_v5(v_org, 'pymes-seed/v1/role/admin');
-    r_vendedor := uuid_generate_v5(v_org, 'pymes-seed/v1/role/vendedor');
-    r_cajero := uuid_generate_v5(v_org, 'pymes-seed/v1/role/cajero');
-    r_contador := uuid_generate_v5(v_org, 'pymes-seed/v1/role/contador');
-    r_almacenero := uuid_generate_v5(v_org, 'pymes-seed/v1/role/almacenero');
+    r_seller := uuid_generate_v5(v_org, 'pymes-seed/v1/role/vendedor');
+    r_cashier := uuid_generate_v5(v_org, 'pymes-seed/v1/role/cajero');
+    r_accountant := uuid_generate_v5(v_org, 'pymes-seed/v1/role/contador');
+    r_warehouse := uuid_generate_v5(v_org, 'pymes-seed/v1/role/almacenero');
     pl_default := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/default');
 
     INSERT INTO roles (id, org_id, name, description, is_system)
     VALUES
-        (r_admin, v_org, 'admin', 'Acceso total', true),
-        (r_vendedor, v_org, 'vendedor', 'Gestión comercial y ventas', true),
-        (r_cajero, v_org, 'cajero', 'Cobros y caja', true),
-        (r_contador, v_org, 'contador', 'Reportes y contabilidad', true),
-        (r_almacenero, v_org, 'almacenero', 'Inventario y productos', true)
+        (r_admin, v_org, 'admin', 'Full access', true),
+        (r_seller, v_org, 'seller', 'Sales and commercial management', true),
+        (r_cashier, v_org, 'cashier', 'Payments and cash register', true),
+        (r_accountant, v_org, 'accountant', 'Reports and accounting', true),
+        (r_warehouse, v_org, 'warehouse', 'Inventory and products', true)
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO role_permissions (id, role_id, resource, action)
     VALUES
         (gen_random_uuid(), r_admin, '*', '*'),
 
-        (gen_random_uuid(), r_vendedor, 'customers', 'read'),
-        (gen_random_uuid(), r_vendedor, 'customers', 'create'),
-        (gen_random_uuid(), r_vendedor, 'customers', 'update'),
-        (gen_random_uuid(), r_vendedor, 'products', 'read'),
-        (gen_random_uuid(), r_vendedor, 'sales', 'read'),
-        (gen_random_uuid(), r_vendedor, 'sales', 'create'),
-        (gen_random_uuid(), r_vendedor, 'quotes', 'read'),
-        (gen_random_uuid(), r_vendedor, 'quotes', 'create'),
-        (gen_random_uuid(), r_vendedor, 'quotes', 'update'),
-        (gen_random_uuid(), r_vendedor, 'inventory', 'read'),
-        (gen_random_uuid(), r_vendedor, 'appointments', 'read'),
-        (gen_random_uuid(), r_vendedor, 'appointments', 'create'),
-        (gen_random_uuid(), r_vendedor, 'appointments', 'update'),
-        (gen_random_uuid(), r_vendedor, 'scheduling', 'read'),
-        (gen_random_uuid(), r_vendedor, 'scheduling', 'create'),
-        (gen_random_uuid(), r_vendedor, 'scheduling', 'update'),
-        (gen_random_uuid(), r_vendedor, 'returns', 'read'),
-        (gen_random_uuid(), r_vendedor, 'returns', 'create'),
-        (gen_random_uuid(), r_vendedor, 'accounts', 'read'),
-        (gen_random_uuid(), r_vendedor, 'price_lists', 'read'),
+        (gen_random_uuid(), r_seller, 'customers', 'read'),
+        (gen_random_uuid(), r_seller, 'customers', 'create'),
+        (gen_random_uuid(), r_seller, 'customers', 'update'),
+        (gen_random_uuid(), r_seller, 'products', 'read'),
+        (gen_random_uuid(), r_seller, 'sales', 'read'),
+        (gen_random_uuid(), r_seller, 'sales', 'create'),
+        (gen_random_uuid(), r_seller, 'quotes', 'read'),
+        (gen_random_uuid(), r_seller, 'quotes', 'create'),
+        (gen_random_uuid(), r_seller, 'quotes', 'update'),
+        (gen_random_uuid(), r_seller, 'inventory', 'read'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'read'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'create'),
+        (gen_random_uuid(), r_seller, 'scheduling', 'update'),
+        (gen_random_uuid(), r_seller, 'returns', 'read'),
+        (gen_random_uuid(), r_seller, 'returns', 'create'),
+        (gen_random_uuid(), r_seller, 'accounts', 'read'),
+        (gen_random_uuid(), r_seller, 'price_lists', 'read'),
 
-        (gen_random_uuid(), r_cajero, 'sales', 'read'),
-        (gen_random_uuid(), r_cajero, 'sales', 'create'),
-        (gen_random_uuid(), r_cajero, 'cashflow', 'read'),
-        (gen_random_uuid(), r_cajero, 'cashflow', 'create'),
-        (gen_random_uuid(), r_cajero, 'customers', 'read'),
-        (gen_random_uuid(), r_cajero, 'payments', 'read'),
-        (gen_random_uuid(), r_cajero, 'payments', 'create'),
-        (gen_random_uuid(), r_cajero, 'returns', 'read'),
-        (gen_random_uuid(), r_cajero, 'returns', 'create'),
-        (gen_random_uuid(), r_cajero, 'accounts', 'read'),
-        (gen_random_uuid(), r_cajero, 'appointments', 'read'),
-        (gen_random_uuid(), r_cajero, 'scheduling', 'read'),
-        (gen_random_uuid(), r_cajero, 'scheduling', 'operate'),
+        (gen_random_uuid(), r_cashier, 'sales', 'read'),
+        (gen_random_uuid(), r_cashier, 'sales', 'create'),
+        (gen_random_uuid(), r_cashier, 'cashflow', 'read'),
+        (gen_random_uuid(), r_cashier, 'cashflow', 'create'),
+        (gen_random_uuid(), r_cashier, 'customers', 'read'),
+        (gen_random_uuid(), r_cashier, 'payments', 'read'),
+        (gen_random_uuid(), r_cashier, 'payments', 'create'),
+        (gen_random_uuid(), r_cashier, 'returns', 'read'),
+        (gen_random_uuid(), r_cashier, 'returns', 'create'),
+        (gen_random_uuid(), r_cashier, 'accounts', 'read'),
+        (gen_random_uuid(), r_cashier, 'scheduling', 'read'),
+        (gen_random_uuid(), r_cashier, 'scheduling', 'operate'),
 
-        (gen_random_uuid(), r_contador, 'reports', 'read'),
-        (gen_random_uuid(), r_contador, 'cashflow', 'read'),
-        (gen_random_uuid(), r_contador, 'sales', 'read'),
-        (gen_random_uuid(), r_contador, 'billing', 'read'),
-        (gen_random_uuid(), r_contador, 'audit', 'read'),
-        (gen_random_uuid(), r_contador, 'audit', 'export'),
-        (gen_random_uuid(), r_contador, 'purchases', 'read'),
-        (gen_random_uuid(), r_contador, 'accounts', 'read'),
-        (gen_random_uuid(), r_contador, 'payments', 'read'),
-        (gen_random_uuid(), r_contador, 'returns', 'read'),
-        (gen_random_uuid(), r_contador, 'recurring', 'read'),
-        (gen_random_uuid(), r_contador, 'price_lists', 'read'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'read'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'approve'),
-        (gen_random_uuid(), r_contador, 'procurement_requests', 'reject'),
-        (gen_random_uuid(), r_contador, 'procurement_policies', 'read'),
+        (gen_random_uuid(), r_accountant, 'reports', 'read'),
+        (gen_random_uuid(), r_accountant, 'cashflow', 'read'),
+        (gen_random_uuid(), r_accountant, 'sales', 'read'),
+        (gen_random_uuid(), r_accountant, 'billing', 'read'),
+        (gen_random_uuid(), r_accountant, 'audit', 'read'),
+        (gen_random_uuid(), r_accountant, 'audit', 'export'),
+        (gen_random_uuid(), r_accountant, 'purchases', 'read'),
+        (gen_random_uuid(), r_accountant, 'accounts', 'read'),
+        (gen_random_uuid(), r_accountant, 'payments', 'read'),
+        (gen_random_uuid(), r_accountant, 'returns', 'read'),
+        (gen_random_uuid(), r_accountant, 'recurring', 'read'),
+        (gen_random_uuid(), r_accountant, 'price_lists', 'read'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'approve'),
+        (gen_random_uuid(), r_accountant, 'procurement_requests', 'reject'),
+        (gen_random_uuid(), r_accountant, 'procurement_policies', 'read'),
 
-        (gen_random_uuid(), r_almacenero, 'inventory', 'read'),
-        (gen_random_uuid(), r_almacenero, 'inventory', 'create'),
-        (gen_random_uuid(), r_almacenero, 'inventory', 'update'),
-        (gen_random_uuid(), r_almacenero, 'products', 'read'),
-        (gen_random_uuid(), r_almacenero, 'purchases', 'read'),
-        (gen_random_uuid(), r_almacenero, 'returns', 'read'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'read'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'create'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'update'),
-        (gen_random_uuid(), r_almacenero, 'procurement_requests', 'submit'),
-        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'read'),
-        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'create'),
-        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'update'),
-        (gen_random_uuid(), r_almacenero, 'procurement_policies', 'delete')
+        (gen_random_uuid(), r_warehouse, 'inventory', 'read'),
+        (gen_random_uuid(), r_warehouse, 'inventory', 'create'),
+        (gen_random_uuid(), r_warehouse, 'inventory', 'update'),
+        (gen_random_uuid(), r_warehouse, 'products', 'read'),
+        (gen_random_uuid(), r_warehouse, 'purchases', 'read'),
+        (gen_random_uuid(), r_warehouse, 'returns', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'create'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'update'),
+        (gen_random_uuid(), r_warehouse, 'procurement_requests', 'submit'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'read'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'create'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'update'),
+        (gen_random_uuid(), r_warehouse, 'procurement_policies', 'delete')
     ON CONFLICT (role_id, resource, action) DO NOTHING;
 
     IF EXISTS (
@@ -121,6 +117,6 @@ BEGIN
     END IF;
 
     INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
-    VALUES (pl_default, v_org, 'Minorista', 'Lista base local', true, 0, true)
+    VALUES (pl_default, v_org, 'Retail', 'Default local price list', true, 0, true)
     ON CONFLICT (id) DO NOTHING;
 END $$;

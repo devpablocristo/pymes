@@ -2,6 +2,7 @@ import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
 import {
   type CreatorFilterState,
   formatWorkOrderActorLabel,
+  isSeedActor,
   isYoCreatorFilterActive,
 } from '../lib/workOrderCreatorFilter';
 
@@ -28,11 +29,13 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
   );
 
   const isYoActive = isYoCreatorFilterActive(creatorFilter, selfId);
+  const isSeedsActive = creatorFilter.mode === 'seeds';
+  const isAllActive = creatorFilter.mode === 'all';
 
   const toggleCreator = useCallback(
     (actor: string) => {
       onFilterChange((prev) => {
-        if (prev.mode === 'all') {
+        if (prev.mode === 'all' || prev.mode === 'yo' || prev.mode === 'seeds') {
           return { mode: 'pick', actors: new Set([actor]) };
         }
         let base = prev.actors;
@@ -56,19 +59,25 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
 
   const selectOnlySelf = useCallback(() => {
     if (!selfId) return;
-    onFilterChange({ mode: 'pick', actors: new Set([selfId]) });
+    onFilterChange({ mode: 'yo' });
   }, [onFilterChange, selfId]);
 
   const setFilterAll = useCallback(() => {
     onFilterChange({ mode: 'all' });
   }, [onFilterChange]);
 
+  const setFilterSeeds = useCallback(() => {
+    onFilterChange({ mode: 'seeds' });
+  }, [onFilterChange]);
+
+  const hasSeedRows = useMemo(() => items.some((row) => isSeedActor(row.created_by)), [items]);
+
   return (
-    <div className="wo-kanban__creators" role="group" aria-label="Filtrar por creador del registro">
+    <div className="crud-creator-badges" role="group" aria-label="Filtrar por creador del registro">
       <button
         type="button"
-        className={`wo-kanban__pill${creatorFilter.mode === 'all' ? ' wo-kanban__pill--active' : ''}`}
-        aria-pressed={creatorFilter.mode === 'all'}
+        className={`badge crud-creator-badge${isAllActive ? ' crud-creator-badge--active' : ''}`}
+        aria-pressed={isAllActive}
         onClick={setFilterAll}
       >
         Todos
@@ -76,11 +85,21 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
       {selfId ? (
         <button
           type="button"
-          className={`wo-kanban__pill${isYoActive ? ' wo-kanban__pill--active' : ''}`}
+          className={`badge crud-creator-badge${isYoActive ? ' crud-creator-badge--active' : ''}`}
           aria-pressed={isYoActive}
           onClick={selectOnlySelf}
         >
           Yo
+        </button>
+      ) : null}
+      {hasSeedRows ? (
+        <button
+          type="button"
+          className={`badge crud-creator-badge${isSeedsActive ? ' crud-creator-badge--active' : ''}`}
+          aria-pressed={isSeedsActive}
+          onClick={setFilterSeeds}
+        >
+          Seeds
         </button>
       ) : null}
       {peerCreators.map((actor) => {
@@ -89,7 +108,7 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
           <button
             key={actor}
             type="button"
-            className={`wo-kanban__pill${active ? ' wo-kanban__pill--active' : ''}`}
+            className={`badge crud-creator-badge${active ? ' crud-creator-badge--active' : ''}`}
             aria-pressed={active}
             onClick={() => toggleCreator(actor)}
           >

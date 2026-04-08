@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmAction } from '@devpablocristo/core-browser';
 import { createPortal } from 'react-dom';
 import {
-  archiveAutoRepairWorkOrder,
-  getAutoRepairWorkOrder,
-  restoreAutoRepairWorkOrder,
-  updateAutoRepairWorkOrder,
-} from '../lib/autoRepairApi';
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+  archiveWorkOrder,
+  getWorkOrder,
+  restoreWorkOrder,
+  updateWorkOrder,
+  type WorkOrder as UnifiedWorkOrder,
+} from '../lib/workOrdersApi';
+
+type AutoRepairWorkOrder = UnifiedWorkOrder;
 import { parseWorkOrderItemsJson, stringifyWorkOrderItems } from '../lib/workOrderItemsJson';
 import './WorkOrderKanbanDetailModal.css';
 import './WorkOrderEditor.css';
@@ -48,7 +50,7 @@ type Draft = {
   vehicle_plate: string;
   customer_id: string;
   customer_name: string;
-  appointment_id: string;
+  booking_id: string;
   requested_work: string;
   diagnosis: string;
   notes: string;
@@ -76,7 +78,7 @@ function woToDraft(wo: AutoRepairWorkOrder): Draft {
     vehicle_plate: wo.vehicle_plate ?? '',
     customer_id: wo.customer_id ?? '',
     customer_name: wo.customer_name ?? '',
-    appointment_id: wo.appointment_id ?? '',
+    booking_id: wo.booking_id ?? '',
     requested_work: wo.requested_work ?? '',
     diagnosis: wo.diagnosis ?? '',
     notes: wo.notes ?? '',
@@ -115,7 +117,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setLoading(true);
     setError(null);
     try {
-      const data = await getAutoRepairWorkOrder(id);
+      const data = await getWorkOrder(id);
       setWo(data);
       setDraft(woToDraft(data));
     } catch (e) {
@@ -147,7 +149,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
       draft.vehicle_plate !== (wo.vehicle_plate ?? '') ||
       draft.customer_id !== (wo.customer_id ?? '') ||
       draft.customer_name !== (wo.customer_name ?? '') ||
-      draft.appointment_id !== (wo.appointment_id ?? '') ||
+      draft.booking_id !== (wo.booking_id ?? '') ||
       draft.requested_work !== (wo.requested_work ?? '') ||
       draft.diagnosis !== (wo.diagnosis ?? '') ||
       draft.notes !== (wo.notes ?? '') ||
@@ -225,7 +227,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setArchiveBusy(true);
     setError(null);
     try {
-      await archiveAutoRepairWorkOrder(wo.id);
+      await archiveWorkOrder(wo.id);
       onRecordRemoved?.(wo.id);
       onClose();
     } catch (e) {
@@ -247,8 +249,8 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setRestoreBusy(true);
     setError(null);
     try {
-      await restoreAutoRepairWorkOrder(wo.id);
-      const data = await getAutoRepairWorkOrder(wo.id);
+      await restoreWorkOrder(wo.id);
+      const data = await getWorkOrder(wo.id);
       setWo(data);
       setDraft(woToDraft(data));
       onSaved(data);
@@ -264,7 +266,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setSaving(true);
     setError(null);
     try {
-      const body: Parameters<typeof updateAutoRepairWorkOrder>[1] = {};
+      const body: Parameters<typeof updateWorkOrder>[1] = {};
       if (draft.status !== wo.status) body.status = draft.status;
       if (draft.vehicle_id.trim() !== (wo.vehicle_id ?? '').trim()) {
         body.vehicle_id = draft.vehicle_id.trim();
@@ -275,9 +277,9 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         body.customer_id = c.length > 0 ? c : undefined;
       }
       if (draft.customer_name !== (wo.customer_name ?? '')) body.customer_name = draft.customer_name;
-      if (draft.appointment_id.trim() !== (wo.appointment_id ?? '').trim()) {
-        const a = draft.appointment_id.trim();
-        body.appointment_id = a.length > 0 ? a : undefined;
+      if (draft.booking_id.trim() !== (wo.booking_id ?? '').trim()) {
+        const a = draft.booking_id.trim();
+        body.booking_id = a.length > 0 ? a : undefined;
       }
       if (draft.requested_work !== (wo.requested_work ?? '')) body.requested_work = draft.requested_work;
       if (draft.diagnosis !== (wo.diagnosis ?? '')) body.diagnosis = draft.diagnosis;
@@ -310,7 +312,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         return;
       }
 
-      const updated = await updateAutoRepairWorkOrder(orderId, body);
+      const updated = await updateWorkOrder(orderId, body);
       setWo(updated);
       setDraft(woToDraft(updated));
       onSaved(updated);
@@ -410,14 +412,14 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
               />
             </div>
             <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-appointment-id">
+              <label className="wo-modal__label" htmlFor="wo-booking-id">
                 Turno (Appointment UUID)
               </label>
               <input
-                id="wo-appointment-id"
+                id="wo-booking-id"
                 className="wo-modal__input"
-                value={draft.appointment_id}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, appointment_id: ev.target.value } : d))}
+                value={draft.booking_id}
+                onChange={(ev) => setDraft((d) => (d ? { ...d, booking_id: ev.target.value } : d))}
               />
             </div>
             <div className="wo-modal__field">

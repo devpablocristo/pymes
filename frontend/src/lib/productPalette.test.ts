@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CALENDAR_APPOINTMENT_COLOR_OPTIONS,
-  DEFAULT_APPOINTMENT_COLOR_HEX,
+  CALENDAR_BOOKING_COLOR_OPTIONS,
+  DEFAULT_BOOKING_COLOR_HEX,
   PRODUCT_PALETTE,
   PRODUCT_PALETTE_LABELS_ES,
   themeHubColorSwatches,
@@ -18,12 +18,12 @@ describe('productPalette', () => {
   });
 
   it('default de citas coincide con el primer swatch', () => {
-    expect(DEFAULT_APPOINTMENT_COLOR_HEX).toBe(PRODUCT_PALETTE[0].hex);
+    expect(DEFAULT_BOOKING_COLOR_HEX).toBe(PRODUCT_PALETTE[0].hex);
   });
 
   it('opciones de calendario alinean hex y swatch', () => {
-    expect(CALENDAR_APPOINTMENT_COLOR_OPTIONS.length).toBe(PRODUCT_PALETTE.length);
-    expect(CALENDAR_APPOINTMENT_COLOR_OPTIONS[0]).toEqual({
+    expect(CALENDAR_BOOKING_COLOR_OPTIONS.length).toBe(PRODUCT_PALETTE.length);
+    expect(CALENDAR_BOOKING_COLOR_OPTIONS[0]).toEqual({
       hex: PRODUCT_PALETTE[0].hex,
       swatch: PRODUCT_PALETTE[0].token,
     });

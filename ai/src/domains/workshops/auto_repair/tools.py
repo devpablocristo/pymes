@@ -58,23 +58,64 @@ def build_internal_tools(
     )
     handlers["get_vehicle"] = _get_vehicle
 
-    async def _list_services(org_id: str, search: str = "") -> dict[str, Any]:
+    async def _create_vehicle(
+        org_id: str,
+        license_plate: str,
+        make: str,
+        model: str,
+        customer_name: str = "",
+        customer_id: str = "",
+        year: int = 0,
+        vin: str = "",
+        color: str = "",
+        notes: str = "",
+        kilometers: int = 0,
+    ) -> dict[str, Any]:
         _ = org_id
-        return await client.list_services(auth, search=search)
+        data: dict[str, Any] = {
+            "license_plate": license_plate,
+            "make": make,
+            "model": model,
+        }
+        if customer_name:
+            data["customer_name"] = customer_name
+        if customer_id:
+            data["customer_id"] = customer_id
+        if year:
+            data["year"] = year
+        if vin:
+            data["vin"] = vin
+        if color:
+            data["color"] = color
+        if notes:
+            data["notes"] = notes
+        if kilometers:
+            data["kilometers"] = kilometers
+        return await client.create_vehicle(auth, data=data)
 
     declarations.append(
         _tool(
-            "list_services",
-            "Listar servicios y reparaciones del taller",
+            "create_vehicle",
+            "Registrar un nuevo vehiculo que ingresa al taller",
             {
                 "type": "object",
                 "properties": {
-                    "search": {"type": "string", "description": "Codigo, nombre o categoria"},
+                    "license_plate": {"type": "string", "description": "Patente del vehiculo"},
+                    "make": {"type": "string", "description": "Marca"},
+                    "model": {"type": "string", "description": "Modelo"},
+                    "customer_name": {"type": "string", "description": "Nombre del cliente"},
+                    "customer_id": {"type": "string", "description": "UUID del cliente si ya existe"},
+                    "year": {"type": "integer", "description": "Anio de fabricacion"},
+                    "vin": {"type": "string", "description": "Numero de chasis"},
+                    "color": {"type": "string"},
+                    "notes": {"type": "string"},
+                    "kilometers": {"type": "integer", "description": "Kilometraje actual"},
                 },
+                "required": ["license_plate", "make", "model"],
             },
         )
     )
-    handlers["list_services"] = _list_services
+    handlers["create_vehicle"] = _create_vehicle
 
     async def _list_work_orders(org_id: str, status: str = "", search: str = "") -> dict[str, Any]:
         _ = org_id
@@ -114,7 +155,36 @@ def build_internal_tools(
     )
     handlers["get_work_order"] = _get_work_order
 
-    async def _create_appointment(
+    async def _update_work_order_status(
+        org_id: str,
+        work_order_id: str,
+        status: str,
+        notes: str = "",
+    ) -> dict[str, Any]:
+        _ = org_id
+        data: dict[str, Any] = {"status": status}
+        if notes:
+            data["notes"] = notes
+        return await client.update_work_order(auth, work_order_id=work_order_id, data=data)
+
+    declarations.append(
+        _tool(
+            "update_work_order_status",
+            "Mover una orden de trabajo por el pipeline (ingresado, en_reparacion, listo, entregado, facturado)",
+            {
+                "type": "object",
+                "properties": {
+                    "work_order_id": {"type": "string", "description": "UUID de la orden"},
+                    "status": {"type": "string", "description": "ingresado, en_reparacion, listo, entregado, facturado"},
+                    "notes": {"type": "string", "description": "Notas opcionales del cambio de estado"},
+                },
+                "required": ["work_order_id", "status"],
+            },
+        )
+    )
+    handlers["update_work_order_status"] = _update_work_order_status
+
+    async def _create_booking(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -133,11 +203,11 @@ def build_internal_tools(
         }
         if notes:
             data["notes"] = notes
-        return await client.create_appointment(auth, data=data)
+        return await client.create_booking(auth, data=data)
 
     declarations.append(
         _tool(
-            "create_appointment",
+            "create_booking",
             "Reservar turno para ingreso al taller",
             {
                 "type": "object",
@@ -153,7 +223,7 @@ def build_internal_tools(
             },
         )
     )
-    handlers["create_appointment"] = _create_appointment
+    handlers["create_booking"] = _create_booking
 
     async def _create_quote(org_id: str, work_order_id: str) -> dict[str, Any]:
         _ = org_id
@@ -222,25 +292,7 @@ def build_external_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _get_public_services(org_id: str, search: str = "") -> dict[str, Any]:
-        _ = org_id
-        return await client.get_public_services(org_slug, search=search)
-
-    declarations.append(
-        _tool(
-            "get_public_services",
-            "Listar servicios publicos del taller",
-            {
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "Filtro por texto"},
-                },
-            },
-        )
-    )
-    handlers["get_public_services"] = _get_public_services
-
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -249,7 +301,7 @@ def build_external_tools(
         duration: int = 60,
     ) -> dict[str, Any]:
         _ = org_id
-        return await client.public_book_appointment(
+        return await client.public_book_scheduling(
             org_slug,
             data={
                 "party_name": customer_name,
@@ -262,7 +314,7 @@ def build_external_tools(
 
     declarations.append(
         _tool(
-            "book_appointment",
+            "book_scheduling",
             "Reservar turno en el taller",
             {
                 "type": "object",
@@ -277,6 +329,6 @@ def build_external_tools(
             },
         )
     )
-    handlers["book_appointment"] = _book_appointment
+    handlers["book_scheduling"] = _book_scheduling
 
     return declarations, handlers

@@ -166,9 +166,17 @@ db_query() {
 wait_for_db_notification_state() {
   local approval_id="$1"
   local expected="$2"
-  local deadline=$((SECONDS + CALLBACK_TIMEOUT_SECONDS))
+  # Usar epoch en lugar de SECONDS: en CI los subshells (docker compose exec) y el runtime del script
+  # hacen poco fiable el contador interno de bash para ventanas largas.
+  local start_ts deadline_ts now_ts
+  start_ts=$(date +%s)
+  deadline_ts=$((start_ts + CALLBACK_TIMEOUT_SECONDS))
 
-  while (( SECONDS < deadline )); do
+  while true; do
+    now_ts=$(date +%s)
+    if (( now_ts >= deadline_ts )); then
+      break
+    fi
     local row count read_at
     row="$(db_query "SELECT COUNT(*), COALESCE(MAX(read_at)::text, '') FROM pymes_in_app_notifications WHERE entity_type = 'review_approval' AND entity_id = '${approval_id}';")"
     row="$(printf '%s' "$row" | tr -d '\r')"

@@ -1,21 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AutoRepairWorkOrder } from '../lib/autoRepairTypes';
+import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
 import { WorkOrderEditor } from './WorkOrderEditor';
 
 const apiMocks = vi.hoisted(() => ({
-  getAutoRepairWorkOrder: vi.fn<[], Promise<AutoRepairWorkOrder>>(),
-  updateAutoRepairWorkOrder: vi.fn(),
-  archiveAutoRepairWorkOrder: vi.fn(),
-  restoreAutoRepairWorkOrder: vi.fn(),
+  getWorkOrder: vi.fn<[], Promise<AutoRepairWorkOrder>>(),
+  updateWorkOrder: vi.fn(),
+  archiveWorkOrder: vi.fn(),
+  restoreWorkOrder: vi.fn(),
   confirmAction: vi.fn(),
 }));
 
-vi.mock('../lib/autoRepairApi', () => ({
-  getAutoRepairWorkOrder: () => apiMocks.getAutoRepairWorkOrder(),
-  updateAutoRepairWorkOrder: (...args: unknown[]) => apiMocks.updateAutoRepairWorkOrder(...args),
-  archiveAutoRepairWorkOrder: (...args: unknown[]) => apiMocks.archiveAutoRepairWorkOrder(...args),
-  restoreAutoRepairWorkOrder: (...args: unknown[]) => apiMocks.restoreAutoRepairWorkOrder(...args),
+vi.mock('../lib/workOrdersApi', () => ({
+  getWorkOrder: () => apiMocks.getWorkOrder(),
+  updateWorkOrder: (...args: unknown[]) => apiMocks.updateWorkOrder(...args),
+  archiveWorkOrder: (...args: unknown[]) => apiMocks.archiveWorkOrder(...args),
+  restoreWorkOrder: (...args: unknown[]) => apiMocks.restoreWorkOrder(...args),
 }));
 
 vi.mock('@devpablocristo/core-browser', () => ({
@@ -27,11 +27,15 @@ function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWor
     id: 'wo-1',
     org_id: 'org-1',
     number: 'OT-001',
+    target_type: 'vehicle',
+    target_id: 'veh-1',
+    target_label: 'AAA111',
+    metadata: {},
     vehicle_id: 'veh-1',
     vehicle_plate: 'AAA111',
     customer_id: 'cust-1',
     customer_name: 'Cliente original',
-    appointment_id: undefined,
+    booking_id: undefined,
     quote_id: undefined,
     sale_id: undefined,
     status: 'received',
@@ -60,13 +64,13 @@ function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWor
 
 describe('WorkOrderEditor', () => {
   beforeEach(() => {
-    apiMocks.getAutoRepairWorkOrder.mockReset();
-    apiMocks.updateAutoRepairWorkOrder.mockReset();
-    apiMocks.archiveAutoRepairWorkOrder.mockReset();
-    apiMocks.restoreAutoRepairWorkOrder.mockReset();
+    apiMocks.getWorkOrder.mockReset();
+    apiMocks.updateWorkOrder.mockReset();
+    apiMocks.archiveWorkOrder.mockReset();
+    apiMocks.restoreWorkOrder.mockReset();
     apiMocks.confirmAction.mockReset();
 
-    apiMocks.getAutoRepairWorkOrder.mockResolvedValue(buildWorkOrder());
+    apiMocks.getWorkOrder.mockResolvedValue(buildWorkOrder());
   });
 
   it('cierra sin confirmación cuando no hay cambios pendientes', async () => {

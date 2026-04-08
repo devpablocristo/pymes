@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,8 @@ func (r *Repository) ImportCustomers(ctx context.Context, orgID uuid.UUID, rows 
 					continue
 				}
 				if err := upsertCustomerParty(ctx, tx, orgID, *existingID, row); err != nil {
-					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
+					slog.Error("import customer upsert failed", "row", idx+2, "error", err)
+					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: "failed to update customer"})
 					continue
 				}
 				if phone := strings.TrimSpace(row["phone"]); phone != "" {
@@ -45,7 +47,8 @@ func (r *Repository) ImportCustomers(ctx context.Context, orgID uuid.UUID, rows 
 			}
 			partyID, err := createCustomerParty(ctx, tx, orgID, row)
 			if err != nil {
-				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
+				slog.Error("import customer create failed", "row", idx+2, "error", err)
+				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: "failed to create customer"})
 				continue
 			}
 			if phone := strings.TrimSpace(row["phone"]); phone != "" {
@@ -72,14 +75,16 @@ func (r *Repository) ImportSuppliers(ctx context.Context, orgID uuid.UUID, rows 
 					continue
 				}
 				if err := upsertSupplierParty(ctx, tx, orgID, *existingID, row); err != nil {
-					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
+					slog.Error("import supplier upsert failed", "row", idx+2, "error", err)
+					result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: "failed to update supplier"})
 					continue
 				}
 				result.Updated++
 				continue
 			}
 			if err := createSupplierParty(ctx, tx, orgID, row); err != nil {
-				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
+				slog.Error("import supplier create failed", "row", idx+2, "error", err)
+				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: "failed to create supplier"})
 				continue
 			}
 			result.Created++
@@ -94,7 +99,8 @@ func (r *Repository) ImportProducts(ctx context.Context, orgID uuid.UUID, rows [
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for idx, row := range rows {
 			if err := importProductRow(ctx, tx, orgID, row, mode, idx, &result); err != nil {
-				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: err.Error()})
+				slog.Error("import product failed", "row", idx+2, "error", err)
+				result.Errors = append(result.Errors, ImportError{Row: idx + 2, Message: "failed to import product"})
 			}
 		}
 		return nil

@@ -42,10 +42,10 @@ export function themeHubColorSwatches(): { id: string; label: string; bg: string
 }
 
 /** Default para citas nuevas y respuestas API sin color. */
-export const DEFAULT_APPOINTMENT_COLOR_HEX = PRODUCT_PALETTE[0].hex;
+export const DEFAULT_BOOKING_COLOR_HEX = PRODUCT_PALETTE[0].hex;
 
 /** Selector de color del calendario: hex persiste; swatch usa token. */
-export const CALENDAR_APPOINTMENT_COLOR_OPTIONS: { hex: string; swatch: string }[] = PRODUCT_PALETTE.map((p) => ({
+export const CALENDAR_BOOKING_COLOR_OPTIONS: { hex: string; swatch: string }[] = PRODUCT_PALETTE.map((p) => ({
   hex: p.hex,
   swatch: p.token,
 }));

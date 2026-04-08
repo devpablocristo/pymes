@@ -2,6 +2,7 @@
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest, downloadAPIFile } from '../lib/api';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
 
@@ -65,7 +66,7 @@ function tagsToText(tags?: string[]): string {
   return (tags ?? []).join(', ');
 }
 
-const resourceConfigs: CrudResourceConfigMap = {
+const controlResourceConfigs: CrudResourceConfigMap = {
   attachments: {
     label: 'adjunto',
     labelPlural: 'adjuntos',
@@ -152,20 +153,6 @@ const resourceConfigs: CrudResourceConfigMap = {
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay eventos de auditoría recientes.',
-    toolbarActions: [
-      {
-        id: 'export-csv',
-        label: 'Exportar CSV',
-        kind: 'secondary',
-        onClick: async ({ setError }) => {
-          try {
-            await downloadAPIFile('/v1/audit/export?format=csv');
-          } catch (e) {
-            setError(e instanceof Error ? e.message : 'No se pudo exportar.');
-          }
-        },
-      },
-    ],
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: AuditEntryRow[] | null }>('/v1/audit');
@@ -327,6 +314,23 @@ const resourceConfigs: CrudResourceConfigMap = {
     isValid: (values) => asString(values.url).trim().startsWith('http'),
   },
 };
+
+const resourceConfigs = Object.fromEntries(
+  Object.entries(controlResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    resourceId === 'audit'
+      ? withCSVToolbar(resourceId, config, {
+          mode: 'server',
+          allowImport: false,
+          serverExport: {
+            download: async (_entity) => {
+              await downloadAPIFile('/v1/audit/export?format=csv');
+            },
+          },
+        })
+      : withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

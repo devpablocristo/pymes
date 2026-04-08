@@ -17,6 +17,52 @@ import (
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )
 
+type returnWithPartyRow struct {
+	returnmodels.ReturnModel
+	PartyID   *uuid.UUID `gorm:"column:party_id"`
+	PartyName string     `gorm:"column:party_name"`
+}
+
+type saleForReturnRow struct {
+	Number        string
+	PartyID       *uuid.UUID `gorm:"column:party_id"`
+	PartyName     string     `gorm:"column:party_name"`
+	AmountPaid    float64    `gorm:"column:amount_paid"`
+	Total         float64
+	Currency      string
+	PaymentMethod string `gorm:"column:payment_method"`
+}
+
+type tenantReturnSettingsRow struct {
+	ReturnPrefix string `gorm:"column:return_prefix"`
+	NextReturn   int    `gorm:"column:next_return_number"`
+	CreditPrefix string `gorm:"column:credit_note_prefix"`
+	NextCredit   int    `gorm:"column:next_credit_note_number"`
+}
+
+type saleItemForReturnRow struct {
+	ID          uuid.UUID
+	ProductID   *uuid.UUID `gorm:"column:product_id"`
+	Description string
+	Quantity    float64
+	UnitPrice   float64 `gorm:"column:unit_price"`
+	TaxRate     float64 `gorm:"column:tax_rate"`
+	TrackStock  bool    `gorm:"column:track_stock"`
+}
+
+type saleForVoidRow struct {
+	AmountPaid    float64 `gorm:"column:amount_paid"`
+	Total         float64
+	Currency      string
+	PaymentMethod string `gorm:"column:payment_method"`
+}
+
+type saleForCreditRow struct {
+	Total      float64
+	AmountPaid float64    `gorm:"column:amount_paid"`
+	PartyID    *uuid.UUID `gorm:"column:party_id"`
+}
+
 type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
@@ -44,6 +90,15 @@ type ApplyCreditInput struct {
 	Actor        string
 }
 
+// CreateManualCreditNoteInput registra una nota de crédito sin devolución (party + monto).
+type CreateManualCreditNoteInput struct {
+	OrgID     uuid.UUID
+	PartyID   uuid.UUID
+	Amount    float64
+	Actor     string
+	ExpiresAt *time.Time
+}
+
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
@@ -54,11 +109,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	if err != nil {
 		return nil, err
 	}
-	var rows []struct {
-		returnmodels.ReturnModel
-		PartyID   *uuid.UUID `gorm:"column:party_id"`
-		PartyName string     `gorm:"column:party_name"`
-	}
+	var rows []returnWithPartyRow
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
@@ -85,11 +136,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndo
 	if err != nil {
 		return returndomain.Return{}, err
 	}
-	var row struct {
-		returnmodels.ReturnModel
-		PartyID   *uuid.UUID `gorm:"column:party_id"`
-		PartyName string     `gorm:"column:party_name"`
-	}
+	var row returnWithPartyRow
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
@@ -117,15 +164,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		if err != nil {
 			return err
 		}
-		var sale struct {
-			Number        string
-			PartyID       *uuid.UUID `gorm:"column:party_id"`
-			PartyName     string     `gorm:"column:party_name"`
-			AmountPaid    float64    `gorm:"column:amount_paid"`
-			Total         float64
-			Currency      string
-			PaymentMethod string `gorm:"column:payment_method"`
-		}
+		var sale saleForReturnRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
@@ -133,12 +172,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			return domainerr.Validation("items are required")
 		}
 
-		var settings struct {
-			ReturnPrefix string `gorm:"column:return_prefix"`
-			NextReturn   int    `gorm:"column:next_return_number"`
-			CreditPrefix string `gorm:"column:credit_note_prefix"`
-			NextCredit   int    `gorm:"column:next_credit_note_number"`
-		}
+		var settings tenantReturnSettingsRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
 			return err
 		}
@@ -152,15 +186,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		subtotal, taxTotal := 0.0, 0.0
 		itemModels := make([]returnmodels.ReturnItemModel, 0, len(in.Items))
 		for _, item := range in.Items {
-			var saleItem struct {
-				ID          uuid.UUID
-				ProductID   *uuid.UUID `gorm:"column:product_id"`
-				Description string
-				Quantity    float64
-				UnitPrice   float64 `gorm:"column:unit_price"`
-				TaxRate     float64 `gorm:"column:tax_rate"`
-				TrackStock  bool    `gorm:"column:track_stock"`
-			}
+			var saleItem saleItemForReturnRow
 			if err := tx.Table("sale_items si").Select("si.id, si.product_id, si.description, si.quantity, si.unit_price, si.tax_rate, COALESCE(p.track_stock, false) as track_stock").Joins("LEFT JOIN products p ON p.id = si.product_id").Where("si.sale_id = ? AND si.id = ?", in.SaleID, item.SaleItemID).Take(&saleItem).Error; err != nil {
 				return err
 			}
@@ -191,7 +217,8 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
 				return err
 			}
-			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), OrgID: in.OrgID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: returnID, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
+			rid := returnID
+			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), OrgID: in.OrgID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: &rid, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
 			if err := tx.Create(&creditRow).Error; err != nil {
 				return err
 			}
@@ -255,12 +282,7 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			out = item
 			return nil
 		}
-		var sale struct {
-			AmountPaid    float64 `gorm:"column:amount_paid"`
-			Total         float64
-			Currency      string
-			PaymentMethod string `gorm:"column:payment_method"`
-		}
+		var sale saleForVoidRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", orgID, item.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
@@ -349,11 +371,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 		if note.Status != "active" {
 			return domainerr.BusinessRule("credit note is not active")
 		}
-		var sale struct {
-			Total      float64
-			AmountPaid float64    `gorm:"column:amount_paid"`
-			PartyID    *uuid.UUID `gorm:"column:party_id"`
-		}
+		var sale saleForCreditRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("total, amount_paid, %s", salePartyIDExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
@@ -402,8 +420,56 @@ func toReturnDomain(row returnmodels.ReturnModel, items []returnmodels.ReturnIte
 	return out
 }
 
+func creditNoteReturnID(row returnmodels.CreditNoteModel) uuid.UUID {
+	if row.ReturnID == nil {
+		return uuid.Nil
+	}
+	return *row.ReturnID
+}
+
 func toCreditDomain(row returnmodels.CreditNoteModel) returndomain.CreditNote {
-	return returndomain.CreditNote{ID: row.ID, OrgID: row.OrgID, Number: row.Number, PartyID: row.PartyID, ReturnID: row.ReturnID, Amount: row.Amount, UsedAmount: row.UsedAmount, Balance: row.Balance, ExpiresAt: row.ExpiresAt, Status: row.Status, CreatedAt: row.CreatedAt}
+	return returndomain.CreditNote{
+		ID: row.ID, OrgID: row.OrgID, Number: row.Number, PartyID: row.PartyID, ReturnID: creditNoteReturnID(row),
+		Amount: row.Amount, UsedAmount: row.UsedAmount, Balance: row.Balance, ExpiresAt: row.ExpiresAt, Status: row.Status, CreatedAt: row.CreatedAt,
+	}
+}
+
+func (r *Repository) CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error) {
+	if in.Amount <= 0 {
+		return returndomain.CreditNote{}, domainerr.Validation("amount must be positive")
+	}
+	var out returndomain.CreditNote
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var partyCount int64
+		if err := tx.Table("parties").Where("id = ? AND org_id = ?", in.PartyID, in.OrgID).Count(&partyCount).Error; err != nil {
+			return err
+		}
+		if partyCount == 0 {
+			return domainerr.NotFoundf("party", in.PartyID.String())
+		}
+		var settings tenantReturnSettingsRow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+			return err
+		}
+		noteID := uuid.New()
+		creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
+		if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+			return err
+		}
+		row := returnmodels.CreditNoteModel{
+			ID: noteID, OrgID: in.OrgID, Number: creditNumber, PartyID: in.PartyID, ReturnID: nil,
+			Amount: in.Amount, UsedAmount: 0, Balance: in.Amount, ExpiresAt: in.ExpiresAt, Status: "active", CreatedAt: time.Now().UTC(),
+		}
+		if err := tx.Create(&row).Error; err != nil {
+			return err
+		}
+		out = toCreditDomain(row)
+		return nil
+	})
+	if err != nil {
+		return returndomain.CreditNote{}, err
+	}
+	return out, nil
 }
 
 func paymentStatus(amountPaid, total float64) string {

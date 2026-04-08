@@ -29,7 +29,7 @@ func NewHandler(uc usecasesPort) *Handler {
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/public-preview/bootstrap", h.GetPublicPreviewBootstrap)
-	authGroup.POST("/appointments", h.CreateBooking)
+	authGroup.POST("/bookings", h.CreateBooking)
 	authGroup.POST("/quotes", h.CreateQuote)
 	authGroup.POST("/payments/:sale_id/link", h.CreateSalePaymentLink)
 }

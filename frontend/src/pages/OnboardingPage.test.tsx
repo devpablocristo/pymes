@@ -86,8 +86,8 @@ function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSet
     wa_receipt_template: '',
     wa_default_country_code: '54',
     scheduling_enabled: true,
-    appointment_label: 'Turno',
-    appointment_reminder_hours: 24,
+    scheduling_label: 'Turno',
+    scheduling_reminder_hours: 24,
     secondary_currency: '',
     default_rate_type: 'blue',
     auto_fetch_rates: false,
@@ -134,7 +134,6 @@ describe('OnboardingPage scheduling setup', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^Taller mecánico/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
     fireEvent.click(screen.getByRole('button', { name: /^Ambos/i }));

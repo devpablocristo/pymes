@@ -23,21 +23,21 @@ interface RuleTemplate {
 
 const RULE_TEMPLATES: RuleTemplate[] = [
   {
-    actionType: 'appointment.book',
+    actionType: 'scheduling.book',
     displayName: 'Agendar turno',
     category: 'Turnos',
     riskClass: 'low',
     hasThreshold: false,
   },
   {
-    actionType: 'appointment.reschedule',
+    actionType: 'scheduling.reschedule',
     displayName: 'Reagendar turno',
     category: 'Turnos',
     riskClass: 'low',
     hasThreshold: false,
   },
   {
-    actionType: 'appointment.cancel',
+    actionType: 'scheduling.cancel',
     displayName: 'Cancelar turno',
     category: 'Turnos',
     riskClass: 'medium',
@@ -98,9 +98,9 @@ const EFFECT_LABELS: Record<Effect, string> = {
 };
 
 const DEFAULT_EFFECTS: Record<string, Effect> = {
-  'appointment.book': 'allow',
-  'appointment.reschedule': 'allow',
-  'appointment.cancel': 'require_approval',
+  'scheduling.book': 'allow',
+  'scheduling.reschedule': 'allow',
+  'scheduling.cancel': 'require_approval',
   'discount.apply': 'allow',
   'payment_link.generate': 'allow',
   'refund.create': 'deny',

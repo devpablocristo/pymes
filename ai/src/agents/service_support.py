@@ -18,7 +18,6 @@ from runtime.logging import get_logger
 from src.runtime_contracts import DEFAULT_LANGUAGE_CODE
 from src.tools import (
     accounts,
-    appointments,
     customers,
     inventory,
     payments,
@@ -27,6 +26,7 @@ from src.tools import (
     purchases,
     quotes,
     sales,
+    scheduling,
     suppliers,
 )
 
@@ -65,10 +65,6 @@ class CommercialChatResult:
     def tokens_used(self) -> int:
         return self.tokens_input + self.tokens_output
 
-    @property
-    def routed_mode(self) -> str | None:
-        """Alias legacy para compatibilidad con clientes existentes."""
-        return self.routed_agent
 
 def sanitize_message(text: str, limit: int = 4000) -> str:
     cleaned = "".join(ch for ch in text if ch == "\n" or 32 <= ord(ch) <= 126 or ord(ch) >= 160)
@@ -188,15 +184,15 @@ async def _build_quote_preview(client: BackendClient, org_id: str, items: list[d
 
 
 def _entity_from_result(result: dict[str, Any]) -> tuple[str, str]:
-    for key in ("sale_id", "quote_id", "id", "appointment_id"):
+    for key in ("sale_id", "quote_id", "id", "booking_id"):
         value = str(result.get(key, "")).strip()
         if value:
             if key.startswith("sale"):
                 return "sale", value
             if key.startswith("quote"):
                 return "quote", value
-            if key.startswith("appointment"):
-                return "appointment", value
+            if key.startswith("booking"):
+                return "booking", value
             return "entity", value
     return "", ""
 
@@ -336,8 +332,7 @@ async def _build_external_sales_tools(
             "address": str(payload.get("business_address", "")).strip(),
             "phone": str(payload.get("business_phone", "")).strip(),
             "email": str(payload.get("business_email", "")).strip(),
-            "scheduling_enabled": bool(payload.get("scheduling_enabled", payload.get("appointments_enabled", False))),
-            "appointments_enabled": bool(payload.get("scheduling_enabled", payload.get("appointments_enabled", False))),
+            "scheduling_enabled": bool(payload.get("scheduling_enabled", False)),
         }
 
     async def _get_public_services(org_id: str, limit: int = 20) -> dict[str, Any]:
@@ -358,10 +353,10 @@ async def _build_external_sales_tools(
         return {"items": items}
 
     async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await appointments.check_availability(client, org_id=org_id, date=date, duration=duration)
+        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
 
-    async def _get_my_appointments(org_id: str, phone: str) -> dict[str, Any]:
-        return await appointments.get_my_appointments(client, org_id=org_id, phone=phone)
+    async def _get_my_bookings(org_id: str, phone: str) -> dict[str, Any]:
+        return await scheduling.get_my_bookings(client, org_id=org_id, phone=phone)
 
     async def _request_quote(org_id: str, items: list[dict[str, Any]], customer_name: str = "", notes: str = "") -> dict[str, Any]:
         return await _build_quote_preview(client, org_id, items=items, customer_name=customer_name, notes=notes)
@@ -369,7 +364,7 @@ async def _build_external_sales_tools(
     async def _get_quote_payment_link(org_id: str, quote_id: str) -> dict[str, Any]:
         return await payments.get_public_quote_payment_link(client, org_id=org_id, quote_id=quote_id)
 
-    async def _book_appointment(
+    async def _book_scheduling(
         org_id: str,
         customer_name: str,
         customer_phone: str,
@@ -377,7 +372,7 @@ async def _build_external_sales_tools(
         start_at: str,
         duration: int = 60,
     ) -> dict[str, Any]:
-        return await appointments.book_appointment(
+        return await scheduling.book_scheduling(
             client,
             org_id=org_id,
             customer_name=customer_name,
@@ -417,7 +412,7 @@ async def _build_external_sales_tools(
         ),
         (
             _tool(
-                "get_my_appointments",
+                "get_my_bookings",
                 "Consultar turnos del cliente",
                 {
                     "type": "object",
@@ -425,7 +420,7 @@ async def _build_external_sales_tools(
                     "required": ["phone"],
                 },
             ),
-            _get_my_appointments,
+            _get_my_bookings,
         ),
         (
             _tool(
@@ -467,7 +462,7 @@ async def _build_external_sales_tools(
         ),
         (
             _tool(
-                "book_appointment",
+                "book_scheduling",
                 "Reservar un turno publico",
                 {
                     "type": "object",
@@ -481,7 +476,7 @@ async def _build_external_sales_tools(
                     "required": ["customer_name", "customer_phone", "title", "start_at"],
                 },
             ),
-            _book_appointment,
+            _book_scheduling,
         ),
     ]
 

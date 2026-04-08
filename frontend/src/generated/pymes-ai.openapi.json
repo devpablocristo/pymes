@@ -668,11 +668,11 @@
                 "enum": [
                   "general",
                   "copilot",
-                  "clientes",
-                  "productos",
-                  "ventas",
-                  "cobros",
-                  "compras"
+                  "customers",
+                  "products",
+                  "sales",
+                  "collections",
+                  "purchases"
                 ]
               },
               {
@@ -976,28 +976,14 @@
             "enum": [
               "general",
               "copilot",
-              "clientes",
-              "productos",
-              "ventas",
-              "cobros",
-              "compras"
+              "customers",
+              "products",
+              "sales",
+              "collections",
+              "purchases"
             ],
             "title": "Routed Agent",
             "description": "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff expl\u00edcito desde notificaciones."
-          },
-          "routed_mode": {
-            "type": "string",
-            "enum": [
-              "general",
-              "copilot",
-              "clientes",
-              "productos",
-              "ventas",
-              "cobros",
-              "compras"
-            ],
-            "title": "Routed Mode",
-            "description": "Alias legacy de `routed_agent` para compatibilidad hacia atr\u00e1s."
           },
           "routing_source": {
             "type": "string",
@@ -1020,7 +1006,6 @@
           "tool_calls",
           "pending_confirmations",
           "routed_agent",
-          "routed_mode",
           "routing_source"
         ],
         "title": "ChatResponse"
@@ -1916,11 +1901,11 @@
                 "enum": [
                   "general",
                   "copilot",
-                  "clientes",
-                  "productos",
-                  "ventas",
-                  "cobros",
-                  "compras"
+                  "customers",
+                  "products",
+                  "sales",
+                  "collections",
+                  "purchases"
                 ]
               },
               {

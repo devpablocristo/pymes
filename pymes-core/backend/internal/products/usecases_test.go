@@ -37,8 +37,9 @@ func TestCreateDefaultsCurrency(t *testing.T) {
 	uc := NewUsecases(repo, nil, nil)
 
 	out, err := uc.Create(context.Background(), productdomain.Product{
-		OrgID: uuid.New(),
-		Name:  "Producto demo",
+		OrgID:    uuid.New(),
+		Name:     "Producto demo",
+		ImageURL: "  https://cdn.example.com/p.png  ",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -48,5 +49,11 @@ func TestCreateDefaultsCurrency(t *testing.T) {
 	}
 	if repo.created.Currency != "ARS" {
 		t.Fatalf("expected repo to receive currency ARS, got %q", repo.created.Currency)
+	}
+	if out.ImageURL != "https://cdn.example.com/p.png" {
+		t.Fatalf("expected trimmed image_url, got %q", out.ImageURL)
+	}
+	if repo.created.ImageURL != "https://cdn.example.com/p.png" {
+		t.Fatalf("expected repo to receive trimmed image_url, got %q", repo.created.ImageURL)
 	}
 }

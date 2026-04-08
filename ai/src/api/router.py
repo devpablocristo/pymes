@@ -175,6 +175,5 @@ async def chat_internal(
         pending_confirmations=result.pending_confirmations,
         blocks=result.blocks,
         routed_agent=normalize_routed_agent(result.routed_agent),
-        routed_mode=normalize_routed_agent(result.routed_mode),
         routing_source=normalize_routing_source(result.routing_source),
     )

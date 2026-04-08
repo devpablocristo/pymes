@@ -210,31 +210,31 @@
   border: 1px solid color-mix(in srgb, var(--color-accent-indigo) 22%, transparent);
 }
 
-.cht__msg-badge--ventas {
+.cht__msg-badge--sales {
   background: color-mix(in srgb, var(--color-success) 16%, transparent);
   color: var(--color-alert-success-text);
   border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
 }
 
-.cht__msg-badge--cobros {
+.cht__msg-badge--collections {
   background: color-mix(in srgb, var(--color-primary) 14%, transparent);
   color: var(--color-primary);
   border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
 }
 
-.cht__msg-badge--compras {
+.cht__msg-badge--purchases {
   background: color-mix(in srgb, var(--color-warning) 16%, transparent);
   color: var(--color-alert-warning-text);
   border-color: color-mix(in srgb, var(--color-warning) 26%, transparent);
 }
 
-.cht__msg-badge--clientes {
+.cht__msg-badge--customers {
   background: color-mix(in srgb, var(--color-purple) 14%, transparent);
   color: var(--color-purple);
   border-color: color-mix(in srgb, var(--color-purple) 24%, transparent);
 }
 
-.cht__msg-badge--productos {
+.cht__msg-badge--products {
   background: color-mix(in srgb, var(--color-accent-pink) 14%, transparent);
   color: var(--color-accent-pink);
   border-color: color-mix(in srgb, var(--color-accent-pink) 22%, transparent);

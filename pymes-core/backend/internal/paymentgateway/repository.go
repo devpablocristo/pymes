@@ -21,6 +21,46 @@ var (
 	ErrGatewayNotConnected = errors.New("payment gateway not connected")
 )
 
+type orgSlugRow struct {
+	ID uuid.UUID
+}
+
+type bankInfoRow struct {
+	BankHolder string `gorm:"column:bank_holder"`
+	BankCBU    string `gorm:"column:bank_cbu"`
+	BankAlias  string `gorm:"column:bank_alias"`
+	BankName   string `gorm:"column:bank_name"`
+}
+
+type serviceIDRow struct {
+	ID uuid.UUID
+}
+
+type saleSnapshotRow struct {
+	ID            uuid.UUID
+	Number        string
+	CustomerName  string
+	CustomerPhone string
+	Total         float64
+	Currency      string
+}
+
+type quoteSnapshotRow struct {
+	ID           uuid.UUID
+	Number       string
+	CustomerName string
+	Total        float64
+	Currency     string
+}
+
+type salePaymentRow struct {
+	Number        string
+	Total         float64
+	AmountPaid    float64 `gorm:"column:amount_paid"`
+	Currency      string
+	PaymentMethod string `gorm:"column:payment_method"`
+}
+
 type Repository struct {
 	db *gorm.DB
 }
@@ -41,9 +81,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 			return id, nil
 		}
 	}
-	var row struct {
-		ID uuid.UUID
-	}
+	var row orgSlugRow
 	err := r.db.WithContext(ctx).Table("orgs").Select("id").Where("slug = ?", trimmed).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -67,12 +105,7 @@ func (r *Repository) GetPlanCode(ctx context.Context, orgID uuid.UUID) string {
 }
 
 func (r *Repository) GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
-	var row struct {
-		BankHolder string `gorm:"column:bank_holder"`
-		BankCBU    string `gorm:"column:bank_cbu"`
-		BankAlias  string `gorm:"column:bank_alias"`
-		BankName   string `gorm:"column:bank_name"`
-	}
+	var row bankInfoRow
 	if err := r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("bank_holder, bank_cbu, bank_alias, bank_name").
@@ -148,9 +181,7 @@ func (r *Repository) GetConnectionByExternalUserID(ctx context.Context, external
 }
 
 func (r *Repository) GetServiceIDByName(ctx context.Context, name string) (uuid.UUID, error) {
-	var row struct {
-		ID uuid.UUID
-	}
+	var row serviceIDRow
 	err := r.db.WithContext(ctx).
 		Table("system_services").
 		Select("id").
@@ -277,14 +308,7 @@ func (r *Repository) GetPreferenceByExternalID(ctx context.Context, provider, ex
 }
 
 func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error) {
-	var row struct {
-		ID            uuid.UUID
-		Number        string
-		CustomerName  string
-		CustomerPhone string
-		Total         float64
-		Currency      string
-	}
+	var row saleSnapshotRow
 	err := r.db.WithContext(ctx).
 		Table("sales s").
 		Select(`
@@ -308,13 +332,7 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUI
 }
 
 func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error) {
-	var row struct {
-		ID           uuid.UUID
-		Number       string
-		CustomerName string
-		Total        float64
-		Currency     string
-	}
+	var row quoteSnapshotRow
 	err := r.db.WithContext(ctx).
 		Table("quotes").
 		Select("id, number, COALESCE(party_name, '') AS customer_name, total, currency").
@@ -352,13 +370,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 			return nil
 		}
 
-		var sale struct {
-			Number        string
-			Total         float64
-			AmountPaid    float64 `gorm:"column:amount_paid"`
-			Currency      string
-			PaymentMethod string `gorm:"column:payment_method"`
-		}
+		var sale salePaymentRow
 		if err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE"}).
 			Table("sales").

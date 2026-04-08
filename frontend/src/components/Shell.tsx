@@ -97,16 +97,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
-      { to: '/modules/workshopServices', label: t('shell.nav.autoRepairServices'), icon: wrenchIcon },
-      { to: '/modules/workOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+      { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
     ],
     [t],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/bikeBicycles', label: t('shell.nav.bikeBicycles'), icon: bikeIcon },
-      { to: '/modules/bikeShopServices', label: t('shell.nav.bikeServices'), icon: wrenchIcon },
       { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: documentIcon },
     ],
     [t],
@@ -114,8 +111,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/beautyStaff', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
-      { to: '/modules/beautySalonServices', label: t('shell.nav.beautyServices'), icon: beautyIcon },
+      { to: '/modules/employees', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
     ],
     [t],
   );

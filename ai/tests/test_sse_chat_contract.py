@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from src.api import chat_stream
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.api.public_router import router as public_chat_router
+import src.api.quota as quota_module
 from src.api.router import router as internal_chat_router
 from src.agents.service_support import CommercialChatResult
 import src.api.public_router as public_router_module
@@ -74,21 +74,6 @@ class StubRepo:
     async def update_dossier(self, org_id: str, patch: dict[str, object]) -> dict[str, object]:
         self.update_calls.append({"org_id": org_id, "patch": patch})
         return patch
-
-
-def chunk(kind: str, *, text: str | None = None, tool_name: str | None = None):
-    tool_call = {"name": tool_name} if tool_name is not None else None
-    return SimpleNamespace(type=kind, text=text, tool_call=tool_call)
-
-
-def make_orchestrate(script):
-    async def fake_orchestrate(**_kwargs):
-        for item in script:
-            if isinstance(item, Exception):
-                raise item
-            yield item
-
-    return fake_orchestrate
 
 
 def parse_sse_events(body: str) -> list[tuple[str, dict[str, object]]]:
@@ -202,7 +187,7 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
             tool_calls=["lookup_customer"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "respuesta final"}],
-            routed_agent="clientes",
+            routed_agent="customers",
             routing_source="orchestrator",
         )
 
@@ -221,8 +206,7 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
         "tool_calls": ["lookup_customer"],
         "pending_confirmations": [],
         "blocks": [{"type": "text", "text": "respuesta final"}],
-        "routed_agent": "clientes",
-        "routed_mode": "clientes",
+        "routed_agent": "customers",
         "routing_source": "orchestrator",
     }
     assert captured["route_hint"] is None
@@ -249,7 +233,7 @@ def test_internal_chat_bypasses_quota_when_plan_limits_are_disabled(monkeypatch)
         )
 
     monkeypatch.setattr(repo, "get_month_usage", fake_get_month_usage)
-    monkeypatch.setattr(router_module, "get_settings", lambda: SimpleNamespace(ai_enforce_plan_limits=False))
+    monkeypatch.setattr(quota_module, "get_settings", lambda: SimpleNamespace(ai_enforce_plan_limits=False))
     monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
 
     response = client.post("/v1/chat", json={"message": "hola"})
@@ -301,7 +285,7 @@ def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
                     "empty_state": None,
                 },
             ],
-            routed_agent="ventas",
+            routed_agent="sales",
             routing_source="copilot_agent",
         )
 
@@ -318,7 +302,7 @@ def test_internal_chat_accepts_enriched_insight_blocks(monkeypatch) -> None:
     assert payload["blocks"][0]["type"] == "insight_card"
     assert payload["blocks"][1]["type"] == "kpi_group"
     assert payload["blocks"][2]["type"] == "table"
-    assert payload["routed_agent"] == "ventas"
+    assert payload["routed_agent"] == "sales"
     assert payload["routing_source"] == "copilot_agent"
 
 
@@ -350,7 +334,6 @@ def test_internal_chat_normalizes_unknown_route_to_general(monkeypatch) -> None:
     assert response.json()["output_kind"] == "chat_reply"
     assert response.json()["content_language"] == "es"
     assert response.json()["routed_agent"] == "general"
-    assert response.json()["routed_mode"] == "general"
     assert response.json()["routing_source"] == "orchestrator"
 
 
@@ -369,7 +352,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
             tool_calls=["search_customers"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "Tenés 2 clientes registrados. Algunos son: Acme, Beta."}],
-            routed_agent="clientes",
+            routed_agent="customers",
             routing_source="read_fallback",
         )
 
@@ -382,7 +365,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
     assert payload["request_id"] == "req-chat-4"
     assert payload["output_kind"] == "chat_reply"
     assert payload["content_language"] == "es"
-    assert payload["routed_agent"] == "clientes"
+    assert payload["routed_agent"] == "customers"
     assert payload["routing_source"] == "read_fallback"
 
 
@@ -403,7 +386,7 @@ def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
             tool_calls=["list_procurement_requests"],
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "Tenés 1 solicitud en borrador."}],
-            routed_agent="compras",
+            routed_agent="purchases",
             routing_source="ui_hint",
         )
 
@@ -411,15 +394,15 @@ def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
 
     response = client.post(
         "/v1/chat",
-        json={"message": "estado compras", "route_hint": "compras", "preferred_language": "en"},
+        json={"message": "estado compras", "route_hint": "purchases", "preferred_language": "en"},
     )
 
     assert response.status_code == 200
     assert response.json()["request_id"] == "req-chat-5"
     assert response.json()["content_language"] == "es"
-    assert response.json()["routed_agent"] == "compras"
+    assert response.json()["routed_agent"] == "purchases"
     assert response.json()["routing_source"] == "ui_hint"
-    assert captured["route_hint"] == "compras"
+    assert captured["route_hint"] == "purchases"
     assert captured["preferred_language"] == "en"
 
 
@@ -450,7 +433,7 @@ def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypa
                             "label": "Ventas",
                             "kind": "send_message",
                             "message": "cuánto hay?",
-                            "route_hint": "ventas",
+                            "route_hint": "sales",
                             "selection_behavior": "route_and_resend",
                             "style": "secondary",
                             "confirmed_actions": [],
@@ -469,7 +452,7 @@ def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypa
     assert response.status_code == 200
     payload = response.json()
     assert payload["request_id"] == "req-chat-6"
-    assert payload["blocks"][1]["actions"][0]["route_hint"] == "ventas"
+    assert payload["blocks"][1]["actions"][0]["route_hint"] == "sales"
     assert payload["blocks"][1]["actions"][0]["selection_behavior"] == "route_and_resend"
 
 
@@ -494,7 +477,12 @@ def test_public_chat_failure_does_not_persist_or_finish(monkeypatch) -> None:
     repo = StubRepo(plan_code="growth")
     client = create_public_client(repo, monkeypatch)
 
-    monkeypatch.setattr(chat_stream, "orchestrate", make_orchestrate([RuntimeError("boom")]))
+    async def fake_stream(**_kwargs):
+        from runtime.api.events import to_sse_event
+
+        yield to_sse_event("error", {"message": "error processing request"})
+
+    monkeypatch.setattr(public_router_module, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})
@@ -510,7 +498,30 @@ def test_public_chat_success_persists_and_finishes(monkeypatch) -> None:
     repo = StubRepo(plan_code="growth")
     client = create_public_client(repo, monkeypatch)
 
-    monkeypatch.setattr(chat_stream, "orchestrate", make_orchestrate([chunk("text", text="respuesta externa")]))
+    async def fake_stream(**kwargs):
+        from runtime.api.events import to_sse_event
+        from runtime.chat.stream import StreamChatResult
+        from runtime.text import estimate_tokens
+
+        llm_messages = kwargs["llm_messages"]
+        on_success = kwargs.get("on_success")
+        tokens_in = estimate_tokens("\n".join(m.content for m in llm_messages))
+        yield to_sse_event("text", {"content": "respuesta externa"})
+        reply_text = "respuesta externa"
+        tokens_out = estimate_tokens(reply_text)
+        result = StreamChatResult(
+            assistant_text=reply_text,
+            tool_calls=[],
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+        )
+        done_payload = await on_success(result) if on_success is not None else None
+        payload: dict[str, object] = {"tokens_used": result.tokens_used}
+        if done_payload:
+            payload.update(done_payload)
+        yield to_sse_event("done", payload)
+
+    monkeypatch.setattr(public_router_module, "stream_orchestrated_chat", fake_stream)
     monkeypatch.setattr(public_router_module, "build_external_tools", lambda *_args, **_kwargs: ([], {}))
 
     response = client.post("/v1/public/demo/chat", json={"message": "hola", "phone": "+54 11 5555 1111"})

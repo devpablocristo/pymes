@@ -269,7 +269,7 @@ export interface components {
             /** Message */
             message?: string | null;
             /** Route Hint */
-            route_hint?: ("general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras") | null;
+            route_hint?: ("general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases") | null;
             /** Selection Behavior */
             selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Url */
@@ -367,13 +367,7 @@ export interface components {
              * @description Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff explícito desde notificaciones.
              * @enum {string}
              */
-            routed_agent: "general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras";
-            /**
-             * Routed Mode
-             * @description Alias legacy de `routed_agent` para compatibilidad hacia atrás.
-             * @enum {string}
-             */
-            routed_mode: "general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras";
+            routed_agent: "general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases";
             /**
              * Routing Source
              * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint
@@ -711,7 +705,7 @@ export interface components {
              * Route Hint
              * @description Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. `copilot` queda reservado para handoff explícito desde notificaciones.
              */
-            route_hint?: ("general" | "copilot" | "clientes" | "productos" | "ventas" | "cobros" | "compras") | null;
+            route_hint?: ("general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases") | null;
             /**
              * Preferred Language
              * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.

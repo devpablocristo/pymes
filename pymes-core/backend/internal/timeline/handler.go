@@ -19,6 +19,11 @@ type usecasesPort interface {
 	Record(ctx context.Context, in timelinedomain.Entry) (timelinedomain.Entry, error)
 }
 
+type addNoteRequest struct {
+	Title string `json:"title"`
+	Note  string `json:"note" binding:"required"`
+}
+
 type Handler struct{ uc usecasesPort }
 
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
@@ -47,10 +52,7 @@ func (h *Handler) AddNote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct {
-		Title string `json:"title"`
-		Note  string `json:"note" binding:"required"`
-	}
+	var req addNoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return

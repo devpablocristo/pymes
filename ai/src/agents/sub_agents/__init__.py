@@ -12,15 +12,16 @@ from runtime.domain.agent import AgentRegistry
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 
-from . import clientes, cobros, compras, productos, ventas
+from . import collections, customers, products, purchases, sales, services
 
 
 def build_registry(client: BackendClient, auth: AuthContext) -> AgentRegistry:
     """Construye el registro con todos los sub-agentes de pymes."""
     registry = AgentRegistry()
-    registry.register(clientes.build(client, auth))
-    registry.register(productos.build(client, auth))
-    registry.register(ventas.build(client, auth))
-    registry.register(cobros.build(client, auth))
-    registry.register(compras.build(client, auth))
+    registry.register(customers.build(client, auth))
+    registry.register(products.build(client, auth))
+    registry.register(services.build(client, auth))
+    registry.register(sales.build(client, auth))
+    registry.register(collections.build(client, auth))
+    registry.register(purchases.build(client, auth))
     return registry

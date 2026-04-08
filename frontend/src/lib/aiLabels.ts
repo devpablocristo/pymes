@@ -7,11 +7,11 @@ function pick(language: LanguageCode, es: string, en: string): string {
 
 export function humanRoutedLabel(mode: string, language: LanguageCode = 'es'): string {
   if (mode === 'copilot') return 'Copilot';
-  if (mode === 'clientes') return pick(language, 'Clientes', 'Customers');
-  if (mode === 'productos') return pick(language, 'Productos', 'Products');
-  if (mode === 'ventas') return pick(language, 'Ventas', 'Sales');
-  if (mode === 'cobros') return pick(language, 'Cobros', 'Collections');
-  if (mode === 'compras') return pick(language, 'Compras', 'Purchases');
+  if (mode === 'customers') return pick(language, 'Clientes', 'Customers');
+  if (mode === 'products') return pick(language, 'Productos', 'Products');
+  if (mode === 'sales') return pick(language, 'Ventas', 'Sales');
+  if (mode === 'collections') return pick(language, 'Cobros', 'Collections');
+  if (mode === 'purchases') return pick(language, 'Compras', 'Purchases');
   if (mode === 'general') return pick(language, 'General', 'General');
   if (mode === 'internal_procurement') return pick(language, 'Compras internas', 'Internal procurement');
   if (mode === 'internal_sales') return pick(language, 'Ventas', 'Sales');

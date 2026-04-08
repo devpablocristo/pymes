@@ -140,14 +140,14 @@ async def _execute_pending_action(
     # Ejecutar el tool aprobado vía el backend client
     backend_client = request.app.state.backend_client
     try:
-        if tool_name == "book_appointment":
-            from src.tools import appointments
-            result = await appointments.book_appointment(backend_client, org_id=conversation.org_id, **tool_args)
+        if tool_name == "book_scheduling":
+            from src.tools import scheduling
+            result = await scheduling.book_scheduling(backend_client, org_id=conversation.org_id, **tool_args)
             return f"Tu turno fue confirmado. {result.get('message', 'Te esperamos!')}"
 
-        if tool_name == "cancel_appointment":
-            from src.tools import appointments
-            result = await appointments.cancel_appointment(backend_client, org_id=conversation.org_id, **tool_args)
+        if tool_name == "cancel_booking":
+            from src.tools import scheduling
+            result = await scheduling.cancel_booking(backend_client, org_id=conversation.org_id, **tool_args)
             return "Tu turno fue cancelado exitosamente."
 
         if tool_name == "create_sale":

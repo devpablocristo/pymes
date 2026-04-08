@@ -28,7 +28,7 @@ type serviceLinkPort interface {
 
 type bookingPort interface {
 	GetAvailability(ctx context.Context, orgRef string, params corepublic.AvailabilityParams) (map[string]any, error)
-	BookAppointment(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
 }
 
 type orgResolver interface {
@@ -56,13 +56,13 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/public/:org_slug/teachers/:slug", h.GetProfessional)
 	group.GET("/public/:org_slug/teachers/catalog", h.ListCatalog)
 	group.GET("/public/:org_slug/teachers/availability", h.GetAvailability)
-	group.POST("/public/:org_slug/teachers/appointments", h.BookAppointment)
+	group.POST("/public/:org_slug/teachers/bookings", h.BookScheduling)
 
 	group.GET("/public/:org_slug/professionals", h.ListProfessionals)
 	group.GET("/public/:org_slug/professionals/:slug", h.GetProfessional)
 	group.GET("/public/:org_slug/catalog", h.ListCatalog)
 	group.GET("/public/:org_slug/availability", h.GetAvailability)
-	group.POST("/public/:org_slug/appointments", h.BookAppointment)
+	group.POST("/public/:org_slug/bookings", h.BookScheduling)
 }
 
 func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
@@ -185,7 +185,7 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func (h *Handler) BookAppointment(c *gin.Context) {
+func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
 		return
@@ -203,7 +203,7 @@ func (h *Handler) BookAppointment(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookAppointment(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

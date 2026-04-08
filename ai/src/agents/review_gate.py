@@ -21,9 +21,9 @@ class ReviewDecision:
 
 # Mapeo de nombre de tool a action_type en Review
 GOVERNED_ACTIONS: dict[str, str] = {
-    "book_appointment": "appointment.book",
-    "cancel_appointment": "appointment.cancel",
-    "reschedule_appointment": "appointment.reschedule",
+    "book_scheduling": "scheduling.book",
+    "cancel_booking": "scheduling.cancel",
+    "reschedule_booking": "scheduling.reschedule",
     "create_sale": "sale.create",
     "create_quote": "quote.create",
     "generate_payment_link": "payment_link.generate",
@@ -45,8 +45,8 @@ READ_ONLY_TOOLS: frozenset[str] = frozenset({
     "get_stock_level",
     "get_account_balances",
     "get_debtors",
-    "get_appointments",
-    "get_my_appointments",
+    "get_bookings",
+    "get_my_bookings",
     "get_payment_status",
     "get_cashflow_summary",
     "get_purchases",
@@ -56,7 +56,8 @@ READ_ONLY_TOOLS: frozenset[str] = frozenset({
     "get_work_order",
     "list_work_orders",
     "list_vehicles",
-    "list_services",
+    "search_services",
+    "get_service",
     "get_business_info",
     "get_public_services",
     "check_availability",

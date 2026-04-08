@@ -85,9 +85,9 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	applyString(&m.WAQuoteTemplate, patch.WAQuoteTemplate)
 	applyString(&m.WAReceiptTemplate, patch.WAReceiptTemplate)
 	applyString(&m.WADefaultCountryCode, patch.WADefaultCountryCode)
-	applyBool(&m.AppointmentsEnabled, patch.SchedulingEnabled)
-	applyString(&m.AppointmentLabel, patch.AppointmentLabel)
-	applyInt(&m.AppointmentReminderHours, patch.AppointmentReminderHours)
+	applyBool(&m.SchedulingEnabled, patch.SchedulingEnabled)
+	applyString(&m.SchedulingLabel, patch.SchedulingLabel)
+	applyInt(&m.SchedulingReminderHours, patch.SchedulingReminderHours)
 	applyString(&m.DefaultRateType, patch.DefaultRateType)
 	applyBool(&m.AutoFetchRates, patch.AutoFetchRates)
 	applyBool(&m.ShowDualPrices, patch.ShowDualPrices)
@@ -186,9 +186,9 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 		WAQuoteTemplate:          m.WAQuoteTemplate,
 		WAReceiptTemplate:        m.WAReceiptTemplate,
 		WADefaultCountryCode:     m.WADefaultCountryCode,
-		SchedulingEnabled:        m.AppointmentsEnabled,
-		AppointmentLabel:         m.AppointmentLabel,
-		AppointmentReminderHours: m.AppointmentReminderHours,
+		SchedulingEnabled:        m.SchedulingEnabled,
+		SchedulingLabel:         m.SchedulingLabel,
+		SchedulingReminderHours: m.SchedulingReminderHours,
 		SecondaryCurrency:        secondaryCurrencyFromSupportedList(supportedList),
 		DefaultRateType:          m.DefaultRateType,
 		AutoFetchRates:           m.AutoFetchRates,
@@ -275,9 +275,9 @@ func normalizeTenantSettingsModel(in models.TenantSettingsModel) models.TenantSe
 	out.WAQuoteTemplate = defaultString(out.WAQuoteTemplate, "Hola {customer_name}, te enviamos el presupuesto {number} por {total}.")
 	out.WAReceiptTemplate = defaultString(out.WAReceiptTemplate, "Hola {customer_name}, tu comprobante de compra {number} por {total}. Gracias por tu compra!")
 	out.WADefaultCountryCode = defaultString(out.WADefaultCountryCode, "54")
-	out.AppointmentLabel = defaultString(out.AppointmentLabel, "Turno")
-	if out.AppointmentReminderHours < 0 {
-		out.AppointmentReminderHours = 24
+	out.SchedulingLabel = defaultString(out.SchedulingLabel, "Turno")
+	if out.SchedulingReminderHours < 0 {
+		out.SchedulingReminderHours = 24
 	}
 	out.DefaultRateType = defaultString(out.DefaultRateType, "blue")
 	out.WAPaymentTemplate = defaultString(out.WAPaymentTemplate, "Podes transferir a:\nAlias: {bank_alias}\nCBU: {bank_cbu}\nTitular: {bank_holder}\nBanco: {bank_name}\nMonto: {total}")

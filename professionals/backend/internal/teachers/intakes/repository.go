@@ -39,7 +39,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intak
 	row := models.IntakeModel{
 		ID:              uuid.New(),
 		OrgID:           in.OrgID,
-		AppointmentID:   in.AppointmentID,
+		BookingID:   in.BookingID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
 		ServiceID:       in.ServiceID,
@@ -69,7 +69,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.I
 func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intake, error) {
 	payload, _ := json.Marshal(in.Payload)
 	updates := map[string]any{
-		"appointment_id":    in.AppointmentID,
+		"booking_id":    in.BookingID,
 		"customer_party_id": in.CustomerPartyID,
 		"service_id":        in.ServiceID,
 		"status":            in.Status,
@@ -99,7 +99,7 @@ func toDomain(row models.IntakeModel) domain.Intake {
 	return domain.Intake{
 		ID:              row.ID,
 		OrgID:           row.OrgID,
-		AppointmentID:   row.AppointmentID,
+		BookingID:   row.BookingID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,
 		ServiceID:       coalesceServiceReference(row.ServiceID),

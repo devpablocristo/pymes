@@ -1,39 +1,32 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
 import {
-  createWorkOrder,
+  createWorkshopVehicle,
+  updateWorkshopVehicle,
+  workshopVehiclesArchivedCrud,
+} from '../lib/autoRepairApi';
+import type { WorkshopVehicle } from '../lib/autoRepairTypes';
+import {
+  archiveWorkOrder as archiveUnifiedWorkOrder,
+  createWorkOrder as createUnifiedWorkOrder,
   createWorkOrderPaymentLink,
   createWorkOrderQuote,
   createWorkOrderSale,
-  createWorkshopAppointment,
-  createWorkshopService,
-  createWorkshopVehicle,
-  getAllWorkOrders,
-  getAutoRepairWorkOrdersArchived,
-  updateWorkOrder,
-  updateWorkshopService,
-  updateWorkshopVehicle,
-  workshopServicesArchivedCrud,
-  workshopVehiclesArchivedCrud,
-  workshopWorkOrdersArchivedCrud,
-} from '../lib/autoRepairApi';
-import type { WorkOrder, WorkOrderItem, WorkshopService, WorkshopVehicle } from '../lib/autoRepairTypes';
-import {
-  bikeBicyclesArchivedCrud,
-  bikeServicesArchivedCrud,
-  bikeWorkOrdersArchivedCrud,
-  createBicycle,
-  createBikeQuote,
-  createBikeSale,
-  createBikePaymentLink,
-  createBikeShopService,
-  createBikeWorkOrder,
-  getBikeWorkOrders,
-  updateBicycle,
-  updateBikeShopService,
-  updateBikeWorkOrder,
-} from '../lib/bikeShopApi';
-import type { Bicycle, BikeShopService, BikeWorkOrder, BikeWorkOrderItem } from '../lib/bikeShopTypes';
+  createWorkshopBooking,
+  getAllWorkOrders as getAllUnifiedWorkOrders,
+  getWorkOrdersArchived as getUnifiedWorkOrdersArchived,
+  hardDeleteWorkOrder as hardDeleteUnifiedWorkOrder,
+  restoreWorkOrder as restoreUnifiedWorkOrder,
+  updateWorkOrder as updateUnifiedWorkOrder,
+  type WorkOrder,
+  type WorkOrderLineItem as WorkOrderItem,
+} from '../lib/workOrdersApi';
+
+type BikeWorkOrder = WorkOrder;
+type BikeWorkOrderItem = WorkOrderItem;
+const createBikeQuote = createWorkOrderQuote;
+const createBikeSale = createWorkOrderSale;
+const createBikePaymentLink = createWorkOrderPaymentLink;
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
   asBoolean,
@@ -178,138 +171,30 @@ const resourceConfigs: CrudResourceConfigMap = {
       asString(values.make).trim().length >= 2 &&
       asString(values.model).trim().length >= 1,
   },
-  workshopServices: {
+  carWorkOrders: {
     supportsArchived: true,
-    label: 'servicio de taller',
-    labelPlural: 'servicios de taller',
-    labelPluralCap: 'Servicios de taller',
-    createLabel: '+ Nuevo servicio de taller',
-    searchPlaceholder: 'Buscar...',
-    dataSource: {
-      list: async (opts) => workshopServicesArchivedCrud.list<WorkshopService>(opts),
-      create: async (values) => {
-        await createWorkshopService({
-          code: asString(values.code),
-          name: asString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          estimated_hours: asNumber(values.estimated_hours),
-          base_price: asNumber(values.base_price),
-          currency: asOptionalString(values.currency) ?? 'ARS',
-          tax_rate: asOptionalNumber(values.tax_rate) ?? 21,
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-      update: async (row: WorkshopService, values) => {
-        await updateWorkshopService(row.id, {
-          code: asOptionalString(values.code),
-          name: asOptionalString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          estimated_hours: asOptionalNumber(values.estimated_hours),
-          base_price: asOptionalNumber(values.base_price),
-          currency: asOptionalString(values.currency),
-          tax_rate: asOptionalNumber(values.tax_rate),
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-      deleteItem: workshopServicesArchivedCrud.deleteItem,
-      restore: workshopServicesArchivedCrud.restore,
-      hardDelete: workshopServicesArchivedCrud.hardDelete,
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Servicio',
-        className: 'cell-name',
-        render: (_value, row: WorkshopService) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.code} · {row.category || 'General'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'estimated_hours', header: 'Hs.', render: (value) => Number(value ?? 0).toFixed(1) },
-      {
-        key: 'base_price',
-        header: 'Precio',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
-      },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
-        ),
-      },
-    ],
-    formFields: [
-      { key: 'code', label: 'Codigo', required: true, placeholder: 'ACEITE-10K' },
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'Cambio de aceite 10.000 km' },
-      { key: 'category', label: 'Categoria', placeholder: 'Mantenimiento, frenos, motor...' },
-      { key: 'estimated_hours', label: 'Horas estimadas', type: 'number', placeholder: '1.5' },
-      { key: 'base_price', label: 'Precio base', type: 'number', placeholder: '45000' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
-      { key: 'linked_service_id', label: 'Service ID vinculado', placeholder: 'UUID del servicio del core' },
-      { key: 'is_active', label: 'Activo', type: 'checkbox' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-    ],
-    rowActions: [
-      {
-        id: 'toggle-active',
-        label: 'Activar / pausar',
-        kind: 'secondary',
-        onClick: async (row: WorkshopService) => {
-          await updateWorkshopService(row.id, { is_active: !row.is_active });
-        },
-      },
-    ],
-    searchText: (row: WorkshopService) => [row.code, row.name, row.category, row.description].filter(Boolean).join(' '),
-    toFormValues: (row: WorkshopService) => ({
-      code: row.code ?? '',
-      name: row.name ?? '',
-      description: row.description ?? '',
-      category: row.category ?? '',
-      estimated_hours: String(row.estimated_hours ?? ''),
-      base_price: String(row.base_price ?? ''),
-      currency: row.currency ?? 'ARS',
-      tax_rate: String(row.tax_rate ?? 21),
-      linked_service_id: row.linked_service_id ?? '',
-      is_active: row.is_active ?? true,
-    }),
-    isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
-  },
-  workOrders: {
-    supportsArchived: true,
-    allowDelete: false,
-    allowRestore: false,
-    allowHardDelete: false,
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo',
     createLabel: '+ Nueva orden de trabajo',
     searchPlaceholder: 'Buscar...',
     dataSource: {
+      // Auto-repair pasa al endpoint unificado /v1/work-orders con target_type='vehicle'.
       list: async ({ archived }) => {
         if (archived) {
-          const data = await getAutoRepairWorkOrdersArchived();
-          return data.items ?? [];
+          return (await getUnifiedWorkOrdersArchived({ target_type: 'vehicle' })) as unknown as WorkOrder[];
         }
-        return getAllWorkOrders();
+        return (await getAllUnifiedWorkOrders({ target_type: 'vehicle' })) as unknown as WorkOrder[];
       },
       create: async (values) => {
-        await createWorkOrder({
+        await createUnifiedWorkOrder({
           number: asOptionalString(values.number),
-          vehicle_id: asString(values.vehicle_id),
-          vehicle_plate: asOptionalString(values.vehicle_plate),
+          target_type: 'vehicle',
+          target_id: asString(values.vehicle_id),
+          target_label: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
-          appointment_id: asOptionalString(values.appointment_id),
+          booking_id: asOptionalString(values.booking_id),
           status: asOptionalString(values.status) ?? 'received',
           requested_work: asOptionalString(values.requested_work),
           diagnosis: asOptionalString(values.diagnosis),
@@ -322,12 +207,12 @@ const resourceConfigs: CrudResourceConfigMap = {
         });
       },
       update: async (row: WorkOrder, values) => {
-        await updateWorkOrder(row.id, {
-          vehicle_id: asOptionalString(values.vehicle_id),
-          vehicle_plate: asOptionalString(values.vehicle_plate),
+        await updateUnifiedWorkOrder(row.id, {
+          target_id: asOptionalString(values.vehicle_id),
+          target_label: asOptionalString(values.vehicle_plate),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
-          appointment_id: asOptionalString(values.appointment_id),
+          booking_id: asOptionalString(values.booking_id),
           status: asOptionalString(values.status),
           requested_work: asOptionalString(values.requested_work),
           diagnosis: asOptionalString(values.diagnosis),
@@ -338,9 +223,9 @@ const resourceConfigs: CrudResourceConfigMap = {
           items: parseWorkOrderItems(values.items_json),
         });
       },
-      deleteItem: workshopWorkOrdersArchivedCrud.deleteItem,
-      restore: workshopWorkOrdersArchivedCrud.restore,
-      hardDelete: workshopWorkOrdersArchivedCrud.hardDelete,
+      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
+      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
+      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
     },
     columns: [
       {
@@ -381,7 +266,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       { key: 'vehicle_plate', label: 'Patente', placeholder: 'Se autocompleta si ya la conoces', createOnly: true },
       { key: 'customer_id', label: 'Customer / Party ID', placeholder: 'UUID del dueño en el core', createOnly: true },
       { key: 'customer_name', label: 'Cliente', placeholder: 'Se autocompleta si el ID existe', createOnly: true },
-      { key: 'appointment_id', label: 'Appointment ID', createOnly: true },
+      { key: 'booking_id', label: 'Booking ID', createOnly: true },
       {
         key: 'status',
         label: 'Estado',
@@ -424,7 +309,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         id: 'schedule',
         label: 'Agendar',
         kind: 'secondary',
-        isVisible: (row: WorkOrder) => !row.appointment_id,
+        isVisible: (row: WorkOrder) => !row.booking_id,
         onClick: async (row: WorkOrder, helpers) => {
           const title = (
             window.prompt('Titulo del turno', row.requested_work || `Servicio ${row.vehicle_plate || row.number}`) ?? ''
@@ -439,7 +324,7 @@ const resourceConfigs: CrudResourceConfigMap = {
           if (!startAtInput) return;
           const durationRaw = (window.prompt('Duracion en minutos', '60') ?? '60').trim();
           const duration = Number(durationRaw || '60');
-          const appointment = await createWorkshopAppointment({
+          const booking = await createWorkshopBooking({
             customer_id: row.customer_id,
             customer_name: row.customer_name || row.vehicle_plate || row.number,
             title,
@@ -454,8 +339,8 @@ const resourceConfigs: CrudResourceConfigMap = {
               vehicle_plate: row.vehicle_plate,
             },
           });
-          if (appointment.id) {
-            await updateWorkOrder(row.id, { appointment_id: appointment.id });
+          if (booking.id) {
+            await updateUnifiedWorkOrder(row.id, { booking_id: booking.id });
           }
           await helpers.reload();
         },
@@ -487,7 +372,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         isVisible: (row: WorkOrder) => row.status !== 'cancelled',
         onClick: async (row: WorkOrder, helpers) => {
           const link = await createWorkOrderPaymentLink(row.id);
-          openExternalURL(link.payment_url);
+          openExternalURL(link.payment_url as string | undefined);
           await helpers.reload();
         },
       },
@@ -511,7 +396,7 @@ const resourceConfigs: CrudResourceConfigMap = {
       vehicle_plate: row.vehicle_plate ?? '',
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
-      appointment_id: row.appointment_id ?? '',
+      booking_id: row.booking_id ?? '',
       status: row.status ?? 'received',
       opened_at: toDateTimeInput(row.opened_at),
       promised_at: toDateTimeInput(row.promised_at),
@@ -530,224 +415,26 @@ const resourceConfigs: CrudResourceConfigMap = {
 
   // ── Bicicletería ──
 
-  bikeBicycles: {
-    label: 'bicicleta',
-    labelPlural: 'bicicletas',
-    labelPluralCap: 'Bicicletas',
-    createLabel: '+ Nueva bicicleta',
-    searchPlaceholder: 'Buscar...',
-    dataSource: {
-      list: async (opts) => bikeBicyclesArchivedCrud.list<Bicycle>(opts),
-      create: async (values) => {
-        await createBicycle({
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          frame_number: asString(values.frame_number),
-          make: asString(values.make),
-          model: asString(values.model),
-          bike_type: asOptionalString(values.bike_type),
-          size: asOptionalString(values.size),
-          wheel_size_inches: asOptionalNumber(values.wheel_size_inches),
-          color: asOptionalString(values.color),
-          ebike_notes: asOptionalString(values.ebike_notes),
-          notes: asOptionalString(values.notes),
-        });
-      },
-      update: async (row: Bicycle, values) => {
-        await updateBicycle(row.id, {
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          frame_number: asOptionalString(values.frame_number),
-          make: asOptionalString(values.make),
-          model: asOptionalString(values.model),
-          bike_type: asOptionalString(values.bike_type),
-          size: asOptionalString(values.size),
-          wheel_size_inches: asOptionalNumber(values.wheel_size_inches),
-          color: asOptionalString(values.color),
-          ebike_notes: asOptionalString(values.ebike_notes),
-          notes: asOptionalString(values.notes),
-        });
-      },
-      deleteItem: bikeBicyclesArchivedCrud.deleteItem,
-      restore: bikeBicyclesArchivedCrud.restore,
-      hardDelete: bikeBicyclesArchivedCrud.hardDelete,
-    },
-    columns: [
-      {
-        key: 'frame_number',
-        header: 'Bicicleta',
-        className: 'cell-name',
-        render: (_value, row: Bicycle) => (
-          <>
-            <strong>{row.frame_number}</strong>
-            <div className="text-secondary">{[row.make, row.model, row.bike_type].filter(Boolean).join(' · ')}</div>
-          </>
-        ),
-      },
-      { key: 'customer_name', header: 'Dueño' },
-      { key: 'size', header: 'Talle' },
-      { key: 'wheel_size_inches', header: 'Rodado', render: (value) => (value ? `${value}"` : '—') },
-      { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
-    ],
-    formFields: [
-      { key: 'customer_id', label: 'Customer / Party ID', placeholder: 'UUID del dueño en el core' },
-      { key: 'customer_name', label: 'Nombre del dueño', placeholder: 'Se autocompleta si el ID existe' },
-      { key: 'frame_number', label: 'Nro. de cuadro', required: true, placeholder: 'WBG1234567890' },
-      { key: 'make', label: 'Marca', required: true, placeholder: 'Trek' },
-      { key: 'model', label: 'Modelo', required: true, placeholder: 'Marlin 7' },
-      { key: 'bike_type', label: 'Tipo', placeholder: 'MTB, ruta, urbana, BMX...' },
-      { key: 'size', label: 'Talle', placeholder: 'M, L, 54cm...' },
-      { key: 'wheel_size_inches', label: 'Rodado (pulgadas)', type: 'number', placeholder: '29' },
-      { key: 'color', label: 'Color' },
-      { key: 'ebike_notes', label: 'Notas e-bike', placeholder: 'Motor, batería, controlador...' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Bicycle) =>
-      [row.frame_number, row.make, row.model, row.bike_type, row.customer_name, row.color, row.notes]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Bicycle) => ({
-      customer_id: row.customer_id ?? '',
-      customer_name: row.customer_name ?? '',
-      frame_number: row.frame_number ?? '',
-      make: row.make ?? '',
-      model: row.model ?? '',
-      bike_type: row.bike_type ?? '',
-      size: row.size ?? '',
-      wheel_size_inches: String(row.wheel_size_inches ?? ''),
-      color: row.color ?? '',
-      ebike_notes: row.ebike_notes ?? '',
-      notes: row.notes ?? '',
-    }),
-    isValid: (values) =>
-      asString(values.frame_number).trim().length >= 3 &&
-      asString(values.make).trim().length >= 2 &&
-      asString(values.model).trim().length >= 1,
-  },
-  bikeShopServices: {
-    supportsArchived: true,
-    label: 'servicio de bicicletería',
-    labelPlural: 'servicios de bicicletería',
-    labelPluralCap: 'Servicios de bicicletería',
-    createLabel: '+ Nuevo servicio',
-    searchPlaceholder: 'Buscar...',
-    dataSource: {
-      list: async (opts) => bikeServicesArchivedCrud.list<BikeShopService>(opts),
-      create: async (values) => {
-        await createBikeShopService({
-          code: asString(values.code),
-          name: asString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          estimated_hours: asNumber(values.estimated_hours),
-          base_price: asNumber(values.base_price),
-          currency: asOptionalString(values.currency) ?? 'ARS',
-          tax_rate: asOptionalNumber(values.tax_rate) ?? 21,
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-      update: async (row: BikeShopService, values) => {
-        await updateBikeShopService(row.id, {
-          code: asOptionalString(values.code),
-          name: asOptionalString(values.name),
-          description: asOptionalString(values.description),
-          category: asOptionalString(values.category),
-          estimated_hours: asOptionalNumber(values.estimated_hours),
-          base_price: asOptionalNumber(values.base_price),
-          currency: asOptionalString(values.currency),
-          tax_rate: asOptionalNumber(values.tax_rate),
-          linked_service_id: asOptionalString(values.linked_service_id),
-          is_active: asBoolean(values.is_active),
-        });
-      },
-      deleteItem: bikeServicesArchivedCrud.deleteItem,
-      restore: bikeServicesArchivedCrud.restore,
-      hardDelete: bikeServicesArchivedCrud.hardDelete,
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Servicio',
-        className: 'cell-name',
-        render: (_value, row: BikeShopService) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.code} · {row.category || 'General'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'estimated_hours', header: 'Hs.', render: (value) => Number(value ?? 0).toFixed(1) },
-      {
-        key: 'base_price',
-        header: 'Precio',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
-      },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
-        ),
-      },
-    ],
-    formFields: [
-      { key: 'code', label: 'Código', required: true, placeholder: 'PARCHE-CAM' },
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'Parche de cámara' },
-      { key: 'category', label: 'Categoría', placeholder: 'Mantenimiento, frenos, ruedas...' },
-      { key: 'estimated_hours', label: 'Horas estimadas', type: 'number', placeholder: '0.5' },
-      { key: 'base_price', label: 'Precio base', type: 'number', placeholder: '3500' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
-      { key: 'linked_service_id', label: 'Service ID vinculado', placeholder: 'UUID del servicio del core' },
-      { key: 'is_active', label: 'Activo', type: 'checkbox' },
-      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
-    ],
-    rowActions: [
-      {
-        id: 'toggle-active',
-        label: 'Activar / pausar',
-        kind: 'secondary',
-        onClick: async (row: BikeShopService) => {
-          await updateBikeShopService(row.id, { is_active: !row.is_active });
-        },
-      },
-    ],
-    searchText: (row: BikeShopService) => [row.code, row.name, row.category, row.description].filter(Boolean).join(' '),
-    toFormValues: (row: BikeShopService) => ({
-      code: row.code ?? '',
-      name: row.name ?? '',
-      description: row.description ?? '',
-      category: row.category ?? '',
-      estimated_hours: String(row.estimated_hours ?? ''),
-      base_price: String(row.base_price ?? ''),
-      currency: row.currency ?? 'ARS',
-      tax_rate: String(row.tax_rate ?? 21),
-      linked_service_id: row.linked_service_id ?? '',
-      is_active: row.is_active ?? true,
-    }),
-    isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
-  },
   bikeWorkOrders: {
-    allowDelete: false,
-    allowRestore: false,
-    allowHardDelete: false,
+    supportsArchived: true,
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo (bicicletería)',
     createLabel: '+ Nueva orden',
     searchPlaceholder: 'Buscar...',
     dataSource: {
-      list: async () => {
-        const data = await getBikeWorkOrders({ limit: 250 });
-        return data.items ?? [];
+      // Bike-shop pasa al endpoint unificado /v1/work-orders con target_type='bicycle'.
+      list: async ({ archived }) => {
+        if (archived) {
+          return (await getUnifiedWorkOrdersArchived({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
+        }
+        return (await getAllUnifiedWorkOrders({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
       },
       create: async (values) => {
-        await createBikeWorkOrder({
-          bicycle_id: asString(values.bicycle_id),
-          bicycle_label: asOptionalString(values.bicycle_label),
+        await createUnifiedWorkOrder({
+          target_type: 'bicycle',
+          target_id: asString(values.bicycle_id),
+          target_label: asOptionalString(values.bicycle_label),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           status: asOptionalString(values.status) ?? 'received',
@@ -762,9 +449,9 @@ const resourceConfigs: CrudResourceConfigMap = {
         });
       },
       update: async (row: BikeWorkOrder, values) => {
-        await updateBikeWorkOrder(row.id, {
-          bicycle_id: asOptionalString(values.bicycle_id),
-          bicycle_label: asOptionalString(values.bicycle_label),
+        await updateUnifiedWorkOrder(row.id, {
+          target_id: asOptionalString(values.bicycle_id),
+          target_label: asOptionalString(values.bicycle_label),
           customer_id: asOptionalString(values.customer_id),
           customer_name: asOptionalString(values.customer_name),
           status: asOptionalString(values.status),
@@ -777,9 +464,9 @@ const resourceConfigs: CrudResourceConfigMap = {
           items: parseBikeWorkOrderItems(values.items_json),
         });
       },
-      deleteItem: bikeWorkOrdersArchivedCrud.deleteItem,
-      restore: bikeWorkOrdersArchivedCrud.restore,
-      hardDelete: bikeWorkOrdersArchivedCrud.hardDelete,
+      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
+      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
+      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
     },
     columns: [
       {
@@ -883,7 +570,7 @@ const resourceConfigs: CrudResourceConfigMap = {
         isVisible: (row: BikeWorkOrder) => row.status !== 'cancelled',
         onClick: async (row: BikeWorkOrder, helpers) => {
           const link = await createBikePaymentLink(row.id);
-          openExternalURL(link.payment_url);
+          openExternalURL(link.payment_url as string | undefined);
           await helpers.reload();
         },
       },

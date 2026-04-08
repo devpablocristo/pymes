@@ -27,7 +27,6 @@ async def update_business_info(
     default_currency: str | None = None,
     default_tax_rate: float | None = None,
     scheduling_enabled: bool | None = None,
-    appointments_enabled: bool | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     if business_name is not None:
@@ -42,12 +41,8 @@ async def update_business_info(
         payload["default_currency"] = default_currency
     if default_tax_rate is not None:
         payload["default_tax_rate"] = default_tax_rate
-    effective_scheduling = scheduling_enabled
-    if effective_scheduling is None:
-        effective_scheduling = appointments_enabled
-    if effective_scheduling is not None:
-        payload["scheduling_enabled"] = effective_scheduling
-        payload["appointments_enabled"] = effective_scheduling
+    if scheduling_enabled is not None:
+        payload["scheduling_enabled"] = scheduling_enabled
     if not payload:
         return {"error": "no fields to update"}
     return await client.request("PATCH", "/v1/tenant-settings", auth=auth, json=payload)

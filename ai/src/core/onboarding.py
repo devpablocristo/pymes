@@ -21,7 +21,7 @@ BUSINESS_PROFILES: dict[str, dict[str, Any]] = {
         "description": "Kiosco, almacen, tienda de ropa, ferreteria",
     },
     "servicio_profesional": {
-        "modules": ["customers", "appointments", "sales", "cashflow"],
+        "modules": ["customers", "scheduling", "sales", "cashflow"],
         "settings": {"track_stock": False, "scheduling_enabled": True},
         "description": "Peluqueria, consultorio, estudio juridico, taller",
     },

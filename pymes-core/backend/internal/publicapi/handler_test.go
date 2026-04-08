@@ -25,7 +25,7 @@ func (f *fakeRepo) GetBusinessInfo(_ context.Context, _ uuid.UUID) (BusinessInfo
 	return f.businessInfo, nil
 }
 
-func (f *fakeRepo) ListPublicServices(_ context.Context, _ uuid.UUID, _ int) ([]PublicService, error) {
+func (f *fakeRepo) ListPublicServiceCatalog(_ context.Context, _ uuid.UUID, _, _, _ string, _ int) ([]PublicServiceCatalogItem, error) {
 	return nil, nil
 }
 
@@ -38,11 +38,11 @@ func (f *fakeRepo) GetAvailability(_ context.Context, _ uuid.UUID, query Availab
 	}}, nil
 }
 
-func (f *fakeRepo) Book(_ context.Context, _ uuid.UUID, _ map[string]any) (AppointmentPublic, error) {
-	return AppointmentPublic{}, nil
+func (f *fakeRepo) Book(_ context.Context, _ uuid.UUID, _ map[string]any) (BookingPublic, error) {
+	return BookingPublic{}, nil
 }
 
-func (f *fakeRepo) ListByPhone(_ context.Context, _ uuid.UUID, _ string, _ int) ([]AppointmentPublic, error) {
+func (f *fakeRepo) ListByPhone(_ context.Context, _ uuid.UUID, _ string, _ int) ([]BookingPublic, error) {
 	return nil, nil
 }
 

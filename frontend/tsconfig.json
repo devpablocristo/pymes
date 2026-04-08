@@ -18,34 +18,129 @@
       "@fullcalendar/interaction": ["./node_modules/@fullcalendar/interaction"],
       "@fullcalendar/react": ["./node_modules/@fullcalendar/react"],
       "@fullcalendar/timegrid": ["./node_modules/@fullcalendar/timegrid"],
+      "@fullcalendar/list": ["./node_modules/@fullcalendar/list"],
+      "@dnd-kit/core": ["./node_modules/@dnd-kit/core"],
+      "@dnd-kit/utilities": ["./node_modules/@dnd-kit/utilities"],
       "@tanstack/react-query": ["./node_modules/@tanstack/react-query"],
-      "@devpablocristo/core-authn/errors": ["../../core/authn/ts/src/errors.ts"],
-      "@devpablocristo/core-fsm": ["../../core/concurrency/fsm/ts/src/index.ts"],
-      "@devpablocristo/core-browser": ["../../core/browser/ts/src/index.ts"],
-      "@devpablocristo/core-browser/crud": ["../../core/browser/ts/src/crud/index.ts"],
-      "@devpablocristo/core-browser/search": ["../../core/browser/ts/src/search/index.ts"],
-      "@devpablocristo/core-browser/storage": ["../../core/browser/ts/src/storage.ts"],
-      "@devpablocristo/core-browser/theme": ["../../core/browser/ts/src/theme.ts"],
-      "@devpablocristo/core-browser/observability": ["../../core/browser/ts/src/observability.ts"],
-      "@devpablocristo/core-browser/i18n": ["../../core/browser/ts/src/i18n/index.ts"],
-      "@devpablocristo/modules-calendar-board": ["../../modules/calendar/board/ts/src/index.ts"],
-      "@devpablocristo/modules-calendar-board/styles.css": ["../../modules/calendar/board/ts/src/styles.css"],
-      "@devpablocristo/modules-crud-ui": ["../../modules/crud/ui/ts/src/index.ts"],
-      "@devpablocristo/modules-crud-ui/csv": ["../../modules/crud/ui/ts/src/csv.ts"],
-      "@devpablocristo/modules-kanban-board": ["../../modules/kanban/board/ts/src/index.ts"],
-      "@devpablocristo/modules-scheduling": ["../../modules/scheduling/ts/src/index.ts"],
-      "@devpablocristo/modules-scheduling/next": ["../../modules/scheduling/ts/src/next.ts"],
-      "@devpablocristo/modules-scheduling/styles.css": ["../../modules/scheduling/ts/src/styles.css"],
-      "@devpablocristo/modules-scheduling/styles.next.css": ["../../modules/scheduling/ts/src/styles.next.css"],
-      "@devpablocristo/modules-work-orders": ["../../modules/work-orders/ts/src/index.ts"],
-      "@devpablocristo/modules-work-orders/styles.css": ["../../modules/work-orders/ts/src/styles.css"],
-      "@devpablocristo/modules-shell-sidebar": ["../../modules/sidebar/ts/src/index.ts"],
-      "@devpablocristo/modules-shell-sidebar/styles.css": ["../../modules/sidebar/ts/src/styles.css"],
-      "@devpablocristo/modules-ui-modal/styles.css": ["../../modules/ui/modal/ts/src/styles.css"],
-      "@devpablocristo/modules-ui-page-shell": ["../../modules/ui/page-shell/ts/src/index.ts"],
-      "@devpablocristo/modules-ui-page-shell/styles.css": ["../../modules/ui/page-shell/ts/src/styles.css"],
-      "@devpablocristo/modules-ui-section-hub": ["../../modules/ui/section-hub/ts/src/index.tsx"],
-      "@devpablocristo/modules-ui-section-hub/styles.css": ["../../modules/ui/section-hub/ts/src/styles.css"],
+      "@devpablocristo/core-authn/errors": [
+        "../core/authn/ts/src/errors.ts",
+        "../../core/authn/ts/src/errors.ts"
+      ],
+      "@devpablocristo/core-fsm": [
+        "../core/concurrency/fsm/ts/src/index.ts",
+        "../../core/concurrency/fsm/ts/src/index.ts"
+      ],
+      "@devpablocristo/core-browser": [
+        "../core/browser/ts/src/index.ts",
+        "../../core/browser/ts/src/index.ts"
+      ],
+      "@devpablocristo/core-browser/crud": [
+        "../core/browser/ts/src/crud/index.ts",
+        "../../core/browser/ts/src/crud/index.ts"
+      ],
+      "@devpablocristo/core-browser/search": [
+        "../core/browser/ts/src/search/index.ts",
+        "../../core/browser/ts/src/search/index.ts"
+      ],
+      "@devpablocristo/core-browser/storage": [
+        "../core/browser/ts/src/storage.ts",
+        "../../core/browser/ts/src/storage.ts"
+      ],
+      "@devpablocristo/core-browser/theme": [
+        "../core/browser/ts/src/theme.ts",
+        "../../core/browser/ts/src/theme.ts"
+      ],
+      "@devpablocristo/core-browser/observability": [
+        "../core/browser/ts/src/observability.ts",
+        "../../core/browser/ts/src/observability.ts"
+      ],
+      "@devpablocristo/core-browser/i18n": [
+        "../core/browser/ts/src/i18n/index.ts",
+        "../../core/browser/ts/src/i18n/index.ts"
+      ],
+      "@devpablocristo/modules-calendar-board": [
+        "./node_modules/@devpablocristo/modules-calendar-board/src/index.ts",
+        "../modules/calendar/board/ts/src/index.ts",
+        "../../modules/calendar/board/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-calendar-board/styles.css": [
+        "./node_modules/@devpablocristo/modules-calendar-board/src/styles.css",
+        "../modules/calendar/board/ts/src/styles.css",
+        "../../modules/calendar/board/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-crud-ui": [
+        "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts",
+        "../modules/crud/ui/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-crud-ui/csv": [
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts",
+        "../modules/crud/ui/ts/src/csv.ts"
+      ],
+      "@devpablocristo/modules-crud-ui/csv-toolbar": [
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts",
+        "../modules/crud/ui/ts/src/csvToolbarMerge.ts"
+      ],
+      "@devpablocristo/modules-crud-ui/surface": [
+        "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx",
+        "../modules/crud/ui/ts/src/crudCanonicalSurface.tsx"
+      ],
+      "@devpablocristo/modules-kanban-board": [
+        "./node_modules/@devpablocristo/modules-kanban-board/src/index.ts",
+        "../modules/kanban/board/ts/src/index.ts",
+        "../../modules/kanban/board/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-scheduling": [
+        "../modules/scheduling/ts/src/index.ts",
+        "../../modules/scheduling/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-scheduling/next": [
+        "../modules/scheduling/ts/src/next.ts",
+        "../../modules/scheduling/ts/src/next.ts"
+      ],
+      "@devpablocristo/modules-scheduling/styles.css": [
+        "../modules/scheduling/ts/src/styles.css",
+        "../../modules/scheduling/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-scheduling/styles.next.css": [
+        "../modules/scheduling/ts/src/styles.next.css",
+        "../../modules/scheduling/ts/src/styles.next.css"
+      ],
+      "@devpablocristo/modules-work-orders": [
+        "../modules/work-orders/ts/src/index.ts",
+        "../../modules/work-orders/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-work-orders/styles.css": [
+        "../modules/work-orders/ts/src/styles.css",
+        "../../modules/work-orders/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-shell-sidebar": [
+        "../modules/sidebar/ts/src/index.ts",
+        "../../modules/sidebar/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-shell-sidebar/styles.css": [
+        "../modules/sidebar/ts/src/styles.css",
+        "../../modules/sidebar/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-ui-modal/styles.css": [
+        "../modules/ui/modal/ts/src/styles.css",
+        "../../modules/ui/modal/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-ui-page-shell": [
+        "../modules/ui/page-shell/ts/src/index.ts",
+        "../../modules/ui/page-shell/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-ui-page-shell/styles.css": [
+        "../modules/ui/page-shell/ts/src/styles.css",
+        "../../modules/ui/page-shell/ts/src/styles.css"
+      ],
+      "@devpablocristo/modules-ui-section-hub": [
+        "../modules/ui/section-hub/ts/src/index.tsx",
+        "../../modules/ui/section-hub/ts/src/index.tsx"
+      ],
+      "@devpablocristo/modules-ui-section-hub/styles.css": [
+        "../modules/ui/section-hub/ts/src/styles.css",
+        "../../modules/ui/section-hub/ts/src/styles.css"
+      ],
       "react": ["./node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
       "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],

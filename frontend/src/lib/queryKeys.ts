@@ -43,9 +43,9 @@ export const queryKeys = {
   session: {
     current: ['session', 'current'] as const,
   },
-  workOrders: {
-    kanban: (archived: boolean) => ['work-orders', 'kanban', archived ? 'archived' : 'active'] as const,
-    crudConfig: ['work-orders', 'crud-config'] as const,
+  carWorkOrders: {
+    kanban: (archived: boolean) => ['car-work-orders', 'kanban', archived ? 'archived' : 'active'] as const,
+    crudConfig: ['car-work-orders', 'crud-config'] as const,
   },
   modules: {
     isCrud: (moduleId: string) => ['modules', 'is-crud', moduleId] as const,

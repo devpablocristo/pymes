@@ -80,7 +80,7 @@ func (r *Repository) ListDueSchedulingReminders(ctx context.Context, now time.Ti
 		  AND b.reminder_sent_at IS NULL
 		  AND b.status IN ('pending_confirmation', 'confirmed')
 		  AND b.start_at >= ?
-		  AND b.start_at <= (? + make_interval(hours => GREATEST(ts.appointment_reminder_hours, 0)))
+		  AND b.start_at <= (? + make_interval(hours => GREATEST(ts.scheduling_reminder_hours, 0)))
 		ORDER BY b.start_at ASC
 		LIMIT ?
 	`, now.UTC(), now.UTC(), limit).Scan(&rows).Error

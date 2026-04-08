@@ -13,28 +13,23 @@ func TestLoadFromEnvAllowsLocalDefaultInternalToken(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvPanicsWithoutInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", "")
-
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for missing production internal token")
-		}
-	}()
-
-	_ = LoadFromEnv()
+func TestValidateInternalServiceTokenRejectsEmptyInProduction(t *testing.T) {
+	t.Parallel()
+	if err := validateInternalServiceToken("production", ""); err == nil {
+		t.Fatal("expected error for missing production internal token")
+	}
 }
 
-func TestLoadFromEnvPanicsWithDefaultInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)
+func TestValidateInternalServiceTokenRejectsDefaultInProduction(t *testing.T) {
+	t.Parallel()
+	if err := validateInternalServiceToken("production", localInternalServiceToken); err == nil {
+		t.Fatal("expected error for default production internal token")
+	}
+}
 
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for default production internal token")
-		}
-	}()
-
-	_ = LoadFromEnv()
+func TestValidateInternalServiceTokenAllowsLocalDefault(t *testing.T) {
+	t.Parallel()
+	if err := validateInternalServiceToken("development", ""); err != nil {
+		t.Fatalf("unexpected error for local token: %v", err)
+	}
 }

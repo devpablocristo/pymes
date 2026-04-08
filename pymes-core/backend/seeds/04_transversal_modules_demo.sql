@@ -18,8 +18,6 @@ DECLARE
     pur2 uuid;
     pr1 uuid;
     wh1 uuid;
-    t_start timestamptz;
-    t_end timestamptz;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
         RETURN;
@@ -32,8 +30,6 @@ BEGIN
     p2 := uuid_generate_v5(v_org, 'pymes-seed/v1/product/2');
     p3 := uuid_generate_v5(v_org, 'pymes-seed/v1/product/3');
     pl_default := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/default');
-    ap1 := uuid_generate_v5(v_org, 'pymes-seed/v1/appointment/1');
-    ap2 := uuid_generate_v5(v_org, 'pymes-seed/v1/appointment/2');
     rec1 := uuid_generate_v5(v_org, 'pymes-seed/v1/recurring/1');
     pur1 := uuid_generate_v5(v_org, 'pymes-seed/v1/purchase/1');
     pur2 := uuid_generate_v5(v_org, 'pymes-seed/v1/purchase/2');
@@ -55,15 +51,6 @@ BEGIN
         (pl_default, p3, 7000.00)
     ON CONFLICT (price_list_id, product_id) DO UPDATE
         SET price = EXCLUDED.price;
-
-    t_start := date_trunc('day', now() AT TIME ZONE 'UTC') + interval '2 days' + interval '10 hours';
-    t_end := t_start + interval '1 hour';
-
-    INSERT INTO appointments (id, org_id, party_id, party_name, party_phone, title, description, status, start_at, end_at, duration, assigned_to, notes, created_by)
-    VALUES
-        (ap1, v_org, c1, 'Cliente Demo Uno', '+54-11-1000-0001', 'Visita comercial', 'Seguimiento de cotización', 'confirmed', t_start, t_end, 60, 'seed', 'seed appointment', 'seed'),
-        (ap2, v_org, c2, 'Cliente Demo Dos', '+54-11-1000-0002', 'Entrega estimada', 'Coordinar logística', 'scheduled', t_start + interval '1 day', t_end + interval '1 day', 60, '', 'seed appointment', 'seed')
-    ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO recurring_expenses (id, org_id, description, amount, currency, category, payment_method, frequency, day_of_month, party_id, is_active, next_due_date, notes, created_by)
     VALUES

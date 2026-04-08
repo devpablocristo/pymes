@@ -55,7 +55,7 @@ func (c *Client) GetAvailability(ctx context.Context, orgRef string, params Avai
 	return c.Get(ctx, path, "")
 }
 
-func (c *Client) BookAppointment(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error) {
+func (c *Client) BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error) {
 	return c.Post(ctx, fmt.Sprintf("/v1/public/%s/book", url.PathEscape(orgRef)), "", payload)
 }
 

@@ -19,7 +19,7 @@ type RepositoryPort interface {
 	Create(ctx context.Context, in domain.Session) (domain.Session, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error)
 	Update(ctx context.Context, in domain.Session) (domain.Session, error)
-	AppointmentSessionExists(ctx context.Context, orgID, appointmentID uuid.UUID) (bool, error)
+	BookingSessionExists(ctx context.Context, orgID, bookingID uuid.UUID) (bool, error)
 	CreateNote(ctx context.Context, in domain.SessionNote) (domain.SessionNote, error)
 }
 
@@ -41,19 +41,19 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.Session, in
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) (domain.Session, error) {
-	if in.AppointmentID == uuid.Nil {
-		return domain.Session{}, fmt.Errorf("appointment_id is required: %w", httperrors.ErrBadInput)
+	if in.BookingID == uuid.Nil {
+		return domain.Session{}, fmt.Errorf("booking_id is required: %w", httperrors.ErrBadInput)
 	}
 	if in.ProfileID == uuid.Nil {
 		return domain.Session{}, fmt.Errorf("profile_id is required: %w", httperrors.ErrBadInput)
 	}
 
-	exists, err := u.repo.AppointmentSessionExists(ctx, in.OrgID, in.AppointmentID)
+	exists, err := u.repo.BookingSessionExists(ctx, in.OrgID, in.BookingID)
 	if err != nil {
 		return domain.Session{}, err
 	}
 	if exists {
-		return domain.Session{}, fmt.Errorf("a session already exists for this appointment: %w", httperrors.ErrConflict)
+		return domain.Session{}, fmt.Errorf("a session already exists for this booking: %w", httperrors.ErrConflict)
 	}
 
 	if in.Status == "" {
@@ -69,7 +69,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 		return domain.Session{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "session.created", "session", out.ID.String(), map[string]any{"appointment_id": out.AppointmentID.String()})
+		u.audit.Log(ctx, out.OrgID.String(), actor, "session.created", "session", out.ID.String(), map[string]any{"booking_id": out.BookingID.String()})
 	}
 	return out, nil
 }

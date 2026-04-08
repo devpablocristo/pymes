@@ -48,7 +48,9 @@ vi.mock('../components/PageLayout', () => ({
   ),
 }));
 
-vi.mock('../../../../modules/scheduling/ts/src/next', () => ({
+vi.mock('@devpablocristo/modules-scheduling/styles.next.css', () => ({}));
+
+vi.mock('@devpablocristo/modules-scheduling/next', () => ({
   createSchedulingClient: (...args: unknown[]) => schedulingMocks.createSchedulingClient(...args),
   SchedulingCalendar: (props: { client: unknown; locale?: string; searchQuery?: string }) => {
     schedulingMocks.capturedCalendarProps.push(props);

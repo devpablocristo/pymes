@@ -16,9 +16,9 @@ export function useCrudListCreatedByMerge(): {
 } {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
-  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() =>
-    clerkEnabled ? { mode: 'pick', actors: new Set() } : { mode: 'all' },
-  );
+  // Por defecto "Todos": semillas/API usan created_by distinto al user id de Clerk (ej. "seed");
+  // modo pick vacío se interpretaba como "solo yo" y ocultaba esas filas.
+  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
   return useMemo(() => {
     if (!clerkEnabled) {

@@ -3,6 +3,7 @@ package publicapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -61,10 +62,33 @@ type BusinessInfo struct {
 	SchedulingEnabled bool      `json:"scheduling_enabled"`
 }
 
+// PublicService es el shape legacy expuesto al adapter HTTP del módulo
+// scheduling (publichttpgin). El endpoint público `/v1/public/:org_id/services`
+// fue removido del handler local a favor de `catalog/services`, pero
+// schedulingpublichttp.Handler aún consume este método del repo para su router.
 type PublicService = schedulingpublic.Service
 type AvailabilitySlot = schedulingpublic.AvailabilitySlot
 type AvailabilityQuery = schedulingpublic.AvailabilityQuery
-type AppointmentPublic = schedulingpublic.Booking
+type BookingPublic = schedulingpublic.Booking
+
+type orgResolveByIDRow struct {
+	ID uuid.UUID `gorm:"column:id"`
+}
+
+type orgResolveBySlugRow struct {
+	ID uuid.UUID
+}
+
+type businessInfoRow struct {
+	OrgID             uuid.UUID
+	Name              string
+	Slug              string
+	BusinessName      string
+	BusinessAddress   string
+	BusinessPhone     string
+	BusinessEmail     string
+	SchedulingEnabled bool
+}
 
 type schedulingSelection struct {
 	Branch   schedulingdomain.Branch
@@ -79,9 +103,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 	}
 
 	if parsed, err := uuid.Parse(trimmed); err == nil {
-		var row struct {
-			ID uuid.UUID `gorm:"column:id"`
-		}
+		var row orgResolveByIDRow
 		err = r.db.WithContext(ctx).
 			Table("orgs").
 			Select("id").
@@ -92,9 +114,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 		}
 	}
 
-	var row struct {
-		ID uuid.UUID
-	}
+	var row orgResolveBySlugRow
 	err := r.db.WithContext(ctx).
 		Table("orgs").
 		Select("id").
@@ -110,16 +130,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 }
 
 func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error) {
-	var row struct {
-		OrgID             uuid.UUID
-		Name              string
-		Slug              string
-		BusinessName      string
-		BusinessAddress   string
-		BusinessPhone     string
-		BusinessEmail     string
-		SchedulingEnabled bool
-	}
+	var row businessInfoRow
 
 	err := r.db.WithContext(ctx).
 		Table("orgs o").
@@ -131,7 +142,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 			COALESCE(ts.business_address, '') as business_address,
 			COALESCE(ts.business_phone, '') as business_phone,
 			COALESCE(ts.business_email, '') as business_email,
-			COALESCE(ts.scheduling_enabled, ts.appointments_enabled, false) as scheduling_enabled
+			COALESCE(ts.scheduling_enabled, false) as scheduling_enabled
 		`).
 		Joins("LEFT JOIN tenant_settings ts ON ts.org_id = o.id").
 		Where("o.id = ?", orgID).
@@ -160,6 +171,8 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 	}, nil
 }
 
+// ListPublicServices mantiene el shape legacy para el adapter externo
+// schedulingpublichttp. El handler local ya no la expone.
 func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	if items, ok, err := r.listSchedulingPublicServices(ctx, orgID, limit); err != nil {
@@ -180,6 +193,120 @@ func (r *Repository) ListPublicServices(ctx context.Context, orgID uuid.UUID, li
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (r *Repository) listSchedulingPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, bool, error) {
+	if r.scheduling == nil {
+		return nil, false, nil
+	}
+	services, err := r.scheduling.ListServices(ctx, orgID)
+	if err != nil {
+		return nil, false, err
+	}
+	active := make([]PublicService, 0, len(services))
+	for _, service := range services {
+		if !service.Active {
+			continue
+		}
+		unit := "booking"
+		if service.FulfillmentMode == schedulingdomain.FulfillmentModeQueue {
+			unit = "ticket"
+		}
+		active = append(active, PublicService{
+			ID:          service.ID,
+			Name:        service.Name,
+			Type:        string(service.FulfillmentMode),
+			Description: service.Description,
+			Unit:        unit,
+			Price:       0,
+			Currency:    "",
+		})
+	}
+	if len(active) == 0 {
+		return nil, false, nil
+	}
+	sort.Slice(active, func(i, j int) bool { return strings.ToLower(active[i].Name) < strings.ToLower(active[j].Name) })
+	if len(active) > limit {
+		active = active[:limit]
+	}
+	return active, true, nil
+}
+
+// PublicServiceCatalogItem es el shape rico expuesto a verticales y al storefront
+// para listar el catálogo de servicios desde public.services.
+type PublicServiceCatalogItem struct {
+	ID                     uuid.UUID      `json:"id"`
+	Code                   string         `json:"code"`
+	Name                   string         `json:"name"`
+	Description            string         `json:"description"`
+	CategoryCode           string         `json:"category_code"`
+	SalePrice              float64        `json:"sale_price"`
+	Currency               string         `json:"currency"`
+	TaxRate                *float64       `json:"tax_rate,omitempty"`
+	DefaultDurationMinutes *int           `json:"default_duration_minutes,omitempty"`
+	Metadata               map[string]any `json:"metadata"`
+}
+
+type publicServiceCatalogRow struct {
+	ID                     uuid.UUID
+	Code                   string
+	Name                   string
+	Description            string
+	CategoryCode           string
+	SalePrice              float64
+	Currency               string
+	TaxRate                *float64
+	DefaultDurationMinutes *int `gorm:"column:default_duration_minutes"`
+	Metadata               []byte
+}
+
+// ListPublicServiceCatalog lee el catálogo rico desde public.services con filtros
+// opcionales por metadata.vertical / metadata.segment y un search por nombre/código.
+func (r *Repository) ListPublicServiceCatalog(ctx context.Context, orgID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error) {
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+
+	q := r.db.WithContext(ctx).
+		Table("services").
+		Select(`id, code, name, description, category_code, sale_price, currency,
+			tax_rate, default_duration_minutes, metadata`).
+		Where("org_id = ? AND deleted_at IS NULL AND is_active = true", orgID)
+
+	if v := strings.TrimSpace(vertical); v != "" {
+		q = q.Where("metadata->>'vertical' = ?", v)
+	}
+	if s := strings.TrimSpace(segment); s != "" {
+		q = q.Where("metadata->>'segment' = ?", s)
+	}
+	if s := strings.TrimSpace(search); s != "" {
+		like := "%" + s + "%"
+		q = q.Where("(name ILIKE ? OR description ILIKE ? OR code ILIKE ?)", like, like, like)
+	}
+
+	var rows []publicServiceCatalogRow
+	if err := q.Order("name ASC").Limit(limit).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	out := make([]PublicServiceCatalogItem, 0, len(rows))
+	for _, row := range rows {
+		metadata := map[string]any{}
+		if len(row.Metadata) > 0 {
+			_ = json.Unmarshal(row.Metadata, &metadata)
+		}
+		out = append(out, PublicServiceCatalogItem{
+			ID:                     row.ID,
+			Code:                   row.Code,
+			Name:                   row.Name,
+			Description:            row.Description,
+			CategoryCode:           row.CategoryCode,
+			SalePrice:              row.SalePrice,
+			Currency:               row.Currency,
+			TaxRate:                row.TaxRate,
+			DefaultDurationMinutes: row.DefaultDurationMinutes,
+			Metadata:               metadata,
+		})
+	}
+	return out, nil
 }
 
 func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error) {
@@ -213,30 +340,30 @@ func (r *Repository) GetAvailability(ctx context.Context, orgID uuid.UUID, query
 	return out, nil
 }
 
-func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (AppointmentPublic, error) {
+func (r *Repository) Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (BookingPublic, error) {
 	branchID, err := uuidPtrFromPayload(payload, "branch_id")
 	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	serviceID, err := uuidPtrFromPayload(payload, "service_id")
 	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	resourceID, err := uuidPtrFromPayload(payload, "resource_id")
 	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	selection, ok, err := r.resolveSchedulingSelection(ctx, orgID, branchID, serviceID, resourceID)
 	if err != nil {
-		return AppointmentPublic{}, err
+		return BookingPublic{}, err
 	}
 	if !ok {
-		return AppointmentPublic{}, fmt.Errorf("scheduling not configured for this organization")
+		return BookingPublic{}, fmt.Errorf("scheduling not configured for this organization")
 	}
 	return r.bookScheduling(ctx, orgID, selection, payload)
 }
 
-func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]AppointmentPublic, error) {
+func (r *Repository) ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]BookingPublic, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	phoneDigits := digitsOnly(phone)
 	if phoneDigits == "" {
@@ -337,69 +464,32 @@ func (r *Repository) JoinWaitlist(ctx context.Context, orgID uuid.UUID, payload 
 	return item, nil
 }
 
-func (r *Repository) ConfirmBookingByToken(ctx context.Context, orgID uuid.UUID, token string) (AppointmentPublic, error) {
+func (r *Repository) ConfirmBookingByToken(ctx context.Context, orgID uuid.UUID, token string) (BookingPublic, error) {
 	if r.scheduling == nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	item, err := r.scheduling.ConfirmBookingByToken(ctx, token)
 	if err != nil {
-		return AppointmentPublic{}, mapSchedulingErr(err)
+		return BookingPublic{}, mapSchedulingErr(err)
 	}
 	if item.OrgID != orgID {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
-	return appointmentFromSchedulingBooking(item), nil
+	return bookingFromSchedulingBooking(item), nil
 }
 
-func (r *Repository) CancelBookingByToken(ctx context.Context, orgID uuid.UUID, token, reason string) (AppointmentPublic, error) {
+func (r *Repository) CancelBookingByToken(ctx context.Context, orgID uuid.UUID, token, reason string) (BookingPublic, error) {
 	if r.scheduling == nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	item, err := r.scheduling.CancelBookingByToken(ctx, token, reason)
 	if err != nil {
-		return AppointmentPublic{}, mapSchedulingErr(err)
+		return BookingPublic{}, mapSchedulingErr(err)
 	}
 	if item.OrgID != orgID {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
-	return appointmentFromSchedulingBooking(item), nil
-}
-
-func (r *Repository) listSchedulingPublicServices(ctx context.Context, orgID uuid.UUID, limit int) ([]PublicService, bool, error) {
-	if r.scheduling == nil {
-		return nil, false, nil
-	}
-	services, err := r.scheduling.ListServices(ctx, orgID)
-	if err != nil {
-		return nil, false, err
-	}
-	active := make([]PublicService, 0, len(services))
-	for _, service := range services {
-		if !service.Active {
-			continue
-		}
-		unit := "appointment"
-		if service.FulfillmentMode == schedulingdomain.FulfillmentModeQueue {
-			unit = "ticket"
-		}
-		active = append(active, PublicService{
-			ID:          service.ID,
-			Name:        service.Name,
-			Type:        string(service.FulfillmentMode),
-			Description: service.Description,
-			Unit:        unit,
-			Price:       0,
-			Currency:    "",
-		})
-	}
-	if len(active) == 0 {
-		return nil, false, nil
-	}
-	sort.Slice(active, func(i, j int) bool { return strings.ToLower(active[i].Name) < strings.ToLower(active[j].Name) })
-	if len(active) > limit {
-		active = active[:limit]
-	}
-	return active, true, nil
+	return bookingFromSchedulingBooking(item), nil
 }
 
 func (r *Repository) resolveSchedulingSelection(ctx context.Context, orgID uuid.UUID, branchID, serviceID, resourceID *uuid.UUID) (schedulingSelection, bool, error) {
@@ -500,20 +590,20 @@ func chooseService(services []schedulingdomain.Service, serviceID *uuid.UUID) (s
 	return schedulingdomain.Service{}, ErrInvalidInput
 }
 
-func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, selection schedulingSelection, payload map[string]any) (AppointmentPublic, error) {
+func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, selection schedulingSelection, payload map[string]any) (BookingPublic, error) {
 	startAt, err := timeValueFromPayload(payload, "start_at")
 	if err != nil || startAt.IsZero() {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	customerName := firstStringFromPayload(payload, "party_name", "customer_name")
 	customerPhone := firstStringFromPayload(payload, "party_phone", "customer_phone")
 	customerEmail := firstStringFromPayload(payload, "customer_email")
 	if strings.TrimSpace(customerName) == "" || strings.TrimSpace(customerPhone) == "" {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	partyID, err := uuidPtrFromPayload(payload, "party_id")
 	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	idempotencyKey := firstStringFromPayload(payload, "idempotency_key")
 	notes := firstStringFromPayload(payload, "notes")
@@ -526,7 +616,7 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 	}
 	holdUntil, err := optionalTimeValueFromPayload(payload, "hold_until")
 	if err != nil {
-		return AppointmentPublic{}, ErrInvalidInput
+		return BookingPublic{}, ErrInvalidInput
 	}
 	source := firstStringFromPayload(payload, "source")
 	if strings.TrimSpace(source) == "" {
@@ -552,7 +642,7 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 	}
 	booking, err := r.scheduling.CreateBooking(ctx, orgID, "public-api", input)
 	if err != nil {
-		return AppointmentPublic{}, mapSchedulingErr(err)
+		return BookingPublic{}, mapSchedulingErr(err)
 	}
 	title := strings.TrimSpace(customTitle)
 	if title == "" {
@@ -564,7 +654,7 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 			actions = buildActionLinks(tokens)
 		}
 	}
-	return AppointmentPublic{
+	return BookingPublic{
 		ID:            booking.ID,
 		CustomerName:  booking.CustomerName,
 		CustomerPhone: booking.CustomerPhone,
@@ -578,8 +668,8 @@ func (r *Repository) bookScheduling(ctx context.Context, orgID uuid.UUID, select
 	}, nil
 }
 
-func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]AppointmentPublic, error) {
-	var rows []AppointmentPublic
+func (r *Repository) listSchedulingBookingsByPhone(ctx context.Context, orgID uuid.UUID, phoneDigits string, limit int) ([]BookingPublic, error) {
+	var rows []BookingPublic
 	err := r.db.WithContext(ctx).
 		Table("scheduling_bookings tb").
 		Select(`
@@ -630,8 +720,8 @@ func mapSchedulingErr(err error) error {
 	}
 }
 
-func appointmentFromSchedulingBooking(item schedulingdomain.Booking) AppointmentPublic {
-	return AppointmentPublic{
+func bookingFromSchedulingBooking(item schedulingdomain.Booking) BookingPublic {
+	return BookingPublic{
 		ID:            item.ID,
 		CustomerName:  item.CustomerName,
 		CustomerPhone: item.CustomerPhone,

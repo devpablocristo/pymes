@@ -21,7 +21,7 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
-	authGroup.POST("/salon-appointments", h.CreateBooking)
+	authGroup.POST("/salon-bookings", h.CreateBooking)
 }
 
 func (h *Handler) CreateBooking(c *gin.Context) {

@@ -1,0 +1,7 @@
+/* Contenedor de la grilla bajo ProductsModuleSection (selector arriba en WorkOrdersHeaderLead). */
+.products-crud-page {
+  padding: var(--space-6) var(--space-8);
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}

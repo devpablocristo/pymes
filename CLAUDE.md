@@ -19,10 +19,29 @@ Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/A
 
 ## 2. Idioma
 
-- **Código**: inglés
-- **Comentarios**: español
+### 2.1 Código — siempre inglés
+
+Todo lo que es **código interno** debe estar en inglés sin excepciones:
+- Variables, funciones, métodos, structs, types, interfaces, enums
+- Nombres de tablas, columnas, índices, constraints en SQL
+- Nombres de campos en JSON (API request/response), GORM tags, JSON tags
+- Nombres de roles, permisos, recursos en RBAC
+- Nombres de archivos y directorios
+- Constantes, feature flags, config keys
+- Seeds y fixtures (nombres de entidades de datos como roles, permisos)
+- Endpoints y rutas HTTP
+- Nombres de migraciones
+- Test names y test data identifiers
+
+### 2.2 Español — solo lo que ve el usuario
+
+- **UI visible** (labels, placeholders, mensajes de error de UI, onboarding text): español (producto para LATAM)
+- **Comentarios** en código: español (para aclarar lógica)
+- **Documentación** (`.md`): español
+- **Strings de i18n**: español (ES) e inglés (EN) según el locale
+- **Descripciones de AI** (prompts, respuestas al usuario): español
 - **TODOs**: inglés
-- **Respuestas**: español siempre
+- **Respuestas del asistente**: español siempre
 
 ---
 
@@ -47,14 +66,13 @@ Documentación canónica del monorepo: **`docs/README.md`** (índice), **`docs/A
 
 ---
 
-## 5. Arquitectura Go — Hexagonal (Gin + GORM + Lambda)
+## 5. Arquitectura Go — Hexagonal (Gin + GORM)
 
 ### 5.1 Estructura de proyecto
 
 ```
 {vertical}/
 ├── backend/
-│   ├── cmd/lambda/main.go
 │   ├── cmd/local/main.go
 │   ├── internal/
 │   │   ├── {modulo}/               # un dir por dominio de negocio
@@ -208,7 +226,7 @@ Los **mappers** viven en el adapter que los necesita:
 ### 6.1 Selección de vertical
 
 - Cada tenant elige **una sola vertical** (o ninguna) durante el onboarding.
-- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'bike_shop' | 'beauty' | 'restaurants'`).
+- La vertical elegida se guarda en `TenantProfile.vertical` (`'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants'`).
 - El sidebar solo muestra la sección de la vertical elegida. Sin vertical = solo módulos comerciales/operaciones.
 - Las rutas de verticales no elegidas siguen existiendo (no se bloquean) pero no aparecen en la navegación.
 

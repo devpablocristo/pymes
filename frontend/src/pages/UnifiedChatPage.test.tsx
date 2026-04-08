@@ -26,8 +26,7 @@ function buildChatReply(overrides?: Partial<PymesAssistantChatResponse>): PymesA
     chat_id: 'conv-3',
     reply: 'Respuesta del asistente',
     request_id: 'req-1',
-    routed_agent: 'ventas',
-    routed_mode: 'ventas',
+    routed_agent: 'sales',
     routing_source: 'llm',
     output_kind: 'chat',
     tokens_used: 10,
@@ -67,14 +66,6 @@ function getMessagesPane(): HTMLElement {
   return pane;
 }
 
-function getConversationButton(title: string): HTMLButtonElement {
-  const label = screen.getByText(title);
-  const button = label.closest('button');
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error(`No se encontró el botón de conversación para ${title}`);
-  }
-  return button;
-}
 
 describe('UnifiedChatPage', () => {
   beforeEach(() => {
@@ -119,7 +110,7 @@ describe('UnifiedChatPage', () => {
     aiMocks.pymesAssistantChat.mockResolvedValue(buildChatReply());
   });
 
-  it('mantiene limpia la nueva conversación sin rehidratar el último historial', async () => {
+  it('hidrata el último historial del asistente automáticamente al abrir el chat', async () => {
     renderUnifiedChat();
 
     expect(screen.getByRole('textbox', { name: /Ej\.: resumí ventas del mes o preguntá libre/i })).toBeInTheDocument();
@@ -130,34 +121,21 @@ describe('UnifiedChatPage', () => {
       expect(aiMocks.getConversation).toHaveBeenCalledWith('conv-1');
     });
     expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
+  });
+
+  it('limpia el hilo del asistente al iniciar una nueva conversación', async () => {
+    renderUnifiedChat();
+
+    expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Nueva conversación' }));
 
     await waitFor(() => {
       expect(within(getMessagesPane()).queryByText('Historial A')).not.toBeInTheDocument();
     });
-    expect(getConversationButton('Conversación A')).toBeInTheDocument();
-  });
-
-  it('reemplaza el hilo AI al cambiar a otra conversación guardada', async () => {
-    renderUnifiedChat();
-
-    expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText(/Ej\.: resumí ventas del mes/i), {
-      target: { value: 'Consulta nueva' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
-
-    expect(await within(getMessagesPane()).findByText('Consulta nueva')).toBeInTheDocument();
-    expect(await within(getMessagesPane()).findByText('Respuesta del asistente')).toBeInTheDocument();
-
-    fireEvent.click(getConversationButton('Conversación B'));
-
-    expect(await within(getMessagesPane()).findByText('Historial B')).toBeInTheDocument();
-    expect(within(getMessagesPane()).queryByText('Consulta nueva')).not.toBeInTheDocument();
-    expect(within(getMessagesPane()).queryByText('Respuesta del asistente')).not.toBeInTheDocument();
-    expect(within(getMessagesPane()).queryByText('Historial A')).not.toBeInTheDocument();
+    // No queda ningún botón de conversación previa en la sidebar (vista estilo WhatsApp).
+    expect(screen.queryByText('Conversación A')).not.toBeInTheDocument();
+    expect(screen.queryByText('Conversación B')).not.toBeInTheDocument();
   });
 
   it('prioriza el handoff desde notificaciones sobre la rehidratación automática del último historial', async () => {
@@ -170,7 +148,7 @@ describe('UnifiedChatPage', () => {
         chatContext: {
           suggested_user_message: 'Explicame este cobro pendiente',
         },
-        routedAgent: 'ventas',
+        routedAgent: 'sales',
         contentLanguage: 'es',
       }),
     );

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
+import { ReportsResultView } from '../components/ReportsResultView';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
 import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
 import {
@@ -16,6 +17,7 @@ import {
 } from '../lib/moduleCatalog';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
+import { isReportDatasetPath } from '../lib/reportsResultPresentation';
 import { vocab } from '../lib/vocabulary';
 
 function currentRuntimeContext(): ModuleRuntimeContext {
@@ -190,14 +192,37 @@ function extractRows(data: unknown): Array<Record<string, unknown>> | null {
       return raw as Array<Record<string, unknown>>;
     }
   }
+  if (data && typeof data === 'object' && 'data' in data) {
+    const inner = (data as { data: unknown }).data;
+    if (Array.isArray(inner)) {
+      if (inner.length === 0) {
+        return [];
+      }
+      if (inner.every((item) => item && typeof item === 'object')) {
+        return inner as Array<Record<string, unknown>>;
+      }
+      return null;
+    }
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      const row = inner as Record<string, unknown>;
+      const scalarRow = Object.fromEntries(Object.entries(row).filter(([, v]) => isScalarCell(v)));
+      if (Object.keys(scalarRow).length > 0) {
+        return [scalarRow];
+      }
+    }
+  }
   return null;
 }
 
-function ResultView({ data }: { data: unknown }) {
+function ResultView({ data, datasetPath }: { data: unknown; datasetPath?: string }) {
   const { t } = useI18n();
 
   if (data === null || data === undefined) {
     return null;
+  }
+
+  if (datasetPath && isReportDatasetPath(datasetPath)) {
+    return <ReportsResultView data={data} datasetPath={datasetPath} />;
   }
 
   const rows = extractRows(data);
@@ -221,7 +246,7 @@ function ResultView({ data }: { data: unknown }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 12).map((row, index) => (
+            {rows.slice(0, 100).map((row, index) => (
               <tr key={String(row.id ?? row.code ?? row.name ?? index)}>
                 {columns.map((column) => (
                   <td key={column}>{stringifyValue(row[column])}</td>
@@ -340,9 +365,13 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
   }
 
   const httpMethod = kind === 'dataset' ? 'GET' : (definition as ModuleAction).method;
+  const anchorId =
+    kind === 'dataset'
+      ? `module-dataset-${(definition as ModuleDataset).id ?? definition.path}`
+      : `module-action-${(definition as ModuleAction).id}`;
 
   return (
-    <section className="card module-card">
+    <section id={anchorId} className="card module-card module-endpoint-anchor">
       <div className="card-header module-card-header-inner">
         <div>
           <h2>{localizeUiText(vocab(definition.title))}</h2>
@@ -416,7 +445,9 @@ function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
 
       {error && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
-      {result !== null && <ResultView data={result} />}
+      {result !== null && (
+        <ResultView data={result} datasetPath={kind === 'dataset' ? definition.path : undefined} />
+      )}
     </section>
   );
 }
@@ -441,6 +472,79 @@ function NotFoundState() {
         </div>
       </div>
     </PageLayout>
+  );
+}
+
+function ModuleDatasetsAndActionsIndex({ module }: { module: ModuleDefinition }) {
+  const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
+  const rows: Array<{ key: string; anchor: string; title: string; method: string; path: string }> = [];
+  for (const d of module.datasets ?? []) {
+    const id = d.id ?? d.path;
+    rows.push({
+      key: `ds-${id}`,
+      anchor: `module-dataset-${id}`,
+      title: d.title,
+      method: 'GET',
+      path: d.path,
+    });
+  }
+  for (const a of module.actions ?? []) {
+    rows.push({
+      key: `ac-${a.id}`,
+      anchor: `module-action-${a.id}`,
+      title: a.title,
+      method: a.method,
+      path: a.path,
+    });
+  }
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <div className="card module-ops-index-card">
+      <div className="card-header module-card-header-inner">
+        <h2>{sentenceCase(t('module.index.title'))}</h2>
+      </div>
+      <div className="module-ops-index-body">
+        <div className="module-ops-badge-row" role="navigation" aria-label={localizeText(t('module.index.title'))}>
+          {rows.map((r) => (
+            <a key={r.key} href={`#${r.anchor}`} className="badge badge-neutral module-ops-badge-link">
+              {localizeUiText(vocab(r.title))}
+            </a>
+          ))}
+        </div>
+        <div className="module-ops-index-table-wrap table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{sentenceCase(t('module.index.columnOp'))}</th>
+                <th>{sentenceCase(t('module.index.columnMethod'))}</th>
+                <th>{sentenceCase(t('module.index.columnPath'))}</th>
+                <th>{sentenceCase(t('module.index.jump'))}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td>{localizeUiText(vocab(r.title))}</td>
+                  <td>
+                    <span className={`http-method http-method-${r.method.toLowerCase()}`}>{r.method}</span>
+                  </td>
+                  <td>
+                    <code className="endpoint-path">{r.path}</code>
+                  </td>
+                  <td>
+                    <a href={`#${r.anchor}`} className="btn-secondary btn-sm">
+                      {sentenceCase(t('module.index.jump'))}
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -555,6 +659,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
       actions={headerActions}
     >
       <ModuleOverviewCards module={module} />
+      <ModuleDatasetsAndActionsIndex module={module} />
       {sessionQuery.error && (
         <div className="alert alert-warning">
           {t('module.bootstrap.error', {
@@ -631,7 +736,7 @@ export function ModulePage() {
   });
 
   if (moduleId === 'workOrders') {
-    return <Navigate to="/modules/workOrders" replace />;
+    return <Navigate to="/modules/carWorkOrders" replace />;
   }
 
   if (crudModuleQuery.isError) {

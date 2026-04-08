@@ -115,9 +115,9 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	appointmentID, err := uuid.Parse(req.AppointmentID)
+	bookingID, err := uuid.Parse(req.BookingID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking_id"})
 		return
 	}
 	profileID, err := uuid.Parse(req.ProfileID)
@@ -126,9 +126,9 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	session := domain.Session{
-		OrgID:         orgID,
-		AppointmentID: appointmentID,
-		ProfileID:     profileID,
+		OrgID:     orgID,
+		BookingID: bookingID,
+		ProfileID: profileID,
 		Summary:       strings.TrimSpace(req.Summary),
 		Metadata:      req.Metadata,
 	}
@@ -223,7 +223,7 @@ func toSessionItem(in domain.Session) dto.SessionItem {
 	item := dto.SessionItem{
 		ID:            in.ID.String(),
 		OrgID:         in.OrgID.String(),
-		AppointmentID: in.AppointmentID.String(),
+		BookingID:     in.BookingID.String(),
 		ProfileID:     in.ProfileID.String(),
 		Status:        in.Status,
 		Summary:       in.Summary,

@@ -9,10 +9,11 @@ import {
   updateRestaurantDiningTable,
 } from '../lib/restaurantsApi';
 import type { RestaurantDiningArea, RestaurantDiningTable } from '../lib/restaurantTypes';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
 
-const resourceConfigs: CrudResourceConfigMap = {
+const restaurantsResourceConfigs: CrudResourceConfigMap = {
   restaurantDiningAreas: {
     label: 'zona del salón',
     labelPlural: 'zonas del salón',
@@ -146,6 +147,13 @@ const resourceConfigs: CrudResourceConfigMap = {
     isValid: (values) => asString(values.area_id).trim().length > 0 && asString(values.code).trim().length >= 1,
   },
 };
+
+const resourceConfigs = Object.fromEntries(
+  Object.entries(restaurantsResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

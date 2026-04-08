@@ -57,11 +57,13 @@ func (r *Repository) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID) (
 	return out, result.Error
 }
 
+type quotesPipelineRow struct {
+	Status string `gorm:"column:status"`
+	Count  int64  `gorm:"column:count"`
+}
+
 func (r *Repository) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
-	var rows []struct {
-		Status string `gorm:"column:status"`
-		Count  int64  `gorm:"column:count"`
-	}
+	var rows []quotesPipelineRow
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT status, COUNT(*) AS count
 		FROM quotes
@@ -169,13 +171,15 @@ func (r *Repository) LoadTopServices(ctx context.Context, orgID uuid.UUID) (dash
 	return out, err
 }
 
+type billingStatusRow struct {
+	PlanCode   string    `gorm:"column:plan_code"`
+	Status     string    `gorm:"column:billing_status"`
+	HardLimits []byte    `gorm:"column:hard_limits"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
 func (r *Repository) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
-	var row struct {
-		PlanCode   string    `gorm:"column:plan_code"`
-		Status     string    `gorm:"column:billing_status"`
-		HardLimits []byte    `gorm:"column:hard_limits"`
-		UpdatedAt  time.Time `gorm:"column:updated_at"`
-	}
+	var row billingStatusRow
 	if err := r.db.WithContext(ctx).Table("tenant_settings").Where("org_id = ?", orgID).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dashboarddomain.BillingStatusData{PlanCode: "starter", Status: "trialing", HardLimits: map[string]any{}}, nil

@@ -142,7 +142,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.GET("/products", h.ListProducts)
 	internal.GET("/products/:id", h.GetProduct)
 	internal.GET("/services/:id", h.GetService)
-	// Legacy appointment routes removidos — verticales usan /scheduling/bookings via schedulingHandler
+	// Verticales usan /scheduling/bookings via schedulingHandler
 	internal.POST("/in-app-notifications", h.CreateInAppNotification)
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
@@ -152,6 +152,61 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 
 func (h *Handler) RegisterReviewCallbackRoutes(internal *gin.RouterGroup) {
 	internal.POST("/review-callback", h.ReviewCallback)
+}
+
+type resolveAPIKeyRequest struct {
+	APIKey string `json:"api_key" binding:"required"`
+}
+
+type createInAppNotificationRequest struct {
+	ID          string          `json:"id"`
+	OrgID       string          `json:"org_id" binding:"required"`
+	Actor       string          `json:"actor" binding:"required"`
+	Title       string          `json:"title" binding:"required"`
+	Body        string          `json:"body" binding:"required"`
+	Kind        string          `json:"kind"`
+	EntityType  string          `json:"entity_type"`
+	EntityID    string          `json:"entity_id"`
+	ChatContext json.RawMessage `json:"chat_context"`
+}
+
+type resolveCustomerRequest struct {
+	OrgID string `json:"org_id" binding:"required"`
+	Name  string `json:"name" binding:"required"`
+	Phone string `json:"phone"`
+	Email string `json:"email"`
+}
+
+type internalAPILineItem struct {
+	ProductID   string   `json:"product_id"`
+	Description string   `json:"description"`
+	Quantity    float64  `json:"quantity"`
+	UnitPrice   float64  `json:"unit_price"`
+	TaxRate     *float64 `json:"tax_rate,omitempty"`
+}
+
+type createQuoteRequest struct {
+	OrgID        string                `json:"org_id" binding:"required"`
+	CustomerID   string                `json:"customer_id"`
+	CustomerName string                `json:"customer_name"`
+	Items        []internalAPILineItem `json:"items" binding:"required"`
+	Notes        string                `json:"notes"`
+	ValidUntil   *string               `json:"valid_until,omitempty"`
+}
+
+type createSaleRequest struct {
+	OrgID         string                `json:"org_id" binding:"required"`
+	CustomerID    string                `json:"customer_id"`
+	CustomerName  string                `json:"customer_name"`
+	QuoteID       string                `json:"quote_id"`
+	PaymentMethod string                `json:"payment_method"`
+	Items         []internalAPILineItem `json:"items" binding:"required"`
+	Notes         string                `json:"notes"`
+}
+
+type sendWhatsAppTextRequest struct {
+	PartyID string `json:"party_id" binding:"required"`
+	Body    string `json:"body" binding:"required"`
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {
@@ -209,9 +264,7 @@ func (h *Handler) ResolveAPIKey(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "api key resolver unavailable"})
 		return
 	}
-	var req struct {
-		APIKey string `json:"api_key" binding:"required"`
-	}
+	var req resolveAPIKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -233,17 +286,7 @@ func (h *Handler) CreateInAppNotification(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "notification inbox unavailable"})
 		return
 	}
-	var req struct {
-		ID          string          `json:"id"`
-		OrgID       string          `json:"org_id" binding:"required"`
-		Actor       string          `json:"actor" binding:"required"`
-		Title       string          `json:"title" binding:"required"`
-		Body        string          `json:"body" binding:"required"`
-		Kind        string          `json:"kind"`
-		EntityType  string          `json:"entity_type"`
-		EntityID    string          `json:"entity_id"`
-		ChatContext json.RawMessage `json:"chat_context"`
-	}
+	var req createInAppNotificationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -319,12 +362,7 @@ func (h *Handler) GetParty(c *gin.Context) {
 }
 
 func (h *Handler) ResolveCustomer(c *gin.Context) {
-	var req struct {
-		OrgID string `json:"org_id" binding:"required"`
-		Name  string `json:"name" binding:"required"`
-		Phone string `json:"phone"`
-		Email string `json:"email"`
-	}
+	var req resolveCustomerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -501,20 +539,7 @@ func (h *Handler) GetService(c *gin.Context) {
 }
 
 func (h *Handler) CreateQuote(c *gin.Context) {
-	var req struct {
-		OrgID        string `json:"org_id" binding:"required"`
-		CustomerID   string `json:"customer_id"`
-		CustomerName string `json:"customer_name"`
-		Items        []struct {
-			ProductID   string   `json:"product_id"`
-			Description string   `json:"description"`
-			Quantity    float64  `json:"quantity"`
-			UnitPrice   float64  `json:"unit_price"`
-			TaxRate     *float64 `json:"tax_rate,omitempty"`
-		} `json:"items" binding:"required"`
-		Notes      string  `json:"notes"`
-		ValidUntil *string `json:"valid_until,omitempty"`
-	}
+	var req createQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -578,21 +603,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 }
 
 func (h *Handler) CreateSale(c *gin.Context) {
-	var req struct {
-		OrgID         string `json:"org_id" binding:"required"`
-		CustomerID    string `json:"customer_id"`
-		CustomerName  string `json:"customer_name"`
-		QuoteID       string `json:"quote_id"`
-		PaymentMethod string `json:"payment_method"`
-		Items         []struct {
-			ProductID   string   `json:"product_id"`
-			Description string   `json:"description"`
-			Quantity    float64  `json:"quantity"`
-			UnitPrice   float64  `json:"unit_price"`
-			TaxRate     *float64 `json:"tax_rate,omitempty"`
-		} `json:"items" binding:"required"`
-		Notes string `json:"notes"`
-	}
+	var req createSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -700,10 +711,7 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
 		return
 	}
-	var req struct {
-		PartyID string `json:"party_id" binding:"required"`
-		Body    string `json:"body" binding:"required"`
-	}
+	var req sendWhatsAppTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return

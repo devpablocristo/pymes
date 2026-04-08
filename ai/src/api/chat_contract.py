@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from runtime.chat import (
     ChatAction as BaseChatAction,
-    ChatBlock,
     ChatRequest as BaseChatRequest,
     ChatResponse as BaseChatResponse,
-    ChatActionsBlock,
     ChatInsightCardBlock,
     ChatKpiGroupBlock,
     ChatKpiItem,
@@ -21,8 +19,8 @@ from src.localization import LanguageCode
 from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
 
 
-RoutedAgent = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
-ChatRouteHint = Literal["general", "copilot", "clientes", "productos", "ventas", "cobros", "compras"]
+RoutedAgent = Literal["general", "copilot", "customers", "products", "services", "sales", "collections", "purchases"]
+ChatRouteHint = Literal["general", "copilot", "customers", "products", "services", "sales", "collections", "purchases"]
 RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback", "ui_hint"]
 
 
@@ -32,12 +30,25 @@ class ChatAction(BaseChatAction):
     confirmed_actions: list[str] = Field(default_factory=list)
 
 
+class ChatActionsBlock(BaseModel):
+    """Bloque actions con ChatAction extendido (route_hint, etc.)."""
+
+    type: Literal["actions"]
+    actions: list[ChatAction] = Field(default_factory=list)
+
+
+ChatBlock = Annotated[
+    ChatTextBlock | ChatActionsBlock | ChatInsightCardBlock | ChatKpiGroupBlock | ChatTableBlock,
+    Field(discriminator="type"),
+]
+
+
 class ChatRequest(BaseChatRequest):
     confirmed_actions: list[str] = Field(default_factory=list)
     route_hint: ChatRouteHint | None = Field(
         default=None,
         description=(
-            "Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. "
+            "Hint opcional para forzar el carril del turno actual: general | customers | products | services | sales | collections | purchases. "
             "`copilot` queda reservado para handoff explícito desde notificaciones."
         ),
     )
@@ -57,16 +68,13 @@ class ChatResponse(BaseChatResponse):
         description="Idioma efectivo del contenido devuelto por el backend para este turno.",
     )
     pending_confirmations: list[str] = Field(default_factory=list)
+    blocks: list[ChatBlock] = Field(default_factory=list)
     routed_agent: RoutedAgent = Field(
         ...,
         description=(
-            "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. "
+            "Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | services | sales | collections | purchases. "
             "`copilot` se usa solo en handoff explícito desde notificaciones."
         ),
-    )
-    routed_mode: RoutedAgent = Field(
-        ...,
-        description="Alias legacy de `routed_agent` para compatibilidad hacia atrás.",
     )
     routing_source: RoutingSource = Field(
         ...,

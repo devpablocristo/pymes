@@ -92,10 +92,10 @@ func (h *Handler) Create(c *gin.Context) {
 		Status:    domain.IntakeStatusDraft,
 		Payload:   req.Payload,
 	}
-	if req.AppointmentID != nil && strings.TrimSpace(*req.AppointmentID) != "" {
-		intake.AppointmentID = vertvalues.ParseOptionalUUID(*req.AppointmentID)
-		if intake.AppointmentID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment_id"})
+	if req.BookingID != nil && strings.TrimSpace(*req.BookingID) != "" {
+		intake.BookingID = vertvalues.ParseOptionalUUID(*req.BookingID)
+		if intake.BookingID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking_id"})
 			return
 		}
 	}
@@ -133,10 +133,10 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	input := UpdateInput{Payload: req.Payload}
-	if req.AppointmentID != nil && strings.TrimSpace(*req.AppointmentID) != "" {
-		input.AppointmentID = vertvalues.ParseOptionalUUID(*req.AppointmentID)
-		if input.AppointmentID == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment_id"})
+	if req.BookingID != nil && strings.TrimSpace(*req.BookingID) != "" {
+		input.BookingID = vertvalues.ParseOptionalUUID(*req.BookingID)
+		if input.BookingID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking_id"})
 			return
 		}
 	}
@@ -186,9 +186,9 @@ func toIntakeItem(in domain.Intake) dto.IntakeItem {
 		CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt: in.UpdatedAt.UTC().Format(time.RFC3339),
 	}
-	if in.AppointmentID != nil {
-		s := in.AppointmentID.String()
-		item.AppointmentID = &s
+	if in.BookingID != nil {
+		s := in.BookingID.String()
+		item.BookingID = &s
 	}
 	if in.CustomerPartyID != nil {
 		s := in.CustomerPartyID.String()

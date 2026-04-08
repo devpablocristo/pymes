@@ -3,12 +3,7 @@ import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@devpablocristo/modules-search';
-import {
-  pymesAssistantChat,
-  listConversations,
-  getConversation,
-  type ConversationSummary,
-} from '../lib/aiApi';
+import { pymesAssistantChat, listConversations, getConversation } from '../lib/aiApi';
 import { humanInsightScopeLabel, humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
@@ -110,18 +105,18 @@ type Msg = {
   badgeTones?: MsgBadgeTone[];
 };
 
-type MsgBadgeTone = 'ventas' | 'cobros' | 'compras' | 'clientes' | 'productos' | 'general' | 'neutral';
+type MsgBadgeTone = 'sales' | 'collections' | 'purchases' | 'customers' | 'products' | 'general' | 'neutral';
 type AssistantReplyRow = Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels' | 'badgeTones'>;
 
 let nextMsgId = 100;
 
 function normalizeManualRouteHint(value: string | null | undefined): ManualRouteHint | undefined {
   if (
-    value === 'clientes' ||
-    value === 'productos' ||
-    value === 'ventas' ||
-    value === 'cobros' ||
-    value === 'compras'
+    value === 'customers' ||
+    value === 'products' ||
+    value === 'sales' ||
+    value === 'collections' ||
+    value === 'purchases'
   ) {
     return value;
   }
@@ -152,11 +147,11 @@ function kpiTrendClassName(trend?: 'up' | 'down' | 'flat' | 'unknown' | null): s
 }
 
 function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
-  if (mode === 'ventas' || mode === 'internal_sales') return 'ventas';
-  if (mode === 'cobros') return 'cobros';
-  if (mode === 'compras' || mode === 'internal_procurement') return 'compras';
-  if (mode === 'clientes') return 'clientes';
-  if (mode === 'productos') return 'productos';
+  if (mode === 'sales' || mode === 'internal_sales') return 'sales';
+  if (mode === 'collections') return 'collections';
+  if (mode === 'purchases' || mode === 'internal_procurement') return 'purchases';
+  if (mode === 'customers') return 'customers';
+  if (mode === 'products') return 'products';
   if (mode === 'general' || mode === 'copilot') return 'general';
   return 'neutral';
 }
@@ -190,11 +185,11 @@ function resolvePreferredLanguage(contentLanguage: string | undefined, fallbackL
 }
 
 function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
-  if (mode === 'clientes') return humanRoutedLabel('clientes', language);
-  if (mode === 'productos') return humanRoutedLabel('productos', language);
-  if (mode === 'ventas') return humanRoutedLabel('ventas', language);
-  if (mode === 'cobros') return humanRoutedLabel('cobros', language);
-  if (mode === 'compras') return humanRoutedLabel('compras', language);
+  if (mode === 'customers') return humanRoutedLabel('customers', language);
+  if (mode === 'products') return humanRoutedLabel('products', language);
+  if (mode === 'sales') return humanRoutedLabel('sales', language);
+  if (mode === 'collections') return humanRoutedLabel('collections', language);
+  if (mode === 'purchases') return humanRoutedLabel('purchases', language);
   return humanRoutedLabel('general', language);
 }
 
@@ -206,7 +201,7 @@ function buildAssistantMetaLabel(
   const parts = [
     `${t('ai.chat.meta.request')} ${reply.request_id}`,
     reply.output_kind,
-    humanRoutedLabel(reply.routed_agent || reply.routed_mode, language),
+    humanRoutedLabel(reply.routed_agent, language),
     humanRoutingSourceLabel(reply.routing_source, language),
   ];
   return parts.join(' · ');
@@ -237,11 +232,11 @@ function buildRouteHintMetaLabel(
 }
 
 function buildAssistantBadgeLabels(reply: PymesAssistantChatResponse, language: LanguageCode): string[] {
-  return [humanBadgeCategoryLabel(reply.routed_agent || reply.routed_mode, language)];
+  return [humanBadgeCategoryLabel(reply.routed_agent, language)];
 }
 
 function buildAssistantBadgeTones(reply: PymesAssistantChatResponse): MsgBadgeTone[] {
-  return [badgeToneForRoute(reply.routed_agent || reply.routed_mode)];
+  return [badgeToneForRoute(reply.routed_agent)];
 }
 
 function applyPymesReply(
@@ -249,7 +244,7 @@ function applyPymesReply(
   language: LanguageCode,
   t: (key: string, variables?: Record<string, string | number>) => string,
 ): AssistantReplyRow[] {
-  const agentLabel = humanRoutedLabel(reply.routed_agent || reply.routed_mode, language);
+  const agentLabel = humanRoutedLabel(reply.routed_agent, language);
   const sourceLabel = humanRoutingSourceLabel(reply.routing_source, language);
   const routedLabel = agentLabel === sourceLabel ? agentLabel : `${agentLabel} · ${sourceLabel}`;
   return [
@@ -407,13 +402,6 @@ export function UnifiedChatPage() {
       }
     }
   }, [conversationDetailQuery.data, historyConversationId, language]);
-
-  function selectSavedConversation(conv: ConversationSummary) {
-    setActive(AI_PYMES_ID);
-    setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: conv.id }));
-    setHistoryConversationId(conv.id);
-    setError('');
-  }
 
   const activeDef = useMemo(() => contactDefs.find((c) => c.id === active)!, [active, contactDefs]);
   const thread = useMemo(() => msgs.filter((m) => m.contactId === active), [msgs, active]);
@@ -597,7 +585,7 @@ export function UnifiedChatPage() {
           }));
         } else {
           const nextStickyRouteHint =
-            normalizeManualRouteHint(reply.routed_agent || reply.routed_mode) ?? apiRouteHint ?? undefined;
+            normalizeManualRouteHint(reply.routed_agent) ?? apiRouteHint ?? undefined;
           if (nextStickyRouteHint) {
             setPendingRouteHintsByContact((prev) => ({
               ...prev,
@@ -730,30 +718,6 @@ export function UnifiedChatPage() {
                 </div>
               </button>
             ))}
-            {/* Conversaciones previas guardadas */}
-            {savedConversations.length > 0 && (
-              <>
-                <div className="cht__conversations-divider">
-                  {t('ai.chat.previousConversations') || 'Conversaciones anteriores'}
-                </div>
-                {savedConversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    type="button"
-                    className={`cht__contact ${chatIds[AI_PYMES_ID] === conv.id ? 'cht__contact--active' : ''}`}
-                    aria-pressed={chatIds[AI_PYMES_ID] === conv.id}
-                    aria-label={`${conv.title || 'Sin título'}. ${conv.message_count} mensajes`}
-                    onClick={() => selectSavedConversation(conv)}
-                  >
-                    <div className="cht__contact-avatar cht__contact-avatar--saved">AP</div>
-                    <div className="cht__contact-info">
-                      <div className="cht__contact-name">{conv.title || 'Sin título'}</div>
-                      <div className="cht__contact-preview">{conv.message_count} mensajes</div>
-                    </div>
-                  </button>
-                ))}
-              </>
-            )}
           </nav>
         </div>
         <div className="cht__main">

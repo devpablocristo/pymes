@@ -2,7 +2,6 @@ package wire
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -10,29 +9,24 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
-	"github.com/devpablocristo/pymes/pymes-core/shared/backend/seedtarget"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/orchestration"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/public"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/vehicles"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workshopservices"
-	bikebicycles "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles"
-	bikeorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/orchestration"
-	bikeworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders"
-	bikeshopservices "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workshopservices"
+	autoRepairWoExt "github.com/devpablocristo/pymes/workshops/backend/internal/auto_repair/workorders_ext"
+	bikeShopWoExt "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/workorders_ext"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/config"
+	orchestrationhandler "github.com/devpablocristo/pymes/workshops/backend/internal/shared/orchestrationhandler"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
+	unifiedworkorders "github.com/devpablocristo/pymes/workshops/backend/internal/workorders"
+	woorchestration "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/orchestration"
 	"github.com/devpablocristo/pymes/workshops/backend/migrations"
-	workshopseeds "github.com/devpablocristo/pymes/workshops/backend/seeds"
 )
 
 func InitializeApp() *app.App {
@@ -47,52 +41,32 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	if cfg.SeedDemoData {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		seedOrg, err := seedtarget.ResolveDemoOrgUUID(ctx, db, cfg.SeedDemoOrgExternalID)
-		if err != nil {
-			logger.Fatal().Err(err).Msg("workshops demo seed org resolution failed")
-		}
-		if err := workshopseeds.Run(ctx, db, logger, seedOrg); err != nil {
-			logger.Fatal().Err(err).Msg("workshops demo seed failed (set PYMES_SEED_DEMO=false to skip)")
-		}
-	}
-
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := &logAudit{logger: logger}
 
 	vehiclesRepo := vehicles.NewRepository(db)
-	servicesRepo := workshopservices.NewRepository(db)
-	workOrdersRepo := workorders.NewRepository(db)
-
-	bikeBicyclesRepo := bikebicycles.NewRepository(db)
-	bikeServicesRepo := bikeshopservices.NewRepository(db)
-	bikeWorkOrdersRepo := bikeworkorders.NewRepository(db)
-
 	vehiclesUC := vehicles.NewUsecases(vehiclesRepo, auditLog, cpClient)
-	servicesUC := workshopservices.NewUsecases(servicesRepo, auditLog, cpClient)
-	workOrdersUC := workorders.NewUsecases(workOrdersRepo, auditLog, cpClient, cpClient)
-	orchestrationUC := orchestration.NewUsecases(cpClient, workOrdersRepo, auditLog)
-
-	bikeBicyclesUC := bikebicycles.NewUsecases(bikeBicyclesRepo, auditLog, cpClient)
-	bikeServicesUC := bikeshopservices.NewUsecases(bikeServicesRepo, auditLog, cpClient)
-	bikeWorkOrdersUC := bikeworkorders.NewUsecases(bikeWorkOrdersRepo, auditLog, cpClient)
-	bikeOrchestrationUC := bikeorchestration.NewUsecases(cpClient, bikeWorkOrdersRepo, auditLog)
-
 	vehiclesHandler := vehicles.NewHandler(vehiclesUC)
-	servicesHandler := workshopservices.NewHandler(servicesUC)
-	workOrdersHandler := workorders.NewHandler(workOrdersUC)
-	orchestrationHandler := orchestration.NewHandler(orchestrationUC)
 
-	bikeBicyclesHandler := bikebicycles.NewHandler(bikeBicyclesUC)
-	bikeServicesHandler := bikeshopservices.NewHandler(bikeServicesUC)
-	bikeWorkOrdersHandler := bikeworkorders.NewHandler(bikeWorkOrdersUC)
-	bikeOrchestrationHandler := bikeorchestration.NewHandler(bikeOrchestrationUC)
+	// Módulo unificado de work orders (workshops/internal/workorders).
+	unifiedWoRepo := unifiedworkorders.NewRepository(db)
+	unifiedWoUC := unifiedworkorders.NewUsecases(
+		unifiedWoRepo,
+		auditLog,
+		cpClient,
+		cpClient,
+		autoRepairWoExt.New(),
+		bikeShopWoExt.New(),
+	)
+	unifiedWoHandler := unifiedworkorders.NewHandler(unifiedWoUC)
 
-	publicHandler := public.NewHandler(servicesUC, bikeServicesUC, cpClient, &cpOrgResolver{client: cpClient})
+	// Orquestación unificada (booking → quote → sale → payment link).
+	woOrchestrationUC := woorchestration.NewUsecases(cpClient, unifiedWoUC, auditLog)
+	woOrchestrationHandler := orchestrationhandler.NewHandler(woOrchestrationUC)
+
+	publicHandler := public.NewHandler(cpClient, cpClient)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -119,35 +93,15 @@ func InitializeApp() *app.App {
 	authGroup.Use(authMiddleware.RequireAuth())
 	authGroup.Use(verticalgin.DevForceOrgMiddleware(cfg.Environment, os.Getenv("PYMES_DEV_FORCE_ORG_UUID")))
 
+	// Vehículos siguen siendo específicos de auto_repair.
 	autoRepairGroup := authGroup.Group("/auto-repair")
 	vehiclesHandler.RegisterRoutes(autoRepairGroup)
-	servicesHandler.RegisterRoutes(autoRepairGroup)
-	workOrdersHandler.RegisterRoutes(autoRepairGroup)
-	orchestrationHandler.RegisterRoutes(autoRepairGroup)
 
-	bikeShopGroup := authGroup.Group("/bike-shop")
-	bikeBicyclesHandler.RegisterRoutes(bikeShopGroup)
-	bikeServicesHandler.RegisterRoutes(bikeShopGroup)
-	bikeWorkOrdersHandler.RegisterRoutes(bikeShopGroup)
-	bikeOrchestrationHandler.RegisterRoutes(bikeShopGroup)
+	// Endpoint unificado: /v1/work-orders (filtrable por ?target_type=vehicle|bicycle).
+	unifiedWoHandler.RegisterRoutes(authGroup)
+	woOrchestrationHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
-}
-
-type cpOrgResolver struct {
-	client *pymescore.Client
-}
-
-func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	orgIDStr, ok := result["org_id"].(string)
-	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
-	}
-	return uuid.Parse(orgIDStr)
 }
 
 func setupLogger() zerolog.Logger {

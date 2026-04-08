@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyWorkOrderCreatorFilter,
   formatWorkOrderActorLabel,
+  isSeedActor,
   isYoCreatorFilterActive,
   type CreatorFilterState,
 } from './workOrderCreatorFilter';
@@ -92,6 +93,37 @@ describe('applyWorkOrderCreatorFilter', () => {
     });
     expect(result).toHaveLength(4);
   });
+
+  it('yo mode matches self and rows without created_by', () => {
+    const result = applyWorkOrderCreatorFilter(ROWS, {
+      ...baseOpts,
+      creatorFilter: { mode: 'yo' },
+    });
+    expect(result.map((r) => r.id)).toEqual(['1', '3', '4']);
+  });
+
+  it('seeds mode keeps only seed-like actors', () => {
+    const seedRows: Row[] = [
+      { id: 'a', created_by: 'seed' },
+      { id: 'b', created_by: 'user_alice' },
+      { id: 'c', created_by: 'seed:demo' },
+    ];
+    const result = applyWorkOrderCreatorFilter(seedRows, {
+      ...baseOpts,
+      creatorFilter: { mode: 'seeds' },
+    });
+    expect(result.map((r) => r.id)).toEqual(['a', 'c']);
+  });
+});
+
+describe('isSeedActor', () => {
+  it('detects seed and seed: prefix', () => {
+    expect(isSeedActor('seed')).toBe(true);
+    expect(isSeedActor('SEED')).toBe(true);
+    expect(isSeedActor('seed:local')).toBe(true);
+    expect(isSeedActor('user_alice')).toBe(false);
+    expect(isSeedActor('')).toBe(false);
+  });
 });
 
 describe('isYoCreatorFilterActive', () => {
@@ -117,5 +149,13 @@ describe('isYoCreatorFilterActive', () => {
   it('returns false when selfId is undefined', () => {
     const filter: CreatorFilterState = { mode: 'pick', actors: new Set() };
     expect(isYoCreatorFilterActive(filter, undefined)).toBe(false);
+  });
+
+  it('returns true when mode is yo and selfId is set', () => {
+    expect(isYoCreatorFilterActive({ mode: 'yo' }, 'user_me')).toBe(true);
+  });
+
+  it('returns false when mode is yo but selfId missing', () => {
+    expect(isYoCreatorFilterActive({ mode: 'yo' }, undefined)).toBe(false);
   });
 });

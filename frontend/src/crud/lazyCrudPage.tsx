@@ -46,17 +46,11 @@ function resolveCrudModuleGroup(resourceId: string): string {
   if (
     [
       'workshopVehicles',
-      'workshopServices',
-      'workOrders',
-      'bikeBicycles',
-      'bikeShopServices',
+      'carWorkOrders',
       'bikeWorkOrders',
     ].includes(resourceId)
   ) {
     return 'workshops';
-  }
-  if (['beautyStaff', 'beautySalonServices'].includes(resourceId)) {
-    return 'beauty';
   }
   if (['restaurantDiningAreas', 'restaurantDiningTables'].includes(resourceId)) {
     return 'restaurants';
@@ -100,6 +94,10 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
       promise = import('./resourceConfigs');
       break;
   }
+  promise = promise.catch((err: unknown) => {
+    crudModulePromises.delete(group);
+    throw err;
+  });
   crudModulePromises.set(group, promise);
   return promise;
 }
@@ -130,18 +128,44 @@ export function LazyConfiguredCrudPage({
     resourceId: string;
     mergeConfig?: Record<string, unknown>;
   }> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void loadCrudModule(resourceId).then((mod) => {
-      if (!cancelled) {
-        setConfiguredCrudPage(() => mod.ConfiguredCrudPage);
-      }
-    });
+    setLoadError(null);
+    void loadCrudModule(resourceId)
+      .then((mod) => {
+        if (cancelled) return;
+        const C = mod.ConfiguredCrudPage;
+        if (C == null) {
+          setLoadError('El bundle del módulo no exporta ConfiguredCrudPage.');
+          return;
+        }
+        setConfiguredCrudPage(() => C);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : String(err));
+        }
+      });
     return () => {
       cancelled = true;
     };
   }, [resourceId]);
+
+  if (loadError != null) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo cargar la superficie CRUD.">
+        <div className="alert alert-error">
+          <p>{loadError}</p>
+          <p className="text-secondary text-sm">
+            Revisá la consola del navegador y que exista <code>pymes/modules/crud/ui/ts</code> o que{' '}
+            <code>@devpablocristo/modules-crud-ui</code> esté instalado en <code>node_modules</code>.
+          </p>
+        </div>
+      </PageLayout>
+    );
+  }
 
   if (ConfiguredCrudPage == null) {
     return (

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest } from '../lib/api';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
   asBoolean,
@@ -199,7 +200,7 @@ function partyFormToBody(values: CrudFormValues): Record<string, unknown> {
   };
 }
 
-const resourceConfigs: CrudResourceConfigMap = {
+const governanceResourceConfigs: CrudResourceConfigMap = {
   procurementRequests: {
     supportsArchived: true,
     label: 'solicitud de compra interna',
@@ -374,11 +375,14 @@ const resourceConfigs: CrudResourceConfigMap = {
   },
   accounts: {
     basePath: '/v1/accounts',
+    allowCreate: true,
     allowEdit: false,
     allowDelete: false,
     label: 'cuenta corriente',
     labelPlural: 'cuentas corrientes',
     labelPluralCap: 'Cuentas corrientes',
+    createLabel: '+ Nueva cuenta corriente',
+    searchPlaceholder: 'Buscar...',
     columns: [
       {
         key: 'entity_name',
@@ -721,6 +725,13 @@ const resourceConfigs: CrudResourceConfigMap = {
       asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
 };
+
+const resourceConfigs = Object.fromEntries(
+  Object.entries(governanceResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, {}),
+  ]),
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

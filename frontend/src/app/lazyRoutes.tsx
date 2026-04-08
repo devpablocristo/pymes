@@ -21,6 +21,15 @@ export const WorkOrdersKanbanPanel = lazy(() =>
 export const WorkOrdersEditorPage = lazy(() =>
   import('../pages/WorkOrdersEditorPage').then((mod) => ({ default: mod.WorkOrdersEditorPage })),
 );
+export const ProductsModuleSection = lazy(() =>
+  import('../pages/ProductsModuleSection').then((mod) => ({ default: mod.ProductsModuleSection })),
+);
+export const ProductsListPage = lazy(() =>
+  import('../pages/ProductsListPage').then((mod) => ({ default: mod.ProductsListPage })),
+);
+export const ProductsGalleryPage = lazy(() =>
+  import('../pages/ProductsGalleryPage').then((mod) => ({ default: mod.ProductsGalleryPage })),
+);
 export const UnifiedChatPage = lazy(() =>
   import('../pages/UnifiedChatPage').then((mod) => ({ default: mod.UnifiedChatPage })),
 );

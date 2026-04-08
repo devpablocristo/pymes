@@ -201,9 +201,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   const [items, setItems] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() =>
-    clerkEnabled ? { mode: 'pick', actors: new Set() } : { mode: 'all' },
-  );
+  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
   const queryClient = useQueryClient();
   const boardQueryKey = useMemo(
@@ -348,6 +346,11 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
 
   return (
     <>
+      {headerLeadSlot ? (
+        <div className="generic-work-orders-board__lead crud-list-header-lead crud-list-header-lead--above-title">
+          {headerLeadSlot}
+        </div>
+      ) : null}
       <StatusKanbanBoard<T>
         columns={COLUMN_ORDER}
         columnIdSet={COLUMN_IDS}
@@ -368,7 +371,6 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         renderOverlayCard={(row) => <CardPreview row={row} />}
         title={title}
         subtitle={showArchived ? 'Archivadas' : undefined}
-        headerLeadSlot={headerLeadSlot}
         searchPlaceholder="Buscar..."
         afterStats={showCreatorBar ? (
           <CreatedByPillsBar items={items} creatorFilter={creatorFilter} onFilterChange={setCreatorFilter} selfId={selfId} />

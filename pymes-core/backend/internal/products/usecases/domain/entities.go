@@ -17,6 +17,7 @@ type Product struct {
 	Currency    string
 	CostPrice   float64
 	TaxRate     *float64
+	ImageURL    string
 	TrackStock  bool
 	IsActive    bool
 	Tags        []string

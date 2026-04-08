@@ -78,7 +78,7 @@ func GetConditionTemplates(actionType string) []dto.ConditionTemplate {
 				DefaultVal: "10",
 			},
 		}
-	case "appointment.reschedule":
+	case "scheduling.reschedule":
 		return []dto.ConditionTemplate{
 			{
 				Label:      "Dentro de X dias",

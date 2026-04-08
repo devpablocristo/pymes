@@ -4,8 +4,6 @@ go 1.26.1
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
-	github.com/aws/aws-lambda-go v1.53.0
-	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/devpablocristo/core/authn/go v0.2.1
 	github.com/devpablocristo/core/authz/go v0.1.0
 	github.com/devpablocristo/core/concurrency/go v0.1.1

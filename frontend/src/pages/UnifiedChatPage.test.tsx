@@ -217,4 +217,22 @@ describe('UnifiedChatPage', () => {
     expect(await within(getMessagesPane()).findByText('Respuesta del asistente')).toBeInTheDocument();
     expect(within(getMessagesPane()).queryByText('Historial A')).not.toBeInTheDocument();
   });
+
+  it('no rehidrata el detalle al enviar un mensaje y no pisa el último mensaje local', async () => {
+    renderUnifiedChat();
+
+    expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
+    expect(aiMocks.getConversation).toHaveBeenCalledTimes(1);
+
+    const textbox = screen.getByRole('textbox', { name: /Ej\.: resumí ventas del mes o preguntá libre/i });
+    fireEvent.change(textbox, { target: { value: 'Mi mensaje nuevo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+
+    expect(await within(getMessagesPane()).findByText('Mi mensaje nuevo')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByText('Respuesta del asistente')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(aiMocks.getConversation).toHaveBeenCalledTimes(1);
+    });
+  });
 });

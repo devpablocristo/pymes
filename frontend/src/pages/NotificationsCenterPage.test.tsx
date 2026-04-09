@@ -11,6 +11,7 @@ import type { InAppNotificationItem } from '../lib/api';
 const apiMocks = vi.hoisted(() => ({
   listInAppNotifications: vi.fn(),
   markInAppNotificationRead: vi.fn(),
+  createInsightNotifications: vi.fn(),
 }));
 
 const reviewMocks = vi.hoisted(() => ({
@@ -35,6 +36,10 @@ const shareMocks = vi.hoisted(() => ({
 vi.mock('../lib/api', () => ({
   listInAppNotifications: () => apiMocks.listInAppNotifications(),
   markInAppNotificationRead: (...args: unknown[]) => apiMocks.markInAppNotificationRead(...args),
+}));
+
+vi.mock('../lib/aiApi', () => ({
+  createInsightNotifications: (...args: unknown[]) => apiMocks.createInsightNotifications(...args),
 }));
 
 vi.mock('../lib/reviewApi', () => ({
@@ -145,6 +150,7 @@ describe('NotificationsCenterPage', () => {
     vi.resetModules();
     apiMocks.listInAppNotifications.mockReset();
     apiMocks.markInAppNotificationRead.mockReset();
+    apiMocks.createInsightNotifications.mockReset();
     reviewMocks.approveRequest.mockReset();
     reviewMocks.rejectRequest.mockReset();
     navigationMocks.navigate.mockReset();
@@ -154,6 +160,13 @@ describe('NotificationsCenterPage', () => {
     shareMocks.buildInAppNotificationShareText.mockClear();
     pageSearchMocks.usePageSearch.mockReturnValue('');
     apiMocks.markInAppNotificationRead.mockResolvedValue({ id: 'notif-1', read_at: '2026-04-03T12:05:00Z' });
+    apiMocks.createInsightNotifications.mockResolvedValue({
+      request_id: 'req-1',
+      service_kind: 'insight_service',
+      output_kind: 'insight_notification',
+      content_language: 'es',
+      items: [],
+    });
     reviewMocks.approveRequest.mockResolvedValue(undefined);
     reviewMocks.rejectRequest.mockResolvedValue(undefined);
     sessionStorage.clear();
@@ -255,6 +268,39 @@ describe('NotificationsCenterPage', () => {
 
     await waitFor(() => {
       expect(reviewMocks.approveRequest).toHaveBeenCalledWith('approval-1', 'Aprobado por soporte');
+    });
+  });
+
+  it('genera insights automáticamente cuando la bandeja está vacía', async () => {
+    const { NotificationsCenterPage } = await import('./NotificationsCenterPage');
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    apiMocks.listInAppNotifications.mockResolvedValue({
+      items: [],
+      unread_count: 0,
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <LanguageProvider initialLanguage="es">
+            <NotificationsCenterPage embedded />
+          </LanguageProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(apiMocks.createInsightNotifications).toHaveBeenCalledWith({
+        period: 'week',
+        compare: true,
+        top_limit: 5,
+        preferred_language: 'es',
+      });
     });
   });
 });

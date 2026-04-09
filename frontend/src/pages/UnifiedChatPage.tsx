@@ -359,10 +359,7 @@ export function UnifiedChatPage() {
   const chatMutation = useMutation({
     mutationFn: pymesAssistantChat,
     onSuccess: async (reply) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.list(30) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.detail(reply.chat_id) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.list(30) });
     },
   });
   const savedConversations = useMemo(() => conversationsQuery.data?.items ?? [], [conversationsQuery.data?.items]);

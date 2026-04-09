@@ -40,7 +40,12 @@ DECLARE
     r_cashier uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/role/cajero');
     r_accountant uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/role/contador');
     r_warehouse uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/role/almacenero');
-    notif_id uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
+    notif_welcome uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
+    notif_sales_weekly uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/sales-weekly');
+    notif_collections uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/collections-followup');
+    notif_stock uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/stock-alert');
+    notif_review uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/review-approval');
+    notif_customer_winback uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/customer-winback');
     sched_branch uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/central');
     sched_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_consultation');
     sched_catchall_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_appointment');
@@ -55,7 +60,19 @@ BEGIN
     SELECT id INTO legacy_demo_service_product_1 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-001' LIMIT 1;
     SELECT id INTO legacy_demo_service_product_2 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-002' LIMIT 1;
 
-    DELETE FROM pymes_in_app_notifications WHERE id = notif_id;
+    DELETE FROM pymes_in_app_notifications
+    WHERE id IN (
+      notif_welcome,
+      notif_sales_weekly,
+      notif_collections,
+      notif_stock,
+      notif_review,
+      notif_customer_winback
+    );
+
+    DELETE FROM org_members
+    WHERE org_id = v_org
+      AND user_id = '${LOCAL_USER_UUID}';
 
     DELETE FROM procurement_request_lines WHERE request_id = pr1;
     DELETE FROM procurement_requests WHERE id = pr1;
@@ -176,11 +193,13 @@ BEGIN
 END \$\$;
 "
 
+run_pymes_sql_inline "
+DELETE FROM users WHERE id = '${LOCAL_USER_UUID}';
+"
+
 if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
   run_pymes_sql_inline "
-  DELETE FROM org_members WHERE org_id = '${TARGET_ORG_UUID}' AND user_id = '${LOCAL_USER_UUID}';
   DELETE FROM tenant_settings WHERE org_id = '${TARGET_ORG_UUID}';
-  DELETE FROM users WHERE id = '${LOCAL_USER_UUID}';
   DELETE FROM orgs WHERE id = '${TARGET_ORG_UUID}';
   "
 fi

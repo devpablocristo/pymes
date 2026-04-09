@@ -46,6 +46,10 @@ type WebhookPort interface {
 	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
 }
 
+type NotificationPort interface {
+	NotifySaleCreated(ctx context.Context, sale saledomain.Sale) error
+}
+
 type Usecases struct {
 	repo      RepositoryPort
 	inventory InventoryPort
@@ -53,12 +57,16 @@ type Usecases struct {
 	audit     AuditPort
 	timeline  TimelinePort
 	webhooks  WebhookPort
+	notifier  NotificationPort
 }
 
 type Option func(*Usecases)
 
 func WithTimeline(t TimelinePort) Option { return func(u *Usecases) { u.timeline = t } }
 func WithWebhooks(w WebhookPort) Option  { return func(u *Usecases) { u.webhooks = w } }
+func WithNotifications(n NotificationPort) Option {
+	return func(u *Usecases) { u.notifier = n }
+}
 
 func NewUsecases(repo RepositoryPort, inventory InventoryPort, cashflow CashflowPort, audit AuditPort, opts ...Option) *Usecases {
 	uc := &Usecases{repo: repo, inventory: inventory, cashflow: cashflow, audit: audit}
@@ -241,6 +249,9 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	}
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "sale.created", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "total": out.Total, "payment_method": out.PaymentMethod})
+	}
+	if u.notifier != nil {
+		_ = u.notifier.NotifySaleCreated(ctx, out)
 	}
 	return out, nil
 }

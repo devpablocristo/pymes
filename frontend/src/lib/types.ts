@@ -109,6 +109,28 @@ export type AuditEntry = {
   created_at: string;
 };
 
+export type BusinessInsightCandidate = {
+  id: string;
+  org_id: string;
+  kind: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  fingerprint: string;
+  severity: string;
+  status: string;
+  title: string;
+  body: string;
+  evidence: Record<string, unknown>;
+  occurrence_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  first_notified_at?: string | null;
+  last_notified_at?: string | null;
+  resolved_at?: string | null;
+  last_actor?: string;
+};
+
 /** Rol de producto (consola): solo admin | user; el rol del token puede ser owner, admin, viewer, etc. */
 export type ProductRole = 'admin' | 'user';
 

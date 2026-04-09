@@ -1,6 +1,6 @@
 # Integración Pymes ↔ `core` (librerías reutilizables)
 
-Monorepo `core` (`../core` en desarrollo local) aporta **primitivas** de auth, SaaS, HTTP y **governance**. Este documento resume qué consume Pymes, qué permanece en el producto y qué no conviene duplicar.
+Monorepo `core` aporta **primitivas** de auth, SaaS, HTTP y **governance**. Este documento resume qué consume Pymes, qué permanece en el producto y qué no conviene duplicar.
 
 ## Dependencias Go (`go.mod` raíz)
 
@@ -15,7 +15,13 @@ Dependencias directas relevantes:
 
 **Transitivas** frecuentes: `core/authz/go` (RBAC del stack), CEL (`google/cel-go`) vía governance.
 
-`replace` en `go.mod` apuntan a `../core/...` para desarrollo local; en CI/producción se usan versiones etiquetadas del mismo módulo. `GOPRIVATE=github.com/devpablocristo/*` y `GOPROXY=direct` para consumo privado (ver `Makefile`).
+Política actual recomendada:
+
+- Pymes debe consumir siempre módulos **publicados y versionados** de `core` y `modules`.
+- Los `replace` a `../core/...` o aliases a `../modules/...` solo se admiten como excepción temporal mientras se prepara una publicación.
+- Antes de cerrar una extracción reusable, el paso final es publicar la nueva versión y volver Pymes al artefacto publicado.
+
+`GOPRIVATE=github.com/devpablocristo/*` y `GOPROXY=direct` se mantienen para consumo privado cuando corresponda (ver `Makefile`), pero no cambian esta regla de versionado.
 
 ## Qué debe seguir viviendo en Pymes (no subir a `core` como feature)
 

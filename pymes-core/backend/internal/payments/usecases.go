@@ -21,13 +21,18 @@ type AuditPort interface {
 	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
-type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+type NotificationPort interface {
+	NotifyPaymentCreated(ctx context.Context, orgID, saleID uuid.UUID, payment paymentsdomain.Payment) error
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+type Usecases struct {
+	repo     RepositoryPort
+	audit    AuditPort
+	notifier NotificationPort
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, notifier NotificationPort) *Usecases {
+	return &Usecases{repo: repo, audit: audit, notifier: notifier}
 }
 
 func (u *Usecases) ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error) {
@@ -52,15 +57,18 @@ func (u *Usecases) CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUI
 	}
 	if u.audit != nil {
 		payload := map[string]any{
-			"sale_id":      saleID.String(),
-			"amount":       out.Amount,
-			"method":       out.Method,
+			"sale_id":     saleID.String(),
+			"amount":      out.Amount,
+			"method":      out.Method,
 			"received_at": out.ReceivedAt.UTC().Format(time.RFC3339),
 		}
 		if strings.TrimSpace(out.Notes) != "" {
 			payload["notes"] = out.Notes
 		}
 		u.audit.Log(ctx, orgID.String(), out.CreatedBy, "payment.created", "payment", out.ID.String(), payload)
+	}
+	if u.notifier != nil {
+		_ = u.notifier.NotifyPaymentCreated(ctx, orgID, saleID, out)
 	}
 	return out, nil
 }

@@ -56,7 +56,7 @@ func TestCreateSalePayment_AuditLogOnSuccess(t *testing.T) {
 		CreatedAt:     created,
 	}
 	audit := &fakeAudit{}
-	uc := NewUsecases(&fakePaymentsRepo{out: out}, audit)
+	uc := NewUsecases(&fakePaymentsRepo{out: out}, audit, nil)
 	got, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
 		Method:     "cash",
 		Amount:     100.5,
@@ -92,7 +92,7 @@ func TestCreateSalePayment_NilAuditNoPanic(t *testing.T) {
 		CreatedBy:     "svc",
 		CreatedAt:     created,
 	}
-	uc := NewUsecases(&fakePaymentsRepo{out: out}, nil)
+	uc := NewUsecases(&fakePaymentsRepo{out: out}, nil, nil)
 	_, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
 		Method:     "transfer",
 		Amount:     50,
@@ -109,7 +109,7 @@ func TestCreateSalePayment_NoAuditWhenRepoFails(t *testing.T) {
 	orgID := uuid.New()
 	saleID := uuid.New()
 	audit := &fakeAudit{}
-	uc := NewUsecases(&fakePaymentsRepo{err: errors.New("repo failed")}, audit)
+	uc := NewUsecases(&fakePaymentsRepo{err: errors.New("repo failed")}, audit, nil)
 	_, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
 		Method:    "cash",
 		Amount:    10,

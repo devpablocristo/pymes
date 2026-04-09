@@ -79,8 +79,8 @@ github.com/devpablocristo/core/http/gin/go v0.1.1 h1:9KL8IyfVaep0LiYVXmBG3QZq4NN
 github.com/devpablocristo/core/http/gin/go v0.1.1/go.mod h1:DEXd4u2NC4EPp+3oRi7SVfH8i8D/e2AN6d5Gj9WFfR8=
 github.com/devpablocristo/core/http/go v0.1.1 h1:sTqSbMjbULIpl7XMK/CJjZ8Gned3/LcxyQbx6h6ioMo=
 github.com/devpablocristo/core/http/go v0.1.1/go.mod h1:z4xQjIs6RFYQ0DdKZPi7N/0aWkOJFdBVTSPpf5kHcYA=
-github.com/devpablocristo/core/notifications/go v0.2.0 h1:gIorZMT3uXGp2schh3cV4O7GUMlRLCwSGiuVz4plOCY=
-github.com/devpablocristo/core/notifications/go v0.2.0/go.mod h1:UVw3va9HdLxnyxDgzudfM2P5VBnY9DUf7PhxPHvoen0=
+github.com/devpablocristo/core/notifications/go v0.3.0 h1:fSC3NQDSUZiX2Ek40k0kPZwjTt1pMGW7XlP/aJ2u0c0=
+github.com/devpablocristo/core/notifications/go v0.3.0/go.mod h1:UVw3va9HdLxnyxDgzudfM2P5VBnY9DUf7PhxPHvoen0=
 github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26 h1:LNqzG0dCS4VDmZAMiyU4mTvvDZ86infbBhepIblDQ1M=
 github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26/go.mod h1:jI4YD87zCS8mjqEoNDSUZOLAztZtxxnGkxNWkcYRYZY=
 github.com/devpablocristo/core/security/go v0.1.0 h1:cG1y35bN2RFF2NAnCtDho0kTF8zBjYEOx9fKnHzjjmw=

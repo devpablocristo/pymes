@@ -44,6 +44,9 @@ export const queryKeys = {
   audit: {
     entries: ['audit', 'entries'] as const,
   },
+  businessInsights: {
+    candidates: (limit: number) => ['business-insights', 'candidates', limit] as const,
+  },
   session: {
     current: ['session', 'current'] as const,
   },

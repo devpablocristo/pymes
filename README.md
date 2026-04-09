@@ -14,6 +14,11 @@ La topologia activa hoy es:
 - `pymes-core/shared/`: código transversal del producto (principalmente backend/shared; no es owner del runtime AI reusable)
 - Código reutilizable **agnóstico** vive en la librería **`core`** (módulos `github.com/devpablocristo/core/...`); lo atado al negocio de un solo servicio permanece en el **`internal/`** de ese backend (no se usa carpeta `pkgs/` en este monorepo)
 
+Regla de consumo:
+
+- `pymes` debe consumir `core` y `modules` por **versiones publicadas**.
+- referencias locales a repos hermanos (`../core`, `../modules`) quedan solo como puente temporal durante una extracción o publicación pendiente, y deben retirarse antes de dar el cambio por cerrado.
+
 No existen deployables `pymes-core/ai` ni `professionals/ai`. El único runtime AI del producto vive en `ai/`; el runtime reusable efectivo está en la librería `core`, y `pymes-core/shared/` no debe reintroducir un runtime AI paralelo.
 
 ## Inicio rapido
@@ -28,6 +33,10 @@ Prerequisitos locales:
 
 - Node `20.19.0` para `frontend/` (`frontend/.nvmrc` fija esa versión para alinear local, CI y builds auxiliares).
 - `ENVIRONMENT=development` en backends Go y `AI_ENVIRONMENT=development` en AI para desarrollo local.
+
+Nota:
+
+- `.env.example` todavía expone `CORE_REPO_PATH` y `MODULES_REPO_PATH` para iteraciones puntuales, pero la política del repo es volver siempre a dependencias publicadas después de publicar el cambio reusable.
 
 Notas operativas del hardening:
 

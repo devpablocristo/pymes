@@ -25,13 +25,18 @@ type AuditPort interface {
 	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
-type Usecases struct {
-	repo  RepositoryPort
-	audit AuditPort
+type NotificationPort interface {
+	NotifyInventoryAdjusted(ctx context.Context, level inventorydomain.StockLevel, delta float64, actor, notes string) error
 }
 
-func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
-	return &Usecases{repo: repo, audit: audit}
+type Usecases struct {
+	repo     RepositoryPort
+	audit    AuditPort
+	notifier NotificationPort
+}
+
+func NewUsecases(repo RepositoryPort, audit AuditPort, notifier NotificationPort) *Usecases {
+	return &Usecases{repo: repo, audit: audit, notifier: notifier}
 }
 
 func (u *Usecases) EnsureStockLevel(ctx context.Context, orgID, productID uuid.UUID) error {
@@ -73,6 +78,9 @@ func (u *Usecases) AdjustManual(ctx context.Context, orgID, productID uuid.UUID,
 			"min_quantity": out.MinQuantity,
 			"quantity":     out.Quantity,
 		})
+	}
+	if u.notifier != nil {
+		_ = u.notifier.NotifyInventoryAdjusted(ctx, out, quantity, actor, notes)
 	}
 	return out, nil
 }

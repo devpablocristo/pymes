@@ -184,7 +184,7 @@ services:
       RESTAURANTS_BACKEND_URL: http://host.docker.internal:8484
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e2b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
       REVIEW_URL: http://review:8080
       PYTHONPATH: /workspace/pymes/ai:/workspace/core/ai/python/src
       # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.

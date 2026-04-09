@@ -15,7 +15,7 @@ require (
 	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
 	github.com/devpablocristo/core/http/gin/go v0.1.1
 	github.com/devpablocristo/core/http/go v0.1.1
-	github.com/devpablocristo/core/notifications/go v0.2.0
+	github.com/devpablocristo/core/notifications/go v0.3.0
 	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1

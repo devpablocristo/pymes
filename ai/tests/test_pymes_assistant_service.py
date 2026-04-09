@@ -344,6 +344,61 @@ async def test_run_internal_orchestrated_chat_routes_broad_info_requests_without
 
 
 @pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_prioritizes_sales_analysis_for_commercial_growth_prompt(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia usar el router general para un pedido comercial ejecutivo claro")
+
+    class StubAnalysisClient:
+        def complete_json(self, *, system_prompt: str, user_prompt: str):
+            assert '"category": "Ventas"' in user_prompt
+            return SimpleNamespace(
+                content=(
+                    '{"reply":"Semana floja con oportunidad comercial clara.",'
+                    '"summary":"El volumen vendido es bajo para la semana y conviene activar palancas comerciales.",'
+                    '"scope":"Ventas · semanal","highlights":[{"label":"Lectura","value":"Comercial"}],'
+                    '"recommendations":["Reactivar clientes recientes.","Promover productos con stock.","Ofrecer combo de ticket medio."],'
+                    '"kpis":[{"label":"Ventas","value":"2","trend":"flat","context":"muestra actual"}],'
+                    '"table":{"title":"Ventas recientes","columns":["Cliente","Total"],"rows":[["Acme","$1,500.00"]]}}'
+                )
+            )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_llm_client", lambda *_args, **_kwargs: StubAnalysisClient())
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: SalesRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message=(
+            "Analizá el negocio con foco comercial. No quiero un listado de productos. "
+            "Quiero un resumen ejecutivo de esta semana y 3 acciones concretas para vender más."
+        ),
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "sales"
+    assert result.routing_source == "read_fallback"
+    assert "Semana floja con oportunidad comercial clara." in result.reply
+    assert result.blocks[0]["type"] == "insight_card"
+
+
+@pytest.mark.asyncio
 async def test_run_internal_orchestrated_chat_bypasses_llm_for_clear_read_request(monkeypatch) -> None:
     repo = StubRepo()
     conversation = SimpleNamespace(id="conv-1", messages=[])

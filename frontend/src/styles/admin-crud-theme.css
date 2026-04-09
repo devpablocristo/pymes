@@ -354,6 +354,12 @@ textarea.input-readonly {
   white-space: nowrap;
 }
 
+.admin-row-subtext {
+  margin-top: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
 /* Cabecera de card en auditoría: título + acciones en varias líneas si hace falta */
 .card-header.admin-card-header--wrap {
   flex-wrap: wrap;

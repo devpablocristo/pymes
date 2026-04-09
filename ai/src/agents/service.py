@@ -152,6 +152,14 @@ _ANALYTICS_HINTS: tuple[str, ...] = (
     "oportunidad",
     "oportunidades",
     "impacto",
+    "resumen ejecutivo",
+    "acciones concretas",
+    "vender más",
+    "vender mas",
+    "foco comercial",
+    "mirada de dueño",
+    "mirada de dueno",
+    "decisiones",
 )
 _ANALYTICS_SYSTEM_PROMPT = """\
 Sos un analista operacional para PyMEs.
@@ -467,6 +475,8 @@ def _looks_like_procurement_domain_request(message: str) -> bool:
 
 def _looks_like_internal_analysis_request(message: str, *, assume_domain_context: bool = False) -> bool:
     text = message.strip().lower()
+    if _looks_like_commercial_growth_analysis_request(text):
+        return True
     if not assume_domain_context and not any(
         (
             _looks_like_customer_domain_request(text),
@@ -478,6 +488,41 @@ def _looks_like_internal_analysis_request(message: str, *, assume_domain_context
     ):
         return False
     return any(hint in text for hint in _ANALYTICS_HINTS)
+
+
+def _looks_like_commercial_growth_analysis_request(message: str) -> bool:
+    text = message.strip().lower()
+    commercial_hints = (
+        "foco comercial",
+        "comercial",
+        "vender más",
+        "vender mas",
+        "venta más",
+        "ventas",
+        "negocio",
+        "resumen ejecutivo",
+        "acciones concretas",
+        "decisiones",
+        "dueño",
+        "dueno",
+    )
+    decision_hints = (
+        "resumen",
+        "resumi",
+        "resumí",
+        "analiza",
+        "analizá",
+        "analisis",
+        "análisis",
+        "decime",
+        "decí",
+        "prioriza",
+        "priorizá",
+        "recomend",
+        "accion",
+        "acción",
+    )
+    return any(hint in text for hint in commercial_hints) and any(hint in text for hint in decision_hints)
 
 
 def _looks_like_contextual_follow_up_request(message: str) -> bool:
@@ -740,6 +785,8 @@ def _infer_internal_read_route(user_message: str) -> str | None:
 def _infer_internal_analysis_route(user_message: str) -> str | None:
     if not _looks_like_internal_analysis_request(user_message):
         return None
+    if _looks_like_commercial_growth_analysis_request(user_message):
+        return SALES_DOMAIN_AGENT_NAME
     if _looks_like_product_domain_request(user_message):
         return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_customer_domain_request(user_message):

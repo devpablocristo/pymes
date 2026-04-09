@@ -22,6 +22,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/businessinsights"
 	calendar_export "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_export"
 	calendar_sync "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
@@ -102,6 +103,7 @@ func InitializeApp() *app.App {
 	auditRepo := audit.NewRepository(db)
 	adminRepo := admin.NewRepository(db)
 	attachmentsRepo := attachments.NewRepository(db)
+	businessInsightsRepo := businessinsights.NewRepository(db)
 	notificationRepo := notifications.NewRepository(db)
 	inAppNotifRepo := inappnotifications.NewRepository(db)
 	outwebhooksRepo := outwebhooks.NewRepository(db)
@@ -137,24 +139,19 @@ func InitializeApp() *app.App {
 	auditUC := audit.NewUsecases(auditRepo)
 	adminUC := admin.NewUsecases(adminRepo)
 	attachmentsUC := attachments.NewUsecases(attachmentsRepo, "/tmp/attachments")
-	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC)
 	cashflowUC := cashflow.NewUsecases(cashflowRepo, auditUC)
 	timelineUC := timeline.NewUsecases(timelineRepo)
 	outwebhooksUC := outwebhooks.NewUsecases(outwebhooksRepo)
+	businessInsightsReadUC := businessinsights.NewUsecases(businessInsightsRepo)
 	customersUC := customers.NewUsecases(customersRepo, auditUC)
 	suppliersUC := suppliers.NewUsecases(suppliersRepo, auditUC)
-	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
-	servicesUC := services.NewUsecases(servicesRepo, auditUC)
-	salesUC := sales.NewUsecases(salesRepo, inventoryUC, cashflowUC, auditUC, sales.WithTimeline(timelineUC), sales.WithWebhooks(outwebhooksUC))
 	accountsUC := accounts.NewUsecases(accountsRepo)
 	currencyUC := currency.NewUsecases(currencyRepo)
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
-	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
 	procurementEngine := procurement.NewGovernanceEngine()
 	procurementUC := procurement.NewUsecases(procurementRepo, procurementEngine, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
-	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
@@ -218,16 +215,33 @@ func InitializeApp() *app.App {
 	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
 	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
 	var reviewClient *reviewproxy.Client
-	var inAppNotifUC *inappnotifications.Usecases
+	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
 	if reviewURL != "" {
 		reviewClient = reviewproxy.NewClient(reviewURL, reviewAPIKey)
 		inAppNotifUC = inappnotifications.NewUsecases(
 			inAppNotifRepo,
 			inappnotifications.WithApprovalSource(reviewproxy.NewPendingApprovalSource(reviewClient)),
 		)
-	} else {
-		inAppNotifUC = inappnotifications.NewUsecases(inAppNotifRepo)
 	}
+	businessInsightsUC := businessinsights.NewService(businessInsightsRepo, inAppNotifUC, businessinsights.Config{
+		FeaturedSaleThreshold:    cfg.InsightsFeaturedSaleThreshold,
+		FeaturedPaymentThreshold: cfg.InsightsFeaturedPaymentThreshold,
+		LowStockDedupWindow:      cfg.InsightsLowStockDedupWindow,
+	})
+	inventoryUC := inventory.NewUsecases(inventoryRepo, auditUC, businessInsightsUC)
+	productsUC := products.NewUsecases(productsRepo, inventoryUC, auditUC)
+	servicesUC := services.NewUsecases(servicesRepo, auditUC)
+	salesUC := sales.NewUsecases(
+		salesRepo,
+		inventoryUC,
+		cashflowUC,
+		auditUC,
+		sales.WithTimeline(timelineUC),
+		sales.WithWebhooks(outwebhooksUC),
+		sales.WithNotifications(businessInsightsUC),
+	)
+	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC)
+	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
@@ -235,6 +249,7 @@ func InitializeApp() *app.App {
 	auditHandler := audit.NewHandler(auditUC)
 	adminHandler := admin.NewHandler(adminUC)
 	attachmentsHandler := attachments.NewHandler(attachmentsUC)
+	businessInsightsHandler := businessinsights.NewHandler(businessInsightsReadUC)
 	customersHandler := customers.NewHandler(customersUC)
 	suppliersHandler := suppliers.NewHandler(suppliersUC)
 	productsHandler := products.NewHandler(productsUC)
@@ -319,6 +334,7 @@ func InitializeApp() *app.App {
 	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
 	auditHandler.RegisterRoutes(authGroup)
+	businessInsightsHandler.RegisterRoutes(authGroup)
 	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)

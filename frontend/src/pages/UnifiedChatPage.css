@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-height: 0;
 }
 
 .cht__layout {
@@ -12,6 +13,8 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   min-height: 520px;
+  height: clamp(560px, calc(100vh - 220px), 820px);
+  max-height: calc(100vh - 160px);
   background: var(--color-surface);
 }
 
@@ -26,6 +29,7 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  min-height: 0;
 }
 
 [data-theme='dark'] .cht__contacts {
@@ -126,6 +130,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .cht__header {
@@ -154,10 +159,12 @@
 .cht__messages {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  overscroll-behavior: contain;
 }
 
 .cht__msg {
@@ -483,6 +490,21 @@
 
 .cht__input-bar input {
   flex: 1;
+}
+
+@media (max-width: 900px) {
+  .cht__layout {
+    height: calc(100vh - 180px);
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .cht__layout {
+    min-height: 0;
+    height: calc(100vh - 150px);
+    border-radius: var(--radius-md);
+  }
 }
 
 .cht__conversations-divider {

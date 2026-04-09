@@ -119,7 +119,8 @@ require (
 // Local development: consume scheduling module from sibling worktree until the
 // latest version is published. Remove this replace once
 // `github.com/devpablocristo/modules/scheduling/go` >= v0.4.0 is tagged.
-replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go
+// Snapshot hasta tag >= v0.4.0 en github.com/devpablocristo/modules.
+replace github.com/devpablocristo/modules/scheduling/go => ./third_party/modules-scheduling-go
 
 replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
 

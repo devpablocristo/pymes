@@ -41,6 +41,7 @@ DECLARE
     notif_id uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
     sched_branch uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/central');
     sched_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_consultation');
+    sched_catchall_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_appointment');
     sched_resource uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-1');
     sched_queue uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/frontdesk');
 BEGIN
@@ -110,7 +111,9 @@ BEGIN
         OR branch_id = sched_branch
         OR service_id = sched_service
       );
-    DELETE FROM scheduling_service_resources WHERE service_id = sched_service OR resource_id = sched_resource;
+    DELETE FROM scheduling_service_resources
+    WHERE service_id IN (sched_service, sched_catchall_service)
+       OR resource_id = sched_resource;
     DELETE FROM scheduling_availability_rules
     WHERE id IN (
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/0'),
@@ -127,10 +130,22 @@ BEGIN
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/4'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/5'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/6')
+    ) OR id IN (
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/weekday/' || gs::text || '/am')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/weekday/' || gs::text || '/pm')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/weekday/' || gs::text || '/am')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/weekday/' || gs::text || '/pm')
+      FROM generate_series(1, 5) AS gs
     );
     DELETE FROM scheduling_queues WHERE id = sched_queue;
     DELETE FROM scheduling_resources WHERE id = sched_resource;
-    DELETE FROM scheduling_services WHERE id = sched_service;
+    DELETE FROM scheduling_services WHERE id IN (sched_service, sched_catchall_service);
     DELETE FROM scheduling_branches WHERE id = sched_branch;
 
     DELETE FROM org_api_key_scopes WHERE api_key_id = '${LOCAL_API_KEY_UUID}';

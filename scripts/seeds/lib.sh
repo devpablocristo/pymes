@@ -67,7 +67,13 @@ resolve_target_org_uuid() {
 
 render_seed_sql() {
   local file="$1"
-  python3 - "$ROOT_DIR/$file" "$TARGET_ORG_UUID" <<'PY'
+  local fullpath
+  if [[ "$file" == /* ]]; then
+    fullpath="$file"
+  else
+    fullpath="$ROOT_DIR/$file"
+  fi
+  python3 - "$fullpath" "$TARGET_ORG_UUID" <<'PY'
 from pathlib import Path
 import sys
 

@@ -375,6 +375,11 @@ func allowsByScopes(scopes []string, resource, action string) bool {
 		if s == "*:*" || s == "admin:*" || s == "admin:console:write" {
 			return true
 		}
+		// Consola solo-lectura: debe cubrir scheduling:read y el resto de GET protegidos por RBAC
+		// (antes solo admin:console:write pasaba, y la agenda quedaba vacía con 403 + items=[]).
+		if s == "admin:console:read" && action == "read" {
+			return true
+		}
 		if s == resource+":"+action || s == resource+":*" {
 			return true
 		}

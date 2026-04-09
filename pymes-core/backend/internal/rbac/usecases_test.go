@@ -58,6 +58,8 @@ func TestUsecases_HasPermission(t *testing.T) {
 		{name: "jwt secops allows all", role: "secops", resource: "reports", action: "read", want: true},
 		{name: "api key scoped allow", authMethod: "api_key", scopes: []string{"sales:create"}, resource: "sales", action: "create", want: true},
 		{name: "api key scoped deny", authMethod: "api_key", scopes: []string{"sales:read"}, resource: "sales", action: "create", want: false},
+		{name: "api key console read allows scheduling read", authMethod: "api_key", scopes: []string{"admin:console:read"}, resource: "scheduling", action: "read", want: true},
+		{name: "api key console read denies scheduling create", authMethod: "api_key", scopes: []string{"admin:console:read"}, resource: "scheduling", action: "create", want: false},
 		{name: "actor permission allow", authMethod: "jwt", resource: "sales", action: "create", want: true},
 		{name: "member default read allow", authMethod: "jwt", resource: "products", action: "read", want: true},
 		{name: "member default write deny", authMethod: "jwt", resource: "products", action: "update", want: false},

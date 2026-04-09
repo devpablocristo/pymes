@@ -13,6 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
+      - name: Symlink sibling core/modules for go.mod replace
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -26,6 +39,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
+      - name: Symlink sibling core/modules for go.mod replace
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -39,6 +65,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
+      - name: Symlink sibling core/modules for go.mod replace
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -52,6 +91,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
+      - name: Symlink sibling core/modules for go.mod replace
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -65,6 +117,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/core
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/modules
+          path: modules
+      - name: Symlink sibling core/modules for go.mod replace
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -111,7 +176,7 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      # core/modules dentro del workspace: vite.config.ts los resuelve vía monorepoPackageDir (anidado o hermano).
+      # core anidado en workspace; `modules` solo como repo hermano (symlink para file:../../modules en package.json).
       - uses: actions/checkout@v4
         with:
           repository: devpablocristo/core
@@ -120,6 +185,10 @@ jobs:
         with:
           repository: devpablocristo/modules
           path: modules
+      - name: Symlink sibling modules for npm file:../../modules
+        run: |
+          parent="$(dirname "$GITHUB_WORKSPACE")"
+          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'

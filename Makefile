@@ -9,7 +9,6 @@
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
 DC = docker compose
-DC_MODULES = docker compose -f ../modules/docker-compose.yml
 
 # Calidad
 
@@ -43,9 +42,11 @@ e2e-review-notifications:
 cleanup-pablo:
 	DRY_RUN=$(DRY_RUN) bash scripts/cleanup-pablo-tree.sh "$(CURDIR)/.."
 
-# Módulo CRUD en ../modules: typecheck + tests TS y go test, todo en imágenes Docker (sin npm/go en el host).
+# Módulo CRUD en el repo `modules`: typecheck + tests TS y go test (ruta vía MODULES_REPO_PATH en .env, default ../modules).
 modules-check:
-	$(DC_MODULES) build crud-ts-check crud-go-check
+	bash -c 'set -a && [[ -f "$(CURDIR)/.env" ]] && . "$(CURDIR)/.env" && set +a && \
+		M="$${MODULES_REPO_PATH:-../modules}" && \
+		docker compose -f "$$M/docker-compose.yml" build crud-ts-check crud-go-check'
 
 # Stack local
 

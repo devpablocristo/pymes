@@ -92,8 +92,8 @@ services:
     volumes:
       - ./pymes-core/backend:/workspace/pymes/pymes-core/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core:/workspace/core
-      - ../modules:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
@@ -140,8 +140,9 @@ services:
       - ./frontend/vite.config.ts:/workspace/pymes/frontend/vite.config.ts
       - ./frontend/tsconfig.json:/workspace/pymes/frontend/tsconfig.json
       - ./frontend/eslint.config.js:/workspace/pymes/frontend/eslint.config.js
-      - ../modules:/workspace/modules
-      - ../core:/workspace/core
+      - ./frontend/vendor:/workspace/pymes/frontend/vendor
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
     env_file:
       - .env
     environment:
@@ -167,7 +168,7 @@ services:
       - ./ai/src:/workspace/pymes/ai/src
       - ./ai/tests:/workspace/pymes/ai/tests
       - ./ai/pyproject.toml:/workspace/pymes/ai/pyproject.toml
-      - ../core/ai/python/src:/workspace/core/ai/python/src
+      - ${CORE_REPO_PATH:-../core}/ai/python/src:/workspace/core/ai/python/src
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -208,8 +209,8 @@ services:
     volumes:
       - ./professionals/backend:/workspace/pymes/professionals/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core:/workspace/core
-      - ../modules:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
@@ -239,8 +240,8 @@ services:
     volumes:
       - ./workshops/backend:/workspace/pymes/workshops/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core:/workspace/core
-      - ../modules:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
@@ -272,8 +273,8 @@ services:
     volumes:
       - ./beauty/backend:/workspace/pymes/beauty/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core:/workspace/core
-      - ../modules:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
@@ -303,8 +304,8 @@ services:
     volumes:
       - ./restaurants/backend:/workspace/pymes/restaurants/backend
       - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
-      - ../core:/workspace/core
-      - ../modules:/workspace/modules
+      - ${CORE_REPO_PATH:-../core}:/workspace/core
+      - ${MODULES_REPO_PATH:-../modules}:/workspace/modules
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:

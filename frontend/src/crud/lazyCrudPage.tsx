@@ -159,7 +159,8 @@ export function LazyConfiguredCrudPage({
         <div className="alert alert-error">
           <p>{loadError}</p>
           <p className="text-secondary text-sm">
-            Revisá la consola del navegador y que exista <code>pymes/modules/crud/ui/ts</code> o que{' '}
+            Revisá la consola del navegador y que exista <code>pymes/modules/crud/ui/ts</code> o el repo hermano{' '}
+            <code>modules/crud/ui/ts</code>, o que{' '}
             <code>@devpablocristo/modules-crud-ui</code> esté instalado en <code>node_modules</code>.
           </p>
         </div>

@@ -11,12 +11,11 @@ const pymesRepoRoot = fileURLToPath(new URL('..', import.meta.url));
 const pymesParentDir = fileURLToPath(new URL('../..', import.meta.url));
 
 /**
- * Resuelve `core/...` o `modules/...` desde layout anidado (`pymes/modules`) o hermano (`../modules`).
- * CI puede clonar dentro del workspace; desarrollo local suele tener clones junto al repo.
+ * Resuelve `core/...` desde `pymes/core` (anidado) o repo hermano `../core`.
  */
-function monorepoPackageDir(kind: 'core' | 'modules', ...segments: string[]): string {
-  const nested = path.join(pymesRepoRoot, kind, ...segments);
-  const sibling = path.join(pymesParentDir, kind, ...segments);
+function monorepoCoreDir(...segments: string[]): string {
+  const nested = path.join(pymesRepoRoot, 'core', ...segments);
+  const sibling = path.join(pymesParentDir, 'core', ...segments);
   if (fs.existsSync(nested)) {
     return nested;
   }
@@ -27,16 +26,26 @@ function monorepoPackageDir(kind: 'core' | 'modules', ...segments: string[]): st
 }
 
 /**
- * Igual que monorepoPackageDir pero si no hay checkout local, usa el paquete publicado en node_modules.
- * Evita alias a rutas inexistentes cuando solo se usa npm (sin carpeta `pymes/modules`).
+ * TS bajo `modules/`: primero `pymes/modules/...` si existe el archivo, si no repo hermano `../../modules/...`.
  */
-function monorepoPackageDirOrNodeModule(
-  kind: 'core' | 'modules',
-  segments: string[],
-  nodeModulesSpecifier: string,
-): string {
-  const nested = path.join(pymesRepoRoot, kind, ...segments);
-  const sibling = path.join(pymesParentDir, kind, ...segments);
+function monorepoModulesDir(...segments: string[]): string {
+  const nested = path.join(pymesRepoRoot, 'modules', ...segments);
+  const sibling = path.join(pymesParentDir, 'modules', ...segments);
+  if (fs.existsSync(nested)) {
+    return nested;
+  }
+  if (fs.existsSync(sibling)) {
+    return sibling;
+  }
+  return sibling;
+}
+
+/**
+ * Igual que `monorepoModulesDir` o paquete publicado en node_modules.
+ */
+function monorepoModulesDirOrNodeModule(segments: string[], nodeModulesSpecifier: string): string {
+  const nested = path.join(pymesRepoRoot, 'modules', ...segments);
+  const sibling = path.join(pymesParentDir, 'modules', ...segments);
   if (fs.existsSync(nested)) {
     return nested;
   }
@@ -55,7 +64,7 @@ function modulesPackagePreferNodeModules(segments: string[], nodeModulesSpecifie
   if (fs.existsSync(published)) {
     return published;
   }
-  return monorepoPackageDir('modules', ...segments);
+  return monorepoModulesDir(...segments);
 }
 
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
@@ -65,15 +74,15 @@ const fullCalendarReact = fileURLToPath(new URL('./node_modules/@fullcalendar/re
 const fullCalendarTimeGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/timegrid', import.meta.url));
 const fullCalendarList = fileURLToPath(new URL('./node_modules/@fullcalendar/list', import.meta.url));
 const tanstackReactQuery = fileURLToPath(new URL('./node_modules/@tanstack/react-query', import.meta.url));
-const coreBrowserIndex = monorepoPackageDir('core', 'browser/ts/src/index.ts');
-const coreBrowserCrud = monorepoPackageDir('core', 'browser/ts/src/crud/index.ts');
-const coreBrowserSearch = monorepoPackageDir('core', 'browser/ts/src/search/index.ts');
-const coreAuthnErrors = monorepoPackageDir('core', 'authn/ts/src/errors.ts');
-const coreFsmIndex = monorepoPackageDir('core', 'concurrency/fsm/ts/src/index.ts');
-const coreBrowserStorage = monorepoPackageDir('core', 'browser/ts/src/storage.ts');
-const coreBrowserTheme = monorepoPackageDir('core', 'browser/ts/src/theme.ts');
-const coreBrowserObservability = monorepoPackageDir('core', 'browser/ts/src/observability.ts');
-const coreBrowserI18n = monorepoPackageDir('core', 'browser/ts/src/i18n/index.ts');
+const coreBrowserIndex = monorepoCoreDir('browser/ts/src/index.ts');
+const coreBrowserCrud = monorepoCoreDir('browser/ts/src/crud/index.ts');
+const coreBrowserSearch = monorepoCoreDir('browser/ts/src/search/index.ts');
+const coreAuthnErrors = monorepoCoreDir('authn/ts/src/errors.ts');
+const coreFsmIndex = monorepoCoreDir('concurrency/fsm/ts/src/index.ts');
+const coreBrowserStorage = monorepoCoreDir('browser/ts/src/storage.ts');
+const coreBrowserTheme = monorepoCoreDir('browser/ts/src/theme.ts');
+const coreBrowserObservability = monorepoCoreDir('browser/ts/src/observability.ts');
+const coreBrowserI18n = monorepoCoreDir('browser/ts/src/i18n/index.ts');
 const modulesCrudUiIndex = modulesPackagePreferNodeModules(
   ['crud/ui/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-crud-ui/src/index.ts',
@@ -87,13 +96,11 @@ const modulesCrudUiSurface = modulesPackagePreferNodeModules(
   './node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx',
 );
 /** Checkout local `modules/` primero; si no existe (CI sin monorepo), tarball npm. */
-const modulesCalendarBoardIndex = monorepoPackageDirOrNodeModule(
-  'modules',
+const modulesCalendarBoardIndex = monorepoModulesDirOrNodeModule(
   ['calendar/board/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-calendar-board/src/index.ts',
 );
-const modulesCalendarBoardStyles = monorepoPackageDirOrNodeModule(
-  'modules',
+const modulesCalendarBoardStyles = monorepoModulesDirOrNodeModule(
   ['calendar/board/ts/src/styles.css'],
   './node_modules/@devpablocristo/modules-calendar-board/src/styles.css',
 );
@@ -101,31 +108,27 @@ const modulesKanbanBoardIndex = modulesPackagePreferNodeModules(
   ['kanban/board/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-kanban-board/src/index.ts',
 );
-const modulesSchedulingIndex = monorepoPackageDir('modules', 'scheduling/ts/src/index.ts');
-const modulesSchedulingNext = monorepoPackageDir('modules', 'scheduling/ts/src/next.ts');
-const modulesSchedulingStyles = monorepoPackageDir('modules', 'scheduling/ts/src/styles.css');
-const modulesSchedulingStylesNext = monorepoPackageDir('modules', 'scheduling/ts/src/styles.next.css');
-const modulesWorkOrdersIndex = monorepoPackageDir('modules', 'work-orders/ts/src/index.ts');
-const modulesWorkOrdersStyles = monorepoPackageDir('modules', 'work-orders/ts/src/styles.css');
-const modulesShellSidebarIndex = monorepoPackageDir('modules', 'sidebar/ts/src/index.ts');
-const modulesShellSidebarStyles = monorepoPackageDir('modules', 'sidebar/ts/src/styles.css');
-const modulesUiModalStyles = monorepoPackageDir('modules', 'ui/modal/ts/src/styles.css');
-const modulesUiPageShellIndex = monorepoPackageDir('modules', 'ui/page-shell/ts/src/index.ts');
-const modulesUiPageShellStyles = monorepoPackageDir('modules', 'ui/page-shell/ts/src/styles.css');
-const modulesUiNotificationFeedIndex = monorepoPackageDirOrNodeModule(
-  'modules',
+const modulesSchedulingIndex = monorepoModulesDir('scheduling/ts/src/index.ts');
+const modulesSchedulingNext = monorepoModulesDir('scheduling/ts/src/next.ts');
+const modulesSchedulingStyles = monorepoModulesDir('scheduling/ts/src/styles.css');
+const modulesSchedulingStylesNext = monorepoModulesDir('scheduling/ts/src/styles.next.css');
+const modulesWorkOrdersIndex = monorepoModulesDir('work-orders/ts/src/index.ts');
+const modulesWorkOrdersStyles = monorepoModulesDir('work-orders/ts/src/styles.css');
+const modulesShellSidebarIndex = monorepoModulesDir('sidebar/ts/src/index.ts');
+const modulesShellSidebarStyles = monorepoModulesDir('sidebar/ts/src/styles.css');
+const modulesUiModalStyles = monorepoModulesDir('ui/modal/ts/src/styles.css');
+const modulesUiPageShellIndex = monorepoModulesDir('ui/page-shell/ts/src/index.ts');
+const modulesUiPageShellStyles = monorepoModulesDir('ui/page-shell/ts/src/styles.css');
+const modulesUiNotificationFeedIndex = monorepoModulesDirOrNodeModule(
   ['ui/notification-feed/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-ui-notification-feed/src/index.ts',
 );
-const modulesUiNotificationFeedStyles = monorepoPackageDirOrNodeModule(
-  'modules',
+const modulesUiNotificationFeedStyles = monorepoModulesDirOrNodeModule(
   ['ui/notification-feed/ts/src/styles.css'],
   './node_modules/@devpablocristo/modules-ui-notification-feed/src/styles.css',
 );
-const modulesUiConversationInboxIndex = monorepoPackageDir('modules', 'ui/conversation-inbox/ts/src/index.ts');
-const modulesUiConversationInboxStyles = monorepoPackageDir('modules', 'ui/conversation-inbox/ts/src/styles.css');
-const modulesUiSectionHubIndex = monorepoPackageDir('modules', 'ui/section-hub/ts/src/index.tsx');
-const modulesUiSectionHubStyles = monorepoPackageDir('modules', 'ui/section-hub/ts/src/styles.css');
+const modulesUiSectionHubIndex = monorepoModulesDir('ui/section-hub/ts/src/index.tsx');
+const modulesUiSectionHubStyles = monorepoModulesDir('ui/section-hub/ts/src/styles.css');
 
 export default defineConfig({
   envDir: '..',
@@ -168,8 +171,6 @@ export default defineConfig({
       { find: '@devpablocristo/modules-ui-page-shell', replacement: modulesUiPageShellIndex },
       { find: '@devpablocristo/modules-ui-notification-feed/styles.css', replacement: modulesUiNotificationFeedStyles },
       { find: '@devpablocristo/modules-ui-notification-feed', replacement: modulesUiNotificationFeedIndex },
-      { find: '@devpablocristo/modules-ui-conversation-inbox/styles.css', replacement: modulesUiConversationInboxStyles },
-      { find: '@devpablocristo/modules-ui-conversation-inbox', replacement: modulesUiConversationInboxIndex },
       { find: '@devpablocristo/modules-ui-section-hub/styles.css', replacement: modulesUiSectionHubStyles },
       { find: '@devpablocristo/modules-ui-section-hub', replacement: modulesUiSectionHubIndex },
     ],

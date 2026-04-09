@@ -13,11 +13,13 @@ run_pymes_sql_inline "
 DO \$\$
 DECLARE
     v_org uuid := '${TARGET_ORG_UUID}';
-    p1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/1');
-    p2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/2');
-    p3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/3');
-    svc1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/4');
-    svc2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/5');
+    p1 uuid;
+    p2 uuid;
+    p3 uuid;
+    svc1 uuid;
+    svc2 uuid;
+    legacy_demo_service_product_1 uuid;
+    legacy_demo_service_product_2 uuid;
     c1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1');
     c2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/2');
     c3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/3');
@@ -45,6 +47,14 @@ DECLARE
     sched_resource uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-1');
     sched_queue uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/frontdesk');
 BEGIN
+    SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO legacy_demo_service_product_1 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-001' LIMIT 1;
+    SELECT id INTO legacy_demo_service_product_2 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-002' LIMIT 1;
+
     DELETE FROM pymes_in_app_notifications WHERE id = notif_id;
 
     DELETE FROM procurement_request_lines WHERE request_id = pr1;
@@ -152,7 +162,12 @@ BEGIN
     DELETE FROM org_api_keys WHERE id = '${LOCAL_API_KEY_UUID}';
 
     DELETE FROM services WHERE org_id = v_org AND id IN (svc1, svc2);
-    DELETE FROM products WHERE org_id = v_org AND id IN (p1, p2, p3);
+    DELETE FROM products
+    WHERE org_id = v_org
+      AND (
+        id IN (p1, p2, p3, legacy_demo_service_product_1, legacy_demo_service_product_2)
+        OR sku IN ('DEMO-PROD-001', 'DEMO-PROD-002', 'DEMO-PROD-003', 'DEMO-SVC-001', 'DEMO-SVC-002')
+      );
 
     DELETE FROM party_roles WHERE org_id = v_org AND party_id IN (c1, c2, c3, s1, s2);
     DELETE FROM party_persons WHERE party_id IN (c1, c3);

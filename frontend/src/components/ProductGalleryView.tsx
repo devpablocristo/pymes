@@ -69,35 +69,44 @@ const imageStyle: CSSProperties = {
 };
 
 const bodyStyle: CSSProperties = {
-  padding: 12,
+  padding: 8,
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 2,
+  color: '#111111',
 };
 
 const nameStyle: CSSProperties = {
   fontWeight: 600,
-  fontSize: 14,
-  lineHeight: 1.3,
+  fontSize: 11,
+  lineHeight: 1.2,
+  color: '#111111',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 };
 
 const priceStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 10,
   fontWeight: 500,
-  color: 'var(--text-primary, #111827)',
+  color: '#111111',
 };
 
 const skuStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'var(--text-secondary, #6b7280)',
+  fontSize: 9,
+  color: '#111111',
+  opacity: 0.85,
 };
 
 function formatPrice(price?: number, currency?: string): string {
   if (price == null || Number.isNaN(price)) return '--';
-  return `${currency ?? 'ARS'} ${Number(price).toFixed(2)}`;
+  return `${currency ?? 'ARS'} ${Number(price).toFixed(0)}`;
+}
+
+function compactText(value: string | undefined, max: number): string {
+  const text = (value ?? '').trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
 function cardImageSrc(item: ProductGalleryItem): string {
@@ -143,9 +152,9 @@ export function ProductGalleryView<T extends ProductGalleryItem>({
             />
           </span>
           <span style={bodyStyle}>
-            <span style={nameStyle} title={item.name}>{item.name}</span>
+            <span style={nameStyle} title={item.name}>{compactText(item.name, 26)}</span>
             <span style={priceStyle}>{formatPrice(item.price, item.currency)}</span>
-            <span style={skuStyle}>{item.sku ? `SKU: ${item.sku}` : 'Sin SKU'}</span>
+            <span style={skuStyle}>{item.sku ? compactText(item.sku, 18) : 'Sin SKU'}</span>
           </span>
         </button>
       ))}

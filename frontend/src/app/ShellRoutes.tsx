@@ -5,7 +5,6 @@ import {
   BikeShopWorkOrdersPage,
   BikeShopWorkOrdersSection,
   CalendarPage,
-  CryptoPage,
   DashboardVisualPage,
   InvoicesPage,
   ModulePage,
@@ -13,14 +12,12 @@ import {
   ProductsGalleryPage,
   ProductsListPage,
   ProductsModuleSection,
-  PublicPreviewPage,
   RestaurantTableSessionsPage,
   SettingsHubPage,
   StockPage,
-  UIComponentsPage,
   UnifiedChatPage,
-  WhatsAppCampaignsPage,
-  WhatsAppInboxPage,
+  CustomerMessagingCampaignsPage,
+  CustomerMessagingInboxPage,
   WorkOrdersEditorPage,
   WorkOrdersKanbanPanel,
   WorkOrdersModuleSection,
@@ -29,8 +26,7 @@ import {
 } from './lazyRoutes';
 
 /**
- * Rutas bajo el Shell autenticado (producto + demos internas).
- * Demos / showcase: `/crypto`, `/ui` (no confundir con módulos de negocio).
+ * Rutas bajo el Shell autenticado (producto).
  */
 export function ShellRoutes() {
   return (
@@ -42,8 +38,6 @@ export function ShellRoutes() {
       <Route path="/admin" element={<Navigate to="/settings" replace />} />
       <Route path="/billing" element={<Navigate to="/settings?section=gateway" replace />} />
       <Route path="/invoices" element={<InvoicesPage />} />
-      <Route path="/crypto" element={<CryptoPage />} />
-      <Route path="/ui" element={<UIComponentsPage />} />
       <Route path="/modules/carWorkOrders" element={<WorkOrdersModuleSection />}>
         <Route index element={<Navigate to="board" replace />} />
         <Route path="board" element={<WorkOrdersKanbanPanel />} />
@@ -59,7 +53,6 @@ export function ShellRoutes() {
       <Route path="/settings" element={<SettingsHubPage />} />
       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
       <Route path="/settings/notifications" element={<Navigate to="/settings?section=notifications" replace />} />
-      <Route path="/scheduling/public-preview" element={<PublicPreviewPage />} />
       <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/carWorkOrders" replace />} />
       <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersSection />}>
         <Route index element={<Navigate to="board" replace />} />
@@ -68,9 +61,8 @@ export function ShellRoutes() {
       </Route>
       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
       <Route path="/automation-rules" element={<AutomationRulesPage />} />
-      <Route path="/whatsapp/campaigns" element={<WhatsAppCampaignsPage />} />
-      <Route path="/whatsapp/inbox" element={<WhatsAppInboxPage />} />
-      <Route path="/approvals" element={<Navigate to="/notifications" replace />} />
+      <Route path="/customer-messaging/campaigns" element={<CustomerMessagingCampaignsPage />} />
+      <Route path="/customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
       <Route path="/watcher-config" element={<WatcherConfigPage />} />
       <Route path="/audit" element={<Navigate to="/settings?section=audit" replace />} />
       <Route path="/roles" element={<Navigate to="/settings?section=rbac" replace />} />
@@ -78,7 +70,8 @@ export function ShellRoutes() {
       <Route path="/stock" element={<StockPage />} />
       <Route path="/modules/inventory" element={<Navigate to="/stock" replace />} />
       <Route path="/modules/inventoryMovements" element={<Navigate to="/stock" replace />} />
-      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/agenda" element={<CalendarPage />} />
+      <Route path="/calendar" element={<Navigate to="/agenda" replace />} />
     </Routes>
   );
 }

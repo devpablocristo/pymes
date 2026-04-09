@@ -13,11 +13,13 @@ run_pymes_sql_inline "
 DO \$\$
 DECLARE
     v_org uuid := '${TARGET_ORG_UUID}';
-    p1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/1');
-    p2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/2');
-    p3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/3');
-    svc1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/4');
-    svc2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/5');
+    p1 uuid;
+    p2 uuid;
+    p3 uuid;
+    svc1 uuid;
+    svc2 uuid;
+    legacy_demo_service_product_1 uuid;
+    legacy_demo_service_product_2 uuid;
     c1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1');
     c2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/2');
     c3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/3');
@@ -41,9 +43,18 @@ DECLARE
     notif_id uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
     sched_branch uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/central');
     sched_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_consultation');
+    sched_catchall_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_appointment');
     sched_resource uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-1');
     sched_queue uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/frontdesk');
 BEGIN
+    SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO legacy_demo_service_product_1 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-001' LIMIT 1;
+    SELECT id INTO legacy_demo_service_product_2 FROM products WHERE org_id = v_org AND sku = 'DEMO-SVC-002' LIMIT 1;
+
     DELETE FROM pymes_in_app_notifications WHERE id = notif_id;
 
     DELETE FROM procurement_request_lines WHERE request_id = pr1;
@@ -85,30 +96,78 @@ BEGIN
     DELETE FROM role_permissions WHERE role_id IN (r_admin, r_seller, r_cashier, r_accountant, r_warehouse);
     DELETE FROM roles WHERE id IN (r_admin, r_seller, r_cashier, r_accountant, r_warehouse);
 
-    DELETE FROM scheduling_service_resources WHERE service_id = sched_service OR resource_id = sched_resource;
+    DELETE FROM scheduling_queue_tickets WHERE id IN (
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-1'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-2'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-3')
+    );
+    -- Turnos que usan catálogo semilla (demo + p. ej. copia migración 0041 appointments → scheduling_bookings)
+    IF to_regclass('public.scheduling_booking_action_tokens') IS NOT NULL THEN
+      DELETE FROM scheduling_booking_action_tokens
+      WHERE booking_id IN (
+        SELECT id FROM scheduling_bookings
+        WHERE org_id = v_org
+          AND (
+            resource_id = sched_resource
+            OR branch_id = sched_branch
+            OR service_id = sched_service
+          )
+      );
+    END IF;
+    DELETE FROM scheduling_bookings
+    WHERE org_id = v_org
+      AND (
+        resource_id = sched_resource
+        OR branch_id = sched_branch
+        OR service_id = sched_service
+      );
+    DELETE FROM scheduling_service_resources
+    WHERE service_id IN (sched_service, sched_catchall_service)
+       OR resource_id = sched_resource;
     DELETE FROM scheduling_availability_rules
     WHERE id IN (
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/0'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/1'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/2'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/3'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/4'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/5'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/6'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/0'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/1'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/2'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/3'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/4'),
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/5')
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/5'),
+      uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/6')
+    ) OR id IN (
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/weekday/' || gs::text || '/am')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/branch/weekday/' || gs::text || '/pm')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/weekday/' || gs::text || '/am')
+      FROM generate_series(1, 5) AS gs
+      UNION ALL
+      SELECT uuid_generate_v5(v_org, 'modules-scheduling/v1/rule/resource/weekday/' || gs::text || '/pm')
+      FROM generate_series(1, 5) AS gs
     );
     DELETE FROM scheduling_queues WHERE id = sched_queue;
     DELETE FROM scheduling_resources WHERE id = sched_resource;
-    DELETE FROM scheduling_services WHERE id = sched_service;
+    DELETE FROM scheduling_services WHERE id IN (sched_service, sched_catchall_service);
     DELETE FROM scheduling_branches WHERE id = sched_branch;
 
     DELETE FROM org_api_key_scopes WHERE api_key_id = '${LOCAL_API_KEY_UUID}';
     DELETE FROM org_api_keys WHERE id = '${LOCAL_API_KEY_UUID}';
 
     DELETE FROM services WHERE org_id = v_org AND id IN (svc1, svc2);
-    DELETE FROM products WHERE org_id = v_org AND id IN (p1, p2, p3);
+    DELETE FROM products
+    WHERE org_id = v_org
+      AND (
+        id IN (p1, p2, p3, legacy_demo_service_product_1, legacy_demo_service_product_2)
+        OR sku IN ('DEMO-PROD-001', 'DEMO-PROD-002', 'DEMO-PROD-003', 'DEMO-SVC-001', 'DEMO-SVC-002')
+      );
 
     DELETE FROM party_roles WHERE org_id = v_org AND party_id IN (c1, c2, c3, s1, s2);
     DELETE FROM party_persons WHERE party_id IN (c1, c3);

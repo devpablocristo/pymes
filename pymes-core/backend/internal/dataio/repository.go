@@ -175,7 +175,7 @@ func (r *Repository) ExportCustomers(ctx context.Context, orgID uuid.UUID) ([]st
 }
 
 func (r *Repository) ExportProducts(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error) {
-	headers := []string{"name", "type", "sku", "price", "cost_price", "unit", "tax_rate", "track_stock", "description", "tags"}
+	headers := []string{"name", "type", "sku", "price", "cost_price", "unit", "tax_rate", "track_stock", "description", "tags", "image_urls"}
 	rows, err := queryRows(ctx, r.db, `
 		SELECT
 			name,
@@ -187,7 +187,8 @@ func (r *Repository) ExportProducts(ctx context.Context, orgID uuid.UUID) ([]str
 			COALESCE(tax_rate, 0),
 			CASE WHEN track_stock THEN 'true' ELSE 'false' END,
 			COALESCE(description,''),
-			COALESCE(array_to_string(tags, ','), '')
+			COALESCE(array_to_string(tags, ','), ''),
+			COALESCE(array_to_string(image_urls, E'\n'), '')
 		FROM products
 		WHERE org_id = ? AND deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -420,10 +421,11 @@ func createProduct(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, row map[st
 		return err
 	}
 	trackStock := parseBool(row["track_stock"], true)
+	urls, firstURL := splitImageURLsFromCSV(row)
 	return tx.WithContext(ctx).Exec(`
-		INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags, metadata, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}'::jsonb, now(), now())
-	`, uuid.New(), orgID, defaultProductType(row["type"]), strings.TrimSpace(row["sku"]), strings.TrimSpace(row["name"]), strings.TrimSpace(row["description"]), defaultString(row["unit"], "unit"), price, costPrice, taxRate, trackStock, pq.StringArray(splitTags(row["tags"]))).Error
+		INSERT INTO products (id, org_id, type, sku, name, description, unit, price, cost_price, tax_rate, track_stock, tags, image_url, image_urls, metadata, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}'::jsonb, now(), now())
+	`, uuid.New(), orgID, defaultProductType(row["type"]), strings.TrimSpace(row["sku"]), strings.TrimSpace(row["name"]), strings.TrimSpace(row["description"]), defaultString(row["unit"], "unit"), price, costPrice, taxRate, trackStock, pq.StringArray(splitTags(row["tags"])), firstURL, pq.Array(urls)).Error
 }
 
 func upsertProduct(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID, row map[string]string) error {
@@ -440,6 +442,7 @@ func upsertProduct(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID, row ma
 		return err
 	}
 	trackStock := parseBool(row["track_stock"], true)
+	urls, firstURL := splitImageURLsFromCSV(row)
 	return tx.WithContext(ctx).Table("products").Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Updates(map[string]any{
 		"type":        defaultProductType(row["type"]),
 		"sku":         strings.TrimSpace(row["sku"]),
@@ -451,6 +454,8 @@ func upsertProduct(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID, row ma
 		"tax_rate":    taxRate,
 		"track_stock": trackStock,
 		"tags":        pq.StringArray(splitTags(row["tags"])),
+		"image_url":   firstURL,
+		"image_urls":  pq.Array(urls),
 		"updated_at":  time.Now().UTC(),
 	}).Error
 }
@@ -518,6 +523,49 @@ func splitName(name string) (string, string) {
 		return parts[0], ""
 	}
 	return parts[0], strings.Join(parts[1:], " ")
+}
+
+const (
+	maxImportProductImageURLs = 20
+	maxImportProductImageURLLen = 2048
+)
+
+// splitImageURLsFromCSV acepta columna image_urls y/o image_url (coma o salto de línea).
+func splitImageURLsFromCSV(row map[string]string) ([]string, string) {
+	raw := strings.TrimSpace(row["image_urls"])
+	if raw == "" {
+		raw = strings.TrimSpace(row["image_url"])
+	}
+	if raw == "" {
+		return []string{}, ""
+	}
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	raw = strings.ReplaceAll(raw, "\r", "\n")
+	seen := make(map[string]struct{}, 8)
+	out := make([]string, 0, 8)
+	for _, line := range strings.Split(raw, "\n") {
+		for _, part := range strings.Split(line, ",") {
+			u := strings.TrimSpace(part)
+			if u == "" {
+				continue
+			}
+			if len(u) > maxImportProductImageURLLen {
+				u = u[:maxImportProductImageURLLen]
+			}
+			if _, ok := seen[u]; ok {
+				continue
+			}
+			seen[u] = struct{}{}
+			out = append(out, u)
+			if len(out) >= maxImportProductImageURLs {
+				return out, out[0]
+			}
+		}
+	}
+	if len(out) == 0 {
+		return []string{}, ""
+	}
+	return out, out[0]
 }
 
 func splitTags(raw string) []string {

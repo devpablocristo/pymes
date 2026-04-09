@@ -58,12 +58,11 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('recurring');
   }
 
-  // Scheduling now lives in dedicated routes (`/calendar`, `/scheduling/public-preview`)
-  // instead of the legacy CRUD module.
+  // Scheduling: operación interna en `/agenda`. El flujo público cliente
+  // se sirve desde su URL real, no embebido en consola.
 
   // Integrations: only if billing or products
   if (profile.usesBilling || sellsProducts || exploring) {
-    visible.add('whatsapp');
     visible.add('paymentGateway');
   }
 

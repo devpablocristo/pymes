@@ -12,6 +12,10 @@ export const queryKeys = {
     preferences: ['notifications', 'preferences'] as const,
     inApp: ['notifications', 'in-app'] as const,
   },
+  customerMessaging: {
+    conversations: ['customer-messaging', 'conversations'] as const,
+    campaigns: ['customer-messaging', 'campaigns'] as const,
+  },
   scheduling: {
     branches: ['scheduling', 'branches'] as const,
     services: ['scheduling', 'services'] as const,

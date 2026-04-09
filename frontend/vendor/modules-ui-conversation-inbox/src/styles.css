@@ -1,0 +1,117 @@
+.m-conversation-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.m-conversation-inbox__error {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-danger, #b91c1c) 12%, transparent);
+  color: var(--color-danger-fg, #7f1d1d);
+  font-size: 0.875rem;
+}
+
+.m-conversation-inbox__summary {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.m-conversation-inbox__empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--color-text-muted, #64748b);
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: 0.5rem;
+}
+
+.m-conversation-inbox__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.m-conversation-inbox__card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: var(--color-surface, #fff);
+}
+
+.m-conversation-inbox__card--unread {
+  border-left: 3px solid var(--color-accent, #4f46e5);
+}
+
+.m-conversation-inbox__card--attention {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 8%, var(--color-surface, #fff));
+}
+
+.m-conversation-inbox__card--success {
+  background: color-mix(in srgb, var(--color-success, #16a34a) 8%, var(--color-surface, #fff));
+}
+
+.m-conversation-inbox__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.m-conversation-inbox__titleWrap {
+  min-width: 0;
+}
+
+.m-conversation-inbox__title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.m-conversation-inbox__detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 0.125rem;
+}
+
+.m-conversation-inbox__headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.m-conversation-inbox__status {
+  font-size: 0.75rem;
+}
+
+.m-conversation-inbox__badge {
+  display: flex;
+  align-items: center;
+}
+
+.m-conversation-inbox__preview {
+  font-size: 0.875rem;
+  color: var(--color-text, #0f172a);
+  margin-bottom: 0.35rem;
+}
+
+.m-conversation-inbox__assignee {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.25rem;
+}
+
+.m-conversation-inbox__timestamp {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.5rem;
+}
+
+.m-conversation-inbox__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

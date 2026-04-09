@@ -1,6 +1,5 @@
 /**
  * Paleta de producto: **hex** estable para API / FullCalendar; **token** para UI (tema claro/oscuro).
- * Una sola lista — evita divergencia entre `CalendarPage` y `UIComponentsPage`.
  */
 export type ProductPaletteEntry = {
   id: string;

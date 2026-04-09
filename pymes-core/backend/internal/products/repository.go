@@ -92,6 +92,10 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Pr
 
 func (r *Repository) Create(ctx context.Context, in productdomain.Product) (productdomain.Product, error) {
 	meta, _ := json.Marshal(in.Metadata)
+	imgURLs := append([]string(nil), in.ImageURLs...)
+	if imgURLs == nil {
+		imgURLs = []string{}
+	}
 	row := models.ProductModel{
 		ID:          uuid.New(),
 		OrgID:       in.OrgID,
@@ -105,6 +109,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 		CostPrice:   in.CostPrice,
 		TaxRate:     in.TaxRate,
 		ImageURL:    strings.TrimSpace(in.ImageURL),
+		ImageURLs:   pq.StringArray(imgURLs),
 		TrackStock:  in.TrackStock,
 		IsActive:    in.IsActive,
 		Tags:        pq.StringArray(utils.NormalizeTags(in.Tags)),
@@ -135,6 +140,10 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productd
 
 func (r *Repository) Update(ctx context.Context, in productdomain.Product) (productdomain.Product, error) {
 	meta, _ := json.Marshal(in.Metadata)
+	imgURLs := append([]string(nil), in.ImageURLs...)
+	if imgURLs == nil {
+		imgURLs = []string{}
+	}
 	updates := map[string]any{
 		"type":           "product",
 		"sku":            strings.TrimSpace(in.SKU),
@@ -146,6 +155,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 		"cost_price":     in.CostPrice,
 		"tax_rate":       in.TaxRate,
 		"image_url":      strings.TrimSpace(in.ImageURL),
+		"image_urls":     pq.StringArray(imgURLs),
 		"track_stock":    in.TrackStock,
 		"is_active":      in.IsActive,
 		"tags":           pq.StringArray(utils.NormalizeTags(in.Tags)),
@@ -249,6 +259,7 @@ func toDomain(row models.ProductModel) productdomain.Product {
 		CostPrice:   row.CostPrice,
 		TaxRate:     row.TaxRate,
 		ImageURL:    row.ImageURL,
+		ImageURLs:   append([]string(nil), row.ImageURLs...),
 		TrackStock:  row.TrackStock,
 		IsActive:    row.IsActive,
 		Tags:        append([]string(nil), row.Tags...),

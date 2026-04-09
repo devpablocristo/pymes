@@ -141,3 +141,30 @@ export const beautyIcon = (
     <path d="M16 7c0-2-1.5-4-4-4S8 5 8 7c0 3 4 5 4 9" />
   </Icon>
 );
+
+// Círculo simple — usado uniformemente en todos los items del sidebar para
+// cohesión visual (decisión de producto: cada item lleva el mismo glyph,
+// la diferenciación es por label, no por icono).
+export const dotIcon = (
+  <Icon>
+    <circle cx="12" cy="12" r="4" />
+  </Icon>
+);
+
+// Tarjeta de crédito — paymentGateway / cobros / Mercado Pago.
+export const creditCardIcon = (
+  <Icon>
+    <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+  </Icon>
+);
+
+// Flechas import/export — dataIO / impor & export de datos.
+export const importExportIcon = (
+  <Icon>
+    <path d="M7 17l-4-4 4-4" />
+    <line x1="3" y1="13" x2="13" y2="13" />
+    <path d="M17 7l4 4-4 4" />
+    <line x1="11" y1="11" x2="21" y2="11" />
+  </Icon>
+);

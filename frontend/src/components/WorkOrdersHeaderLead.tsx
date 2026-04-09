@@ -16,7 +16,7 @@ type Props = {
 };
 
 /**
- * Switch de dos vistas en rutas hermanas (Tablero/Lista en OT, Galería/Tabla en productos, etc.).
+ * Switch de dos vistas en rutas hermanas (Tablero/Lista en OT, Galería/Lista en productos, etc.).
  */
 export function WorkOrdersHeaderLead({
   boardPath,

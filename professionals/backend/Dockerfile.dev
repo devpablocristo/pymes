@@ -11,6 +11,10 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GOPROXY=direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
+COPY modules/scheduling/go /workspace/modules/scheduling/go
+COPY core/scheduling/go /workspace/core/scheduling/go
+COPY core/calendar/ics/go /workspace/core/calendar/ics/go
+COPY core/calendar/sync/google/go /workspace/core/calendar/sync/google/go
 
 WORKDIR /workspace/pymes/professionals/backend
 

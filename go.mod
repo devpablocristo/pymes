@@ -6,6 +6,8 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/devpablocristo/core/authn/go v0.2.1
 	github.com/devpablocristo/core/authz/go v0.1.0
+	github.com/devpablocristo/core/calendar/ics/go v0.0.0-00010101000000-000000000000
+	github.com/devpablocristo/core/calendar/sync/google/go v0.0.0-00010101000000-000000000000
 	github.com/devpablocristo/core/concurrency/go v0.1.1
 	github.com/devpablocristo/core/config/go v0.0.0-20260328151810-084828e80b26
 	github.com/devpablocristo/core/databases/postgres/go v0.1.1
@@ -113,3 +115,16 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 )
+
+// Local development: consume scheduling module from sibling worktree until the
+// latest version is published. Remove this replace once
+// `github.com/devpablocristo/modules/scheduling/go` >= v0.4.0 is tagged.
+// Snapshot hasta tag >= v0.4.0 en github.com/devpablocristo/modules.
+replace github.com/devpablocristo/modules/scheduling/go => ./third_party/modules-scheduling-go
+
+replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
+
+// Snapshot local hasta que existan tags en github.com/devpablocristo/core.
+replace github.com/devpablocristo/core/calendar/ics/go => ./third_party/core-calendar-ics-go
+
+replace github.com/devpablocristo/core/calendar/sync/google/go => ./third_party/core-calendar-sync-google-go

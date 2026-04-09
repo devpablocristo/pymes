@@ -80,7 +80,7 @@ describe('CalendarPage', () => {
     pageSearchMocks.usePageSearch.mockReturnValue('cliente demo');
   });
 
-  it('mounts scheduling calendar and queue board with the shared client, locale and page search query', async () => {
+  it('mounts scheduling calendar with the shared client, locale and page search query', async () => {
     const { CalendarPage } = await import('./CalendarPage');
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -101,7 +101,6 @@ describe('CalendarPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('scheduling-calendar')).toHaveTextContent('calendar:es:cliente demo');
-      expect(screen.getByTestId('queue-operator-board')).toHaveTextContent('queue:es:cliente demo');
     });
     expect(pageSearchMocks.usePageSearch).toHaveBeenCalled();
     expect(schedulingMocks.createSchedulingClient).toHaveBeenCalledTimes(1);
@@ -112,12 +111,8 @@ describe('CalendarPage', () => {
         searchQuery: 'cliente demo',
       }),
     );
-    expect(schedulingMocks.capturedQueueProps.at(-1)).toEqual(
-      expect.objectContaining({
-        client: schedulingMocks.client,
-        locale: 'es',
-        searchQuery: 'cliente demo',
-      }),
-    );
+    // QueueOperatorBoard se removió de CalendarPage en Stage 3.
+    // Si en el futuro vuelve, va en su propia página (no embebido en agenda).
+    expect(screen.queryByTestId('queue-operator-board')).toBeNull();
   });
 });

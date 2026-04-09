@@ -19,7 +19,7 @@ router = APIRouter(prefix="/v1/internal", tags=["internal"])
 logger = get_logger(__name__)
 
 
-class WhatsAppMessageRequest(BaseModel):
+class CustomerMessagingInboundRequest(BaseModel):
     org_id: str = Field(min_length=36, max_length=36)
     phone_number_id: str = Field(min_length=3, max_length=120)
     from_phone: str = Field(min_length=6, max_length=32)
@@ -29,7 +29,7 @@ class WhatsAppMessageRequest(BaseModel):
     conversation_id: str | None = None
 
 
-class WhatsAppMessageResponse(BaseModel):
+class CustomerMessagingInboundResponse(BaseModel):
     conversation_id: str
     reply: str
     tokens_used: int
@@ -46,9 +46,14 @@ def require_internal_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
 
 
-@router.post("/whatsapp/message", response_model=WhatsAppMessageResponse, dependencies=[Depends(require_internal_token)])
-async def whatsapp_message(
-    req: WhatsAppMessageRequest,
+@router.post(
+    "/customer-messaging/inbound",
+    response_model=CustomerMessagingInboundResponse,
+    dependencies=[Depends(require_internal_token)],
+    operation_id="customer_messaging_inbound_v1_internal_customer_messaging_inbound_post",
+)
+async def customer_messaging_inbound(
+    req: CustomerMessagingInboundRequest,
     repo: AIRepository = Depends(get_repository),
     llm: LLMProvider = Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
@@ -78,14 +83,14 @@ async def whatsapp_message(
         assistant_metadata={"channel": "whatsapp", "phone_number_id": req.phone_number_id.strip()},
     )
     logger.info(
-        "chat_whatsapp_completed",
+        "chat_customer_messaging_completed",
         org_id=org_id,
         external_contact=external_contact,
         conversation_id=result.conversation_id,
         tool_calls=len(result.tool_calls),
         tokens_used=result.tokens_used,
     )
-    return WhatsAppMessageResponse(
+    return CustomerMessagingInboundResponse(
         conversation_id=result.conversation_id,
         reply=result.reply,
         tokens_used=result.tokens_used,

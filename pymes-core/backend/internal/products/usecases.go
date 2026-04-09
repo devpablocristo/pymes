@@ -50,8 +50,16 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
+	urls, err := normalizeProductImageURLs(in.ImageURLs)
+	if err != nil {
+		return productdomain.Product{}, err
+	}
+	in.ImageURLs = urls
 	in.ImageURL = strings.TrimSpace(in.ImageURL)
-	if len(in.ImageURL) > 2048 {
+	if len(in.ImageURLs) > 0 {
+		in.ImageURL = in.ImageURLs[0]
+	}
+	if len(in.ImageURL) > maxProductImageURLLen {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if in.Unit == "" {
@@ -86,6 +94,7 @@ type UpdateInput struct {
 	CostPrice   *float64
 	TaxRate     *float64
 	ImageURL    *string
+	ImageURLs   *[]string
 	TrackStock  *bool
 	IsActive    *bool
 	Tags        *[]string
@@ -125,8 +134,21 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		v := *in.TaxRate
 		current.TaxRate = &v
 	}
-	if in.ImageURL != nil {
+	if in.ImageURLs != nil {
+		urls, err := normalizeProductImageURLs(*in.ImageURLs)
+		if err != nil {
+			return productdomain.Product{}, err
+		}
+		current.ImageURLs = urls
+		if len(urls) > 0 {
+			current.ImageURL = urls[0]
+		} else {
+			current.ImageURL = ""
+		}
+	}
+	if in.ImageURL != nil && in.ImageURLs == nil {
 		current.ImageURL = strings.TrimSpace(*in.ImageURL)
+		current.ImageURLs = nil
 	}
 	if in.TrackStock != nil {
 		current.TrackStock = *in.TrackStock
@@ -144,7 +166,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if len(current.ImageURL) > 2048 {
+	if len(current.ImageURL) > maxProductImageURLLen {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if strings.TrimSpace(current.Currency) == "" {

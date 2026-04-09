@@ -134,6 +134,7 @@ func (h *Handler) Create(c *gin.Context) {
 		CostPrice:   req.CostPrice,
 		TaxRate:     req.TaxRate,
 		ImageURL:    strings.TrimSpace(req.ImageURL),
+		ImageURLs:   append([]string(nil), req.ImageURLs...),
 		TrackStock:  trackStock,
 		IsActive:    isActive,
 		Tags:        req.Tags,
@@ -201,6 +202,7 @@ func (h *Handler) Update(c *gin.Context) {
 		CostPrice:   req.CostPrice,
 		TaxRate:     req.TaxRate,
 		ImageURL:    req.ImageURL,
+		ImageURLs:   req.ImageURLs,
 		TrackStock:  req.TrackStock,
 		IsActive:    req.IsActive,
 		Tags:        req.Tags,
@@ -271,7 +273,8 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func toProductItem(in productdomain.Product) dto.ProductItem {
-	return dto.ProductItem{
+	disp := displayProductImageURLs(in)
+	item := dto.ProductItem{
 		ID:          in.ID.String(),
 		OrgID:       in.OrgID.String(),
 		SKU:         in.SKU,
@@ -282,7 +285,7 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		Currency:    in.Currency,
 		CostPrice:   in.CostPrice,
 		TaxRate:     in.TaxRate,
-		ImageURL:    in.ImageURL,
+		ImageURL:    "",
 		TrackStock:  in.TrackStock,
 		IsActive:    in.IsActive,
 		Tags:        in.Tags,
@@ -291,6 +294,11 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
 		DeletedAt:   formatOptionalTime(in.DeletedAt),
 	}
+	if len(disp) > 0 {
+		item.ImageURL = disp[0]
+		item.ImageURLs = disp
+	}
+	return item
 }
 
 func rejectLegacyProductTypeField(c *gin.Context) bool {

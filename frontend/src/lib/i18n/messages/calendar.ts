@@ -16,14 +16,6 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.demo': 'Vista operativa real de agenda con reservas, disponibilidad y cola.',
     'calendar.pageTitle': 'Agenda',
     'calendar.pageLead': 'Reservas, disponibilidad y operación diaria desde la agenda.',
-    'calendar.publicPreview.title': 'Reserva pública',
-    'calendar.publicPreview.lead': 'Vista previa del flujo público de reservas',
-    'calendar.publicPreview.configTitle': 'Configuración',
-    'calendar.publicPreview.orgRefLabel': 'Referencia de organización',
-    'calendar.publicPreview.orgRefPlaceholder': 'slug-publico-o-uuid',
-    'calendar.publicPreview.load': 'Cargar',
-    'calendar.publicPreview.notice':
-      'Esta es una vista previa. La página pública real se sirve desde una URL separada y usa el mismo contrato público.',
   },
   en: {
     'calendar.day.mon': 'Mon',
@@ -40,13 +32,5 @@ export const calendarMessages: TranslationsByLanguage = {
     'calendar.demo': 'Live schedule workspace with bookings, availability, and queue operations.',
     'calendar.pageTitle': 'Schedule',
     'calendar.pageLead': 'Bookings, availability, and daily operations from the schedule.',
-    'calendar.publicPreview.title': 'Public booking',
-    'calendar.publicPreview.lead': 'Preview the public booking flow',
-    'calendar.publicPreview.configTitle': 'Configuration',
-    'calendar.publicPreview.orgRefLabel': 'Organization reference',
-    'calendar.publicPreview.orgRefPlaceholder': 'public-slug-or-uuid',
-    'calendar.publicPreview.load': 'Load',
-    'calendar.publicPreview.notice':
-      'This is a preview. The real public page is served from a separate URL and uses the same public contract.',
   },
 };

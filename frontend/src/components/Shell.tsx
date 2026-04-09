@@ -1,23 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
-import {
-  adminIcon,
-  beautyIcon,
-  bellIcon,
-  bikeIcon,
-  calendarIcon,
-  carIcon,
-  chartIcon,
-  chatIcon,
-  clockIcon,
-  dashboardIcon,
-  documentIcon,
-  globeIcon,
-  specialtiesIcon,
-  teachersIcon,
-  utensilsIcon,
-  wrenchIcon,
-} from './ShellIcons';
+import { dotIcon } from './ShellIcons';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
@@ -36,9 +19,10 @@ type ModuleListItem = {
   icon: string;
   customRoute?: string;
 };
-function Glyph({ label }: { label: string }) {
-  return <span className="sidebar-token">{label}</span>;
-}
+// Decisión de producto: TODOS los items del sidebar usan el mismo glyph
+// (un círculo simple). La diferenciación es por label, no por icono. Esto
+// elimina ruido visual y forza al usuario a leer la etiqueta. Si en el
+// futuro se vuelve a iconos por concepto, restaurar el mapeo aquí.
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
@@ -68,59 +52,83 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const mainNav = useMemo<AppShellNavItem[]>(() => {
-    const items: AppShellNavItem[] = [
-      { to: '/dashboard', label: t('shell.nav.dashboard'), icon: chartIcon },
-      { to: '/calendar', label: t('shell.nav.calendar'), icon: calendarIcon },
-      { to: '/chat', label: t('shell.nav.chat'), icon: chatIcon },
-      { to: '/notifications', label: t('shell.nav.notifications'), icon: bellIcon },
-      { to: '/invoices', label: t('shell.nav.invoices'), icon: documentIcon },
-      { to: '/whatsapp/inbox', label: t('shell.nav.whatsappInbox'), icon: chatIcon },
-      { to: '/whatsapp/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: chatIcon },
-      { to: '/crypto', label: t('shell.nav.crypto'), icon: chartIcon },
-      { to: '/ui', label: t('shell.nav.uiComponents'), icon: dashboardIcon },
-      { to: '/settings', label: t('shell.nav.settings'), icon: adminIcon },
-    ];
-    return items;
-  }, [t]);
+  // Sidebar dividido en secciones lógicas:
+  // - "Inicio" arriba.
+  // - "Día a día" para operación frecuente.
+  // - "Comercial" para lo transaccional.
+  // - "WhatsApp" como entrada a customer messaging sobre ese canal.
+  // - Verticales y módulos dinámicos en el medio.
+  // - "Sistema" al final.
+
+  const homeNav = useMemo<AppShellNavItem[]>(
+    () => [{ to: '/dashboard', label: t('shell.nav.dashboard'), icon: dotIcon }],
+    [t],
+  );
+
+  const dailyNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/agenda', label: t('shell.nav.calendar'), icon: dotIcon },
+      { to: '/chat', label: t('shell.nav.chat'), icon: dotIcon },
+      { to: '/notifications', label: t('shell.nav.notifications'), icon: dotIcon },
+    ],
+    [t],
+  );
+
+  const commercialNav = useMemo<AppShellNavItem[]>(
+    () => [{ to: '/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
+    [t],
+  );
+
+  const whatsappNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: '/customer-messaging/inbox', label: t('shell.nav.whatsappInbox'), icon: dotIcon },
+      { to: '/customer-messaging/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
+    ],
+    [t],
+  );
+
+  const systemNav = useMemo<AppShellNavItem[]>(
+    () => [{ to: '/settings', label: t('shell.nav.settings'), icon: dotIcon }],
+    [t],
+  );
 
   const professionalsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/teachers', label: t('shell.nav.teachers'), icon: teachersIcon },
-      { to: '/modules/specialties', label: t('shell.nav.teachersSpecialties'), icon: specialtiesIcon },
-      { to: '/modules/intakes', label: t('shell.nav.teachersIntakes'), icon: documentIcon },
-      { to: '/modules/sessions', label: t('shell.nav.teachersSessions'), icon: clockIcon },
+      { to: '/modules/teachers', label: t('shell.nav.teachers'), icon: dotIcon },
+      { to: '/modules/specialties', label: t('shell.nav.teachersSpecialties'), icon: dotIcon },
+      { to: '/modules/intakes', label: t('shell.nav.teachersIntakes'), icon: dotIcon },
+      { to: '/modules/sessions', label: t('shell.nav.teachersSessions'), icon: dotIcon },
     ],
     [t],
   );
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: carIcon },
-      { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: documentIcon },
+      { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
+      { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
     [t],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: documentIcon },
+      { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: dotIcon },
     ],
     [t],
   );
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/employees', label: t('shell.nav.beautyStaff'), icon: teachersIcon },
+      { to: '/modules/employees', label: t('shell.nav.beautyStaff'), icon: dotIcon },
     ],
     [t],
   );
 
   const restaurantsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/restaurantDiningAreas', label: t('shell.nav.restaurantAreas'), icon: dashboardIcon },
-      { to: '/modules/restaurantDiningTables', label: t('shell.nav.restaurantTables'), icon: utensilsIcon },
-      { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: clockIcon },
+      { to: '/modules/restaurantDiningAreas', label: t('shell.nav.restaurantAreas'), icon: dotIcon },
+      { to: '/modules/restaurantDiningTables', label: t('shell.nav.restaurantTables'), icon: dotIcon },
+      { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: dotIcon },
     ],
     [t],
   );
@@ -129,15 +137,6 @@ export function Shell({ children }: { children: ReactNode }) {
     const visibleIds = getVisibleModuleIds();
     const profile = getTenantProfile();
     const vertical = profile?.vertical ?? 'none';
-    const baseNav: AppShellNavItem[] = [...mainNav];
-
-    if (profile?.usesScheduling) {
-      baseNav.splice(2, 0, {
-        to: '/scheduling/public-preview',
-        label: t('shell.nav.schedulingPublic'),
-        icon: globeIcon,
-      });
-    }
 
     const moduleNav = catalog.groups
       .map<AppShellNavSection>((group) => ({
@@ -150,12 +149,18 @@ export function Shell({ children }: { children: ReactNode }) {
           .map((module) => ({
             to: module.customRoute ?? `/modules/${module.id}`,
             label: localizeUiText(vocab(module.navLabel)),
-            icon: <Glyph label={module.icon} />,
+            icon: dotIcon,
           })),
       }))
       .filter((section) => section.items.length > 0);
 
-    const result: AppShellNavSection[] = [{ label: sentenceCase(t('shell.sections.base')), items: baseNav }];
+    const result: AppShellNavSection[] = [
+      { label: sentenceCase(t('shell.sections.home')), items: homeNav },
+      { label: sentenceCase(t('shell.sections.daily')), items: dailyNav },
+      { label: sentenceCase(t('shell.sections.commercial')), items: commercialNav },
+      { label: sentenceCase(t('shell.sections.whatsapp')), items: whatsappNav },
+    ];
+
     if (vertical === 'professionals') {
       result.push({ label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav });
     }
@@ -172,18 +177,24 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     result.push(...moduleNav);
+    // Sistema (Settings) al final, convención de Linear / Slack / Notion.
+    result.push({ label: sentenceCase(t('shell.sections.system')), items: systemNav });
     return result;
   }, [
     beautyNav,
     bikeShopNav,
     catalog.groups,
     catalog.modules,
+    commercialNav,
+    dailyNav,
+    homeNav,
     localizeUiText,
-    mainNav,
     professionalsNav,
     restaurantsNav,
     sentenceCase,
+    systemNav,
     t,
+    whatsappNav,
     workshopsNav,
   ]);
 

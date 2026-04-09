@@ -83,16 +83,12 @@ github.com/devpablocristo/core/notifications/go v0.2.0 h1:gIorZMT3uXGp2schh3cV4O
 github.com/devpablocristo/core/notifications/go v0.2.0/go.mod h1:UVw3va9HdLxnyxDgzudfM2P5VBnY9DUf7PhxPHvoen0=
 github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26 h1:LNqzG0dCS4VDmZAMiyU4mTvvDZ86infbBhepIblDQ1M=
 github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26/go.mod h1:jI4YD87zCS8mjqEoNDSUZOLAztZtxxnGkxNWkcYRYZY=
-github.com/devpablocristo/core/scheduling/go v0.1.0 h1:WMZFNCzyuPrdSRNQhEJ5JRqcvJRX/NRmZOBikSdc1nM=
-github.com/devpablocristo/core/scheduling/go v0.1.0/go.mod h1:zp4UFTTle6z+7SEt4bh9eZX2eANzSrN/96Jj1OJ2OSM=
 github.com/devpablocristo/core/security/go v0.1.0 h1:cG1y35bN2RFF2NAnCtDho0kTF8zBjYEOx9fKnHzjjmw=
 github.com/devpablocristo/core/security/go v0.1.0/go.mod h1:iwFHt1JZ4bRwnqysUasQBGCnHsMTJowvMJBgbnqrDAE=
 github.com/devpablocristo/core/validate/go v0.1.1 h1:FMA8qJ36WGJ1U6JEY8dguu+8lT5JtYdAJdLo5vMXWY4=
 github.com/devpablocristo/core/validate/go v0.1.1/go.mod h1:kOsWOU6vZJN71ZXYvrXrtvUpH+G6178+vKbfc04R+BU=
 github.com/devpablocristo/modules/crud/paths/go v0.1.0 h1:+CFlsHDfL3R9Gf+0DDwBRNL8K7JHuQz45vh9WTaZ/Eg=
 github.com/devpablocristo/modules/crud/paths/go v0.1.0/go.mod h1:GgI8/7t94PXoaxEmKdixNNGujSjo9cf6JSFog+QJ3MU=
-github.com/devpablocristo/modules/scheduling/go v0.1.0 h1:GbKH/cDtxoZMZ2C4ChXGbNZMx3a3qMaVzyz7Kp1f0Nk=
-github.com/devpablocristo/modules/scheduling/go v0.1.0/go.mod h1:Afs+GHBYPxyd/CXGVPtqgvSuMC1BipVo842fIhbR4i8=
 github.com/dhui/dktest v0.4.6 h1:+DPKyScKSEp3VLtbMDHcUq6V5Lm5zfZZVb0Sk7Ahom4=
 github.com/dhui/dktest v0.4.6/go.mod h1:JHTSYDtKkvFNFHJKqCzVzqXecyv+tKt8EzceOmQOgbU=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=

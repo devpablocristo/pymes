@@ -7,11 +7,13 @@ source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 ensure_seed_dbs_ready
 
-if [[ -n "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
-  bash "$ROOT_DIR/scripts/seeds/core-01-clerk-prereqs.sh"
-else
-  bash "$ROOT_DIR/scripts/seeds/core-01-local-org.sh"
+if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
+  echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required (Clerk org external_id, e.g. org_xxx)." >&2
+  echo "Definilo en $ROOT_DIR/.env (scripts/seeds/lib.sh lo carga al correr make seed)." >&2
+  exit 1
 fi
+
+bash "$ROOT_DIR/scripts/seeds/core-01-clerk-prereqs.sh"
 
 bash "$ROOT_DIR/scripts/seeds/core-02-core-business.sh"
 bash "$ROOT_DIR/scripts/seeds/core-03-rbac.sh"

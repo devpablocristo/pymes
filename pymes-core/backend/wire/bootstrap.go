@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	googleoauth "github.com/devpablocristo/core/calendar/sync/google/go"
 	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
 	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
@@ -21,8 +22,12 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
+	calendar_export "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_export"
+	calendar_sync "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/currency"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging"
+	customerwhatsapp "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/channels/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
@@ -54,7 +59,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
@@ -126,7 +130,9 @@ func InitializeApp() *app.App {
 	schedulerRepo := scheduler.NewRepository(db)
 	timelineRepo := timeline.NewRepository(db)
 	schedulingRepo := schedulingmodule.NewRepository(db)
-	whatsappRepo := whatsapp.NewRepository(db)
+	calendarExportRepo := calendar_export.NewRepository(db)
+	calendarSyncRepo := calendar_sync.NewRepository(db)
+	customerMessagingRepo := customer_messaging.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
 	adminUC := admin.NewUsecases(adminRepo)
@@ -155,16 +161,31 @@ func InitializeApp() *app.App {
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
 	schedulingUC := schedulingmodule.NewUsecases(schedulingRepo, auditUC, schedulingmodule.WithNotifications(outwebhooksUC))
+	calendarExportUC := calendar_export.NewUsecases(calendarExportRepo, schedulingUC, calendar_export.Config{
+		ProductID: "-//Pymes SaaS//Calendar Export//ES",
+	})
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
 	if err != nil {
 		logger.Warn().Err(err).Msg("invalid PAYMENT_GATEWAY_ENCRYPTION_KEY; mercado pago integration disabled")
 	}
-	whatsappAIClient := whatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
-	whatsappMetaClient := whatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
-	whatsappUC := whatsapp.NewUsecases(
-		whatsappRepo,
+
+	// Cliente OAuth Google para sync de calendario. Si las env vars no están
+	// (caso típico en dev sin credenciales), el usecase queda con un cliente
+	// configurado pero `Validate()` falla en el primer call → el endpoint
+	// devuelve error claro al usuario en vez de panic al boot.
+	googleOAuthClient := calendar_sync.NewGoogleOAuthClient(googleoauth.Config{
+		ClientID:     cfg.GoogleOAuthClientID,
+		ClientSecret: cfg.GoogleOAuthClientSecret,
+		RedirectURL:  cfg.GoogleOAuthRedirectURL,
+		Scopes:       []string{googleoauth.ScopeCalendar},
+	})
+	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
+	whatsappAIClient := customerwhatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
+	whatsappMetaClient := customerwhatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
+	customerMessagingUC := customer_messaging.NewUsecases(
+		customerMessagingRepo,
 		timelineUC,
 		cfg.FrontendURL,
 		whatsappAIClient,
@@ -173,7 +194,7 @@ func InitializeApp() *app.App {
 		cfg.WhatsAppWebhookVerifyToken,
 		cfg.WhatsAppAppSecret,
 	)
-	dataioUC := dataio.NewUsecases(dataioRepo, auditUC, dataio.WithOptIn(whatsappUC))
+	dataioUC := dataio.NewUsecases(dataioRepo, auditUC, dataio.WithOptIn(customerMessagingUC))
 	paymentGatewayUC := paymentgateway.NewUsecases(
 		paymentGatewayRepo,
 		paymentgatewayclient.NewMercadoPagoGateway(),
@@ -243,7 +264,9 @@ func InitializeApp() *app.App {
 	returnsHandler := returns.NewHandler(returnsUC)
 	timelineHandler := timeline.NewHandler(timelineUC)
 	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
-	whatsappHandler := whatsapp.NewHandler(whatsappUC)
+	calendarExportHandler := calendar_export.NewHandler(calendarExportUC, cfg.PublicBaseURL)
+	calendarSyncHandler := calendar_sync.NewHandler(calendarSyncUC, cfg.FrontendURL)
+	customerMessagingHandler := customer_messaging.NewHandler(customerMessagingUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
 	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
@@ -251,7 +274,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -263,8 +286,15 @@ func InitializeApp() *app.App {
 	v1 := router.Group("/v1")
 	// Orgs, Clerk, billing, users — served by core/saas/go via AttachSaaSUnmatchedRoutes (NoRoute).
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
-	whatsappHandler.RegisterPublicRoutes(v1)
+	customerMessagingHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
+	// Feed iCalendar público: el cliente (Apple Calendar / Google Calendar / Outlook /
+	// Thunderbird) suscribe vía URL conociendo sólo el plaintext del token.
+	calendarExportHandler.RegisterPublicRoutes(v1)
+	// Callback OAuth de Google: el browser del usuario llega acá tras el flow
+	// de consent. Sin auth Clerk porque el redirect viene desde Google, no
+	// desde la app. La autenticación es el `state` validado contra DB.
+	calendarSyncHandler.RegisterPublicRoutes(v1)
 
 	internalGroup := v1.Group("/internal/v1")
 	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
@@ -285,7 +315,6 @@ func InitializeApp() *app.App {
 
 	authGroup := v1.Group("")
 	authGroup.Use(GinSaaSAuthMiddleware(saasSvc))
-	authGroup.Use(NewGinDevForceOrgMiddleware(cfg.Environment, os.Getenv("PYMES_DEV_FORCE_ORG_UUID")))
 	adminHandler.RegisterRoutes(authGroup)
 	attachmentsHandler.RegisterRoutes(authGroup)
 	rbacHandler.RegisterRoutes(authGroup)
@@ -293,7 +322,7 @@ func InitializeApp() *app.App {
 	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	whatsappHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	customerMessagingHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
 	inAppNotifHandler.RegisterRoutes(authGroup)
 	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
@@ -317,6 +346,8 @@ func InitializeApp() *app.App {
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware.RequirePermission)
+	calendarExportHandler.RegisterAuthRoutes(authGroup)
+	calendarSyncHandler.RegisterAuthRoutes(authGroup)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	// Review proxy — opcional, se activa si REVIEW_URL está configurado

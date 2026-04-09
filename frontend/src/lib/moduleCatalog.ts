@@ -114,14 +114,6 @@ const staticModuleCatalog: Record<string, ModuleDefinition> = {
       },
     ],
   },
-  whatsapp: {
-    id: 'whatsapp',
-    title: 'WhatsApp',
-    navLabel: 'WhatsApp',
-    summary: '',
-    group: 'integrations',
-    icon: 'WA',
-  },
   paymentGateway: {
     id: 'paymentGateway',
     title: 'Pasarela de pago',

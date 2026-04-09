@@ -2,12 +2,20 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# `make seed` y los scripts hijo corren en bash sin pasar por docker compose: leen `.env` de la raíz del monorepo.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 REVIEW_DB_NAME="${REVIEW_DB_NAME:-nexus_review}"
 REVIEW_DB_USER="${REVIEW_DB_USER:-postgres}"
-LEGACY_DEMO_ORG_UUID="00000000-0000-0000-0000-000000000001"
 
 dc() {
   (cd "$ROOT_DIR" && ${DOCKER_COMPOSE} "$@")
@@ -38,15 +46,16 @@ ensure_seed_dbs_ready() {
 resolve_target_org_uuid() {
   local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
   if [[ -z "$external_id" ]]; then
-    printf '%s\n' "$LEGACY_DEMO_ORG_UUID"
-    return
+    echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required" >&2
+    exit 1
   fi
 
+  # psql no sustituye :'var' en -c de modo no interactivo; por stdin sí (PG 16 en imagen oficial).
   local org_uuid
   org_uuid="$(
-    dc exec -T postgres \
-      psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v external_id="$external_id" \
-      -c "SELECT id::text FROM orgs WHERE external_id = :'external_id';"
+    printf '%s\n' "SELECT cast(id as text) FROM orgs WHERE external_id = :'external_id';" \
+      | dc exec -T postgres \
+        psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -z "$org_uuid" ]]; then
@@ -58,16 +67,20 @@ resolve_target_org_uuid() {
 
 render_seed_sql() {
   local file="$1"
-  python3 - "$ROOT_DIR/$file" "$TARGET_ORG_UUID" "$LEGACY_DEMO_ORG_UUID" <<'PY'
+  local fullpath
+  if [[ "$file" == /* ]]; then
+    fullpath="$file"
+  else
+    fullpath="$ROOT_DIR/$file"
+  fi
+  python3 - "$fullpath" "$TARGET_ORG_UUID" <<'PY'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 target_org_uuid = sys.argv[2]
-legacy_org_uuid = sys.argv[3]
 body = path.read_text()
 body = body.replace("__SEED_ORG_ID__", target_org_uuid)
-body = body.replace(legacy_org_uuid, target_org_uuid)
 sys.stdout.write(body)
 PY
 }
@@ -88,4 +101,4 @@ run_review_sql_inline() {
 }
 
 export ROOT_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER
-export REVIEW_DB_NAME REVIEW_DB_USER LEGACY_DEMO_ORG_UUID
+export REVIEW_DB_NAME REVIEW_DB_USER

@@ -24,6 +24,7 @@ import (
 	servicedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/services/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/products"
@@ -31,7 +32,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/users"
-	wapdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
 type adminPort interface {
@@ -79,8 +79,8 @@ type notificationInboxPort interface {
 	ApplyApprovalEvent(ctx context.Context, event inappnotifications.ApprovalEvent) (int, error)
 }
 
-type whatsAppSendPort interface {
-	SendText(ctx context.Context, req wapdomain.SendTextRequest) (wapdomain.Message, error)
+type customerMessagingSendPort interface {
+	SendText(ctx context.Context, req domain.SendTextRequest) (domain.Message, error)
 }
 
 type Handler struct {
@@ -94,7 +94,7 @@ type Handler struct {
 	gateway           paymentGatewayPort
 	apiKeys           apiKeyResolverPort
 	notificationInbox notificationInboxPort
-	whatsapp          whatsAppSendPort
+	customerMessaging customerMessagingSendPort
 	// resolveOrgRef traduce Clerk org_... / slug / UUID (opcional; nil = ruta no registrada).
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error)
 }
@@ -110,7 +110,7 @@ func NewHandler(
 	gateway paymentGatewayPort,
 	apiKeys apiKeyResolverPort,
 	notificationInbox notificationInboxPort,
-	whatsapp whatsAppSendPort,
+	customerMessaging customerMessagingSendPort,
 	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error),
 ) *Handler {
 	return &Handler{
@@ -124,7 +124,7 @@ func NewHandler(
 		gateway:           gateway,
 		apiKeys:           apiKeys,
 		notificationInbox: notificationInbox,
-		whatsapp:          whatsapp,
+		customerMessaging: customerMessaging,
 		resolveOrgRef:     resolveOrgRef,
 	}
 }
@@ -147,7 +147,7 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
 	internal.POST("/sales/:id/payment-link", h.CreateSalePaymentLink)
-	internal.POST("/whatsapp/send-text", h.InternalSendWhatsAppText)
+	internal.POST("/customer-messaging/send-text", h.InternalSendWhatsAppText)
 }
 
 func (h *Handler) RegisterReviewCallbackRoutes(internal *gin.RouterGroup) {
@@ -204,7 +204,7 @@ type createSaleRequest struct {
 	Notes         string                `json:"notes"`
 }
 
-type sendWhatsAppTextRequest struct {
+type sendCustomerMessagingTextRequest struct {
 	PartyID string `json:"party_id" binding:"required"`
 	Body    string `json:"body" binding:"required"`
 }
@@ -700,10 +700,10 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 	})
 }
 
-// InternalSendWhatsAppText permite a servicios internos (p. ej. vertical talleres) enviar texto respetando opt-in en el core.
+// InternalSendWhatsAppText permite a servicios internos enviar texto respetando consentimiento y canal oficial desde el core.
 func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
-	if h.whatsapp == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "whatsapp send unavailable"})
+	if h.customerMessaging == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "customer messaging send unavailable"})
 		return
 	}
 	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
@@ -711,7 +711,7 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Org-ID header required"})
 		return
 	}
-	var req sendWhatsAppTextRequest
+	var req sendCustomerMessagingTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -721,7 +721,7 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
 		return
 	}
-	_, err = h.whatsapp.SendText(c.Request.Context(), wapdomain.SendTextRequest{
+	_, err = h.customerMessaging.SendText(c.Request.Context(), domain.SendTextRequest{
 		OrgID:   orgID,
 		PartyID: partyID,
 		Body:    strings.TrimSpace(req.Body),

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "llama3.2:1b"
+    ollama_model: str = "gemma4:e2b"
     ollama_timeout_seconds: float = 240.0
     assistant_max_tool_calls: int = 5
     assistant_tool_timeout_seconds: float = 20.0

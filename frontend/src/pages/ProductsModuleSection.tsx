@@ -17,7 +17,7 @@ export function ProductsModuleSection() {
         boardPath={GALLERY_PATH}
         listPath={LIST_PATH}
         leftLabel={t('crud.viewMode.gallery')}
-        rightLabel={t('crud.viewMode.table')}
+        rightLabel={t('crud.viewMode.list')}
         groupAriaLabel={t('crud.viewMode.aria')}
       />
       <Outlet />

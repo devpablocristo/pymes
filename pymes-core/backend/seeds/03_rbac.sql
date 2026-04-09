@@ -3,8 +3,7 @@
 
 DO $$
 DECLARE
-    v_org uuid := '00000000-0000-0000-0000-000000000001';
-    v_user uuid := '00000000-0000-0000-0000-000000000002';
+    v_org uuid := '__SEED_ORG_ID__';
 
     r_admin uuid;
     r_seller uuid;
@@ -102,19 +101,17 @@ BEGIN
         (gen_random_uuid(), r_warehouse, 'procurement_policies', 'delete')
     ON CONFLICT (role_id, resource, action) DO NOTHING;
 
-    IF EXISTS (
-        SELECT 1
-        FROM users u
-        JOIN org_members om ON om.user_id = u.id
-        WHERE u.id = v_user AND om.org_id = v_org
-    ) THEN
-        INSERT INTO user_roles (user_id, org_id, role_id, assigned_by)
-        VALUES (v_user, v_org, r_admin, 'seed')
-        ON CONFLICT (user_id, org_id) DO UPDATE
-            SET role_id = EXCLUDED.role_id,
-                assigned_by = EXCLUDED.assigned_by,
-                assigned_at = now();
-    END IF;
+    -- Asigna el rol admin a todos los miembros admin/owner del org. Funciona
+    -- tanto con Clerk (admins vienen de webhooks/onboarding) como con cualquier
+    -- otro provisionamiento manual.
+    INSERT INTO user_roles (user_id, org_id, role_id, assigned_by)
+    SELECT om.user_id, v_org, r_admin, 'seed'
+    FROM org_members om
+    WHERE om.org_id = v_org AND om.role IN ('admin', 'owner')
+    ON CONFLICT (user_id, org_id) DO UPDATE
+        SET role_id = EXCLUDED.role_id,
+            assigned_by = EXCLUDED.assigned_by,
+            assigned_at = now();
 
     INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
     VALUES (pl_default, v_org, 'Retail', 'Default local price list', true, 0, true)

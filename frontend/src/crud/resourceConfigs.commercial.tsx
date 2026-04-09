@@ -8,6 +8,8 @@ import {
   asOptionalNumber,
   asOptionalString,
   asString,
+  formatProductImageURLsToForm,
+  parseImageURLList,
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
@@ -57,6 +59,8 @@ type Product = {
   currency?: string;
   cost_price?: number;
   tax_rate?: number | null;
+  image_url?: string;
+  image_urls?: string[];
   track_stock: boolean;
   is_active: boolean;
   deleted_at?: string | null;
@@ -441,6 +445,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
             tags: parseCSV(values.tags),
             description: asOptionalString(values.description),
+            image_urls: parseImageURLList(values.image_urls),
           },
         });
       },
@@ -459,6 +464,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
             tags: parseCSV(values.tags),
             description: asOptionalString(values.description),
+            image_urls: parseImageURLList(values.image_urls),
           },
         });
       },
@@ -518,6 +524,13 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
         ],
       },
       { key: 'tags', label: 'Tags', placeholder: 'nuevo, combo, premium' },
+      {
+        key: 'image_urls',
+        label: 'Imágenes (URLs)',
+        type: 'textarea',
+        fullWidth: true,
+        placeholder: 'Una URL por línea (hasta 20). La primera es la principal.',
+      },
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Product) =>
@@ -533,6 +546,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       track_stock: row.track_stock ?? true,
       is_active: row.is_active ? 'true' : 'false',
       tags: tagsToText(row.tags),
+      image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
       description: row.description ?? '',
     }),
     toBody: (values) => ({
@@ -547,6 +561,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
       tags: parseCSV(values.tags),
       description: asOptionalString(values.description),
+      image_urls: parseImageURLList(values.image_urls),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.price) || '0') >= 0,
   },

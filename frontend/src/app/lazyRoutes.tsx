@@ -41,19 +41,16 @@ export const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) =>
 export const OnboardingPage = lazy(() =>
   import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })),
 );
-export const PublicPreviewPage = lazy(() =>
-  import('../pages/PublicPreviewPage').then((mod) => ({ default: mod.PublicPreviewPage })),
-);
 export const RestaurantTableSessionsPage = lazy(() =>
   import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })),
 );
 export const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
 export const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
-export const WhatsAppCampaignsPage = lazy(() =>
-  import('../pages/WhatsAppCampaignsPage').then((mod) => ({ default: mod.WhatsAppCampaignsPage })),
+export const CustomerMessagingCampaignsPage = lazy(() =>
+  import('../pages/CustomerMessagingCampaignsPage').then((mod) => ({ default: mod.CustomerMessagingCampaignsPage })),
 );
-export const WhatsAppInboxPage = lazy(() =>
-  import('../pages/WhatsAppInboxPage').then((mod) => ({ default: mod.WhatsAppInboxPage })),
+export const CustomerMessagingInboxPage = lazy(() =>
+  import('../pages/CustomerMessagingInboxPage').then((mod) => ({ default: mod.CustomerMessagingInboxPage })),
 );
 export const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })));
@@ -65,7 +62,3 @@ export const InvoicesPage = lazy(() => import('../pages/InvoicesPage').then((mod
 export const SettingsHubPage = lazy(() =>
   import('../pages/SettingsHubPage').then((mod) => ({ default: mod.SettingsHubPage })),
 );
-export const UIComponentsPage = lazy(() =>
-  import('../pages/UIComponentsPage').then((mod) => ({ default: mod.UIComponentsPage })),
-);
-export const CryptoPage = lazy(() => import('../pages/CryptoPage').then((m) => ({ default: m.CryptoPage })));

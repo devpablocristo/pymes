@@ -10,8 +10,8 @@ Pasos para conectar la API de WhatsApp con el **control plane** (`pymes-core`), 
 |------|----------------|
 | Variables de entorno documentadas | `.env.example`: `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_GRAPH_API_BASE_URL` |
 | Plantilla local | Tu `.env` puede incluir el mismo bloque (no versionar secretos) |
-| Rutas HTTP del backend | `GET/POST/DELETE /v1/whatsapp/connection`, envíos bajo `/v1/whatsapp/send/*`, opt-in, plantillas, mensajes |
-| Webhook público | `GET` y `POST /v1/webhooks/whatsapp` (sin el mismo auth JWT que el resto; firma + verify token) |
+| Rutas HTTP del backend | Superficie canónica bajo `/v1/customer-messaging/*` |
+| Webhook público | `GET` y `POST /v1/webhooks/customer-messaging/whatsapp` |
 | Validación de firma | El backend usa `WHATSAPP_APP_SECRET` y la cabecera `X-Hub-Signature-256` en los `POST` |
 
 ---
@@ -47,17 +47,17 @@ Meta **no** puede llamar a `localhost`.
 
 | Situación | Qué hacer |
 |-----------|-----------|
-| Solo desarrollo en tu PC | Usar un **túnel HTTPS** (ngrok, Cloudflare Tunnel, etc.) hacia el puerto donde escucha el API (ej. `8100` en host con Compose). Callback: `https://<túnel>/v1/webhooks/whatsapp` |
+| Solo desarrollo en tu PC | Usar un **túnel HTTPS** (ngrok, Cloudflare Tunnel, etc.) hacia el puerto donde escucha el API (ej. `8100` en host con Compose). Callback: `https://<túnel>/v1/webhooks/customer-messaging/whatsapp` |
 | Staging / producción | Dominio o URL del balanceador donde expongas el mismo path |
 
-**Pendiente** si aún no tenés túnel ni servidor público: no vas a poder dar de alta el webhook en Meta hasta entonces. Podés igual **probar conexión y envíos** con `POST /v1/whatsapp/connection` si ya tenés token e IDs.
+**Pendiente** si aún no tenés túnel ni servidor público: no vas a poder dar de alta el webhook en Meta hasta entonces. Podés igual **probar conexión y envíos** con `POST /v1/customer-messaging/connections/whatsapp` si ya tenés token e IDs.
 
 ### 3. Registrar la línea por organización
 
 Autenticado como la org (JWT de Clerk o API key según tu setup):
 
 ```http
-POST /v1/whatsapp/connection
+POST /v1/customer-messaging/connections/whatsapp
 Content-Type: application/json
 
 {
@@ -69,14 +69,14 @@ Content-Type: application/json
 
 Opcional: `display_phone_number`, `verified_name`.
 
-Comprobar: `GET /v1/whatsapp/connection` (no devuelve el token).
+Comprobar: `GET /v1/customer-messaging/connections/whatsapp` (no devuelve el token).
 
 ### 4. Opt-in (envíos por API)
 
-Los envíos servidor → WhatsApp (`/v1/whatsapp/send/*`) exigen **teléfono del party** y **opt-in** registrado:
+Los envíos servidor → WhatsApp (`/v1/customer-messaging/messages/*`) exigen **teléfono del party** y **opt-in** registrado:
 
 ```http
-POST /v1/whatsapp/opt-ins
+POST /v1/customer-messaging/consents
 ```
 
 Cuerpo: `party_id`, `phone`, opcional `source`.
@@ -93,23 +93,23 @@ No usan el webhook. Requieren permisos de lectura (`quotes`, `sales`, `customers
 
 | Ya (proyecto + Meta de prueba) | Falta (típico en dev) |
 |--------------------------------|------------------------|
-| Código y rutas del módulo WhatsApp en `pymes-core` | Completar `WHATSAPP_*` en `.env` y reiniciar `cp-backend` |
+| Código y rutas del canal WhatsApp en `pymes-core` | Completar `WHATSAPP_*` en `.env` y reiniciar `cp-backend` |
 | Placeholders en `.env.example` | Mismo verify token en Meta y en `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
 | App Meta + App Secret para pruebas | URL **HTTPS pública** (túnel o deploy) para el webhook |
 | | Alta del webhook en Meta con esa URL |
-| | `POST /v1/whatsapp/connection` por tenant |
-| | `POST /v1/whatsapp/opt-ins` para contactos que reciban mensajes por API |
+| | `POST /v1/customer-messaging/connections/whatsapp` por tenant |
+| | `POST /v1/customer-messaging/consents` para contactos que reciban mensajes por API |
 
 ---
 
 ## Con todo configurado: qué podés hacer
 
-Con **Meta bien configurado**, **variables de entorno del backend** (`WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, etc.), **webhook** apuntando a tu URL y **`POST /v1/whatsapp/connection`** hecho para la org, en Pymes podés:
+Con **Meta bien configurado**, **variables de entorno del backend** (`WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, etc.), **webhook** apuntando a tu URL y **`POST /v1/customer-messaging/connections/whatsapp`** hecho para la org, en Pymes podés:
 
 ### Conexión y operación básica
 
-- Ver **estado** de la línea por org (`GET /v1/whatsapp/connection`) y **desconectar** si hace falta (`DELETE /v1/whatsapp/connection`).
-- Ver **estadísticas** locales de mensajes (`GET /v1/whatsapp/connection/stats`: enviados, recibidos, entregados, leídos, fallidos según lo registrado en backend).
+- Ver **estado** de la línea por org (`GET /v1/customer-messaging/connections/whatsapp`) y **desconectar** si hace falta (`DELETE /v1/customer-messaging/connections/whatsapp`).
+- Ver **estadísticas** locales de mensajes (`GET /v1/customer-messaging/connections/whatsapp/stats`: enviados, recibidos, entregados, leídos, fallidos según lo registrado en backend).
 
 ### Enviar desde el servidor (Graph API)
 
@@ -124,12 +124,12 @@ Los envíos quedan **registrados** en base (y pueden reflejarse en timeline seg�
 
 ### Historial y plantillas en Pymes
 
-- **Listar / filtrar mensajes** almacenados (`GET /v1/whatsapp/messages`).
+- **Listar / filtrar mensajes** almacenados (`GET /v1/customer-messaging/messages`).
 - **Plantillas locales** (borradores, listado, detalle, borrado; el alta local es previo a lo que apruebe Meta).
 
 ### Opt-in / cumplimiento
 
-- **Registrar y listar** consentimientos, **opt-out** y **consultar** si un party tiene opt-in (`/v1/whatsapp/opt-ins`).
+- **Registrar y listar** consentimientos, **opt-out** y **consultar** si un party tiene opt-in (`/v1/customer-messaging/consents`).
 
 ### Enlaces `wa.me` (sin depender del webhook)
 
@@ -145,12 +145,12 @@ Los envíos quedan **registrados** en base (y pueden reflejarse en timeline seg�
 
 ## Referencias en código
 
-- Handler y rutas: `pymes-core/backend/internal/whatsapp/handler.go`
-- Firma y verify: `pymes-core/backend/internal/whatsapp/inbound.go`
+- Handler y rutas: `pymes-core/backend/internal/customer_messaging/handler.go`
+- Firma y verify: `pymes-core/backend/internal/customer_messaging/inbound.go`
 - Config env: `pymes-core/backend/internal/shared/config/config.go` (`WHATSAPP_*`)
 
 ---
 
 ## Consola (frontend)
 
-La pantalla del módulo **WhatsApp** en la consola puede no incluir formularios de conexión; las operaciones anteriores aplican vía **API** o herramientas tipo Postman hasta que exista UI dedicada.
+La consola ya tiene bandeja y campañas bajo `/customer-messaging/*`, pero la conexión de línea, templates y consentimientos siguen muy orientados a **API** o herramientas tipo Postman.

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from src.agents.catalog import normalize_routed_agent, normalize_routing_source
 from src.agents.service import run_internal_orchestrated_chat
-from src.api.chat_contract import ChatRequest, ChatResponse
+from src.api.chat_contract import ChatBlock, ChatRequest, ChatResponse
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.api.quota import check_quota
 from src.backend_client.auth import AuthContext
@@ -38,6 +38,7 @@ class ConversationMessage(BaseModel):
     content: str
     ts: str | None = None
     tool_calls: list[str] = Field(default_factory=list)
+    blocks: list[ChatBlock] = Field(default_factory=list)
 
 
 class ConversationDetail(BaseModel):
@@ -101,6 +102,7 @@ async def get_conversation(
                 content=m.get("content", ""),
                 ts=m.get("ts"),
                 tool_calls=m.get("tool_calls", []),
+                blocks=m.get("blocks", []),
             )
             for m in (row.messages or [])
         ],

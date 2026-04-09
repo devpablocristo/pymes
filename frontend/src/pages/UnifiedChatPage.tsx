@@ -394,6 +394,7 @@ export function UnifiedChatPage() {
         id: `restored-${detail.id}-${i}`,
         contactId: AI_PYMES_ID,
         text: m.content,
+        blocks: m.role === 'assistant' ? (m.blocks ?? []) : undefined,
         fromMe: m.role === 'user',
         time: formatIsoTime(m.ts, language),
       }));

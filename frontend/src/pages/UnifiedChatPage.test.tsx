@@ -104,6 +104,7 @@ describe('UnifiedChatPage', () => {
           content: conversationId === 'conv-1' ? 'Historial A' : 'Historial B',
           ts: '2026-04-02T12:00:00Z',
           tool_calls: [],
+          blocks: [],
         },
       ],
     }));
@@ -121,6 +122,49 @@ describe('UnifiedChatPage', () => {
       expect(aiMocks.getConversation).toHaveBeenCalledWith('conv-1');
     });
     expect(await within(getMessagesPane()).findByText('Historial A')).toBeInTheDocument();
+  });
+
+  it('renderiza acciones persistidas del historial del asistente', async () => {
+    aiMocks.getConversation.mockResolvedValue({
+      id: 'conv-1',
+      title: 'Conversación A',
+      created_at: '2026-04-02T12:00:00Z',
+      updated_at: '2026-04-02T12:00:00Z',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'Elegí una categoría para continuar.',
+          ts: '2026-04-02T12:00:00Z',
+          tool_calls: [],
+          blocks: [
+            {
+              type: 'text',
+              text: 'Elegí una categoría para continuar.',
+            },
+            {
+              type: 'actions',
+              actions: [
+                {
+                  id: 'clarify_route_sales',
+                  label: 'Ventas',
+                  kind: 'send_message',
+                  message: 'Resumime cómo viene el negocio esta semana y decime 3 acciones concretas para vender más.',
+                  route_hint: 'sales',
+                  selection_behavior: 'route_and_resend',
+                  confirmed_actions: [],
+                  style: 'secondary',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    renderUnifiedChat();
+
+    expect(await within(getMessagesPane()).findByText('Elegí una categoría para continuar.')).toBeInTheDocument();
+    expect(await within(getMessagesPane()).findByRole('button', { name: 'Ventas' })).toBeInTheDocument();
   });
 
   it('limpia el hilo del asistente al iniciar una nueva conversación', async () => {

@@ -562,6 +562,8 @@ export interface components {
             ts?: string | null;
             /** Tool Calls */
             tool_calls?: string[];
+            /** Blocks */
+            blocks?: (components["schemas"]["ChatTextBlock"] | components["schemas"]["ChatActionsBlock"] | components["schemas"]["ChatInsightCardBlock"] | components["schemas"]["ChatKpiGroupBlock"] | components["schemas"]["ChatTableBlock"])[];
         };
         /** ConversationSummary */
         ConversationSummary: {

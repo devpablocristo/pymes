@@ -1412,10 +1412,74 @@ def _build_internal_analysis_user_prompt(*, snapshot: _InternalDomainSnapshot, u
         "scope": snapshot.scope,
         "question": user_message,
         "factual_summary": snapshot.summary,
-        "evidence": snapshot.raw_result,
-        "fallback_blocks": snapshot.blocks,
+        "evidence": _compact_internal_analysis_evidence(snapshot.raw_result),
     }
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _compact_internal_analysis_scalar(value: Any) -> Any:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return None
+
+
+def _compact_internal_analysis_item(value: Any) -> Any:
+    if isinstance(value, dict):
+        preferred_keys = (
+            "id",
+            "name",
+            "product_name",
+            "customer_name",
+            "title",
+            "code",
+            "sku",
+            "status",
+            "category",
+            "currency",
+            "price",
+            "amount",
+            "total",
+            "quantity",
+            "min_quantity",
+            "balance",
+            "created_at",
+            "issued_at",
+            "due_date",
+        )
+        compact: dict[str, Any] = {}
+        for key in preferred_keys:
+            if key in value:
+                scalar = _compact_internal_analysis_scalar(value.get(key))
+                if scalar is not None:
+                    compact[key] = scalar
+        if compact:
+            return compact
+        return {
+            str(key): scalar
+            for key, item in value.items()
+            if (scalar := _compact_internal_analysis_scalar(item)) is not None
+        }
+    return _compact_internal_analysis_scalar(value)
+
+
+def _compact_internal_analysis_evidence(raw_result: dict[str, Any]) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    for key, value in raw_result.items():
+        if isinstance(value, list):
+            items = [_compact_internal_analysis_item(item) for item in value]
+            items = [item for item in items if item is not None][:8]
+            compact[key] = items
+            if len(value) > len(items):
+                compact[f"{key}_total"] = len(value)
+        elif isinstance(value, dict):
+            compact_value = _compact_internal_analysis_item(value)
+            if compact_value is not None:
+                compact[key] = compact_value
+        else:
+            scalar = _compact_internal_analysis_scalar(value)
+            if scalar is not None:
+                compact[key] = scalar
+    return compact
 
 
 def _build_internal_analysis_blocks(payload: _AnalysisCompletion) -> list[dict[str, Any]]:

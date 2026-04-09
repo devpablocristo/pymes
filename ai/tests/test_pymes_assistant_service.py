@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.agents.service import _summarize_procurement_requests, run_internal_orchestrated_chat
+from src.agents.service import (
+    _InternalDomainSnapshot,
+    _build_internal_analysis_user_prompt,
+    _summarize_procurement_requests,
+    run_internal_orchestrated_chat,
+)
 from src.backend_client.auth import AuthContext
 
 
@@ -473,6 +478,43 @@ async def test_run_internal_orchestrated_chat_uses_structured_analysis_for_activ
     assert result.blocks[0]["type"] == "insight_card"
     assert result.blocks[1]["type"] == "kpi_group"
     assert result.blocks[2]["type"] == "table"
+
+
+def test_build_internal_analysis_user_prompt_compacts_evidence_and_omits_blocks() -> None:
+    prompt = _build_internal_analysis_user_prompt(
+        snapshot=_InternalDomainSnapshot(
+            routed_agent="products",
+            scope="Productos · Catalogo",
+            summary="Hay productos cargados.",
+            tool_calls=["search_products"],
+            blocks=[
+                {
+                    "type": "actions",
+                    "actions": [{"id": "clarify_route_sales", "label": "Ventas"}],
+                }
+            ],
+            raw_result={
+                "total": 12,
+                "items": [
+                    {
+                        "id": f"prod-{idx}",
+                        "name": f"Producto {idx}",
+                        "sku": f"SKU-{idx}",
+                        "price": 100 + idx,
+                        "quantity": 5 + idx,
+                        "description": "texto largo que no hace falta en el prompt",
+                    }
+                    for idx in range(12)
+                ],
+            },
+        ),
+        user_message="Resumime cómo viene el negocio esta semana.",
+    )
+
+    assert '"fallback_blocks"' not in prompt
+    assert '"items_total": 12' in prompt
+    assert '"description"' not in prompt
+    assert prompt.count('"id": "prod-') == 8
 
 
 @pytest.mark.asyncio

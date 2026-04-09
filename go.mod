@@ -123,6 +123,7 @@ replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling
 
 replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
 
-replace github.com/devpablocristo/core/calendar/ics/go => ../core/calendar/ics/go
+// Snapshot local hasta que existan tags en github.com/devpablocristo/core.
+replace github.com/devpablocristo/core/calendar/ics/go => ./third_party/core-calendar-ics-go
 
-replace github.com/devpablocristo/core/calendar/sync/google/go => ../core/calendar/sync/google/go
+replace github.com/devpablocristo/core/calendar/sync/google/go => ./third_party/core-calendar-sync-google-go

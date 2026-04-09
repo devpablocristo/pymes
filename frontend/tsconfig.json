@@ -68,22 +68,18 @@
       ],
       "@devpablocristo/modules-crud-ui": [
         "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts",
-        "../modules/crud/ui/ts/src/index.ts",
         "../../modules/crud/ui/ts/src/index.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv": [
         "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts",
-        "../modules/crud/ui/ts/src/csv.ts",
         "../../modules/crud/ui/ts/src/csv.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv-toolbar": [
         "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts",
-        "../modules/crud/ui/ts/src/csvToolbarMerge.ts",
         "../../modules/crud/ui/ts/src/csvToolbarMerge.ts"
       ],
       "@devpablocristo/modules-crud-ui/surface": [
         "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx",
-        "../modules/crud/ui/ts/src/crudCanonicalSurface.tsx",
         "../../modules/crud/ui/ts/src/crudCanonicalSurface.tsx"
       ],
       "@devpablocristo/modules-kanban-board": [

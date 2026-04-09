@@ -159,9 +159,10 @@ export function LazyConfiguredCrudPage({
         <div className="alert alert-error">
           <p>{loadError}</p>
           <p className="text-secondary text-sm">
-            Revisá la consola del navegador y que exista <code>pymes/modules/crud/ui/ts</code> o el repo hermano{' '}
-            <code>modules/crud/ui/ts</code>, o que{' '}
-            <code>@devpablocristo/modules-crud-ui</code> esté instalado en <code>node_modules</code>.
+            Revisá la consola del navegador: el código CRUD vive en el repo hermano{' '}
+            <code>modules/crud/ui/ts</code> (mismo directorio padre que <code>pymes/</code>) o instalá{' '}
+            <code>@devpablocristo/modules-crud-ui</code> en <code>node_modules</code>. En Docker,{' '}
+            <code>MODULES_REPO_PATH</code> debe apuntar a ese checkout.
           </p>
         </div>
       </PageLayout>

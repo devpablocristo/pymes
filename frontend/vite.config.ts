@@ -26,29 +26,17 @@ function monorepoCoreDir(...segments: string[]): string {
 }
 
 /**
- * TS bajo `modules/`: primero `pymes/modules/...` si existe el archivo, si no repo hermano `../../modules/...`.
+ * TS bajo `modules/`: repo hermano `../../modules/...` (mismo padre que `pymes/`).
  */
 function monorepoModulesDir(...segments: string[]): string {
-  const nested = path.join(pymesRepoRoot, 'modules', ...segments);
-  const sibling = path.join(pymesParentDir, 'modules', ...segments);
-  if (fs.existsSync(nested)) {
-    return nested;
-  }
-  if (fs.existsSync(sibling)) {
-    return sibling;
-  }
-  return sibling;
+  return path.join(pymesParentDir, 'modules', ...segments);
 }
 
 /**
- * Igual que `monorepoModulesDir` o paquete publicado en node_modules.
+ * Checkout hermano `modules/` o paquete publicado en node_modules.
  */
 function monorepoModulesDirOrNodeModule(segments: string[], nodeModulesSpecifier: string): string {
-  const nested = path.join(pymesRepoRoot, 'modules', ...segments);
   const sibling = path.join(pymesParentDir, 'modules', ...segments);
-  if (fs.existsSync(nested)) {
-    return nested;
-  }
   if (fs.existsSync(sibling)) {
     return sibling;
   }
@@ -95,7 +83,7 @@ const modulesCrudUiSurface = modulesPackagePreferNodeModules(
   ['crud/ui/ts/src/crudCanonicalSurface.tsx'],
   './node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx',
 );
-/** Checkout local `modules/` primero; si no existe (CI sin monorepo), tarball npm. */
+/** Repo hermano `modules/`; si no existe en disco, fallback a paquete en node_modules (CI con symlink). */
 const modulesCalendarBoardIndex = monorepoModulesDirOrNodeModule(
   ['calendar/board/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-calendar-board/src/index.ts',

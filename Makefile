@@ -7,7 +7,7 @@
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
-GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=direct
+GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
 DC = docker compose
 
 # Calidad
@@ -52,7 +52,8 @@ modules-check:
 
 # Levanta stack local (Postgres Pymes, Review, cp-backend, 4 verticales Go, frontend, AI)
 up:
-	$(DC) up -d --build
+	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
+	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto
 down:

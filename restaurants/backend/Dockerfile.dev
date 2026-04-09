@@ -8,13 +8,13 @@ WORKDIR /workspace
 ENV GOPRIVATE=github.com/devpablocristo/* \
     GONOSUMDB=github.com/devpablocristo/* \
     GONOPROXY=github.com/devpablocristo/* \
-    GOPROXY=direct
+    GOPROXY=https://proxy.golang.org,direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
-COPY modules/scheduling/go /workspace/modules/scheduling/go
+COPY pymes/third_party/modules-scheduling-go /workspace/pymes/third_party/modules-scheduling-go
+COPY pymes/third_party/core-calendar-ics-go /workspace/pymes/third_party/core-calendar-ics-go
+COPY pymes/third_party/core-calendar-sync-google-go /workspace/pymes/third_party/core-calendar-sync-google-go
 COPY core/scheduling/go /workspace/core/scheduling/go
-COPY core/calendar/ics/go /workspace/core/calendar/ics/go
-COPY core/calendar/sync/google/go /workspace/core/calendar/sync/google/go
 
 WORKDIR /workspace/pymes/restaurants/backend
 

@@ -58,8 +58,8 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('recurring');
   }
 
-  // Scheduling: operación interna en `/agenda`, flujo cliente (preview en consola) en `/web-clientes`
-  // instead of the legacy CRUD module.
+  // Scheduling: operación interna en `/agenda`. El flujo público cliente
+  // se sirve desde su URL real, no embebido en consola.
 
   // Integrations: only if billing or products
   if (profile.usesBilling || sellsProducts || exploring) {

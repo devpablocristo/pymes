@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
+	googleoauth "github.com/devpablocristo/core/calendar/sync/google/go"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
 	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
 	schedulingpublichttp "github.com/devpablocristo/modules/scheduling/go/publichttpgin"
@@ -21,6 +22,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
+	calendar_export "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_export"
+	calendar_sync "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/currency"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
@@ -126,6 +129,8 @@ func InitializeApp() *app.App {
 	schedulerRepo := scheduler.NewRepository(db)
 	timelineRepo := timeline.NewRepository(db)
 	schedulingRepo := schedulingmodule.NewRepository(db)
+	calendarExportRepo := calendar_export.NewRepository(db)
+	calendarSyncRepo := calendar_sync.NewRepository(db)
 	whatsappRepo := whatsapp.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
@@ -155,12 +160,27 @@ func InitializeApp() *app.App {
 	rbacMiddleware := handlers.NewRBACMiddleware(rbacUC)
 	returnsUC := returns.NewUsecases(returnsRepo, auditUC, timelineUC, outwebhooksUC)
 	schedulingUC := schedulingmodule.NewUsecases(schedulingRepo, auditUC, schedulingmodule.WithNotifications(outwebhooksUC))
+	calendarExportUC := calendar_export.NewUsecases(calendarExportRepo, schedulingUC, calendar_export.Config{
+		ProductID: "-//Pymes SaaS//Calendar Export//ES",
+	})
 
 	var paymentGatewayCrypto *paymentgateway.Crypto
 	paymentGatewayCrypto, err = paymentgateway.NewCrypto(cfg.PaymentGatewayEncryptionKey)
 	if err != nil {
 		logger.Warn().Err(err).Msg("invalid PAYMENT_GATEWAY_ENCRYPTION_KEY; mercado pago integration disabled")
 	}
+
+	// Cliente OAuth Google para sync de calendario. Si las env vars no están
+	// (caso típico en dev sin credenciales), el usecase queda con un cliente
+	// configurado pero `Validate()` falla en el primer call → el endpoint
+	// devuelve error claro al usuario en vez de panic al boot.
+	googleOAuthClient := calendar_sync.NewGoogleOAuthClient(googleoauth.Config{
+		ClientID:     cfg.GoogleOAuthClientID,
+		ClientSecret: cfg.GoogleOAuthClientSecret,
+		RedirectURL:  cfg.GoogleOAuthRedirectURL,
+		Scopes:       []string{googleoauth.ScopeCalendar},
+	})
+	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
 	whatsappAIClient := whatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
 	whatsappMetaClient := whatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
 	whatsappUC := whatsapp.NewUsecases(
@@ -243,6 +263,8 @@ func InitializeApp() *app.App {
 	returnsHandler := returns.NewHandler(returnsUC)
 	timelineHandler := timeline.NewHandler(timelineUC)
 	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
+	calendarExportHandler := calendar_export.NewHandler(calendarExportUC, cfg.PublicBaseURL)
+	calendarSyncHandler := calendar_sync.NewHandler(calendarSyncUC, cfg.FrontendURL)
 	whatsappHandler := whatsapp.NewHandler(whatsappUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
@@ -265,6 +287,13 @@ func InitializeApp() *app.App {
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
 	whatsappHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
+	// Feed iCalendar público: el cliente (Apple Calendar / Google Calendar / Outlook /
+	// Thunderbird) suscribe vía URL conociendo sólo el plaintext del token.
+	calendarExportHandler.RegisterPublicRoutes(v1)
+	// Callback OAuth de Google: el browser del usuario llega acá tras el flow
+	// de consent. Sin auth Clerk porque el redirect viene desde Google, no
+	// desde la app. La autenticación es el `state` validado contra DB.
+	calendarSyncHandler.RegisterPublicRoutes(v1)
 
 	internalGroup := v1.Group("/internal/v1")
 	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
@@ -316,6 +345,8 @@ func InitializeApp() *app.App {
 	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware.RequirePermission)
+	calendarExportHandler.RegisterAuthRoutes(authGroup)
+	calendarSyncHandler.RegisterAuthRoutes(authGroup)
 	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
 
 	// Review proxy — opcional, se activa si REVIEW_URL está configurado

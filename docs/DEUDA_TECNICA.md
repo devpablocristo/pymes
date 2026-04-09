@@ -83,13 +83,12 @@ Los magic links se construyen en
   está pensado para el cliente final, no para el dueño. Es el origen de la
   confusión que motivó este documento — ver nota al final.
 
-**Vista preview en la consola del dueño.**
-
-[frontend/src/pages/PublicPreviewPage.tsx](../frontend/src/pages/PublicPreviewPage.tsx)
-renderiza `PublicSchedulingFlow` dentro de la consola autenticada para que el
-dueño vea cómo le aparece a sus clientes. Es owner-side por hosting pero
-expone literalmente la UX cliente-facing — útil tenerlo en cuenta cuando
-cambiemos estilos del flujo público.
+**Vista preview en la consola del dueño.** Eliminada — la página
+`/web-clientes` (`WebClientesPage` / alias `PublicPreviewPage`) embebía
+`PublicSchedulingFlow` dentro de la consola autenticada "para soporte y
+prueba". Era duplicación del flow público real, que se sirve directamente
+desde su URL pública. Si en el futuro hace falta una preview, mejor abrir
+la URL pública en una pestaña nueva que mantener un wrapper en consola.
 
 ---
 
@@ -415,3 +414,362 @@ Lo que el dueño puede hacer ahora (acumulado F1+F2+F3):
    hoy solo se ve la ausencia de slots).
 2. Unificación calendario ↔ `AvailabilityRule` para editar reglas
    recurrentes desde el calendario (F5 — opcional).
+
+---
+
+## Rediseño "Google Calendar" del calendario interno (Stages 1–5)
+
+Después de F1–F3 se decidió separar formalmente las dos superficies del
+calendario y darle al dueño una UX equivalente a Google Calendar:
+
+- **Calendario interno** (consola del dueño/empleados): bookings + eventos
+  internos + bloqueos, todo en la misma vista, drag/resize libres.
+- **Calendario externo** (`PublicSchedulingFlow`): solo slots disponibles
+  para el cliente final. Sigue siendo el flujo restringido cliente-facing.
+
+### Stage 1 — Eventos internos (`calendar_events`) — DONE
+
+Nueva entidad en `modules/scheduling/go` separada de `Booking`:
+
+- Migración `0004_calendar_events.up.sql` → tabla `scheduling_calendar_events`
+  (FK a org/branch/resource opcional, status `scheduled|done|cancelled`,
+  visibility `team|private`, check constraints, índices parciales).
+- Domain: `CalendarEvent`, `CalendarEventStatus`, `CalendarEventVisibility`,
+  `ListCalendarEventsFilter`.
+- Repo GORM: Create/Get/List/Update/Delete + `ListCalendarEventsOccupyingResource`
+  (filtra `status != cancelled`, lo usa el slot picker).
+- Usecases con validación + `RepositoryPort` extendido.
+- DTOs en `httpgin/dto/dto.go`, 5 rutas en `httpgin/handler.go`,
+  helper `parseRFC3339Query`.
+
+Diferencia con `Booking`: los `CalendarEvent` son **internos** (reuniones,
+tareas, notas del dueño); no tienen cliente, ni magic link, ni notificación.
+No aparecen en `PublicSchedulingFlow`.
+
+### Stage 2 — Slot picker descuenta eventos — DONE
+
+`listAvailableSlots` ahora también llama a `ListCalendarEventsOccupyingResource`
+y los suma como `BlockedRange` virtuales antes de generar slots. El cliente
+final no ve un hueco si el dueño ya tiene un evento interno encima.
+
+### Stage 3 — Frontend unificado — DONE
+
+- `modules/scheduling/ts/src/types.ts`: `InternalEvent`, payloads, query
+  type, +22 strings de copy.
+- `client.ts`: `listInternalEvents`, `getInternalEvent`, `createInternalEvent`,
+  `updateInternalEvent`, `deleteInternalEvent`.
+- `SchedulingInternalEventModal.tsx` (nuevo): modal completo
+  (título, descripción, fecha/hora, recurso opcional, status, visibility).
+- `SchedulingCalendarBoard.tsx`: query de eventos internos, render en color
+  índigo (`#6366f1`), 3 mutations, click handler discrimina por
+  `extendedProps.internalEvent`, botón "+ Nuevo evento" en toolbar. **Se
+  removieron** los widgets "Reservar slot", el grid de stats y el filtro
+  "Fecha foco".
+- `CalendarPage.tsx`: removido `QueueOperatorBoard` (el operador de cola
+  no era parte del calendario).
+- 6 tests viejos (`SchedulingCalendar.test.tsx`) marcados con `it.skip` +
+  TODO — testaban el affordance "Reservar slot" eliminado. Deuda técnica:
+  reescribir contra los flujos nuevos.
+
+### Stage 4 — Feed iCalendar (suscripción externa) — DONE
+
+Para que el dueño pueda suscribirse al calendario interno desde Apple
+Calendar / Google Calendar / Outlook / Thunderbird vía URL.
+
+- **Nuevo módulo `core/calendar/ics/go`** (agnóstico, reusable):
+  `Calendar`, `Event`, `Status`, `Render` con CRLF, line folding RFC 5545
+  §3.1 con `safeUTF8Cut` (no rompe code points multibyte), escape RFC §3.3.11.
+  11 tests.
+- **Pymes** `internal/calendar_export/`: módulo hexagonal completo
+  (domain, model, dto, repo, usecases, handler).
+  - Migración `0054_calendar_export_tokens.up.sql` (token hash sha256,
+    índice único, partial index sobre activos).
+  - Tokens generados con 32 bytes random, hex; el plain text se devuelve
+    una sola vez al issuer; el feed se sirve por hash.
+  - `RegisterAuthRoutes`: CRUD de tokens (issue/list/revoke).
+  - `RegisterPublicRoutes`: `GET /v1/calendar-export/feed/:token` →
+    `text/calendar; charset=utf-8`.
+  - `MarkFeedUsed` se ejecuta fire-and-forget con `context.Background()`
+    para no bloquear la respuesta.
+
+Limitación conocida: el feed itera bookings día a día porque
+`ListBookings` upstream no soporta range. Aceptable para volúmenes
+actuales; si crece, se agrega `ListBookingsBetween` al módulo.
+
+### Stage 5A — Google Calendar OAuth + persistencia — DONE (sin credenciales E2E)
+
+Primer paso del two-way sync con Google Calendar. Solo el "saludo OAuth",
+intercambio de código y persistencia encriptada. **No hay pull ni push
+todavía** (eso es 5B/5C).
+
+- **Nuevo módulo `core/calendar/sync/google/go`** (agnóstico, reusable):
+  cliente OAuth 2.0 implementado con `net/http` puro, **sin** dependencia
+  de `golang.org/x/oauth2` (mantiene el grafo de deps chico, tests sin
+  network). API: `BuildAuthURL` (pide `access_type=offline` +
+  `prompt=consent` para garantizar refresh token), `ExchangeCode`,
+  `Refresh`. 11 tests con `httptest`.
+- **Pymes** `internal/calendar_sync/`: módulo hexagonal completo.
+  - Migración `0055_calendar_sync_connections.up.sql` → dos tablas:
+    `calendar_sync_connections` (refresh + access token encriptados,
+    `sync_token`, `last_sync_at`, `revoked_at`, índice único parcial sobre
+    activos por `(org_id, created_by, provider)`) y
+    `calendar_sync_oauth_states` (CSRF state con TTL).
+  - Domain `Provider`, `Connection`, `OAuthState`.
+  - Repo: `UpsertConnection` (idempotente — resucita revocadas),
+    `ListByCreator`, `RevokeConnection`, `CreateOAuthState`,
+    `ConsumeOAuthState` (delete + TTL atómico), `PurgeExpiredOAuthStates`.
+    Sentinels `ErrConnectionNotFound`, `ErrOAuthStateNotFound`.
+  - Usecases: `Cipher` interface local + `GoogleOAuthClient` interface
+    local (ISP — no importa `paymentgateway` ni el módulo `core/...`,
+    el wire los inyecta por shape). Métodos `StartGoogleConnect`,
+    `HandleGoogleCallback`, `ListMyConnections`, `RevokeConnection`.
+  - Handler: rutas auth (`POST /calendar-sync/google/connect`,
+    `GET /calendar-sync/connections`, `DELETE /calendar-sync/connections/:id`)
+    + ruta pública (`GET /calendar-sync/google/callback`). El callback
+    redirige al frontend con `?google_sync=connected` o
+    `?google_sync=error&reason=...` (mejor UX que JSON ya que el browser
+    viene desde Google, no desde la SPA).
+- **Wiring**:
+  - `pymes/go.mod`: require + replace para `core/calendar/sync/google/go`.
+  - `Dockerfile.dev`: `COPY core/calendar/sync/google/go`.
+  - `internal/shared/config/config.go`: env vars `GOOGLE_OAUTH_CLIENT_ID`,
+    `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URL`.
+  - `wire/bootstrap.go`: inyecta `paymentGatewayCrypto` como `Cipher` por
+    shape; registra rutas auth + pública con `cfg.FrontendURL`.
+
+**Verificación parcial (sin Google creds)** — smoke OK con `curl`:
+
+| Caso | Resultado |
+|---|---|
+| `POST /v1/calendar-sync/google/connect` sin creds | HTTP 500 + log `ClientID is required` (esperado) |
+| `GET /v1/calendar-sync/connections` | HTTP 200 `{"items":[]}` |
+| `GET /v1/calendar-sync/google/callback` (sin params) | HTTP 302 → `/agenda?google_sync=error&reason=missing_params` |
+| `GET /v1/calendar-sync/google/callback?state=fake&code=xxx` | HTTP 302 → `reason=expired_state` |
+
+**E2E real con Google queda pendiente** hasta que se configure un OAuth
+client en console.cloud.google.com con redirect URI
+`http://localhost:8100/v1/calendar-sync/google/callback`. El usuario
+decidió **no meter credenciales todavía**.
+
+### Lo que falta (backlog vivo)
+
+Movido a la sección "Deuda técnica consolidada" más abajo. Esa es la
+fuente de verdad — todo lo pendiente vive ahí.
+
+## Deuda técnica consolidada (todo, todos los tipos)
+
+> **Lectura única.** Esta sección es la fuente de verdad de toda la deuda
+> técnica del producto que conoce el equipo. Si una nota dice "documentado
+> en `docs/DEUDA_TECNICA.md`" se refiere a esto. Antes de empezar trabajo
+> nuevo, revisar acá.
+
+### Tests
+
+- **6 tests skipped en `SchedulingCalendar.test.tsx`** (Stage 3) —
+  testaban el affordance "Reservar slot" eliminado. Hay que reescribirlos
+  contra los flujos nuevos (eventos internos + bloqueos + entry switcher).
+  No son funcionalidad rota, son tests obsoletos. Marcados con
+  `it.skip` + comentario TODO.
+
+### Frontend / módulo scheduling
+
+- **`focusedDate` sin UI** — el state sigue para que el resto del
+  componente compute rangos y queries, pero la affordance "Fecha foco"
+  fue removida porque el grid ya tiene Hoy/‹/›. Eventualmente reemplazar
+  por el estado interno del FullCalendar (`api.getDate()`).
+- **`selectedServiceId` sin UI** (backlog 3.5 done a medias) — el filtro
+  "Servicio" se sacó del header pero el state sigue y se autoselecciona
+  al primer servicio del catálogo. El slot picker del booking modal lo
+  necesita internamente. Pendiente: migrar la elección de servicio
+  *adentro* del modal del booking en lugar de tenerla como state global
+  del board.
+- **Multi-select de recursos** — los chips de capa de recursos en el
+  toolbar son single-select por compatibilidad con el resto del flow
+  (filtros de bookings, business hours, slot picker, todos asumen
+  `selectedResourceId: string | null`). Convertir a `Set<string>` (estilo
+  Google Calendar layers reales) implica propagar el cambio por todo el
+  board. Hacer cuando aparezca el caso real de "quiero ver dos
+  recursos al mismo tiempo".
+### Modelo de sub-verticales (`bike_shop` mal categorizado)
+
+`bike_shop` aparece en `VerticalType` del frontend
+([tenantProfile.ts:7](../frontend/src/lib/tenantProfile.ts#L7)) como peer de
+`workshops`, pero conceptualmente es un **sub-dominio de workshops** (al
+mismo nivel que `auto_repair`, `teachers`, `dining`). Las verticales
+formales son solo `professionals | workshops | beauty | restaurants`.
+
+**Por qué importa**: hoy un tenant que quiere "bicicletería" elige
+`bike_shop` como vertical top-level, lo cual es incorrecto: debería elegir
+`workshops` y luego un sub-tipo. La inconsistencia se filtra a:
+- `tenantProfile.ts` (`VerticalType` enum tiene `bike_shop`)
+- `Shell.tsx` (`vertical === 'bike_shop'` con su propio sidebar section)
+- `OnboardingPage.tsx` (lista bike_shop como vertical)
+- i18n (`shell.sections.bikeShop`, `onboarding.vertical.bikeShop*`)
+- Backend `tenant_settings.vertical` (text column libre, hoy admite `'bike_shop'`)
+- AI service (`ai/src/domains/workshops/bike_shop/`) — éste sí está bien,
+  está adentro de `workshops/` como sub-dominio.
+
+**Refactor completo (multi-archivo, multi-capa)**:
+1. **Migration**: agregar columna `tenant_settings.vertical_subtype text NOT NULL DEFAULT ''`.
+2. **Backend Go**: agregar `VerticalSubtype string` al `TenantProfile`
+   struct + serialización + handlers GET/PATCH del perfil.
+3. **Frontend types**: `TenantProfile.verticalSubtype: 'auto_repair' | 'bike_shop' | 'teachers' | 'dining' | ''`.
+4. **OnboardingPage**: paso adicional cuando `vertical === 'workshops'` o
+   `professionals` o `restaurants`: elegir sub-tipo.
+5. **Shell.tsx**: usar `verticalSubtype === 'bike_shop'` (no `vertical ===`).
+6. **VerticalType**: quitar `'bike_shop'` del enum (queda
+   `'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants'`).
+7. **Migración de datos**: tenants existentes con `vertical='bike_shop'` →
+   pasar a `vertical='workshops', vertical_subtype='bike_shop'`.
+8. **Limpiar i18n**: las claves `shell.sections.bikeShop` y
+   `onboarding.vertical.bikeShop*` se pueden quitar (ya no son top-level).
+
+**Cuándo encararlo**: cuando aparezca un segundo sub-dominio que pida la
+misma estructura (ej. promover `teachers` a sub-dominio explícito de
+`professionals`). Hoy el modelo funciona mal pero no rompe nada porque
+el tenant puede elegir directamente `bike_shop` y la app responde.
+
+**Riesgo si se hace mal**: tenants existentes pierden su elección de
+vertical durante la migración de datos.
+
+### Branch global (refactor app shell)
+
+- **`selectedBranchId` debería ser contexto global de la app**, no state
+  local del calendario. Tres lugares:
+  1. **Settings → Mi perfil**: campo "Sucursal por defecto" persistido
+     en `users.preferences.default_branch_id` o equivalente. El usuario
+     lo configura una vez.
+  2. **Topbar global** (`AppShell` / `Topbar` de `pymes/frontend`): un
+     `<BranchSwitcher>` que **solo se renderiza si el usuario tiene
+     acceso a >1 sucursal**. Para PyMEs con 1 sola sucursal (mayoría),
+     no aparece — cero fricción.
+  3. **`BranchContext`** (React Context) que lee de Clerk + del default
+     del perfil + del switcher, en ese orden. Las páginas (calendar,
+     bookings, sales, OTs, customers, etc.) consumen el context en vez
+     de tener cada una su propio dropdown.
+- **Hoy, mientras tanto**: el dropdown de branch vive en el
+  `toolbarTrailing` del calendario, condicional a `branches.length > 1`.
+  Cuando se haga el refactor del topbar, el dropdown se quita y el
+  calendario consume el context.
+- **Riesgo del refactor**: medio. Toca el app shell + todas las
+  páginas que dependen de sucursal. **Beneficio**: consistencia total y
+  elimina friccion de elegir sucursal cada vez que cambiás de pantalla.
+
+### Backend
+
+- **3 migrations sin `.down.sql`** restantes — todas relacionadas con
+  WhatsApp (`0024`, `0038`, `0039`). Las maneja el agente paralelo dedicado
+  a WhatsApp. Las otras 7 ya tienen `.down.sql` escrito y pendiente de
+  verificación con `golang-migrate down 1 && up 1` en local.
+
+- **`ListBookings` upstream no soporta range** — el feed ICS itera día
+  a día. Aceptable para volúmenes actuales; cuando crezca, agregar
+  `ListBookingsBetween(orgID, branchID, start, end)` en el módulo
+  `modules/scheduling/go` y bumpear versión.
+- **Catch-all service de F3** ("Turno general") no se autoprovisiona en
+  orgs nuevas de producción ni se linkea automáticamente a recursos
+  creados después del seed. Workaround: el dueño lo crea manualmente
+  vía la UI de admin. Solución limpia: `EnsureCatchAllService` usecase
+  llamado desde el flow de onboarding o lazy desde la primera carga del
+  calendario.
+
+### Sync Google Calendar (Stages 5B/5C/5D)
+
+- **Stage 5A E2E real** — bloqueado: usuario decidió **no** meter
+  credenciales Google todavía. Cuando quiera, crear OAuth client en
+  console.cloud.google.com con redirect URI
+  `http://localhost:8100/v1/calendar-sync/google/callback` y exportar
+  `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `_REDIRECT_URL`.
+- **Stage 5B Pull**: traer eventos de Google → importar como
+  `calendar_events` con `metadata.source = "google_sync"` + `sync_token`
+  para deltas. Implica `ListEvents` en `core/calendar/sync/google/go`.
+- **Stage 5C Push**: publicar bookings + eventos internos en Google.
+  Cuidado con loops: marcar con `metadata.pushed_by_pymes = true` para
+  evitar re-importar.
+- **Stage 5D Worker**: scheduler background que dispara sync por org
+  cada N minutos; resolución de conflictos por `updated_at` (last write
+  wins, con audit log).
+- **Frontend del flow Connect**: botón "Conectar Google Calendar" en
+  Settings o aside del calendario que llame `POST /calendar-sync/google/connect`,
+  abra popup, reaccione al `?google_sync=...` del callback con un toast.
+  Vista de conexiones activas con botón "Revocar".
+- **Stage 6 Outlook / Microsoft 365**: **descartado por el usuario**, no
+  se va a implementar (al menos por ahora).
+
+### CRUD UI para los modales del calendario
+
+Las tres entidades que viven en el calendario interno (`Booking`,
+`CalendarEvent`, `BlockedRange`) son **conceptualmente CRUDs**, y pymes
+ya tiene un módulo genérico [`modules/crud/ui/ts`](../../modules/crud/ui/ts/src/CrudPage.tsx)
+que se usa en las pantallas tabulares (services, customers, branches,
+etc.). En teoría los modales del calendario podrían reusar ese módulo
+en vez de tener tres archivos `*Modal.tsx` custom.
+
+Las tres entidades que viven en el calendario interno (`Booking`,
+`CalendarEvent`, `BlockedRange`) son **conceptualmente CRUDs**, y pymes
+ya tiene un módulo genérico [`modules/crud/ui/ts`](../../modules/crud/ui/ts/src/CrudPage.tsx)
+que se usa en las pantallas tabulares (services, customers, branches,
+etc.). En teoría los modales del calendario podrían reusar ese módulo
+en vez de tener tres archivos `*Modal.tsx` custom.
+
+**Por qué hoy NO se usa**:
+
+1. `modules/crud/ui` es un **page abstraction** (tabla + toolbar +
+   modal en un solo componente `CrudPage`), no un form library. No
+   expone un `<CrudForm>` standalone que se pueda embeber dentro del
+   calendario o de un shell como `SchedulingCreateEntryModal`.
+2. Faltan field types y features que los modales del calendario sí
+   necesitan:
+   - **`time`** (los modales usan `<input type="time">` directo).
+   - **Async select dependiente** (booking necesita services cargados
+     de la API, resources filtrados por branch, customers tipeables).
+   - **Slot picker integrado** (booking valida contra `(branch, service,
+     resource, date)` listando slots disponibles).
+   - **Field dependency** (visibility de campos según otro campo).
+3. El booking modal en particular está atado a side effects pesados
+   (payments, magic links, notificaciones, fraude, AI tools). Migrarlo a
+   un CRUD genérico oculta esos side effects en el wiring en vez de
+   hacerlos explícitos en el formulario.
+4. La superficie principal del calendario es **espacial**
+   (FullCalendar), no tabular. Esa parte nunca va a ser CRUD.
+
+**Qué habría que hacer para encararla algún día**:
+
+- Extraer un componente `<CrudForm>` standalone de `modules/crud/ui`
+  (independiente del wrapper `CrudPage`).
+- Agregarle al módulo CRUD: field type `time`, async-loaded select con
+  callback de fetch, dependent fields (visibility/options en función de
+  otro field), validación custom por field.
+- Migrar `BlockedRangeModal` primero (es el más simple — sin async, sin
+  side effects). Si funciona, migrar `SchedulingInternalEventModal`. El
+  booking modal queda al final o nunca, según cómo escale el módulo.
+- Test de regresión obligatorio en cada paso: el flujo de booking
+  cliente-facing y los magic links no pueden romperse.
+
+**Cuándo tiene sentido encararla**: cuando aparezca un **cuarto modal**
+con un patrón parecido (ej. recordatorios del cliente, eventos de
+Google sync, etc.) y el costo de mantener N modales custom supere el
+costo de la abstracción. Hoy, con tres, el ROI es negativo.
+
+**Riesgos si se encara mal**: regresar las CRUD pages existentes en
+pymes que ya usan `CrudPage` (services, customers, branches), porque
+la extracción de `<CrudForm>` toca un módulo publicado y compartido.
+
+---
+
+### Backlog UX (post-rediseño)
+
+- **3.5** — DONE a medias. Filtro "Servicio" sacado del header del
+  calendario. Falta migrar la elección de servicio *adentro* del modal
+  del booking (hoy se autoselecciona el primero del catálogo). Ver
+  arriba "Frontend / módulo scheduling — `selectedServiceId` sin UI".
+- **3.6** — mover los stats cards a `/dashboard`. Hoy se borraron de
+  `/agenda` pero no se reubicaron. Mientras tanto `dashboardQuery`
+  sigue corriendo (deuda relacionada arriba).
+- **3.7** — crear `/recepcion` con `QueueOperatorBoard`. El operador de
+  cola se movió fuera del calendario en Stage 3 pero todavía no tiene
+  página propia.
+- **3.8** — sidebar de "capas" estilo Google Calendar (toggle por tipo:
+  bookings / eventos internos / bloqueos / Google sync). Hoy los chips
+  del toolbar son solo de recursos (single-select); el toggle por tipo
+  de evento está pendiente.

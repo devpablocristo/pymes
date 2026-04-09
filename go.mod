@@ -6,6 +6,8 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/devpablocristo/core/authn/go v0.2.1
 	github.com/devpablocristo/core/authz/go v0.1.0
+	github.com/devpablocristo/core/calendar/ics/go v0.0.0-00010101000000-000000000000
+	github.com/devpablocristo/core/calendar/sync/google/go v0.0.0-00010101000000-000000000000
 	github.com/devpablocristo/core/concurrency/go v0.1.1
 	github.com/devpablocristo/core/config/go v0.0.0-20260328151810-084828e80b26
 	github.com/devpablocristo/core/databases/postgres/go v0.1.1
@@ -120,3 +122,7 @@ require (
 replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go
 
 replace github.com/devpablocristo/core/scheduling/go => ../core/scheduling/go
+
+replace github.com/devpablocristo/core/calendar/ics/go => ../core/calendar/ics/go
+
+replace github.com/devpablocristo/core/calendar/sync/google/go => ../core/calendar/sync/google/go

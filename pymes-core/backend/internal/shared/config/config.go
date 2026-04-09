@@ -59,6 +59,9 @@ type Config struct {
 	MPRedirectURI               string
 	PaymentGatewayMode          string
 	PaymentGatewayEncryptionKey string
+	GoogleOAuthClientID         string
+	GoogleOAuthClientSecret     string
+	GoogleOAuthRedirectURL      string
 }
 
 // LoadFromEnv carga valores con defaults seguros para desarrollo local.
@@ -109,6 +112,9 @@ func LoadFromEnv() Config {
 		MPRedirectURI:               envconfig.Get("MP_REDIRECT_URI", ""),
 		PaymentGatewayMode:          envconfig.Get("PAYMENT_GATEWAY_MODE", "mercadopago"),
 		PaymentGatewayEncryptionKey: envconfig.Get("PAYMENT_GATEWAY_ENCRYPTION_KEY", ""),
+		GoogleOAuthClientID:         envconfig.Get("GOOGLE_OAUTH_CLIENT_ID", ""),
+		GoogleOAuthClientSecret:     envconfig.Get("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+		GoogleOAuthRedirectURL:      envconfig.Get("GOOGLE_OAUTH_REDIRECT_URL", ""),
 	}
 	if err := validateInternalServiceToken(cfg.Environment, cfg.InternalServiceToken); err != nil {
 		log.Fatal(err)

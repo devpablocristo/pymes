@@ -12,7 +12,8 @@
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [WHATSAPP_SETUP.md](./WHATSAPP_SETUP.md) | WhatsApp + Meta: env, webhook, conexión por org, opt-in; qué ya está y qué falta |
-| [CUSTOMER_WEB.md](./CUSTOMER_WEB.md) | **Web clientes** — inventario de la superficie pública (clientes finales de las PyMEs): scheduling público, chat IA público, WhatsApp inbound, pagos externos + backlog |
+| [CUSTOMER_MESSAGING_RATIONALIZATION.md](./CUSTOMER_MESSAGING_RATIONALIZATION.md) | Diseño de racionalización: `customer messaging` como bounded context, qué queda en `pymes-core`, qué extraer a `core` y `modules`, plan de migración |
+| [DEUDA_TECNICA.md](./DEUDA_TECNICA.md) | **Deuda técnica consolidada** — fuente de verdad de toda la deuda del producto (frontend, backend, tests, refactors pendientes); también contiene el inventario de la superficie cliente-facing |
 | [CONTROL_PLANE.md](./CONTROL_PLANE.md) | Control plane, seguridad interna, comandos de validación |
 | [AUTH.md](./AUTH.md) | Identidad (Clerk vs API key), rutas, org en consola; puntero a checklist local |
 | [CLERK_LOCAL.md](./CLERK_LOCAL.md) | Clerk en Docker: `.env`, JWKS, token de sesión, onboarding/org, troubleshooting `invalid org` |

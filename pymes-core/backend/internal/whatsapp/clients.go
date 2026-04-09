@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/devpablocristo/core/http/go/httpclient"
+	cm "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging"
 )
 
 type AIClient struct {
@@ -27,13 +28,6 @@ type AIMessageRequest struct {
 	Message       string `json:"message"`
 	MessageID     string `json:"message_id,omitempty"`
 	ProfileName   string `json:"profile_name,omitempty"`
-}
-
-type AIMessageResponse struct {
-	ConversationID string   `json:"conversation_id"`
-	Reply          string   `json:"reply"`
-	TokensUsed     int      `json:"tokens_used"`
-	ToolCalls      []string `json:"tool_calls"`
 }
 
 type metaSendResponse struct {
@@ -72,9 +66,9 @@ func NewMetaClient(baseURL string) *MetaClient {
 	}
 }
 
-func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIMessageResponse, error) {
+func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (cm.AIMessageResponse, error) {
 	if c == nil || c.caller.BaseURL == "" {
-		return AIMessageResponse{}, fmt.Errorf("ai service url not configured")
+		return cm.AIMessageResponse{}, fmt.Errorf("ai service url not configured")
 	}
 	body := AIMessageRequest{
 		OrgID:         req.OrgID.String(),
@@ -86,14 +80,14 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (AIM
 	}
 	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/whatsapp/message", body)
 	if err != nil {
-		return AIMessageResponse{}, err
+		return cm.AIMessageResponse{}, err
 	}
 	if st >= http.StatusMultipleChoices {
-		return AIMessageResponse{}, fmt.Errorf("ai service returned %d: %s", st, strings.TrimSpace(string(raw)))
+		return cm.AIMessageResponse{}, fmt.Errorf("ai service returned %d: %s", st, strings.TrimSpace(string(raw)))
 	}
-	var out AIMessageResponse
+	var out cm.AIMessageResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return AIMessageResponse{}, err
+		return cm.AIMessageResponse{}, err
 	}
 	return out, nil
 }
@@ -189,7 +183,7 @@ func (c *MetaClient) SendMediaMessage(ctx context.Context, phoneNumberID, access
 }
 
 // SendInteractiveButtons envía un mensaje con hasta 3 botones de respuesta rápida.
-func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, accessToken, to, body string, buttons []InteractiveButtonPayload) (string, error) {
+func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, accessToken, to, body string, buttons []cm.InteractiveButtonPayload) (string, error) {
 	actionButtons := make([]map[string]any, 0, len(buttons))
 	for _, b := range buttons {
 		actionButtons = append(actionButtons, map[string]any{
@@ -208,12 +202,6 @@ func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, 
 			"action": map[string]any{"buttons": actionButtons},
 		},
 	})
-}
-
-// InteractiveButtonPayload para construir botones de respuesta rápida.
-type InteractiveButtonPayload struct {
-	ID    string
-	Title string
 }
 
 // MarkAsRead marca un mensaje como leído.

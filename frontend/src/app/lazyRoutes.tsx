@@ -41,9 +41,6 @@ export const ModulePage = lazy(() => import('../pages/ModulePage').then((mod) =>
 export const OnboardingPage = lazy(() =>
   import('../pages/OnboardingPage').then((mod) => ({ default: mod.OnboardingPage })),
 );
-export const WebClientesPage = lazy(() =>
-  import('../pages/WebClientesPage').then((mod) => ({ default: mod.WebClientesPage })),
-);
 export const RestaurantTableSessionsPage = lazy(() =>
   import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })),
 );
@@ -65,7 +62,3 @@ export const InvoicesPage = lazy(() => import('../pages/InvoicesPage').then((mod
 export const SettingsHubPage = lazy(() =>
   import('../pages/SettingsHubPage').then((mod) => ({ default: mod.SettingsHubPage })),
 );
-export const UIComponentsPage = lazy(() =>
-  import('../pages/UIComponentsPage').then((mod) => ({ default: mod.UIComponentsPage })),
-);
-export const CryptoPage = lazy(() => import('../pages/CryptoPage').then((m) => ({ default: m.CryptoPage })));

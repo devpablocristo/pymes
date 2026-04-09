@@ -147,7 +147,6 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/quotes", h.CreateQuote)
 	internal.POST("/sales", h.CreateSale)
 	internal.POST("/sales/:id/payment-link", h.CreateSalePaymentLink)
-	internal.POST("/whatsapp/send-text", h.InternalSendWhatsAppText)
 	internal.POST("/customer-messaging/send-text", h.InternalSendWhatsAppText)
 }
 

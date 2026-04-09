@@ -384,60 +384,6 @@
         }
       }
     },
-    "/v1/internal/whatsapp/message": {
-      "post": {
-        "tags": [
-          "internal"
-        ],
-        "summary": "Customer Messaging Inbound",
-        "operationId": "customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post",
-        "deprecated": true,
-        "parameters": [
-          {
-            "name": "X-Internal-Service-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "X-Internal-Service-Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CustomerMessagingInboundRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CustomerMessagingInboundResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/internal/customer-messaging/inbound": {
       "post": {
         "tags": [
@@ -554,7 +500,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PublicChatRequest"
+                "$ref": "#/components/schemas/src__domains__professionals__teachers__public_router__PublicChatRequest"
               }
             }
           }
@@ -644,7 +590,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__public_router__PublicChatRequest"
+                "$ref": "#/components/schemas/PublicChatRequest"
               }
             }
           }
@@ -2243,22 +2189,7 @@
         ],
         "title": "ChatRequest"
       },
-      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "ChatRequest"
-      },
-      "src__domains__workshops__auto_repair__public_router__PublicChatRequest": {
+      "src__domains__professionals__teachers__public_router__PublicChatRequest": {
         "properties": {
           "message": {
             "type": "string",
@@ -2283,6 +2214,21 @@
           "message"
         ],
         "title": "PublicChatRequest"
+      },
+      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
       }
     }
   }

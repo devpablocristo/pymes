@@ -10,8 +10,8 @@ Pasos para conectar la API de WhatsApp con el **control plane** (`pymes-core`), 
 |------|----------------|
 | Variables de entorno documentadas | `.env.example`: `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_GRAPH_API_BASE_URL` |
 | Plantilla local | Tu `.env` puede incluir el mismo bloque (no versionar secretos) |
-| Rutas HTTP del backend | Legacy bajo `/v1/whatsapp/*` y superficie principal nueva bajo `/v1/customer-messaging/*` |
-| Webhook público | `GET` y `POST /v1/webhooks/whatsapp` y alias nuevo `/v1/webhooks/customer-messaging/whatsapp` |
+| Rutas HTTP del backend | Superficie canónica bajo `/v1/customer-messaging/*` |
+| Webhook público | `GET` y `POST /v1/webhooks/customer-messaging/whatsapp` |
 | Validación de firma | El backend usa `WHATSAPP_APP_SECRET` y la cabecera `X-Hub-Signature-256` en los `POST` |
 
 ---
@@ -47,10 +47,10 @@ Meta **no** puede llamar a `localhost`.
 
 | Situación | Qué hacer |
 |-----------|-----------|
-| Solo desarrollo en tu PC | Usar un **túnel HTTPS** (ngrok, Cloudflare Tunnel, etc.) hacia el puerto donde escucha el API (ej. `8100` en host con Compose). Callback: `https://<túnel>/v1/webhooks/customer-messaging/whatsapp` (o legacy `/v1/webhooks/whatsapp`) |
+| Solo desarrollo en tu PC | Usar un **túnel HTTPS** (ngrok, Cloudflare Tunnel, etc.) hacia el puerto donde escucha el API (ej. `8100` en host con Compose). Callback: `https://<túnel>/v1/webhooks/customer-messaging/whatsapp` |
 | Staging / producción | Dominio o URL del balanceador donde expongas el mismo path |
 
-**Pendiente** si aún no tenés túnel ni servidor público: no vas a poder dar de alta el webhook en Meta hasta entonces. Podés igual **probar conexión y envíos** con `POST /v1/customer-messaging/connections/whatsapp` o el path legacy si ya tenés token e IDs.
+**Pendiente** si aún no tenés túnel ni servidor público: no vas a poder dar de alta el webhook en Meta hasta entonces. Podés igual **probar conexión y envíos** con `POST /v1/customer-messaging/connections/whatsapp` si ya tenés token e IDs.
 
 ### 3. Registrar la línea por organización
 

@@ -27,6 +27,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/currency"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging"
+	customerwhatsapp "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/channels/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
@@ -58,7 +59,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
@@ -182,8 +182,8 @@ func InitializeApp() *app.App {
 		Scopes:       []string{googleoauth.ScopeCalendar},
 	})
 	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
-	whatsappAIClient := whatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
-	whatsappMetaClient := whatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
+	whatsappAIClient := customerwhatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
+	whatsappMetaClient := customerwhatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
 	customerMessagingUC := customer_messaging.NewUsecases(
 		customerMessagingRepo,
 		timelineUC,

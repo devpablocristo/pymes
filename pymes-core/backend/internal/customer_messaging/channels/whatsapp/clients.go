@@ -66,7 +66,7 @@ func NewMetaClient(baseURL string) *MetaClient {
 	}
 }
 
-func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (cm.AIMessageResponse, error) {
+func (c *AIClient) ProcessWhatsApp(ctx context.Context, req cm.InboundMessage) (cm.AIMessageResponse, error) {
 	if c == nil || c.caller.BaseURL == "" {
 		return cm.AIMessageResponse{}, fmt.Errorf("ai service url not configured")
 	}
@@ -92,7 +92,6 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (cm.
 	return out, nil
 }
 
-// sendMessage envía un payload genérico a Meta Graph API y retorna el wa_message_id.
 func (c *MetaClient) sendMessage(ctx context.Context, phoneNumberID, accessToken string, payload any) (string, error) {
 	if c == nil || c.caller.BaseURL == "" {
 		return "", fmt.Errorf("whatsapp graph api base url not configured")
@@ -125,7 +124,6 @@ func (c *MetaClient) sendMessage(ctx context.Context, phoneNumberID, accessToken
 	return "", fmt.Errorf("meta graph api returned success without message id: %s", strings.TrimSpace(string(raw)))
 }
 
-// SendTextMessage envía un mensaje de texto simple.
 func (c *MetaClient) SendTextMessage(ctx context.Context, phoneNumberID, accessToken, to, body string) (string, error) {
 	return c.sendMessage(ctx, phoneNumberID, accessToken, map[string]any{
 		"messaging_product": "whatsapp",
@@ -139,7 +137,6 @@ func (c *MetaClient) SendTextMessage(ctx context.Context, phoneNumberID, accessT
 	})
 }
 
-// SendTemplateMessage envía un template message aprobado por Meta.
 func (c *MetaClient) SendTemplateMessage(ctx context.Context, phoneNumberID, accessToken, to, templateName, language string, params []string) (string, error) {
 	components := make([]map[string]any, 0)
 	if len(params) > 0 {
@@ -166,7 +163,6 @@ func (c *MetaClient) SendTemplateMessage(ctx context.Context, phoneNumberID, acc
 	})
 }
 
-// SendMediaMessage envía un mensaje con imagen, documento, audio o video.
 func (c *MetaClient) SendMediaMessage(ctx context.Context, phoneNumberID, accessToken, to, mediaType, mediaURL, caption string) (string, error) {
 	mt := strings.TrimSpace(strings.ToLower(mediaType))
 	mediaPayload := map[string]any{"link": strings.TrimSpace(mediaURL)}
@@ -182,7 +178,6 @@ func (c *MetaClient) SendMediaMessage(ctx context.Context, phoneNumberID, access
 	})
 }
 
-// SendInteractiveButtons envía un mensaje con hasta 3 botones de respuesta rápida.
 func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, accessToken, to, body string, buttons []cm.InteractiveButtonPayload) (string, error) {
 	actionButtons := make([]map[string]any, 0, len(buttons))
 	for _, b := range buttons {
@@ -204,7 +199,6 @@ func (c *MetaClient) SendInteractiveButtons(ctx context.Context, phoneNumberID, 
 	})
 }
 
-// MarkAsRead marca un mensaje como leído.
 func (c *MetaClient) MarkAsRead(ctx context.Context, phoneNumberID, accessToken, messageID string) error {
 	_, err := c.sendMessage(ctx, phoneNumberID, accessToken, map[string]any{
 		"messaging_product": "whatsapp",

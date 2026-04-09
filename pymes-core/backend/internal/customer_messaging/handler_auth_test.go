@@ -1,4 +1,4 @@
-package whatsapp
+package customer_messaging
 
 import (
 	"bytes"
@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 
 	types "github.com/devpablocristo/core/security/go/contextkeys"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
 // allowAllRBAC deja pasar cualquier RequirePermission (tests de handler HTTP).
@@ -43,7 +43,7 @@ func authContextMiddleware(orgID uuid.UUID, actor string) gin.HandlerFunc {
 	}
 }
 
-func newAuthenticatedWhatsAppRouter(uc *Usecases, orgID uuid.UUID) *gin.Engine {
+func newAuthenticatedCustomerMessagingRouter(uc *Usecases, orgID uuid.UUID) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(authContextMiddleware(orgID, "admin"))
@@ -74,14 +74,14 @@ func TestHTTPSendText(t *testing.T) {
 	}
 	metaClient := &testMetaClient{}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, metaClient, nil, "", "")
-	r := newAuthenticatedWhatsAppRouter(uc, orgID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	body := map[string]string{
 		"party_id": partyID.String(),
 		"body":     "Hola por HTTP",
 	}
 	raw, _ := json.Marshal(body)
-	req := httptest.NewRequest(http.MethodPost, "/v1/whatsapp/send/text", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/v1/customer-messaging/messages/text", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -102,14 +102,14 @@ func TestHTTPSendText_InvalidPartyID(t *testing.T) {
 	t.Parallel()
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
-	r := newAuthenticatedWhatsAppRouter(uc, orgID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
 	body := map[string]string{
 		"party_id": "not-a-uuid",
 		"body":     "x",
 	}
 	raw, _ := json.Marshal(body)
-	req := httptest.NewRequest(http.MethodPost, "/v1/whatsapp/send/text", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/v1/customer-messaging/messages/text", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -139,9 +139,9 @@ func TestHTTPListMessages(t *testing.T) {
 		}},
 	}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedWhatsAppRouter(uc, orgID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/whatsapp/messages", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/messages", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -181,9 +181,9 @@ func TestHTTPGetConnection(t *testing.T) {
 		},
 	}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedWhatsAppRouter(uc, orgID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/whatsapp/connection", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/connections/whatsapp", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -203,9 +203,9 @@ func TestHTTPListMessages_InvalidPartyIDQuery(t *testing.T) {
 	t.Parallel()
 	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	uc := NewUsecases(&testRepo{}, nil, "http://localhost:5173", nil, nil, nil, "", "")
-	r := newAuthenticatedWhatsAppRouter(uc, orgID)
+	r := newAuthenticatedCustomerMessagingRouter(uc, orgID)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/whatsapp/messages?party_id=bad-uuid", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/customer-messaging/messages?party_id=bad-uuid", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 

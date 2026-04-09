@@ -192,7 +192,7 @@ async def _send_whatsapp_reply(
 
         await backend_client.request(
             "POST",
-            "/v1/whatsapp/send/text",
+            "/v1/customer-messaging/messages/text",
             json=body,
             include_internal=True,
         )

@@ -16,7 +16,7 @@ Pasar de un módulo centrado en el proveedor `WhatsApp` a una capacidad de produ
 
 ### 1. Mezcla de responsabilidades
 
-Hoy `pymes-core/backend/internal/whatsapp` mezcla:
+Antes del refactor `pymes-core/backend/internal/whatsapp` mezclaba:
 
 - conexión al proveedor
 - webhook e inbound
@@ -244,7 +244,7 @@ Apoyarse en:
 
 ### 2. No extraer una UI WhatsApp-specific
 
-`WhatsAppInboxPage` y `WhatsAppCampaignsPage` en `frontend` deben quedar como composición/configuración de módulos reusable, no como lógica bespoke.
+`CustomerMessagingInboxPage` y `CustomerMessagingCampaignsPage` en `frontend` deben quedar como composición/configuración de módulos reusable, no como lógica bespoke.
 
 ## Qué eliminar o deprecar
 
@@ -272,7 +272,7 @@ Dejar una sola fuente de verdad por tipo:
 
 Actual:
 
-- `/v1/internal/v1/whatsapp/send-text`
+- `/v1/internal/v1/customer-messaging/send-text`
 
 Objetivo:
 
@@ -284,20 +284,16 @@ Mantener compatibilidad transitoria con el path actual y marcarlo como legacy.
 
 ### API externa owner-side
 
-Mantener en transición:
-
-- `/v1/whatsapp/...`
-
 Objetivo canónico:
 
 - `/v1/customer-messaging/connections/whatsapp`
 - `/v1/customer-messaging/messages`
 - `/v1/customer-messaging/conversations`
 - `/v1/customer-messaging/campaigns`
-- `/v1/customer-messaging/consents/whatsapp`
-- `/v1/customer-messaging/share-links`
+- `/v1/customer-messaging/consents`
+- `/v1/customer-messaging/share/*`
 
-No migrar todo de golpe. Primero reorganizar internamente; luego exponer aliases o v2.
+La migración ya dejó expuesta la superficie canónica; cualquier referencia legacy restante debe tratarse como deuda documental y no como contrato vigente.
 
 ### API interna service-to-service
 
@@ -347,12 +343,7 @@ La intención de negocio es la misma: contactar al cliente.
 
 ### R4. Estado documentado debe coincidir con estado implementado
 
-Hoy el tracking de `statuses` de Meta está modelado pero no totalmente conectado en el webhook actual.
-
-Hasta implementarlo:
-
-- documentarlo como parcial
-- no venderlo como cerrado
+El webhook debe procesar `messages` y `statuses` de Meta de forma consistente.
 
 ## Plan de migración
 
@@ -366,7 +357,7 @@ Hasta implementarlo:
 
 - crear `internal/customer_messaging`
 - mover use cases y entidades
-- dejar `internal/whatsapp` como facade/adaptador temporal
+- retirar `internal/whatsapp` una vez completada la migración
 
 ### Fase 2. Separar canal de dominio
 
@@ -382,8 +373,8 @@ Hasta implementarlo:
 ### Fase 4. Alias y deprecaciones HTTP
 
 - introducir rutas canónicas `customer-messaging`
-- mantener rutas legacy `/v1/whatsapp/*`
-- marcar legacy en docs y OpenAPI
+- eliminar aliases legacy cuando el frontend y los integradores internos ya no los consuman
+- mantener la documentación alineada al contrato real
 
 ### Fase 5. Completar gaps reales
 
@@ -395,8 +386,7 @@ Hasta implementarlo:
 
 ### Dejar
 
-- `pymes-core/backend/internal/whatsapp/clients.go`
-- `pymes-core/backend/internal/whatsapp/inbound.go`
+- `pymes-core/backend/internal/customer_messaging/channels/whatsapp/clients.go`
 - migraciones `whatsapp_*`
 - setup de env `WHATSAPP_*`
 
@@ -405,7 +395,7 @@ Hasta implementarlo:
 - `handler.go`
 - `usecases.go`
 - `repository.go`
-- `usecases/domain/entities.go`
+- `domain/entities.go`
 
 ### Extraer a `modules`
 

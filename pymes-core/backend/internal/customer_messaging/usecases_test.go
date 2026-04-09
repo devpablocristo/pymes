@@ -1,4 +1,4 @@
-package whatsapp
+package customer_messaging
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/domain"
 )
 
 // --- Fakes ---

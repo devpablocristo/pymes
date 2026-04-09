@@ -63,7 +63,6 @@ export function getVisibleModuleIds(): Set<string> {
 
   // Integrations: only if billing or products
   if (profile.usesBilling || sellsProducts || exploring) {
-    visible.add('whatsapp');
     visible.add('paymentGateway');
   }
 

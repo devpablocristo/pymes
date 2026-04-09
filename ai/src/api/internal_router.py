@@ -52,13 +52,6 @@ def require_internal_token(
     dependencies=[Depends(require_internal_token)],
     operation_id="customer_messaging_inbound_v1_internal_customer_messaging_inbound_post",
 )
-@router.post(
-    "/whatsapp/message",
-    response_model=CustomerMessagingInboundResponse,
-    dependencies=[Depends(require_internal_token)],
-    deprecated=True,
-    operation_id="customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post",
-)
 async def customer_messaging_inbound(
     req: CustomerMessagingInboundRequest,
     repo: AIRepository = Depends(get_repository),

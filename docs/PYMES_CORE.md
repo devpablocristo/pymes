@@ -16,7 +16,7 @@ Cada carpeta es un bounded context con patrón hexagonal (`handler`, `usecases`,
 
 `accounts`, `admin`, `appointments`, `attachments`, `audit`, `cashflow`, `currency`, `customer_messaging`, `customers`, `dashboard`, `dataio`, `inventory`, `notifications`, `outwebhooks`, `party`, `paymentgateway`, `payments`, `pdfgen`, `pricelists`, `procurement`, `products`, `publicapi`, `purchases`, `quotes`, `rbac`, `recurring`, `reports`, `returns`, `sales`, `scheduler`, `suppliers`, `timeline`, `whatsapp`.
 
-`internal/whatsapp` quedó como adapter del canal/proveedor Meta; el dominio y las rutas principales de mensajería viven en `internal/customer_messaging`.
+El dominio y las rutas principales de mensajería viven en `internal/customer_messaging`, y el adapter proveedor de Meta quedó en `internal/customer_messaging/channels/whatsapp`.
 
 Paquete **`internal/users`**: helpers (p. ej. resolución de claves); **no** expone `handler` HTTP propio en Gin — el perfil de usuario en consola usa rutas SaaS (`GET /v1/users/me`, etc.).
 

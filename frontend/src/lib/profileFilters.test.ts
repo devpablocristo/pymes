@@ -119,7 +119,6 @@ describe('getVisibleModuleIds', () => {
     expect(ids.has('products')).toBe(true);
     expect(ids.has('services')).toBe(true);
     expect(ids.has('sales')).toBe(true);
-    expect(ids.has('whatsapp')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
   });
 });

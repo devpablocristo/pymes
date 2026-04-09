@@ -146,26 +146,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/internal/whatsapp/message": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Customer Messaging Inbound
-         * @deprecated
-         */
-        post: operations["customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/internal/customer-messaging/inbound": {
         parameters: {
             query?: never;
@@ -826,17 +806,17 @@ export interface components {
             /** Message */
             message: string;
         };
-        /** ChatRequest */
-        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
-            /** Message */
-            message: string;
-        };
         /** PublicChatRequest */
-        src__domains__workshops__auto_repair__public_router__PublicChatRequest: {
+        src__domains__professionals__teachers__public_router__PublicChatRequest: {
             /** Message */
             message: string;
             /** Phone */
             phone?: string | null;
+        };
+        /** ChatRequest */
+        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
+            /** Message */
+            message: string;
         };
     };
     responses: never;
@@ -1115,41 +1095,6 @@ export interface operations {
             };
         };
     };
-    customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Internal-Service-Token"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CustomerMessagingInboundRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CustomerMessagingInboundResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     customer_messaging_inbound_v1_internal_customer_messaging_inbound_post: {
         parameters: {
             query?: never;
@@ -1229,7 +1174,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PublicChatRequest"];
+                "application/json": components["schemas"]["src__domains__professionals__teachers__public_router__PublicChatRequest"];
             };
         };
         responses: {
@@ -1297,7 +1242,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["src__domains__workshops__auto_repair__public_router__PublicChatRequest"];
+                "application/json": components["schemas"]["PublicChatRequest"];
             };
         };
         responses: {

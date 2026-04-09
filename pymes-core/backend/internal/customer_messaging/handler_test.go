@@ -1,4 +1,4 @@
-package whatsapp
+package customer_messaging
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/domain"
 )
 
 // handlerUsecases implementa usecasesPort para tests de handler.
@@ -152,9 +152,9 @@ func TestHandleWebhookRejectsInvalidSignature(t *testing.T) {
 	handler := NewHandler(uc)
 
 	router := gin.New()
-	router.POST("/v1/webhooks/whatsapp", handler.HandleWebhook)
+	router.POST("/v1/webhooks/customer-messaging/whatsapp", handler.HandleWebhook)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/whatsapp", bytes.NewBufferString(`{"entry":[]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/customer-messaging/whatsapp", bytes.NewBufferString(`{"entry":[]}`))
 	req.Header.Set("X-Hub-Signature-256", "sha256=bad")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -174,9 +174,9 @@ func TestHandleWebhookProcessesValidPayload(t *testing.T) {
 	handler := NewHandler(uc)
 
 	router := gin.New()
-	router.POST("/v1/webhooks/whatsapp", handler.HandleWebhook)
+	router.POST("/v1/webhooks/customer-messaging/whatsapp", handler.HandleWebhook)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/whatsapp", bytes.NewBufferString(`{"entry":[]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/customer-messaging/whatsapp", bytes.NewBufferString(`{"entry":[]}`))
 	req.Header.Set("X-Hub-Signature-256", "sha256=good")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -199,11 +199,11 @@ func TestVerifyWebhookGETSuccess(t *testing.T) {
 	handler := NewHandler(uc)
 
 	router := gin.New()
-	router.GET("/v1/webhooks/whatsapp", handler.VerifyWebhook)
+	router.GET("/v1/webhooks/customer-messaging/whatsapp", handler.VerifyWebhook)
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=meta-verify-secret&hub.challenge=challenge-xyz",
+		"/v1/webhooks/customer-messaging/whatsapp?hub.mode=subscribe&hub.verify_token=meta-verify-secret&hub.challenge=challenge-xyz",
 		nil,
 	)
 	rec := httptest.NewRecorder()
@@ -227,11 +227,11 @@ func TestVerifyWebhookGETRejectsBadToken(t *testing.T) {
 	handler := NewHandler(uc)
 
 	router := gin.New()
-	router.GET("/v1/webhooks/whatsapp", handler.VerifyWebhook)
+	router.GET("/v1/webhooks/customer-messaging/whatsapp", handler.VerifyWebhook)
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=challenge-xyz",
+		"/v1/webhooks/customer-messaging/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=challenge-xyz",
 		nil,
 	)
 	rec := httptest.NewRecorder()

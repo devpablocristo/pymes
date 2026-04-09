@@ -57,53 +57,17 @@ type Handler struct{ uc usecasesPort }
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/whatsapp/quote/:id", rbac.RequirePermission("quotes", "read"), h.Quote)
-	auth.GET("/whatsapp/sale/:id/receipt", rbac.RequirePermission("sales", "read"), h.SaleReceipt)
-	auth.GET("/whatsapp/customer/:id/message", rbac.RequirePermission("customers", "read"), h.CustomerMessage)
 	auth.GET("/customer-messaging/share/quote/:id", rbac.RequirePermission("quotes", "read"), h.Quote)
 	auth.GET("/customer-messaging/share/sale/:id/receipt", rbac.RequirePermission("sales", "read"), h.SaleReceipt)
 	auth.GET("/customer-messaging/share/customer/:id/message", rbac.RequirePermission("customers", "read"), h.CustomerMessage)
-
-	wa := auth.Group("/whatsapp")
-	h.registerWhatsAppChannelRoutes(wa, rbac)
 
 	cm := auth.Group("/customer-messaging")
 	h.registerCustomerMessagingRoutes(cm, rbac)
 }
 
 func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
-	v1.GET("/webhooks/whatsapp", h.VerifyWebhook)
-	v1.POST("/webhooks/whatsapp", ginmw.NewRateLimit(240), ginmw.NewBodySizeLimit(256<<10), h.HandleWebhook)
 	v1.GET("/webhooks/customer-messaging/whatsapp", h.VerifyWebhook)
 	v1.POST("/webhooks/customer-messaging/whatsapp", ginmw.NewRateLimit(240), ginmw.NewBodySizeLimit(256<<10), h.HandleWebhook)
-}
-
-func (h *Handler) registerWhatsAppChannelRoutes(group *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	group.GET("/connection", h.GetConnection)
-	group.POST("/connection", h.Connect)
-	group.DELETE("/connection", h.Disconnect)
-	group.GET("/connection/stats", h.GetConnectionStats)
-	group.POST("/send/text", rbac.RequirePermission("whatsapp", "write"), h.SendText)
-	group.POST("/send/template", rbac.RequirePermission("whatsapp", "write"), h.SendTemplate)
-	group.POST("/send/media", rbac.RequirePermission("whatsapp", "write"), h.SendMedia)
-	group.POST("/send/interactive", rbac.RequirePermission("whatsapp", "write"), h.SendInteractive)
-	group.GET("/messages", rbac.RequirePermission("whatsapp", "read"), h.ListMessages)
-	group.GET("/templates", rbac.RequirePermission("whatsapp", "read"), h.ListTemplates)
-	group.POST("/templates", rbac.RequirePermission("whatsapp", "write"), h.CreateTemplate)
-	group.GET("/templates/:id", rbac.RequirePermission("whatsapp", "read"), h.GetTemplate)
-	group.DELETE("/templates/:id", rbac.RequirePermission("whatsapp", "write"), h.DeleteTemplate)
-	group.GET("/opt-ins", rbac.RequirePermission("whatsapp", "read"), h.ListOptIns)
-	group.POST("/opt-ins", rbac.RequirePermission("whatsapp", "write"), h.RegisterOptIn)
-	group.DELETE("/opt-ins/:party_id", rbac.RequirePermission("whatsapp", "write"), h.RegisterOptOut)
-	group.GET("/opt-ins/:party_id/status", rbac.RequirePermission("whatsapp", "read"), h.CheckOptIn)
-	group.GET("/conversations", rbac.RequirePermission("whatsapp", "read"), h.ListWAConversations)
-	group.POST("/conversations/:id/assign", rbac.RequirePermission("whatsapp", "write"), h.AssignWAConversation)
-	group.POST("/conversations/:id/read", rbac.RequirePermission("whatsapp", "write"), h.MarkWAConversationRead)
-	group.POST("/conversations/:id/resolve", rbac.RequirePermission("whatsapp", "write"), h.ResolveWAConversation)
-	group.GET("/campaigns", rbac.RequirePermission("whatsapp", "read"), h.ListCampaigns)
-	group.POST("/campaigns", rbac.RequirePermission("whatsapp", "write"), h.CreateCampaign)
-	group.GET("/campaigns/:id", rbac.RequirePermission("whatsapp", "read"), h.GetCampaignDetail)
-	group.POST("/campaigns/:id/send", rbac.RequirePermission("whatsapp", "write"), h.SendCampaign)
 }
 
 func (h *Handler) registerCustomerMessagingRoutes(group *gin.RouterGroup, rbac *handlers.RBACMiddleware) {

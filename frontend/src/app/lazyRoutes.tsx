@@ -47,10 +47,10 @@ export const RestaurantTableSessionsPage = lazy(() =>
 export const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
 export const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 export const CustomerMessagingCampaignsPage = lazy(() =>
-  import('../pages/WhatsAppCampaignsPage').then((mod) => ({ default: mod.CustomerMessagingCampaignsPage })),
+  import('../pages/CustomerMessagingCampaignsPage').then((mod) => ({ default: mod.CustomerMessagingCampaignsPage })),
 );
 export const CustomerMessagingInboxPage = lazy(() =>
-  import('../pages/WhatsAppInboxPage').then((mod) => ({ default: mod.CustomerMessagingInboxPage })),
+  import('../pages/CustomerMessagingInboxPage').then((mod) => ({ default: mod.CustomerMessagingInboxPage })),
 );
 export const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })));

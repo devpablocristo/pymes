@@ -114,15 +114,6 @@ const staticModuleCatalog: Record<string, ModuleDefinition> = {
       },
     ],
   },
-  whatsapp: {
-    id: 'whatsapp',
-    title: 'WhatsApp',
-    navLabel: 'WhatsApp',
-    summary: 'Mensajería con clientes, campañas y operación conversacional sobre WhatsApp.',
-    group: 'integrations',
-    icon: 'WA',
-    customRoute: '/customer-messaging/inbox',
-  },
   paymentGateway: {
     id: 'paymentGateway',
     title: 'Pasarela de pago',

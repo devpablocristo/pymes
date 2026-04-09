@@ -315,23 +315,23 @@ Los nombres de servicio NO llevan prefijo `pymes-`. El `COMPOSE_PROJECT_NAME` ya
 
 ---
 
-## 12. WhatsApp Business — Módulo transversal
+## 12. Customer Messaging sobre WhatsApp
 
 ### 12.1 Arquitectura
 
-WhatsApp es un módulo transversal en `pymes-core/backend/internal/whatsapp/`. No va en `core/saas/go` (es específico del producto pymes). Estructura hexagonal completa:
+La mensajería con clientes vive en `pymes-core/backend/internal/customer_messaging/`. El adapter proveedor de Meta vive en `pymes-core/backend/internal/customer_messaging/channels/whatsapp/`. No va en `core/saas/go` porque sigue siendo específico del producto pymes.
 
 ```
-internal/whatsapp/
-├── usecases.go                     # lógica + ports (RepositoryPort, TimelinePort, etc.)
-├── usecases/domain/entities.go     # Connection, Message, Template, OptIn
-├── handler.go                      # HTTP adapter (Gin)
-├── handler/dto/dto.go              # DTOs request/response
-├── repository.go                   # GORM adapter + sentinels + mappers
-├── repository/models/models.go     # GORM models
-├── clients.go                      # AIClient + MetaClient (Graph API v23.0)
-├── inbound.go                      # Webhook handling (verify + HMAC + inbound messages)
-├── *_test.go                       # 10 tests
+internal/customer_messaging/
+├── usecases.go                               # lógica + ports
+├── domain/entities.go                        # Connection, Message, Template, OptIn, Campaign
+├── handler.go                                # HTTP adapter (Gin)
+├── handler/dto/dto.go                        # DTOs request/response
+├── repository.go                             # GORM adapter + sentinels + mappers
+├── repository/models/models.go               # GORM models
+├── inbound.go                                # Webhook handling (verify + HMAC + inbound messages/statuses)
+├── channels/whatsapp/clients.go              # AIClient + MetaClient (Graph API)
+├── *_test.go
 ```
 
 ### 12.2 Tablas
@@ -345,46 +345,46 @@ internal/whatsapp/
 
 ### 12.3 API (endpoints)
 
-**Links wa.me/ (legacy):**
-- `GET /v1/whatsapp/quote/:id` — link de presupuesto
-- `GET /v1/whatsapp/sale/:id/receipt` — link de comprobante
-- `GET /v1/whatsapp/customer/:id/message` — mensaje libre
+**Links wa.me/:**
+- `GET /v1/customer-messaging/share/quote/:id` — link de presupuesto
+- `GET /v1/customer-messaging/share/sale/:id/receipt` — link de comprobante
+- `GET /v1/customer-messaging/share/customer/:id/message` — mensaje libre
 
 **Conexión:**
-- `GET /v1/whatsapp/connection` — estado
-- `POST /v1/whatsapp/connection` — conectar (phone_number_id, waba_id, access_token)
-- `DELETE /v1/whatsapp/connection` — desconectar
-- `GET /v1/whatsapp/connection/stats` — métricas
+- `GET /v1/customer-messaging/connections/whatsapp` — estado
+- `POST /v1/customer-messaging/connections/whatsapp` — conectar (phone_number_id, waba_id, access_token)
+- `DELETE /v1/customer-messaging/connections/whatsapp` — desconectar
+- `GET /v1/customer-messaging/connections/whatsapp/stats` — métricas
 
 **Envío real (Graph API):**
-- `POST /v1/whatsapp/send/text` — texto directo
-- `POST /v1/whatsapp/send/template` — template aprobado
-- `POST /v1/whatsapp/send/media` — imagen, documento, audio, video
-- `POST /v1/whatsapp/send/interactive` — botones de respuesta rápida (max 3)
+- `POST /v1/customer-messaging/messages/text` — texto directo
+- `POST /v1/customer-messaging/messages/template` — template aprobado
+- `POST /v1/customer-messaging/messages/media` — imagen, documento, audio, video
+- `POST /v1/customer-messaging/messages/interactive` — botones de respuesta rápida (max 3)
 
 **Historial:**
-- `GET /v1/whatsapp/messages` — listado con filtros (party_id, direction, status)
+- `GET /v1/customer-messaging/messages` — listado con filtros (party_id, direction, status)
 
 **Templates:**
-- `GET /v1/whatsapp/templates` — listar
-- `POST /v1/whatsapp/templates` — crear (draft)
-- `GET /v1/whatsapp/templates/:id` — detalle
-- `DELETE /v1/whatsapp/templates/:id` — eliminar
+- `GET /v1/customer-messaging/templates` — listar
+- `POST /v1/customer-messaging/templates` — crear (draft)
+- `GET /v1/customer-messaging/templates/:id` — detalle
+- `DELETE /v1/customer-messaging/templates/:id` — eliminar
 
 **Opt-in:**
-- `GET /v1/whatsapp/opt-ins` — listar contactos con consentimiento
-- `POST /v1/whatsapp/opt-ins` — registrar consentimiento
-- `DELETE /v1/whatsapp/opt-ins/:party_id` — registrar opt-out
-- `GET /v1/whatsapp/opt-ins/:party_id/status` — verificar estado
+- `GET /v1/customer-messaging/consents` — listar contactos con consentimiento
+- `POST /v1/customer-messaging/consents` — registrar consentimiento
+- `DELETE /v1/customer-messaging/consents/:party_id` — registrar opt-out
+- `GET /v1/customer-messaging/consents/:party_id/status` — verificar estado
 
 **Webhooks (públicos, sin auth):**
-- `GET /v1/webhooks/whatsapp` — verificación Meta
-- `POST /v1/webhooks/whatsapp` — inbound + status (rate limit 240/min, max 256KB)
+- `GET /v1/webhooks/customer-messaging/whatsapp` — verificación Meta
+- `POST /v1/webhooks/customer-messaging/whatsapp` — inbound + status (rate limit 240/min, max 256KB)
 
 ### 12.4 Meta Graph API
 
 - Versión: v23.0
-- Client: `MetaClient` en `clients.go`
+- Client: `MetaClient` en `channels/whatsapp/clients.go`
 - Métodos: `SendTextMessage`, `SendTemplateMessage`, `SendMediaMessage`, `SendInteractiveButtons`, `MarkAsRead`
 - Todos retornan `(waMessageID string, error)` para tracking
 - Tokens almacenados encriptados via `paymentgateway.Crypto`

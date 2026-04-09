@@ -154,7 +154,7 @@ export function CustomerMessagingCampaignsPage() {
 
   return (
     <PageLayout
-      title="Campañas WhatsApp"
+      title="Campañas de Mensajería"
       lead="Templates salientes, segmentación por tag y envío masivo sobre contactos con consentimiento."
       actions={
         <button
@@ -247,5 +247,3 @@ export function CustomerMessagingCampaignsPage() {
     </PageLayout>
   );
 }
-
-export const WhatsAppCampaignsPage = CustomerMessagingCampaignsPage

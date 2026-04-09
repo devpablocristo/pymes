@@ -12,10 +12,10 @@ import { usePageSearch } from '../components/PageSearch';
 import { formatDate } from '../crud/resourceConfigs.shared';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import {
-  assignWhatsAppConversation,
+  assignCustomerMessagingConversation,
   listCustomerMessagingConversations,
-  markWhatsAppConversationRead,
-  resolveWhatsAppConversation,
+  markCustomerMessagingConversationRead,
+  resolveCustomerMessagingConversation,
   type CustomerMessagingConversation,
 } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
@@ -35,19 +35,20 @@ export function CustomerMessagingInboxPage() {
     refetchInterval: 30_000,
   });
   const assignMutation = useMutation({
-    mutationFn: ({ id, assignedTo }: { id: string; assignedTo: string }) => assignWhatsAppConversation(id, assignedTo),
+    mutationFn: ({ id, assignedTo }: { id: string; assignedTo: string }) =>
+      assignCustomerMessagingConversation(id, assignedTo),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.customerMessaging.conversations });
     },
   });
   const markReadMutation = useMutation({
-    mutationFn: markWhatsAppConversationRead,
+    mutationFn: markCustomerMessagingConversationRead,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.customerMessaging.conversations });
     },
   });
   const resolveMutation = useMutation({
-    mutationFn: resolveWhatsAppConversation,
+    mutationFn: resolveCustomerMessagingConversation,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.customerMessaging.conversations });
     },
@@ -124,7 +125,7 @@ export function CustomerMessagingInboxPage() {
 
   return (
     <PageLayout
-      title="Bandeja WhatsApp"
+      title="Bandeja de Mensajería"
       lead="Conversaciones entrantes, asignación operativa y seguimiento básico por contacto."
       actions={
         <button
@@ -147,5 +148,3 @@ export function CustomerMessagingInboxPage() {
     </PageLayout>
   );
 }
-
-export const WhatsAppInboxPage = CustomerMessagingInboxPage

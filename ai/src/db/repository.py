@@ -15,6 +15,7 @@ DEFAULT_DOSSIER: dict[str, Any] = {
     "business": {
         "name": "",
         "type": "",
+        "vertical": "",
         "profile": "",
         "description": "",
         "currency": "ARS",
@@ -32,6 +33,14 @@ DEFAULT_DOSSIER: dict[str, Any] = {
     "preferences": {},
     "team": [],
     "learned_context": [],
+    "memory": {
+        "business_facts": [],
+        "stable_business_facts": [],
+        "open_loops": [],
+        "decisions": [],
+        "recent_threads": [],
+        "user_profiles": {},
+    },
     "kpis_baseline": {},
 }
 

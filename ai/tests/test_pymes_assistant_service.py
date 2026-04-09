@@ -6,11 +6,15 @@ import pytest
 
 from src.agents.service import (
     _InternalDomainSnapshot,
+    _build_internal_general_system_prompt,
     _build_internal_analysis_user_prompt,
+    _default_internal_reply,
+    _hydrate_dossier_from_backend_settings,
     _summarize_procurement_requests,
     run_internal_orchestrated_chat,
 )
 from src.backend_client.auth import AuthContext
+from src.core.dossier import build_operating_context_for_prompt, capture_turn_memory, consolidate_memory
 
 
 class StubRepo:
@@ -18,10 +22,35 @@ class StubRepo:
         self.append_calls: list[dict[str, object]] = []
         self.track_calls: list[dict[str, int | str]] = []
         self.agent_events: list[dict[str, object]] = []
+        self.dossier: dict[str, object] = {
+            "business": {"name": "", "vertical": "", "profile": "", "type": "", "description": "", "currency": "ARS", "tax_rate": 21.0},
+            "onboarding": {"status": "pending", "current_step": "welcome", "steps_completed": [], "steps_skipped": []},
+            "modules_active": [],
+            "modules_inactive": [],
+            "preferences": {},
+            "team": [],
+            "learned_context": [],
+            "memory": {
+                "business_facts": [],
+                "stable_business_facts": [],
+                "open_loops": [],
+                "decisions": [],
+                "recent_threads": [],
+                "user_profiles": {},
+            },
+            "kpis_baseline": {},
+        }
 
     async def append_messages(self, **kwargs):
         self.append_calls.append(kwargs)
         return SimpleNamespace(id=kwargs["conversation_id"])
+
+    async def get_or_create_dossier(self, _org_id: str):
+        return self.dossier
+
+    async def update_dossier(self, _org_id: str, patch):
+        self.dossier = patch
+        return self.dossier
 
     async def track_usage(self, org_id: str, tokens_in: int, tokens_out: int) -> None:
         self.track_calls.append({"org_id": org_id, "tokens_in": tokens_in, "tokens_out": tokens_out})
@@ -230,6 +259,165 @@ def test_summarize_procurement_requests_uses_singular_copy() -> None:
     assert result == "Tenés 1 solicitud de compra activa: 1 en borrador. Es: Repuestos taller."
 
 
+def test_default_internal_reply_presents_business_advisor_role() -> None:
+    reply = _default_internal_reply("general")
+    assert "asesor del negocio" in reply.lower()
+    assert "ventas" in reply.lower()
+
+
+def test_build_operating_context_for_prompt_infers_vertical_and_pymes_playbook() -> None:
+    dossier = {
+        "business": {"name": "Taller Norte", "profile": "servicio_profesional"},
+        "modules_active": ["customers", "scheduling", "products", "sales"],
+    }
+
+    context = build_operating_context_for_prompt(dossier)
+
+    assert "Vertical principal: servicios profesionales." in context
+    assert "Cómo funciona Pymes:" in context
+    assert "Antes que listar registros" not in context
+    assert "priorizá análisis, riesgos, prioridades y acciones" in context
+
+
+def test_internal_general_system_prompt_embeds_operating_context() -> None:
+    dossier = {
+        "business": {"name": "Bici Centro", "vertical": "bike_shop"},
+        "modules_active": ["products", "inventory", "sales", "scheduling"],
+    }
+
+    prompt = _build_internal_general_system_prompt(dossier)
+
+    assert "asesor del negocio" in prompt.lower()
+    assert "Vertical principal: bicicletería." in prompt
+    assert "Cómo pensar esta vertical:" in prompt
+
+
+def test_internal_analysis_user_prompt_includes_operating_context() -> None:
+    snapshot = _InternalDomainSnapshot(
+        routed_agent="sales",
+        scope="Ventas",
+        summary="Tenés 2 ventas registradas.",
+        tool_calls=["get_recent_sales"],
+        blocks=[],
+        raw_result={"total": 2, "items": [{"customer_name": "Acme", "total": 1500.0}]},
+    )
+
+    payload = _build_internal_analysis_user_prompt(
+        snapshot=snapshot,
+        user_message="Resumime cómo viene el negocio",
+        dossier={
+            "business": {"name": "Resto Demo", "vertical": "restaurants"},
+            "modules_active": ["products", "sales"],
+        },
+    )
+
+    assert '"operating_context"' in payload
+    assert "gastronomía" in payload
+
+
+def test_capture_turn_memory_stores_business_user_and_open_loops() -> None:
+    dossier = {
+        "business": {"name": "Demo"},
+        "modules_active": ["sales"],
+    }
+
+    capture_turn_memory(
+        dossier,
+        user_id="user-1",
+        user_message="Recordá que nuestro negocio vende al por mayor y respondeme breve.",
+        assistant_reply="Entendido. Voy a priorizar ese contexto.",
+        routed_agent="general",
+        tool_calls=[],
+        pending_confirmations=["create_sale"],
+        confirmed_actions=set(),
+    )
+
+    context = build_operating_context_for_prompt(dossier, "user-1")
+
+    assert "Memoria del negocio:" in context
+    assert "nuestro negocio vende al por mayor" in context.lower()
+    assert "Memoria del usuario interno:" in context
+    assert "respuestas breves" in context.lower()
+    assert "Temas abiertos recientes:" in context
+    assert "create_sale" in context
+
+
+def test_consolidate_memory_curates_stable_facts_preferences_and_decisions() -> None:
+    dossier = {
+        "business": {"name": "Demo"},
+        "modules_active": ["sales"],
+        "memory": {
+            "business_facts": [
+                {"text": "Vendemos al por mayor", "kind": "explicit_business_fact", "times_seen": 2},
+                {"text": "Vendemos al por mayor", "kind": "explicit_business_fact", "times_seen": 1},
+                {"text": "Tenemos atención personalizada", "kind": "explicit_business_fact", "times_seen": 1},
+            ],
+            "decisions": [
+                {"action": "create_sale", "summary": "Confirmar venta urgente", "agent": "sales"},
+                {"action": "create_sale", "summary": "Confirmar venta urgente", "agent": "sales"},
+            ],
+            "open_loops": [],
+            "recent_threads": [],
+            "user_profiles": {
+                "user-1": {
+                    "preferences": [
+                        "El usuario prefiere respuestas breves.",
+                        "El usuario prefiere respuestas breves.",
+                        "El usuario prefiere respuestas con tablas cuando agregan valor.",
+                    ],
+                    "recent_topics": ["sales: revisar ventas", "sales: revisar ventas"],
+                }
+            },
+        },
+    }
+
+    consolidate_memory(dossier)
+    context = build_operating_context_for_prompt(dossier, "user-1")
+
+    assert "Vendemos al por mayor" in dossier["memory"]["stable_business_facts"]
+    assert len(dossier["memory"]["decisions"]) == 1
+    assert dossier["memory"]["user_profiles"]["user-1"]["active_preferences"] == [
+        "El usuario prefiere respuestas breves.",
+        "El usuario prefiere respuestas con tablas cuando agregan valor.",
+    ]
+    assert "Decisiones recientes:" in context
+    assert "create_sale: Confirmar venta urgente" in context
+
+
+@pytest.mark.asyncio
+async def test_hydrate_dossier_from_backend_settings_refreshes_business_context() -> None:
+    repo = StubRepo()
+
+    class SettingsBackend:
+        async def request(self, method: str, path: str, auth=None, **_kwargs):
+            assert method == "GET"
+            assert path == "/v1/tenant-settings"
+            assert auth is not None
+            return {
+                "business_name": "Bici Norte",
+                "vertical": "bike_shop",
+                "business_type": "retail",
+                "business_description": "Taller y tienda de ciclismo",
+            }
+
+    dossier, snapshot = await _hydrate_dossier_from_backend_settings(
+        repo=repo,  # type: ignore[arg-type]
+        backend_client=SettingsBackend(),  # type: ignore[arg-type]
+        org_id="org-123",
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert dossier["business"]["name"] == "Bici Norte"
+    assert dossier["business"]["vertical"] == "bike_shop"
+    assert snapshot["business"]["name"] == "Bici Norte"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("route_hint", "message", "expected_tool", "expected_text"),
@@ -396,6 +584,109 @@ async def test_run_internal_orchestrated_chat_prioritizes_sales_analysis_for_com
     assert result.routing_source == "read_fallback"
     assert "Semana floja con oportunidad comercial clara." in result.reply
     assert result.blocks[0]["type"] == "insight_card"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_does_not_offer_clarification_for_executive_business_request(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia pedir clarificacion para una consulta ejecutiva clara")
+
+    class StubAnalysisClient:
+        def complete_json(self, *, system_prompt: str, user_prompt: str):
+            assert '"category": "Ventas"' in user_prompt
+            return SimpleNamespace(
+                content=(
+                    '{"reply":"Necesitás foco comercial esta semana.",'
+                    '"summary":"El negocio necesita empuje comercial y seguimiento de ventas.",'
+                    '"scope":"Ventas · semanal","highlights":[{"label":"Lectura","value":"Ejecutiva"}],'
+                    '"recommendations":["Reactivar clientes recientes."],'
+                    '"kpis":[{"label":"Ventas","value":"2","trend":"flat","context":"muestra actual"}],'
+                    '"table":{"title":"Ventas recientes","columns":["Cliente","Total"],"rows":[["Acme","$1,500.00"]]}}'
+                )
+            )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_llm_client", lambda *_args, **_kwargs: StubAnalysisClient())
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: SalesRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="Quiero una mirada de dueño del negocio y 3 acciones concretas para vender más esta semana.",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.routed_agent == "sales"
+    assert result.routing_source == "read_fallback"
+    assert "Necesitás foco comercial esta semana." in result.reply
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_overrides_service_route_hint_for_executive_business_request(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia usar el router general cuando un route_hint ejecutivo se puede resolver por analysis fallback")
+
+    class StubAnalysisClient:
+        def complete_json(self, *, system_prompt: str, user_prompt: str):
+            assert '"category": "Ventas"' in user_prompt
+            return SimpleNamespace(
+                content=(
+                    '{"reply":"La prioridad es mover ventas, no listar servicios.",'
+                    '"summary":"La consulta es ejecutiva y debe resolverse con foco comercial.",'
+                    '"scope":"Ventas · semanal","highlights":[{"label":"Ruteo","value":"Ventas"}],'
+                    '"recommendations":["Promover servicios de mayor margen."],'
+                    '"kpis":[{"label":"Ventas","value":"2","trend":"flat","context":"muestra actual"}],'
+                    '"table":{"title":"Ventas recientes","columns":["Cliente","Total"],"rows":[["Acme","$1,500.00"]]}}'
+                )
+            )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_llm_client", lambda *_args, **_kwargs: StubAnalysisClient())
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: SalesRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="Quiero una mirada de dueño del negocio. Decime 3 acciones concretas para vender más.",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        route_hint="services",
+    )
+
+    assert result.routed_agent == "sales"
+    assert result.routing_source == "ui_hint"
+    assert "La prioridad es mover ventas, no listar servicios." in result.reply
 
 
 @pytest.mark.asyncio
@@ -692,7 +983,8 @@ async def test_run_internal_orchestrated_chat_uses_general_fallback(monkeypatch)
     )
 
     assert result.routed_agent == "general"
-    assert "clientes, productos, ventas, cobros y compras" in result.reply
+    assert "asesor del negocio" in result.reply.lower()
+    assert "clientes, productos, ventas, cobros, servicios y compras" in result.reply.lower()
     assert result.blocks == [{"type": "text", "text": result.reply}]
 
 
@@ -777,7 +1069,7 @@ async def test_run_internal_orchestrated_chat_offers_clarification_for_menu_requ
     )
 
     assert result.routed_agent == "general"
-    assert result.reply == "Elegí una categoría para continuar."
+    assert result.reply == "Elegí una categoría para que pueda ayudarte mejor."
     assert "Necesito un poco más de contexto" not in result.reply
     assert result.blocks[1]["type"] == "actions"
     assert [action["label"] for action in result.blocks[1]["actions"]] == [
@@ -825,7 +1117,7 @@ async def test_run_internal_orchestrated_chat_offers_menu_even_with_active_route
     )
 
     assert result.routed_agent == "general"
-    assert result.reply == "Elegí una categoría para continuar."
+    assert result.reply == "Elegí una categoría para que pueda ayudarte mejor."
     assert result.blocks[1]["type"] == "actions"
     assert result.blocks[1]["actions"][0]["selection_behavior"] == "prompt_for_query"
 

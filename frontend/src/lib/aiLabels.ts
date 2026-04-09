@@ -12,10 +12,10 @@ export function humanRoutedLabel(mode: string, language: LanguageCode = 'es'): s
   if (mode === 'sales') return pick(language, 'Ventas', 'Sales');
   if (mode === 'collections') return pick(language, 'Cobros', 'Collections');
   if (mode === 'purchases') return pick(language, 'Compras', 'Purchases');
-  if (mode === 'general') return pick(language, 'General', 'General');
+  if (mode === 'general') return pick(language, 'Asesor del negocio', 'Business advisor');
   if (mode === 'internal_procurement') return pick(language, 'Compras internas', 'Internal procurement');
   if (mode === 'internal_sales') return pick(language, 'Ventas', 'Sales');
-  return mode || pick(language, 'General', 'General');
+  return mode || pick(language, 'Asesor del negocio', 'Business advisor');
 }
 
 export function humanInsightScopeLabel(scope: string, language: LanguageCode = 'es'): string {

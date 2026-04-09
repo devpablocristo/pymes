@@ -11,6 +11,7 @@ from src.agents.audit import record_agent_event
 from src.agents.policy import CommercialPolicy
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
+from src.core.dossier import build_operating_context_for_prompt, infer_business_vertical
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from runtime.types import ToolDeclaration
 from src.db.repository import AIRepository
@@ -79,6 +80,8 @@ def build_commercial_prompt(agent_mode: str, channel: str, auth: AuthContext | N
     business = dossier.get("business", {}) if isinstance(dossier, dict) else {}
     business_name = str(business.get("name") or "el negocio").strip()
     modules = ", ".join(dossier.get("modules_active", [])) if isinstance(dossier, dict) else ""
+    vertical = infer_business_vertical(dossier)
+    operating_context = build_operating_context_for_prompt(dossier, auth.actor if auth is not None else None)
     prompt = [
         "Sos un agente comercial de pymes.",
         "Responde siempre en espanol, con tono profesional, claro y directo.",
@@ -102,7 +105,9 @@ def build_commercial_prompt(agent_mode: str, channel: str, auth: AuthContext | N
             [
                 f"Asistis al equipo comercial interno de {business_name}. Rol actual: {role}.",
                 f"Modulos activos visibles para este usuario: {modules or 'no informados' }.",
+                f"Vertical prioritaria: {vertical or 'generalista'}.",
                 "Podes acelerar ventas, presupuestos y cobros, pero no saltar permisos ni validaciones.",
+                "Si el pedido es ejecutivo o comercial, prioriza lectura de negocio y propuestas accionables antes que listado de registros.",
             ]
         )
     else:
@@ -111,9 +116,12 @@ def build_commercial_prompt(agent_mode: str, channel: str, auth: AuthContext | N
             [
                 f"Asistis compras y abastecimiento interno de {business_name}. Rol actual: {role}.",
                 f"Modulos activos visibles para este usuario: {modules or 'no informados' }.",
+                f"Vertical prioritaria: {vertical or 'generalista'}.",
                 "No emitas compras finales automaticamente. Limita la respuesta a analisis, sugerencias y borradores.",
             ]
         )
+    if operating_context:
+        prompt.append(operating_context)
     return "\n".join(prompt)
 
 

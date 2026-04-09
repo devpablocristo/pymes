@@ -55,15 +55,20 @@ from src.chat_blocks import (
     build_route_selection_block,
 )
 from src.config import get_settings
-from src.core.dossier import summarize_dossier_for_context
+from src.core.dossier import (
+    build_operating_context_for_prompt,
+    capture_turn_memory,
+    summarize_dossier_for_context,
+    sync_business_from_settings,
+)
 from runtime import LLMError, build_llm_client, validate_json_completion
 from runtime.orchestrator import OrchestratorLimits, orchestrate
 from runtime.services.multi_agent_orchestrator import run_routed_agent
-from src.db.repository import AIRepository
+from src.db.repository import AIRepository, DEFAULT_DOSSIER
 from runtime.types import LLMProvider, Message
 from runtime.logging import get_logger
 from runtime.text import estimate_tokens
-from src.tools import payments, scheduling
+from src.tools import payments, scheduling, settings as settings_tools
 
 logger = get_logger(__name__)
 
@@ -77,10 +82,11 @@ _INTERNAL_SENSITIVE_TOOLS = {
     "send_payment_info",
 }
 
-_INTERNAL_GENERAL_SYSTEM_PROMPT = """\
-Sos el asistente general de una plataforma de gestión para PyMEs.
-Respondé saludos y preguntas generales de forma amable, clara y concisa.
-Si el usuario pide una acción concreta del negocio, indicá que puede pedírtela directamente y el sistema la va a enrutar.
+_INTERNAL_GENERAL_SYSTEM_PROMPT_BASE = """\
+Sos el asesor del negocio dentro de una plataforma de gestión para PyMEs.
+Tu trabajo es ayudar a entender cómo viene el negocio, ordenar prioridades y derivar a especialistas cuando la consulta baja a un dominio concreto.
+Respondé saludos y preguntas generales de forma clara y concisa.
+Si el usuario pide una acción o lectura concreta de un dominio, indicá que podés resolverla o derivarla al especialista correspondiente.
 Respondé siempre en español."""
 
 _AMBIGUOUS_ROUTE_OPTIONS: tuple[tuple[str, str], ...] = (
@@ -191,6 +197,85 @@ Reglas:
 """
 
 
+def _build_internal_general_system_prompt(dossier: dict[str, Any], user_id: str | None = None) -> str:
+    operating_context = build_operating_context_for_prompt(dossier, user_id)
+    if not operating_context:
+        return _INTERNAL_GENERAL_SYSTEM_PROMPT_BASE
+    return f"{_INTERNAL_GENERAL_SYSTEM_PROMPT_BASE}\n\n{operating_context}"
+
+
+async def _get_runtime_dossier(repo: AIRepository, org_id: str) -> dict[str, Any]:
+    getter = getattr(repo, "get_or_create_dossier", None)
+    if getter is None:
+        return copy.deepcopy(DEFAULT_DOSSIER)
+    dossier = await getter(org_id)
+    if isinstance(dossier, dict):
+        return dossier
+    return copy.deepcopy(DEFAULT_DOSSIER)
+
+
+async def _persist_dossier_if_changed(repo: AIRepository, org_id: str, before: dict[str, Any], after: dict[str, Any]) -> None:
+    if after == before:
+        return
+    updater = getattr(repo, "update_dossier", None)
+    if updater is None:
+        return
+    await updater(org_id, after)
+
+
+async def _hydrate_dossier_from_backend_settings(
+    *,
+    repo: AIRepository,
+    backend_client: BackendClient,
+    org_id: str,
+    auth: AuthContext | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    dossier = await _get_runtime_dossier(repo, org_id)
+    snapshot = copy.deepcopy(dossier)
+    if auth is None:
+        return dossier, snapshot
+    requester = getattr(backend_client, "request", None)
+    if requester is None:
+        return dossier, snapshot
+    try:
+        tenant_settings = await settings_tools.get_tenant_settings(backend_client, auth)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("assistant_dossier_hydration_failed", org_id=org_id, error=str(exc))
+        return dossier, snapshot
+    if isinstance(tenant_settings, dict) and tenant_settings:
+        sync_business_from_settings(dossier, tenant_settings)
+        await _persist_dossier_if_changed(repo, org_id, snapshot, dossier)
+        snapshot = copy.deepcopy(dossier)
+    return dossier, snapshot
+
+
+async def _remember_internal_turn(
+    *,
+    repo: AIRepository,
+    org_id: str,
+    dossier: dict[str, Any],
+    dossier_snapshot: dict[str, Any],
+    auth: AuthContext,
+    user_message: str,
+    assistant_reply: str,
+    routed_agent: str,
+    tool_calls: list[str],
+    pending_confirmations: list[str],
+    confirmed_actions: set[str],
+) -> None:
+    capture_turn_memory(
+        dossier,
+        user_id=auth.actor,
+        user_message=user_message,
+        assistant_reply=assistant_reply,
+        routed_agent=routed_agent,
+        tool_calls=tool_calls,
+        pending_confirmations=pending_confirmations,
+        confirmed_actions=confirmed_actions,
+    )
+    await _persist_dossier_if_changed(repo, org_id, dossier_snapshot, dossier)
+
+
 @dataclass(frozen=True)
 class _InternalDomainSnapshot:
     routed_agent: str
@@ -245,7 +330,11 @@ class _AnalysisCompletion(BaseModel):
 
 def _default_internal_reply(routed_agent: str) -> str:
     if routed_agent == PRODUCT_AGENT_NAME:
-        return "Hola. Puedo ayudarte con clientes, productos, ventas, cobros y compras. Decime qué necesitás."
+        return (
+            "Hola. Soy tu asesor del negocio. "
+            "Puedo ayudarte a entender cómo viene la operación, priorizar decisiones y profundizar en clientes, productos, "
+            "ventas, cobros, servicios y compras. Decime qué necesitás."
+        )
     return "No pude generar una respuesta útil en este momento."
 
 
@@ -294,6 +383,8 @@ def _looks_like_smalltalk(message: str) -> bool:
 def _looks_like_ambiguous_internal_query(message: str) -> bool:
     text = message.strip().lower()
     if not text or _looks_like_smalltalk(text):
+        return False
+    if _looks_like_executive_business_request(text):
         return False
 
     explicit_domain_hints = (
@@ -416,7 +507,7 @@ def _looks_like_procurement_write_request(message: str) -> bool:
 
 def _build_internal_route_clarification(user_message: str) -> tuple[str, list[dict[str, Any]]]:
     reply = (
-        "Necesito un poco más de contexto para responder eso. "
+        "Necesito un poco más de contexto para ayudarte bien con eso. "
         "Elegí una categoría y tomo esa selección sobre tu mensaje anterior."
     )
     return reply, [
@@ -430,7 +521,7 @@ def _build_internal_route_clarification(user_message: str) -> tuple[str, list[di
 
 
 def _build_internal_route_menu(user_message: str) -> tuple[str, list[dict[str, Any]]]:
-    reply = "Elegí una categoría para continuar."
+    reply = "Elegí una categoría para que pueda ayudarte mejor."
     return reply, [
         build_text_block(reply),
         build_route_selection_block(
@@ -523,6 +614,54 @@ def _looks_like_commercial_growth_analysis_request(message: str) -> bool:
         "acción",
     )
     return any(hint in text for hint in commercial_hints) and any(hint in text for hint in decision_hints)
+
+
+def _looks_like_executive_business_request(message: str) -> bool:
+    text = message.strip().lower()
+    business_hints = (
+        "mirada de dueño",
+        "mirada de dueno",
+        "dueño",
+        "dueno",
+        "negocio",
+        "resumen ejecutivo",
+        "cómo viene el negocio",
+        "como viene el negocio",
+        "qué harías hoy",
+        "que harias hoy",
+        "qué decisiones",
+        "que decisiones",
+        "acciones concretas",
+        "priorizadas por impacto",
+        "priorizadas",
+        "priorizá",
+        "prioriza",
+    )
+    outcome_hints = (
+        "vender más",
+        "vender mas",
+        "decime",
+        "decí",
+        "resumime",
+        "resumí",
+        "analizá",
+        "analiza",
+        "decisiones",
+        "acciones",
+    )
+    return any(hint in text for hint in business_hints) and any(hint in text for hint in outcome_hints)
+
+
+def _infer_executive_priority_route(user_message: str) -> str | None:
+    if not _looks_like_executive_business_request(user_message):
+        return None
+    if _looks_like_collections_domain_request(user_message):
+        return COLLECTIONS_DOMAIN_AGENT_NAME
+    if _looks_like_procurement_domain_request(user_message):
+        return PURCHASES_DOMAIN_AGENT_NAME
+    if _looks_like_customer_domain_request(user_message):
+        return CUSTOMERS_DOMAIN_AGENT_NAME
+    return SALES_DOMAIN_AGENT_NAME
 
 
 def _looks_like_contextual_follow_up_request(message: str) -> bool:
@@ -765,6 +904,8 @@ def _looks_like_product_low_stock_request(message: str) -> bool:
 
 
 def _infer_internal_read_route(user_message: str) -> str | None:
+    if _infer_executive_priority_route(user_message) is not None:
+        return None
     if _looks_like_product_low_stock_request(user_message):
         return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_product_catalog_request(user_message):
@@ -785,6 +926,8 @@ def _infer_internal_read_route(user_message: str) -> str | None:
 def _infer_internal_analysis_route(user_message: str) -> str | None:
     if not _looks_like_internal_analysis_request(user_message):
         return None
+    if executive_route := _infer_executive_priority_route(user_message):
+        return executive_route
     if _looks_like_commercial_growth_analysis_request(user_message):
         return SALES_DOMAIN_AGENT_NAME
     if _looks_like_product_domain_request(user_message):
@@ -1453,7 +1596,13 @@ def _build_internal_analysis_settings() -> _InternalAnalysisCompletionSettings:
     )
 
 
-def _build_internal_analysis_user_prompt(*, snapshot: _InternalDomainSnapshot, user_message: str) -> str:
+def _build_internal_analysis_user_prompt(
+    *,
+    snapshot: _InternalDomainSnapshot,
+    user_message: str,
+    dossier: dict[str, Any] | None = None,
+    user_id: str | None = None,
+) -> str:
     payload = {
         "category": _scope_label_for_agent(snapshot.routed_agent),
         "scope": snapshot.scope,
@@ -1461,6 +1610,8 @@ def _build_internal_analysis_user_prompt(*, snapshot: _InternalDomainSnapshot, u
         "factual_summary": snapshot.summary,
         "evidence": _compact_internal_analysis_evidence(snapshot.raw_result),
     }
+    if dossier:
+        payload["operating_context"] = build_operating_context_for_prompt(dossier, user_id)
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -1557,6 +1708,8 @@ async def _run_internal_analysis_fallback(
     routed_agent: str,
     org_id: str,
     user_message: str,
+    dossier: dict[str, Any] | None = None,
+    user_id: str | None = None,
 ) -> tuple[str | None, list[str], list[dict[str, Any]]]:
     snapshot = await _collect_internal_domain_snapshot(
         registry=registry,
@@ -1573,7 +1726,12 @@ async def _run_internal_analysis_fallback(
         completion = await asyncio.to_thread(
             client.complete_json,
             system_prompt=_ANALYTICS_SYSTEM_PROMPT,
-            user_prompt=_build_internal_analysis_user_prompt(snapshot=snapshot, user_message=user_message),
+            user_prompt=_build_internal_analysis_user_prompt(
+                snapshot=snapshot,
+                user_message=user_message,
+                dossier=dossier,
+                user_id=user_id,
+            ),
         )
         payload = validate_json_completion(completion.content, _AnalysisCompletion)
         return payload.reply, snapshot.tool_calls, _build_internal_analysis_blocks(payload)
@@ -1589,6 +1747,8 @@ async def _run_internal_analysis_fallback(
 def _apply_internal_route_hint(*, routed_agent: str, user_message: str) -> str:
     if routed_agent != PRODUCT_AGENT_NAME:
         return routed_agent
+    if executive_route := _infer_executive_priority_route(user_message):
+        return executive_route
     if _looks_like_product_domain_request(user_message):
         return PRODUCTS_DOMAIN_AGENT_NAME
     if _looks_like_service_domain_request(user_message):
@@ -1616,6 +1776,10 @@ def _normalize_explicit_route_hint(route_hint: str | None) -> str | None:
 
 
 def _override_explicit_route_hint(*, explicit_route_hint: str, user_message: str) -> str | None:
+    if executive_route := _infer_executive_priority_route(user_message):
+        if explicit_route_hint != executive_route:
+            return executive_route
+        return explicit_route_hint
     explicit_matchers: tuple[tuple[str, Any], ...] = (
         (PRODUCTS_DOMAIN_AGENT_NAME, _looks_like_product_domain_request),
         (SERVICES_DOMAIN_AGENT_NAME, _looks_like_service_domain_request),
@@ -1824,6 +1988,12 @@ async def run_internal_orchestrated_chat(
     routing_source = ROUTING_SOURCE_ORCHESTRATOR
     blocks: list[dict[str, Any]] = []
     explicit_route_hint = _normalize_explicit_route_hint(route_hint)
+    dossier, dossier_snapshot = await _hydrate_dossier_from_backend_settings(
+        repo=repo,
+        backend_client=backend_client,
+        org_id=org_id,
+        auth=auth,
+    )
     registry = build_registry(backend_client, auth)
     _wrap_internal_registry_handlers(
         registry=registry,
@@ -1861,6 +2031,19 @@ async def run_internal_orchestrated_chat(
             tokens_output=tokens_out,
         )
         await repo.track_usage(org_id, tokens_in, tokens_out)
+        await _remember_internal_turn(
+            repo=repo,
+            org_id=org_id,
+            dossier=dossier,
+            dossier_snapshot=dossier_snapshot,
+            auth=auth,
+            user_message=sanitized_message,
+            assistant_reply=reply,
+            routed_agent=routed_agent,
+            tool_calls=[],
+            pending_confirmations=[],
+            confirmed_actions=confirmed,
+        )
         await record_agent_event(
             repo,
             org_id=org_id,
@@ -1914,6 +2097,19 @@ async def run_internal_orchestrated_chat(
             tokens_output=tokens_out,
         )
         await repo.track_usage(org_id, tokens_in, tokens_out)
+        await _remember_internal_turn(
+            repo=repo,
+            org_id=org_id,
+            dossier=dossier,
+            dossier_snapshot=dossier_snapshot,
+            auth=auth,
+            user_message=sanitized_message,
+            assistant_reply=reply,
+            routed_agent=routed_agent,
+            tool_calls=[],
+            pending_confirmations=[],
+            confirmed_actions=confirmed,
+        )
         await record_agent_event(
             repo,
             org_id=org_id,
@@ -1967,6 +2163,8 @@ async def run_internal_orchestrated_chat(
             routed_agent=explicit_route_hint,
             org_id=org_id,
             user_message=sanitized_message,
+            dossier=dossier,
+            user_id=auth.actor,
         )
         if analysis_reply:
             routed_agent = explicit_route_hint
@@ -1998,6 +2196,19 @@ async def run_internal_orchestrated_chat(
                 tokens_output=tokens_out,
             )
             await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+            await _remember_internal_turn(
+                repo=repo,
+                org_id=org_id,
+                dossier=dossier,
+                dossier_snapshot=dossier_snapshot,
+                auth=auth,
+                user_message=sanitized_message,
+                assistant_reply=reply,
+                routed_agent=routed_agent,
+                tool_calls=sorted(set(tool_calls)),
+                pending_confirmations=[],
+                confirmed_actions=confirmed,
+            )
             await record_agent_event(
                 repo,
                 org_id=org_id,
@@ -2064,6 +2275,19 @@ async def run_internal_orchestrated_chat(
                 tokens_output=tokens_out,
             )
             await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+            await _remember_internal_turn(
+                repo=repo,
+                org_id=org_id,
+                dossier=dossier,
+                dossier_snapshot=dossier_snapshot,
+                auth=auth,
+                user_message=sanitized_message,
+                assistant_reply=reply,
+                routed_agent=routed_agent,
+                tool_calls=sorted(set(tool_calls)),
+                pending_confirmations=[],
+                confirmed_actions=confirmed,
+            )
             await record_agent_event(
                 repo,
                 org_id=org_id,
@@ -2101,6 +2325,8 @@ async def run_internal_orchestrated_chat(
                 routed_agent=analysis_routed_agent,
                 org_id=org_id,
                 user_message=sanitized_message,
+                dossier=dossier,
+                user_id=auth.actor,
             )
             if analysis_reply:
                 routed_agent = analysis_routed_agent
@@ -2132,6 +2358,19 @@ async def run_internal_orchestrated_chat(
                     tokens_output=tokens_out,
                 )
                 await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+                await _remember_internal_turn(
+                    repo=repo,
+                    org_id=org_id,
+                    dossier=dossier,
+                    dossier_snapshot=dossier_snapshot,
+                    auth=auth,
+                    user_message=sanitized_message,
+                    assistant_reply=reply,
+                    routed_agent=routed_agent,
+                    tool_calls=sorted(set(tool_calls)),
+                    pending_confirmations=[],
+                    confirmed_actions=confirmed,
+                )
                 await record_agent_event(
                     repo,
                     org_id=org_id,
@@ -2200,6 +2439,19 @@ async def run_internal_orchestrated_chat(
                     tokens_output=tokens_out,
                 )
                 await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+                await _remember_internal_turn(
+                    repo=repo,
+                    org_id=org_id,
+                    dossier=dossier,
+                    dossier_snapshot=dossier_snapshot,
+                    auth=auth,
+                    user_message=sanitized_message,
+                    assistant_reply=reply,
+                    routed_agent=routed_agent,
+                    tool_calls=sorted(set(tool_calls)),
+                    pending_confirmations=[],
+                    confirmed_actions=confirmed,
+                )
                 await record_agent_event(
                     repo,
                     org_id=org_id,
@@ -2295,7 +2547,7 @@ async def run_internal_orchestrated_chat(
                     user_message=sanitized_message,
                     history=history,
                     context={"org_id": org_id},
-                    general_system_prompt=_INTERNAL_GENERAL_SYSTEM_PROMPT,
+                    general_system_prompt=_build_internal_general_system_prompt(dossier, auth.actor),
                     general_limits=_build_internal_general_limits(),
                 ):
                     if chunk.type == "route" and chunk.text:
@@ -2408,6 +2660,19 @@ async def run_internal_orchestrated_chat(
         tokens_output=tokens_out,
     )
     await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+    await _remember_internal_turn(
+        repo=repo,
+        org_id=org_id,
+        dossier=dossier,
+        dossier_snapshot=dossier_snapshot,
+        auth=auth,
+        user_message=sanitized_message,
+        assistant_reply=reply,
+        routed_agent=routed_agent,
+        tool_calls=sorted(set(tool_calls)),
+        pending_confirmations=list(pending_confirmations),
+        confirmed_actions=confirmed,
+    )
     await record_agent_event(
         repo,
         org_id=org_id,
@@ -2474,7 +2739,12 @@ async def run_commercial_chat(
     else:
         if auth is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        dossier = await repo.get_or_create_dossier(org_id)
+        dossier, _ = await _hydrate_dossier_from_backend_settings(
+            repo=repo,
+            backend_client=backend_client,
+            org_id=org_id,
+            auth=auth,
+        )
         modules_active = dossier.get("modules_active", []) if isinstance(dossier, dict) else []
         if agent_mode == "internal_sales":
             policy = build_internal_sales_policy(auth, modules_active, channel=channel)  # type: ignore[arg-type]
@@ -2486,8 +2756,12 @@ async def run_commercial_chat(
         actor_id = auth.actor
         actor_type = "internal_user"
 
-    dossier = await repo.get_or_create_dossier(org_id)
-    dossier_snapshot = copy.deepcopy(dossier)
+    dossier, dossier_snapshot = await _hydrate_dossier_from_backend_settings(
+        repo=repo,
+        backend_client=backend_client,
+        org_id=org_id,
+        auth=auth,
+    )
 
     if agent_mode == "external_sales":
         declarations, handlers = await _build_external_sales_tools(
@@ -2619,8 +2893,17 @@ async def run_commercial_chat(
         tokens_output=tokens_out,
     )
     await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
-    if dossier != dossier_snapshot:
-        await repo.update_dossier(org_id, dossier)
+    capture_turn_memory(
+        dossier,
+        user_id=actor_id if actor_type == "internal_user" else None,
+        user_message=sanitized_message,
+        assistant_reply=assistant_text,
+        routed_agent=agent_mode,
+        tool_calls=sorted(set(tool_calls)),
+        pending_confirmations=list(state.pending_confirmations),
+        confirmed_actions=confirmed,
+    )
+    await _persist_dossier_if_changed(repo, org_id, dossier_snapshot, dossier)
 
     await record_agent_event(
         repo,

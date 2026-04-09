@@ -37,6 +37,7 @@ Prerequisitos locales:
 Nota:
 
 - `.env.example` todavía expone `CORE_REPO_PATH` y `MODULES_REPO_PATH` para iteraciones puntuales, pero la política del repo es volver siempre a dependencias publicadas después de publicar el cambio reusable.
+- El servicio `ai/` debe consumir el runtime reusable Python desde el paquete publicado `devpablocristo-core-ai`; no debe montar `../../core/ai/python/src` como dependencia efectiva de runtime.
 
 Notas operativas del hardening:
 

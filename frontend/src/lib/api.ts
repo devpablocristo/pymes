@@ -196,7 +196,7 @@ export async function downloadAPIFile(path: string, options: RequestOptions = {}
 
 // ── WhatsApp Campaigns ──
 
-export type WhatsAppCampaign = {
+export type CustomerMessagingCampaign = {
   id: string;
   name: string;
   template_name: string;
@@ -217,7 +217,7 @@ export type WhatsAppCampaign = {
   updated_at: string;
 };
 
-export type WhatsAppCampaignRecipient = {
+export type CustomerMessagingCampaignRecipient = {
   id: string;
   party_id: string;
   phone: string;
@@ -230,33 +230,33 @@ export type WhatsAppCampaignRecipient = {
   read_at?: string;
 };
 
-export async function listWhatsAppCampaigns(): Promise<{ items: WhatsAppCampaign[] }> {
-  return apiRequest('/v1/whatsapp/campaigns');
+export async function listCustomerMessagingCampaigns(): Promise<{ items: CustomerMessagingCampaign[] }> {
+  return apiRequest('/v1/customer-messaging/campaigns');
 }
 
-export async function getWhatsAppCampaign(
+export async function getCustomerMessagingCampaign(
   id: string,
-): Promise<WhatsAppCampaign & { recipients: WhatsAppCampaignRecipient[] }> {
-  return apiRequest(`/v1/whatsapp/campaigns/${id}`);
+): Promise<CustomerMessagingCampaign & { recipients: CustomerMessagingCampaignRecipient[] }> {
+  return apiRequest(`/v1/customer-messaging/campaigns/${id}`);
 }
 
-export async function createWhatsAppCampaign(data: {
+export async function createCustomerMessagingCampaign(data: {
   name: string;
   template_name: string;
   template_language?: string;
   template_params?: string[];
   tag_filter?: string;
-}): Promise<WhatsAppCampaign> {
-  return apiRequest('/v1/whatsapp/campaigns', { method: 'POST', body: data });
+}): Promise<CustomerMessagingCampaign> {
+  return apiRequest('/v1/customer-messaging/campaigns', { method: 'POST', body: data });
 }
 
-export async function sendWhatsAppCampaign(id: string): Promise<{ status: string }> {
-  return apiRequest(`/v1/whatsapp/campaigns/${id}/send`, { method: 'POST' });
+export async function sendCustomerMessagingCampaign(id: string): Promise<{ status: string }> {
+  return apiRequest(`/v1/customer-messaging/campaigns/${id}/send`, { method: 'POST' });
 }
 
 // ── WhatsApp Conversations (multi-operador) ──
 
-export type WhatsAppConversation = {
+export type CustomerMessagingConversation = {
   id: string;
   party_id: string;
   phone: string;
@@ -270,25 +270,35 @@ export type WhatsAppConversation = {
   updated_at: string;
 };
 
-export async function listWhatsAppConversations(params?: {
+export async function listCustomerMessagingConversations(params?: {
   assigned_to?: string;
   status?: string;
-}): Promise<{ items: WhatsAppConversation[] }> {
+}): Promise<{ items: CustomerMessagingConversation[] }> {
   const q = new URLSearchParams();
   if (params?.assigned_to) q.set('assigned_to', params.assigned_to);
   if (params?.status) q.set('status', params.status);
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  return apiRequest(`/v1/whatsapp/conversations${suffix}`);
+  return apiRequest(`/v1/customer-messaging/conversations${suffix}`);
 }
 
 export async function assignWhatsAppConversation(id: string, assignedTo: string): Promise<{ status: string }> {
-  return apiRequest(`/v1/whatsapp/conversations/${id}/assign`, { method: 'POST', body: { assigned_to: assignedTo } });
+  return apiRequest(`/v1/customer-messaging/conversations/${id}/assign`, { method: 'POST', body: { assigned_to: assignedTo } });
 }
 
 export async function markWhatsAppConversationRead(id: string): Promise<{ status: string }> {
-  return apiRequest(`/v1/whatsapp/conversations/${id}/read`, { method: 'POST' });
+  return apiRequest(`/v1/customer-messaging/conversations/${id}/read`, { method: 'POST' });
 }
 
 export async function resolveWhatsAppConversation(id: string): Promise<{ status: string }> {
-  return apiRequest(`/v1/whatsapp/conversations/${id}/resolve`, { method: 'POST' });
+  return apiRequest(`/v1/customer-messaging/conversations/${id}/resolve`, { method: 'POST' });
 }
+
+export type WhatsAppCampaign = CustomerMessagingCampaign
+export type WhatsAppCampaignRecipient = CustomerMessagingCampaignRecipient
+export type WhatsAppConversation = CustomerMessagingConversation
+
+export const listWhatsAppCampaigns = listCustomerMessagingCampaigns
+export const getWhatsAppCampaign = getCustomerMessagingCampaign
+export const createWhatsAppCampaign = createCustomerMessagingCampaign
+export const sendWhatsAppCampaign = sendCustomerMessagingCampaign
+export const listWhatsAppConversations = listCustomerMessagingConversations

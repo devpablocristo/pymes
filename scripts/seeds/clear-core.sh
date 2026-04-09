@@ -90,12 +90,26 @@ BEGIN
       uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-2'),
       uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-3')
     );
-    DELETE FROM scheduling_bookings WHERE id IN (
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-1'),
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-2'),
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-3'),
-      uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-4')
-    );
+    -- Turnos que usan catálogo semilla (demo + p. ej. copia migración 0041 appointments → scheduling_bookings)
+    IF to_regclass('public.scheduling_booking_action_tokens') IS NOT NULL THEN
+      DELETE FROM scheduling_booking_action_tokens
+      WHERE booking_id IN (
+        SELECT id FROM scheduling_bookings
+        WHERE org_id = v_org
+          AND (
+            resource_id = sched_resource
+            OR branch_id = sched_branch
+            OR service_id = sched_service
+          )
+      );
+    END IF;
+    DELETE FROM scheduling_bookings
+    WHERE org_id = v_org
+      AND (
+        resource_id = sched_resource
+        OR branch_id = sched_branch
+        OR service_id = sched_service
+      );
     DELETE FROM scheduling_service_resources WHERE service_id = sched_service OR resource_id = sched_resource;
     DELETE FROM scheduling_availability_rules
     WHERE id IN (

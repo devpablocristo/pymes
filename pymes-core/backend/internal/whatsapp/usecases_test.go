@@ -16,18 +16,22 @@ import (
 // --- Fakes ---
 
 type testRepo struct {
-	conn               Connection
-	getConnByPhoneErr  error
-	domainConn         domain.Connection
-	partyPhone         string
-	partyName          string
-	messages           []domain.Message
-	templates          []domain.Template
-	optIns             []domain.OptIn
-	savedMsg           *domain.Message
-	savedTpl           *domain.Template
-	savedOptIn         *domain.OptIn
-	savedConn          *domain.Connection
+	conn                Connection
+	getConnByPhoneErr   error
+	domainConn          domain.Connection
+	partyPhone          string
+	partyName           string
+	messages            []domain.Message
+	templates           []domain.Template
+	optIns              []domain.OptIn
+	savedMsg            *domain.Message
+	savedTpl            *domain.Template
+	savedOptIn          *domain.OptIn
+	savedConn           *domain.Connection
+	lastStatusMessageID string
+	lastStatus          domain.MessageStatus
+	lastStatusCode      string
+	lastStatusTitle     string
 }
 
 func (r *testRepo) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
@@ -76,6 +80,10 @@ func (r *testRepo) SaveMessage(ctx context.Context, msg domain.Message) error {
 }
 
 func (r *testRepo) UpdateMessageStatus(ctx context.Context, waMessageID string, status domain.MessageStatus, errorCode, errorMsg string) error {
+	r.lastStatusMessageID = waMessageID
+	r.lastStatus = status
+	r.lastStatusCode = errorCode
+	r.lastStatusTitle = errorMsg
 	return nil
 }
 
@@ -510,6 +518,32 @@ func TestHandleInboundWebhook_NoMessages(t *testing.T) {
 	}
 }
 
+func TestHandleInboundWebhook_ProcessesStatusUpdatesWithoutAIReply(t *testing.T) {
+	t.Parallel()
+	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
+	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, nil, nil, "", "")
+	payload := []byte(`{
+		"object":"whatsapp_business_account",
+		"entry":[{"changes":[{"field":"statuses","value":{
+			"metadata":{"phone_number_id":"1"},
+			"statuses":[{"id":"wamid-xyz","status":"read","timestamp":"1710000000"}]
+		}}]}]
+	}`)
+	result, err := uc.HandleInboundWebhook(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("HandleInboundWebhook() error = %v", err)
+	}
+	if result.Processed != 0 || result.Replied != 0 {
+		t.Fatalf("result = %+v, want zeros for status-only webhook", result)
+	}
+	if repo.lastStatusMessageID != "wamid-xyz" {
+		t.Fatalf("status message id = %q, want %q", repo.lastStatusMessageID, "wamid-xyz")
+	}
+	if repo.lastStatus != domain.StatusRead {
+		t.Fatalf("status = %q, want %q", repo.lastStatus, domain.StatusRead)
+	}
+}
+
 func TestHandleInboundWebhook_SkipsUnknownConnection(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{
@@ -536,7 +570,7 @@ func TestHandleInboundWebhook_RequiresAI(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", nil, &testMetaClient{}, nil, "", "")
-	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
+	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
 		t.Fatal("HandleInboundWebhook() error = nil, want error when AI is not configured")
 	}
@@ -546,7 +580,7 @@ func TestHandleInboundWebhook_RequiresMeta(t *testing.T) {
 	t.Parallel()
 	repo := &testRepo{conn: Connection{OrgID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PhoneNumberID: "1", AccessToken: "t", IsActive: true}}
 	uc := NewUsecases(repo, nil, "http://localhost:5173", &testAIClient{}, nil, nil, "", "")
-	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[]}`))
+	_, err := uc.HandleInboundWebhook(context.Background(), []byte(`{"object":"whatsapp_business_account","entry":[{"changes":[{"field":"messages","value":{"metadata":{"phone_number_id":"1"},"messages":[{"id":"m1","from":"5491100000000","type":"text","text":{"body":"Hola"}}]}}]}]}`))
 	if err == nil {
 		t.Fatal("HandleInboundWebhook() error = nil, want error when Meta client is not configured")
 	}

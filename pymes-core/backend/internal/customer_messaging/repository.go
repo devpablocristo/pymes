@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/domain"
-	whmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/repository/models"
+	whmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/repository/models"
 )
 
 var (

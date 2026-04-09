@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,6 +89,7 @@ type metaWebhookValue struct {
 	Metadata metaMetadata         `json:"metadata"`
 	Contacts []metaContact        `json:"contacts"`
 	Messages []metaInboundMessage `json:"messages"`
+	Statuses []metaStatus         `json:"statuses"`
 }
 
 type metaMetadata struct {
@@ -108,6 +110,18 @@ type metaInboundMessage struct {
 	Text struct {
 		Body string `json:"body"`
 	} `json:"text"`
+}
+
+type metaStatus struct {
+	ID        string            `json:"id"`
+	Status    string            `json:"status"`
+	Timestamp string            `json:"timestamp"`
+	Errors    []metaStatusError `json:"errors"`
+}
+
+type metaStatusError struct {
+	Code  int    `json:"code"`
+	Title string `json:"title"`
 }
 
 func (u *Usecases) VerifyWebhook(mode, token, challenge string) (string, error) {
@@ -150,18 +164,23 @@ func (u *Usecases) ValidateWebhookSignature(signatureHeader string, payload []by
 }
 
 func (u *Usecases) HandleInboundWebhook(ctx context.Context, payload []byte) (InboundResult, error) {
+	messages, statusUpdates, err := parseWebhookPayload(payload)
+	if err != nil {
+		return InboundResult{}, err
+	}
+	for _, update := range statusUpdates {
+		if err := u.HandleStatusUpdate(ctx, update); err != nil && !errors.Is(err, ErrNotFound) {
+			return InboundResult{}, err
+		}
+	}
+	if len(messages) == 0 {
+		return InboundResult{}, nil
+	}
 	if u.ai == nil {
 		return InboundResult{}, domainerr.Unavailable("whatsapp ai bridge not configured")
 	}
 	if u.meta == nil {
 		return InboundResult{}, domainerr.Unavailable("whatsapp delivery not configured")
-	}
-	messages, err := parseInboundMessages(payload)
-	if err != nil {
-		return InboundResult{}, err
-	}
-	if len(messages) == 0 {
-		return InboundResult{}, nil
 	}
 	result := InboundResult{}
 	for _, msg := range messages {
@@ -256,56 +275,97 @@ func (u *Usecases) resolveAccessToken(stored string) (string, error) {
 	return u.tokenCrypto.Decrypt(token)
 }
 
-func parseInboundMessages(payload []byte) ([]InboundMessage, error) {
+func parseWebhookPayload(payload []byte) ([]InboundMessage, []domain.StatusUpdate, error) {
 	var envelope metaWebhookEnvelope
 	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return nil, domainerr.Validation("invalid whatsapp webhook payload")
+		return nil, nil, domainerr.Validation("invalid whatsapp webhook payload")
 	}
-	out := make([]InboundMessage, 0)
+	messages := make([]InboundMessage, 0)
+	statusUpdates := make([]domain.StatusUpdate, 0)
 	for _, entry := range envelope.Entry {
 		for _, change := range entry.Changes {
-			if field := strings.TrimSpace(change.Field); field != "" && field != "messages" {
-				continue
-			}
 			phoneNumberID := strings.TrimSpace(change.Value.Metadata.PhoneNumberID)
 			if phoneNumberID == "" {
 				continue
 			}
-			contactNames := map[string]string{}
-			for _, contact := range change.Value.Contacts {
-				name := strings.TrimSpace(contact.Profile.Name)
-				if name == "" {
-					continue
+			field := strings.TrimSpace(change.Field)
+			switch field {
+			case "", "messages":
+				contactNames := map[string]string{}
+				for _, contact := range change.Value.Contacts {
+					name := strings.TrimSpace(contact.Profile.Name)
+					if name == "" {
+						continue
+					}
+					contactNames[strings.TrimSpace(contact.WaID)] = name
 				}
-				contactNames[strings.TrimSpace(contact.WaID)] = name
-			}
-			for _, msg := range change.Value.Messages {
-				if strings.TrimSpace(strings.ToLower(msg.Type)) != "text" {
-					continue
+				for _, msg := range change.Value.Messages {
+					if strings.TrimSpace(strings.ToLower(msg.Type)) != "text" {
+						continue
+					}
+					body := strings.TrimSpace(msg.Text.Body)
+					from := strings.TrimSpace(msg.From)
+					if body == "" || from == "" {
+						continue
+					}
+					profileName := contactNames[from]
+					if profileName == "" && len(change.Value.Contacts) == 1 {
+						profileName = strings.TrimSpace(change.Value.Contacts[0].Profile.Name)
+					}
+					messages = append(messages, InboundMessage{
+						PhoneNumberID: phoneNumberID,
+						FromPhone:     from,
+						Text:          body,
+						MessageID:     strings.TrimSpace(msg.ID),
+						ProfileName:   profileName,
+					})
 				}
-				body := strings.TrimSpace(msg.Text.Body)
-				from := strings.TrimSpace(msg.From)
-				if body == "" || from == "" {
-					continue
+			case "statuses":
+				for _, rawStatus := range change.Value.Statuses {
+					status := strings.ToLower(strings.TrimSpace(rawStatus.Status))
+					var mapped domain.MessageStatus
+					switch status {
+					case "sent":
+						mapped = domain.StatusSent
+					case "delivered":
+						mapped = domain.StatusDelivered
+					case "read":
+						mapped = domain.StatusRead
+					case "failed":
+						mapped = domain.StatusFailed
+					default:
+						continue
+					}
+					update := domain.StatusUpdate{
+						WAMessageID: strings.TrimSpace(rawStatus.ID),
+						Status:      mapped,
+					}
+					if ts := strings.TrimSpace(rawStatus.Timestamp); ts != "" {
+						if unixSeconds, parseErr := strconv.ParseInt(ts, 10, 64); parseErr == nil {
+							update.Timestamp = time.Unix(unixSeconds, 0).UTC()
+						}
+					}
+					if len(rawStatus.Errors) > 0 {
+						update.ErrorCode = fmt.Sprintf("%d", rawStatus.Errors[0].Code)
+						update.ErrorTitle = strings.TrimSpace(rawStatus.Errors[0].Title)
+					}
+					if update.WAMessageID != "" {
+						statusUpdates = append(statusUpdates, update)
+					}
 				}
-				profileName := contactNames[from]
-				if profileName == "" && len(change.Value.Contacts) == 1 {
-					profileName = strings.TrimSpace(change.Value.Contacts[0].Profile.Name)
-				}
-				out = append(out, InboundMessage{
-					PhoneNumberID: phoneNumberID,
-					FromPhone:     from,
-					Text:          body,
-					MessageID:     strings.TrimSpace(msg.ID),
-					ProfileName:   profileName,
-				})
 			}
 		}
 	}
-	return out, nil
+	return messages, statusUpdates, nil
 }
 
 // ParseInboundMessages expone el parser para wrappers de compatibilidad y tests legacy.
 func ParseInboundMessages(payload []byte) ([]InboundMessage, error) {
-	return parseInboundMessages(payload)
+	messages, _, err := parseWebhookPayload(payload)
+	return messages, err
+}
+
+// ParseWebhookPayload expone el parser completo para tests y compatibilidad.
+func ParseWebhookPayload(payload []byte) ([]InboundMessage, []domain.StatusUpdate, error) {
+	return parseWebhookPayload(payload)
 }

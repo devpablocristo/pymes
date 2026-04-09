@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/v1/chat/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description Lista conversaciones internas del usuario autenticado.
+         */
+        get: operations["list_conversations_v1_chat_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Conversation
+         * @description Devuelve una conversación con su historial de mensajes.
+         */
+        get: operations["get_conversation_v1_chat_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/chat": {
         parameters: {
             query?: never;
@@ -115,8 +155,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Whatsapp Message */
-        post: operations["whatsapp_message_v1_internal_whatsapp_message_post"];
+        /**
+         * Customer Messaging Inbound
+         * @deprecated
+         */
+        post: operations["customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/internal/customer-messaging/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Customer Messaging Inbound */
+        post: operations["customer_messaging_inbound_v1_internal_customer_messaging_inbound_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -268,16 +328,19 @@ export interface components {
             style: "primary" | "secondary" | "ghost";
             /** Message */
             message?: string | null;
-            /** Route Hint */
-            route_hint?: ("general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases") | null;
-            /** Selection Behavior */
-            selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Url */
             url?: string | null;
+            /** Route Hint */
+            route_hint?: ("general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
+            /** Selection Behavior */
+            selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Confirmed Actions */
             confirmed_actions?: string[];
         };
-        /** ChatActionsBlock */
+        /**
+         * ChatActionsBlock
+         * @description Bloque actions con ChatAction extendido (route_hint, etc.).
+         */
         ChatActionsBlock: {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -330,8 +393,22 @@ export interface components {
         };
         /** ChatRequest */
         ChatRequest: {
+            /** Chat Id */
+            chat_id?: string | null;
             /** Message */
             message: string;
+            /**
+             * Preferred Language
+             * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.
+             */
+            preferred_language?: ("es" | "en") | null;
+            /** Confirmed Actions */
+            confirmed_actions?: string[];
+            /**
+             * Route Hint
+             * @description Hint opcional para forzar el carril del turno actual: general | customers | products | services | sales | collections | purchases. `copilot` queda reservado para handoff explícito desde notificaciones.
+             */
+            route_hint?: ("general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -357,17 +434,17 @@ export interface components {
             /** Tokens Used */
             tokens_used: number;
             /** Tool Calls */
-            tool_calls: string[];
-            /** Pending Confirmations */
-            pending_confirmations: string[];
+            tool_calls?: string[];
             /** Blocks */
             blocks?: (components["schemas"]["ChatTextBlock"] | components["schemas"]["ChatActionsBlock"] | components["schemas"]["ChatInsightCardBlock"] | components["schemas"]["ChatKpiGroupBlock"] | components["schemas"]["ChatTableBlock"])[];
+            /** Pending Confirmations */
+            pending_confirmations?: string[];
             /**
              * Routed Agent
-             * @description Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff explícito desde notificaciones.
+             * @description Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | services | sales | collections | purchases. `copilot` se usa solo en handoff explícito desde notificaciones.
              * @enum {string}
              */
-            routed_agent: "general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases";
+            routed_agent: "general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases";
             /**
              * Routing Source
              * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint
@@ -476,6 +553,76 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+        };
+        /** ConversationDetail */
+        ConversationDetail: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessage"][];
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Items */
+            items: components["schemas"]["ConversationSummary"][];
+        };
+        /** ConversationMessage */
+        ConversationMessage: {
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
+            /** Ts */
+            ts?: string | null;
+            /** Tool Calls */
+            tool_calls?: string[];
+        };
+        /** ConversationSummary */
+        ConversationSummary: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Message Count */
+            message_count: number;
+        };
+        /** CustomerMessagingInboundRequest */
+        CustomerMessagingInboundRequest: {
+            /** Org Id */
+            org_id: string;
+            /** Phone Number Id */
+            phone_number_id: string;
+            /** From Phone */
+            from_phone: string;
+            /** Message */
+            message: string;
+            /** Message Id */
+            message_id?: string | null;
+            /** Profile Name */
+            profile_name?: string | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
+        };
+        /** CustomerMessagingInboundResponse */
+        CustomerMessagingInboundResponse: {
+            /** Conversation Id */
+            conversation_id: string;
+            /** Reply */
+            reply: string;
+            /** Tokens Used */
+            tokens_used: number;
+            /** Tool Calls */
+            tool_calls: string[];
         };
         /** ExternalSalesChatRequest */
         ExternalSalesChatRequest: {
@@ -665,53 +812,6 @@ export interface components {
             /** Error Type */
             type: string;
         };
-        /** WhatsAppMessageRequest */
-        WhatsAppMessageRequest: {
-            /** Org Id */
-            org_id: string;
-            /** Phone Number Id */
-            phone_number_id: string;
-            /** From Phone */
-            from_phone: string;
-            /** Message */
-            message: string;
-            /** Message Id */
-            message_id?: string | null;
-            /** Profile Name */
-            profile_name?: string | null;
-            /** Conversation Id */
-            conversation_id?: string | null;
-        };
-        /** WhatsAppMessageResponse */
-        WhatsAppMessageResponse: {
-            /** Conversation Id */
-            conversation_id: string;
-            /** Reply */
-            reply: string;
-            /** Tokens Used */
-            tokens_used: number;
-            /** Tool Calls */
-            tool_calls: string[];
-        };
-        /** ChatRequest */
-        src__api__chat_contract__ChatRequest: {
-            /** Chat Id */
-            chat_id?: string | null;
-            /** Message */
-            message: string;
-            /** Confirmed Actions */
-            confirmed_actions?: string[];
-            /**
-             * Route Hint
-             * @description Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. `copilot` queda reservado para handoff explícito desde notificaciones.
-             */
-            route_hint?: ("general" | "copilot" | "customers" | "products" | "sales" | "collections" | "purchases") | null;
-            /**
-             * Preferred Language
-             * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.
-             */
-            preferred_language?: ("es" | "en") | null;
-        };
         /** PublicChatRequest */
         src__api__public_router__PublicChatRequest: {
             /** Conversation Id */
@@ -723,6 +823,11 @@ export interface components {
         };
         /** ChatRequest */
         src__domains__professionals__teachers__internal_router__ChatRequest: {
+            /** Message */
+            message: string;
+        };
+        /** ChatRequest */
+        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
             /** Message */
             message: string;
         };
@@ -742,6 +847,68 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_conversations_v1_chat_conversations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_v1_chat_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     chat_internal_v1_chat_post: {
         parameters: {
             query?: never;
@@ -751,7 +918,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["src__api__chat_contract__ChatRequest"];
+                "application/json": components["schemas"]["ChatRequest"];
             };
         };
         responses: {
@@ -948,7 +1115,7 @@ export interface operations {
             };
         };
     };
-    whatsapp_message_v1_internal_whatsapp_message_post: {
+    customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post: {
         parameters: {
             query?: never;
             header?: {
@@ -959,7 +1126,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WhatsAppMessageRequest"];
+                "application/json": components["schemas"]["CustomerMessagingInboundRequest"];
             };
         };
         responses: {
@@ -969,7 +1136,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WhatsAppMessageResponse"];
+                    "application/json": components["schemas"]["CustomerMessagingInboundResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_messaging_inbound_v1_internal_customer_messaging_inbound_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Internal-Service-Token"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerMessagingInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerMessagingInboundResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1060,7 +1262,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChatRequest"];
+                "application/json": components["schemas"]["src__domains__workshops__auto_repair__internal_router__ChatRequest"];
             };
         };
         responses: {

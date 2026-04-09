@@ -133,6 +133,24 @@
         "../modules/ui/page-shell/ts/src/styles.css",
         "../../modules/ui/page-shell/ts/src/styles.css"
       ],
+      "@devpablocristo/modules-ui-notification-feed": [
+        "../modules/ui/notification-feed/ts/src/index.ts",
+        "../../modules/ui/notification-feed/ts/src/index.ts",
+        "./node_modules/@devpablocristo/modules-ui-notification-feed/src/index.ts"
+      ],
+      "@devpablocristo/modules-ui-notification-feed/styles.css": [
+        "../modules/ui/notification-feed/ts/src/styles.css",
+        "../../modules/ui/notification-feed/ts/src/styles.css",
+        "./node_modules/@devpablocristo/modules-ui-notification-feed/src/styles.css"
+      ],
+      "@devpablocristo/modules-ui-conversation-inbox": [
+        "../modules/ui/conversation-inbox/ts/src/index.ts",
+        "../../modules/ui/conversation-inbox/ts/src/index.ts"
+      ],
+      "@devpablocristo/modules-ui-conversation-inbox/styles.css": [
+        "../modules/ui/conversation-inbox/ts/src/styles.css",
+        "../../modules/ui/conversation-inbox/ts/src/styles.css"
+      ],
       "@devpablocristo/modules-ui-section-hub": [
         "../modules/ui/section-hub/ts/src/index.tsx",
         "../../modules/ui/section-hub/ts/src/index.tsx"

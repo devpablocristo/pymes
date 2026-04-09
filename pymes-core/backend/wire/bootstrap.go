@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	googleoauth "github.com/devpablocristo/core/calendar/sync/google/go"
+	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
 	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
 	schedulingpublichttp "github.com/devpablocristo/modules/scheduling/go/publichttpgin"
@@ -26,6 +26,7 @@ import (
 	calendar_sync "github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/currency"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
@@ -131,7 +132,7 @@ func InitializeApp() *app.App {
 	schedulingRepo := schedulingmodule.NewRepository(db)
 	calendarExportRepo := calendar_export.NewRepository(db)
 	calendarSyncRepo := calendar_sync.NewRepository(db)
-	whatsappRepo := whatsapp.NewRepository(db)
+	customerMessagingRepo := customer_messaging.NewRepository(db)
 
 	auditUC := audit.NewUsecases(auditRepo)
 	adminUC := admin.NewUsecases(adminRepo)
@@ -183,8 +184,8 @@ func InitializeApp() *app.App {
 	calendarSyncUC := calendar_sync.NewUsecases(calendarSyncRepo, paymentGatewayCrypto, googleOAuthClient, calendar_sync.Config{})
 	whatsappAIClient := whatsapp.NewAIClient(cfg.AIServiceURL, cfg.InternalServiceToken)
 	whatsappMetaClient := whatsapp.NewMetaClient(cfg.WhatsAppGraphAPIBaseURL)
-	whatsappUC := whatsapp.NewUsecases(
-		whatsappRepo,
+	customerMessagingUC := customer_messaging.NewUsecases(
+		customerMessagingRepo,
 		timelineUC,
 		cfg.FrontendURL,
 		whatsappAIClient,
@@ -193,7 +194,7 @@ func InitializeApp() *app.App {
 		cfg.WhatsAppWebhookVerifyToken,
 		cfg.WhatsAppAppSecret,
 	)
-	dataioUC := dataio.NewUsecases(dataioRepo, auditUC, dataio.WithOptIn(whatsappUC))
+	dataioUC := dataio.NewUsecases(dataioRepo, auditUC, dataio.WithOptIn(customerMessagingUC))
 	paymentGatewayUC := paymentgateway.NewUsecases(
 		paymentGatewayRepo,
 		paymentgatewayclient.NewMercadoPagoGateway(),
@@ -265,7 +266,7 @@ func InitializeApp() *app.App {
 	schedulingHandler := schedulinghttp.NewHandler(schedulingUC)
 	calendarExportHandler := calendar_export.NewHandler(calendarExportUC, cfg.PublicBaseURL)
 	calendarSyncHandler := calendar_sync.NewHandler(calendarSyncUC, cfg.FrontendURL)
-	whatsappHandler := whatsapp.NewHandler(whatsappUC)
+	customerMessagingHandler := customer_messaging.NewHandler(customerMessagingUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
 	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
@@ -273,7 +274,7 @@ func InitializeApp() *app.App {
 	if saasSvc != nil {
 		resolveOrgRefFn = saasSvc.ResolveOrgRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, whatsappUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveOrgRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -285,7 +286,7 @@ func InitializeApp() *app.App {
 	v1 := router.Group("/v1")
 	// Orgs, Clerk, billing, users — served by core/saas/go via AttachSaaSUnmatchedRoutes (NoRoute).
 	paymentGatewayHandler.RegisterPublicRoutes(v1)
-	whatsappHandler.RegisterPublicRoutes(v1)
+	customerMessagingHandler.RegisterPublicRoutes(v1)
 	schedulerHandler.RegisterRoutes(v1)
 	// Feed iCalendar público: el cliente (Apple Calendar / Google Calendar / Outlook /
 	// Thunderbird) suscribe vía URL conociendo sólo el plaintext del token.
@@ -321,7 +322,7 @@ func InitializeApp() *app.App {
 	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	whatsappHandler.RegisterRoutes(authGroup, rbacMiddleware)
+	customerMessagingHandler.RegisterRoutes(authGroup, rbacMiddleware)
 	notificationHandler.RegisterRoutes(authGroup)
 	inAppNotifHandler.RegisterRoutes(authGroup)
 	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)

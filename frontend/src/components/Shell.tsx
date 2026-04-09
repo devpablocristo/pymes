@@ -52,13 +52,13 @@ export function Shell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Sidebar dividido en secciones lógicas (estilo Linear / Notion / Slack):
-  // - "Inicio" arriba (landing del usuario al entrar).
-  // - "Día a día" agrupa lo que se toca todo el día.
-  // - "Comercial" lo transaccional / dinero.
-  // - "WhatsApp" en su propia sección porque es un canal completo aparte.
+  // Sidebar dividido en secciones lógicas:
+  // - "Inicio" arriba.
+  // - "Día a día" para operación frecuente.
+  // - "Comercial" para lo transaccional.
+  // - "WhatsApp" como entrada a customer messaging sobre ese canal.
   // - Verticales y módulos dinámicos en el medio.
-  // - "Sistema" al final (settings, convención de la industria).
+  // - "Sistema" al final.
 
   const homeNav = useMemo<AppShellNavItem[]>(
     () => [{ to: '/dashboard', label: t('shell.nav.dashboard'), icon: dotIcon }],
@@ -79,12 +79,10 @@ export function Shell({ children }: { children: ReactNode }) {
     [t],
   );
 
-  // WhatsApp: NO tocar items ni paths ni labels. Otro agente maneja whatsapp.
-  // Solo se mueven a su propia sección sidebar para coherencia visual.
   const whatsappNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/whatsapp/inbox', label: t('shell.nav.whatsappInbox'), icon: dotIcon },
-      { to: '/whatsapp/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
+      { to: '/customer-messaging/inbox', label: t('shell.nav.whatsappInbox'), icon: dotIcon },
+      { to: '/customer-messaging/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
     ],
     [t],
   );

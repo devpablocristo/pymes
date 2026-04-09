@@ -1,6 +1,9 @@
-/* Contenedor de la grilla bajo ProductsModuleSection (selector arriba en WorkOrdersHeaderLead). */
+/*
+ * Contenedor bajo ProductsModuleSection.
+ * Sin padding horizontal extra: el margen lo define `.main-content` del shell (misma referencia que el CRUD en lista).
+ */
 .products-crud-page {
-  padding: var(--space-6) var(--space-8);
+  padding: 0;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;

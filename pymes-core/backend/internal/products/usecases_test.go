@@ -57,3 +57,25 @@ func TestCreateDefaultsCurrency(t *testing.T) {
 		t.Fatalf("expected repo to receive trimmed image_url, got %q", repo.created.ImageURL)
 	}
 }
+
+func TestCreateSyncsPrimaryFromImageURLs(t *testing.T) {
+	t.Parallel()
+
+	repo := &captureProductRepo{}
+	uc := NewUsecases(repo, nil, nil)
+
+	out, err := uc.Create(context.Background(), productdomain.Product{
+		OrgID:     uuid.New(),
+		Name:      "Multifoto",
+		ImageURLs: []string{"  https://a.example/x.png  ", "https://b.example/y.png"},
+	}, "tester")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.ImageURL != "https://a.example/x.png" {
+		t.Fatalf("expected primary image_url from first image_urls, got %q", out.ImageURL)
+	}
+	if len(repo.created.ImageURLs) != 2 || repo.created.ImageURLs[0] != "https://a.example/x.png" {
+		t.Fatalf("unexpected image_urls in repo: %#v", repo.created.ImageURLs)
+	}
+}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductGalleryView, type ProductGalleryItem } from '../components/ProductGalleryView';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
@@ -9,17 +9,17 @@ type ProductRow = ProductGalleryItem & { deleted_at?: string | null };
 
 type ProductsListResponse = { items: ProductRow[] };
 
-const LIST_PATH = '/modules/products/list';
-
 /**
- * Vista galería: misma data que el listado; al elegir una tarjeta volvemos a la tabla (como antes con el toggle).
+ * Vista galería: misma data que el listado; clic en tarjeta abre detalle (modal) con imágenes y datos.
  */
 export function ProductsGalleryPage() {
-  const navigate = useNavigate();
   const { t } = useI18n();
   const [items, setItems] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const closeDetail = useCallback(() => setDetailId(null), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,11 +57,12 @@ export function ProductsGalleryPage() {
     <div className="products-crud-page">
       <ProductGalleryView
         items={items}
-        onSelect={() => navigate(LIST_PATH)}
+        onSelect={(id) => setDetailId(id)}
         loading={loading}
         emptyLabel={t('crud.viewMode.gallery.empty')}
         loadingLabel={t('crud.viewMode.gallery.loading')}
       />
+      <ProductDetailModal productId={detailId} onClose={closeDetail} />
     </div>
   );
 }

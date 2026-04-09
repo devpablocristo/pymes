@@ -8,6 +8,7 @@
 ## `products`
 
 - `id`, `org_id`, `sku`, `name`, `description`
+- `image_url` (URL principal, legacy) e `image_urls` (`text[]`, hasta 20 URLs; la API prioriza la lista y expone ambas coherentes)
 - `unit`, `price`, `currency`, `cost_price`, `tax_rate`, `track_stock`
 - `is_active` para desactivar comercialmente sin archivar
 - `tags`, `metadata`, `created_at`, `updated_at`, `deleted_at`

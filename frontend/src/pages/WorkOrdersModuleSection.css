@@ -12,6 +12,8 @@
   gap: var(--space-3);
   width: 100%;
   min-width: 0;
+  /* Paridad con `.page-header` del CRUD (lista productos / tablero OT). */
+  margin-bottom: var(--space-4);
 }
 
 .wo-mod-orders__header-lead > p {

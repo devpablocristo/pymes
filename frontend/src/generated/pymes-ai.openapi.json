@@ -5,6 +5,97 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/v1/chat/conversations": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "List Conversations",
+        "description": "Lista conversaciones internas del usuario autenticado.",
+        "operationId": "list_conversations_v1_chat_conversations_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Conversation",
+        "description": "Devuelve una conversaci\u00f3n con su historial de mensajes.",
+        "operationId": "get_conversation_v1_chat_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 36,
+              "maxLength": 36,
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/chat": {
       "post": {
         "tags": [
@@ -16,7 +107,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/src__api__chat_contract__ChatRequest"
+                "$ref": "#/components/schemas/ChatRequest"
               }
             }
           },
@@ -298,8 +389,9 @@
         "tags": [
           "internal"
         ],
-        "summary": "Whatsapp Message",
-        "operationId": "whatsapp_message_v1_internal_whatsapp_message_post",
+        "summary": "Customer Messaging Inbound",
+        "operationId": "customer_messaging_inbound_legacy_v1_internal_whatsapp_message_post",
+        "deprecated": true,
         "parameters": [
           {
             "name": "X-Internal-Service-Token",
@@ -317,7 +409,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/WhatsAppMessageRequest"
+                "$ref": "#/components/schemas/CustomerMessagingInboundRequest"
               }
             }
           }
@@ -328,7 +420,60 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WhatsAppMessageResponse"
+                  "$ref": "#/components/schemas/CustomerMessagingInboundResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/internal/customer-messaging/inbound": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Customer Messaging Inbound",
+        "operationId": "customer_messaging_inbound_v1_internal_customer_messaging_inbound_post",
+        "parameters": [
+          {
+            "name": "X-Internal-Service-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Internal-Service-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerMessagingInboundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerMessagingInboundResponse"
                 }
               }
             }
@@ -447,7 +592,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
+                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__internal_router__ChatRequest"
               }
             }
           },
@@ -661,6 +806,17 @@
             ],
             "title": "Message"
           },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
           "route_hint": {
             "anyOf": [
               {
@@ -670,6 +826,7 @@
                   "copilot",
                   "customers",
                   "products",
+                  "services",
                   "sales",
                   "collections",
                   "purchases"
@@ -695,17 +852,6 @@
               }
             ],
             "title": "Selection Behavior"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
           },
           "confirmed_actions": {
             "items": {
@@ -742,7 +888,8 @@
         "required": [
           "type"
         ],
-        "title": "ChatActionsBlock"
+        "title": "ChatActionsBlock",
+        "description": "Bloque actions con ChatAction extendido (route_hint, etc.)."
       },
       "ChatInsightCardBlock": {
         "properties": {
@@ -877,11 +1024,67 @@
       },
       "ChatRequest": {
         "properties": {
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Id"
+          },
           "message": {
             "type": "string",
             "maxLength": 4000,
             "minLength": 1,
             "title": "Message"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "es",
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language",
+            "description": "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a espa\u00f1ol."
+          },
+          "confirmed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Confirmed Actions"
+          },
+          "route_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "copilot",
+                  "customers",
+                  "products",
+                  "services",
+                  "sales",
+                  "collections",
+                  "purchases"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Hint",
+            "description": "Hint opcional para forzar el carril del turno actual: general | customers | products | services | sales | collections | purchases. `copilot` queda reservado para handoff expl\u00edcito desde notificaciones."
           }
         },
         "type": "object",
@@ -931,13 +1134,6 @@
             "type": "array",
             "title": "Tool Calls"
           },
-          "pending_confirmations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Pending Confirmations"
-          },
           "blocks": {
             "items": {
               "oneOf": [
@@ -971,6 +1167,13 @@
             "type": "array",
             "title": "Blocks"
           },
+          "pending_confirmations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pending Confirmations"
+          },
           "routed_agent": {
             "type": "string",
             "enum": [
@@ -978,12 +1181,13 @@
               "copilot",
               "customers",
               "products",
+              "services",
               "sales",
               "collections",
               "purchases"
             ],
             "title": "Routed Agent",
-            "description": "Agente o sub-agente seleccionado para este turno: general | copilot | clientes | productos | ventas | cobros | compras. `copilot` se usa solo en handoff expl\u00edcito desde notificaciones."
+            "description": "Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | services | sales | collections | purchases. `copilot` se usa solo en handoff expl\u00edcito desde notificaciones."
           },
           "routing_source": {
             "type": "string",
@@ -1003,8 +1207,6 @@
           "chat_id",
           "reply",
           "tokens_used",
-          "tool_calls",
-          "pending_confirmations",
           "routed_agent",
           "routing_source"
         ],
@@ -1345,6 +1547,229 @@
           "quantity"
         ],
         "title": "ContractItem"
+      },
+      "ConversationDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "messages",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationDetail"
+      },
+      "ConversationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ConversationListResponse"
+      },
+      "ConversationMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "tool_calls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ConversationMessage"
+      },
+      "ConversationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "message_count"
+        ],
+        "title": "ConversationSummary"
+      },
+      "CustomerMessagingInboundRequest": {
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Org Id"
+          },
+          "phone_number_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Phone Number Id"
+          },
+          "from_phone": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 6,
+            "title": "From Phone"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "profile_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Name"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_id",
+          "phone_number_id",
+          "from_phone",
+          "message"
+        ],
+        "title": "CustomerMessagingInboundRequest"
+      },
+      "CustomerMessagingInboundResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "reply": {
+            "type": "string",
+            "title": "Reply"
+          },
+          "tokens_used": {
+            "type": "integer",
+            "title": "Tokens Used"
+          },
+          "tool_calls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "reply",
+          "tokens_used",
+          "tool_calls"
+        ],
+        "title": "CustomerMessagingInboundResponse"
       },
       "ExternalSalesChatRequest": {
         "properties": {
@@ -1766,178 +2191,6 @@
         ],
         "title": "ValidationError"
       },
-      "WhatsAppMessageRequest": {
-        "properties": {
-          "org_id": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Org Id"
-          },
-          "phone_number_id": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 3,
-            "title": "Phone Number Id"
-          },
-          "from_phone": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 6,
-            "title": "From Phone"
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
-          },
-          "message_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Message Id"
-          },
-          "profile_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Name"
-          },
-          "conversation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Conversation Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "org_id",
-          "phone_number_id",
-          "from_phone",
-          "message"
-        ],
-        "title": "WhatsAppMessageRequest"
-      },
-      "WhatsAppMessageResponse": {
-        "properties": {
-          "conversation_id": {
-            "type": "string",
-            "title": "Conversation Id"
-          },
-          "reply": {
-            "type": "string",
-            "title": "Reply"
-          },
-          "tokens_used": {
-            "type": "integer",
-            "title": "Tokens Used"
-          },
-          "tool_calls": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Tool Calls"
-          }
-        },
-        "type": "object",
-        "required": [
-          "conversation_id",
-          "reply",
-          "tokens_used",
-          "tool_calls"
-        ],
-        "title": "WhatsAppMessageResponse"
-      },
-      "src__api__chat_contract__ChatRequest": {
-        "properties": {
-          "chat_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chat Id"
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
-          },
-          "confirmed_actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Confirmed Actions"
-          },
-          "route_hint": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "general",
-                  "copilot",
-                  "customers",
-                  "products",
-                  "sales",
-                  "collections",
-                  "purchases"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Route Hint",
-            "description": "Hint opcional para forzar el carril del turno actual: general | clientes | productos | ventas | cobros | compras. `copilot` queda reservado para handoff expl\u00edcito desde notificaciones."
-          },
-          "preferred_language": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "es",
-                  "en"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preferred Language",
-            "description": "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a espa\u00f1ol."
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "ChatRequest"
-      },
       "src__api__public_router__PublicChatRequest": {
         "properties": {
           "conversation_id": {
@@ -1976,6 +2229,21 @@
         "title": "PublicChatRequest"
       },
       "src__domains__professionals__teachers__internal_router__ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
+      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
         "properties": {
           "message": {
             "type": "string",

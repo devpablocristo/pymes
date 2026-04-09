@@ -21,7 +21,7 @@ type MetaClient struct {
 	caller *httpclient.Caller
 }
 
-type AIMessageRequest struct {
+type CustomerMessagingInboundRequest struct {
 	OrgID         string `json:"org_id"`
 	PhoneNumberID string `json:"phone_number_id"`
 	FromPhone     string `json:"from_phone"`
@@ -70,7 +70,7 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (cm.
 	if c == nil || c.caller.BaseURL == "" {
 		return cm.AIMessageResponse{}, fmt.Errorf("ai service url not configured")
 	}
-	body := AIMessageRequest{
+	body := CustomerMessagingInboundRequest{
 		OrgID:         req.OrgID.String(),
 		PhoneNumberID: req.PhoneNumberID,
 		FromPhone:     req.FromPhone,
@@ -78,7 +78,7 @@ func (c *AIClient) ProcessWhatsApp(ctx context.Context, req InboundMessage) (cm.
 		MessageID:     req.MessageID,
 		ProfileName:   req.ProfileName,
 	}
-	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/whatsapp/message", body)
+	st, raw, err := c.caller.DoJSON(ctx, http.MethodPost, "/v1/internal/customer-messaging/inbound", body)
 	if err != nil {
 		return cm.AIMessageResponse{}, err
 	}

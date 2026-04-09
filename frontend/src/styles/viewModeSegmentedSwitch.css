@@ -1,4 +1,4 @@
-/* Segment control compartido: Tablero/Lista (OT), Tabla/Galería (productos), etc. */
+/* Segment control compartido: Tablero/Lista (OT), Galería/Lista (productos), etc. */
 .m-seg-switch {
   position: relative;
   display: inline-flex;

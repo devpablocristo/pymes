@@ -11,6 +11,8 @@ export type ProductGalleryItem = {
   price?: number;
   currency?: string;
   image_url?: string;
+  /** Varias URLs; la tarjeta usa la primera. */
+  image_urls?: string[];
 };
 
 export type ProductGalleryViewProps<T extends ProductGalleryItem> = {
@@ -98,6 +100,13 @@ function formatPrice(price?: number, currency?: string): string {
   return `${currency ?? 'ARS'} ${Number(price).toFixed(2)}`;
 }
 
+function cardImageSrc(item: ProductGalleryItem): string {
+  const fromList = item.image_urls?.map((u) => u.trim()).filter(Boolean) ?? [];
+  if (fromList.length > 0) return fromList[0]!;
+  const one = item.image_url?.trim();
+  return one ?? '';
+}
+
 export function ProductGalleryView<T extends ProductGalleryItem>({
   items,
   onSelect,
@@ -124,7 +133,7 @@ export function ProductGalleryView<T extends ProductGalleryItem>({
         >
           <span style={imageWrapStyle}>
             <img
-              src={item.image_url || PLACEHOLDER_IMAGE}
+              src={cardImageSrc(item) || PLACEHOLDER_IMAGE}
               alt={item.name}
               style={imageStyle}
               loading="lazy"

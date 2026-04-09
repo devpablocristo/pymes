@@ -16,8 +16,8 @@ import {
   SettingsHubPage,
   StockPage,
   UnifiedChatPage,
-  WhatsAppCampaignsPage,
-  WhatsAppInboxPage,
+  CustomerMessagingCampaignsPage,
+  CustomerMessagingInboxPage,
   WorkOrdersEditorPage,
   WorkOrdersKanbanPanel,
   WorkOrdersModuleSection,
@@ -61,8 +61,10 @@ export function ShellRoutes() {
       </Route>
       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
       <Route path="/automation-rules" element={<AutomationRulesPage />} />
-      <Route path="/whatsapp/campaigns" element={<WhatsAppCampaignsPage />} />
-      <Route path="/whatsapp/inbox" element={<WhatsAppInboxPage />} />
+      <Route path="/customer-messaging/campaigns" element={<CustomerMessagingCampaignsPage />} />
+      <Route path="/customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
+      <Route path="/whatsapp/campaigns" element={<Navigate to="/customer-messaging/campaigns" replace />} />
+      <Route path="/whatsapp/inbox" element={<Navigate to="/customer-messaging/inbox" replace />} />
       <Route path="/watcher-config" element={<WatcherConfigPage />} />
       <Route path="/audit" element={<Navigate to="/settings?section=audit" replace />} />
       <Route path="/roles" element={<Navigate to="/settings?section=rbac" replace />} />

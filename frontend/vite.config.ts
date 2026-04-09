@@ -112,6 +112,18 @@ const modulesShellSidebarStyles = monorepoPackageDir('modules', 'sidebar/ts/src/
 const modulesUiModalStyles = monorepoPackageDir('modules', 'ui/modal/ts/src/styles.css');
 const modulesUiPageShellIndex = monorepoPackageDir('modules', 'ui/page-shell/ts/src/index.ts');
 const modulesUiPageShellStyles = monorepoPackageDir('modules', 'ui/page-shell/ts/src/styles.css');
+const modulesUiNotificationFeedIndex = monorepoPackageDirOrNodeModule(
+  'modules',
+  ['ui/notification-feed/ts/src/index.ts'],
+  './node_modules/@devpablocristo/modules-ui-notification-feed/src/index.ts',
+);
+const modulesUiNotificationFeedStyles = monorepoPackageDirOrNodeModule(
+  'modules',
+  ['ui/notification-feed/ts/src/styles.css'],
+  './node_modules/@devpablocristo/modules-ui-notification-feed/src/styles.css',
+);
+const modulesUiConversationInboxIndex = monorepoPackageDir('modules', 'ui/conversation-inbox/ts/src/index.ts');
+const modulesUiConversationInboxStyles = monorepoPackageDir('modules', 'ui/conversation-inbox/ts/src/styles.css');
 const modulesUiSectionHubIndex = monorepoPackageDir('modules', 'ui/section-hub/ts/src/index.tsx');
 const modulesUiSectionHubStyles = monorepoPackageDir('modules', 'ui/section-hub/ts/src/styles.css');
 
@@ -154,6 +166,10 @@ export default defineConfig({
       { find: '@devpablocristo/modules-ui-modal/styles.css', replacement: modulesUiModalStyles },
       { find: '@devpablocristo/modules-ui-page-shell/styles.css', replacement: modulesUiPageShellStyles },
       { find: '@devpablocristo/modules-ui-page-shell', replacement: modulesUiPageShellIndex },
+      { find: '@devpablocristo/modules-ui-notification-feed/styles.css', replacement: modulesUiNotificationFeedStyles },
+      { find: '@devpablocristo/modules-ui-notification-feed', replacement: modulesUiNotificationFeedIndex },
+      { find: '@devpablocristo/modules-ui-conversation-inbox/styles.css', replacement: modulesUiConversationInboxStyles },
+      { find: '@devpablocristo/modules-ui-conversation-inbox', replacement: modulesUiConversationInboxIndex },
       { find: '@devpablocristo/modules-ui-section-hub/styles.css', replacement: modulesUiSectionHubStyles },
       { find: '@devpablocristo/modules-ui-section-hub', replacement: modulesUiSectionHubIndex },
     ],

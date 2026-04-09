@@ -2,6 +2,8 @@ package whatsapp
 
 import (
 	"testing"
+
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/whatsapp/usecases/domain"
 )
 
 func TestParseInboundMessages_InvalidJSON(t *testing.T) {
@@ -91,6 +93,35 @@ func TestParseInboundMessages_SkipsNonMessagesField(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Fatalf("len = %d, want 0 when field is not messages", len(got))
+	}
+}
+
+func TestParseWebhookPayload_StatusUpdate(t *testing.T) {
+	t.Parallel()
+	payload := []byte(`{
+		"object":"whatsapp_business_account",
+		"entry":[{
+			"changes":[{
+				"field":"statuses",
+				"value":{
+					"metadata":{"phone_number_id":"pnid-1"},
+					"statuses":[{"id":"wamid-123","status":"read","timestamp":"1710000000"}]
+				}
+			}]
+		}]
+	}`)
+	messages, statuses, err := parseWebhookPayload(payload)
+	if err != nil {
+		t.Fatalf("ParseWebhookPayload() error = %v", err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("messages len = %d, want 0", len(messages))
+	}
+	if len(statuses) != 1 {
+		t.Fatalf("statuses len = %d, want 1", len(statuses))
+	}
+	if statuses[0].WAMessageID != "wamid-123" || statuses[0].Status != domain.StatusRead {
+		t.Fatalf("status = %+v", statuses[0])
 	}
 }
 

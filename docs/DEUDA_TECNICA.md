@@ -117,14 +117,14 @@ están en español (cliente-facing) en
 ## 3. WhatsApp inbound (cliente escribiendo al negocio)
 
 Webhooks de Meta en
-[pymes-core/backend/internal/whatsapp/inbound.go](../pymes-core/backend/internal/whatsapp/inbound.go),
+[pymes-core/backend/internal/customer_messaging/inbound.go](../pymes-core/backend/internal/customer_messaging/inbound.go),
 montados sin auth (rate limit 240/min, body máx 256KB) — ver
 `docs/WHATSAPP_SETUP.md` y `CLAUDE.md §12`.
 
 | Método | Path | Descripción |
 |---|---|---|
-| GET | `/v1/webhooks/whatsapp` | Verificación inicial Meta |
-| POST | `/v1/webhooks/whatsapp` | Mensajes entrantes + status (delivered/read) |
+| GET | `/v1/webhooks/customer-messaging/whatsapp` | Verificación inicial Meta |
+| POST | `/v1/webhooks/customer-messaging/whatsapp` | Mensajes entrantes + status (delivered/read) |
 
 El cliente nunca toca directamente estos endpoints — escribe al WhatsApp del
 negocio, Meta reenvía acá, y el AI agent toma la conversación. Por eso es
@@ -165,10 +165,10 @@ operativa, pero es útil tenerlas mapeadas en el mismo lugar para no mezclarlas.
 
 | Feature | Endpoint owner-side | Sale al cliente como |
 |---|---|---|
-| Link `wa.me` de presupuesto | `GET /v1/whatsapp/quote/:id` ([whatsapp/handler.go:80](../pymes-core/backend/internal/whatsapp/handler.go#L80)) | Mensaje de WhatsApp con texto preformado |
-| Link `wa.me` de comprobante de venta | `GET /v1/whatsapp/sale/:id/receipt` ([whatsapp/handler.go:81](../pymes-core/backend/internal/whatsapp/handler.go#L81)) | Idem |
-| Mensaje libre a cliente | `GET /v1/whatsapp/customer/:id/message` | Idem |
-| Envío directo por WhatsApp Cloud API | `POST /v1/whatsapp/send/{text,template,media,interactive}` | Mensaje real desde el número del negocio |
+| Link `wa.me` de presupuesto | `GET /v1/customer-messaging/share/quote/:id` | Mensaje de WhatsApp con texto preformado |
+| Link `wa.me` de comprobante de venta | `GET /v1/customer-messaging/share/sale/:id/receipt` | Idem |
+| Mensaje libre a cliente | `GET /v1/customer-messaging/share/customer/:id/message` | Idem |
+| Envío directo por WhatsApp Cloud API | `POST /v1/customer-messaging/messages/{text,template,media,interactive}` | Mensaje real desde el número del negocio |
 | Confirmación / cancelación de booking por email | Generado por `scheduler.usecases` | Magic link → consume rutas de la sección 1 |
 | Generación de PDF de presupuesto / factura | `pdfgenHandler` (auth) | Adjunto en mensaje |
 

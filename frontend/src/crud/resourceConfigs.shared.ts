@@ -64,6 +64,26 @@ export function stringifyJSON(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+/** URLs de imágenes: una por línea o separadas por coma. */
+export function parseImageURLList(value: CrudFieldValue | undefined): string[] {
+  const normalized = asString(value).trim();
+  if (!normalized) return [];
+  const parts = normalized.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const p of parts) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push(p);
+  }
+  return out;
+}
+
+export function formatProductImageURLsToForm(urls: string[] | undefined, legacySingle?: string): string {
+  const list = urls?.length ? urls : legacySingle?.trim() ? [legacySingle.trim()] : [];
+  return list.join('\n');
+}
+
 export function openExternalURL(url?: string): void {
   if (!url) return;
   const opened = window.open(url, '_blank', 'noopener,noreferrer');

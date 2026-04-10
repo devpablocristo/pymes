@@ -210,8 +210,12 @@ describe('NotificationsCenterPage', () => {
         notificationId: 'notif-1',
         title: 'Insight nuevo',
         body: 'Conviene revisar las ventas del día.',
-        scope: 'sales',
+        source: 'in_app_notification',
+        notification_id: 'notif-1',
         routedAgent: 'commercial',
+        chatContext: expect.objectContaining({
+          suggested_user_message: 'Explicame este insight',
+        }),
       }),
     );
   });

@@ -3,14 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
-import type { AuditEntry, BusinessInsightCandidate, SessionResponse, TenantSettings } from '../lib/types';
+import type { AuditEntry, SessionResponse, TenantSettings } from '../lib/types';
 import { AdminPage } from './AdminPage';
 
 const apiMocks = vi.hoisted(() => ({
   getTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
   updateTenantSettings: vi.fn(),
   getAuditEntries: vi.fn<[], Promise<{ items: AuditEntry[] }>>(),
-  getBusinessInsightCandidates: vi.fn<[], Promise<{ items: BusinessInsightCandidate[] }>>(),
   getSession: vi.fn<[], Promise<SessionResponse>>(),
   downloadAuditExportCsv: vi.fn<[], Promise<string>>(),
 }));
@@ -19,7 +18,6 @@ vi.mock('../lib/api', () => ({
   getTenantSettings: () => apiMocks.getTenantSettings(),
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
   getAuditEntries: () => apiMocks.getAuditEntries(),
-  getBusinessInsightCandidates: () => apiMocks.getBusinessInsightCandidates(),
   getSession: () => apiMocks.getSession(),
   downloadAuditExportCsv: () => apiMocks.downloadAuditExportCsv(),
 }));
@@ -120,12 +118,10 @@ describe('AdminPage scheduling settings', () => {
     apiMocks.getTenantSettings.mockReset();
     apiMocks.updateTenantSettings.mockReset();
     apiMocks.getAuditEntries.mockReset();
-    apiMocks.getBusinessInsightCandidates.mockReset();
     apiMocks.getSession.mockReset();
     apiMocks.downloadAuditExportCsv.mockReset();
 
     apiMocks.getAuditEntries.mockResolvedValue({ items: [] });
-    apiMocks.getBusinessInsightCandidates.mockResolvedValue({ items: [] });
     apiMocks.getSession.mockResolvedValue({
       auth: {
         org_id: '00000000-0000-0000-0000-000000000001',

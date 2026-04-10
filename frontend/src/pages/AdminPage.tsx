@@ -2,12 +2,10 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
-import { InsightCandidatesCard } from '@devpablocristo/modules-admin-insights';
 import { useSearch } from '@devpablocristo/modules-search';
 import {
   downloadAuditExportCsv,
   getAuditEntries,
-  getBusinessInsightCandidates,
   getSession,
   getTenantSettings,
   updateTenantSettings,
@@ -17,7 +15,7 @@ import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import { getTheme, toggleTheme } from '../lib/theme';
 import { syncTenantProfileFromSettings } from '../lib/tenantProfile';
-import type { AuditEntry, BusinessInsightCandidate, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
+import type { AuditEntry, TenantSettings, TenantSettingsUpdatePayload } from '../lib/types';
 import { AdminRbacSection } from './AdminRbacSection';
 
 function formatDateTime(iso: string): string {
@@ -205,12 +203,6 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
     (a: AuditEntry) => `${a.action} ${a.resource_type} ${a.resource_id ?? ''} ${a.actor ?? ''}`,
     [],
   );
-  const insightTextFn = useCallback(
-    (row: BusinessInsightCandidate) =>
-      `${row.title} ${row.event_type} ${row.entity_type} ${row.entity_id} ${row.status} ${row.severity}`,
-    [],
-  );
-
   const tenantQuery = useQuery({
     queryKey: queryKeys.tenant.settings,
     queryFn: getTenantSettings,
@@ -229,22 +221,11 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
     queryFn: getSession,
     staleTime: 5 * 60_000,
   });
-  const insightCandidatesQuery = useQuery({
-    queryKey: queryKeys.businessInsights.candidates(100),
-    queryFn: async () => {
-      const response = await getBusinessInsightCandidates(100);
-      return response.items ?? [];
-    },
-    staleTime: 30_000,
-  });
-
   const settings = tenantQuery.data ?? null;
   const activity = auditQuery.data ?? [];
   const filteredActivity = useSearch(activity, auditTextFn, adminSearch);
-  const insightCandidates = insightCandidatesQuery.data ?? [];
-  const filteredInsightCandidates = useSearch(insightCandidates, insightTextFn, adminSearch);
   const [error, setError] = useState('');
-  const loading = tenantQuery.isPending || auditQuery.isPending || insightCandidatesQuery.isPending;
+  const loading = tenantQuery.isPending || auditQuery.isPending;
   const [saving, setSaving] = useState(false);
   const sessionOrgId = sessionQuery.data?.auth.org_id ?? '';
   const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
@@ -254,8 +235,6 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
     ? formatFetchErrorForUser(tenantQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
     : auditQuery.isError
       ? formatFetchErrorForUser(auditQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
-      : insightCandidatesQuery.isError
-        ? formatFetchErrorForUser(insightCandidatesQuery.error, 'No pudimos conectar con el servidor. Verificá tu red.')
       : '';
 
   useEffect(() => {
@@ -739,8 +718,6 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
 
       {(showAll || section === 'audit') && (
         <>
-          <InsightCandidatesCard items={filteredInsightCandidates} formatDateTime={formatDateTime} />
-
           <div className="card">
             <div className="card-header admin-card-header--wrap">
               <h2>Registro de auditoría</h2>

@@ -15,7 +15,7 @@ from src.agents.catalog import (
     CUSTOMERS_DOMAIN_AGENT_NAME,
     COLLECTIONS_DOMAIN_AGENT_NAME,
     PURCHASES_DOMAIN_AGENT_NAME,
-    COPILOT_AGENT_NAME,
+    INSIGHT_CHAT_AGENT_NAME,
     PRODUCTS_DOMAIN_AGENT_NAME,
     PRODUCT_AGENT_NAME,
     ROUTING_SOURCE_ORCHESTRATOR,
@@ -26,7 +26,7 @@ from src.agents.catalog import (
     is_known_routed_agent,
     normalize_routed_agent,
 )
-from src.agents.copilot_service import maybe_build_copilot_response
+from src.agents.insight_chat_service import build_insight_chat_response_for_scope, match_insight_chat_request
 from src.agents.contracts import CommercialContractEnvelope
 from src.agents.policy import build_external_sales_policy, build_internal_procurement_policy, build_internal_sales_policy
 from src.agents.service_support import (
@@ -41,7 +41,13 @@ from src.agents.service_support import (
     sanitize_message,
 )
 from src.agents.sub_agents import build_registry
-from src.api.external_chat_support import get_external_conversation, history_to_messages
+from src.api.chat_contract import ChatHandoff
+from src.api.external_chat_support import (
+    compact_insight_evidence_for_prompt,
+    extract_insight_evidence,
+    get_external_conversation,
+    history_to_messages,
+)
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from runtime.chat.blocks import (
@@ -61,6 +67,7 @@ from src.core.dossier import (
     summarize_dossier_for_context,
     sync_business_from_settings,
 )
+from src.routing import RoutingDecision, TurnContext, resolve_routing_decision
 from runtime import LLMError, build_llm_client, validate_json_completion
 from runtime.orchestrator import OrchestratorLimits, orchestrate
 from runtime.services.multi_agent_orchestrator import run_routed_agent
@@ -284,6 +291,17 @@ class _InternalDomainSnapshot:
     tool_calls: list[str]
     blocks: list[dict[str, Any]]
     raw_result: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _InternalRoutingOutcome:
+    reply: str
+    routed_agent: str
+    routing_source: str
+    tool_calls: list[str]
+    pending_confirmations: list[str]
+    blocks: list[dict[str, Any]]
+    insight_evidence_payload: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -1772,7 +1790,66 @@ def _normalize_explicit_route_hint(route_hint: str | None) -> str | None:
         return None
     if not is_known_routed_agent(normalized):
         return None
-    return normalized
+    return normalize_routed_agent(normalized)
+
+
+def _is_internal_insight_handoff(handoff: ChatHandoff | None) -> bool:
+    if handoff is None:
+        return False
+    return handoff.insight_scope in {"sales_collections", "inventory_profit", "customers_retention"}
+
+
+async def _validate_internal_insight_handoff(
+    *,
+    backend_client: BackendClient,
+    auth: AuthContext,
+    handoff: ChatHandoff | None,
+) -> bool:
+    valid, _reason = await _validate_internal_insight_handoff_with_reason(
+        backend_client=backend_client,
+        auth=auth,
+        handoff=handoff,
+    )
+    return valid
+
+
+async def _validate_internal_insight_handoff_with_reason(
+    *,
+    backend_client: BackendClient,
+    auth: AuthContext,
+    handoff: ChatHandoff | None,
+) -> tuple[bool, str]:
+    if not _is_internal_insight_handoff(handoff):
+        return False, "unsupported_scope"
+    if handoff is None or handoff.source != "in_app_notification":
+        return True, "validated"
+    notification_id = str(handoff.notification_id or "").strip()
+    if not notification_id:
+        return False, "missing_notification_id"
+    try:
+        payload = await backend_client.request(
+            "GET",
+            "/v1/in-app-notifications",
+            auth=auth,
+            params={"limit": 100},
+        )
+    except Exception:  # noqa: BLE001
+        return False, "notification_lookup_failed"
+    items = payload.get("items") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
+        return False, "invalid_notification_payload"
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id", "")).strip() != notification_id:
+            continue
+        chat_context = item.get("chat_context")
+        if isinstance(chat_context, dict):
+            scope = str(chat_context.get("scope", "")).strip()
+            if scope and handoff.insight_scope is not None and scope != str(handoff.insight_scope):
+                return False, "scope_mismatch"
+        return True, "validated"
+    return False, "notification_not_found"
 
 
 def _override_explicit_route_hint(*, explicit_route_hint: str, user_message: str) -> str | None:
@@ -1962,6 +2039,363 @@ async def _run_direct_internal_agent(
     return reply, tool_calls, pending_confirmations
 
 
+async def _build_internal_turn_context(
+    *,
+    sanitized_message: str,
+    route_hint: str | None,
+    handoff: ChatHandoff | None,
+    backend_client: BackendClient,
+    auth: AuthContext,
+) -> TurnContext:
+    normalized_route_hint = _normalize_explicit_route_hint(route_hint)
+    route_hint_source = "explicit" if normalized_route_hint is not None else None
+    if normalized_route_hint is None:
+        inferred_route_hint = _apply_internal_route_hint(
+            routed_agent=PRODUCT_AGENT_NAME,
+            user_message=sanitized_message,
+        )
+        if inferred_route_hint != PRODUCT_AGENT_NAME:
+            normalized_route_hint = inferred_route_hint
+            route_hint_source = "inferred"
+    handoff_is_structured_insight = _is_internal_insight_handoff(handoff)
+    handoff_is_valid = False
+    handoff_validation_reason = ""
+    if handoff_is_structured_insight:
+        handoff_is_valid, handoff_validation_reason = await _validate_internal_insight_handoff_with_reason(
+            backend_client=backend_client,
+            auth=auth,
+            handoff=handoff,
+        )
+    legacy_insight_request = None
+    if normalized_route_hint == INSIGHT_CHAT_AGENT_NAME:
+        legacy_insight_request = match_insight_chat_request(sanitized_message)
+    return TurnContext(
+        message=sanitized_message,
+        route_hint=normalized_route_hint,
+        route_hint_source=route_hint_source,
+        handoff=handoff,
+        legacy_insight_request=legacy_insight_request,
+        is_menu_request=_looks_like_menu_request(sanitized_message),
+        is_ambiguous_query=_looks_like_ambiguous_internal_query(sanitized_message),
+        handoff_is_structured_insight=handoff_is_structured_insight,
+        handoff_is_valid=handoff_is_valid,
+        handoff_validation_reason=handoff_validation_reason,
+        legacy_insight_match=legacy_insight_request is not None,
+    )
+
+
+async def _execute_static_routing_decision(
+    *,
+    target: str,
+    sanitized_message: str,
+) -> _InternalRoutingOutcome:
+    if target == "route_menu":
+        reply, blocks = _build_internal_route_menu(sanitized_message)
+    else:
+        reply, blocks = _build_internal_route_clarification(sanitized_message)
+    return _InternalRoutingOutcome(
+        reply=reply,
+        routed_agent=PRODUCT_AGENT_NAME,
+        routing_source=ROUTING_SOURCE_ORCHESTRATOR,
+        tool_calls=[],
+        pending_confirmations=[],
+        blocks=blocks,
+    )
+
+
+async def _execute_insight_routing_decision(
+    *,
+    decision: RoutingDecision,
+    turn_context: TurnContext,
+    backend_client: BackendClient,
+    auth: AuthContext,
+    org_id: str,
+    conversation_id: str,
+    preferred_language: str | None,
+) -> _InternalRoutingOutcome | None:
+    handoff = turn_context.handoff
+    if decision.reason == "structured_handoff" and handoff is None:
+        return None
+    notification_id = decision.extras.get("notification_id")
+    evidence_source = "insight_handoff" if decision.reason == "structured_handoff" else "insight_chat_legacy_match"
+    period = str(decision.extras.get("period") or "month")
+    compare = bool(True if decision.extras.get("compare") is None else decision.extras.get("compare"))
+    top_limit = int(decision.extras.get("top_limit") or 5)
+    insight_response = await build_insight_chat_response_for_scope(
+        backend_client=backend_client,
+        auth=auth,
+        scope=str(decision.target),
+        period=period,
+        compare=compare,
+        top_limit=top_limit,
+        notification_id=str(notification_id).strip() or None,
+        evidence_source=evidence_source,
+    )
+    if insight_response is None:
+        if decision.reason == "structured_handoff" and handoff is not None:
+            logger.warning(
+                "handoff_failed",
+                org_id=org_id,
+                conversation_id=conversation_id,
+                handoff_source=handoff.source,
+                notification_id=handoff.notification_id or "",
+                handoff_scope=handoff.insight_scope or "",
+                period=handoff.period or "",
+                reason="insight_resolution_failed",
+            )
+        return None
+    if decision.reason == "structured_handoff" and handoff is not None:
+        logger.info(
+            "handoff_resolved",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            routed_agent=INSIGHT_CHAT_AGENT_NAME,
+            handoff_source=handoff.source,
+            notification_id=handoff.notification_id or "",
+            handoff_scope=handoff.insight_scope or "",
+            period=handoff.period or "",
+        )
+    else:
+        logger.info(
+            "insight_chat_routed",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            routed_agent=INSIGHT_CHAT_AGENT_NAME,
+            route_hint=turn_context.route_hint,
+            scope=decision.target,
+            period=period,
+        )
+    return _InternalRoutingOutcome(
+        reply=insight_response.reply,
+        routed_agent=INSIGHT_CHAT_AGENT_NAME,
+        routing_source=ROUTING_SOURCE_UI_HINT,
+        tool_calls=[],
+        pending_confirmations=[],
+        blocks=copy.deepcopy(insight_response.blocks),
+        insight_evidence_payload=(
+            insight_response.insight_evidence.model_dump(mode="json")
+            if insight_response.insight_evidence is not None
+            else None
+        ),
+    )
+
+
+async def _execute_direct_agent_routing_decision(
+    *,
+    llm: LLMProvider,
+    registry: Any,
+    routed_agent: str,
+    org_id: str,
+    sanitized_message: str,
+    dossier: dict[str, Any],
+    user_id: str,
+    history: list[Message],
+    conversation_id: str,
+    route_hint_source: str | None,
+) -> _InternalRoutingOutcome | None:
+    routing_source = (
+        ROUTING_SOURCE_UI_HINT if route_hint_source == "explicit" else ROUTING_SOURCE_READ_FALLBACK
+    )
+    if _looks_like_internal_analysis_request(sanitized_message, assume_domain_context=True):
+        analysis_reply, analysis_tool_calls, analysis_blocks = await _run_internal_analysis_fallback(
+            registry=registry,
+            routed_agent=routed_agent,
+            org_id=org_id,
+            user_message=sanitized_message,
+            dossier=dossier,
+            user_id=user_id,
+        )
+        if analysis_reply:
+            return _InternalRoutingOutcome(
+                reply=analysis_reply,
+                routed_agent=routed_agent,
+                routing_source=routing_source,
+                tool_calls=sorted(set(analysis_tool_calls)),
+                pending_confirmations=[],
+                blocks=analysis_blocks or _build_internal_blocks(analysis_reply, []),
+            )
+
+    fallback_reply, fallback_tool_calls, fallback_blocks = await _run_internal_read_fallback(
+        registry=registry,
+        routed_agent=routed_agent,
+        org_id=org_id,
+        user_message=sanitized_message,
+    )
+    if fallback_reply:
+        return _InternalRoutingOutcome(
+            reply=fallback_reply,
+            routed_agent=routed_agent,
+            routing_source=routing_source,
+            tool_calls=sorted(set(fallback_tool_calls)),
+            pending_confirmations=[],
+            blocks=fallback_blocks or _build_internal_blocks(fallback_reply, []),
+        )
+
+    forced_agent = registry.get(routed_agent)
+    if forced_agent is None:
+        return None
+    logger.info(
+        "internal_assistant_route_hint_requested",
+        org_id=org_id,
+        conversation_id=conversation_id,
+        routed_agent=routed_agent,
+    )
+    try:
+        reply, tool_calls, pending_confirmations = await _run_direct_internal_agent(
+            llm=llm,
+            agent=forced_agent,
+            history=history,
+            org_id=org_id,
+            user_message=sanitized_message,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "internal_assistant_route_hint_direct_failed",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            routed_agent=routed_agent,
+            error=str(exc),
+        )
+        reply = _default_internal_reply(routed_agent)
+        tool_calls = []
+        pending_confirmations = []
+    return _InternalRoutingOutcome(
+        reply=reply,
+        routed_agent=routed_agent,
+        routing_source=ROUTING_SOURCE_UI_HINT,
+        tool_calls=sorted(set(tool_calls)),
+        pending_confirmations=list(pending_confirmations),
+        blocks=[],
+    )
+
+
+async def _execute_orchestrator_routing_decision(
+    *,
+    llm: LLMProvider,
+    registry: Any,
+    org_id: str,
+    sanitized_message: str,
+    history: list[Message],
+    dossier: dict[str, Any],
+    conversation_id: str,
+    turn_context: TurnContext,
+    auth: AuthContext,
+) -> _InternalRoutingOutcome:
+    if turn_context.handoff_is_structured_insight and not turn_context.handoff_is_valid and turn_context.handoff is not None:
+        logger.warning(
+            "handoff_failed",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            handoff_source=turn_context.handoff.source,
+            notification_id=turn_context.handoff.notification_id or "",
+            handoff_scope=turn_context.handoff.insight_scope or "",
+            period=turn_context.handoff.period or "",
+            reason=turn_context.handoff_validation_reason or "validation_failed",
+        )
+
+    assistant_parts: list[str] = []
+    tool_calls: list[str] = []
+    pending_confirmations: list[str] = []
+    routed_agent = PRODUCT_AGENT_NAME
+    routing_source = ROUTING_SOURCE_ORCHESTRATOR
+
+    if turn_context.route_hint == INSIGHT_CHAT_AGENT_NAME and not turn_context.legacy_insight_match:
+        logger.info(
+            "insight_chat_hint_skipped",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            route_hint=turn_context.route_hint,
+        )
+
+    try:
+        async for chunk in run_routed_agent(
+            llm=llm,
+            registry=registry,
+            user_message=sanitized_message,
+            history=history,
+            context={"org_id": org_id},
+            general_system_prompt=_build_internal_general_system_prompt(dossier, auth.actor),
+            general_limits=_build_internal_general_limits(),
+        ):
+            if chunk.type == "route" and chunk.text:
+                routed_agent = normalize_routed_agent(chunk.text)
+                logger.info(
+                    "internal_assistant_routed",
+                    org_id=org_id,
+                    conversation_id=conversation_id,
+                    routed_agent=routed_agent,
+                )
+            elif chunk.type == "text" and chunk.text:
+                assistant_parts.append(chunk.text)
+            elif chunk.type == "tool_call" and chunk.tool_call:
+                tool_name = str(chunk.tool_call.name).strip()
+                if tool_name:
+                    tool_calls.append(tool_name)
+            elif chunk.type == "tool_result":
+                required_action = _extract_pending_confirmation(chunk)
+                if required_action and required_action not in pending_confirmations:
+                    pending_confirmations.append(required_action)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("internal_assistant_failed", org_id=org_id, conversation_id=conversation_id, error=str(exc))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
+
+    hinted_routed_agent = _apply_internal_route_hint(routed_agent=routed_agent, user_message=sanitized_message)
+    if hinted_routed_agent != routed_agent:
+        logger.info(
+            "internal_assistant_route_hint_applied",
+            org_id=org_id,
+            conversation_id=conversation_id,
+            routed_agent=routed_agent,
+            hinted_routed_agent=hinted_routed_agent,
+        )
+        routed_agent = hinted_routed_agent
+    reply = "".join(assistant_parts).strip() or _default_internal_reply(routed_agent)
+    blocks = _build_internal_blocks(reply, pending_confirmations)
+    if not pending_confirmations and not tool_calls:
+        fallback_reply, fallback_tool_calls, fallback_blocks = await _run_internal_read_fallback(
+            registry=registry,
+            routed_agent=routed_agent,
+            org_id=org_id,
+            user_message=sanitized_message,
+        )
+        if fallback_reply:
+            reply = fallback_reply
+            routing_source = ROUTING_SOURCE_READ_FALLBACK
+            tool_calls.extend(fallback_tool_calls)
+            if fallback_blocks:
+                blocks = fallback_blocks
+            logger.info(
+                "internal_assistant_read_fallback_applied",
+                org_id=org_id,
+                conversation_id=conversation_id,
+                routed_agent=routed_agent,
+            )
+        if not fallback_blocks:
+            blocks = _build_internal_blocks(reply, pending_confirmations)
+    if (
+        routed_agent == PRODUCT_AGENT_NAME
+        and not pending_confirmations
+        and not tool_calls
+        and turn_context.is_menu_request
+    ):
+        reply, blocks = _build_internal_route_menu(sanitized_message)
+    elif (
+        routed_agent == PRODUCT_AGENT_NAME
+        and not pending_confirmations
+        and not tool_calls
+        and turn_context.is_ambiguous_query
+    ):
+        reply, blocks = _build_internal_route_clarification(sanitized_message)
+    return _InternalRoutingOutcome(
+        reply=reply,
+        routed_agent=routed_agent,
+        routing_source=routing_source,
+        tool_calls=sorted(set(tool_calls)),
+        pending_confirmations=list(pending_confirmations),
+        blocks=blocks,
+    )
+
+
 async def run_internal_orchestrated_chat(
     *,
     repo: AIRepository,
@@ -1972,6 +2406,7 @@ async def run_internal_orchestrated_chat(
     conversation_id: str | None,
     auth: AuthContext,
     confirmed_actions: list[str] | None = None,
+    handoff: ChatHandoff | None = None,
     route_hint: str | None = None,
     preferred_language: str | None = None,
 ) -> CommercialChatResult:
@@ -1987,7 +2422,7 @@ async def run_internal_orchestrated_chat(
     routed_agent = PRODUCT_AGENT_NAME
     routing_source = ROUTING_SOURCE_ORCHESTRATOR
     blocks: list[dict[str, Any]] = []
-    explicit_route_hint = _normalize_explicit_route_hint(route_hint)
+    insight_evidence_payload: dict[str, Any] | None = None
     dossier, dossier_snapshot = await _hydrate_dossier_from_backend_settings(
         repo=repo,
         backend_client=backend_client,
@@ -2004,625 +2439,195 @@ async def run_internal_orchestrated_chat(
         confirmed_actions=confirmed,
     )
 
-    if explicit_route_hint != COPILOT_AGENT_NAME and _looks_like_menu_request(sanitized_message):
-        reply, blocks = _build_internal_route_menu(sanitized_message)
-        explicit_route_hint = None
-        tool_calls = []
-        pending_confirmations = []
-        tokens_out = estimate_tokens(reply)
-        now = datetime.now(UTC).isoformat()
-        user_message = {"role": "user", "content": sanitized_message, "ts": now}
-        assistant_message = {
-            "role": "assistant",
-            "content": reply,
-            "ts": now,
-            "tool_calls": [],
-            "pending_confirmations": [],
-            "blocks": blocks,
-            "routed_agent": routed_agent,
-            "routing_source": routing_source,
-        }
-        await repo.append_messages(
-            org_id=org_id,
-            conversation_id=conversation.id,
-            new_messages=[user_message, assistant_message],
-            tool_calls_count=0,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-        )
-        await repo.track_usage(org_id, tokens_in, tokens_out)
-        await _remember_internal_turn(
-            repo=repo,
-            org_id=org_id,
-            dossier=dossier,
-            dossier_snapshot=dossier_snapshot,
-            auth=auth,
-            user_message=sanitized_message,
-            assistant_reply=reply,
-            routed_agent=routed_agent,
-            tool_calls=[],
-            pending_confirmations=[],
-            confirmed_actions=confirmed,
-        )
-        await record_agent_event(
-            repo,
-            org_id=org_id,
-            conversation_id=conversation.id,
-            agent_mode=routed_agent,
-            channel=_INTERNAL_ASSISTANT_CHANNEL,
-            actor_id=auth.actor,
-            actor_type="internal_user",
-            action="chat.completed",
-            result="success",
-            confirmed=True,
-            metadata={
-                "routing_source": routing_source,
-                "tool_calls": [],
-                "pending_confirmations": [],
-            },
-        )
-        return CommercialChatResult(
-            conversation_id=conversation.id,
-            reply=reply,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-            tool_calls=[],
-            pending_confirmations=[],
-            blocks=blocks,
-            routed_agent=routed_agent,
-            routing_source=routing_source,
-        )
-
-    if explicit_route_hint is None and _looks_like_ambiguous_internal_query(sanitized_message):
-        reply, blocks = _build_internal_route_clarification(sanitized_message)
-        tokens_out = estimate_tokens(reply)
-        now = datetime.now(UTC).isoformat()
-        user_message = {"role": "user", "content": sanitized_message, "ts": now}
-        assistant_message = {
-            "role": "assistant",
-            "content": reply,
-            "ts": now,
-            "tool_calls": [],
-            "pending_confirmations": [],
-            "blocks": blocks,
-            "routed_agent": routed_agent,
-            "routing_source": routing_source,
-        }
-        await repo.append_messages(
-            org_id=org_id,
-            conversation_id=conversation.id,
-            new_messages=[user_message, assistant_message],
-            tool_calls_count=0,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-        )
-        await repo.track_usage(org_id, tokens_in, tokens_out)
-        await _remember_internal_turn(
-            repo=repo,
-            org_id=org_id,
-            dossier=dossier,
-            dossier_snapshot=dossier_snapshot,
-            auth=auth,
-            user_message=sanitized_message,
-            assistant_reply=reply,
-            routed_agent=routed_agent,
-            tool_calls=[],
-            pending_confirmations=[],
-            confirmed_actions=confirmed,
-        )
-        await record_agent_event(
-            repo,
-            org_id=org_id,
-            conversation_id=conversation.id,
-            agent_mode=routed_agent,
-            channel=_INTERNAL_ASSISTANT_CHANNEL,
-            actor_id=auth.actor,
-            actor_type="internal_user",
-            action="chat.completed",
-            result="success",
-            confirmed=bool(confirmed),
-            metadata={
-                "routing_source": routing_source,
-                "tool_calls": [],
-                "pending_confirmations": [],
-            },
-        )
-        return CommercialChatResult(
-            conversation_id=conversation.id,
-            reply=reply,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-            tool_calls=[],
-            pending_confirmations=[],
-            blocks=blocks,
-            routed_agent=routed_agent,
-            routing_source=routing_source,
-        )
-
-    if explicit_route_hint not in {None, COPILOT_AGENT_NAME}:
+    # Routing order mirrors docs/architecture/pymes-ai-handoff-baseline.md:
+    # 1) hard UI/static rules, 2) structured insight handoff, 3) explicit domain hint,
+    # 4) legacy insight_chat hint, 5) orchestrator + post-routing fallbacks.
+    turn_context = await _build_internal_turn_context(
+        sanitized_message=sanitized_message,
+        route_hint=route_hint,
+        handoff=handoff,
+        backend_client=backend_client,
+        auth=auth,
+    )
+    if turn_context.route_hint not in {None, INSIGHT_CHAT_AGENT_NAME}:
         overridden_route_hint = _override_explicit_route_hint(
-            explicit_route_hint=explicit_route_hint,
+            explicit_route_hint=str(turn_context.route_hint),
             user_message=sanitized_message,
         )
-        if overridden_route_hint != explicit_route_hint:
+        if overridden_route_hint != turn_context.route_hint:
             logger.info(
                 "internal_assistant_route_hint_overridden",
                 org_id=org_id,
                 conversation_id=conversation.id,
-                explicit_route_hint=explicit_route_hint,
+                explicit_route_hint=turn_context.route_hint,
                 overridden_route_hint=overridden_route_hint,
             )
-            explicit_route_hint = overridden_route_hint
+            turn_context = TurnContext(
+                message=turn_context.message,
+                route_hint=overridden_route_hint,
+                route_hint_source="explicit",
+                handoff=turn_context.handoff,
+                legacy_insight_request=turn_context.legacy_insight_request,
+                is_menu_request=turn_context.is_menu_request,
+                is_ambiguous_query=turn_context.is_ambiguous_query,
+                handoff_is_structured_insight=turn_context.handoff_is_structured_insight,
+                handoff_is_valid=turn_context.handoff_is_valid,
+                handoff_validation_reason=turn_context.handoff_validation_reason,
+                legacy_insight_match=turn_context.legacy_insight_match,
+            )
 
-    if explicit_route_hint not in {None, COPILOT_AGENT_NAME} and _looks_like_internal_analysis_request(
-        sanitized_message,
-        assume_domain_context=True,
-    ):
-        analysis_reply, analysis_tool_calls, analysis_blocks = await _run_internal_analysis_fallback(
-            registry=registry,
-            routed_agent=explicit_route_hint,
+    history = history_to_messages(list(conversation.messages))
+
+    # --- Fase 6: inyectar evidencia de insight previo para follow-ups ---
+    _prior_evidence = extract_insight_evidence(list(conversation.messages))
+    if _prior_evidence is not None:
+        _compacted = compact_insight_evidence_for_prompt(_prior_evidence)
+        history = [
+            Message(
+                role="system",
+                content=(
+                    "CONTEXTO INSIGHT PREVIO (datos reales del negocio, "
+                    "usá solo estos números para responder follow-ups):\n"
+                    f"{_compacted}"
+                ),
+            ),
+            *history,
+        ]
+        logger.info(
+            "insight_evidence_injected",
             org_id=org_id,
-            user_message=sanitized_message,
-            dossier=dossier,
-            user_id=auth.actor,
+            conversation_id=conversation.id,
+            scope=_prior_evidence.get("scope", ""),
+            period=_prior_evidence.get("period", ""),
         )
-        if analysis_reply:
-            routed_agent = explicit_route_hint
-            routing_source = ROUTING_SOURCE_UI_HINT
-            reply = analysis_reply
-            tool_calls.extend(analysis_tool_calls)
-            blocks = analysis_blocks or _build_internal_blocks(reply, [])
-            tokens_out = estimate_tokens(reply)
-            now = datetime.now(UTC).isoformat()
-            user_message = {"role": "user", "content": sanitized_message, "ts": now}
-            assistant_message = {
-                "role": "assistant",
-                "content": reply,
-                "ts": now,
-                "tool_calls": sorted(set(tool_calls)),
-                "routed_agent": routed_agent,
-                    "agent_mode": routed_agent,
-                "channel": _INTERNAL_ASSISTANT_CHANNEL,
-                "routing_source": routing_source,
-                "pending_confirmations": [],
-                "blocks": copy.deepcopy(blocks),
-            }
-            await repo.append_messages(
-                org_id=org_id,
-                conversation_id=conversation.id,
-                new_messages=[user_message, assistant_message],
-                tool_calls_count=len(tool_calls),
-                tokens_input=tokens_in,
-                tokens_output=tokens_out,
+
+    decision = await resolve_routing_decision(turn_context)
+    logger.info(
+        "internal_turn_routing_decision",
+        org_id=org_id,
+        conversation_id=conversation.id,
+        handler_kind=decision.handler_kind,
+        routing_target=decision.target,
+        routing_reason=decision.reason,
+        route_hint=turn_context.route_hint or "",
+        route_hint_source=turn_context.route_hint_source or "",
+        handoff_source=(turn_context.handoff.source if turn_context.handoff is not None else ""),
+        handoff_scope=(turn_context.handoff.insight_scope if turn_context.handoff is not None else ""),
+        handoff_valid=turn_context.handoff_is_valid,
+    )
+
+    match decision.handler_kind:
+        case "static_reply":
+            outcome = await _execute_static_routing_decision(
+                target=decision.target,
+                sanitized_message=sanitized_message,
             )
-            await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
-            await _remember_internal_turn(
-                repo=repo,
-                org_id=org_id,
-                dossier=dossier,
-                dossier_snapshot=dossier_snapshot,
+        case "insight_lane":
+            outcome = await _execute_insight_routing_decision(
+                decision=decision,
+                turn_context=turn_context,
+                backend_client=backend_client,
                 auth=auth,
-                user_message=sanitized_message,
-                assistant_reply=reply,
-                routed_agent=routed_agent,
-                tool_calls=sorted(set(tool_calls)),
-                pending_confirmations=[],
-                confirmed_actions=confirmed,
-            )
-            await record_agent_event(
-                repo,
                 org_id=org_id,
                 conversation_id=conversation.id,
-                agent_mode=routed_agent,
-                channel=_INTERNAL_ASSISTANT_CHANNEL,
-                actor_id=auth.actor,
-                actor_type="internal_user",
-                action="chat.completed",
-                result="success",
-                confirmed=bool(confirmed),
-                metadata={
-                    "routing_source": routing_source,
-                    "tool_calls": sorted(set(tool_calls)),
-                    "pending_confirmations": [],
-                },
+                preferred_language=preferred_language,
             )
-            return CommercialChatResult(
-                conversation_id=conversation.id,
-                reply=reply,
-                tokens_input=tokens_in,
-                tokens_output=tokens_out,
-                tool_calls=sorted(set(tool_calls)),
-                pending_confirmations=[],
-                blocks=blocks,
-                routed_agent=routed_agent,
-                routing_source=routing_source,
-            )
-
-    if explicit_route_hint not in {None, COPILOT_AGENT_NAME}:
-        fallback_reply, fallback_tool_calls, fallback_blocks = await _run_internal_read_fallback(
-            registry=registry,
-            routed_agent=explicit_route_hint,
-            org_id=org_id,
-            user_message=sanitized_message,
-        )
-        if fallback_reply:
-            routed_agent = explicit_route_hint
-            routing_source = ROUTING_SOURCE_UI_HINT
-            reply = fallback_reply
-            tool_calls.extend(fallback_tool_calls)
-            blocks = fallback_blocks or _build_internal_blocks(reply, [])
-            tokens_out = estimate_tokens(reply)
-            now = datetime.now(UTC).isoformat()
-            user_message = {"role": "user", "content": sanitized_message, "ts": now}
-            assistant_message = {
-                "role": "assistant",
-                "content": reply,
-                "ts": now,
-                "tool_calls": sorted(set(tool_calls)),
-                "routed_agent": routed_agent,
-                    "agent_mode": routed_agent,
-                "channel": _INTERNAL_ASSISTANT_CHANNEL,
-                "routing_source": routing_source,
-                "pending_confirmations": [],
-                "blocks": copy.deepcopy(blocks),
-            }
-            await repo.append_messages(
-                org_id=org_id,
-                conversation_id=conversation.id,
-                new_messages=[user_message, assistant_message],
-                tool_calls_count=len(tool_calls),
-                tokens_input=tokens_in,
-                tokens_output=tokens_out,
-            )
-            await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
-            await _remember_internal_turn(
-                repo=repo,
-                org_id=org_id,
-                dossier=dossier,
-                dossier_snapshot=dossier_snapshot,
-                auth=auth,
-                user_message=sanitized_message,
-                assistant_reply=reply,
-                routed_agent=routed_agent,
-                tool_calls=sorted(set(tool_calls)),
-                pending_confirmations=[],
-                confirmed_actions=confirmed,
-            )
-            await record_agent_event(
-                repo,
-                org_id=org_id,
-                conversation_id=conversation.id,
-                agent_mode=routed_agent,
-                channel=_INTERNAL_ASSISTANT_CHANNEL,
-                actor_id=auth.actor,
-                actor_type="internal_user",
-                action="chat.completed",
-                result="success",
-                confirmed=bool(confirmed),
-                metadata={
-                    "routing_source": routing_source,
-                    "tool_calls": sorted(set(tool_calls)),
-                    "pending_confirmations": [],
-                },
-            )
-            return CommercialChatResult(
-                conversation_id=conversation.id,
-                reply=reply,
-                tokens_input=tokens_in,
-                tokens_output=tokens_out,
-                tool_calls=sorted(set(tool_calls)),
-                pending_confirmations=[],
-                blocks=blocks,
-                routed_agent=routed_agent,
-                routing_source=routing_source,
-            )
-
-    if explicit_route_hint is None:
-        analysis_routed_agent = _infer_internal_analysis_route(sanitized_message)
-        if analysis_routed_agent is not None:
-            analysis_reply, analysis_tool_calls, analysis_blocks = await _run_internal_analysis_fallback(
-                registry=registry,
-                routed_agent=analysis_routed_agent,
-                org_id=org_id,
-                user_message=sanitized_message,
-                dossier=dossier,
-                user_id=auth.actor,
-            )
-            if analysis_reply:
-                routed_agent = analysis_routed_agent
-                routing_source = ROUTING_SOURCE_READ_FALLBACK
-                reply = analysis_reply
-                tool_calls.extend(analysis_tool_calls)
-                blocks = analysis_blocks or _build_internal_blocks(reply, [])
-                tokens_out = estimate_tokens(reply)
-                now = datetime.now(UTC).isoformat()
-                user_message = {"role": "user", "content": sanitized_message, "ts": now}
-                assistant_message = {
-                    "role": "assistant",
-                    "content": reply,
-                    "ts": now,
-                    "tool_calls": sorted(set(tool_calls)),
-                    "routed_agent": routed_agent,
-                            "agent_mode": routed_agent,
-                    "channel": _INTERNAL_ASSISTANT_CHANNEL,
-                    "routing_source": routing_source,
-                    "pending_confirmations": [],
-                    "blocks": copy.deepcopy(blocks),
-                }
-                await repo.append_messages(
-                    org_id=org_id,
-                    conversation_id=conversation.id,
-                    new_messages=[user_message, assistant_message],
-                    tool_calls_count=len(tool_calls),
-                    tokens_input=tokens_in,
-                    tokens_output=tokens_out,
+            if outcome is None:
+                fallback_context = TurnContext(
+                    message=turn_context.message,
+                    route_hint=turn_context.route_hint,
+                    route_hint_source=turn_context.route_hint_source,
+                    handoff=turn_context.handoff,
+                    legacy_insight_request=turn_context.legacy_insight_request,
+                    is_menu_request=turn_context.is_menu_request,
+                    is_ambiguous_query=turn_context.is_ambiguous_query,
+                    handoff_is_structured_insight=turn_context.handoff_is_structured_insight,
+                    handoff_is_valid=False,
+                    handoff_validation_reason=turn_context.handoff_validation_reason or "insight_resolution_failed",
+                    legacy_insight_match=turn_context.legacy_insight_match,
                 )
-                await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
-                await _remember_internal_turn(
-                    repo=repo,
-                    org_id=org_id,
-                    dossier=dossier,
-                    dossier_snapshot=dossier_snapshot,
-                    auth=auth,
-                    user_message=sanitized_message,
-                    assistant_reply=reply,
-                    routed_agent=routed_agent,
-                    tool_calls=sorted(set(tool_calls)),
-                    pending_confirmations=[],
-                    confirmed_actions=confirmed,
-                )
-                await record_agent_event(
-                    repo,
-                    org_id=org_id,
-                    conversation_id=conversation.id,
-                    agent_mode=routed_agent,
-                    channel=_INTERNAL_ASSISTANT_CHANNEL,
-                    actor_id=auth.actor,
-                    actor_type="internal_user",
-                    action="chat.completed",
-                    result="success",
-                    confirmed=bool(confirmed),
-                    metadata={
-                        "routing_source": routing_source,
-                        "tool_calls": sorted(set(tool_calls)),
-                        "pending_confirmations": [],
-                    },
-                )
-                return CommercialChatResult(
-                    conversation_id=conversation.id,
-                    reply=reply,
-                    tokens_input=tokens_in,
-                    tokens_output=tokens_out,
-                    tool_calls=sorted(set(tool_calls)),
-                    pending_confirmations=[],
-                    blocks=blocks,
-                    routed_agent=routed_agent,
-                    routing_source=routing_source,
-                )
-
-    if explicit_route_hint is None:
-        fastpath_routed_agent = _infer_internal_read_route(sanitized_message)
-        if fastpath_routed_agent is not None:
-            fallback_reply, fallback_tool_calls, fallback_blocks = await _run_internal_read_fallback(
-                registry=registry,
-                routed_agent=fastpath_routed_agent,
-                org_id=org_id,
-                user_message=sanitized_message,
-            )
-            if fallback_reply:
-                routed_agent = fastpath_routed_agent
-                routing_source = ROUTING_SOURCE_READ_FALLBACK
-                reply = fallback_reply
-                tool_calls.extend(fallback_tool_calls)
-                blocks = fallback_blocks or _build_internal_blocks(reply, pending_confirmations)
-                tokens_out = estimate_tokens(reply)
-                now = datetime.now(UTC).isoformat()
-                user_message = {"role": "user", "content": sanitized_message, "ts": now}
-                assistant_message = {
-                    "role": "assistant",
-                    "content": reply,
-                    "ts": now,
-                    "tool_calls": sorted(set(tool_calls)),
-                    "routed_agent": routed_agent,
-                            "agent_mode": routed_agent,
-                    "channel": _INTERNAL_ASSISTANT_CHANNEL,
-                    "routing_source": routing_source,
-                    "pending_confirmations": [],
-                    "blocks": copy.deepcopy(blocks),
-                }
-                await repo.append_messages(
-                    org_id=org_id,
-                    conversation_id=conversation.id,
-                    new_messages=[user_message, assistant_message],
-                    tool_calls_count=len(tool_calls),
-                    tokens_input=tokens_in,
-                    tokens_output=tokens_out,
-                )
-                await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
-                await _remember_internal_turn(
-                    repo=repo,
-                    org_id=org_id,
-                    dossier=dossier,
-                    dossier_snapshot=dossier_snapshot,
-                    auth=auth,
-                    user_message=sanitized_message,
-                    assistant_reply=reply,
-                    routed_agent=routed_agent,
-                    tool_calls=sorted(set(tool_calls)),
-                    pending_confirmations=[],
-                    confirmed_actions=confirmed,
-                )
-                await record_agent_event(
-                    repo,
-                    org_id=org_id,
-                    conversation_id=conversation.id,
-                    agent_mode=routed_agent,
-                    channel=_INTERNAL_ASSISTANT_CHANNEL,
-                    actor_id=auth.actor,
-                    actor_type="internal_user",
-                    action="chat.completed",
-                    result="success",
-                    confirmed=bool(confirmed),
-                    metadata={
-                        "routing_source": routing_source,
-                        "tool_calls": sorted(set(tool_calls)),
-                        "pending_confirmations": [],
-                    },
-                )
-                return CommercialChatResult(
-                    conversation_id=conversation.id,
-                    reply=reply,
-                    tokens_input=tokens_in,
-                    tokens_output=tokens_out,
-                    tool_calls=sorted(set(tool_calls)),
-                    pending_confirmations=[],
-                    blocks=blocks,
-                    routed_agent=routed_agent,
-                    routing_source=routing_source,
-                )
-
-    handled_by_explicit_copilot = False
-    if explicit_route_hint == COPILOT_AGENT_NAME:
-        copilot_response = await maybe_build_copilot_response(
-            backend_client=backend_client,
-            auth=auth,
-            user_message=sanitized_message,
-            preferred_language=preferred_language,
-        )
-        if copilot_response is not None:
-            routed_agent = COPILOT_AGENT_NAME
-            routing_source = ROUTING_SOURCE_UI_HINT
-            reply = copilot_response.reply
-            blocks = copy.deepcopy(copilot_response.blocks)
-            logger.info(
-                "internal_copilot_routed",
-                org_id=org_id,
-                conversation_id=conversation.id,
-                routed_agent=routed_agent,
-                route_hint=explicit_route_hint,
-            )
-            handled_by_explicit_copilot = True
-        else:
-            explicit_route_hint = None
-    if handled_by_explicit_copilot:
-        pass
-    else:
-        history = history_to_messages(list(conversation.messages))
-
-        try:
-            if explicit_route_hint is not None:
-                forced_agent = registry.get(explicit_route_hint)
-                if forced_agent is None:
-                    explicit_route_hint = None
-                else:
-                    routed_agent = explicit_route_hint
-                    routing_source = ROUTING_SOURCE_UI_HINT
-                    logger.info(
-                        "internal_assistant_route_hint_requested",
+                fallback_decision = await resolve_routing_decision(fallback_context)
+                if fallback_decision.handler_kind == "insight_lane":
+                    outcome = await _execute_insight_routing_decision(
+                        decision=fallback_decision,
+                        turn_context=fallback_context,
+                        backend_client=backend_client,
+                        auth=auth,
                         org_id=org_id,
                         conversation_id=conversation.id,
-                        routed_agent=routed_agent,
+                        preferred_language=preferred_language,
                     )
-                    try:
-                        reply, tool_calls, pending_confirmations = await _run_direct_internal_agent(
-                            llm=llm,
-                            agent=forced_agent,
-                            history=history,
-                            org_id=org_id,
-                            user_message=sanitized_message,
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "internal_assistant_route_hint_direct_failed",
-                            org_id=org_id,
-                            conversation_id=conversation.id,
-                            routed_agent=routed_agent,
-                            error=str(exc),
-                        )
-                        reply = _default_internal_reply(routed_agent)
-            if explicit_route_hint is None:
-                async for chunk in run_routed_agent(
+                if outcome is None:
+                    outcome = await _execute_orchestrator_routing_decision(
+                        llm=llm,
+                        registry=registry,
+                        org_id=org_id,
+                        sanitized_message=sanitized_message,
+                        history=history,
+                        dossier=dossier,
+                        conversation_id=conversation.id,
+                        turn_context=fallback_context,
+                        auth=auth,
+                    )
+        case "direct_agent":
+            outcome = await _execute_direct_agent_routing_decision(
+                llm=llm,
+                registry=registry,
+                routed_agent=str(decision.target),
+                org_id=org_id,
+                sanitized_message=sanitized_message,
+                dossier=dossier,
+                user_id=auth.actor,
+                history=history,
+                conversation_id=conversation.id,
+                route_hint_source=turn_context.route_hint_source,
+            )
+            if outcome is None:
+                outcome = await _execute_orchestrator_routing_decision(
                     llm=llm,
                     registry=registry,
-                    user_message=sanitized_message,
+                    org_id=org_id,
+                    sanitized_message=sanitized_message,
                     history=history,
-                    context={"org_id": org_id},
-                    general_system_prompt=_build_internal_general_system_prompt(dossier, auth.actor),
-                    general_limits=_build_internal_general_limits(),
-                ):
-                    if chunk.type == "route" and chunk.text:
-                        routed_agent = normalize_routed_agent(chunk.text)
-                        logger.info(
-                            "internal_assistant_routed",
-                            org_id=org_id,
-                            conversation_id=conversation.id,
-                            routed_agent=routed_agent,
-                        )
-                    elif chunk.type == "text" and chunk.text:
-                        assistant_parts.append(chunk.text)
-                    elif chunk.type == "tool_call" and chunk.tool_call:
-                        tool_name = str(chunk.tool_call.name).strip()
-                        if tool_name:
-                            tool_calls.append(tool_name)
-                    elif chunk.type == "tool_result":
-                        required_action = _extract_pending_confirmation(chunk)
-                        if required_action and required_action not in pending_confirmations:
-                            pending_confirmations.append(required_action)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("internal_assistant_failed", org_id=org_id, conversation_id=conversation.id, error=str(exc))
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
-
-        if explicit_route_hint is None:
-            hinted_routed_agent = _apply_internal_route_hint(routed_agent=routed_agent, user_message=sanitized_message)
-            if hinted_routed_agent != routed_agent:
-                logger.info(
-                    "internal_assistant_route_hint_applied",
-                    org_id=org_id,
+                    dossier=dossier,
                     conversation_id=conversation.id,
-                    routed_agent=routed_agent,
-                    hinted_routed_agent=hinted_routed_agent,
+                    turn_context=TurnContext(
+                        message=turn_context.message,
+                        route_hint=None,
+                        route_hint_source=None,
+                        handoff=turn_context.handoff,
+                        legacy_insight_request=turn_context.legacy_insight_request,
+                        is_menu_request=turn_context.is_menu_request,
+                        is_ambiguous_query=turn_context.is_ambiguous_query,
+                        handoff_is_structured_insight=turn_context.handoff_is_structured_insight,
+                        handoff_is_valid=turn_context.handoff_is_valid,
+                        handoff_validation_reason=turn_context.handoff_validation_reason,
+                        legacy_insight_match=turn_context.legacy_insight_match,
+                    ),
+                    auth=auth,
                 )
-                routed_agent = hinted_routed_agent
-            reply = "".join(assistant_parts).strip() or _default_internal_reply(routed_agent)
-        blocks = _build_internal_blocks(reply, pending_confirmations)
-        if not pending_confirmations and not tool_calls:
-            fallback_reply, fallback_tool_calls, fallback_blocks = await _run_internal_read_fallback(
+        case _:
+            outcome = await _execute_orchestrator_routing_decision(
+                llm=llm,
                 registry=registry,
-                routed_agent=routed_agent,
                 org_id=org_id,
-                user_message=sanitized_message,
+                sanitized_message=sanitized_message,
+                history=history,
+                dossier=dossier,
+                conversation_id=conversation.id,
+                turn_context=turn_context,
+                auth=auth,
             )
-            if fallback_reply:
-                reply = fallback_reply
-                if routing_source != ROUTING_SOURCE_UI_HINT:
-                    routing_source = ROUTING_SOURCE_READ_FALLBACK
-                tool_calls.extend(fallback_tool_calls)
-                if fallback_blocks:
-                    blocks = fallback_blocks
-                logger.info(
-                    "internal_assistant_read_fallback_applied",
-                    org_id=org_id,
-                    conversation_id=conversation.id,
-                    routed_agent=routed_agent,
-                )
-            if not fallback_blocks:
-                blocks = _build_internal_blocks(reply, pending_confirmations)
-        if (
-            explicit_route_hint is None
-            and routed_agent == PRODUCT_AGENT_NAME
-            and not pending_confirmations
-            and not tool_calls
-            and _looks_like_menu_request(sanitized_message)
-        ):
-            reply, blocks = _build_internal_route_menu(sanitized_message)
-        elif (
-            explicit_route_hint is None
-            and routed_agent == PRODUCT_AGENT_NAME
-            and not pending_confirmations
-            and not tool_calls
-            and _looks_like_ambiguous_internal_query(sanitized_message)
-        ):
-            reply, blocks = _build_internal_route_clarification(sanitized_message)
+
+    reply = outcome.reply
+    routed_agent = outcome.routed_agent
+    routing_source = outcome.routing_source
+    tool_calls = list(outcome.tool_calls)
+    pending_confirmations = list(outcome.pending_confirmations)
+    blocks = copy.deepcopy(outcome.blocks)
+    insight_evidence_payload = copy.deepcopy(outcome.insight_evidence_payload)
+    if not blocks:
+        blocks = _build_internal_blocks(reply, pending_confirmations)
     if pending_confirmations:
         reply = (
             "Necesito confirmación explícita para continuar con: "
@@ -2647,6 +2652,8 @@ async def run_internal_orchestrated_chat(
         "pending_confirmations": list(pending_confirmations),
         "blocks": copy.deepcopy(blocks),
     }
+    if insight_evidence_payload is not None:
+        assistant_message["insight_evidence"] = copy.deepcopy(insight_evidence_payload)
 
     await repo.append_messages(
         org_id=org_id,
@@ -2686,9 +2693,31 @@ async def run_internal_orchestrated_chat(
         confirmed=bool(confirmed),
         metadata={
             "routing_source": routing_source,
+            "routing_reason": decision.reason,
+            "handler_kind": decision.handler_kind,
             "tool_calls": sorted(set(tool_calls)),
             "pending_confirmations": list(pending_confirmations),
+            "has_handoff": handoff is not None,
+            "handoff_scope": (handoff.insight_scope if handoff is not None else None),
+            "has_insight_evidence": insight_evidence_payload is not None,
+            "evidence_injected": _prior_evidence is not None,
         },
+    )
+    logger.info(
+        "internal_turn_summary",
+        org_id=org_id,
+        conversation_id=conversation.id,
+        routed_agent=routed_agent,
+        routing_source=routing_source,
+        routing_reason=decision.reason,
+        handler_kind=decision.handler_kind,
+        has_handoff=handoff is not None,
+        handoff_scope=(handoff.insight_scope if handoff is not None else ""),
+        evidence_injected=_prior_evidence is not None,
+        tool_calls_count=len(tool_calls),
+        tokens_input=tokens_in,
+        tokens_output=tokens_out,
+        result="confirmation_required" if pending_confirmations else "success",
     )
 
     return CommercialChatResult(

@@ -247,7 +247,7 @@
   border-color: color-mix(in srgb, var(--color-accent-pink) 22%, transparent);
 }
 
-.cht__msg-badge--copilot {
+.cht__msg-badge--insight_chat {
   background: color-mix(in srgb, var(--color-accent-indigo) 16%, transparent);
   color: var(--color-accent-indigo);
   border-color: color-mix(in srgb, var(--color-accent-indigo) 26%, transparent);

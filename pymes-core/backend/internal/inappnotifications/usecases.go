@@ -97,6 +97,18 @@ func (u *Usecases) ListForActor(ctx context.Context, orgIDStr, actor string, lim
 	return items, unread, nil
 }
 
+func (u *Usecases) CountUnreadForActor(ctx context.Context, orgIDStr, actor string) (int64, error) {
+	orgID, err := uuid.Parse(orgIDStr)
+	if err != nil {
+		return 0, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
+	}
+	userID, ok := u.resolveUserID(orgID, actor)
+	if !ok {
+		return 0, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
+	}
+	return u.inbox.CountUnread(ctx, orgID.String(), userID.String())
+}
+
 func (u *Usecases) MarkReadForActor(ctx context.Context, orgIDStr, actor string, notifID uuid.UUID) (time.Time, error) {
 	orgID, err := uuid.Parse(orgIDStr)
 	if err != nil {

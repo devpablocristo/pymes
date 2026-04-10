@@ -76,5 +76,31 @@ def _ensure_runtime_package_stub() -> None:
         logging_mod.get_request_id = _get_request_id  # type: ignore[attr-defined]
         sys.modules["runtime.logging"] = logging_mod
 
+    if "httpserver" not in sys.modules:
+        httpserver_mod = _t.ModuleType("httpserver")
+        httpserver_mod.__path__ = []  # type: ignore[attr-defined]
+        sys.modules["httpserver"] = httpserver_mod
+
+    if "httpserver.errors" not in sys.modules:
+        errors_mod = _t.ModuleType("httpserver.errors")
+
+        def error_payload(
+            code: str = "",
+            message: str = "",
+            request_id: str = "",
+            details: dict | None = None,
+        ):
+            return {
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "details": details or {},
+                    "request_id": request_id,
+                }
+            }
+
+        errors_mod.error_payload = error_payload  # type: ignore[attr-defined]
+        sys.modules["httpserver.errors"] = errors_mod
+
 
 _ensure_runtime_package_stub()

@@ -1,7 +1,7 @@
 # Pymes — flujo local habitual: todo en contenedores (`make up`).
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
-	up down ps logs \
+	up down ps logs llm-up llm-pull \
 	staticcheck ruff lint \
 	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
@@ -9,6 +9,7 @@
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
 DC = docker compose
+LOCAL_OLLAMA_DIR = /home/pablo/Projects/Pablo/local-infra/ollama
 
 # Calidad
 
@@ -50,8 +51,18 @@ modules-check:
 
 # Stack local
 
+# Levanta Ollama compartido del ecosistema local
+llm-up:
+	cd $(LOCAL_OLLAMA_DIR) && docker compose up -d
+
+# Asegura el modelo LLM local por defecto en el Ollama compartido
+llm-pull:
+	cd $(LOCAL_OLLAMA_DIR) && ./scripts/pull-model.sh gemma4:e4b
+
 # Levanta stack local (Postgres Pymes, Review, cp-backend, 4 verticales Go, frontend, AI)
 up:
+	@$(MAKE) llm-up
+	@$(MAKE) llm-pull
 	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
 	$(DC) up -d --no-build
 

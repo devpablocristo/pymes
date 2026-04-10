@@ -406,6 +406,87 @@ def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:
     assert captured["preferred_language"] == "en"
 
 
+def test_internal_chat_forwards_handoff_to_service(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-5b")
+
+    async def fake_run_internal_orchestrated_chat(**kwargs):
+        captured.update(kwargs)
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="Ventas arriba 12% esta semana.",
+            tokens_input=10,
+            tokens_output=14,
+            tool_calls=[],
+            pending_confirmations=[],
+            blocks=[{"type": "text", "text": "Ventas arriba 12% esta semana."}],
+            routed_agent="insight_chat",
+            routing_source="ui_hint",
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post(
+        "/v1/chat",
+        json={
+            "message": "explicame este insight",
+            "handoff": {
+                "source": "in_app_notification",
+                "notification_id": "notif-123",
+                "insight_scope": "sales_collections",
+                "period": "week",
+                "compare": True,
+                "top_limit": 5,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["request_id"] == "req-chat-5b"
+    assert response.json()["routed_agent"] == "insight_chat"
+    assert captured["handoff"] is not None
+    handoff = captured["handoff"]
+    assert handoff.source == "in_app_notification"
+    assert handoff.notification_id == "notif-123"
+    assert handoff.insight_scope == "sales_collections"
+    assert handoff.period == "week"
+    assert handoff.compare is True
+    assert handoff.top_limit == 5
+
+
+def test_internal_chat_without_handoff_still_calls_service(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-5c")
+
+    async def fake_run_internal_orchestrated_chat(**kwargs):
+        captured.update(kwargs)
+        return CommercialChatResult(
+            conversation_id="conv-1",
+            reply="respuesta final",
+            tokens_input=8,
+            tokens_output=10,
+            tool_calls=[],
+            pending_confirmations=[],
+            blocks=[{"type": "text", "text": "respuesta final"}],
+            routed_agent="general",
+            routing_source="orchestrator",
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post("/v1/chat", json={"message": "hola"})
+
+    assert response.status_code == 200
+    assert response.json()["request_id"] == "req-chat-5c"
+    assert captured["handoff"] is None
+
+
 def test_internal_chat_serializes_clarification_actions_with_route_hint(monkeypatch) -> None:
     repo = StubRepo()
     client = create_internal_client(repo)

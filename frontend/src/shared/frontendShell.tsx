@@ -7,6 +7,7 @@ import {
 } from '@devpablocristo/modules-ui-page-shell';
 import '@devpablocristo/modules-ui-page-shell/styles.css';
 import { useI18n } from '../lib/i18n';
+import { NotificationBadge } from '../components/NotificationBadge';
 
 export type { AppShellNavItem, AppShellNavSection };
 
@@ -51,6 +52,7 @@ export function AppShell({
         >
           {item.icon}
           <span>{sentenceCase(item.label)}</span>
+          {item.to === '/notifications' && <NotificationBadge />}
         </NavLink>
       )}
     >

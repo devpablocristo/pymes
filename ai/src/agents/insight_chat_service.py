@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import BaseModel, Field
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from runtime.chat.blocks import (
@@ -14,6 +16,7 @@ from src.insights.domain import (
     CustomersRetentionInsight,
     InsightFilters,
     InsightMetric,
+    InsightPeriod,
     InventoryProfitInsight,
     SalesCollectionsInsight,
 )
@@ -116,13 +119,64 @@ _REFERENCE_HINTS = ("#", " id ", " nro ", " n° ", " numero ", " número ")
 
 
 @dataclass(frozen=True)
-class CopilotResponse:
+class InsightChatResponse:
     reply: str
     blocks: list[dict[str, Any]]
+    insight_evidence: InternalInsightEvidence | None = None
+
+
+ResolvedInsight = SalesCollectionsInsight | InventoryProfitInsight | CustomersRetentionInsight
+
+
+class InsightEvidencePeriod(BaseModel):
+    label: str
+    from_date: str
+    to_date: str
+
+
+class InsightEvidenceKPI(BaseModel):
+    key: str
+    label: str
+    unit: Literal["currency", "count", "percentage"]
+    value: float
+    previous_value: float | None = None
+    delta: float | None = None
+    delta_pct: float | None = None
+    trend: Literal["up", "down", "flat", "unknown"] = "unknown"
+
+
+class InsightEvidenceHighlight(BaseModel):
+    severity: Literal["positive", "info", "warning"]
+    title: str
+    detail: str
+
+
+class InternalInsightEvidence(BaseModel):
+    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff"
+    notification_id: str | None = None
+    scope: Literal["sales_collections", "inventory_profit", "customers_retention"]
+    period: Literal["today", "week", "month"]
+    compare: bool = True
+    top_limit: int = Field(default=5, ge=1, le=10)
+    computed_at: str
+    summary: str
+    current_period: InsightEvidencePeriod
+    comparison_period: InsightEvidencePeriod | None = None
+    kpis: list[InsightEvidenceKPI] = Field(default_factory=list)
+    highlights: list[InsightEvidenceHighlight] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    entity_ids: list[str] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class _InsightRequest:
+    scope: str
+    period: str
+    compare: bool
+
+
+@dataclass(frozen=True)
+class InsightChatMatch:
     scope: str
     period: str
     compare: bool
@@ -189,8 +243,19 @@ def _match_insight_request(message: str) -> _InsightRequest | None:
     return None
 
 
-def looks_like_copilot_insight_request(message: str) -> bool:
-    return _match_insight_request(message) is not None
+def match_insight_chat_request(message: str) -> InsightChatMatch | None:
+    request = _match_insight_request(message)
+    if request is None:
+        return None
+    return InsightChatMatch(
+        scope=request.scope,
+        period=request.period,
+        compare=request.compare,
+    )
+
+
+def looks_like_insight_chat_request(message: str) -> bool:
+    return match_insight_chat_request(message) is not None
 
 
 def _format_scope_label(scope: str, filters: InsightFilters) -> str:
@@ -330,33 +395,173 @@ def _build_customers_retention_blocks(insight: CustomersRetentionInsight, filter
     ]
 
 
-async def maybe_build_copilot_response(
+def _serialize_period(period: InsightPeriod | None) -> InsightEvidencePeriod | None:
+    if period is None:
+        return None
+    return InsightEvidencePeriod(
+        label=period.label,
+        from_date=period.from_date.isoformat(),
+        to_date=period.to_date.isoformat(),
+    )
+
+
+def _collect_insight_entity_ids(insight: ResolvedInsight) -> list[str]:
+    def _item_value(item: Any, key: str) -> str | None:
+        if isinstance(item, dict):
+            value = item.get(key)
+        else:
+            value = getattr(item, key, None)
+        if isinstance(value, str) and value.strip():
+            return value
+        return None
+
+    entity_ids: list[str] = []
+    if isinstance(insight, (SalesCollectionsInsight, CustomersRetentionInsight)):
+        for item in insight.top_customers:
+            if customer_id := _item_value(item, "customer_id"):
+                if customer_id not in entity_ids:
+                    entity_ids.append(customer_id)
+    if isinstance(insight, InventoryProfitInsight):
+        for item in insight.top_products:
+            if product_id := _item_value(item, "product_id"):
+                if product_id not in entity_ids:
+                    entity_ids.append(product_id)
+        for item in insight.low_stock:
+            if product_id := _item_value(item, "product_id"):
+                if product_id not in entity_ids:
+                    entity_ids.append(product_id)
+    if isinstance(insight, SalesCollectionsInsight):
+        for item in insight.debtors:
+            if party_id := _item_value(item, "party_id"):
+                if party_id not in entity_ids:
+                    entity_ids.append(party_id)
+    return entity_ids
+
+
+def build_internal_insight_evidence(
+    *,
+    insight: ResolvedInsight,
+    filters: InsightFilters,
+    notification_id: str | None = None,
+    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff",
+    computed_at: str | None = None,
+) -> InternalInsightEvidence:
+    return InternalInsightEvidence(
+        source=source,
+        notification_id=notification_id,
+        scope=insight.scope,
+        period=filters.period,
+        compare=filters.compare,
+        top_limit=filters.top_limit,
+        computed_at=computed_at or datetime.now(UTC).isoformat(),
+        summary=insight.summary,
+        current_period=_serialize_period(insight.period),
+        comparison_period=_serialize_period(insight.comparison_period),
+        kpis=[InsightEvidenceKPI.model_validate(metric.model_dump(mode="json")) for metric in insight.kpis],
+        highlights=[InsightEvidenceHighlight.model_validate(item.model_dump(mode="json")) for item in insight.highlights],
+        recommendations=list(insight.recommendations),
+        entity_ids=_collect_insight_entity_ids(insight),
+    )
+
+
+def _build_insight_chat_response_from_insight(*, insight: ResolvedInsight, filters: InsightFilters) -> InsightChatResponse:
+    return _build_insight_chat_response_with_evidence(
+        insight=insight,
+        filters=filters,
+        notification_id=None,
+        source="insight_handoff",
+    )
+
+
+def _build_insight_chat_response_with_evidence(
+    *,
+    insight: ResolvedInsight,
+    filters: InsightFilters,
+    notification_id: str | None,
+    source: Literal["insight_handoff", "insight_chat_legacy_match"],
+) -> InsightChatResponse:
+    if isinstance(insight, SalesCollectionsInsight):
+        blocks = _build_sales_collections_blocks(insight, filters)
+    elif isinstance(insight, InventoryProfitInsight):
+        blocks = _build_inventory_profit_blocks(insight, filters)
+    else:
+        blocks = _build_customers_retention_blocks(insight, filters)
+    return InsightChatResponse(
+        reply=insight.summary,
+        blocks=blocks,
+        insight_evidence=build_internal_insight_evidence(
+            insight=insight,
+            filters=filters,
+            notification_id=notification_id,
+            source=source,
+        ),
+    )
+
+
+async def maybe_build_insight_chat_response(
     *,
     backend_client: BackendClient,
     auth: AuthContext,
     user_message: str,
     preferred_language: str | None = None,
-) -> CopilotResponse | None:
+) -> InsightChatResponse | None:
     _ = preferred_language
-    request = _match_insight_request(user_message)
+    request = match_insight_chat_request(user_message)
     if request is None:
         return None
 
-    filters = InsightFilters(period=request.period, compare=request.compare, top_limit=5)
+    return await build_insight_chat_response_for_scope(
+        backend_client=backend_client,
+        auth=auth,
+        scope=request.scope,
+        period=request.period,
+        compare=request.compare,
+        top_limit=5,
+        evidence_source="insight_chat_legacy_match",
+    )
+
+
+async def build_insight_chat_response_for_scope(
+    *,
+    backend_client: BackendClient,
+    auth: AuthContext,
+    scope: str,
+    period: str,
+    compare: bool,
+    top_limit: int,
+    notification_id: str | None = None,
+    evidence_source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff",
+) -> InsightChatResponse | None:
+    filters = InsightFilters(period=period, compare=compare, top_limit=top_limit)
     service = InsightsService(BackendInsightsRepository(backend_client))
 
     try:
-        if request.scope == "sales_collections":
+        if scope == "sales_collections":
             insight = await service.build_sales_collections_insight(auth=auth, filters=filters)
-            return CopilotResponse(reply=insight.summary, blocks=_build_sales_collections_blocks(insight, filters))
-        if request.scope == "inventory_profit":
+            return _build_insight_chat_response_with_evidence(
+                insight=insight,
+                filters=filters,
+                notification_id=notification_id,
+                source=evidence_source,
+            )
+        if scope == "inventory_profit":
             insight = await service.build_inventory_profit_insight(auth=auth, filters=filters)
-            return CopilotResponse(reply=insight.summary, blocks=_build_inventory_profit_blocks(insight, filters))
-        if request.scope == "customers_retention":
+            return _build_insight_chat_response_with_evidence(
+                insight=insight,
+                filters=filters,
+                notification_id=notification_id,
+                source=evidence_source,
+            )
+        if scope == "customers_retention":
             insight = await service.build_customers_retention_insight(auth=auth, filters=filters)
-            return CopilotResponse(reply=insight.summary, blocks=_build_customers_retention_blocks(insight, filters))
+            return _build_insight_chat_response_with_evidence(
+                insight=insight,
+                filters=filters,
+                notification_id=notification_id,
+                source=evidence_source,
+            )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("internal_copilot_failed", org_id=auth.org_id, error=str(exc))
+        logger.warning("insight_chat_failed", org_id=auth.org_id, error=str(exc))
         return None
 
     return None

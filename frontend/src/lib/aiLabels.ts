@@ -6,7 +6,7 @@ function pick(language: LanguageCode, es: string, en: string): string {
 }
 
 export function humanRoutedLabel(mode: string, language: LanguageCode = 'es'): string {
-  if (mode === 'copilot') return 'Copilot';
+  if (mode === 'insight_chat') return pick(language, 'Análisis', 'Insights');
   if (mode === 'customers') return pick(language, 'Clientes', 'Customers');
   if (mode === 'products') return pick(language, 'Productos', 'Products');
   if (mode === 'sales') return pick(language, 'Ventas', 'Sales');
@@ -26,7 +26,7 @@ export function humanInsightScopeLabel(scope: string, language: LanguageCode = '
 }
 
 export function humanRoutingSourceLabel(source: PymesRoutingSource, language: LanguageCode = 'es'): string {
-  if (source === 'copilot_agent') return 'Copilot';
+  if (source === 'copilot_agent') return pick(language, 'Análisis', 'Insights');
   if (source === 'read_fallback') return pick(language, 'Fallback lectura', 'Read fallback');
   if (source === 'ui_hint') return pick(language, 'Selección manual', 'Manual selection');
   return pick(language, 'Orquestador', 'Orchestrator');

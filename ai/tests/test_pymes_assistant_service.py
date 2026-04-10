@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
+from src.agents.insight_chat_service import InternalInsightEvidence, InsightEvidencePeriod
 from src.agents.service import (
     _InternalDomainSnapshot,
     _build_internal_general_system_prompt,
@@ -65,6 +67,28 @@ class StubRegistry:
 
     def get(self, _name: str):
         return None
+
+
+def _async_return(value):
+    async def _inner(*_args, **_kwargs):
+        return value
+
+    return _inner
+
+
+class CapturingLogger:
+    def __init__(self) -> None:
+        self.info_calls: list[tuple[str, dict[str, object]]] = []
+        self.warning_calls: list[tuple[str, dict[str, object]]] = []
+
+    def info(self, event: str, **kwargs) -> None:
+        self.info_calls.append((event, kwargs))
+
+    def warning(self, event: str, **kwargs) -> None:
+        self.warning_calls.append((event, kwargs))
+
+    def exception(self, event: str, **kwargs) -> None:
+        self.warning_calls.append((event, kwargs))
 
 
 class CustomersAgent:
@@ -1160,7 +1184,7 @@ async def test_run_internal_orchestrated_chat_normalizes_unknown_route_to_genera
 
 
 @pytest.mark.asyncio
-async def test_run_internal_orchestrated_chat_routes_to_explicit_copilot_handoff(monkeypatch) -> None:
+async def test_run_internal_orchestrated_chat_routes_to_explicit_insight_chat_handoff(monkeypatch) -> None:
     repo = StubRepo()
     conversation = SimpleNamespace(id="conv-1", messages=[])
 
@@ -1170,19 +1194,22 @@ async def test_run_internal_orchestrated_chat_routes_to_explicit_copilot_handoff
     async def fake_run_routed_agent(**_kwargs):
         raise AssertionError("el product agent no deberia ejecutar routing LLM cuando llega un handoff explicito")
 
-    async def fake_maybe_build_copilot_response(**_kwargs):
+    async def fake_build_insight_chat_response_for_scope(**kwargs):
+        assert kwargs["scope"] == "sales_collections"
+        assert kwargs["period"] == "month"
         return SimpleNamespace(
             reply="Ventas arriba 12% este mes.",
             blocks=[
                 {"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% este mes.", "scope": "Ventas y cobranzas · este mes", "highlights": [], "recommendations": ["Mantener seguimiento semanal."]},
                 {"type": "kpi_group", "title": "KPIs clave", "items": [{"label": "Ventas", "value": "$120,000.00", "trend": "up", "context": "+12.0% vs período anterior"}]},
             ],
+            insight_evidence=None,
         )
 
     monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
     monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
     monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
-    monkeypatch.setattr("src.agents.service.maybe_build_copilot_response", fake_maybe_build_copilot_response)
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
 
     result = await run_internal_orchestrated_chat(
         repo=repo,  # type: ignore[arg-type]
@@ -1198,22 +1225,731 @@ async def test_run_internal_orchestrated_chat_routes_to_explicit_copilot_handoff
             scopes=["admin:console:write"],
             mode="jwt",
         ),
-        route_hint="copilot",
+        route_hint="insight_chat",
     )
 
-    assert result.routed_agent == "copilot"
+    assert result.routed_agent == "insight_chat"
     assert result.reply == "Ventas arriba 12% este mes."
     assert result.blocks[0]["type"] == "insight_card"
     assert result.blocks[1]["type"] == "kpi_group"
     assistant_message = repo.append_calls[0]["new_messages"][1]
-    assert assistant_message["routed_agent"] == "copilot"
-    assert assistant_message["agent_mode"] == "copilot"
+    assert assistant_message["routed_agent"] == "insight_chat"
+    assert assistant_message["agent_mode"] == "insight_chat"
     assert assistant_message["routing_source"] == "ui_hint"
     assert repo.agent_events[-1]["metadata"]["routing_source"] == "ui_hint"
 
 
 @pytest.mark.asyncio
-async def test_run_internal_orchestrated_chat_routes_operational_prompt_without_copilot(monkeypatch) -> None:
+async def test_run_internal_orchestrated_chat_prioritizes_structured_handoff_before_legacy_insight_chat_match(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+    captured: dict[str, object] = {}
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia usar el router general cuando el handoff estructurado ya alcanza para entrar al carril insight")
+
+    async def fake_build_insight_chat_response_for_scope(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            reply="Ventas arriba 12% esta semana.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% esta semana.", "scope": "Ventas y cobranzas · esta semana", "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return True, "validated"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+    monkeypatch.setattr(
+        "src.agents.service._validate_internal_insight_handoff_with_reason",
+        fake_validate_internal_insight_handoff_with_reason,
+    )
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="week",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert result.routed_agent == "insight_chat"
+    assert result.reply == "Ventas arriba 12% esta semana."
+    assert captured["scope"] == "sales_collections"
+    assert captured["period"] == "week"
+    assert captured["compare"] is True
+    assert captured["top_limit"] == 5
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_persists_insight_evidence_in_assistant_message(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_build_insight_chat_response_for_scope(**_kwargs):
+        return SimpleNamespace(
+            reply="Ventas arriba 12% esta semana.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% esta semana.", "scope": "Ventas y cobranzas · esta semana", "highlights": [], "recommendations": []}],
+            insight_evidence=InternalInsightEvidence(
+                source="insight_handoff",
+                notification_id="notif-123",
+                scope="sales_collections",
+                period="week",
+                compare=True,
+                top_limit=5,
+                computed_at="2026-04-10T12:00:00Z",
+                summary="Ventas arriba 12% esta semana.",
+                current_period=InsightEvidencePeriod(
+                    label="Esta semana",
+                    from_date="2026-04-07",
+                    to_date="2026-04-10",
+                ),
+                comparison_period=None,
+            ),
+        )
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return True, "validated"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+    monkeypatch.setattr(
+        "src.agents.service._validate_internal_insight_handoff_with_reason",
+        fake_validate_internal_insight_handoff_with_reason,
+    )
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="week",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assistant_message = repo.append_calls[0]["new_messages"][1]
+    assert result.routed_agent == "insight_chat"
+    assert assistant_message["insight_evidence"]["notification_id"] == "notif-123"
+    assert assistant_message["insight_evidence"]["scope"] == "sales_collections"
+    assert assistant_message["insight_evidence"]["period"] == "week"
+    assert assistant_message["insight_evidence"]["summary"] == "Ventas arriba 12% esta semana."
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_falls_back_to_legacy_insight_chat_when_handoff_is_invalid(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia usar el router general cuando el fallback legacy de insight_chat alcanza")
+
+    async def fake_build_insight_chat_response_for_scope(**kwargs):
+        assert kwargs["scope"] == "sales_collections"
+        assert kwargs["period"] == "month"
+        assert kwargs["evidence_source"] == "insight_chat_legacy_match"
+        return SimpleNamespace(
+            reply="Ventas arriba 12% este mes.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% este mes.", "scope": "Ventas y cobranzas · este mes", "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="Como viene el negocio este mes?",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        route_hint="insight_chat",
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="unknown_scope",
+            period="month",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert result.routed_agent == "insight_chat"
+    assert result.reply == "Ventas arriba 12% este mes."
+    assert result.blocks[0]["type"] == "insight_card"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_falls_back_to_legacy_insight_chat_when_handoff_resolution_fails(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError("no deberia usar el router general cuando el fallback legacy de insight_chat alcanza")
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_build_insight_chat_response_for_scope(**kwargs):
+        calls.append(kwargs)
+        if kwargs["evidence_source"] == "insight_handoff":
+            return None
+        return SimpleNamespace(
+            reply="Ventas arriba 12% este mes.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% este mes.", "scope": "Ventas y cobranzas · este mes", "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return True, "validated"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+    monkeypatch.setattr(
+        "src.agents.service._validate_internal_insight_handoff_with_reason",
+        fake_validate_internal_insight_handoff_with_reason,
+    )
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="Como viene el negocio este mes?",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        route_hint="insight_chat",
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="month",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert result.routed_agent == "insight_chat"
+    assert result.reply == "Ventas arriba 12% este mes."
+    assert result.blocks[0]["type"] == "insight_card"
+    assert [call["evidence_source"] for call in calls] == ["insight_handoff", "insight_chat_legacy_match"]
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_logs_handoff_resolved(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+    logger = CapturingLogger()
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_build_insight_chat_response_for_scope(**_kwargs):
+        return SimpleNamespace(
+            reply="Ventas arriba 12% esta semana.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% esta semana.", "scope": "Ventas y cobranzas · esta semana", "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return True, "validated"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+    monkeypatch.setattr("src.agents.service._validate_internal_insight_handoff_with_reason", fake_validate_internal_insight_handoff_with_reason)
+    monkeypatch.setattr("src.agents.service.logger", logger)
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="week",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    resolved_logs = [entry for entry in logger.info_calls if entry[0] == "handoff_resolved"]
+    assert len(resolved_logs) == 1
+    assert resolved_logs[0][1]["notification_id"] == "notif-123"
+    assert resolved_logs[0][1]["handoff_scope"] == "sales_collections"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_logs_handoff_failed(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+    logger = CapturingLogger()
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="general", tool_call=None)
+        yield SimpleNamespace(type="text", text="Hola.", tool_call=None)
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return False, "notification_not_found"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service._validate_internal_insight_handoff_with_reason", fake_validate_internal_insight_handoff_with_reason)
+    monkeypatch.setattr("src.agents.service.logger", logger)
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-404",
+            insight_scope="sales_collections",
+            period="week",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert logger.warning_calls[0][0] == "handoff_failed"
+    assert logger.warning_calls[0][1]["notification_id"] == "notif-404"
+    assert logger.warning_calls[0][1]["reason"] == "notification_not_found"
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_logs_routing_decision_for_structured_handoff(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+    logger = CapturingLogger()
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_build_insight_chat_response_for_scope(**_kwargs):
+        return SimpleNamespace(
+            reply="Ventas arriba 12% esta semana.",
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": "Ventas arriba 12% esta semana.", "scope": "Ventas y cobranzas · esta semana", "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return True, "validated"
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+    monkeypatch.setattr("src.agents.service._validate_internal_insight_handoff_with_reason", fake_validate_internal_insight_handoff_with_reason)
+    monkeypatch.setattr("src.agents.service.logger", logger)
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="week",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    decision_logs = [entry for entry in logger.info_calls if entry[0] == "internal_turn_routing_decision"]
+    assert len(decision_logs) == 1
+    event, payload = decision_logs[0]
+    assert event == "internal_turn_routing_decision"
+    assert payload["handler_kind"] == "insight_lane"
+    assert payload["routing_target"] == "sales_collections"
+    assert payload["routing_reason"] == "structured_handoff"
+    assert payload["handoff_source"] == "in_app_notification"
+    assert payload["handoff_scope"] == "sales_collections"
+    assert payload["handoff_valid"] is True
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_logs_routing_decision_for_orchestrator_fallback(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+    logger = CapturingLogger()
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="general", tool_call=None)
+        yield SimpleNamespace(type="text", text="Hola.", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.logger", logger)
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="hola",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    decision_logs = [entry for entry in logger.info_calls if entry[0] == "internal_turn_routing_decision"]
+    assert len(decision_logs) == 1
+    event, payload = decision_logs[0]
+    assert event == "internal_turn_routing_decision"
+    assert payload["handler_kind"] == "orchestrator"
+    assert payload["routing_target"] == "general"
+    assert payload["routing_reason"] == "no_deterministic_match"
+    assert payload["route_hint"] == ""
+    assert payload["route_hint_source"] == ""
+    assert payload["handoff_source"] == ""
+    assert payload["handoff_scope"] == ""
+    assert payload["handoff_valid"] is False
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_does_not_persist_insight_evidence_for_regular_route(monkeypatch) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        yield SimpleNamespace(type="route", text="customers", tool_call=None)
+        yield SimpleNamespace(type="text", text="Encontré 3 clientes.", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="listame los clientes",
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assistant_message = repo.append_calls[0]["new_messages"][1]
+    assert "insight_evidence" not in assistant_message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("scenario", "route_hint", "message", "handoff", "validation_result", "structured_reply", "legacy_reply", "expected_reply"),
+    [
+        (
+            "valid_handoff",
+            None,
+            "hola",
+            SimpleNamespace(
+                source="in_app_notification",
+                notification_id="notif-123",
+                insight_scope="sales_collections",
+                period="week",
+                compare=True,
+                top_limit=5,
+            ),
+            (True, "validated"),
+            "Ventas arriba 12% esta semana.",
+            None,
+            "Ventas arriba 12% esta semana.",
+        ),
+        (
+            "no_handoff_legacy_insight_chat",
+            "insight_chat",
+            "Como viene el negocio este mes?",
+            None,
+            (False, "unsupported_scope"),
+            None,
+            "Ventas arriba 12% este mes.",
+            "Ventas arriba 12% este mes.",
+        ),
+        (
+            "invalid_handoff_fallback",
+            "insight_chat",
+            "Como viene el negocio este mes?",
+            SimpleNamespace(
+                source="in_app_notification",
+                notification_id="notif-404",
+                insight_scope="sales_collections",
+                period="month",
+                compare=True,
+                top_limit=5,
+            ),
+            (False, "notification_not_found"),
+            None,
+            "Ventas arriba 12% este mes.",
+            "Ventas arriba 12% este mes.",
+        ),
+    ],
+)
+async def test_run_internal_orchestrated_chat_handoff_parity_table(
+    monkeypatch,
+    scenario: str,
+    route_hint: str | None,
+    message: str,
+    handoff: SimpleNamespace | None,
+    validation_result: tuple[bool, str],
+    structured_reply: str | None,
+    legacy_reply: str | None,
+    expected_reply: str,
+) -> None:
+    repo = StubRepo()
+    conversation = SimpleNamespace(id="conv-1", messages=[])
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    async def fake_run_routed_agent(**_kwargs):
+        raise AssertionError(f"el caso {scenario} no deberia necesitar el router general")
+
+    async def fake_validate_internal_insight_handoff_with_reason(**_kwargs):
+        return validation_result
+
+    async def fake_build_insight_chat_response_for_scope(**kwargs):
+        if kwargs["evidence_source"] == "insight_handoff":
+            if structured_reply is None:
+                return None
+            reply = structured_reply
+            scope = "Ventas y cobranzas · esta semana"
+        else:
+            if legacy_reply is None:
+                return None
+            reply = legacy_reply
+            scope = "Ventas y cobranzas · este mes"
+        return SimpleNamespace(
+            reply=reply,
+            blocks=[{"type": "insight_card", "title": "Ventas y cobranzas", "summary": reply, "scope": scope, "highlights": [], "recommendations": []}],
+            insight_evidence=None,
+        )
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+    monkeypatch.setattr("src.agents.service._validate_internal_insight_handoff_with_reason", fake_validate_internal_insight_handoff_with_reason)
+    monkeypatch.setattr("src.agents.service.build_insight_chat_response_for_scope", fake_build_insight_chat_response_for_scope)
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message=message,
+        conversation_id=None,
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+        route_hint=route_hint,
+        handoff=handoff,
+    )
+
+    assert result.routed_agent == "insight_chat"
+    assert result.reply == expected_reply
+    assert result.blocks[0]["type"] == "insight_card"
+
+
+@pytest.mark.asyncio
+async def test_validate_internal_insight_handoff_accepts_notification_visible_for_org_and_actor() -> None:
+    auth = AuthContext(
+        tenant_id="org-123",
+        actor="user-1",
+        role="admin",
+        scopes=["admin:console:write"],
+        mode="jwt",
+    )
+    backend_client = SimpleNamespace(
+        request=_async_return(
+            {
+                "items": [
+                    {
+                        "id": "notif-123",
+                        "chat_context": {"scope": "sales_collections"},
+                    }
+                ]
+            }
+        )
+    )
+
+    from src.agents.service import _validate_internal_insight_handoff
+
+    result = await _validate_internal_insight_handoff(
+        backend_client=backend_client,  # type: ignore[arg-type]
+        auth=auth,
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="month",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_validate_internal_insight_handoff_rejects_notification_scope_mismatch() -> None:
+    auth = AuthContext(
+        tenant_id="org-123",
+        actor="user-1",
+        role="admin",
+        scopes=["admin:console:write"],
+        mode="jwt",
+    )
+    backend_client = SimpleNamespace(
+        request=_async_return(
+            {
+                "items": [
+                    {
+                        "id": "notif-123",
+                        "chat_context": {"scope": "inventory_profit"},
+                    }
+                ]
+            }
+        )
+    )
+
+    from src.agents.service import _validate_internal_insight_handoff
+
+    result = await _validate_internal_insight_handoff(
+        backend_client=backend_client,  # type: ignore[arg-type]
+        auth=auth,
+        handoff=SimpleNamespace(
+            source="in_app_notification",
+            notification_id="notif-123",
+            insight_scope="sales_collections",
+            period="month",
+            compare=True,
+            top_limit=5,
+        ),
+    )
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_routes_operational_prompt_without_insight_chat(monkeypatch) -> None:
     repo = StubRepo()
     conversation = SimpleNamespace(id="conv-1", messages=[])
 
@@ -1633,3 +2369,118 @@ async def test_run_internal_orchestrated_chat_respects_explicit_route_hint(monke
     assert result.routing_source == "ui_hint"
     assert result.tool_calls == ["list_procurement_requests"]
     assert "Tenés 3 solicitudes de compra activas" in result.reply
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_injects_evidence_on_followup(monkeypatch) -> None:
+    """Turn 2 con chat_id y evidencia previa inyecta CONTEXTO INSIGHT PREVIO en history."""
+    repo = StubRepo()
+    evidence_payload = {
+        "source": "insight_handoff",
+        "scope": "sales_collections",
+        "period": "week",
+        "compare": True,
+        "top_limit": 5,
+        "computed_at": datetime.now(UTC).isoformat(),
+        "summary": "Ventas arriba 12% esta semana.",
+        "current_period": {"label": "esta semana", "from_date": "2026-04-03", "to_date": "2026-04-10"},
+        "kpis": [{"key": "total_sales", "label": "Ventas totales", "unit": "currency", "value": 120000.0, "delta_pct": 12.1, "trend": "up"}],
+        "highlights": [{"severity": "positive", "title": "Ventas en alza", "detail": "Crecimiento sostenido."}],
+        "recommendations": ["Revisar stock."],
+        "entity_ids": ["cust-1"],
+    }
+    conversation = SimpleNamespace(
+        id="conv-1",
+        messages=[
+            {"role": "user", "content": "Quiero entender ventas de esta semana."},
+            {"role": "assistant", "content": "Ventas arriba 12% esta semana.", "insight_evidence": evidence_payload},
+        ],
+    )
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    captured_history: list = []
+
+    async def fake_run_routed_agent(**kwargs):
+        captured_history.extend(kwargs.get("history") or [])
+        yield SimpleNamespace(type="route", text="general", tool_call=None)
+        yield SimpleNamespace(type="text", text="Eso implica que el negocio viene bien.", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+
+    result = await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="que implica eso?",
+        conversation_id="conv-1",
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    assert result.reply == "Eso implica que el negocio viene bien."
+    # La evidencia debe estar inyectada como primer mensaje del history
+    assert len(captured_history) >= 1
+    evidence_msg = captured_history[0]
+    assert evidence_msg.role == "system"
+    assert "CONTEXTO INSIGHT PREVIO" in evidence_msg.content
+    assert "Ventas totales" in evidence_msg.content
+    assert "120000" in evidence_msg.content
+    # entity_ids no debe estar en el compactado
+    assert "cust-1" not in evidence_msg.content
+
+
+@pytest.mark.asyncio
+async def test_run_internal_orchestrated_chat_no_evidence_injection_for_regular_conversation(monkeypatch) -> None:
+    """Conversación sin insight_evidence no inyecta mensaje extra de contexto."""
+    repo = StubRepo()
+    conversation = SimpleNamespace(
+        id="conv-2",
+        messages=[
+            {"role": "user", "content": "dame la lista de clientes"},
+            {"role": "assistant", "content": "Tenés 3 clientes."},
+        ],
+    )
+
+    async def fake_load_internal_conversation(*_args, **_kwargs):
+        return conversation
+
+    captured_history: list = []
+
+    async def fake_run_routed_agent(**kwargs):
+        captured_history.extend(kwargs.get("history") or [])
+        yield SimpleNamespace(type="route", text="general", tool_call=None)
+        yield SimpleNamespace(type="text", text="Puedo ayudarte.", tool_call=None)
+
+    monkeypatch.setattr("src.agents.service._load_internal_conversation", fake_load_internal_conversation)
+    monkeypatch.setattr("src.agents.service.run_routed_agent", fake_run_routed_agent)
+    monkeypatch.setattr("src.agents.service.build_registry", lambda *_args, **_kwargs: StubRegistry())
+
+    await run_internal_orchestrated_chat(
+        repo=repo,  # type: ignore[arg-type]
+        llm=object(),  # type: ignore[arg-type]
+        backend_client=object(),  # type: ignore[arg-type]
+        org_id="org-123",
+        message="otra cosa",
+        conversation_id="conv-2",
+        auth=AuthContext(
+            tenant_id="org-123",
+            actor="user-1",
+            role="admin",
+            scopes=["admin:console:write"],
+            mode="jwt",
+        ),
+    )
+
+    # Sin evidencia, no debe haber mensaje system de contexto insight
+    for msg in captured_history:
+        assert "CONTEXTO INSIGHT PREVIO" not in getattr(msg, "content", "")

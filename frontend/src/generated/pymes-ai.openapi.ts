@@ -311,7 +311,7 @@ export interface components {
             /** Url */
             url?: string | null;
             /** Route Hint */
-            route_hint?: ("general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
+            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
             /** Selection Behavior */
             selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Confirmed Actions */
@@ -329,6 +329,40 @@ export interface components {
             type: "actions";
             /** Actions */
             actions?: components["schemas"]["ChatAction"][];
+        };
+        /** ChatHandoff */
+        ChatHandoff: {
+            /**
+             * Source
+             * @description Origen estructurado del turno anclado. En Fase 1 se usa para validar contrato, sin cambiar el routing todavía.
+             * @enum {string}
+             */
+            source: "in_app_notification" | "direct";
+            /**
+             * Notification Id
+             * @description Identificador de la notificación origen cuando el turno viene desde notificaciones in-app.
+             */
+            notification_id?: string | null;
+            /**
+             * Insight Scope
+             * @description Scope estable del insight al que se ancla el turno.
+             */
+            insight_scope?: ("sales_collections" | "inventory_profit" | "customers_retention") | null;
+            /**
+             * Period
+             * @description Período usado para calcular el insight que originó el turno.
+             */
+            period?: ("today" | "week" | "month") | null;
+            /**
+             * Compare
+             * @description Indica si el insight origen usó comparación contra período anterior.
+             */
+            compare?: boolean | null;
+            /**
+             * Top Limit
+             * @description Límite superior usado por el insight origen para rankings o listados resumidos.
+             */
+            top_limit?: number | null;
         };
         /** ChatInsightCardBlock */
         ChatInsightCardBlock: {
@@ -373,22 +407,8 @@ export interface components {
         };
         /** ChatRequest */
         ChatRequest: {
-            /** Chat Id */
-            chat_id?: string | null;
             /** Message */
             message: string;
-            /**
-             * Preferred Language
-             * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.
-             */
-            preferred_language?: ("es" | "en") | null;
-            /** Confirmed Actions */
-            confirmed_actions?: string[];
-            /**
-             * Route Hint
-             * @description Hint opcional para forzar el carril del turno actual: general | customers | products | services | sales | collections | purchases. `copilot` queda reservado para handoff explícito desde notificaciones.
-             */
-            route_hint?: ("general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
         };
         /** ChatResponse */
         ChatResponse: {
@@ -421,13 +441,13 @@ export interface components {
             pending_confirmations?: string[];
             /**
              * Routed Agent
-             * @description Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | services | sales | collections | purchases. `copilot` se usa solo en handoff explícito desde notificaciones.
+             * @description Agente o sub-agente seleccionado para este turno: general | insight_chat | customers | products | services | sales | collections | purchases.
              * @enum {string}
              */
-            routed_agent: "general" | "copilot" | "customers" | "products" | "services" | "sales" | "collections" | "purchases";
+            routed_agent: "general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases";
             /**
              * Routing Source
-             * @description Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint
+             * @description Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint
              * @enum {string}
              */
             routing_source: "copilot_agent" | "orchestrator" | "read_fallback" | "ui_hint";
@@ -667,7 +687,7 @@ export interface components {
              * Routed Agent
              * @constant
              */
-            routed_agent: "copilot";
+            routed_agent: "insight_chat";
             /**
              * Content Language
              * @default es
@@ -794,6 +814,27 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** ChatRequest */
+        src__api__chat_contract__ChatRequest: {
+            /** Chat Id */
+            chat_id?: string | null;
+            /** Message */
+            message: string;
+            /**
+             * Preferred Language
+             * @description Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a español.
+             */
+            preferred_language?: ("es" | "en") | null;
+            /** Confirmed Actions */
+            confirmed_actions?: string[];
+            /** @description Contexto estructurado opcional para anclar el turno actual a una notificación o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atrás: si `handoff` no se envía, el request sigue funcionando con el contrato previo. */
+            handoff?: components["schemas"]["ChatHandoff"] | null;
+            /**
+             * Route Hint
+             * @description Hint opcional para forzar el carril del turno actual: general | insight_chat | customers | products | services | sales | collections | purchases.
+             */
+            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
+        };
         /** PublicChatRequest */
         src__api__public_router__PublicChatRequest: {
             /** Conversation Id */
@@ -814,11 +855,6 @@ export interface components {
             message: string;
             /** Phone */
             phone?: string | null;
-        };
-        /** ChatRequest */
-        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
-            /** Message */
-            message: string;
         };
     };
     responses: never;
@@ -900,7 +936,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChatRequest"];
+                "application/json": components["schemas"]["src__api__chat_contract__ChatRequest"];
             };
         };
         responses: {
@@ -1209,7 +1245,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["src__domains__workshops__auto_repair__internal_router__ChatRequest"];
+                "application/json": components["schemas"]["ChatRequest"];
             };
         };
         responses: {

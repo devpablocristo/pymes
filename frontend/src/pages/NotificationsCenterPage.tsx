@@ -121,6 +121,35 @@ function getNotificationContentLanguage(chatContext: unknown): string | null {
   return typeof contentLanguage === 'string' && contentLanguage.trim() !== '' ? contentLanguage : null;
 }
 
+function getNotificationInsightScope(chatContext: unknown): NotificationChatHandoff['insight_scope'] | undefined {
+  const scope = getNotificationScope(chatContext);
+  if (scope === 'sales_collections' || scope === 'inventory_profit' || scope === 'customers_retention') {
+    return scope;
+  }
+  return undefined;
+}
+
+function getNotificationInsightPeriod(chatContext: unknown): NotificationChatHandoff['period'] | undefined {
+  if (!chatContext || typeof chatContext !== 'object') return undefined;
+  const period = (chatContext as Record<string, unknown>).period;
+  if (period === 'today' || period === 'week' || period === 'month') {
+    return period;
+  }
+  return undefined;
+}
+
+function getNotificationCompare(chatContext: unknown): NotificationChatHandoff['compare'] | undefined {
+  if (!chatContext || typeof chatContext !== 'object') return undefined;
+  const compare = (chatContext as Record<string, unknown>).compare;
+  return typeof compare === 'boolean' ? compare : undefined;
+}
+
+function getNotificationTopLimit(chatContext: unknown): NotificationChatHandoff['top_limit'] | undefined {
+  if (!chatContext || typeof chatContext !== 'object') return undefined;
+  const topLimit = (chatContext as Record<string, unknown>).top_limit;
+  return typeof topLimit === 'number' ? topLimit : undefined;
+}
+
 function toneForApproval(riskLevel: string): NotificationFeedTone {
   switch (riskLevel) {
     case 'high':
@@ -156,25 +185,37 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   const markReadMutation = useMutation({
     mutationFn: markInAppNotificationRead,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.summary }),
+      ]);
     },
   });
   const approveMutation = useMutation({
     mutationFn: ({ id, note }: { id: string; note: string }) => approveRequest(id, note),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.summary }),
+      ]);
     },
   });
   const rejectMutation = useMutation({
     mutationFn: ({ id, note }: { id: string; note: string }) => rejectRequest(id, note),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.summary }),
+      ]);
     },
   });
   const generateInsightsMutation = useMutation({
     mutationFn: () => createInsightNotifications({ period: 'week', compare: true, top_limit: 5, preferred_language: language }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.inApp }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications.summary }),
+      ]);
     },
   });
   const notifications = notificationsQuery.data?.items ?? [];
@@ -210,15 +251,26 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
   }, [pendingApprovalsCount, t, unreadCount]);
 
   async function openInChat(n: InAppNotificationItem): Promise<void> {
+    const chatContext = n.chat_context && typeof n.chat_context === 'object' ? n.chat_context : {};
     const scope = getNotificationScope(n.chat_context);
+    const insightScope = getNotificationInsightScope(n.chat_context);
     const routedAgent = getNotificationRoutedAgent(n.chat_context);
     const contentLanguage = getNotificationContentLanguage(n.chat_context);
+    const period = getNotificationInsightPeriod(n.chat_context);
+    const compare = getNotificationCompare(n.chat_context);
+    const topLimit = getNotificationTopLimit(n.chat_context);
     const handoff: NotificationChatHandoff = {
       notificationId: n.id,
       title: n.title,
       body: n.body,
-      chatContext: n.chat_context && typeof n.chat_context === 'object' ? n.chat_context : {},
-      scope: scope ?? undefined,
+      chatContext,
+      source: 'in_app_notification',
+      notification_id: n.id,
+      insight_scope: insightScope,
+      period,
+      compare,
+      top_limit: topLimit,
+      scope: insightScope,
       routedAgent: routedAgent ?? undefined,
       contentLanguage: contentLanguage ?? undefined,
     };
@@ -346,8 +398,10 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
       meta:
         scope || routedAgent ? (
           <>
-            {routedAgent ? `${t('ai.chat.meta.agent')}: ${humanRoutedLabel(routedAgent, language)}` : null}
-            {routedAgent && scope ? ' · ' : null}
+            {routedAgent && !(routedAgent === 'insight_chat' && scope)
+              ? `${t('ai.chat.meta.agent')}: ${humanRoutedLabel(routedAgent, language)}`
+              : null}
+            {routedAgent && !(routedAgent === 'insight_chat' && scope) && scope ? ' · ' : null}
             {scope ? `${t('ai.chat.meta.context')}: ${humanInsightScopeLabel(scope, language)}` : null}
           </>
         ) : undefined,

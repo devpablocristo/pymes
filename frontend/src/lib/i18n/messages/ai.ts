@@ -2,7 +2,7 @@ import type { TranslationsByLanguage } from '../types';
 
 export const aiMessages: TranslationsByLanguage = {
   es: {
-    'ai.labels.routed.copilot': 'Copilot',
+    'ai.labels.routed.insight_chat': 'Análisis',
     'ai.labels.routed.customers': 'Clientes',
     'ai.labels.routed.products': 'Productos',
     'ai.labels.routed.sales': 'Ventas',
@@ -14,7 +14,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.labels.scope.sales_collections': 'Ventas y cobranzas',
     'ai.labels.scope.inventory_profit': 'Inventario y rentabilidad',
     'ai.labels.scope.customers_retention': 'Clientes y retención',
-    'ai.labels.routingSource.copilot_agent': 'Copilot',
+    'ai.labels.routingSource.copilot_agent': 'Análisis',
     'ai.labels.routingSource.read_fallback': 'Fallback lectura',
     'ai.labels.routingSource.ui_hint': 'Selección manual',
     'ai.labels.routingSource.orchestrator': 'Orquestador',
@@ -84,7 +84,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.notifications.preferences.channels.email': 'Correo',
   },
   en: {
-    'ai.labels.routed.copilot': 'Copilot',
+    'ai.labels.routed.insight_chat': 'Insights',
     'ai.labels.routed.customers': 'Customers',
     'ai.labels.routed.products': 'Products',
     'ai.labels.routed.sales': 'Sales',
@@ -96,7 +96,7 @@ export const aiMessages: TranslationsByLanguage = {
     'ai.labels.scope.sales_collections': 'Sales and collections',
     'ai.labels.scope.inventory_profit': 'Inventory and profitability',
     'ai.labels.scope.customers_retention': 'Customers and retention',
-    'ai.labels.routingSource.copilot_agent': 'Copilot',
+    'ai.labels.routingSource.copilot_agent': 'Insights',
     'ai.labels.routingSource.read_fallback': 'Read fallback',
     'ai.labels.routingSource.ui_hint': 'Manual selection',
     'ai.labels.routingSource.orchestrator': 'Orchestrator',

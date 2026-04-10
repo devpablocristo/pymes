@@ -236,7 +236,7 @@ def test_sales_collections_router_returns_response() -> None:
     assert payload["items"][0]["title"] == "Insight de ventas y cobranzas"
     assert payload["items"][0]["body"] == "Este mes: Ventas: $1,000.00 · Cliente destacado: Acme."
     assert payload["items"][0]["chat_context"]["scope"] == "sales_collections"
-    assert payload["items"][0]["chat_context"]["routed_agent"] == "copilot"
+    assert payload["items"][0]["chat_context"]["routed_agent"] == "insight_chat"
     assert payload["items"][0]["chat_context"]["content_language"] == "es"
     assert service.calls[0][0] == "sales_collections"
     assert service.calls[0][1].period == "month"

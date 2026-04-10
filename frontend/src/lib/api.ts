@@ -6,7 +6,6 @@ import type {
   NotificationPreference,
   SessionResponse,
   AuditEntry,
-  BusinessInsightCandidate,
   TenantSettings,
   TenantSettingsUpdatePayload,
 } from './types';
@@ -78,6 +77,10 @@ export async function listInAppNotifications(): Promise<{
   return request('/v1/in-app-notifications');
 }
 
+export async function getNotificationsSummary(): Promise<{ unread_count: number }> {
+  return request('/v1/in-app-notifications/summary');
+}
+
 export async function markInAppNotificationRead(id: string): Promise<{ id: string; read_at: string }> {
   return request(`/v1/in-app-notifications/${id}`, { method: 'PATCH', body: { read: true } });
 }
@@ -96,10 +99,6 @@ export async function updateNotificationPreference(payload: {
 
 export async function getAuditEntries(): Promise<{ items: AuditEntry[] }> {
   return request('/v1/audit');
-}
-
-export async function getBusinessInsightCandidates(limit = 100): Promise<{ items: BusinessInsightCandidate[] }> {
-  return request(`/v1/admin/business-insights/candidates?limit=${limit}`);
 }
 
 export async function downloadAuditExportCsv(): Promise<string> {

@@ -198,7 +198,7 @@ def build_operating_context_for_prompt(dossier: dict[str, Any], user_id: str | N
     business = dossier.get("business", {}) if isinstance(dossier, dict) else {}
     consolidate_memory(dossier)
     vertical = infer_business_vertical(dossier)
-    memory = ensure_operational_memory(dossier)
+    ensure_operational_memory(dossier)
     memory_view = build_operational_memory_view(dossier, user_id)
     modules = [
         _compact_text(module)

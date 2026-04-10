@@ -11,6 +11,7 @@ export const queryKeys = {
   notifications: {
     preferences: ['notifications', 'preferences'] as const,
     inApp: ['notifications', 'in-app'] as const,
+    summary: ['notifications', 'summary'] as const,
   },
   customerMessaging: {
     conversations: ['customer-messaging', 'conversations'] as const,
@@ -43,9 +44,6 @@ export const queryKeys = {
   },
   audit: {
     entries: ['audit', 'entries'] as const,
-  },
-  businessInsights: {
-    candidates: (limit: number) => ['business-insights', 'candidates', limit] as const,
   },
   session: {
     current: ['session', 'current'] as const,

@@ -158,3 +158,23 @@ La documentacion canónica vive en `docs/`.
 - [pymes-core/docs/FRAUD_PREVENTION.md](./pymes-core/docs/FRAUD_PREVENTION.md) — auditoría, cobros, RBAC (anti-fraude)
 - [docs/PROFESSIONALS.md](./docs/PROFESSIONALS.md) / [docs/WORKSHOPS.md](./docs/WORKSHOPS.md) / [docs/BEAUTY.md](./docs/BEAUTY.md) / [docs/RESTAURANTS.md](./docs/RESTAURANTS.md)
 - [pymes-core/backend/docs/SAAS_CORE.md](./pymes-core/backend/docs/SAAS_CORE.md) — integración `core/saas/go`
+
+
+## LLM Local Compartido
+
+`pymes` ya no levanta un `ollama` propio. Para usar modelos locales, arrancá el stack compartido:
+
+```bash
+cd /home/pablo/Projects/Pablo/local-infra/ollama
+docker compose up -d
+docker compose exec -T ollama ollama pull gemma4:e4b
+```
+
+Atajos:
+
+```bash
+make llm-up
+make llm-pull
+```
+
+Y dejá `OLLAMA_BASE_URL=http://host.docker.internal:11434` en `.env`.

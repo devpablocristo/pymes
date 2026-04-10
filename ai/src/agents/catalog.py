@@ -32,8 +32,11 @@ except ImportError:
             return str(name)
         return ROUTING_SOURCE_ORCHESTRATOR
 
+# Alias semántico: mismo valor que core exporta ("copilot_agent") hasta que core migre.
+ROUTING_SOURCE_INSIGHT_CHAT_AGENT: Final[str] = ROUTING_SOURCE_COPILOT_AGENT
+
 PRODUCT_AGENT_NAME: Final[str] = "general"
-COPILOT_AGENT_NAME: Final[str] = "copilot"
+INSIGHT_CHAT_AGENT_NAME: Final[str] = "insight_chat"
 
 CUSTOMERS_DOMAIN_AGENT_NAME: Final[str] = "customers"
 PRODUCTS_DOMAIN_AGENT_NAME: Final[str] = "products"
@@ -53,10 +56,9 @@ DOMAIN_AGENT_NAMES: Final[tuple[str, ...]] = (
 
 ALL_ROUTED_AGENT_NAMES: Final[tuple[str, ...]] = (
     PRODUCT_AGENT_NAME,
-    COPILOT_AGENT_NAME,
+    INSIGHT_CHAT_AGENT_NAME,
     *DOMAIN_AGENT_NAMES,
 )
-
 
 def is_known_routed_agent(name: str | None) -> bool:
     return bool(name and name in ALL_ROUTED_AGENT_NAMES)

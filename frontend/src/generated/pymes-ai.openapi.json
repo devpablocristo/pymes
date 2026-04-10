@@ -107,7 +107,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
+                "$ref": "#/components/schemas/src__api__chat_contract__ChatRequest"
               }
             }
           },
@@ -538,7 +538,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__internal_router__ChatRequest"
+                "$ref": "#/components/schemas/ChatRequest"
               }
             }
           },
@@ -769,7 +769,7 @@
                 "type": "string",
                 "enum": [
                   "general",
-                  "copilot",
+                  "insight_chat",
                   "customers",
                   "products",
                   "services",
@@ -836,6 +836,97 @@
         ],
         "title": "ChatActionsBlock",
         "description": "Bloque actions con ChatAction extendido (route_hint, etc.)."
+      },
+      "ChatHandoff": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "in_app_notification",
+              "direct"
+            ],
+            "title": "Source",
+            "description": "Origen estructurado del turno anclado. En Fase 1 se usa para validar contrato, sin cambiar el routing todav\u00eda."
+          },
+          "notification_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notification Id",
+            "description": "Identificador de la notificaci\u00f3n origen cuando el turno viene desde notificaciones in-app."
+          },
+          "insight_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sales_collections",
+                  "inventory_profit",
+                  "customers_retention"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insight Scope",
+            "description": "Scope estable del insight al que se ancla el turno."
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "today",
+                  "week",
+                  "month"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period",
+            "description": "Per\u00edodo usado para calcular el insight que origin\u00f3 el turno."
+          },
+          "compare": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare",
+            "description": "Indica si el insight origen us\u00f3 comparaci\u00f3n contra per\u00edodo anterior."
+          },
+          "top_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Limit",
+            "description": "L\u00edmite superior usado por el insight origen para rankings o listados resumidos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "ChatHandoff"
       },
       "ChatInsightCardBlock": {
         "properties": {
@@ -970,67 +1061,11 @@
       },
       "ChatRequest": {
         "properties": {
-          "chat_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chat Id"
-          },
           "message": {
             "type": "string",
             "maxLength": 4000,
             "minLength": 1,
             "title": "Message"
-          },
-          "preferred_language": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "es",
-                  "en"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preferred Language",
-            "description": "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a espa\u00f1ol."
-          },
-          "confirmed_actions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Confirmed Actions"
-          },
-          "route_hint": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "general",
-                  "copilot",
-                  "customers",
-                  "products",
-                  "services",
-                  "sales",
-                  "collections",
-                  "purchases"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Route Hint",
-            "description": "Hint opcional para forzar el carril del turno actual: general | customers | products | services | sales | collections | purchases. `copilot` queda reservado para handoff expl\u00edcito desde notificaciones."
           }
         },
         "type": "object",
@@ -1124,7 +1159,7 @@
             "type": "string",
             "enum": [
               "general",
-              "copilot",
+              "insight_chat",
               "customers",
               "products",
               "services",
@@ -1133,7 +1168,7 @@
               "purchases"
             ],
             "title": "Routed Agent",
-            "description": "Agente o sub-agente seleccionado para este turno: general | copilot | customers | products | services | sales | collections | purchases. `copilot` se usa solo en handoff expl\u00edcito desde notificaciones."
+            "description": "Agente o sub-agente seleccionado para este turno: general | insight_chat | customers | products | services | sales | collections | purchases."
           },
           "routing_source": {
             "type": "string",
@@ -1144,7 +1179,7 @@
               "ui_hint"
             ],
             "title": "Routing Source",
-            "description": "Origen efectivo del turno: copilot_agent | orchestrator | read_fallback | ui_hint"
+            "description": "Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint"
           }
         },
         "type": "object",
@@ -1573,6 +1608,39 @@
             },
             "type": "array",
             "title": "Tool Calls"
+          },
+          "blocks": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ChatTextBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatActionsBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatInsightCardBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatKpiGroupBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatTableBlock"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "actions": "#/components/schemas/ChatActionsBlock",
+                  "insight_card": "#/components/schemas/ChatInsightCardBlock",
+                  "kpi_group": "#/components/schemas/ChatKpiGroupBlock",
+                  "table": "#/components/schemas/ChatTableBlock",
+                  "text": "#/components/schemas/ChatTextBlock"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Blocks"
           }
         },
         "type": "object",
@@ -1879,7 +1947,7 @@
           },
           "routed_agent": {
             "type": "string",
-            "const": "copilot",
+            "const": "insight_chat",
             "title": "Routed Agent"
           },
           "content_language": {
@@ -2137,6 +2205,88 @@
         ],
         "title": "ValidationError"
       },
+      "src__api__chat_contract__ChatRequest": {
+        "properties": {
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "es",
+                  "en"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language",
+            "description": "Idioma preferido para contenido generado por AI. Hoy se normaliza sobre `es|en`; si falta o no se soporta, el backend cae a espa\u00f1ol."
+          },
+          "confirmed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Confirmed Actions"
+          },
+          "handoff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatHandoff"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Contexto estructurado opcional para anclar el turno actual a una notificaci\u00f3n o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atr\u00e1s: si `handoff` no se env\u00eda, el request sigue funcionando con el contrato previo."
+          },
+          "route_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "insight_chat",
+                  "customers",
+                  "products",
+                  "services",
+                  "sales",
+                  "collections",
+                  "purchases"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Hint",
+            "description": "Hint opcional para forzar el carril del turno actual: general | insight_chat | customers | products | services | sales | collections | purchases."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
       "src__api__public_router__PublicChatRequest": {
         "properties": {
           "conversation_id": {
@@ -2214,21 +2364,6 @@
           "message"
         ],
         "title": "PublicChatRequest"
-      },
-      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "ChatRequest"
       }
     }
   }

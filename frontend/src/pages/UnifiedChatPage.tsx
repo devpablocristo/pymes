@@ -9,6 +9,7 @@ import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
+  buildChatRequestHandoff,
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
@@ -19,7 +20,7 @@ import { queryKeys } from '../lib/queryKeys';
 import './UnifiedChatPage.css';
 
 type ContactKind = 'human' | 'ai_pymes';
-type ManualRouteHint = Exclude<NonNullable<CommercialChatRequest['route_hint']>, 'general' | 'copilot'>;
+type ManualRouteHint = Exclude<NonNullable<CommercialChatRequest['route_hint']>, 'general' | 'insight_chat'>;
 
 type ContactDef = {
   id: string;
@@ -152,7 +153,7 @@ function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
   if (mode === 'purchases' || mode === 'internal_procurement') return 'purchases';
   if (mode === 'customers') return 'customers';
   if (mode === 'products') return 'products';
-  if (mode === 'general' || mode === 'copilot') return 'general';
+  if (mode === 'general' || mode === 'insight_chat') return 'general';
   return 'neutral';
 }
 
@@ -213,8 +214,10 @@ function buildNotificationHandoffMetaLabel(
   t: (key: string, variables?: Record<string, string | number>) => string,
 ): string | null {
   const parts = [`${t('ai.chat.meta.notification')} ${handoff.notificationId}`];
-  if (handoff.routedAgent) {
-    parts.push(`${t('ai.chat.meta.agent')} ${humanRoutedLabel(handoff.routedAgent, language)}`);
+  const routedAgent = handoff.routedAgent;
+  const showAgentLabel = Boolean(routedAgent) && !(routedAgent === 'insight_chat' && handoff.scope);
+  if (showAgentLabel && routedAgent) {
+    parts.push(`${t('ai.chat.meta.agent')} ${humanRoutedLabel(routedAgent, language)}`);
   }
   if (handoff.scope) {
     parts.push(`${t('ai.chat.meta.context')} ${humanInsightScopeLabel(handoff.scope, language)}`);
@@ -490,7 +493,8 @@ export function UnifiedChatPage() {
           message: text,
           chat_id: null,
           confirmed_actions: [],
-          route_hint: handoff.routedAgent === 'copilot' ? 'copilot' : undefined,
+          handoff: buildChatRequestHandoff(handoff),
+          route_hint: handoff.routedAgent === 'insight_chat' ? 'insight_chat' : undefined,
           preferred_language: resolvePreferredLanguage(handoff.contentLanguage, language),
         });
         setChatIds((prev) => ({ ...prev, [AI_PYMES_ID]: reply.chat_id }));

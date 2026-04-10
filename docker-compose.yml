@@ -40,21 +40,6 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  # LLM local (OpenAI-compatible API en :11434). Modelos: `docker compose exec ollama ollama pull <modelo>`.
-  ollama:
-    restart: unless-stopped
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
   review:
     restart: unless-stopped
     build:
@@ -188,7 +173,7 @@ services:
       REVIEW_URL: http://review:8080
       PYTHONPATH: /workspace/pymes/ai:/workspace/core/ai/python/src
       # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     depends_on:
       cp-backend:
         condition: service_started
@@ -196,8 +181,6 @@ services:
         condition: service_healthy
       work-backend:
         condition: service_started
-      ollama:
-        condition: service_healthy
 
   # ── Professionals Vertical ──
 
@@ -326,7 +309,6 @@ services:
         condition: service_healthy
 
 volumes:
-  ollama_data:
   pgdata:
   review_pgdata:
   cp_backend_go_mod:

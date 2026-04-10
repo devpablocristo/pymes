@@ -36,6 +36,8 @@ export type {
   PymesAssistantChatBlock,
   PymesChatOutputKind,
   PymesAssistantChatResponse,
+  PymesChatHandoff,
+  PymesChatHandoffSource,
   PymesInsightOutputKind,
   PymesInsightServiceKind,
   PymesRoutedAgent,

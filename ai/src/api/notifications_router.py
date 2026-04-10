@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from runtime.logging import get_request_id, get_logger
-from src.agents.catalog import COPILOT_AGENT_NAME
+from src.agents.catalog import INSIGHT_CHAT_AGENT_NAME
 from src.api.deps import get_auth_context, get_backend_client, get_repository
 from src.api.quota import check_quota
 from src.backend_client.auth import AuthContext
@@ -42,7 +42,7 @@ class NotificationsRequest(BaseModel):
 class NotificationChatContext(BaseModel):
     suggested_user_message: str
     scope: Literal["sales_collections", "inventory_profit", "customers_retention"]
-    routed_agent: Literal["copilot"]
+    routed_agent: Literal["insight_chat"]
     content_language: LanguageCode = "es"
 
 
@@ -126,7 +126,7 @@ def _build_notification_item(
         chat_context=NotificationChatContext(
             suggested_user_message=f"Quiero entender {title.lower()} de {_period_label(period)}.",
             scope=scope,
-            routed_agent=COPILOT_AGENT_NAME,
+            routed_agent=INSIGHT_CHAT_AGENT_NAME,
             content_language=content_language,
         ),
         created_at=created_at,

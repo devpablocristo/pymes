@@ -145,6 +145,7 @@ async def chat_internal(
             conversation_id=req.chat_id,
             auth=auth,
             confirmed_actions=req.confirmed_actions,
+            handoff=req.handoff,
             route_hint=req.route_hint,
             preferred_language=preferred_language,
         )

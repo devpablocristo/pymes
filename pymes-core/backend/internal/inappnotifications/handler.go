@@ -24,6 +24,7 @@ func NewHandler(uc *Usecases) *Handler {
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup) {
 	auth.GET("/in-app-notifications", h.List)
+	auth.GET("/in-app-notifications/summary", h.Summary)
 	auth.PATCH("/in-app-notifications/:id", h.Patch)
 }
 
@@ -46,6 +47,18 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"items":        out,
+		"unread_count": unread,
+	})
+}
+
+func (h *Handler) Summary(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	unread, err := h.uc.CountUnreadForActor(c.Request.Context(), authCtx.OrgID, authCtx.Actor)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
 		"unread_count": unread,
 	})
 }

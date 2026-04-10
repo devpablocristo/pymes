@@ -65,6 +65,82 @@ def history_to_messages(history: list[dict[str, Any]]) -> list[Message]:
     return result
 
 
+_EVIDENCE_TTL_HOURS = 24
+
+
+def extract_insight_evidence(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Busca la evidencia de insight más reciente en los últimos 10 mensajes del hilo."""
+    now = datetime.now(UTC)
+    for item in reversed(messages[-10:]):
+        if str(item.get("role", "")).strip().lower() != "assistant":
+            continue
+        evidence = item.get("insight_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        computed_at = str(evidence.get("computed_at", "")).strip()
+        if computed_at:
+            try:
+                ts = datetime.fromisoformat(computed_at)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=UTC)
+                if (now - ts).total_seconds() > _EVIDENCE_TTL_HOURS * 3600:
+                    continue
+            except (ValueError, TypeError):
+                pass
+        return evidence
+    return None
+
+
+def compact_insight_evidence_for_prompt(evidence: dict[str, Any]) -> str:
+    """Compacta la evidencia de insight para inyectar en el prompt del LLM."""
+    import json as _json
+
+    compacted: dict[str, Any] = {}
+    for key in ("scope", "period", "summary"):
+        if evidence.get(key):
+            compacted[key] = evidence[key]
+
+    # Períodos
+    for period_key in ("current_period", "comparison_period"):
+        period = evidence.get(period_key)
+        if isinstance(period, dict):
+            compacted[period_key] = {
+                k: period[k] for k in ("label", "from_date", "to_date") if k in period
+            }
+
+    # KPIs: solo campos útiles para el LLM
+    raw_kpis = evidence.get("kpis")
+    if isinstance(raw_kpis, list):
+        compacted["kpis"] = [
+            {k: kpi[k] for k in ("label", "value", "unit", "delta_pct", "trend") if k in kpi}
+            for kpi in raw_kpis
+        ]
+
+    # Highlights
+    raw_highlights = evidence.get("highlights")
+    if isinstance(raw_highlights, list):
+        compacted["highlights"] = [
+            {k: h[k] for k in ("severity", "title", "detail") if k in h}
+            for h in raw_highlights
+        ]
+
+    # Recommendations
+    raw_recs = evidence.get("recommendations")
+    if isinstance(raw_recs, list):
+        compacted["recommendations"] = list(raw_recs)
+
+    # Truncar si el JSON es grande (>500 tokens estimados)
+    result = _json.dumps(compacted, ensure_ascii=False)
+    if estimate_tokens(result) > 500:
+        if "recommendations" in compacted:
+            compacted["recommendations"] = compacted["recommendations"][:3]
+        if "highlights" in compacted:
+            compacted["highlights"] = compacted["highlights"][:5]
+        result = _json.dumps(compacted, ensure_ascii=False)
+
+    return result
+
+
 async def get_external_conversation(
     repo: AIRepository,
     org_id: str,

@@ -9,6 +9,9 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Ownership, shared, bordes HTTP entre bounded contexts |
 | [V2_INTERNAL.md](./V2_INTERNAL.md) | Camino canónico actual, desvíos detectados y criterio de convergencia incremental |
 | [AI_OWNERSHIP.md](./AI_OWNERSHIP.md) | Ownership IA del ecosistema: categorías `Agent`/`Service`, runtime reusable, `ProductAgent`, `DomainAgent`, `CopilotAgent`, `InsightService`, `GovernanceService` |
+| [architecture/pymes-ai-evolution.md](./architecture/pymes-ai-evolution.md) | **Evolución del sistema de IA**: as-is vs to-be, fases incrementales, gaps, riesgos y enlaces al código (`ai/`, core, Nexus, frontend) |
+| [architecture/pymes-ai-regression-checklist.md](./architecture/pymes-ai-regression-checklist.md) | Checklist de regresión del asistente AI (escenarios obligatorios antes de release) |
+| [architecture/pymes-ai-runbook.md](./architecture/pymes-ai-runbook.md) | Runbook de incidentes del servicio AI (logs, errores comunes, diagnóstico) |
 | [PYMES_CORE.md](./PYMES_CORE.md) | Backend transversal: módulos `internal/`, procurement, migraciones, enlaces a SaaS |
 | [CORE_INTEGRATION.md](./CORE_INTEGRATION.md) | Dependencias `github.com/devpablocristo/core/...`, qué no duplicar, consola `/modules` |
 | [WHATSAPP_SETUP.md](./WHATSAPP_SETUP.md) | WhatsApp + Meta: env, webhook, conexión por org, opt-in; qué ya está y qué falta |

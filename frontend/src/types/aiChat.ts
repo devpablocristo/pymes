@@ -3,6 +3,8 @@ import type { components, paths } from '../generated/pymes-ai.openapi';
 type Schemas = components['schemas'];
 
 export type CommercialChatRequest = paths['/v1/chat']['post']['requestBody']['content']['application/json'];
+export type PymesChatHandoff = Schemas['ChatHandoff'];
+export type PymesChatHandoffSource = PymesChatHandoff['source'];
 
 export type PymesAssistantChatResponse = paths['/v1/chat']['post']['responses'][200]['content']['application/json'];
 

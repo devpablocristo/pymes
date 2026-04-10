@@ -189,6 +189,12 @@ describe('UnifiedChatPage', () => {
         notificationId: 'notif-1',
         title: 'Cobro pendiente',
         body: 'Hay un cobro para revisar.',
+        source: 'in_app_notification',
+        notification_id: 'notif-1',
+        insight_scope: 'sales_collections',
+        period: 'week',
+        compare: true,
+        top_limit: 5,
         chatContext: {
           suggested_user_message: 'Explicame este cobro pendiente',
         },
@@ -209,6 +215,14 @@ describe('UnifiedChatPage', () => {
       expect.objectContaining({
         message: 'Explicame este cobro pendiente',
         chat_id: null,
+        handoff: {
+          source: 'in_app_notification',
+          notification_id: 'notif-1',
+          insight_scope: 'sales_collections',
+          period: 'week',
+          compare: true,
+          top_limit: 5,
+        },
         preferred_language: 'es',
       }),
     );

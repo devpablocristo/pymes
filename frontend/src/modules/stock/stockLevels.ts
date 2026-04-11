@@ -10,6 +10,8 @@ export type StockLevelRow = {
   track_stock?: boolean;
   is_low_stock: boolean;
   updated_at: string;
+  /** Si viene del API, alinea filtro «Yo» / píldoras con la vista lista. */
+  created_by?: string;
 };
 
 export function mapInventoryItem(row: Omit<StockLevelRow, 'id'>): StockLevelRow {

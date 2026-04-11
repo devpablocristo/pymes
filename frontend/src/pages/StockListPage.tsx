@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
 import { StockLevelDetailModal } from '../modules/stock';
+import './StockPage.css';
 
 /** Lista administrativa; «Ver detalle» abre modal (ajuste, mínimo, movimientos, archivar). */
 export function StockListPage() {
@@ -16,13 +17,15 @@ export function StockListPage() {
 
   return (
     <>
-      <LazyConfiguredCrudPage
-        key={listKey}
-        resourceId="stock"
-        mergeConfig={{
-          onRowClick: (row: { id: string }) => setDetailProductId(row.id),
-        }}
-      />
+      <div className="stock-inventory-list-crud">
+        <LazyConfiguredCrudPage
+          key={listKey}
+          resourceId="stock"
+          mergeConfig={{
+            onRowClick: (row: { id: string }) => setDetailProductId(row.id),
+          }}
+        />
+      </div>
       <StockLevelDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} onAfterSave={bumpList} />
     </>
   );

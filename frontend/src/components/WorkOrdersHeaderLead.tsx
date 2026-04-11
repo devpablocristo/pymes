@@ -27,12 +27,11 @@ export function WorkOrdersHeaderLead({
 }: Props) {
   return (
     <CrudViewModeSwitch
-      primaryPath={boardPath}
-      secondaryPath={listPath}
-      primaryLabel={leftLabel}
-      secondaryLabel={rightLabel}
+      modes={[
+        { path: boardPath, label: leftLabel },
+        { path: listPath, label: rightLabel, contextPattern: editPattern ?? `${listPath}/edit/:orderId` },
+      ]}
       groupAriaLabel={groupAriaLabel}
-      secondaryContextPattern={editPattern ?? `${listPath}/edit/:orderId`}
       description={description}
     />
   );

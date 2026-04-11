@@ -340,6 +340,7 @@ export function hasCrudResource(resourceId: string): boolean {
 
 export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
   resourceId: string,
+  opts?: { preserveCsvToolbar?: boolean },
 ): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
+  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId, opts);
 }

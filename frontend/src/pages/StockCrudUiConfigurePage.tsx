@@ -1,8 +1,8 @@
 import { CrudUiPreferencesPanel } from '@devpablocristo/modules-crud-ui';
-import { Link } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
-import { CRUD_UI_RESOURCES, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
+import { CRUD_UI_CHANGE_EVENT, CRUD_UI_RESOURCES, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
+import './StockCrudUiConfigurePage.css';
 
 const STOCK_CRUD_UI_RESOURCES = CRUD_UI_RESOURCES.filter((r) => r.resourceId === 'stock');
 
@@ -13,24 +13,21 @@ export function StockCrudUiConfigurePage() {
       title="Vistas del inventario"
       lead="Solo afecta a lista, galería y tablero de inventario en este navegador."
     >
-      <p className="u-mb-3">
-        <Link to="/modules/stock/list">← Volver al inventario</Link>
-      </p>
       <CrudUiPreferencesPanel
         storageKey={CRUD_UI_STORAGE_KEY}
         resources={STOCK_CRUD_UI_RESOURCES}
-        changeEventName="pymes:crud-ui-config-changed"
+        changeEventName={CRUD_UI_CHANGE_EVENT}
         loadPageConfig={loadLazyCrudPageConfig}
         hideResourceCardHeader
         copy={{
           defaultViewLabel: 'Vista por defecto',
         }}
         classes={{
-          section: 'admin-settings-section',
+          section: 'admin-settings-section stock-crud-prefs',
           hint: 'admin-settings-hint',
-          stack: 'stg__gateway-stack',
-          grid: 'admin-settings-grid',
-          checkboxRow: 'admin-checkbox-row',
+          stack: 'stg__gateway-stack stock-crud-prefs__stack',
+          grid: 'stock-crud-prefs__grid',
+          checkboxRow: 'admin-checkbox-row stock-crud-prefs__row',
         }}
       />
     </PageLayout>

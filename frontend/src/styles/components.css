@@ -74,8 +74,20 @@
   align-items: stretch;
   gap: var(--space-3);
   flex-shrink: 0;
-  min-width: 0;
   max-width: 100%;
+  /*
+   * Sin un suelo, el ancho de la columna = max(buscador, fila de botones). Con pocos botones
+   * (p. ej. galería) la columna se achica y el buscador queda más corto que en lista/tablero.
+   */
+  min-width: min(100%, 32rem);
+}
+
+.page-header.crud-page-shell__header .crud-page-shell__header-actions .m-kanban__search,
+.page-header.crud-page-shell__header .crud-page-shell__header-actions input[type='search'] {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .page-header.crud-page-shell__header .crud-page-shell__header-actions > .actions-row {

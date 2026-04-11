@@ -5,7 +5,7 @@ export function WorkOrdersModuleSection() {
     <ConfiguredCrudSection
       resourceId="carWorkOrders"
       baseRoute="/modules/carWorkOrders"
-      secondaryContextPattern="/modules/carWorkOrders/edit/:orderId"
+      contextPatternByModeId={{ list: '/modules/carWorkOrders/edit/:orderId' }}
     />
   );
 }

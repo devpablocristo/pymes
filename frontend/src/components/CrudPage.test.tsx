@@ -224,4 +224,98 @@ describe('CrudPage', () => {
       expect(hardDelete).toHaveBeenCalledWith({ id: '1', name: 'Archivado', active: false });
     });
   });
+
+  it('permite columnas específicas para archivados y desactiva el click de fila en esa vista', async () => {
+    const onRowClick = vi.fn();
+    const list = vi.fn().mockImplementation(async ({ archived }: { archived?: boolean } = {}) =>
+      archived ? [{ id: '1', name: 'Archivado', active: false }] : [{ id: '2', name: 'Activo', active: true }],
+    );
+
+    render(
+      <CrudPage<SampleItem>
+        label="item"
+        labelPlural="items"
+        labelPluralCap="Items"
+        supportsArchived
+        allowRestore
+        allowHardDelete
+        dataSource={{
+          list: async ({ archived }: { archived?: boolean } = {}) => list({ archived }),
+          restore: async () => undefined,
+          hardDelete: async () => undefined,
+        }}
+        columns={[
+          { key: 'name', header: 'Nombre' },
+          { key: 'active', header: 'Activo', render: (value) => (value ? 'Si' : 'No') },
+        ]}
+        archivedColumns={[{ key: 'name', header: 'Nombre archivado' }]}
+        formFields={[
+          { key: 'name', label: 'Nombre', required: true },
+          { key: 'active', label: 'Activo', type: 'checkbox' },
+        ]}
+        searchText={(row) => row.name}
+        toFormValues={(row) => ({ name: row.name, active: row.active })}
+        isValid={() => true}
+        onRowClick={onRowClick}
+      />,
+    );
+
+    await screen.findByRole('cell', { name: 'Activo' });
+    fireEvent.click(screen.getByRole('cell', { name: 'Activo' }));
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver archivados' }));
+    await screen.findByText('Archivado');
+
+    expect(screen.getByText('Nombre archivado')).toBeInTheDocument();
+    expect(screen.queryByText('Activo')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Archivado'));
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+
+    expect(screen.getByRole('button', { name: 'Restaurar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toBeInTheDocument();
+  });
+
+  it('oculta acciones CSV al cambiar a archivados', async () => {
+    const list = vi.fn().mockImplementation(async ({ archived }: { archived?: boolean } = {}) =>
+      archived ? [{ id: '1', name: 'Archivado', active: false }] : [{ id: '2', name: 'Activo', active: true }],
+    );
+
+    render(
+      <CrudPage<SampleItem>
+        label="item"
+        labelPlural="items"
+        labelPluralCap="Items"
+        supportsArchived
+        toolbarActions={[
+          { id: 'csv-export', label: 'Exportar CSV', kind: 'secondary', isVisible: ({ archived }) => !archived, onClick: async () => undefined },
+          { id: 'csv-import', label: 'Importar CSV', kind: 'secondary', isVisible: ({ archived }) => !archived, onClick: async () => undefined },
+        ]}
+        dataSource={{
+          list: async ({ archived }: { archived?: boolean } = {}) => list({ archived }),
+        }}
+        columns={[
+          { key: 'name', header: 'Nombre' },
+          { key: 'active', header: 'Activo', render: (value) => (value ? 'Si' : 'No') },
+        ]}
+        formFields={[
+          { key: 'name', label: 'Nombre', required: true },
+          { key: 'active', label: 'Activo', type: 'checkbox' },
+        ]}
+        searchText={(row) => row.name}
+        toFormValues={(row) => ({ name: row.name, active: row.active })}
+        isValid={() => true}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Exportar CSV' });
+    expect(screen.getByRole('button', { name: 'Importar CSV' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver archivados' }));
+    await screen.findByText('Archivado');
+
+    expect(screen.queryByRole('button', { name: 'Exportar CSV' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Importar CSV' })).not.toBeInTheDocument();
+  });
 });

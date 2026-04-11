@@ -128,6 +128,7 @@ const modulesUiSectionHubStyles = monorepoModulesDir('ui/section-hub/ts/src/styl
 
 export default defineConfig({
   envDir: '..',
+  cacheDir: process.env.VITE_CACHE_DIR ?? 'node_modules/.vite',
   plugins: [react()],
   resolve: {
     preserveSymlinks: true,

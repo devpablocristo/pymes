@@ -3,13 +3,22 @@ import { CrudViewModeSwitch } from './CrudViewModeSwitch';
 import '../../pages/WorkOrdersModuleSection.css';
 
 type Props = {
-  primaryPath: string;
-  secondaryPath: string;
-  primaryLabel: string;
-  secondaryLabel: string;
+  modes: Array<{
+    path: string;
+    label: string;
+    contextPattern?: string;
+  }>;
   groupAriaLabel: string;
-  secondaryContextPattern?: string;
   description?: string;
+  actionLink?: {
+    to: string;
+    label: string;
+    hideWhenActivePattern?: string;
+    activeReplacement?: {
+      to: string;
+      label: string;
+    };
+  };
 };
 
 export function CrudModuleSection(props: Props) {

@@ -1,3 +1,5 @@
+import { createCrudKanbanTransitionModel } from '../modules/crud';
+
 /**
  * Fases del tablero Kanban de OT (macro-columnas) y etiquetas finas para badges.
  * Lógica idéntica a @devpablocristo/modules-work-orders/kanbanConfig.
@@ -39,50 +41,28 @@ export function canonicalWorkOrderStatus(raw: string): string {
 }
 
 export function workOrderKanbanPhaseFromStatus(raw: string): WorkOrderKanbanPhase {
-  const s = canonicalWorkOrderStatus(raw);
-  switch (s) {
-    case 'received':
-    case 'diagnosing':
-      return 'wo_intake';
-    case 'quote_pending':
-    case 'awaiting_parts':
-      return 'wo_quote';
-    case 'in_progress':
-    case 'quality_check':
-    case 'on_hold':
-      return 'wo_shop';
-    case 'ready_for_pickup':
-    case 'delivered':
-      return 'wo_exit';
-    case 'invoiced':
-    case 'cancelled':
-      return 'wo_closed';
-    default:
-      return 'wo_intake';
-  }
+  return workOrderKanbanTransitionModel.getColumnIdForStatus(raw);
 }
 
 export function defaultCanonStatusForKanbanPhase(phase: WorkOrderKanbanPhase): string | null {
-  switch (phase) {
-    case 'wo_intake':
-      return 'received';
-    case 'wo_quote':
-      return 'quote_pending';
-    case 'wo_shop':
-      return 'in_progress';
-    case 'wo_exit':
-      return 'ready_for_pickup';
-    case 'wo_closed':
-      return 'invoiced';
-    default:
-      return 'received';
-  }
+  return workOrderKanbanTransitionModel.getDefaultStatusForColumn(phase);
 }
 
 export function isWorkOrderKanbanTerminalStatus(raw: string): boolean {
-  const s = canonicalWorkOrderStatus(raw);
-  return s === 'invoiced' || s === 'cancelled';
+  return workOrderKanbanTransitionModel.isTerminalStatus(raw);
 }
+
+export const workOrderKanbanTransitionModel = createCrudKanbanTransitionModel<string, WorkOrderKanbanPhase>({
+  normalizeStatus: canonicalWorkOrderStatus,
+  columns: [
+    { columnId: 'wo_intake', statuses: ['received', 'diagnosing'], defaultStatus: 'received' },
+    { columnId: 'wo_quote', statuses: ['quote_pending', 'awaiting_parts'], defaultStatus: 'quote_pending' },
+    { columnId: 'wo_shop', statuses: ['in_progress', 'quality_check', 'on_hold'], defaultStatus: 'in_progress' },
+    { columnId: 'wo_exit', statuses: ['ready_for_pickup', 'delivered'], defaultStatus: 'ready_for_pickup' },
+    { columnId: 'wo_closed', statuses: ['invoiced', 'cancelled'], defaultStatus: 'invoiced' },
+  ],
+  terminalStatuses: ['invoiced', 'cancelled'],
+});
 
 const BADGE_LABELS: Record<string, string> = {
   received: 'Recibido',

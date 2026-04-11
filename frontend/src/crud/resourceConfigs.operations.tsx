@@ -392,8 +392,11 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     allowEdit: false,
     allowDelete: false,
     supportsArchived: true,
+    featureFlags: {
+      creatorFilter: false,
+    },
     archivedEmptyState: 'No hay productos archivados en inventario.',
-    searchPlaceholder: 'Buscar por producto o SKU',
+    searchPlaceholder: 'Buscar...',
     emptyState: 'No hay productos en el inventario.',
     viewModes: [
       { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de inventario', isDefault: true },
@@ -407,6 +410,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         id: 'stock-new-product',
         label: '+ Nuevo producto',
         kind: 'primary',
+        isVisible: ({ archived }) => !archived,
         onClick: async () => {
           window.location.assign('/modules/products/list');
         },
@@ -414,6 +418,12 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     ],
     dataSource: {
       list: async ({ archived }) => fetchStockLevels({ archived: Boolean(archived) }),
+      restore: async (row: StockLevelRow) => {
+        await apiRequest(`/v1/products/${row.product_id}/restore`, { method: 'POST', body: {} });
+      },
+      hardDelete: async (row: StockLevelRow) => {
+        await apiRequest(`/v1/products/${row.product_id}`, { method: 'DELETE' });
+      },
     },
     columns: [
       {
@@ -439,6 +449,14 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         ),
       },
       { key: 'updated_at', header: 'Actualizado', className: 'stock-col-date', render: (value) => formatDate(String(value ?? '')) },
+    ],
+    archivedColumns: [
+      {
+        key: 'product_name',
+        header: 'Producto',
+        className: 'cell-name',
+        render: (_value, row: StockLevelRow) => <strong>{row.product_name}</strong>,
+      },
     ],
     formFields: [],
     searchText: (row: StockLevelRow) => [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
@@ -615,6 +633,7 @@ export function hasCrudResource(resourceId: string): boolean {
 
 export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
   resourceId: string,
+  opts?: { preserveCsvToolbar?: boolean },
 ): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
+  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId, opts);
 }

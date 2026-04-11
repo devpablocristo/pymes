@@ -1,14 +1,16 @@
 import { CrudPageShell } from '@devpablocristo/core-browser/crud';
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { ProductDetailModal } from '../../components/ProductDetailModal';
-import { loadLazyCrudPageConfig } from '../../crud/lazyCrudPage';
 import { apiRequest } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
-import { queryKeys } from '../../lib/queryKeys';
 import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
-import { CrudGallerySurface } from '../../modules/crud';
+import {
+  CrudCreateNavigationButton,
+  CrudGallerySurface,
+  CrudToolbarActionButtons,
+  useCrudConfigQuery,
+  useCrudRemotePaginatedList,
+} from '../../modules/crud';
 import '../ProductsGalleryPage.css';
 
 type ProductRow = {
@@ -33,60 +35,58 @@ type ProductsListResponse = {
 const PAGE_SIZE = 100;
 
 export function ProductsGalleryModeContent() {
-  const navigate = useNavigate();
   const { t, sentenceCase, localizeText } = useI18n();
-  const crudConfigQuery = useQuery({
-    queryKey: queryKeys.products.crudConfig,
-    queryFn: () => loadLazyCrudPageConfig<ProductRow>('products'),
-  });
+  const crudConfigQuery = useCrudConfigQuery<ProductRow>('products', { preserveCsvToolbar: true });
   const crudConfig = crudConfigQuery.data ?? null;
   const { preSearchFilter, listHeaderInlineSlot } = useCrudListCreatedByMerge();
-  const [items, setItems] = useState<ProductRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const deferredSearch = useDeferredValue(search.trim());
 
-  const closeDetail = useCallback(() => setDetailId(null), []);
+  const fetchPage = useCallback(
+    async ({
+      limit,
+      search: q,
+      archived,
+      after,
+      signal: _signal,
+    }: {
+      limit: number;
+      search: string;
+      archived: boolean;
+      after: string | null;
+      signal: AbortSignal;
+    }) => {
+      void _signal;
+      const query = new URLSearchParams({ limit: String(limit) });
+      if (q) query.set('search', q);
+      if (archived) query.set('archived', 'true');
+      if (after) query.set('after', after);
+      return apiRequest<ProductsListResponse>(`/v1/products?${query.toString()}`);
+    },
+    [],
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setLoadingMore(false);
-    const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
-    if (deferredSearch) query.set('search', deferredSearch);
-    if (showArchived) query.set('archived', 'true');
-    apiRequest<ProductsListResponse>(`/v1/products?${query.toString()}`)
-      .then((data) => {
-        if (cancelled) return;
-        const list = data.items ?? [];
-        setItems(list);
-        setTotal(Number(data.total ?? 0));
-        setHasMore(Boolean(data.has_more));
-        setNextCursor(data.next_cursor?.trim() || null);
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'Error');
-        setItems([]);
-        setHasMore(false);
-        setNextCursor(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [deferredSearch, showArchived, reloadKey]);
+  const {
+    items,
+    loading,
+    error,
+    setError,
+    total,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useCrudRemotePaginatedList<ProductRow>({
+    pageSize: PAGE_SIZE,
+    deferredSearch,
+    archived: showArchived,
+    reloadKey,
+    fetchPage,
+  });
+
+  const closeDetail = useCallback(() => setDetailId(null), []);
 
   const visibleItems = useMemo(() => {
     if (!preSearchFilter) return items;
@@ -106,55 +106,13 @@ export function ProductsGalleryModeContent() {
   const subtitle = loading
     ? t('crud.viewMode.gallery.loading')
     : `${total} ${total === 1 ? crudConfig?.label ?? 'producto' : crudConfig?.labelPlural ?? 'productos'}`;
-  const visibleToolbarActions = useMemo(
-    () => (crudConfig?.toolbarActions ?? []).filter((action) => action.isVisible?.({ archived: showArchived, items }) ?? true),
-    [crudConfig, items, showArchived],
-  );
-
   const searchPlaceholderResolved = crudConfig?.searchPlaceholder
     ? localizeText(crudConfig.searchPlaceholder)
     : t('crud.search.placeholder');
 
-  const runToolbarAction = useCallback(
-    async (actionId: string) => {
-      if (!crudConfig) return;
-      const action = (crudConfig.toolbarActions ?? []).find((candidate) => candidate.id === actionId);
-      if (!action) return;
-      setError(null);
-      try {
-        await action.onClick({
-          items,
-          reload: async () => {
-            setReloadKey((value) => value + 1);
-          },
-          setError: (message: string) => setError(message),
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error');
-      }
-    },
-    [crudConfig, items],
-  );
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const query = new URLSearchParams({ limit: String(PAGE_SIZE), after: nextCursor });
-      if (deferredSearch) query.set('search', deferredSearch);
-      if (showArchived) query.set('archived', 'true');
-      const data = await apiRequest<ProductsListResponse>(`/v1/products?${query.toString()}`);
-      setItems((prev) => [...prev, ...(data.items ?? [])]);
-      setHasMore(Boolean(data.has_more));
-      setNextCursor(data.next_cursor?.trim() || null);
-      setTotal(Number(data.total ?? total));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [deferredSearch, loadingMore, nextCursor, showArchived, total]);
+  const reloadItems = useCallback(async () => {
+    setReloadKey((value) => value + 1);
+  }, []);
 
   return (
     <div className="products-crud-page">
@@ -170,25 +128,18 @@ export function ProductsGalleryModeContent() {
         }}
         headerActions={
           <>
-            {visibleToolbarActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className={`btn-sm ${action.kind === 'primary' ? 'btn-primary' : action.kind === 'danger' ? 'btn-danger' : action.kind === 'success' ? 'btn-success' : 'btn-secondary'}`}
-                onClick={() => {
-                  void runToolbarAction(action.id);
-                }}
-              >
-                {localizeText(action.label)}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="btn-sm btn-primary"
-              onClick={() => navigate('/modules/products/list')}
-            >
-              {crudConfig?.createLabel ? localizeText(crudConfig.createLabel) : '+ Nuevo producto'}
-            </button>
+            <CrudToolbarActionButtons
+              actions={crudConfig?.toolbarActions}
+              items={items}
+              archived={showArchived}
+              reload={reloadItems}
+              setError={setError}
+              formatLabel={localizeText}
+            />
+            <CrudCreateNavigationButton
+              to="/modules/products/list"
+              label={crudConfig?.createLabel ? localizeText(crudConfig.createLabel) : '+ Nuevo producto'}
+            />
             <button
               type="button"
               className={`btn-sm ${showArchived ? 'btn-primary' : 'btn-secondary'}`}

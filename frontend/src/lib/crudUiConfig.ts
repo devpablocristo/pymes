@@ -2,6 +2,7 @@ import type { CrudPageConfig } from '../components/CrudPage';
 import { createCrudUiPreferencesApi, type CrudUiResourceOverride } from '@devpablocristo/modules-crud-ui';
 
 export const CRUD_UI_STORAGE_KEY = 'pymes.crud-ui-config.v1';
+export const CRUD_UI_CHANGE_EVENT = 'pymes:crud-ui-config-changed';
 
 export type CrudUiResourceId = 'products' | 'carWorkOrders' | 'bikeWorkOrders' | 'stock';
 
@@ -22,7 +23,7 @@ export const CRUD_UI_RESOURCES: CrudUiResourceDescriptor[] = [
 const crudUiApi = createCrudUiPreferencesApi({
   storageKey: CRUD_UI_STORAGE_KEY,
   knownResourceIds: CRUD_UI_RESOURCES.map((r) => r.resourceId),
-  changeEventName: 'pymes:crud-ui-config-changed',
+  changeEventName: CRUD_UI_CHANGE_EVENT,
 });
 
 export function readCrudUiConfigState(): CrudUiConfigState {

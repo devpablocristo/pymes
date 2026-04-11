@@ -5,14 +5,17 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { normalize } from '@devpablocristo/core-browser/search';
 import type { KanbanColumnDef, SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
-import { useCallback, useEffect, useMemo, useState, type ReactElement, type RefObject } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import type { CrudHelpers } from '../../components/CrudPage';
-import { CrudKanbanSurface } from '../crud';
-import { loadLazyCrudPageConfig } from '../../crud/lazyCrudPage';
-import { useI18n } from '../../lib/i18n';
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  createCrudKanbanArchiveTerminalDragPolicy,
+  CrudKanbanSurface,
+  CrudResourceShellHeader,
+  useCrudArchivedSearchParam,
+} from '../crud';
 import { StockLevelDetailModal } from './StockLevelDetailModal';
 import { fetchStockLevels, type StockLevelRow } from './stockLevels';
+import '../../pages/StockPage.css';
 import '../../pages/WorkOrdersKanbanPanel.css';
 
 /** Mismas columnas que `GenericWorkOrdersBoard` (órdenes auto). */
@@ -57,19 +60,6 @@ function resolveStockDropColumnId(
     return COLUMN_IDS.has(c) ? c : 'wo_intake';
   }
   return null;
-}
-
-function toolbarBtnClass(kind?: 'primary' | 'secondary' | 'danger' | 'success'): string {
-  switch (kind) {
-    case 'primary':
-      return 'btn-sm btn-primary';
-    case 'danger':
-      return 'btn-sm btn-danger';
-    case 'success':
-      return 'btn-sm btn-success';
-    default:
-      return 'btn-sm btn-secondary';
-  }
 }
 
 function StockKanbanCardBody({
@@ -140,17 +130,17 @@ function StockKanbanCardPreview({ row }: { row: StockLevelRow }) {
 }
 
 export function StockInventoryKanbanBoard() {
-  const { localizeText: formatFieldText } = useI18n();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { archived: showArchived } = useCrudArchivedSearchParam();
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [toolbarError, setToolbarError] = useState<string | null>(null);
+  const [boardSearch, setBoardSearch] = useState('');
   /** Columna Kanban elegida por drag (no persiste en API). */
   const [manualColumnById, setManualColumnById] = useState<Record<string, string>>({});
 
-  const stockQuery = useQuery({
-    queryKey: ['stock', 'inventory-kanban'],
-    queryFn: fetchStockLevels,
+  const stockQuery = useQuery<StockLevelRow[]>({
+    queryKey: ['stock', 'inventory-kanban', showArchived ? 'archived' : 'active'],
+    queryFn: () => fetchStockLevels({ archived: showArchived }),
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
@@ -177,55 +167,20 @@ export function StockInventoryKanbanBoard() {
     [manualColumnById],
   );
 
+  const archiveTerminalDragPolicy = useMemo(
+    () =>
+      createCrudKanbanArchiveTerminalDragPolicy<StockLevelRow>({
+        showArchived,
+        transitionModel: { isTerminalStatus: (phase) => phase === 'wo_closed' },
+        getItemStatus: (row) => displayPhase(row, manualColumnById),
+      }),
+    [manualColumnById, showArchived],
+  );
+
   const handleMoveCard = useCallback((id: string, targetColumnId: string) => {
     if (!COLUMN_IDS.has(targetColumnId)) return;
     setManualColumnById((prev) => ({ ...prev, [id]: targetColumnId }));
   }, []);
-
-  const crudConfigQuery = useQuery({
-    queryKey: ['stock', 'crud-config'],
-    queryFn: () => loadLazyCrudPageConfig<StockLevelRow>('stock'),
-  });
-  const crudConfig = crudConfigQuery.data ?? null;
-
-  const renderExtraToolbar = useMemo(
-    () =>
-      ({
-        items: toolbarItems,
-        reload: toolbarReload,
-        setError: toolbarSetError,
-      }: {
-        items: StockLevelRow[];
-        reload: () => Promise<void>;
-        setError: (message: string | null) => void;
-      }): ReactElement => {
-        const helpers: CrudHelpers<StockLevelRow> = {
-          items: toolbarItems,
-          reload: toolbarReload,
-          setError: (message: string) => toolbarSetError(message),
-        };
-        const toolbarActions = (crudConfig?.toolbarActions ?? []).filter(
-          (action) => action.isVisible?.({ archived: false, items: toolbarItems }) ?? true,
-        );
-        return (
-          <>
-            {toolbarActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className={toolbarBtnClass(action.kind)}
-                onClick={() => {
-                  void action.onClick(helpers);
-                }}
-              >
-                {formatFieldText(action.label)}
-              </button>
-            ))}
-          </>
-        );
-      },
-    [crudConfig, formatFieldText],
-  );
 
   const filterRow = useCallback((row: StockLevelRow, q: string) => {
     const hay = normalize(
@@ -236,65 +191,65 @@ export function StockInventoryKanbanBoard() {
     return hay.includes(normalize(q));
   }, []);
 
-  const statsLine = useCallback((visible: number, total: number) => {
-    if (visible === total) {
-      return `${total} ${total === 1 ? 'producto en el inventario' : 'productos en el inventario'}`;
-    }
-    return `${visible} de ${total} productos en el inventario (filtrado)`;
-  }, []);
+  const statsLine = useCallback((_visible: number, _total: number) => '', []);
+
+  const filteredCount = useMemo(() => {
+    const q = boardSearch.trim().toLowerCase();
+    if (!q) return items.length;
+    return items.filter((row) => filterRow(row, q)).length;
+  }, [boardSearch, items, filterRow]);
 
   return (
     <>
-      <CrudKanbanSurface<StockLevelRow>
-        columns={COLUMN_ORDER}
-        columnIdSet={COLUMN_IDS}
-        getRowColumnId={getRowColumnId}
-        fallbackColumnId="wo_intake"
+      <CrudResourceShellHeader<StockLevelRow>
+        resourceId="stock"
+        preserveCsvToolbar
         items={items}
+        subtitleCount={filteredCount}
         loading={stockQuery.isLoading}
         error={combinedError}
-        onMoveCard={handleMoveCard}
-        resolveDropColumnId={(overId, snapshot) =>
-          resolveStockDropColumnId(overId, snapshot, manualColumnById)
-        }
-        filterRow={filterRow}
-        isRowDraggable={() => true}
-        isColumnDroppable={() => true}
-        onCardOpen={(row) => setDetailProductId(row.product_id)}
-        renderCard={({ row, onOpen, suppressOpenRef }) => (
-          <StockKanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
-        )}
-        renderOverlayCard={(row) => <StockKanbanCardPreview row={row} />}
-        title="Inventario"
-        subtitle="Misma grilla que órdenes de trabajo. Podés arrastrar tarjetas entre columnas (vista local; se resetea al recargar datos)."
-        searchPlaceholder="Buscar..."
-        toolbarButtonRow={
-          <>
-            {renderExtraToolbar({
-              items,
-              reload,
-              setError: (message) => {
-                setToolbarError(message);
-              },
-            })}
-            <button type="button" className="btn-sm btn-primary" onClick={() => void navigate('/modules/products/list')}>
-              + Nuevo producto
-            </button>
-          </>
-        }
-        statsLine={statsLine}
-        columnFooter={() => (
-          <Link to="/modules/products/list" className="m-kanban__column-add" draggable={false}>
-            <span className="m-kanban__column-add-icon" aria-hidden="true">
-              +
-            </span>
-            Añadir producto
-          </Link>
-        )}
+        setError={setToolbarError}
+        reload={reload}
+        searchValue={boardSearch}
+        onSearchChange={setBoardSearch}
+        onArchiveToggle={() => setDetailProductId(null)}
       />
-      <p className="text-secondary text-sm" style={{ marginTop: 'var(--space-3)', padding: '0 var(--space-3)' }}>
-        Preferencias de vistas: <Link to="/modules/stock/configure">Configurar inventario</Link>.
-      </p>
+      <div className="stock-inventory-kanban__board-only">
+        <CrudKanbanSurface<StockLevelRow>
+          columns={COLUMN_ORDER}
+          columnIdSet={COLUMN_IDS}
+          getRowColumnId={getRowColumnId}
+          fallbackColumnId="wo_intake"
+          items={items}
+          loading={stockQuery.isLoading}
+          error={null}
+          onMoveCard={handleMoveCard}
+          resolveDropColumnId={(overId, snapshot) =>
+            resolveStockDropColumnId(overId, snapshot, manualColumnById)
+          }
+          filterRow={filterRow}
+          isRowDraggable={archiveTerminalDragPolicy.isRowDraggable}
+          isColumnDroppable={archiveTerminalDragPolicy.isColumnDroppable}
+          onCardOpen={(row) => setDetailProductId(row.product_id)}
+          renderCard={({ row, onOpen, suppressOpenRef }) => (
+            <StockKanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
+          )}
+          renderOverlayCard={(row) => <StockKanbanCardPreview row={row} />}
+          title="Inventario"
+          externalSearch={boardSearch}
+          statsLine={statsLine}
+          columnFooter={() =>
+            showArchived ? null : (
+              <Link to="/modules/products/list" className="m-kanban__column-add" draggable={false}>
+                <span className="m-kanban__column-add-icon" aria-hidden="true">
+                  +
+                </span>
+                Añadir producto
+              </Link>
+            )
+          }
+        />
+      </div>
       <StockLevelDetailModal
         productId={detailProductId}
         onClose={() => setDetailProductId(null)}

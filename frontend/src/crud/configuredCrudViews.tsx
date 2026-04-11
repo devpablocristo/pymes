@@ -4,7 +4,7 @@ import type { CrudPageConfig, CrudViewModeConfig, CrudViewModeId } from '../comp
 import { PageLayout } from '../components/PageLayout';
 import { CrudExplorerPage, CrudModuleSection } from '../modules/crud';
 import { apiRequest } from '../lib/api';
-import { applyCrudUiOverride } from '../lib/crudUiConfig';
+import { applyCrudUiOverride, CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { Navigate } from 'react-router-dom';
 import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
 import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
@@ -60,6 +60,31 @@ function resolveViewModes<T extends { id: string }>(resourceId: string, config: 
   return [...modes].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
 }
 
+function useCrudUiConfigVersion() {
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    function refreshOnCrudUiConfigChange() {
+      setVersion((current) => current + 1);
+    }
+
+    function refreshOnStorage(event: StorageEvent) {
+      if (event.key == null || event.key === CRUD_UI_STORAGE_KEY) {
+        setVersion((current) => current + 1);
+      }
+    }
+
+    window.addEventListener(CRUD_UI_CHANGE_EVENT, refreshOnCrudUiConfigChange);
+    window.addEventListener('storage', refreshOnStorage);
+    return () => {
+      window.removeEventListener(CRUD_UI_CHANGE_EVENT, refreshOnCrudUiConfigChange);
+      window.removeEventListener('storage', refreshOnStorage);
+    };
+  }, []);
+
+  return version;
+}
+
 function useCrudConfig(resourceId: string) {
   const [config, setConfig] = useState<CrudPageConfig<{ id: string }> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,29 +116,45 @@ function useCrudConfig(resourceId: string) {
 export function ConfiguredCrudSection({
   resourceId,
   baseRoute,
-  secondaryContextPattern,
+  contextPatternByModeId,
+  actionLink,
 }: {
   resourceId: string;
   baseRoute: string;
-  secondaryContextPattern?: string;
+  contextPatternByModeId?: Partial<Record<CrudViewModeId, string>>;
+  actionLink?: {
+    to: string;
+    label: string;
+    hideWhenActivePattern?: string;
+    activeReplacement?: {
+      to: string;
+      label: string;
+    };
+  };
 }) {
   const { config, loading } = useCrudConfig(resourceId);
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId]);
-  const primary = viewModes[0] ?? fallbackViewModes(resourceId)[0];
-  const secondary = viewModes[1] ?? primary;
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
 
   if (loading && config == null) {
-    return <CrudModuleSection primaryPath={`${baseRoute}/list`} secondaryPath={`${baseRoute}/list`} primaryLabel="..." secondaryLabel="..." groupAriaLabel="Cargando vistas" />;
+    return (
+      <CrudModuleSection
+        modes={[{ path: `${baseRoute}/list`, label: '...' }]}
+        groupAriaLabel="Cargando vistas"
+        actionLink={actionLink}
+      />
+    );
   }
 
   return (
     <CrudModuleSection
-      primaryPath={`${baseRoute}/${primary.path}`}
-      secondaryPath={`${baseRoute}/${secondary.path}`}
-      primaryLabel={primary.label}
-      secondaryLabel={secondary.label}
-      groupAriaLabel={primary.ariaLabel ?? secondary.ariaLabel ?? 'Cambiar vista'}
-      secondaryContextPattern={secondaryContextPattern}
+      modes={viewModes.map((mode) => ({
+        path: `${baseRoute}/${mode.path}`,
+        label: mode.label,
+        contextPattern: contextPatternByModeId?.[mode.id],
+      }))}
+      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
+      actionLink={actionLink}
     />
   );
 }
@@ -130,7 +171,8 @@ export function ConfiguredCrudModePage({
   const [searchParams] = useSearchParams();
   const explorerSelectedId = searchParams.get('selected')?.trim() || undefined;
   const { config, error, loading } = useCrudConfig(resourceId);
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId]);
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
   const activeMode = viewModes.find((mode) => mode.id === modeId) ?? null;
 
   if (error) {
@@ -199,7 +241,8 @@ export function ConfiguredCrudIndexRedirect({
   baseRoute: string;
 }) {
   const { config, loading } = useCrudConfig(resourceId);
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId]);
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
   const target = viewModes[0]?.path || 'list';
 
   if (loading && config == null) {

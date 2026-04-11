@@ -1,3 +1,22 @@
+/* Galería/listado auxiliar bajo pestañas del módulo inventario (misma regla que products-crud-page). */
+.stock-crud-surface-page {
+  padding: 0;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* `CrudResourceShellHeader` + tablero: ocultar cabecera duplicada del Kanban. */
+.stock-inventory-kanban__board-only .m-kanban > .page-header.crud-page-shell__header {
+  display: none;
+}
+
+.stock-inventory-list-crud .page-header.crud-page-shell__header .crud-page-shell__header-actions input[type='search'],
+.stock-inventory-list-crud .page-header.crud-page-shell__header .crud-page-shell__header-actions .m-kanban__search {
+  max-width: min(30rem, 100%);
+  box-sizing: border-box;
+}
+
 .stock-col-num {
   text-align: right;
   width: 96px;

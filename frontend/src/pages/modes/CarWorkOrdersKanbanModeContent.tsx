@@ -1,10 +1,7 @@
 import { useMemo, type ReactElement } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import type { CrudHelpers } from '../../components/CrudPage';
+import { CrudCreateNavigationButton, CrudToolbarActionButtons, useCrudConfigQuery } from '../../modules/crud';
 import { GenericWorkOrdersBoard, type GenericWorkOrder } from '../../components/GenericWorkOrdersBoard';
 import { WorkOrderKanbanDetailModal } from '../../components/WorkOrderKanbanDetailModal';
-import { loadLazyCrudPageConfig } from '../../crud/lazyCrudPage';
 import {
   getAllWorkOrders,
   getWorkOrdersArchived,
@@ -12,7 +9,6 @@ import {
   type WorkOrder as AutoRepairWorkOrder,
 } from '../../lib/workOrdersApi';
 import { useI18n } from '../../lib/i18n';
-import { queryKeys } from '../../lib/queryKeys';
 
 const listPath = '/modules/carWorkOrders/list';
 
@@ -40,11 +36,7 @@ function toGenericWorkOrder(row: AutoRepairWorkOrder): AutoRepairKanbanWorkOrder
 
 export function CarWorkOrdersKanbanModeContent() {
   const { localizeText: formatFieldText } = useI18n();
-  const navigate = useNavigate();
-  const crudConfigQuery = useQuery({
-    queryKey: queryKeys.carWorkOrders.crudConfig,
-    queryFn: () => loadLazyCrudPageConfig<AutoRepairWorkOrder>('carWorkOrders'),
-  });
+  const crudConfigQuery = useCrudConfigQuery<AutoRepairWorkOrder>('carWorkOrders');
   const crudConfig = crudConfigQuery.data ?? null;
 
   const renderExtraToolbar = useMemo(
@@ -60,41 +52,30 @@ export function CarWorkOrdersKanbanModeContent() {
         setError: (message: string | null) => void;
         showArchived: boolean;
       }): ReactElement => {
-        const helpers: CrudHelpers<AutoRepairWorkOrder> = {
-          items,
-          reload,
-          setError: (message: string) => setError(message),
-        };
-        const toolbarActions = (crudConfig?.toolbarActions ?? []).filter(
-          (action) => action.isVisible?.({ archived: showArchived, items }) ?? true,
-        );
         const canCreate =
           crudConfig?.allowCreate ??
           Boolean(crudConfig && crudConfig.formFields.length > 0 && (crudConfig.dataSource?.create || crudConfig.basePath));
 
         return (
           <>
-            {toolbarActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className={workOrderKanbanToolbarBtnClass(action.kind)}
-                onClick={() => {
-                  void action.onClick(helpers);
-                }}
-              >
-                {formatFieldText(action.label)}
-              </button>
-            ))}
-            {canCreate ? (
-              <button type="button" className="btn-sm btn-primary" onClick={() => navigate(listPath)}>
-                {crudConfig?.createLabel ? formatFieldText(crudConfig.createLabel) : '+ Nueva orden'}
-              </button>
-            ) : null}
+            <CrudToolbarActionButtons
+              actions={crudConfig?.toolbarActions}
+              items={items}
+              archived={showArchived}
+              reload={reload}
+              setError={setError}
+              formatLabel={formatFieldText}
+              buttonClassName={workOrderKanbanToolbarBtnClass}
+            />
+            <CrudCreateNavigationButton
+              to={listPath}
+              enabled={canCreate}
+              label={crudConfig?.createLabel ? formatFieldText(crudConfig.createLabel) : '+ Nueva orden'}
+            />
           </>
         );
       },
-    [crudConfig, formatFieldText, navigate],
+    [crudConfig, formatFieldText],
   );
 
   return (

@@ -8,16 +8,20 @@ import { normalize } from '@devpablocristo/core-browser/search';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CrudKanbanSurface } from '../modules/crud';
+import {
+  createCrudKanbanArchiveTerminalDragPolicy,
+  CrudArchivedSearchParamToggle,
+  CrudKanbanSurface,
+  useCrudKanbanMove,
+  useCrudQueryListCacheSync,
+} from '../modules/crud';
 import { CreatedByPillsBar } from './CreatedByPillsBar';
 import { clerkEnabled } from '../lib/auth';
 import { applyWorkOrderCreatorFilter, type CreatorFilterState } from '../lib/workOrderCreatorFilter';
 import {
   canonicalWorkOrderStatus,
-  defaultCanonStatusForKanbanPhase,
-  isWorkOrderKanbanTerminalStatus,
-  workOrderKanbanPhaseFromStatus,
   workOrderStatusBadgeLabel,
+  workOrderKanbanTransitionModel,
   type WorkOrderKanbanPhase,
 } from '../lib/workOrderKanban';
 import '../pages/WorkOrdersKanbanPanel.css';
@@ -106,9 +110,9 @@ function resolveDropColumnId<T extends GenericWorkOrder>(overId: string | undefi
     const s = overId.slice(4);
     return COLUMN_IDS.has(s) ? s : null;
   }
-  const overCard = items.find((x) => x.id === overId);
+    const overCard = items.find((x) => x.id === overId);
   if (overCard) {
-    const c = workOrderKanbanPhaseFromStatus(overCard.status);
+    const c = workOrderKanbanTransitionModel.getColumnIdForStatus(overCard.status);
     return COLUMN_IDS.has(c) ? c : 'wo_intake';
   }
   return null;
@@ -196,7 +200,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
 }: GenericWorkOrdersBoardProps<T>) {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const showArchived = searchParams.get('archived') === '1';
 
   const [items, setItems] = useState<T[]>([]);
@@ -218,6 +222,12 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
 
   const patchMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchStatus(id, status),
+  });
+
+  const { upsertInListCache, removeFromListCache } = useCrudQueryListCacheSync<T>({
+    queryClient,
+    queryKey: boardQueryKey,
+    setItems,
   });
 
   useEffect(() => {
@@ -243,82 +253,50 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     [items, creatorFilter, clerkUserLoaded, selfId],
   );
 
-  const handleMoveCard = useCallback(
-    (id: string, targetPhase: string, overItemId?: string) => {
-      const card = items.find((x) => x.id === id);
-      if (!card) return;
-      const currentPhase = workOrderKanbanPhaseFromStatus(card.status);
-      const sameColumn = currentPhase === targetPhase;
-
-      if (sameColumn) {
-        // Reorder dentro de la misma columna (solo local, sin API)
-        if (!overItemId) return;
-        setItems((prev) => {
-          const idx = prev.findIndex((x) => x.id === id);
-          if (idx === -1) return prev;
-          const moved = prev[idx];
-          const without = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-          const targetIdx = without.findIndex((x) => x.id === overItemId);
-          if (targetIdx === -1) return prev;
-          without.splice(targetIdx, 0, moved);
-          return without;
-        });
-        return;
-      }
-
-      // Cross-column: cambiar status + reposicionar
-      const next = defaultCanonStatusForKanbanPhase(targetPhase as WorkOrderKanbanPhase);
-      if (next == null) return;
-      setItems((prev) => {
-        const c = prev.find((x) => x.id === id);
-        if (!c) return prev;
-        const updated = { ...c, status: next } as T;
-        const without = prev.filter((x) => x.id !== id);
-        if (overItemId) {
-          const idx = without.findIndex((x) => x.id === overItemId);
-          if (idx !== -1) {
-            without.splice(idx, 0, updated);
-            return without;
-          }
-        }
-        let lastIdx = -1;
-        for (let i = without.length - 1; i >= 0; i -= 1) {
-          if (workOrderKanbanPhaseFromStatus(without[i].status) === targetPhase) {
-            lastIdx = i;
-            break;
-          }
-        }
-        if (lastIdx !== -1) {
-          without.splice(lastIdx + 1, 0, updated);
-        } else {
-          without.push(updated);
-        }
-        return without;
-      });
-      void (async () => {
-        try {
-          const serverUpdated = await patchMutation.mutateAsync({ id, status: next });
-          setItems((prev) => prev.map((x) => (x.id === id ? { ...serverUpdated, status: next } as T : x)));
-          setError(null);
-        } catch (e) {
-          await reload();
-          setError(e instanceof Error ? e.message : 'Error al guardar');
-        }
-      })();
-    },
-    [items, reload, patchMutation],
+  const archiveTerminalDragPolicy = useMemo(
+    () =>
+      createCrudKanbanArchiveTerminalDragPolicy<T, WorkOrderKanbanPhase>({
+        showArchived,
+        transitionModel: workOrderKanbanTransitionModel,
+        getItemStatus: (row: T) => row.status,
+      }),
+    [showArchived],
   );
 
-  const handleModalSaved = useCallback((wo: T) => {
-    queryClient.setQueryData<T[]>(boardQueryKey, (current) => (current ?? []).map((row) => (row.id === wo.id ? wo : row)));
-    setItems((prev) => prev.map((x) => (x.id === wo.id ? wo : x)));
-  }, [boardQueryKey, queryClient]);
+  const handleMoveCard = useCrudKanbanMove<T, WorkOrderKanbanPhase>({
+    items,
+    setItems,
+    transitionModel: workOrderKanbanTransitionModel,
+    getItemColumnId: (row) => workOrderKanbanTransitionModel.getColumnIdForStatus(row.status),
+    getItemStatus: (row) => row.status,
+    setItemStatus: (row, status) => ({ ...row, status } as T),
+    persistStatusChange: async (id, nextStatus) => patchMutation.mutateAsync({ id, status: nextStatus }),
+    mergePersistedItem: (persisted, nextStatus) => ({ ...persisted, status: nextStatus } as T),
+    reload,
+    setError,
+  });
 
-  const handleOrderRemoved = useCallback((id: string) => {
-    queryClient.setQueryData<T[]>(boardQueryKey, (current) => (current ?? []).filter((row) => row.id !== id));
-    setItems((prev) => prev.filter((x) => x.id !== id));
-    setDetailOrderId(null);
-  }, [boardQueryKey, queryClient]);
+  const handleBoardMoveCard = useCallback(
+    (id: string, targetColumnId: string, overItemId?: string) => {
+      handleMoveCard(id, targetColumnId as WorkOrderKanbanPhase, overItemId);
+    },
+    [handleMoveCard],
+  );
+
+  const handleModalSaved = useCallback(
+    (wo: T) => {
+      upsertInListCache(wo);
+    },
+    [upsertInListCache],
+  );
+
+  const handleOrderRemoved = useCallback(
+    (id: string) => {
+      removeFromListCache(id);
+      setDetailOrderId(null);
+    },
+    [removeFromListCache],
+  );
 
   const filterRow = useCallback((row: T, q: string) => {
     const hay = normalize(
@@ -343,16 +321,16 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         leadSlot={headerLeadSlot}
         columns={COLUMN_ORDER}
         columnIdSet={COLUMN_IDS}
-        getRowColumnId={(row) => workOrderKanbanPhaseFromStatus(row.status)}
+        getRowColumnId={(row) => workOrderKanbanTransitionModel.getColumnIdForStatus(row.status)}
         fallbackColumnId="wo_intake"
         items={boardItems}
         loading={woQuery.isLoading}
         error={error}
-        onMoveCard={handleMoveCard}
+        onMoveCard={handleBoardMoveCard}
         resolveDropColumnId={(overId) => resolveDropColumnId(overId, items)}
         filterRow={filterRow}
-        isRowDraggable={(row) => !showArchived && !isWorkOrderKanbanTerminalStatus(row.status)}
-        isColumnDroppable={() => !showArchived}
+        isRowDraggable={archiveTerminalDragPolicy.isRowDraggable}
+        isColumnDroppable={archiveTerminalDragPolicy.isColumnDroppable}
         onCardOpen={(row) => setDetailOrderId(row.id)}
         renderCard={({ row, onOpen, suppressOpenRef }) => (
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
@@ -372,20 +350,12 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
               setError: setBoardError,
               showArchived,
             })}
-            <button
-              type="button"
+            <CrudArchivedSearchParamToggle
               className="btn-secondary btn-sm"
-              onClick={() => {
-                setSearchParams((prev) => {
-                  const p = new URLSearchParams(prev);
-                  if (p.get('archived') === '1') p.delete('archived');
-                  else p.set('archived', '1');
-                  return p;
-                });
-              }}
-            >
-              {showArchived ? 'Ver activas' : 'Ver archivadas'}
-            </button>
+              showActiveLabel="Ver activas"
+              showArchivedLabel="Ver archivadas"
+              onToggle={() => setDetailOrderId(null)}
+            />
           </>
         }
         statsLine={statsLine}

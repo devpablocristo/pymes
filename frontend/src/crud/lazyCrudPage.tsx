@@ -111,11 +111,16 @@ export async function loadCrudResourceConfig(resourceId: string) {
   return { ConfiguredCrudPage: mod.ConfiguredCrudPage };
 }
 
+export type LoadLazyCrudPageConfigOptions = {
+  preserveCsvToolbar?: boolean;
+};
+
 export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { id: string }>(
   resourceId: string,
+  options?: LoadLazyCrudPageConfigOptions,
 ): Promise<CrudPageConfig<TRecord> | null> {
   const mod = await loadCrudModule(resourceId);
-  return mod.getCrudPageConfig<TRecord>(resourceId);
+  return mod.getCrudPageConfig<TRecord>(resourceId, options);
 }
 
 export function LazyConfiguredCrudPage({

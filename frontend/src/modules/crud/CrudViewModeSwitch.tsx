@@ -1,66 +1,71 @@
-import { NavLink, useMatch } from 'react-router-dom';
+import { NavLink, matchPath, useLocation } from 'react-router-dom';
 import '../../styles/viewModeSegmentedSwitch.css';
 import '../../pages/WorkOrdersModuleSection.css';
 
+type CrudViewModeLink = {
+  path: string;
+  label: string;
+  contextPattern?: string;
+};
+
 type Props = {
-  primaryPath: string;
-  secondaryPath: string;
-  primaryLabel: string;
-  secondaryLabel: string;
+  modes: CrudViewModeLink[];
   groupAriaLabel: string;
-  secondaryContextPattern?: string;
   description?: string;
+  actionLink?: {
+    to: string;
+    label: string;
+    hideWhenActivePattern?: string;
+    activeReplacement?: {
+      to: string;
+      label: string;
+    };
+  };
 };
 
 export function CrudViewModeSwitch({
-  primaryPath,
-  secondaryPath,
-  primaryLabel,
-  secondaryLabel,
+  modes,
   groupAriaLabel,
-  secondaryContextPattern,
   description,
+  actionLink,
 }: Props) {
-  const isPrimaryActive = useMatch(primaryPath);
-  const isSecondaryMatch = useMatch(secondaryPath);
-  const isSecondaryContextMatch = useMatch(secondaryContextPattern ?? `${secondaryPath}/*`);
-  const isSecondaryContext = isSecondaryMatch || isSecondaryContextMatch;
+  const { pathname } = useLocation();
+  const isActionHidden = Boolean(
+    actionLink?.hideWhenActivePattern && matchPath({ path: actionLink.hideWhenActivePattern, end: false }, pathname),
+  );
+  const resolvedActionLink =
+    isActionHidden && actionLink?.activeReplacement
+      ? actionLink.activeReplacement
+      : isActionHidden
+        ? null
+        : actionLink;
+
+  function isModeActive(mode: CrudViewModeLink): boolean {
+    return Boolean(
+      matchPath({ path: mode.path, end: true }, pathname) ||
+        (mode.contextPattern && matchPath({ path: mode.contextPattern, end: false }, pathname)),
+    );
+  }
 
   return (
     <div className="wo-mod-orders__header-lead">
       {description ? <p>{description}</p> : null}
-      <div className="m-seg-switch" role="group" aria-label={groupAriaLabel}>
-        <NavLink to={primaryPath} className="m-seg-switch__track" draggable={false}>
-          <span className={`m-seg-switch__label${isPrimaryActive ? ' m-seg-switch__label--active' : ''}`}>
-            {primaryLabel}
-          </span>
-          <span className={`m-seg-switch__label${!isPrimaryActive && isSecondaryContext ? ' m-seg-switch__label--active' : ''}`}>
-            {secondaryLabel}
-          </span>
-          <span
-            className={`m-seg-switch__thumb${isPrimaryActive ? ' m-seg-switch__thumb--left' : ' m-seg-switch__thumb--right'}`}
-          />
-        </NavLink>
-        {!isPrimaryActive ? (
-          <NavLink
-            to={primaryPath}
-            className="m-seg-switch__hit m-seg-switch__hit--left"
-            aria-hidden="true"
-            draggable={false}
-            tabIndex={-1}
-          >
-            &nbsp;
-          </NavLink>
-        ) : null}
-        {isPrimaryActive ? (
-          <NavLink
-            to={secondaryPath}
-            className="m-seg-switch__hit m-seg-switch__hit--right"
-            aria-hidden="true"
-            draggable={false}
-            tabIndex={-1}
-          >
-            &nbsp;
+      <div className="wo-mod-orders__bar">
+        <nav className="m-view-tabs" aria-label={groupAriaLabel}>
+          {modes.map((mode) => (
+            <NavLink
+              key={mode.path}
+              to={mode.path}
+              draggable={false}
+              className={`m-view-tabs__item${isModeActive(mode) ? ' m-view-tabs__item--active' : ''}`}
+            >
+              {mode.label}
+            </NavLink>
+          ))}
+        </nav>
+        {resolvedActionLink ? (
+          <NavLink className="wo-mod-orders__action" to={resolvedActionLink.to}>
+            {resolvedActionLink.label}
           </NavLink>
         ) : null}
       </div>

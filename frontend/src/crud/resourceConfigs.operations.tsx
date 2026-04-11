@@ -32,6 +32,9 @@ function stockInventoryUpdatedCell(raw: string) {
       <span className="stock-datetime-cell__date">
         {d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
       </span>
+      <span className="stock-datetime-cell__sep" aria-hidden>
+        {' · '}
+      </span>
       <span className="stock-datetime-cell__time">{d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   );

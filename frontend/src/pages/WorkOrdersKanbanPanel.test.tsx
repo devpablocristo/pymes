@@ -7,6 +7,7 @@ import { PageSearchProvider } from '../components/PageSearch';
 import { LanguageProvider } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
+import { CarWorkOrdersKanbanModeContent } from './modes/CarWorkOrdersKanbanModeContent';
 import { WorkOrdersKanbanPanel } from './WorkOrdersKanbanPanel';
 
 const apiMocks = vi.hoisted(() => ({
@@ -147,6 +148,17 @@ describe('WorkOrdersKanbanPanel', () => {
     ]);
     apiMocks.getWorkOrdersArchived.mockResolvedValue([]);
     apiMocks.loadLazyCrudPageConfig.mockResolvedValue({
+      viewModes: [
+        {
+          id: 'kanban',
+          label: 'Tablero',
+          path: 'board',
+          ariaLabel: 'Navegación tablero / lista',
+          isDefault: true,
+          render: () => <CarWorkOrdersKanbanModeContent />,
+        },
+        { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
+      ],
       toolbarActions: [],
       formFields: [],
       allowCreate: false,

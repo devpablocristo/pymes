@@ -10,10 +10,10 @@ import { Link } from 'react-router-dom';
 import {
   createCrudKanbanArchiveTerminalDragPolicy,
   CrudKanbanSurface,
-  CrudResourceShellHeader,
   useCrudArchivedSearchParam,
 } from '../crud';
 import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
+import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
 import { StockLevelDetailModal } from './StockLevelDetailModal';
 import { fetchStockLevels, type StockLevelRow } from './stockLevels';
 import '../../pages/StockPage.css';
@@ -207,7 +207,7 @@ export function StockInventoryKanbanBoard() {
 
   return (
     <>
-      <CrudResourceShellHeader<StockLevelRow>
+      <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="stock"
         preserveCsvToolbar
         items={itemsAfterCreator}

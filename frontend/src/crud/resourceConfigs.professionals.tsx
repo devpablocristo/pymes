@@ -17,6 +17,11 @@ import {
   updateTeacherSpecialty,
 } from '../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../lib/teachersTypes';
+import {
+  renderProfessionalsBooleanBadge,
+  renderProfessionalsStatusBadge,
+  teacherSpecialtiesToText,
+} from './professionalsCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from './resourceConfigs.shared';
@@ -67,24 +72,17 @@ const professionalsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'specialties',
         header: 'Especialidades',
-        render: (value) =>
-          ((value as TeacherProfile['specialties']) ?? [])
-            .map((item) => (typeof item === 'string' ? item : item.name))
-            .join(', ') || '---',
+        render: (value) => teacherSpecialtiesToText((value as TeacherProfile['specialties']) ?? []),
       },
       {
         key: 'is_public',
         header: 'Publico',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Si' : 'No'}</span>
-        ),
+        render: (value) => renderProfessionalsBooleanBadge(Boolean(value)),
       },
       {
         key: 'is_bookable',
         header: 'Reservable',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Si' : 'No'}</span>
-        ),
+        render: (value) => renderProfessionalsBooleanBadge(Boolean(value)),
       },
     ],
     formFields: [
@@ -120,7 +118,7 @@ const professionalsResourceConfigs: CrudResourceConfigMap = {
         row.headline,
         row.public_slug,
         row.bio,
-        row.specialties.map((item) => (typeof item === 'string' ? item : item.name)).join(', '),
+        teacherSpecialtiesToText(row.specialties),
       ]
         .filter(Boolean)
         .join(' '),
@@ -165,9 +163,7 @@ const professionalsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activa' : 'Inactiva'}</span>
-        ),
+        render: (value) => renderProfessionalsBooleanBadge(Boolean(value), 'Activa', 'Inactiva'),
       },
     ],
     formFields: [
@@ -216,13 +212,7 @@ const professionalsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'status',
         header: 'Estado',
-        render: (value) => (
-          <span
-            className={`badge ${value === 'reviewed' ? 'badge-success' : value === 'submitted' ? 'badge-warning' : 'badge-neutral'}`}
-          >
-            {String(value)}
-          </span>
-        ),
+        render: (value) => renderProfessionalsStatusBadge(value),
       },
       { key: 'created_at', header: 'Creado', render: (value) => formatDate(String(value ?? '')) },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
@@ -283,13 +273,7 @@ const professionalsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'status',
         header: 'Estado',
-        render: (value) => (
-          <span
-            className={`badge ${value === 'completed' ? 'badge-success' : value === 'active' ? 'badge-warning' : 'badge-neutral'}`}
-          >
-            {String(value)}
-          </span>
-        ),
+        render: (value) => renderProfessionalsStatusBadge(value),
       },
       { key: 'started_at', header: 'Inicio', render: (value) => formatDate(String(value ?? '')) },
       { key: 'ended_at', header: 'Fin', render: (value) => formatDate(String(value ?? '')) },

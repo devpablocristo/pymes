@@ -23,6 +23,7 @@ import {
 } from '../lib/workOrdersApi';
 import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
 import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
+import { formatWorkshopMoney, renderWorkshopWorkOrderStatusBadge } from './workshopsCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
@@ -258,19 +259,12 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'status',
         header: 'Estado',
-        render: (value) => {
-          const v = String(value ?? '');
-          const canon = v === 'diagnosis' ? 'diagnosing' : v === 'ready' ? 'ready_for_pickup' : v;
-          const success = canon === 'ready_for_pickup' || canon === 'delivered' || canon === 'invoiced';
-          const danger = canon === 'cancelled';
-          const cls = success ? 'badge-success' : danger ? 'badge-danger' : 'badge-warning';
-          return <span className={`badge ${cls}`}>{canon}</span>;
-        },
+        render: (value) => renderWorkshopWorkOrderStatusBadge(value),
       },
       {
         key: 'total',
         header: 'Total',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatWorkshopMoney(value, row.currency),
       },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],
@@ -510,18 +504,12 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'status',
         header: 'Estado',
-        render: (value) => {
-          const v = String(value ?? '');
-          const success = v === 'ready_for_pickup' || v === 'delivered' || v === 'invoiced';
-          const danger = v === 'cancelled';
-          const cls = success ? 'badge-success' : danger ? 'badge-danger' : 'badge-warning';
-          return <span className={`badge ${cls}`}>{v}</span>;
-        },
+        render: (value) => renderWorkshopWorkOrderStatusBadge(value),
       },
       {
         key: 'total',
         header: 'Total',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatWorkshopMoney(value, row.currency),
       },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],

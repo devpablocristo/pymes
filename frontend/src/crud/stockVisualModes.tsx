@@ -1,38 +1,54 @@
 import { normalize } from '@devpablocristo/core-browser/search';
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useI18n } from '../lib/i18n';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
-import { CrudGallerySurface, CrudResourceShellHeader, useCrudArchivedSearchParam } from '../modules/crud';
+import { CrudGallerySurface, useCrudRemoteGalleryPage } from '../modules/crud';
+import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
 import { fetchStockLevels, StockLevelDetailModal, type StockLevelRow } from '../modules/stock';
 import '../pages/StockPage.css';
 
 export function StockGalleryView() {
   const { t } = useI18n();
-  const { archived: showArchived } = useCrudArchivedSearchParam();
   const { preSearchFilter } = useCrudListCreatedByMerge();
-  const [items, setItems] = useState<StockLevelRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [detailProductId, setDetailProductId] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(search.trim());
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setItems(await fetchStockLevels({ archived: showArchived }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [showArchived]);
+  const fetchPage = useCallback(
+    async ({
+      archived,
+      signal: _signal,
+    }: {
+      limit: number;
+      search: string;
+      archived: boolean;
+      after: string | null;
+      signal: AbortSignal;
+    }) => {
+      void _signal;
+      return {
+        items: await fetchStockLevels({ archived }),
+        has_more: false,
+        next_cursor: null,
+      };
+    },
+    [],
+  );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  const {
+    items,
+    loading,
+    error,
+    setError,
+    search,
+    setSearch,
+    deferredSearch,
+    selectedId: detailProductId,
+    selectItem,
+    closeDetail,
+    reload,
+    handleArchiveToggle,
+  } = useCrudRemoteGalleryPage<StockLevelRow>({
+    pageSize: 500,
+    fetchPage,
+  });
 
   const creatorFilteredItems = useMemo(
     () => (preSearchFilter ? preSearchFilter(items) : items),
@@ -52,7 +68,7 @@ export function StockGalleryView() {
 
   return (
     <div className="stock-crud-surface-page">
-      <CrudResourceShellHeader<StockLevelRow>
+      <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="stock"
         preserveCsvToolbar
         items={items}
@@ -63,7 +79,7 @@ export function StockGalleryView() {
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
-        onArchiveToggle={() => setDetailProductId(null)}
+        onArchiveToggle={handleArchiveToggle}
       />
       <CrudGallerySurface<StockLevelRow>
         items={visibleItems}
@@ -76,9 +92,9 @@ export function StockGalleryView() {
           subtitle: (row) => row.sku?.trim() || 'sin SKU',
           meta: (row) => `Actual ${row.quantity} · mín. ${row.min_quantity}${row.is_low_stock ? ' · bajo mínimo' : ''}`,
         }}
-        onSelect={(row) => setDetailProductId(row.product_id)}
+        onSelect={(row) => selectItem(row.product_id)}
       />
-      <StockLevelDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} onAfterSave={() => void reload()} />
+      <StockLevelDetailModal productId={detailProductId} onClose={closeDetail} onAfterSave={() => void reload()} />
     </div>
   );
 }

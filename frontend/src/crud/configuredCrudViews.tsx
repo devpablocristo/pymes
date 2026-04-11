@@ -6,51 +6,9 @@ import { CrudExplorerPage, CrudModuleSection } from '../modules/crud';
 import { apiRequest } from '../lib/api';
 import { applyCrudUiOverride, CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { Navigate } from 'react-router-dom';
-import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
-import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
-import { ProductsGalleryModeContent } from '../pages/modes/ProductsGalleryModeContent';
 import { loadLazyCrudPageConfig, LazyConfiguredCrudPage } from './lazyCrudPage';
 
 function fallbackViewModes(resourceId: string): CrudViewModeConfig[] {
-  if (resourceId === 'products') {
-    return [
-      {
-        id: 'gallery',
-        label: 'Galería',
-        path: 'gallery',
-        ariaLabel: 'Vista galería o lista',
-        isDefault: true,
-        render: () => <ProductsGalleryModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista galería o lista' },
-    ];
-  }
-  if (resourceId === 'carWorkOrders') {
-    return [
-      {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <CarWorkOrdersKanbanModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
-    ];
-  }
-  if (resourceId === 'bikeWorkOrders') {
-    return [
-      {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <BikeWorkOrdersKanbanModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
-    ];
-  }
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
 }
 

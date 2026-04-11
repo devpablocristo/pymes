@@ -47,4 +47,13 @@ describe('StockLevelDetailModal (cableado)', () => {
     });
     expect(shell.lastProps!.advancedSettingsHref).toBe('/modules/custom');
   });
+
+  it('propaga uploadImages al puerto generico del shell', async () => {
+    const uploadImages = vi.fn(async () => ['https://cdn.example/a.png']);
+    render(<StockLevelDetailModal productId="p1" onClose={() => {}} inventoryHandlers={{ uploadImages }} />);
+    await waitFor(() => {
+      expect(shell.lastProps).not.toBeNull();
+    });
+    expect(shell.lastProps!.ports.uploadLinkedEntityImages).toBe(uploadImages);
+  });
 });

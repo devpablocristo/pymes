@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageFullscreenViewer } from './ImageFullscreenViewer';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { collectCrudImageUrls, CrudImageFullscreenViewer } from '../modules/crud';
 import './ProductDetailModal.css';
 
 export type ProductDetailResponse = {
@@ -29,16 +29,10 @@ export type ProductDetailResponse = {
 export function collectProductImageUrls(
   p: Pick<ProductDetailResponse, 'image_url' | 'image_urls'>,
 ): string[] {
-  const raw = p.image_urls?.length ? p.image_urls : p.image_url ? [p.image_url] : [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const u of raw) {
-    const t = (u ?? '').trim();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
+  return collectCrudImageUrls({
+    imageUrls: p.image_urls,
+    legacyImageUrl: p.image_url,
+  });
 }
 
 export type ProductDetailModalProps = {
@@ -267,7 +261,7 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   return (
     <>
       {createPortal(body, document.body)}
-      <ImageFullscreenViewer
+      <CrudImageFullscreenViewer
         imageUrl={lightboxUrl}
         onClose={() => setLightboxUrl(null)}
         contentLabel={product?.name}

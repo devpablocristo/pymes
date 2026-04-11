@@ -1,6 +1,19 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest } from '../lib/api';
+import {
+  buildPartyFormValues,
+  buildPartySearchText,
+  formatActivePartyRoles,
+  formatGovernanceMoney,
+  formatGovernanceTagList,
+  parseGovernancePermissionInputs,
+  parseProcurementRequestLines,
+  partyCrudFormFields,
+  partyCrudFormToBody,
+  toProcurementPolicyCrudBody,
+  toProcurementRequestCrudBody,
+} from './governanceCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
@@ -101,105 +114,6 @@ type Party = {
   roles?: Array<{ role: string; is_active: boolean }>;
 };
 
-function parseCSV(value: CrudFieldValue | undefined): string[] {
-  return asString(value)
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function tagsToText(tags?: string[]): string {
-  return (tags ?? []).join(', ');
-}
-
-function parseProcurementLines(value: CrudFieldValue | undefined): Array<{
-  product_id?: string;
-  description: string;
-  quantity: number;
-  unit_price_estimate: number;
-}> {
-  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los ítems deben ser un arreglo JSON');
-  return parsed
-    .map((item) => ({
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_price_estimate: Number(item.unit_price_estimate ?? item.unit_price ?? 0),
-    }))
-    .filter((item) => item.description && item.quantity > 0);
-}
-
-function toProcurementRequestBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    title: asString(values.title),
-    description: asOptionalString(values.description) ?? '',
-    category: asOptionalString(values.category) ?? '',
-    estimated_total: asNumber(values.estimated_total),
-    currency: asOptionalString(values.currency) ?? 'ARS',
-    lines: parseProcurementLines(values.lines_json),
-  };
-}
-
-function toProcurementPolicyBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    name: asString(values.name),
-    expression: asString(values.expression),
-    effect: asString(values.effect),
-    priority: asNumber(values.priority),
-    mode: asString(values.mode),
-    enabled: asBoolean(values.enabled),
-    action_filter: asOptionalString(values.action_filter) ?? '',
-    system_filter: asOptionalString(values.system_filter) ?? '',
-  };
-}
-
-function parsePermissionInputs(value: CrudFieldValue | undefined): RolePermission[] {
-  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los permisos deben ser un arreglo JSON');
-  return parsed
-    .map((item) => ({
-      resource: String(item.resource ?? '').trim(),
-      action: String(item.action ?? '').trim(),
-    }))
-    .filter((item) => item.resource && item.action);
-}
-
-function partyFormToBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    party_type: asString(values.party_type) || 'person',
-    display_name: asString(values.display_name),
-    email: asOptionalString(values.email),
-    phone: asOptionalString(values.phone),
-    tax_id: asOptionalString(values.tax_id),
-    notes: asOptionalString(values.notes),
-    tags: parseCSV(values.tags),
-    address: {},
-    person:
-      (asString(values.party_type) || 'person') === 'person'
-        ? {
-            first_name: asOptionalString(values.person_first_name) ?? '',
-            last_name: asOptionalString(values.person_last_name) ?? '',
-          }
-        : undefined,
-    organization:
-      (asString(values.party_type) || 'person') === 'organization'
-        ? {
-            legal_name: asOptionalString(values.org_legal_name) ?? asString(values.display_name),
-            trade_name: asOptionalString(values.org_trade_name) ?? asString(values.display_name),
-            tax_condition: asOptionalString(values.org_tax_condition) ?? '',
-          }
-        : undefined,
-    agent:
-      (asString(values.party_type) || 'person') === 'automated_agent'
-        ? {
-            agent_kind: 'system',
-            provider: 'internal',
-            config: {},
-            is_active: true,
-          }
-        : undefined,
-  };
-}
-
 const governanceResourceConfigs: CrudResourceConfigMap = {
   procurementRequests: {
     supportsArchived: true,
@@ -213,12 +127,12 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
         return data.items ?? [];
       },
       create: async (values) => {
-        await apiRequest('/v1/procurement-requests', { method: 'POST', body: toProcurementRequestBody(values) });
+        await apiRequest('/v1/procurement-requests', { method: 'POST', body: toProcurementRequestCrudBody(values) });
       },
       update: async (row, values) => {
         await apiRequest(`/v1/procurement-requests/${row.id}`, {
           method: 'PATCH',
-          body: toProcurementRequestBody(values),
+          body: toProcurementRequestCrudBody(values),
         });
       },
       deleteItem: async (row) => {
@@ -240,8 +154,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
           <>
             <strong>{row.title || row.id}</strong>
             <div className="text-secondary">
-              {row.requester_actor || '—'} · {row.status || 'draft'} · {row.currency || 'ARS'}{' '}
-              {Number(row.estimated_total ?? 0).toFixed(2)}
+              {row.requester_actor || '—'} · {row.status || 'draft'} · {formatGovernanceMoney(row.estimated_total, row.currency)}
             </div>
           </>
         ),
@@ -318,12 +231,12 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
         return data.items ?? [];
       },
       create: async (values) => {
-        await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyBody(values) });
+        await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyCrudBody(values) });
       },
       update: async (row, values) => {
         await apiRequest(`/v1/procurement-policies/${row.id}`, {
           method: 'PATCH',
-          body: toProcurementPolicyBody(values),
+          body: toProcurementPolicyCrudBody(values),
         });
       },
       deleteItem: async (row) => {
@@ -400,12 +313,12 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'balance',
         header: 'Saldo',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatGovernanceMoney(value, row.currency),
       },
       {
         key: 'credit_limit',
         header: 'Limite',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatGovernanceMoney(value, row.currency),
       },
       { key: 'updated_at', header: 'Actualizada', render: (value) => formatDate(String(value ?? '')) },
     ],
@@ -461,7 +374,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
           body: {
             name: asString(values.name),
             description: asOptionalString(values.description) ?? '',
-            permissions: parsePermissionInputs(values.permissions_json),
+            permissions: parseGovernancePermissionInputs(values.permissions_json),
           },
         });
       },
@@ -470,7 +383,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
           method: 'PUT',
           body: {
             description: asOptionalString(values.description),
-            permissions: parsePermissionInputs(values.permissions_json),
+            permissions: parseGovernancePermissionInputs(values.permissions_json),
           },
         });
       },
@@ -560,65 +473,14 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'roles',
         header: 'Roles',
-        render: (_value, row: Party) =>
-          row.roles
-            ?.filter((role) => role.is_active)
-            .map((role) => role.role)
-            .join(', ') || '---',
+        render: (_value, row: Party) => formatActivePartyRoles(row.roles),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
-    formFields: [
-      {
-        key: 'party_type',
-        label: 'Tipo',
-        type: 'select',
-        required: true,
-        options: [
-          { label: 'Persona', value: 'person' },
-          { label: 'Organizacion', value: 'organization' },
-          { label: 'Agente automatizado', value: 'automated_agent' },
-        ],
-      },
-      { key: 'display_name', label: 'Nombre visible', required: true, placeholder: 'Nombre principal' },
-      { key: 'email', label: 'Email', type: 'email' },
-      { key: 'phone', label: 'Telefono', type: 'tel' },
-      { key: 'tax_id', label: 'CUIT / CUIL' },
-      { key: 'tags', label: 'Tags', placeholder: 'cliente, proveedor' },
-      { key: 'person_first_name', label: 'Nombre persona' },
-      { key: 'person_last_name', label: 'Apellido persona' },
-      { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
-      { key: 'org_trade_name', label: 'Nombre comercial' },
-      { key: 'org_tax_condition', label: 'Condicion fiscal' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Party) =>
-      [
-        row.display_name,
-        row.email,
-        row.phone,
-        row.tax_id,
-        row.notes,
-        tagsToText(row.tags),
-        row.roles?.map((role) => role.role).join(', '),
-      ]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Party) => ({
-      party_type: row.party_type ?? 'person',
-      display_name: row.display_name ?? '',
-      email: row.email ?? '',
-      phone: row.phone ?? '',
-      tax_id: row.tax_id ?? '',
-      tags: tagsToText(row.tags),
-      person_first_name: row.person?.first_name ?? '',
-      person_last_name: row.person?.last_name ?? '',
-      org_legal_name: row.organization?.legal_name ?? '',
-      org_trade_name: row.organization?.trade_name ?? '',
-      org_tax_condition: row.organization?.tax_condition ?? '',
-      notes: row.notes ?? '',
-    }),
-    toBody: partyFormToBody,
+    formFields: partyCrudFormFields,
+    searchText: buildPartySearchText,
+    toFormValues: buildPartyFormValues,
+    toBody: partyCrudFormToBody,
     isValid: (values) =>
       asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
@@ -659,66 +521,17 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'roles',
         header: 'Roles',
-        render: (_value, row: Party) =>
-          row.roles
-            ?.filter((role) => role.is_active)
-            .map((role) => role.role)
-            .join(', ') || '---',
+        render: (_value, row: Party) => formatActivePartyRoles(row.roles),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
-    formFields: [
-      {
-        key: 'party_type',
-        label: 'Tipo',
-        type: 'select',
-        required: true,
-        options: [
-          { label: 'Persona', value: 'person' },
-          { label: 'Organizacion', value: 'organization' },
-          { label: 'Agente automatizado', value: 'automated_agent' },
-        ],
-      },
-      { key: 'display_name', label: 'Nombre visible', required: true, placeholder: 'Nombre principal' },
-      { key: 'email', label: 'Email', type: 'email' },
-      { key: 'phone', label: 'Telefono', type: 'tel' },
-      { key: 'tax_id', label: 'CUIT / CUIL' },
-      { key: 'tags', label: 'Tags', placeholder: 'operaciones, campo' },
-      { key: 'person_first_name', label: 'Nombre persona' },
-      { key: 'person_last_name', label: 'Apellido persona' },
-      { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
-      { key: 'org_trade_name', label: 'Nombre comercial' },
-      { key: 'org_tax_condition', label: 'Condicion fiscal' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Party) =>
-      [
-        row.display_name,
-        row.email,
-        row.phone,
-        row.tax_id,
-        row.notes,
-        tagsToText(row.tags),
-        row.roles?.map((role) => role.role).join(', '),
-      ]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Party) => ({
-      party_type: row.party_type ?? 'person',
-      display_name: row.display_name ?? '',
-      email: row.email ?? '',
-      phone: row.phone ?? '',
-      tax_id: row.tax_id ?? '',
-      tags: tagsToText(row.tags),
-      person_first_name: row.person?.first_name ?? '',
-      person_last_name: row.person?.last_name ?? '',
-      org_legal_name: row.organization?.legal_name ?? '',
-      org_trade_name: row.organization?.trade_name ?? '',
-      org_tax_condition: row.organization?.tax_condition ?? '',
-      notes: row.notes ?? '',
-    }),
+    formFields: partyCrudFormFields.map((field) =>
+      field.key === 'tags' ? { ...field, placeholder: 'operaciones, campo' } : field,
+    ),
+    searchText: buildPartySearchText,
+    toFormValues: buildPartyFormValues,
     toBody: (values) => ({
-      ...partyFormToBody(values),
+      ...partyCrudFormToBody(values),
       roles: [{ role: 'employee' }],
     }),
     isValid: (values) =>

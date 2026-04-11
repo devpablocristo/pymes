@@ -1,7 +1,8 @@
 import { useMemo, type ReactElement } from 'react';
-import { CrudCreateNavigationButton, CrudToolbarActionButtons, useCrudConfigQuery } from '../../modules/crud';
+import { CrudCreateNavigationButton, CrudToolbarActionButtons } from '../../modules/crud';
 import { GenericWorkOrdersBoard, type GenericWorkOrder } from '../../components/GenericWorkOrdersBoard';
 import { WorkOrderKanbanDetailModal } from '../../components/WorkOrderKanbanDetailModal';
+import { usePymesCrudConfigQuery } from '../../crud/usePymesCrudConfigQuery';
 import {
   getAllWorkOrders,
   getWorkOrdersArchived,
@@ -36,7 +37,7 @@ function toGenericWorkOrder(row: AutoRepairWorkOrder): AutoRepairKanbanWorkOrder
 
 export function CarWorkOrdersKanbanModeContent() {
   const { localizeText: formatFieldText } = useI18n();
-  const crudConfigQuery = useCrudConfigQuery<AutoRepairWorkOrder>('carWorkOrders');
+  const crudConfigQuery = usePymesCrudConfigQuery<AutoRepairWorkOrder>('carWorkOrders');
   const crudConfig = crudConfigQuery.data ?? null;
 
   const renderExtraToolbar = useMemo(

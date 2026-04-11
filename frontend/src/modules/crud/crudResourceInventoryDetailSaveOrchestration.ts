@@ -177,7 +177,7 @@ export async function persistCrudInventoryDetailSave(
   try {
     linked = await ports.loadLinkedEntity(linkedEntityId);
   } catch {
-    linked = null;
+    linked = linkedAfterPatch;
   }
 
   const movements = await ports.loadMovements(linkedEntityId);

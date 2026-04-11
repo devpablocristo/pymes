@@ -7,6 +7,9 @@ export type CrudLinkedEntityFormBlockStrings = Pick<
   | 'fieldSkuLabel'
   | 'fieldImageUrlsLabel'
   | 'fieldImageUrlsHint'
+  | 'fieldImageUploadActionLabel'
+  | 'fieldImageUploadingLabel'
+  | 'fieldImageRemoveLabel'
   | 'fieldTrackStockLabel'
   | 'galleryAriaLabel'
   | 'openImageFullscreenLabel'
@@ -121,15 +124,15 @@ export function CrudLinkedEntityEditHeaderFields({
 export type CrudLinkedEntityEditBodyFieldsProps = {
   strings: CrudLinkedEntityFormBlockStrings;
   imageUrlsInputId: string;
-  imageUrlsText: string;
-  onImageUrlsTextChange: (value: string) => void;
+  imageUrls: string[];
+  onImageUrlsChange: (value: string[]) => void;
   onImageUrlsInput?: () => void;
+  onUploadImages?: (files: File[]) => Promise<void>;
+  imageUploadDisabled?: boolean;
   trackStockInputId: string;
   trackStock: boolean;
   onTrackStockChange: (value: boolean) => void;
   showTrackStock: boolean;
-  /** URLs ya parseadas para preview bajo el textarea. */
-  previewUrls: string[];
   onOpenPreviewImage: (url: string) => void;
   galleryRootClassName: string;
   galleryItemClassName: string;
@@ -143,45 +146,80 @@ export type CrudLinkedEntityEditBodyFieldsProps = {
 export function CrudLinkedEntityEditBodyFields({
   strings,
   imageUrlsInputId,
-  imageUrlsText,
-  onImageUrlsTextChange,
+  imageUrls,
+  onImageUrlsChange,
   onImageUrlsInput,
+  onUploadImages,
+  imageUploadDisabled = false,
   trackStockInputId,
   trackStock,
   onTrackStockChange,
   showTrackStock,
-  previewUrls,
   onOpenPreviewImage,
   galleryRootClassName,
   galleryItemClassName,
   galleryZoomClassName,
 }: CrudLinkedEntityEditBodyFieldsProps) {
+  const handleFileChange = async (files: FileList | null) => {
+    if (!onUploadImages || !files) return;
+    const selected = Array.from(files).filter((file) => file.size > 0);
+    if (!selected.length) return;
+    onImageUrlsInput?.();
+    await onUploadImages(selected);
+  };
+
   return (
     <>
       <div className="crud-linked-entity-form__field" style={{ gridColumn: '1 / -1' }}>
         <label htmlFor={imageUrlsInputId}>{strings.fieldImageUrlsLabel}</label>
-        <textarea
-          id={imageUrlsInputId}
-          value={imageUrlsText}
-          onChange={(e) => {
-            onImageUrlsInput?.();
-            onImageUrlsTextChange(e.target.value);
-          }}
-          rows={4}
-          placeholder={strings.fieldImageUrlsHint}
-        />
-      </div>
-      {previewUrls.length > 0 ? (
-        <div style={{ gridColumn: '1 / -1' }}>
-          <CrudLinkedEntityImageGalleryStrip
-            urls={previewUrls}
-            ariaLabel={strings.galleryAriaLabel}
-            openImageLabel={strings.openImageFullscreenLabel}
-            onOpenImage={onOpenPreviewImage}
-            rootClassName={galleryRootClassName}
-            itemClassName={galleryItemClassName}
-            zoomButtonClassName={galleryZoomClassName}
+        <div className="crud-linked-entity-form__upload-row">
+          <label className="btn-sm btn-secondary crud-linked-entity-form__upload-button" htmlFor={imageUrlsInputId}>
+            {imageUploadDisabled
+              ? (strings.fieldImageUploadingLabel ?? 'Subiendo…')
+              : (strings.fieldImageUploadActionLabel ?? 'Subir imágenes')}
+          </label>
+          <input
+            id={imageUrlsInputId}
+            className="crud-linked-entity-form__file-input"
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={imageUploadDisabled || !onUploadImages}
+            onChange={(e) => {
+              void handleFileChange(e.currentTarget.files);
+              e.currentTarget.value = '';
+            }}
           />
+          <p className="crud-linked-entity-form__hint">{strings.fieldImageUrlsHint}</p>
+        </div>
+      </div>
+      {imageUrls.length > 0 ? (
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div className="crud-linked-entity-form__image-list">
+            {imageUrls.map((url) => (
+              <div key={url} className="crud-linked-entity-form__image-item">
+                <CrudLinkedEntityImageGalleryStrip
+                  urls={[url]}
+                  ariaLabel={strings.galleryAriaLabel}
+                  openImageLabel={strings.openImageFullscreenLabel}
+                  onOpenImage={onOpenPreviewImage}
+                  rootClassName={galleryRootClassName}
+                  itemClassName={galleryItemClassName}
+                  zoomButtonClassName={galleryZoomClassName}
+                />
+                <button
+                  type="button"
+                  className="btn-sm btn-secondary crud-linked-entity-form__image-remove"
+                  onClick={() => {
+                    onImageUrlsInput?.();
+                    onImageUrlsChange(imageUrls.filter((current) => current !== url));
+                  }}
+                >
+                  {strings.fieldImageRemoveLabel ?? 'Quitar'}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
       {showTrackStock ? (

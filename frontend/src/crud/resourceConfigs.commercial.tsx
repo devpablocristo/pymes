@@ -4,6 +4,18 @@ import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import { withCSVToolbar } from './csvToolbar';
 import {
+  formatCrudMoney,
+  formatCrudPercent,
+  formatCrudAddress,
+  formatTagList,
+  parseCostCrudLineItems,
+  parsePricedCrudLineItems,
+  parseTagCsv,
+  renderCrudActiveBadge,
+  renderCrudBooleanBadge,
+  type CrudAddress,
+} from './commercialCrudHelpers';
+import {
   asBoolean,
   asNumber,
   asOptionalNumber,
@@ -19,14 +31,6 @@ import { renderTagBadges } from './crudTagBadges';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
 
-type Address = {
-  street?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  country?: string;
-};
-
 type Customer = {
   id: string;
   type: string;
@@ -36,7 +40,7 @@ type Customer = {
   phone?: string;
   notes: string;
   tags?: string[];
-  address?: Address;
+  address?: CrudAddress;
 };
 
 type Supplier = {
@@ -48,7 +52,7 @@ type Supplier = {
   contact_name?: string;
   notes: string;
   tags?: string[];
-  address?: Address;
+  address?: CrudAddress;
 };
 
 type Product = {
@@ -158,25 +162,6 @@ type Purchase = {
   }>;
 };
 
-function parseCSV(value: CrudFieldValue | undefined): string[] {
-  return asString(value)
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function tagsToText(tags?: string[]): string {
-  return (tags ?? []).join(', ');
-}
-
-function formatAddress(address?: Address): string {
-  return [address?.street, address?.city, address?.state, address?.country].filter(Boolean).join(', ') || '---';
-}
-
-function renderActiveBadge(value: boolean, activeLabel = 'Activo', inactiveLabel = 'Inactivo') {
-  return <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? activeLabel : inactiveLabel}</span>;
-}
-
 /** Archive/restore/hard delete: el listado paginado va por `basePath` + httpClient del shell. */
 function buildArchivedMutationsOnly<T extends { id: string }>(basePath: string) {
   return {
@@ -207,50 +192,6 @@ function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product
       price: Number(item.price ?? 0),
     }))
     .filter((item) => item.product_id || item.service_id);
-}
-
-function parsePricedLineItems(value: CrudFieldValue | undefined): Array<{
-  product_id?: string;
-  service_id?: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-  tax_rate?: number;
-  sort_order: number;
-}> {
-  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
-  return parsed
-    .map((item, index) => ({
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      service_id: asOptionalString(item.service_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_price: Number(item.unit_price ?? 0),
-      tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
-      sort_order: Number(item.sort_order ?? index),
-    }))
-    .filter((item) => item.description && item.quantity > 0);
-}
-
-function parseCostLineItems(value: CrudFieldValue | undefined): Array<{
-  product_id?: string;
-  service_id?: string;
-  description: string;
-  quantity: number;
-  unit_cost: number;
-  tax_rate?: number;
-}> {
-  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
-  return parsed
-    .map((item) => ({
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      service_id: asOptionalString(item.service_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_cost: Number(item.unit_cost ?? 0),
-      tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
-    }))
-    .filter((item) => item.description && item.quantity > 0);
 }
 
 const customerLabel = vocab('cliente');
@@ -295,8 +236,8 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
         header: 'Tags / Direccion',
         render: (_value, row: Customer) => (
           <>
-            <div>{tagsToText(row.tags) || '---'}</div>
-            <div className="text-secondary">{formatAddress(row.address)}</div>
+            <div>{formatTagList(row.tags) || '---'}</div>
+            <div className="text-secondary">{formatCrudAddress(row.address)}</div>
           </>
         ),
       },
@@ -325,7 +266,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'notes', label: 'Notas', type: 'textarea', placeholder: 'Notas internas...', fullWidth: true },
     ],
     searchText: (row: Customer) =>
-      [row.name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags), formatAddress(row.address)]
+      [row.name, row.email, row.phone, row.tax_id, row.notes, formatTagList(row.tags), formatCrudAddress(row.address)]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: Customer) => ({
@@ -334,7 +275,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_id: row.tax_id ?? '',
       email: row.email ?? '',
       phone: row.phone ?? '',
-      tags: tagsToText(row.tags),
+      tags: formatTagList(row.tags),
       address_street: row.address?.street ?? '',
       address_city: row.address?.city ?? '',
       address_state: row.address?.state ?? '',
@@ -348,7 +289,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       email: asOptionalString(values.email),
       phone: asOptionalString(values.phone),
       notes: asOptionalString(values.notes),
-      tags: parseCSV(values.tags),
+      tags: parseTagCsv(values.tags),
       address: {
         street: asString(values.address_street),
         city: asString(values.address_city),
@@ -389,7 +330,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'tags', header: 'Tags', render: (value) => tagsToText(value as string[]) || '---' },
+      { key: 'tags', header: 'Tags', render: (value) => formatTagList(value as string[]) || '---' },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
     formFields: [
@@ -402,7 +343,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Supplier) =>
-      [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, tagsToText(row.tags)]
+      [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, formatTagList(row.tags)]
         .filter(Boolean)
         .join(' '),
     toFormValues: (row: Supplier) => ({
@@ -411,7 +352,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_id: row.tax_id ?? '',
       email: row.email ?? '',
       phone: row.phone ?? '',
-      tags: tagsToText(row.tags),
+      tags: formatTagList(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -420,7 +361,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_id: asOptionalString(values.tax_id),
       email: asOptionalString(values.email),
       phone: asOptionalString(values.phone),
-      tags: parseCSV(values.tags),
+      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,
@@ -456,7 +397,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             tax_rate: asOptionalNumber(values.tax_rate),
             track_stock: asBoolean(values.track_stock),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseCSV(values.tags),
+            tags: parseTagCsv(values.tags),
             description: asOptionalString(values.description),
             image_urls: parseImageURLList(values.image_urls),
           },
@@ -475,7 +416,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             tax_rate: asOptionalNumber(values.tax_rate),
             track_stock: asBoolean(values.track_stock),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseCSV(values.tags),
+            tags: parseTagCsv(values.tags),
             description: asOptionalString(values.description),
             image_urls: parseImageURLList(values.image_urls),
           },
@@ -495,8 +436,8 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
-      { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      { key: 'price', header: 'Precio', render: (value, row) => formatCrudMoney(value, row.currency) },
+      { key: 'cost_price', header: 'Costo', render: (value, row) => formatCrudMoney(value, row.currency) },
       {
         key: 'tags',
         header: 'Tags',
@@ -506,16 +447,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'track_stock',
         header: 'Stock',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>
-            {value ? 'Controlado' : 'Sin control'}
-          </span>
-        ),
+        render: (value) => renderCrudActiveBadge(Boolean(value), 'Controlado', 'Sin control'),
       },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => renderActiveBadge(Boolean(value)),
+        render: (value) => renderCrudActiveBadge(Boolean(value)),
       },
     ],
     formFields: [
@@ -547,7 +484,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Product) =>
-      [row.name, row.sku, row.description, row.unit, row.currency, tagsToText(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.sku, row.description, row.unit, row.currency, formatTagList(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Product) => ({
       name: row.name ?? '',
       sku: row.sku ?? '',
@@ -558,7 +495,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_rate: row.tax_rate?.toString() ?? '',
       track_stock: row.track_stock ?? true,
       is_active: row.is_active ? 'true' : 'false',
-      tags: tagsToText(row.tags),
+      tags: formatTagList(row.tags),
       image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
       description: row.description ?? '',
     }),
@@ -572,7 +509,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tax_rate: asOptionalNumber(values.tax_rate),
       track_stock: asBoolean(values.track_stock),
       is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-      tags: parseCSV(values.tags),
+      tags: parseTagCsv(values.tags),
       description: asOptionalString(values.description),
       image_urls: parseImageURLList(values.image_urls),
     }),
@@ -600,7 +537,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             currency: asOptionalString(values.currency) ?? 'ARS',
             default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseCSV(values.tags),
+            tags: parseTagCsv(values.tags),
             description: asOptionalString(values.description),
           },
         });
@@ -618,7 +555,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             currency: asOptionalString(values.currency) ?? 'ARS',
             default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseCSV(values.tags),
+            tags: parseTagCsv(values.tags),
             description: asOptionalString(values.description),
           },
         });
@@ -639,8 +576,8 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'sale_price', header: 'Precio', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
-      { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
+      { key: 'sale_price', header: 'Precio', render: (value, row) => formatCrudMoney(value, row.currency) },
+      { key: 'cost_price', header: 'Costo', render: (value, row) => formatCrudMoney(value, row.currency) },
       {
         key: 'default_duration_minutes',
         header: 'Duracion',
@@ -649,7 +586,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => renderActiveBadge(Boolean(value)),
+        render: (value) => renderCrudActiveBadge(Boolean(value)),
       },
     ],
     formFields: [
@@ -674,7 +611,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Service) =>
-      [row.name, row.code, row.category_code, row.description, row.currency, tagsToText(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.code, row.category_code, row.description, row.currency, formatTagList(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Service) => ({
       name: row.name ?? '',
       code: row.code ?? '',
@@ -685,7 +622,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       currency: row.currency ?? 'ARS',
       default_duration_minutes: row.default_duration_minutes?.toString() ?? '',
       is_active: row.is_active ? 'true' : 'false',
-      tags: tagsToText(row.tags),
+      tags: formatTagList(row.tags),
       description: row.description ?? '',
     }),
     toBody: (values) => ({
@@ -698,7 +635,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       currency: asOptionalString(values.currency) ?? 'ARS',
       default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
       is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-      tags: parseCSV(values.tags),
+      tags: parseTagCsv(values.tags),
       description: asOptionalString(values.description),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
@@ -721,20 +658,16 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'markup', header: 'Markup', render: (value) => `${Number(value ?? 0).toFixed(2)}%` },
+      { key: 'markup', header: 'Markup', render: (value) => formatCrudPercent(value) },
       {
         key: 'is_default',
         header: 'Default',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Si' : 'No'}</span>
-        ),
+        render: (value) => renderCrudBooleanBadge(Boolean(value)),
       },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activa' : 'Inactiva'}</span>
-        ),
+        render: (value) => renderCrudActiveBadge(Boolean(value), 'Activa', 'Inactiva'),
       },
     ],
     formFields: [
@@ -794,7 +727,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'total',
         header: 'Total',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatCrudMoney(value, row.currency),
       },
       { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '---' },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
@@ -855,7 +788,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       customer_id: asOptionalString(values.customer_id),
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
-      items: parsePricedLineItems(values.items_json),
+      items: parsePricedCrudLineItems(values.items_json),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -887,7 +820,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'total',
         header: 'Total',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatCrudMoney(value, row.currency),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -1000,7 +933,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       customer_name: asString(values.customer_name),
       quote_id: asOptionalString(values.quote_id),
       payment_method: asString(values.payment_method),
-      items: parsePricedLineItems(values.items_json),
+      items: parsePricedCrudLineItems(values.items_json),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -1033,7 +966,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'total',
         header: 'Total',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatCrudMoney(value, row.currency),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -1067,7 +1000,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),
       payment_status: asOptionalString(values.payment_status),
-      items: parseCostLineItems(values.items_json),
+      items: parseCostCrudLineItems(values.items_json),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>

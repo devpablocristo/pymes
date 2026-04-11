@@ -7,7 +7,14 @@ import {
   listSalePayments,
   type SalePaymentRow,
 } from '../lib/api';
+import { getCrudSearchParam } from '../modules/crud';
 import { fetchStockLevels, type StockLevelRow } from '../modules/stock';
+import {
+  formatOperationsMoney,
+  parseReturnSaleItemsJson,
+  renderOperationsActiveBadge,
+  validateReturnForm,
+} from './operationsCrudHelpers';
 import { StockBoardView, StockGalleryView } from './stockVisualModes';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import { withCSVToolbar } from './csvToolbar';
@@ -94,13 +101,6 @@ type RecurringExpense = {
   is_active: boolean;
 };
 
-function searchParam(name: string): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const raw = new URLSearchParams(window.location.search).get(name);
-  const t = raw?.trim();
-  return t || undefined;
-}
-
 const operationsResourceConfigs: CrudResourceConfigMap = {
   returns: {
     basePath: '/v1/returns',
@@ -183,27 +183,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         const reason = asString(values.reason).trim().toLowerCase() || 'other';
         const notes = asString(values.notes).trim();
         const raw = asString(values.items_json).trim();
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw) as unknown;
-        } catch {
-          throw new Error('El campo «Ítems» debe ser JSON válido.');
-        }
-        if (!Array.isArray(parsed) || parsed.length === 0) {
-          throw new Error('Ítems: se requiere un array con al menos un elemento.');
-        }
-        const items = parsed.map((entry) => {
-          if (!entry || typeof entry !== 'object') {
-            throw new Error('Cada ítem debe ser un objeto con sale_item_id y quantity.');
-          }
-          const o = entry as Record<string, unknown>;
-          const sale_item_id = String(o.sale_item_id ?? '').trim();
-          const quantity = Number(o.quantity);
-          if (!sale_item_id || Number.isNaN(quantity) || quantity <= 0) {
-            throw new Error('Cada ítem necesita sale_item_id (UUID) y quantity > 0.');
-          }
-          return { sale_item_id, quantity };
-        });
+        const items = parseReturnSaleItemsJson(raw);
         await apiRequest(`/v1/sales/${saleId}/return`, {
           method: 'POST',
           body: {
@@ -225,10 +205,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         notes: '',
         items_json: '[{"sale_item_id":"","quantity":1}]',
       }) as CrudFormValues,
-    isValid: (values) =>
-      asString(values.sale_id).trim().length >= 32 &&
-      ['cash', 'credit_note', 'original_method'].includes(asString(values.refund_method).trim().toLowerCase()) &&
-      asString(values.items_json).trim().length >= 2,
+    isValid: validateReturnForm,
     rowActions: [
       {
         id: 'void',
@@ -267,9 +244,9 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
           </>
         ),
       },
-      { key: 'balance', header: 'Saldo', render: (value) => String(value ?? '') },
-      { key: 'amount', header: 'Monto', render: (value) => String(value ?? '') },
-      { key: 'used_amount', header: 'Usado', render: (value) => String(value ?? '') },
+      { key: 'balance', header: 'Saldo', render: (value) => formatOperationsMoney(value) },
+      { key: 'amount', header: 'Monto', render: (value) => formatOperationsMoney(value) },
+      { key: 'used_amount', header: 'Usado', render: (value) => formatOperationsMoney(value) },
       {
         key: 'return_id',
         header: 'Devolución',
@@ -340,7 +317,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'amount',
         header: 'Importe',
-        render: (value, row: CashMovementRow) => `${row.currency} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row: CashMovementRow) => formatOperationsMoney(value, row.currency),
       },
       { key: 'description', header: 'Descripción', className: 'cell-notes' },
       { key: 'reference_type', header: 'Origen', render: (_v, row: CashMovementRow) => row.reference_type || '---' },
@@ -513,13 +490,13 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     emptyState: 'Sin venta en contexto. Agregá ?sale_id=<UUID> a la URL o registrá cobros desde el listado de ventas.',
     dataSource: {
       list: async () => {
-        const sid = searchParam('sale_id');
+        const sid = getCrudSearchParam('sale_id');
         if (!sid) return [];
         const { items } = await listSalePayments(sid);
         return items ?? [];
       },
       create: async (values) => {
-        const saleId = searchParam('sale_id')?.trim() || asString(values.sale_id).trim();
+        const saleId = getCrudSearchParam('sale_id')?.trim() || asString(values.sale_id).trim();
         if (!saleId) {
           throw new Error('Indicá la venta: ?sale_id= en la URL o el campo «Venta (UUID)».');
         }
@@ -539,7 +516,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     },
     columns: [
       { key: 'method', header: 'Método', className: 'cell-name' },
-      { key: 'amount', header: 'Importe', render: (v) => String(v ?? '') },
+      { key: 'amount', header: 'Importe', render: (v) => formatOperationsMoney(v) },
       { key: 'received_at', header: 'Recibido', render: (v) => formatDate(String(v ?? '')) },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -559,14 +536,14 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       [row.method, row.notes, String(row.amount), row.received_at, row.id].filter(Boolean).join(' '),
     toFormValues: () =>
       ({
-        sale_id: searchParam('sale_id') ?? '',
+        sale_id: getCrudSearchParam('sale_id') ?? '',
         method: '',
         amount: '',
         received_at: '',
         notes: '',
       }) as CrudFormValues,
     isValid: (values) => {
-      const saleOk = Boolean(searchParam('sale_id')?.trim() || asString(values.sale_id).trim());
+      const saleOk = Boolean(getCrudSearchParam('sale_id')?.trim() || asString(values.sale_id).trim());
       return saleOk && asString(values.method).trim().length > 0 && asNumber(values.amount) > 0;
     },
   },
@@ -592,15 +569,13 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'amount',
         header: 'Importe',
-        render: (value, row) => `${row.currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`,
+        render: (value, row) => formatOperationsMoney(value, row.currency),
       },
       { key: 'next_due_date', header: 'Proximo venc.', render: (value) => String(value ?? '') || '---' },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
-        ),
+        render: (value) => renderOperationsActiveBadge(Boolean(value)),
       },
     ],
     formFields: [

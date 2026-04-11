@@ -7,7 +7,7 @@ import type {
   CrudLinkedEntitySnapshot,
   CrudResourceInventoryDetailPorts,
   CrudResourceInventoryDetailStrings,
-} from '../crud';
+} from '../crud/crudResourceInventoryDetailContract';
 import { fetchStockLevelByProductId, type StockLevelRow } from './stockLevels';
 
 type ProductApiRow = {
@@ -29,6 +29,15 @@ type MovementApiRow = {
   created_at: string;
 };
 
+type AttachmentUploadRequest = {
+  storage_key: string;
+  upload_url: string;
+};
+
+type AttachmentRow = {
+  id: string;
+};
+
 export const stockInventoryDetailModalStringsEs: CrudResourceInventoryDetailStrings = {
   dialogLoadingTitle: 'Cargando…',
   dialogFallbackTitle: 'Inventario',
@@ -36,8 +45,11 @@ export const stockInventoryDetailModalStringsEs: CrudResourceInventoryDetailStri
   sectionEditHeading: 'Editar',
   fieldDisplayNameLabel: 'Nombre',
   fieldSkuLabel: 'SKU',
-  fieldImageUrlsLabel: 'Imágenes (URLs, una por línea o separadas por coma)',
-  fieldImageUrlsHint: 'Podés pegar enlaces https a imágenes públicas.',
+  fieldImageUrlsLabel: 'Imágenes',
+  fieldImageUrlsHint: 'Podés subir una o varias imágenes.',
+  fieldImageUploadActionLabel: 'Subir imágenes',
+  fieldImageUploadingLabel: 'Subiendo imágenes…',
+  fieldImageRemoveLabel: 'Quitar',
   fieldTrackStockLabel: 'Controlar stock en depósito',
   fieldQuantityLabel: 'Cantidad actual',
   fieldMinQuantityLabel: 'Stock mínimo',
@@ -152,6 +164,7 @@ export type StockInventoryDetailHandlers = {
   fetchEntity: (productId: string) => Promise<CrudLinkedEntitySnapshot>;
   fetchMovements: (productId: string) => Promise<CrudInventoryMovementSnapshot[]>;
   patchEntity: (productId: string, patch: CrudLinkedEntityPatch) => Promise<CrudLinkedEntitySnapshot>;
+  uploadImages: (productId: string, files: File[]) => Promise<string[]>;
   postAdjust: (productId: string, body: CrudInventoryAdjustPayload) => Promise<void>;
   archiveEntity: (productId: string) => Promise<void>;
 };
@@ -188,6 +201,49 @@ export async function defaultPatchStockLinkedEntity(
   return mapLinked(p);
 }
 
+export async function defaultUploadStockLinkedEntityImages(productId: string, files: File[]): Promise<string[]> {
+  const urls: string[] = [];
+  for (const file of files) {
+    const upload = await apiRequest<AttachmentUploadRequest>('/v1/attachments/upload-url', {
+      method: 'POST',
+      body: {
+        entity_type: 'products',
+        entity_id: productId,
+        file_name: file.name,
+        content_type: file.type || 'application/octet-stream',
+        size_bytes: file.size,
+      },
+    });
+
+    const response = await fetch(upload.upload_url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+      credentials: 'same-origin',
+    });
+    if (!response.ok) {
+      throw new Error('No se pudo subir una imagen.');
+    }
+
+    const attachment = await apiRequest<AttachmentRow>('/v1/attachments/confirm', {
+      method: 'POST',
+      body: {
+        entity_type: 'products',
+        entity_id: productId,
+        file_name: file.name,
+        content_type: file.type || 'application/octet-stream',
+        size_bytes: file.size,
+        storage_key: upload.storage_key,
+      },
+    });
+
+    urls.push(`/v1/attachments/${attachment.id}/download`);
+  }
+  return urls;
+}
+
 export async function defaultPostStockInventoryAdjust(
   productId: string,
   body: CrudInventoryAdjustPayload,
@@ -211,6 +267,7 @@ const defaultStockInventoryDetailHandlers: StockInventoryDetailHandlers = {
   fetchEntity: defaultFetchStockLinkedEntity,
   fetchMovements: defaultFetchStockInventoryMovements,
   patchEntity: defaultPatchStockLinkedEntity,
+  uploadImages: defaultUploadStockLinkedEntityImages,
   postAdjust: defaultPostStockInventoryAdjust,
   archiveEntity: defaultArchiveStockLinkedEntity,
 };
@@ -228,6 +285,7 @@ export function buildStockInventoryDetailPorts(
     loadLinkedEntity: h.fetchEntity,
     loadMovements: h.fetchMovements,
     patchLinkedEntity: h.patchEntity,
+    uploadLinkedEntityImages: h.uploadImages,
     postInventoryAdjust: h.postAdjust,
     archiveLinkedEntity: h.archiveEntity,
   };

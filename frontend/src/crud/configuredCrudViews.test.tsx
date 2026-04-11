@@ -12,18 +12,6 @@ vi.mock('./lazyCrudPage', () => ({
   LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
-vi.mock('../pages/modes/ProductsGalleryModeContent', () => ({
-  ProductsGalleryModeContent: () => <div>products-gallery-fallback</div>,
-}));
-
-vi.mock('../pages/modes/CarWorkOrdersKanbanModeContent', () => ({
-  CarWorkOrdersKanbanModeContent: () => <div>car-work-orders-fallback</div>,
-}));
-
-vi.mock('../pages/modes/BikeWorkOrdersKanbanModeContent', () => ({
-  BikeWorkOrdersKanbanModeContent: () => <div>bike-work-orders-fallback</div>,
-}));
-
 function buildStockConfig(): CrudPageConfig<{ id: string }> {
   return {
     label: 'item',
@@ -125,5 +113,18 @@ describe('configuredCrudViews', () => {
     });
 
     expect(await screen.findByText('stock no expone el modo gallery.')).toBeInTheDocument();
+  });
+
+  it('falls back to list mode when the resource has no declared view modes', async () => {
+    render(
+      <MemoryRouter initialEntries={['/modules/custom']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/modules/custom" element={<ConfiguredCrudIndexRedirect resourceId="custom" baseRoute="/modules/custom" />} />
+          <Route path="/modules/custom/list" element={<div>custom-list-screen</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('custom-list-screen')).toBeInTheDocument();
   });
 });

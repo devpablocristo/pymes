@@ -1,4 +1,8 @@
 import type { CrudFieldValue } from '../components/CrudPage';
+import {
+  formatCrudLinkedEntityImageUrlsToForm,
+  parseCrudLinkedEntityImageUrlList,
+} from '../modules/crud/crudLinkedEntityImageUrls';
 
 export function asString(value: CrudFieldValue | undefined): string {
   if (typeof value === 'boolean') {
@@ -66,22 +70,11 @@ export function stringifyJSON(value: unknown): string {
 
 /** URLs de imágenes: una por línea o separadas por coma. */
 export function parseImageURLList(value: CrudFieldValue | undefined): string[] {
-  const normalized = asString(value).trim();
-  if (!normalized) return [];
-  const parts = normalized.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const p of parts) {
-    if (seen.has(p)) continue;
-    seen.add(p);
-    out.push(p);
-  }
-  return out;
+  return parseCrudLinkedEntityImageUrlList(asString(value));
 }
 
 export function formatProductImageURLsToForm(urls: string[] | undefined, legacySingle?: string): string {
-  const list = urls?.length ? urls : legacySingle?.trim() ? [legacySingle.trim()] : [];
-  return list.join('\n');
+  return formatCrudLinkedEntityImageUrlsToForm(urls, legacySingle);
 }
 
 export function openExternalURL(url?: string): void {

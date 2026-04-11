@@ -1,7 +1,14 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
-import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest, downloadAPIFile } from '../lib/api';
+import { buildCrudContextEntityPath, getCrudContextEntityParams } from '../modules/crud';
+import {
+  formatControlTagList,
+  normalizeControlListItems,
+  openControlSignedUrl,
+  parseControlCsv,
+  renderControlActiveBadge,
+} from './controlCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asBoolean, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
@@ -48,24 +55,6 @@ type WebhookEndpoint = {
   created_at: string;
 };
 
-function searchParam(name: string): string | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const raw = new URLSearchParams(window.location.search).get(name);
-  const t = raw?.trim();
-  return t || undefined;
-}
-
-function parseCSV(value: CrudFieldValue | undefined): string[] {
-  return asString(value)
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function tagsToText(tags?: string[]): string {
-  return (tags ?? []).join(', ');
-}
-
 const controlResourceConfigs: CrudResourceConfigMap = {
   attachments: {
     label: 'adjunto',
@@ -78,16 +67,10 @@ const controlResourceConfigs: CrudResourceConfigMap = {
     emptyState: 'Indicá en la URL ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/attachments).',
     dataSource: {
       list: async () => {
-        const entity = searchParam('entity');
-        const entityId = searchParam('entity_id');
-        if (!entity || !entityId) return [];
-        const data = await apiRequest<{ items?: AttachmentRow[] | null }>(
-          `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/attachments?limit=200`,
-        );
-        return parseListItemsFromResponse<AttachmentRow>(data).map((row) => ({
-          ...row,
-          id: String(row.id),
-        }));
+        const path = buildCrudContextEntityPath(getCrudContextEntityParams(), '/attachments?limit=200');
+        if (!path) return [];
+        const data = await apiRequest<{ items?: AttachmentRow[] | null }>(path);
+        return normalizeControlListItems<AttachmentRow>(data);
       },
       deleteItem: async (row: AttachmentRow) => {
         await apiRequest(`/v1/attachments/${row.id}`, { method: 'DELETE' });
@@ -117,10 +100,7 @@ const controlResourceConfigs: CrudResourceConfigMap = {
         kind: 'secondary',
         onClick: async (row: AttachmentRow, helpers) => {
           try {
-            const link = await apiRequest<{ url: string }>(`/v1/attachments/${row.id}/url`);
-            if (link.url) {
-              window.open(link.url, '_blank', 'noopener,noreferrer');
-            }
+            await openControlSignedUrl(`/v1/attachments/${row.id}/url`);
           } catch (e) {
             helpers.setError(e instanceof Error ? e.message : 'No se pudo obtener el enlace.');
           }
@@ -156,10 +136,7 @@ const controlResourceConfigs: CrudResourceConfigMap = {
     dataSource: {
       list: async () => {
         const data = await apiRequest<{ items?: AuditEntryRow[] | null }>('/v1/audit');
-        return parseListItemsFromResponse<AuditEntryRow>(data).map((row) => ({
-          ...row,
-          id: String(row.id),
-        }));
+        return normalizeControlListItems<AuditEntryRow>(data);
       },
     },
     columns: [
@@ -196,28 +173,22 @@ const controlResourceConfigs: CrudResourceConfigMap = {
     emptyState: 'Indicá ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/timeline).',
     dataSource: {
       list: async () => {
-        const entity = searchParam('entity');
-        const entityId = searchParam('entity_id');
-        if (!entity || !entityId) return [];
-        const data = await apiRequest<{ items?: TimelineEntryRow[] | null }>(
-          `/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/timeline?limit=100`,
-        );
-        return parseListItemsFromResponse<TimelineEntryRow>(data).map((row) => ({
-          ...row,
-          id: String(row.id),
-        }));
+        const path = buildCrudContextEntityPath(getCrudContextEntityParams(), '/timeline?limit=100');
+        if (!path) return [];
+        const data = await apiRequest<{ items?: TimelineEntryRow[] | null }>(path);
+        return normalizeControlListItems<TimelineEntryRow>(data);
       },
       create: async (values) => {
-        const entity = searchParam('entity');
-        const entityId = searchParam('entity_id');
-        if (!entity || !entityId) {
+        const context = getCrudContextEntityParams();
+        const path = buildCrudContextEntityPath(context, '/notes');
+        if (!path) {
           throw new Error('Faltan entity y entity_id en la URL.');
         }
         const note = asString(values.note).trim();
         if (!note) {
           throw new Error('La nota es obligatoria.');
         }
-        await apiRequest(`/v1/${encodeURIComponent(entity)}/${encodeURIComponent(entityId)}/notes`, {
+        await apiRequest(path, {
           method: 'POST',
           body: {
             title: asOptionalString(values.title) || undefined,
@@ -268,16 +239,14 @@ const controlResourceConfigs: CrudResourceConfigMap = {
         render: (_value, row: WebhookEndpoint) => (
           <>
             <strong>{row.url}</strong>
-            <div className="text-secondary">{tagsToText(row.events) || 'Sin eventos'}</div>
+            <div className="text-secondary">{formatControlTagList(row.events) || 'Sin eventos'}</div>
           </>
         ),
       },
       {
         key: 'is_active',
         header: 'Estado',
-        render: (value) => (
-          <span className={`badge ${value ? 'badge-success' : 'badge-neutral'}`}>{value ? 'Activo' : 'Inactivo'}</span>
-        ),
+        render: (value) => renderControlActiveBadge(Boolean(value)),
       },
       { key: 'created_at', header: 'Creado', render: (value) => formatDate(String(value ?? '')) },
       { key: 'secret', header: 'Secret', render: (value) => (String(value ?? '').trim() ? 'Configurado' : '---') },
@@ -298,17 +267,17 @@ const controlResourceConfigs: CrudResourceConfigMap = {
         },
       },
     ],
-    searchText: (row: WebhookEndpoint) => [row.url, tagsToText(row.events)].join(' '),
+    searchText: (row: WebhookEndpoint) => [row.url, formatControlTagList(row.events)].join(' '),
     toFormValues: (row: WebhookEndpoint) => ({
       url: row.url ?? '',
       secret: row.secret ?? '',
-      events: tagsToText(row.events),
+      events: formatControlTagList(row.events),
       is_active: row.is_active ?? true,
     }),
     toBody: (values) => ({
       url: asString(values.url),
       secret: asOptionalString(values.secret),
-      events: parseCSV(values.events),
+      events: parseControlCsv(values.events),
       is_active: asBoolean(values.is_active),
     }),
     isValid: (values) => asString(values.url).trim().startsWith('http'),

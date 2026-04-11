@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ImageFullscreenViewer } from '../../components/ImageFullscreenViewer';
-import { formatProductImageURLsToForm as formatLinkedEntityImageUrlsToForm, parseImageURLList } from '../../crud/resourceConfigs.shared';
+import { CrudImageFullscreenViewer } from './CrudImageFullscreenViewer';
+import {
+  collectCrudImageUrls,
+  formatCrudLinkedEntityImageUrlsToForm,
+} from './crudLinkedEntityImageUrls';
 import {
   defaultCrudResourceInventoryDetailFeatureFlags,
   type CrudInventoryLevelSnapshot,
@@ -25,20 +28,6 @@ import {
 } from './crudLinkedEntityInventoryFormBlock';
 import { CrudInventoryQuantitiesNotesBlock } from './crudInventoryQuantitiesNotesBlock';
 import './CrudResourceInventoryDetailModal.css';
-
-function collectLinkedImageUrls(p: CrudLinkedEntitySnapshot | null): string[] {
-  if (!p) return [];
-  const raw = p.imageUrls?.length ? p.imageUrls : p.legacyImageUrl?.trim() ? [p.legacyImageUrl.trim()] : [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const u of raw) {
-    const t = (u ?? '').trim();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
-}
 
 /**
  * Shell + contenido estándar: portal, backdrop, header, body con scroll, footer,
@@ -79,8 +68,9 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
-  const [imageUrlsInput, setImageUrlsInput] = useState('');
+  const [imageUrlsInput, setImageUrlsInput] = useState<string[]>([]);
   const [trackStockInput, setTrackStockInput] = useState(true);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const imageUrlsTouchedRef = useRef(false);
   const portsRef = useRef(ports);
   portsRef.current = ports;
@@ -90,15 +80,25 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const canArchive = permissions?.canArchive !== false;
   const archiveLinkedEntityFn = onArchive ?? ports.archiveLinkedEntity;
 
-  const serverImageUrls = useMemo(() => collectLinkedImageUrls(linked), [linked]);
-  const draftImageUrls = useMemo(() => parseImageURLList(imageUrlsInput), [imageUrlsInput]);
+  const serverImageUrls = useMemo(
+    () => collectCrudImageUrls({ imageUrls: linked?.imageUrls, legacyImageUrl: linked?.legacyImageUrl }),
+    [linked],
+  );
+  const draftImageUrls = imageUrlsInput;
+
+  const toImageUrlArray = useCallback((lnk: CrudLinkedEntitySnapshot | null): string[] => {
+    return formatCrudLinkedEntityImageUrlsToForm(lnk?.imageUrls, lnk?.legacyImageUrl)
+      .split('\n')
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }, []);
 
   const syncFormFromServer = useCallback((lvl: CrudInventoryLevelSnapshot, lnk: CrudLinkedEntitySnapshot | null) => {
     setNameInput(String(lnk?.name ?? lvl.displayTitle ?? ''));
     setSkuInput(String(lnk?.sku ?? lvl.displaySubtitle ?? ''));
-    setImageUrlsInput(formatLinkedEntityImageUrlsToForm(lnk?.imageUrls, lnk?.legacyImageUrl));
+    setImageUrlsInput(toImageUrlArray(lnk));
     setTrackStockInput(lvl.trackStock !== false);
-  }, []);
+  }, [toImageUrlArray]);
 
   const resetInventoryFields = useCallback((lvl: CrudInventoryLevelSnapshot) => {
     setMinInput(String(lvl.minQuantity ?? ''));
@@ -173,10 +173,10 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
 
   useEffect(() => {
     if (!editing || !linked || imageUrlsTouchedRef.current) return;
-    const next = formatLinkedEntityImageUrlsToForm(linked.imageUrls, linked.legacyImageUrl);
-    if (!next.trim()) return;
+    const next = toImageUrlArray(linked);
+    if (!next.length) return;
     setImageUrlsInput(next);
-  }, [editing, linked]);
+  }, [editing, linked, toImageUrlArray]);
 
   useEffect(() => {
     if (!linkedEntityId) return;
@@ -252,6 +252,31 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     setEditing(false);
     onCancelEdit?.();
   };
+
+  const handleUploadImages = useCallback(
+    async (files: File[]) => {
+      if (!level || !portsRef.current.uploadLinkedEntityImages || files.length === 0) return;
+      setUploadingImages(true);
+      setFormError('');
+      try {
+        const uploadedUrls = await portsRef.current.uploadLinkedEntityImages(level.linkedEntityId, files);
+        setImageUrlsInput((current) => {
+          const merged = [...current];
+          for (const url of uploadedUrls) {
+            const trimmed = url.trim();
+            if (!trimmed || merged.includes(trimmed)) continue;
+            merged.push(trimmed);
+          }
+          return merged;
+        });
+      } catch (e: unknown) {
+        setFormError(e instanceof Error ? e.message : strings.saveErrorGeneric);
+      } finally {
+        setUploadingImages(false);
+      }
+    },
+    [level, strings.saveErrorGeneric],
+  );
 
   const handleSave = async () => {
     if (!level || !canSave) return;
@@ -432,16 +457,17 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
                           <CrudLinkedEntityEditBodyFields
                             strings={strings}
                             imageUrlsInputId="crud-inv-detail-image-urls"
-                            imageUrlsText={imageUrlsInput}
-                            onImageUrlsTextChange={setImageUrlsInput}
+                            imageUrls={imageUrlsInput}
+                            onImageUrlsChange={setImageUrlsInput}
                             onImageUrlsInput={() => {
                               imageUrlsTouchedRef.current = true;
                             }}
+                            onUploadImages={ports.uploadLinkedEntityImages ? handleUploadImages : undefined}
+                            imageUploadDisabled={uploadingImages || saving}
                             trackStockInputId="crud-inv-detail-track"
                             trackStock={trackStockInput}
                             onTrackStockChange={setTrackStockInput}
                             showTrackStock={flags.linkedEntityTrackStock}
-                            previewUrls={draftImageUrls}
                             onOpenPreviewImage={setLightboxUrl}
                             galleryRootClassName="crud-inv-detail-modal__gallery"
                             galleryItemClassName="crud-inv-detail-modal__gallery-item"
@@ -587,7 +613,7 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   return (
     <>
       {createPortal(body, document.body)}
-      <ImageFullscreenViewer
+      <CrudImageFullscreenViewer
         imageUrl={lightboxUrl}
         onClose={() => setLightboxUrl(null)}
         contentLabel={nameInput.trim() || level?.displayTitle}

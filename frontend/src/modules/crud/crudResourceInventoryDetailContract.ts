@@ -73,6 +73,9 @@ export type CrudResourceInventoryDetailStrings = {
   fieldSkuLabel: string;
   fieldImageUrlsLabel: string;
   fieldImageUrlsHint: string;
+  fieldImageUploadActionLabel?: string;
+  fieldImageUploadingLabel?: string;
+  fieldImageRemoveLabel?: string;
   fieldTrackStockLabel: string;
   fieldQuantityLabel: string;
   fieldMinQuantityLabel: string;
@@ -144,6 +147,7 @@ export type CrudResourceInventoryDetailPorts<
   loadLinkedEntity: (linkedEntityId: string) => Promise<CrudLinkedEntitySnapshot | null>;
   loadMovements: (linkedEntityId: string) => Promise<TMove[]>;
   patchLinkedEntity: (linkedEntityId: string, patch: CrudLinkedEntityPatch) => Promise<CrudLinkedEntitySnapshot>;
+  uploadLinkedEntityImages?: (linkedEntityId: string, files: File[]) => Promise<string[]>;
   postInventoryAdjust: (linkedEntityId: string, body: CrudInventoryAdjustPayload) => Promise<void>;
   /** Archivado vía puerto; alternativa: prop `onArchive` en el modal. */
   archiveLinkedEntity?: (linkedEntityId: string) => Promise<void>;

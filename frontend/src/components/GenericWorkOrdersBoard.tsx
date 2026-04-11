@@ -5,15 +5,15 @@
 import { useUser } from '@clerk/react';
 import { type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { normalize } from '@devpablocristo/core-browser/search';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { useCallback, useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { Link } from 'react-router-dom';
 import {
   createCrudKanbanArchiveTerminalDragPolicy,
   CrudArchivedSearchParamToggle,
   CrudKanbanSurface,
   useCrudKanbanMove,
-  useCrudQueryListCacheSync,
+  useCrudRemoteArchivedListState,
 } from '../modules/crud';
 import { CreatedByPillsBar } from './CreatedByPillsBar';
 import { clerkEnabled } from '../lib/auth';
@@ -200,53 +200,35 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
 }: GenericWorkOrdersBoardProps<T>) {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
-  const [searchParams] = useSearchParams();
-  const showArchived = searchParams.get('archived') === '1';
-
-  const [items, setItems] = useState<T[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
-  const queryClient = useQueryClient();
-  const boardQueryKey = useMemo(
-    () => [...queryKey, showArchived ? 'archived' : 'active'] as const,
-    [queryKey, showArchived],
-  );
-  const woQuery = useQuery({
-    queryKey: boardQueryKey,
-    queryFn: () => (showArchived ? listArchived() : listAll()),
-    refetchOnWindowFocus: false,
-    staleTime: Infinity,
+  const {
+    showArchived,
+    items,
+    setItems,
+    error: queryError,
+    setError: setQueryError,
+    loading,
+    reload,
+    upsertInListCache,
+    removeFromListCache,
+  } = useCrudRemoteArchivedListState<T>({
+    queryKey,
+    listActive: listAll,
+    listArchived,
+    loadErrorMessage: 'Error al cargar órdenes',
   });
 
   const patchMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchStatus(id, status),
   });
 
-  const { upsertInListCache, removeFromListCache } = useCrudQueryListCacheSync<T>({
-    queryClient,
-    queryKey: boardQueryKey,
-    setItems,
-  });
-
-  useEffect(() => {
-    if (woQuery.data) {
-      setItems(woQuery.data);
-      setError(null);
-    }
-    if (woQuery.error) {
-      setError(woQuery.error instanceof Error ? woQuery.error.message : 'Error al cargar órdenes');
-    }
-  }, [woQuery.data, woQuery.error]);
-
-  const reload = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey });
-  }, [queryClient, queryKey]);
-
   const setBoardError = useCallback((message: string | null) => {
     setError(message);
-  }, []);
+    setQueryError(message);
+  }, [setQueryError]);
 
   const boardItems = useMemo(
     () => applyWorkOrderCreatorFilter(items, { authEnabled: clerkEnabled, authUserLoaded: clerkUserLoaded, selfId, creatorFilter }),
@@ -324,8 +306,8 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         getRowColumnId={(row) => workOrderKanbanTransitionModel.getColumnIdForStatus(row.status)}
         fallbackColumnId="wo_intake"
         items={boardItems}
-        loading={woQuery.isLoading}
-        error={error}
+        loading={loading}
+        error={error ?? queryError}
         onMoveCard={handleBoardMoveCard}
         resolveDropColumnId={(overId) => resolveDropColumnId(overId, items)}
         filterRow={filterRow}

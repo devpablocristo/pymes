@@ -9,6 +9,7 @@ import {
   updateRestaurantDiningTable,
 } from '../lib/restaurantsApi';
 import type { RestaurantDiningArea, RestaurantDiningTable } from '../lib/restaurantTypes';
+import { renderRestaurantTableStatusBadge } from './restaurantsCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from './resourceConfigs.shared';
@@ -97,18 +98,7 @@ const restaurantsResourceConfigs: CrudResourceConfigMap = {
       {
         key: 'status',
         header: 'Estado',
-        render: (value) => {
-          const s = String(value ?? '');
-          const cls =
-            s === 'occupied'
-              ? 'badge-warning'
-              : s === 'reserved'
-                ? 'badge-neutral'
-                : s === 'cleaning'
-                  ? 'badge-neutral'
-                  : 'badge-success';
-          return <span className={`badge ${cls}`}>{s || 'available'}</span>;
-        },
+        render: (value) => renderRestaurantTableStatusBadge(value),
       },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
     ],

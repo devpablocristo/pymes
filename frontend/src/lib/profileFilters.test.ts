@@ -64,7 +64,7 @@ describe('getVisibleModuleIds', () => {
     mockStorage.getJSON.mockReturnValue(makeProfile({ sells: 'products' }));
     const ids = getVisibleModuleIds();
     expect(ids.has('products')).toBe(true);
-    expect(ids.has('inventory')).toBe(true);
+    expect(ids.has('stock')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
     expect(ids.has('priceLists')).toBe(true);
     expect(ids.has('services')).toBe(false);
@@ -83,7 +83,7 @@ describe('getVisibleModuleIds', () => {
     const ids = getVisibleModuleIds();
     expect(ids.has('products')).toBe(false);
     expect(ids.has('services')).toBe(true);
-    expect(ids.has('inventory')).toBe(false);
+    expect(ids.has('stock')).toBe(false);
     expect(ids.has('priceLists')).toBe(true);
     expect(ids.has('quotes')).toBe(true);
     expect(ids.has('purchases')).toBe(true);

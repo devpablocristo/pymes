@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getTenantProfile } from '../lib/tenantProfile';
+import { getTenantProfile, saveTenantProfile } from '../lib/tenantProfile';
 import type { TenantSettings } from '../lib/types';
 
 const apiMocks = vi.hoisted(() => ({
@@ -155,5 +155,34 @@ describe('App onboarding gating', () => {
     await waitFor(() => {
       expect(screen.getByText('onboarding')).toBeInTheDocument();
     });
+  });
+
+  it('no deja que un perfil local viejo saltee el onboarding si backend dice incompleto', async () => {
+    saveTenantProfile({
+      businessName: 'Cache viejo',
+      teamSize: 'small',
+      sells: 'both',
+      clientLabel: 'clientes',
+      usesScheduling: true,
+      usesBilling: true,
+      currency: 'ARS',
+      paymentMethod: 'mixed',
+      vertical: 'workshops',
+      completedAt: '2026-04-02T10:00:00.000Z',
+    });
+    apiMocks.getTenantSettings.mockResolvedValue(
+      buildTenantSettings({
+        vertical: '',
+        onboarding_completed_at: null,
+      }),
+    );
+
+    renderApp();
+
+    await waitFor(() => {
+      expect(screen.getByText('onboarding')).toBeInTheDocument();
+    });
+
+    expect(getTenantProfile()).toBeNull();
   });
 });

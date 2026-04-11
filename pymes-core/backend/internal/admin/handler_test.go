@@ -62,6 +62,40 @@ func TestHandlerUpdateTenantSettingsAcceptsSchedulingEnabled(t *testing.T) {
 	}
 }
 
+func TestHandlerUpdateTenantSettingsAllowsClearingOnboardingCompletedAt(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeUsecases{settings: baseTenantSettings()}
+	rec := performTenantSettingsUpdate(t, repo, `{"onboarding_completed_at":""}`)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if repo.updatePatch.OnboardingCompletedAt == nil {
+		t.Fatalf("expected onboarding_completed_at patch to be forwarded")
+	}
+	if *repo.updatePatch.OnboardingCompletedAt != nil {
+		t.Fatalf("expected onboarding_completed_at to be cleared")
+	}
+}
+
+func TestHandlerUpdateTenantSettingsAllowsNullOnboardingCompletedAt(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeUsecases{settings: baseTenantSettings()}
+	rec := performTenantSettingsUpdate(t, repo, `{"onboarding_completed_at":null}`)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if repo.updatePatch.OnboardingCompletedAt == nil {
+		t.Fatalf("expected onboarding_completed_at patch to be forwarded")
+	}
+	if *repo.updatePatch.OnboardingCompletedAt != nil {
+		t.Fatalf("expected onboarding_completed_at to be cleared")
+	}
+}
+
 func performTenantSettingsUpdate(t *testing.T, uc usecasesPort, body string) *httptest.ResponseRecorder {
 	t.Helper()
 

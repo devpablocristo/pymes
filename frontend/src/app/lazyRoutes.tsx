@@ -24,6 +24,9 @@ export const WorkOrdersEditorPage = lazy(() =>
 export const ProductsModuleSection = lazy(() =>
   import('../pages/ProductsModuleSection').then((mod) => ({ default: mod.ProductsModuleSection })),
 );
+export const ConfiguredCrudIndexRedirect = lazy(() =>
+  import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudIndexRedirect })),
+);
 export const ProductsListPage = lazy(() =>
   import('../pages/ProductsListPage').then((mod) => ({ default: mod.ProductsListPage })),
 );
@@ -54,7 +57,16 @@ export const CustomerMessagingInboxPage = lazy(() =>
 );
 export const WatcherConfigPage = lazy(() => import('../pages/WatcherConfigPage'));
 export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod) => ({ default: mod.CalendarPage })));
-export const StockPage = lazy(() => import('../pages/StockPage').then((mod) => ({ default: mod.StockPage })));
+export const ConfiguredCrudModePage = lazy(() =>
+  import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudModePage })),
+);
+export const StockModuleSection = lazy(() =>
+  import('../pages/StockModuleSection').then((mod) => ({ default: mod.StockModuleSection })),
+);
+export const StockListPage = lazy(() => import('../pages/StockListPage').then((mod) => ({ default: mod.StockListPage })));
+export const StockCrudUiConfigurePage = lazy(() =>
+  import('../pages/StockCrudUiConfigurePage').then((mod) => ({ default: mod.StockCrudUiConfigurePage })),
+);
 export const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
 );

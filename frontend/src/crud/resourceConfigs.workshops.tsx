@@ -21,12 +21,9 @@ import {
   type WorkOrder,
   type WorkOrderLineItem as WorkOrderItem,
 } from '../lib/workOrdersApi';
-
-type BikeWorkOrder = WorkOrder;
-type BikeWorkOrderItem = WorkOrderItem;
-const createBikeQuote = createWorkOrderQuote;
-const createBikeSale = createWorkOrderSale;
-const createBikePaymentLink = createWorkOrderPaymentLink;
+import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
+import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
+import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
   asBoolean,
@@ -41,6 +38,12 @@ import {
   toDateTimeInput,
   toRFC3339,
 } from './resourceConfigs.shared';
+
+type BikeWorkOrder = WorkOrder;
+type BikeWorkOrderItem = WorkOrderItem;
+const createBikeQuote = createWorkOrderQuote;
+const createBikeSale = createWorkOrderSale;
+const createBikePaymentLink = createWorkOrderPaymentLink;
 
 function parseWorkOrderItems(value: CrudFieldValue | undefined): WorkOrderItem[] {
   const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
@@ -82,7 +85,7 @@ function parseBikeWorkOrderItems(value: CrudFieldValue | undefined): BikeWorkOrd
     .filter((item) => item.description && item.quantity > 0);
 }
 
-const resourceConfigs: CrudResourceConfigMap = {
+const workshopsResourceConfigs: CrudResourceConfigMap = {
   workshopVehicles: {
     supportsArchived: true,
     label: 'vehículo',
@@ -173,6 +176,17 @@ const resourceConfigs: CrudResourceConfigMap = {
   },
   carWorkOrders: {
     supportsArchived: true,
+    viewModes: [
+      {
+        id: 'kanban',
+        label: 'Tablero',
+        path: 'board',
+        ariaLabel: 'Navegación tablero / lista',
+        isDefault: true,
+        render: () => <CarWorkOrdersKanbanModeContent />,
+      },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
+    ],
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo',
@@ -417,6 +431,17 @@ const resourceConfigs: CrudResourceConfigMap = {
 
   bikeWorkOrders: {
     supportsArchived: true,
+    viewModes: [
+      {
+        id: 'kanban',
+        label: 'Tablero',
+        path: 'board',
+        ariaLabel: 'Navegación tablero / lista',
+        isDefault: true,
+        render: () => <BikeWorkOrdersKanbanModeContent />,
+      },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
+    ],
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo (bicicletería)',
@@ -600,6 +625,16 @@ const resourceConfigs: CrudResourceConfigMap = {
       asString(values.items_json).trim().length > 0,
   },
 };
+
+const resourceConfigs = Object.fromEntries(
+  Object.entries(workshopsResourceConfigs).map(([resourceId, config]) => {
+    const csvOpts =
+      resourceId === 'carWorkOrders' || resourceId === 'bikeWorkOrders'
+        ? { mode: 'client' as const, allowImport: false, allowExport: true }
+        : { mode: 'client' as const };
+    return [resourceId, withCSVToolbar(resourceId, config, csvOpts)];
+  }),
+) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
 

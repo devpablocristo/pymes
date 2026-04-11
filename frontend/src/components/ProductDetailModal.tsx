@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ImageFullscreenViewer } from './ImageFullscreenViewer';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import './ProductDetailModal.css';
@@ -24,17 +25,10 @@ export type ProductDetailResponse = {
   updated_at?: string;
 };
 
-const PLACEHOLDER_IMAGE =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">' +
-      '<rect width="200" height="200" fill="#e5e7eb"/>' +
-      '<path d="M40 150 L80 100 L110 130 L140 90 L170 150 Z" fill="#9ca3af"/>' +
-      '<circle cx="140" cy="60" r="14" fill="#9ca3af"/>' +
-      '</svg>',
-  );
-
-function collectImageUrls(p: ProductDetailResponse): string[] {
+/** URLs de galería del producto (sin duplicados). Reutilizable en inventario y otros modales. */
+export function collectProductImageUrls(
+  p: Pick<ProductDetailResponse, 'image_url' | 'image_urls'>,
+): string[] {
   const raw = p.image_urls?.length ? p.image_urls : p.image_url ? [p.image_url] : [];
   const out: string[] = [];
   const seen = new Set<string>();
@@ -58,8 +52,9 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slide, setSlide] = useState(0);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  const urls = useMemo(() => (product ? collectImageUrls(product) : []), [product]);
+  const urls = useMemo(() => (product ? collectProductImageUrls(product) : []), [product]);
 
   useEffect(() => {
     if (!productId) {
@@ -91,6 +86,10 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   }, [productId, t]);
 
   useEffect(() => {
+    setLightboxUrl(null);
+  }, [productId]);
+
+  useEffect(() => {
     if (!productId) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -109,7 +108,6 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
 
   if (!productId) return null;
 
-  const mainSrc = urls.length ? urls[Math.min(slide, urls.length - 1)]! : PLACEHOLDER_IMAGE;
   const fmtMoney = (n: number | undefined, cur: string | undefined) =>
     `${cur ?? 'ARS'} ${Number(n ?? 0).toFixed(2)}`;
 
@@ -141,57 +139,74 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
             <p className="product-detail-modal__error">{error}</p>
           ) : (
             <>
-              <div className="product-detail-modal__media">
-                <div className="product-detail-modal__main-image-wrap">
-                  <img
-                    src={mainSrc}
-                    alt=""
-                    className="product-detail-modal__main-image"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_IMAGE;
-                    }}
-                  />
+              {urls.length > 0 ? (
+                <div className="product-detail-modal__media">
+                  <div className="product-detail-modal__main-image-wrap">
+                    <img
+                      src={urls[Math.min(slide, urls.length - 1)]!}
+                      alt=""
+                      className="product-detail-modal__main-image product-detail-modal__main-image--zoomable"
+                      onClick={() => setLightboxUrl(urls[Math.min(slide, urls.length - 1)]!)}
+                      onError={(e) => {
+                        const media = (e.currentTarget as HTMLImageElement).closest('.product-detail-modal__media');
+                        if (media) (media as HTMLElement).hidden = true;
+                      }}
+                    />
+                    {urls.length > 1 ? (
+                      <>
+                        <button
+                          type="button"
+                          className="product-detail-modal__nav product-detail-modal__nav--prev"
+                          onClick={goPrev}
+                          aria-label={t('crud.products.detail.prevImage')}
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          className="product-detail-modal__nav product-detail-modal__nav--next"
+                          onClick={goNext}
+                          aria-label={t('crud.products.detail.nextImage')}
+                        >
+                          ›
+                        </button>
+                        <span className="product-detail-modal__counter" aria-live="polite">
+                          {slide + 1} / {urls.length}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
                   {urls.length > 1 ? (
-                    <>
-                      <button
-                        type="button"
-                        className="product-detail-modal__nav product-detail-modal__nav--prev"
-                        onClick={goPrev}
-                        aria-label={t('crud.products.detail.prevImage')}
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        className="product-detail-modal__nav product-detail-modal__nav--next"
-                        onClick={goNext}
-                        aria-label={t('crud.products.detail.nextImage')}
-                      >
-                        ›
-                      </button>
-                      <span className="product-detail-modal__counter" aria-live="polite">
-                        {slide + 1} / {urls.length}
-                      </span>
-                    </>
+                    <div className="product-detail-modal__thumbs" role="tablist" aria-label={t('crud.products.detail.thumbsAria')}>
+                      {urls.map((u, idx) => (
+                        <button
+                          key={u + String(idx)}
+                          type="button"
+                          role="tab"
+                          aria-selected={idx === slide}
+                          className={`product-detail-modal__thumb${idx === slide ? ' product-detail-modal__thumb--active' : ''}`}
+                          onClick={() => setSlide(idx)}
+                          onDoubleClick={(ev) => {
+                            ev.preventDefault();
+                            setLightboxUrl(u);
+                          }}
+                          title={t('crud.products.detail.thumbDblClickZoom')}
+                        >
+                          <img
+                            src={u}
+                            alt=""
+                            loading="lazy"
+                            onError={(ev) => {
+                              const btn = (ev.currentTarget as HTMLImageElement).closest('button');
+                              if (btn) btn.hidden = true;
+                            }}
+                          />
+                        </button>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
-                {urls.length > 1 ? (
-                  <div className="product-detail-modal__thumbs" role="tablist" aria-label={t('crud.products.detail.thumbsAria')}>
-                    {urls.map((u, idx) => (
-                      <button
-                        key={u + String(idx)}
-                        type="button"
-                        role="tab"
-                        aria-selected={idx === slide}
-                        className={`product-detail-modal__thumb${idx === slide ? ' product-detail-modal__thumb--active' : ''}`}
-                        onClick={() => setSlide(idx)}
-                      >
-                        <img src={u} alt="" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_IMAGE; }} />
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+              ) : null}
               {product && !loading ? (
                 <dl className="product-detail-modal__fields">
                   <div className="product-detail-modal__row">
@@ -249,5 +264,14 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
     </div>
   );
 
-  return createPortal(body, document.body);
+  return (
+    <>
+      {createPortal(body, document.body)}
+      <ImageFullscreenViewer
+        imageUrl={lightboxUrl}
+        onClose={() => setLightboxUrl(null)}
+        contentLabel={product?.name}
+      />
+    </>
+  );
 }

@@ -9,9 +9,15 @@ const apiMocks = vi.hoisted(() => ({
   getSession: vi.fn<[], Promise<SessionResponse>>(),
   getMe: vi.fn<[], Promise<MeProfileResponse>>(),
   getBillingStatus: vi.fn<[], Promise<BillingStatus>>(),
+  updateTenantSettings: vi.fn(),
 }));
 
 const signOutMock = vi.hoisted(() => vi.fn<[], Promise<void>>().mockResolvedValue(undefined));
+const setActiveMock = vi.hoisted(() => vi.fn<[{ organization: string }], Promise<void>>().mockResolvedValue(undefined));
+const createOrganizationMock = vi.hoisted(() =>
+  vi.fn<[{ name: string }], Promise<{ id: string }>>().mockResolvedValue({ id: 'org_new' }),
+);
+const sessionReloadMock = vi.hoisted(() => vi.fn<[], Promise<void>>().mockResolvedValue(undefined));
 
 const useUserMock = vi.hoisted(() =>
   vi.fn(() => ({
@@ -47,13 +53,25 @@ vi.mock('@clerk/react', () => ({
     orgId: 'org_mock',
     orgRole: 'org:admin',
   }),
-  useClerk: () => ({ signOut: signOutMock }),
+  useClerk: () => ({ signOut: signOutMock, setActive: setActiveMock, createOrganization: createOrganizationMock }),
+  useSession: () => ({ session: { reload: sessionReloadMock } }),
+  useOrganizationList: () => ({
+    isLoaded: true,
+    userMemberships: {
+      data: [
+        { id: 'membership_1', organization: { id: 'org_mock', name: 'Organización desde Clerk' } },
+        { id: 'membership_2', organization: { id: 'org_alt', name: 'Tenant alternativo' } },
+      ],
+      isLoading: false,
+    },
+  }),
 }));
 
 vi.mock('../lib/api', () => ({
   getSession: () => apiMocks.getSession(),
   getMe: () => apiMocks.getMe(),
   getBillingStatus: () => apiMocks.getBillingStatus(),
+  updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
 }));
 
 import { SettingsPage } from './SettingsPage';
@@ -103,6 +121,9 @@ function renderSettingsClerk() {
 
 describe('SettingsPage (modo Clerk)', () => {
   beforeEach(() => {
+    setActiveMock.mockClear();
+    createOrganizationMock.mockClear();
+    sessionReloadMock.mockClear();
     apiMocks.getSession.mockResolvedValue(sessionJwt);
     apiMocks.getMe.mockResolvedValue(meWithPlaceholderUser);
     apiMocks.getBillingStatus.mockResolvedValue({
@@ -113,6 +134,7 @@ describe('SettingsPage (modo Clerk)', () => {
       usage: {},
       current_period_end: new Date().toISOString(),
     });
+    apiMocks.updateTenantSettings.mockResolvedValue({});
     useUserMock.mockImplementation(() => ({
       isLoaded: true,
       user: {
@@ -136,7 +158,7 @@ describe('SettingsPage (modo Clerk)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Organización desde Clerk')).toBeInTheDocument();
+      expect(screen.getAllByText('Organización desde Clerk').length).toBeGreaterThan(0);
     });
     expect(screen.getByText('Tipo de cuenta')).toBeInTheDocument();
     expect(screen.getByText('Administrador')).toBeInTheDocument();
@@ -167,5 +189,19 @@ describe('SettingsPage (modo Clerk)', () => {
     renderSettingsClerk();
 
     expect(screen.getAllByText(/Cargando/i).length).toBeGreaterThan(0);
+  });
+
+  it('muestra cambio de tenant con organizaciones disponibles', async () => {
+    renderSettingsClerk();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tenants y organizaciones')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Tenant alternativo')).toBeInTheDocument();
+    expect(screen.getAllByText('Actual').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Usar esta' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear y usar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reabrir onboarding' })).toBeInTheDocument();
   });
 });

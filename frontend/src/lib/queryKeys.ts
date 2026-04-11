@@ -52,6 +52,9 @@ export const queryKeys = {
     kanban: (archived: boolean) => ['car-work-orders', 'kanban', archived ? 'archived' : 'active'] as const,
     crudConfig: ['car-work-orders', 'crud-config'] as const,
   },
+  products: {
+    crudConfig: ['products', 'crud-config'] as const,
+  },
   modules: {
     isCrud: (moduleId: string) => ['modules', 'is-crud', moduleId] as const,
   },

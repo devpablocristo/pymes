@@ -1,11 +1,22 @@
 import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui/surface';
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
+import { applyCrudUiOverride } from '../lib/crudUiConfig';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
 type ResourceConfigMap = CrudResourceConfigMap;
 
 export function hasCrudResourceInMap(resourceConfigs: ResourceConfigMap, resourceId: string): boolean {
   return resourceId in resourceConfigs;
+}
+
+function withoutCsvToolbarActions<T extends { id: string }>(config: CrudPageConfig<T>): CrudPageConfig<T> {
+  if (config.featureFlags?.csvToolbar !== false) {
+    return config;
+  }
+  return {
+    ...config,
+    toolbarActions: (config.toolbarActions ?? []).filter((a) => a.id !== 'csv-import' && a.id !== 'csv-export'),
+  };
 }
 
 export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: string }>(
@@ -16,7 +27,11 @@ export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: 
   if (!config) {
     return null;
   }
-  return mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>);
+  const merged = applyCrudUiOverride(
+    resourceId,
+    mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>),
+  );
+  return withoutCsvToolbarActions(merged);
 }
 
 export function buildConfiguredCrudPage(resourceConfigs: ResourceConfigMap) {

@@ -25,7 +25,7 @@
     "@devpablocristo/core-http": "^0.1.0",
     "@devpablocristo/modules-admin-insights": "^0.1.0",
     "@devpablocristo/modules-calendar-board": "file:../../modules/calendar/board/ts",
-    "@devpablocristo/modules-crud-ui": "^0.6.1",
+    "@devpablocristo/modules-crud-ui": "file:../../modules/crud/ui/ts",
     "@devpablocristo/modules-kanban-board": "^0.2.0",
     "@devpablocristo/modules-scheduling": "file:../../modules/scheduling/ts",
     "@devpablocristo/modules-search": "^0.1.0",

@@ -1,5 +1,26 @@
 package dto
 
+import "encoding/json"
+
+type NullableStringField struct {
+	Set   bool
+	Value *string
+}
+
+func (f *NullableStringField) UnmarshalJSON(data []byte) error {
+	f.Set = true
+	if string(data) == "null" {
+		f.Value = nil
+		return nil
+	}
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	f.Value = &value
+	return nil
+}
+
 type UpdateTenantSettingsRequest struct {
 	PlanCode                 *string        `json:"plan_code,omitempty"`
 	HardLimits               map[string]any `json:"hard_limits,omitempty"`
@@ -23,7 +44,7 @@ type UpdateTenantSettingsRequest struct {
 	UsesBilling              *bool          `json:"uses_billing,omitempty"`
 	PaymentMethod            *string        `json:"payment_method,omitempty"`
 	Vertical                 *string        `json:"vertical,omitempty"`
-	OnboardingCompletedAt    *string        `json:"onboarding_completed_at,omitempty"`
+	OnboardingCompletedAt    NullableStringField `json:"onboarding_completed_at,omitempty"`
 	WAQuoteTemplate          *string        `json:"wa_quote_template,omitempty"`
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`

@@ -1,0 +1,19 @@
+# Copiar a la raíz del contexto de build cuando `docker-compose` usa `build.context: ..`
+# (repo padre del checkout de `pymes`, p. ej. `Pablo/`):
+#
+#   cp pymes/docker/build-context-pablo.dockerignore ../.dockerignore
+#
+# Docker solo aplica `.dockerignore` en la raíz del contexto (`..`), no en `pymes/`.
+
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+# No excluir `core/` ni `nexus/`: `cp-backend` y `review` hacen COPY desde ahí con `context: ..`.
+ponti/
+medmory/
+toollab/
+local-infra/

@@ -26,6 +26,7 @@ type ListStockParams struct {
 	Limit    int
 	After    *uuid.UUID
 	LowStock bool
+	Archived bool
 	Order    string
 }
 
@@ -96,7 +97,12 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 	q := r.db.WithContext(ctx).
 		Table("stock_levels sl").
 		Joins("JOIN products p ON p.id = sl.product_id").
-		Where("sl.org_id = ? AND p.deleted_at IS NULL", p.OrgID)
+		Where("sl.org_id = ?", p.OrgID)
+	if p.Archived {
+		q = q.Where("p.deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("p.deleted_at IS NULL")
+	}
 	if p.LowStock {
 		q = q.Where("sl.min_quantity > 0 AND sl.quantity <= sl.min_quantity")
 	}

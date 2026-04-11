@@ -1,6 +1,16 @@
-import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ConfiguredCrudModePage } from '../crud/configuredCrudViews';
 
-/** Vista tabla: CRUD canónico sin wrapper de modo (el switch vive en ProductsModuleSection). */
 export function ProductsListPage() {
-  return <LazyConfiguredCrudPage resourceId="products" />;
+  const [searchParams] = useSearchParams();
+  const mergeConfig = useMemo(() => {
+    const raw = searchParams.get('archived')?.trim().toLowerCase();
+    if (raw === '1' || raw === 'true' || raw === 'yes') {
+      return { initialShowArchived: true };
+    }
+    return undefined;
+  }, [searchParams]);
+
+  return <ConfiguredCrudModePage resourceId="products" modeId="list" mergeConfig={mergeConfig} />;
 }

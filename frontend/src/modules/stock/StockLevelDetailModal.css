@@ -1,0 +1,278 @@
+/* Modal inventario / producto — mismo fondo que la página (`--color-bg`) */
+
+.stock-level-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.stock-level-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+
+.stock-level-modal {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  max-height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-z16, 0 12px 28px color-mix(in srgb, var(--color-text) 12%, transparent));
+  overflow: hidden;
+}
+
+.stock-level-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  background: var(--color-bg);
+}
+
+.stock-level-modal__title-block {
+  min-width: 0;
+}
+
+.stock-level-modal__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+.stock-level-modal__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal__body {
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-level-modal__main {
+  padding: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.stock-level-modal__gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-text) 4%, var(--color-bg));
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Si todas las imágenes fallan al cargar, no dejar franja vacía */
+.stock-level-modal__gallery:not(:has(.stock-level-modal__gallery-item:not([hidden]))) {
+  display: none;
+}
+
+.stock-level-modal__gallery-item {
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-bg));
+  border: 1px solid var(--color-border);
+}
+
+.stock-level-modal__gallery-zoom {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+.stock-level-modal__gallery-zoom:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.stock-level-modal__gallery-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  max-height: min(52vh, 520px);
+  object-fit: contain;
+  object-position: center;
+}
+
+.stock-level-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  background: var(--color-bg);
+}
+
+.stock-level-modal__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.stock-level-modal__link {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.stock-level-modal__link:hover {
+  text-decoration: underline;
+  color: var(--color-primary-hover);
+}
+
+.stock-level-modal__muted {
+  margin: 0 0 var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal__form-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 520px) {
+  .stock-level-modal__form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.stock-level-modal__field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.stock-level-modal__field input,
+.stock-level-modal__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: var(--space-2) var(--space-2);
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.stock-level-modal__field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.stock-level-modal__field input::placeholder,
+.stock-level-modal__field textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.stock-level-modal__error {
+  margin: 0 var(--space-4) var(--space-2);
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+.stock-level-modal__body > .stock-level-modal__error {
+  margin-top: var(--space-2);
+}
+
+.stock-level-modal .stock-detail--in-modal {
+  padding: 0;
+  gap: var(--space-4);
+}
+
+.stock-level-modal .stock-detail__section h4 {
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal .stock-detail__stat {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.stock-level-modal .stock-detail__stat span {
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal .stock-detail__stat strong {
+  color: var(--color-text);
+}
+
+.stock-level-modal .stock-movements-table th {
+  border-bottom-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal .stock-movements-table td {
+  border-bottom-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.stock-level-modal .stock-empty {
+  color: var(--color-text-secondary);
+}
+
+.stock-level-modal .stock-badge-low {
+  background: var(--color-warning-subtle, color-mix(in srgb, var(--color-warning) 22%, var(--color-bg)));
+  color: var(--color-alert-warning-text, #92400e);
+}
+
+.stock-level-modal .text-secondary {
+  color: var(--color-text-secondary) !important;
+}
+
+.stock-level-modal .stock-qty-in {
+  color: var(--color-success);
+}
+
+.stock-level-modal .stock-qty-out {
+  color: var(--color-danger);
+}
+
+.stock-level-modal .stock-level-modal__error {
+  margin-left: 0;
+  margin-right: 0;
+}

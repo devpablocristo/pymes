@@ -23,6 +23,7 @@ function resolveCrudModuleGroup(resourceId: string): string {
   }
   if (
     [
+      'stock',
       'returns',
       'creditNotes',
       'cashflow',

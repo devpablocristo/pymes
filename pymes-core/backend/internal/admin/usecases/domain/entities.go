@@ -87,7 +87,7 @@ type TenantSettingsPatch struct {
 	UsesBilling              *bool          `json:"uses_billing,omitempty"`
 	PaymentMethod            *string        `json:"payment_method,omitempty"`
 	Vertical                 *string        `json:"vertical,omitempty"`
-	OnboardingCompletedAt    *time.Time     `json:"onboarding_completed_at,omitempty"`
+	OnboardingCompletedAt    **time.Time    `json:"onboarding_completed_at,omitempty"`
 	WAQuoteTemplate          *string        `json:"wa_quote_template,omitempty"`
 	WAReceiptTemplate        *string        `json:"wa_receipt_template,omitempty"`
 	WADefaultCountryCode     *string        `json:"wa_default_country_code,omitempty"`

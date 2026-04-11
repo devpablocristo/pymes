@@ -15,6 +15,9 @@ export type CSVToolbarOptions = {
   entity?: string;
   allowImport?: boolean;
   allowExport?: boolean;
+  /** Con `mode: 'client'`, import vía dataio usando `importEntity` (p. ej. inventario → catálogo products). */
+  importUsesServer?: boolean;
+  importEntity?: string;
   importMode?: 'create_only' | 'upsert';
   fileName?: string;
   columns?: CSVColumn[];
@@ -104,10 +107,11 @@ export function withCSVToolbar<T extends { id: string }>(
   const entity = options.entity ?? resourceId;
   const defaultAllowImport = Boolean(config.dataSource?.create || config.basePath);
   const allowImport = options.allowImport ?? defaultAllowImport;
+  const wantsServerImport =
+    allowImport && (mode === 'server' || Boolean(options.importUsesServer));
 
   const serverImport =
-    options.serverImport ??
-    (mode === 'server' && allowImport ? createCoreDataioServerImportPort() : undefined);
+    options.serverImport ?? (wantsServerImport ? createCoreDataioServerImportPort() : undefined);
   const serverExport =
     options.serverExport ?? (mode === 'server' ? createCoreDataioServerExportPort() : undefined);
 
@@ -122,6 +126,8 @@ export function withCSVToolbar<T extends { id: string }>(
     fileName: options.fileName,
     serverImport,
     serverExport,
+    importUsesServer: options.importUsesServer,
+    importEntity: options.importEntity,
     ui: pymesCsvUi,
     importClientRow: (values) => createFromValues(config, values),
     messages: spanishCsvMessages,

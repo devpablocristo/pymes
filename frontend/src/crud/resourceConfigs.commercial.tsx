@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { type CrudFieldValue, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
-import { withCSVToolbar, type CSVToolbarOptions } from './csvToolbar';
+import { mergeCsvOptionsForResource } from './csvEntityPolicy';
+import { withCSVToolbar } from './csvToolbar';
 import {
   asBoolean,
   asNumber,
@@ -13,6 +14,7 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
+import { ProductsGalleryModeContent } from '../pages/modes/ProductsGalleryModeContent';
 import { renderTagBadges } from './crudTagBadges';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
@@ -426,6 +428,17 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   products: {
     basePath: '/v1/products',
     supportsArchived: true,
+    viewModes: [
+      {
+        id: 'gallery',
+        label: 'Galería',
+        path: 'gallery',
+        ariaLabel: 'Vista galería o lista',
+        isDefault: true,
+        render: () => <ProductsGalleryModeContent />,
+      },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista galería o lista' },
+    ],
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
@@ -1062,25 +1075,10 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
 };
 
-function commercialCsvToolbarOptions(resourceId: string): CSVToolbarOptions {
-  switch (resourceId) {
-    case 'customers':
-      return { mode: 'server', entity: 'customers' };
-    case 'suppliers':
-      return { mode: 'server', entity: 'suppliers' };
-    case 'products':
-      return { mode: 'server', entity: 'products' };
-    case 'services':
-      return { mode: 'server', entity: 'services' };
-    default:
-      return { mode: 'client' };
-  }
-}
-
 const resourceConfigs = Object.fromEntries(
   Object.entries(commercialResourceConfigs).map(([resourceId, config]) => [
     resourceId,
-    withCSVToolbar(resourceId, config, commercialCsvToolbarOptions(resourceId)),
+    withCSVToolbar(resourceId, config, mergeCsvOptionsForResource(resourceId, config)),
   ]),
 ) as CrudResourceConfigMap;
 

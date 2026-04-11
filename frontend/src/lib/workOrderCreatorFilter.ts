@@ -23,6 +23,7 @@ export function isSeedActor(raw: string | undefined): boolean {
 
 export function formatWorkOrderActorLabel(actor: string, selfId: string | undefined): string {
   if (selfId && actor === selfId) return 'Yo';
+  if (isSeedActor(actor)) return 'Seeds';
   if (actor.includes('@')) return actor.split('@')[0] ?? actor;
   if (actor.length > 14) return `${actor.slice(0, 12)}…`;
   return actor || '—';

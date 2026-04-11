@@ -1,13 +1,19 @@
+# Context de build: directorio padre del repo `pymes` (p. ej. `Pablo/`) para poder resolver
+# dependencias `file:../../modules/...` del package-lock antes de `npm ci`.
 FROM node:20.19.0-alpine
 
 WORKDIR /workspace/pymes/frontend
 
-COPY frontend/package.json frontend/package-lock.json* ./
+COPY pymes/frontend/package.json pymes/frontend/package-lock.json* ./
+COPY pymes/frontend/vendor ./vendor
+COPY modules/calendar/board/ts /workspace/modules/calendar/board/ts
+COPY modules/crud/ui/ts /workspace/modules/crud/ui/ts
+COPY modules/scheduling/ts /workspace/modules/scheduling/ts
 RUN npm ci
 
-COPY frontend/ /workspace/pymes/frontend
+COPY pymes/frontend/ /workspace/pymes/frontend/
 
-COPY frontend/docker-entrypoint-dev.sh /usr/local/bin/docker-entrypoint-dev.sh
+COPY pymes/frontend/docker-entrypoint-dev.sh /usr/local/bin/docker-entrypoint-dev.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint-dev.sh
 
 EXPOSE 5173

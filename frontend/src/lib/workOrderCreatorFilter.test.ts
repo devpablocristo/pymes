@@ -33,6 +33,12 @@ describe('formatWorkOrderActorLabel', () => {
     expect(formatWorkOrderActorLabel('alice', undefined)).toBe('alice');
   });
 
+  it('normalizes seed-like actors as Seeds', () => {
+    expect(formatWorkOrderActorLabel('seed', undefined)).toBe('Seeds');
+    expect(formatWorkOrderActorLabel('seeds', undefined)).toBe('Seeds');
+    expect(formatWorkOrderActorLabel('seed:local', undefined)).toBe('Seeds');
+  });
+
   it('returns dash for empty actor', () => {
     expect(formatWorkOrderActorLabel('', undefined)).toBe('\u2014');
   });

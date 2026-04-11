@@ -67,20 +67,21 @@
         "./node_modules/@devpablocristo/modules-calendar-board/src/styles.css"
       ],
       "@devpablocristo/modules-crud-ui": [
-        "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts",
-        "../../modules/crud/ui/ts/src/index.ts"
+        "../../modules/crud/ui/ts/src/index.ts",
+        "./node_modules/@devpablocristo/modules-crud-ui/src/index.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv": [
-        "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts",
-        "../../modules/crud/ui/ts/src/csv.ts"
+        "../../modules/crud/ui/ts/src/csv.ts",
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csv.ts"
       ],
       "@devpablocristo/modules-crud-ui/csv-toolbar": [
-        "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts",
-        "../../modules/crud/ui/ts/src/csvToolbarMerge.ts"
+        "../../modules/crud/ui/ts/src/csvToolbarMerge.ts",
+        "./node_modules/@devpablocristo/modules-crud-ui/src/csvToolbarMerge.ts"
       ],
       "@devpablocristo/modules-crud-ui/surface": [
-        "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx",
-        "../../modules/crud/ui/ts/src/crudCanonicalSurface.tsx"
+        "../../modules/crud/ui/ts/src/surface.ts",
+        "./node_modules/@devpablocristo/modules-crud-ui/src/surface.ts",
+        "./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx"
       ],
       "@devpablocristo/modules-kanban-board": [
         "./node_modules/@devpablocristo/modules-kanban-board/src/index.ts",

@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearch } from '@devpablocristo/modules-search';
 import type { CSSProperties } from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   SectionHubPage,
   parseSectionHubSelection,
@@ -572,6 +572,7 @@ function GatewayTab() {
 // ─── Página principal ───
 
 export function SettingsHubPage() {
+  const navigate = useNavigate();
   const settingsSearch = usePageSearch();
   const sectionTextFn = useCallback((s: SectionCard) => `${s.label} ${s.desc}`, []);
   const sessionQuery = useQuery({
@@ -582,18 +583,24 @@ export function SettingsHubPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
   const waitingForAdminSection = !sessionQuery.data && (requestedSection === 'rbac' || requestedSection === 'audit');
-  const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
+  const isAccountAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const availableSections = useMemo(() => {
     if (!sessionQuery.data) {
       return NON_ADMIN_SECTIONS;
     }
-    if (isConsoleAdmin) {
+    if (isAccountAdmin) {
       return SETTING_SECTIONS;
     }
     return NON_ADMIN_SECTIONS;
-  }, [isConsoleAdmin, sessionQuery.data]);
+  }, [isAccountAdmin, sessionQuery.data]);
   const filteredSections = useSearch(availableSections, sectionTextFn, settingsSearch);
   const [section, setSection] = useState<Section>(() => sectionFromSearchParam(NON_ADMIN_SECTIONS, requestedSection));
+
+  useEffect(() => {
+    if (requestedSection === 'crudUi') {
+      navigate('/modules/stock/configure', { replace: true });
+    }
+  }, [navigate, requestedSection]);
 
   useEffect(() => {
     if (waitingForAdminSection) {
@@ -694,12 +701,12 @@ export function SettingsHubPage() {
           <AdminPage section="workspace" embedded />
         </Suspense>
       )}
-      {section === 'rbac' && isConsoleAdmin && (
+      {section === 'rbac' && isAccountAdmin && (
         <Suspense fallback={<div className="spinner" />}>
           <AdminPage section="rbac" embedded />
         </Suspense>
       )}
-      {section === 'audit' && isConsoleAdmin && (
+      {section === 'audit' && isAccountAdmin && (
         <Suspense fallback={<div className="spinner" />}>
           <AdminPage section="audit" embedded />
         </Suspense>

@@ -109,11 +109,13 @@ services:
       review:
         condition: service_healthy
 
+  # `context: ..` permite `file:../../modules/...` en package-lock. Opcional: copiar
+  # `pymes/docker/build-context-pablo.dockerignore` → `../.dockerignore` para un contexto más liviano.
   frontend:
     restart: unless-stopped
     build:
-      context: .
-      dockerfile: ./frontend/Dockerfile.dev
+      context: ..
+      dockerfile: pymes/frontend/Dockerfile.dev
     ports:
       - "5180:5173"
     volumes:

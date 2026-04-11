@@ -55,6 +55,17 @@ function modulesPackagePreferNodeModules(segments: string[], nodeModulesSpecifie
   return monorepoModulesDir(...segments);
 }
 
+/** `surface.ts` (≥0.7.0) o `crudCanonicalSurface.tsx` (0.6.x) en npm, si no monorepo local. */
+function modulesCrudUiSurfacePath(): string {
+  const surfaceNew = fileURLToPath(new URL('./node_modules/@devpablocristo/modules-crud-ui/src/surface.ts', import.meta.url));
+  const surfaceLegacy = fileURLToPath(
+    new URL('./node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx', import.meta.url),
+  );
+  if (fs.existsSync(surfaceNew)) return surfaceNew;
+  if (fs.existsSync(surfaceLegacy)) return surfaceLegacy;
+  return monorepoModulesDir('crud/ui/ts/src/surface.ts');
+}
+
 const fullCalendarCore = fileURLToPath(new URL('./node_modules/@fullcalendar/core', import.meta.url));
 const fullCalendarDayGrid = fileURLToPath(new URL('./node_modules/@fullcalendar/daygrid', import.meta.url));
 const fullCalendarInteraction = fileURLToPath(new URL('./node_modules/@fullcalendar/interaction', import.meta.url));
@@ -71,18 +82,15 @@ const coreBrowserStorage = monorepoCoreDir('browser/ts/src/storage.ts');
 const coreBrowserTheme = monorepoCoreDir('browser/ts/src/theme.ts');
 const coreBrowserObservability = monorepoCoreDir('browser/ts/src/observability.ts');
 const coreBrowserI18n = monorepoCoreDir('browser/ts/src/i18n/index.ts');
-const modulesCrudUiIndex = modulesPackagePreferNodeModules(
+const modulesCrudUiIndex = monorepoModulesDirOrNodeModule(
   ['crud/ui/ts/src/index.ts'],
   './node_modules/@devpablocristo/modules-crud-ui/src/index.ts',
 );
-const modulesCrudUiCsv = modulesPackagePreferNodeModules(
+const modulesCrudUiCsv = monorepoModulesDirOrNodeModule(
   ['crud/ui/ts/src/csv.ts'],
   './node_modules/@devpablocristo/modules-crud-ui/src/csv.ts',
 );
-const modulesCrudUiSurface = modulesPackagePreferNodeModules(
-  ['crud/ui/ts/src/crudCanonicalSurface.tsx'],
-  './node_modules/@devpablocristo/modules-crud-ui/src/crudCanonicalSurface.tsx',
-);
+const modulesCrudUiSurface = modulesCrudUiSurfacePath();
 /** Repo hermano `modules/`; si no existe en disco, fallback a paquete en node_modules (CI con symlink). */
 const modulesCalendarBoardIndex = monorepoModulesDirOrNodeModule(
   ['calendar/board/ts/src/index.ts'],

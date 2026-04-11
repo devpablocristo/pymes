@@ -195,4 +195,27 @@ describe('WorkOrdersKanbanPanel', () => {
     const cached = queryClient.getQueryData<AutoRepairWorkOrder[]>(queryKeys.carWorkOrders.kanban(false)) ?? [];
     expect(cached.some((row) => row.id === 'wo-1')).toBe(false);
   });
+
+  it('vuelve a pintar las órdenes cuando la query se recarga con nuevos datos', async () => {
+    const { queryClient } = renderKanban();
+
+    expect(
+      await screen.findByRole('button', { name: 'OT-001 - Cliente original' }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
+
+    apiMocks.getAllWorkOrders.mockResolvedValueOnce([
+      buildWorkOrder({ id: 'wo-3', number: 'OT-003', customer_name: 'Cliente recargado' }),
+    ]);
+
+    await queryClient.invalidateQueries({ queryKey: queryKeys.carWorkOrders.kanban(false) });
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: 'OT-003 - Cliente recargado' })).toBeInTheDocument();
+      },
+      { timeout: 10_000 },
+    );
+
+    expect(screen.queryByRole('button', { name: 'OT-001 - Cliente original' })).not.toBeInTheDocument();
+  });
 });

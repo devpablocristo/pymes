@@ -3,11 +3,12 @@
  * Reutilizable por cualquier vertical (auto-repair, bike-shop, etc.).
  */
 import { useUser } from '@clerk/react';
-import { StatusKanbanBoard, type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
+import { type KanbanColumnDef, type SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { normalize } from '@devpablocristo/core-browser/search';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { CrudKanbanSurface } from '../modules/crud';
 import { CreatedByPillsBar } from './CreatedByPillsBar';
 import { clerkEnabled } from '../lib/auth';
 import { applyWorkOrderCreatorFilter, type CreatorFilterState } from '../lib/workOrderCreatorFilter';
@@ -219,10 +220,8 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchStatus(id, status),
   });
 
-  const initialLoadDone = useRef(false);
   useEffect(() => {
-    if (woQuery.data && !initialLoadDone.current) {
-      initialLoadDone.current = true;
+    if (woQuery.data) {
       setItems(woQuery.data);
       setError(null);
     }
@@ -231,13 +230,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     }
   }, [woQuery.data, woQuery.error]);
 
-  // Reset al cambiar vista activas/archivadas
-  useEffect(() => {
-    initialLoadDone.current = false;
-  }, [showArchived]);
-
   const reload = useCallback(async () => {
-    initialLoadDone.current = false;
     await queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
 
@@ -346,12 +339,8 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
 
   return (
     <>
-      {headerLeadSlot ? (
-        <div className="generic-work-orders-board__lead crud-list-header-lead crud-list-header-lead--above-title">
-          {headerLeadSlot}
-        </div>
-      ) : null}
-      <StatusKanbanBoard<T>
+      <CrudKanbanSurface<T>
+        leadSlot={headerLeadSlot}
         columns={COLUMN_ORDER}
         columnIdSet={COLUMN_IDS}
         getRowColumnId={(row) => workOrderKanbanPhaseFromStatus(row.status)}

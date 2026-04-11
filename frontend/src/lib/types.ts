@@ -78,7 +78,7 @@ export type TenantSettingsUpdatePayload = {
   uses_billing?: boolean;
   payment_method?: string;
   vertical?: string;
-  onboarding_completed_at?: string;
+  onboarding_completed_at?: string | null;
   wa_quote_template?: string;
   wa_receipt_template?: string;
   wa_default_country_code?: string;

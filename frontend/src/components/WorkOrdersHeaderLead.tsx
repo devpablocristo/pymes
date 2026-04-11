@@ -1,6 +1,4 @@
-import { NavLink, useMatch } from 'react-router-dom';
-import '../styles/viewModeSegmentedSwitch.css';
-import '../pages/WorkOrdersModuleSection.css';
+import { CrudViewModeSwitch } from '../modules/crud';
 
 type Props = {
   boardPath: string;
@@ -27,33 +25,15 @@ export function WorkOrdersHeaderLead({
   editPattern,
   description,
 }: Props) {
-  const isBoardActive = useMatch(boardPath);
-  const isListMatch = useMatch(listPath);
-  const isEditMatch = useMatch(editPattern ?? `${listPath}/edit/:orderId`);
-  const isListContext = isListMatch || isEditMatch;
-
   return (
-    <div className="wo-mod-orders__header-lead">
-      {description && <p>{description}</p>}
-      <div className="m-seg-switch" role="group" aria-label={groupAriaLabel}>
-        <NavLink to={boardPath} className="m-seg-switch__track" draggable={false}>
-          <span className={`m-seg-switch__label${isBoardActive ? ' m-seg-switch__label--active' : ''}`}>
-            {leftLabel}
-          </span>
-          <span className={`m-seg-switch__label${!isBoardActive && isListContext ? ' m-seg-switch__label--active' : ''}`}>
-            {rightLabel}
-          </span>
-          <span
-            className={`m-seg-switch__thumb${isBoardActive ? ' m-seg-switch__thumb--left' : ' m-seg-switch__thumb--right'}`}
-          />
-        </NavLink>
-        {!isBoardActive ? (
-          <NavLink to={boardPath} className="m-seg-switch__hit m-seg-switch__hit--left" aria-hidden="true" draggable={false} tabIndex={-1}>&nbsp;</NavLink>
-        ) : null}
-        {isBoardActive ? (
-          <NavLink to={listPath} className="m-seg-switch__hit m-seg-switch__hit--right" aria-hidden="true" draggable={false} tabIndex={-1}>&nbsp;</NavLink>
-        ) : null}
-      </div>
-    </div>
+    <CrudViewModeSwitch
+      primaryPath={boardPath}
+      secondaryPath={listPath}
+      primaryLabel={leftLabel}
+      secondaryLabel={rightLabel}
+      groupAriaLabel={groupAriaLabel}
+      secondaryContextPattern={editPattern ?? `${listPath}/edit/:orderId`}
+      description={description}
+    />
   );
 }

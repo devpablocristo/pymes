@@ -48,6 +48,7 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.products.detail.prevImage': 'Imagen anterior',
     'crud.products.detail.nextImage': 'Imagen siguiente',
     'crud.products.detail.thumbsAria': 'Miniaturas de imágenes',
+    'crud.products.detail.thumbDblClickZoom': 'Doble clic para ver a pantalla completa',
   },
   en: {
     'crud.title.archived': 'Archived {{labelPluralCap}}',
@@ -96,5 +97,6 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.products.detail.prevImage': 'Previous image',
     'crud.products.detail.nextImage': 'Next image',
     'crud.products.detail.thumbsAria': 'Image thumbnails',
+    'crud.products.detail.thumbDblClickZoom': 'Double-click to view fullscreen',
   },
 };

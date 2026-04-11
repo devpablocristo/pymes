@@ -78,6 +78,59 @@
   width: 100%;
 }
 
+.crud-table tbody tr.crud-table__row-clickable {
+  cursor: pointer;
+}
+
+.crud-table tbody tr.crud-table__row-clickable:hover {
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+/* Ordenación por cabecera (CrudPage) */
+.crud-table__sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--font-weight-semibold, 600);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.crud-table__sort-btn:hover {
+  color: var(--color-primary, #2563eb);
+}
+
+.crud-table__sort-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.crud-table__sort-icons {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 0.65;
+  font-size: 0.55rem;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.crud-table__sort-icon {
+  opacity: 0.35;
+}
+
+.crud-table__sort-icon--active {
+  opacity: 1;
+  color: var(--color-primary, #2563eb);
+}
+
 .crud-table .cell-name {
   font-weight: var(--font-weight-semibold);
 }

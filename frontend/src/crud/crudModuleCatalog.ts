@@ -55,7 +55,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   returns: { title: 'Devoluciones', navLabel: 'Devoluciones', labelPlural: 'devoluciones' },
   creditNotes: { title: 'Notas de crédito', navLabel: 'Notas de crédito', labelPlural: 'notas de crédito' },
   cashflow: { title: 'Caja', navLabel: 'Caja', labelPlural: 'movimientos de caja' },
-  stock: { title: 'Stock', navLabel: 'Stock', labelPlural: 'niveles de stock' },
+  stock: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'productos en el inventario' },
   payments: { title: 'Pagos', navLabel: 'Pagos', labelPlural: 'pagos' },
   attachments: { title: 'Adjuntos', navLabel: 'Adjuntos', labelPlural: 'adjuntos' },
   audit: { title: 'Auditoría', navLabel: 'Auditoría', labelPlural: 'eventos de auditoría' },
@@ -161,8 +161,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   stock: {
     group: 'operations',
     icon: 'ST',
-    summary: 'Niveles de stock por producto, ajustes manuales y historial de movimientos.',
-    customRoute: '/stock',
+    summary: 'Productos en inventario, cantidades, ajustes manuales y movimientos.',
   },
   payments: {
     group: 'commercial',
@@ -347,6 +346,7 @@ export const crudModuleCatalog: Record<string, ModuleDefinition> = Object.fromEn
       notes: meta?.notes,
       datasets: meta?.datasets,
       actions: meta?.actions,
+      ...(meta?.customRoute ? { customRoute: meta.customRoute } : {}),
     };
     return [resourceId, definition];
   }),

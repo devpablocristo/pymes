@@ -7,6 +7,9 @@ import {
   listSalePayments,
   type SalePaymentRow,
 } from '../lib/api';
+import { fetchStockLevels, type StockLevelRow } from '../modules/stock';
+import { StockBoardView, StockGalleryView } from './stockVisualModes';
+import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
@@ -381,8 +384,75 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       return (ty === 'income' || ty === 'expense') && asNumber(values.amount) > 0;
     },
   },
-  // Stock unificado: página custom en /stock (StockPage.tsx).
-  // Los CRUD separados de inventory/inventoryMovements fueron reemplazados.
+  stock: {
+    label: 'producto en el inventario',
+    labelPlural: 'productos en el inventario',
+    labelPluralCap: 'Inventario',
+    allowCreate: false,
+    allowEdit: false,
+    allowDelete: false,
+    supportsArchived: true,
+    archivedEmptyState: 'No hay productos archivados en inventario.',
+    searchPlaceholder: 'Buscar por producto o SKU',
+    emptyState: 'No hay productos en el inventario.',
+    viewModes: [
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de inventario', isDefault: true },
+      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de inventario', render: () => <StockGalleryView /> },
+      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de inventario', render: () => <StockBoardView /> },
+    ],
+    rowActions: [],
+    /** Alta de ítem de catálogo (otro módulo). CSV de inventario: solo export de esta vista (entidad stock). */
+    toolbarActions: [
+      {
+        id: 'stock-new-product',
+        label: '+ Nuevo producto',
+        kind: 'primary',
+        onClick: async () => {
+          window.location.assign('/modules/products/list');
+        },
+      },
+    ],
+    dataSource: {
+      list: async ({ archived }) => fetchStockLevels({ archived: Boolean(archived) }),
+    },
+    columns: [
+      {
+        key: 'product_name',
+        header: 'Producto',
+        className: 'cell-name',
+        render: (_value, row: StockLevelRow) => (
+          <>
+            <strong>{row.product_name}</strong>
+            <div className="text-secondary">{row.sku || 'sin SKU'}</div>
+          </>
+        ),
+      },
+      { key: 'quantity', header: 'Actual', className: 'stock-col-num' },
+      { key: 'min_quantity', header: 'Mínimo', className: 'stock-col-num' },
+      {
+        key: 'is_low_stock',
+        header: 'Estado',
+        render: (value) => (
+          <span className={value ? 'stock-status stock-status--warning' : 'stock-status'}>
+            {value ? 'Bajo mínimo' : 'Normal'}
+          </span>
+        ),
+      },
+      { key: 'updated_at', header: 'Actualizado', className: 'stock-col-date', render: (value) => formatDate(String(value ?? '')) },
+    ],
+    formFields: [],
+    searchText: (row: StockLevelRow) => [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
+    toFormValues: (row: StockLevelRow) => ({
+      product_id: row.product_id,
+      product_name: row.product_name ?? '',
+      sku: row.sku ?? '',
+      quantity: String(row.quantity ?? ''),
+      min_quantity: String(row.min_quantity ?? ''),
+      is_low_stock: row.is_low_stock ? 'true' : 'false',
+      updated_at: String(row.updated_at ?? ''),
+    }),
+    isValid: () => true,
+  },
   payments: {
     label: 'pago',
     labelPlural: 'pagos',
@@ -531,18 +601,10 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
 };
 
 const resourceConfigs = Object.fromEntries(
-  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => {
-    const csvOpts =
-      resourceId === 'creditNotes'
-        ? {
-            columns: [
-              { key: 'party_id', label: 'party_id (UUID)' },
-              { key: 'amount', label: 'amount' },
-            ],
-          }
-        : {};
-    return [resourceId, withCSVToolbar(resourceId, config, csvOpts)];
-  }),
+  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => [
+    resourceId,
+    withCSVToolbar(resourceId, config, mergeCsvOptionsForResource(resourceId, config)),
+  ]),
 ) as CrudResourceConfigMap;
 
 export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);

@@ -321,11 +321,15 @@ func applyBool(dst *bool, src *bool) {
 	}
 }
 
-func applyTime(dst **time.Time, src *time.Time) {
+func applyTime(dst **time.Time, src **time.Time) {
 	if src == nil {
 		return
 	}
-	value := src.UTC()
+	if *src == nil {
+		*dst = nil
+		return
+	}
+	value := (*src).UTC()
 	*dst = &value
 }
 

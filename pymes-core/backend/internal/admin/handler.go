@@ -80,16 +80,23 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	var onboardingCompletedAt *time.Time
-	if req.OnboardingCompletedAt != nil {
-		value := strings.TrimSpace(*req.OnboardingCompletedAt)
-		if value != "" {
+	var onboardingCompletedAt **time.Time
+	if req.OnboardingCompletedAt.Set {
+		if req.OnboardingCompletedAt.Value == nil {
+			onboardingCompletedAt = new(*time.Time)
+		} else {
+			value := strings.TrimSpace(*req.OnboardingCompletedAt.Value)
+			if value == "" {
+				onboardingCompletedAt = new(*time.Time)
+			} else {
 			parsed, err := time.Parse(time.RFC3339, value)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid onboarding_completed_at"})
 				return
 			}
-			onboardingCompletedAt = &parsed
+			onboardingCompletedAt = new(*time.Time)
+			*onboardingCompletedAt = &parsed
+			}
 		}
 	}
 	schedulingEnabled := req.SchedulingEnabled

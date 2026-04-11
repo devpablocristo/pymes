@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LazyConfiguredCrudPage } from '../crud/lazyCrudPage';
+import { ConfiguredCrudModePage } from '../crud/configuredCrudViews';
 import type { WorkOrder as BikeWorkOrder } from '../lib/workOrdersApi';
 
 const LIST_PATH = '/workshops/bike-shop/orders/list';
@@ -13,5 +13,5 @@ export function BikeShopWorkOrdersPage() {
     }),
     [navigate],
   );
-  return <LazyConfiguredCrudPage resourceId="bikeWorkOrders" mergeConfig={mergeConfig} />;
+  return <ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="list" mergeConfig={mergeConfig} />;
 }

@@ -23,8 +23,7 @@ export function getVisibleModuleIds(): Set<string> {
   // Inventory remains product-only.
   if (sellsProducts || exploring) {
     visible.add('products');
-    visible.add('inventory');
-    visible.add('inventoryMovements');
+    visible.add('stock');
   }
 
   if (sellsServices || exploring) {

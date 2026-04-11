@@ -16,11 +16,16 @@ describe('moduleCatalog CRUD split', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const workOrdersListSrc = readFileSync(path.join(dir, '../pages/AutoRepairWorkOrdersPage.tsx'), 'utf8');
     const kanbanSrc = readFileSync(path.join(dir, '../pages/WorkOrdersKanbanPanel.tsx'), 'utf8');
+    const configuredCrudSrc = readFileSync(path.join(dir, '../crud/configuredCrudViews.tsx'), 'utf8');
 
-    expect(workOrdersListSrc).toContain('../crud/lazyCrudPage');
+    const usesLazyCrudBoundary = (src: string) =>
+      src.includes('../crud/lazyCrudPage') || src.includes('../crud/configuredCrudViews');
+
+    expect(usesLazyCrudBoundary(workOrdersListSrc)).toBe(true);
     expect(workOrdersListSrc).not.toContain('../crud/resourceConfigs');
-    expect(kanbanSrc).toContain('../crud/lazyCrudPage');
+    expect(usesLazyCrudBoundary(kanbanSrc)).toBe(true);
     expect(kanbanSrc).not.toContain('../crud/resourceConfigs');
+    expect(configuredCrudSrc).toContain('./lazyCrudPage');
   });
 
   it('splits operations and control CRUD groups into dedicated lazy modules', () => {

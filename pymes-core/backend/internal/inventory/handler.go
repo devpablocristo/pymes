@@ -50,7 +50,14 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListStockParams{OrgID: orgID, Limit: limit, After: after, LowStock: c.Query("low_stock") == "true", Order: c.Query("order")})
+	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListStockParams{
+		OrgID:    orgID,
+		Limit:    limit,
+		After:    after,
+		LowStock: c.Query("low_stock") == "true",
+		Archived: c.Query("archived") == "true",
+		Order:    c.Query("order"),
+	})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

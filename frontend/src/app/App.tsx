@@ -25,7 +25,7 @@ function RequireOnboarding({ children }: { children: ReactNode }) {
   const tenantSettings = tenantSettingsQuery.data;
 
   useEffect(() => {
-    if (!tenantSettings?.onboarding_completed_at) {
+    if (!tenantSettings) {
       return;
     }
     syncTenantProfileFromSettings(tenantSettings);
@@ -37,16 +37,17 @@ function RequireOnboarding({ children }: { children: ReactNode }) {
     if (tenantSettingsQuery.isPending) {
       return <>{children}</>;
     }
-    // API cargó bien → renderizar children (el sync ya se hizo arriba)
-    return <>{children}</>;
   }
 
-  // Sin perfil local: depender de la API
+  // Sin perfil local, o con perfil local potencialmente viejo: depender de la API.
   if (tenantSettingsQuery.isPending) {
     return <div className="spinner" aria-label="Cargando" />;
   }
 
   if (tenantSettingsQuery.isError || !tenantSettings) {
+    if (localProfileExists) {
+      return <>{children}</>;
+    }
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p>No se pudo cargar la configuración del tenant.</p>

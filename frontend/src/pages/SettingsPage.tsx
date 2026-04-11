@@ -1,12 +1,12 @@
-import { useAuth, useClerk, useOrganization, useUser } from '@clerk/react';
+import { useAuth, useClerk, useOrganization, useOrganizationList, useSession, useUser } from '@clerk/react';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { AccountPlanSection } from '../components/AccountPlanSection';
 import { PageLayout } from '../components/PageLayout';
-import { getMe, getSession, patchMeProfile } from '../lib/api';
+import { getMe, getSession, getTenantSettings, patchMeProfile, updateTenantSettings } from '../lib/api';
 import { clerkEnabled } from '../lib/auth';
-import { clearTenantProfile } from '../lib/tenantProfile';
+import { clearTenantProfile, syncTenantProfileFromSettings } from '../lib/tenantProfile';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
@@ -227,6 +227,164 @@ function ClerkOrganizationNameSection({ t }: { t: (key: string) => string }) {
           {t('profile.personal.cancel')}
         </button>
       </p>
+    </div>
+  );
+}
+
+function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => string }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { orgId, isLoaded: authLoaded } = useAuth();
+  const { session } = useSession();
+  const clerk = useClerk();
+  const {
+    isLoaded: listLoaded,
+    userMemberships,
+  } = useOrganizationList({
+    userMemberships: { pageSize: 50 },
+  });
+
+  const [newOrgName, setNewOrgName] = useState('');
+  const [switchingOrgID, setSwitchingOrgID] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState('');
+  const [reopeningOnboarding, setReopeningOnboarding] = useState(false);
+
+  const memberships = userMemberships.data ?? [];
+
+  async function activateOrganization(targetOrgID: string): Promise<void> {
+    setSwitchError('');
+    setSwitchingOrgID(targetOrgID);
+    try {
+      clearTenantProfile();
+      await clerk.setActive({ organization: targetOrgID });
+      await session?.reload();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.session.current }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.me.current }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tenant.settings }),
+      ]);
+      const tenantSettings = await queryClient.fetchQuery({
+        queryKey: queryKeys.tenant.settings,
+        queryFn: getTenantSettings,
+      });
+      syncTenantProfileFromSettings(tenantSettings);
+      navigate(tenantSettings.onboarding_completed_at ? '/' : '/onboarding', { replace: true });
+    } catch (err) {
+      setSwitchError(formatClerkAPIUserMessage(err, t('profile.org.switchError')));
+    } finally {
+      setSwitchingOrgID(null);
+    }
+  }
+
+  async function handleCreateOrganization(): Promise<void> {
+    const name = newOrgName.trim();
+    if (name.length < 2) {
+      setSwitchError(t('profile.org.validationMin'));
+      return;
+    }
+    setSwitchError('');
+    setSwitchingOrgID('__new__');
+    try {
+      const created = await clerk.createOrganization({ name });
+      setNewOrgName('');
+      await activateOrganization(created.id);
+    } catch (err) {
+      setSwitchError(formatClerkAPIUserMessage(err, t('profile.org.switchError')));
+      setSwitchingOrgID(null);
+    }
+  }
+
+  async function handleReopenOnboarding(): Promise<void> {
+    setSwitchError('');
+    setReopeningOnboarding(true);
+    try {
+      clearTenantProfile();
+      const tenantSettings = await updateTenantSettings({ onboarding_completed_at: null });
+      queryClient.setQueryData(queryKeys.tenant.settings, tenantSettings);
+      syncTenantProfileFromSettings(tenantSettings);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.session.current }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.me.current }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tenant.settings }),
+      ]);
+      navigate('/onboarding', { replace: true });
+    } catch (err) {
+      setSwitchError(formatFetchErrorForUser(err, t('profile.org.switchError')));
+    } finally {
+      setReopeningOnboarding(false);
+    }
+  }
+
+  if (!authLoaded || !listLoaded) {
+    return <p className="text-muted">{t('common.status.loading')}</p>;
+  }
+
+  return (
+    <div className="profile-org-switcher">
+      <p className="text-muted profile-field-hint">{t('profile.org.switchLead')}</p>
+      <div className="profile-org-switcher__list">
+        {memberships.map((membership) => {
+          const membershipOrgID = membership.organization?.id ?? '';
+          const isCurrent = membershipOrgID !== '' && membershipOrgID === orgId;
+          const isBusy = switchingOrgID === membershipOrgID;
+          return (
+            <div key={membershipOrgID || membership.id} className="profile-org-switcher__item">
+              <div>
+                <strong>{membership.organization?.name?.trim() || membershipOrgID || '—'}</strong>
+                {isCurrent ? (
+                  <div className="text-muted">{t('profile.org.switchCurrent')}</div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isCurrent || isBusy || switchingOrgID != null || !membershipOrgID}
+                onClick={() => void activateOrganization(membershipOrgID)}
+              >
+                {isBusy ? t('profile.org.switchLoading') : isCurrent ? t('profile.org.switchCurrent') : t('profile.org.switchUse')}
+              </button>
+            </div>
+          );
+        })}
+        {memberships.length === 0 ? <p className="text-muted">{t('profile.org.switchEmpty')}</p> : null}
+      </div>
+      <div className="profile-org-switcher__create">
+        <label className="profile-field-label" htmlFor="profile-org-create">
+          {t('profile.org.switchCreateLabel')}
+        </label>
+        <input
+          id="profile-org-create"
+          className="input profile-input"
+          value={newOrgName}
+          onChange={(e) => setNewOrgName(e.target.value)}
+          placeholder={t('profile.org.switchCreatePlaceholder')}
+          maxLength={100}
+        />
+        <p className="profile-form-actions">
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={switchingOrgID != null}
+            onClick={() => void handleCreateOrganization()}
+          >
+            {switchingOrgID === '__new__' ? t('profile.org.switchLoading') : t('profile.org.switchCreateAction')}
+          </button>
+        </p>
+      </div>
+      <div className="profile-org-switcher__reset">
+        <p className="text-muted profile-field-hint">{t('profile.org.reopenOnboardingHint')}</p>
+        <p className="profile-form-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={switchingOrgID != null || reopeningOnboarding}
+            onClick={() => void handleReopenOnboarding()}
+          >
+            {reopeningOnboarding ? t('profile.org.reopenOnboardingLoading') : t('profile.org.reopenOnboarding')}
+          </button>
+        </p>
+      </div>
+      {switchError ? <p className="alert alert-error profile-form-alert">{switchError}</p> : null}
     </div>
   );
 }
@@ -617,6 +775,10 @@ function SettingsProfileBody({ clerkMode }: { clerkMode: boolean }) {
             {clerkMode && (
               <div className="profile-org-after-signout">
                 <ClerkOrganizationNameSection t={t} />
+                <div className="profile-org-switcher-wrap">
+                  <h3 className="profile-subsection-title">{t('profile.org.switchTitle')}</h3>
+                  <ClerkOrganizationSwitcherSection t={t} />
+                </div>
               </div>
             )}
           </div>

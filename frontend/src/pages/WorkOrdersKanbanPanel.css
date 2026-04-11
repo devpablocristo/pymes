@@ -92,3 +92,24 @@
 }
 
 /* El tablero usa el mismo shell canónico que el resto; no ocultar ni rebajar el h1. */
+
+/**
+ * DragOverlay (@dnd-kit) hace portal a document.body: queda fuera de .m-kanban__board,
+ * donde viven las vars --kb-* del paquete modules-kanban-board. Sin esto, la tarjeta
+ * fantasma al arrastrar pierde fondo, borde y sombra al pasar a otra columna.
+ * Valores alineados con StatusKanbanBoard.css del paquete.
+ */
+.m-kanban__card--overlay {
+  --kb-list-bg: rgba(16, 18, 4, 0.78);
+  --kb-list-border: rgba(255, 255, 255, 0.1);
+  --kb-list-highlight: rgba(255, 255, 255, 0.06);
+  --kb-card-bg: #22272b;
+  --kb-card-border: rgba(255, 255, 255, 0.06);
+  --kb-text: #ffffff;
+  --kb-text-muted: #9fadbc;
+  --kb-accent-blue: #579dff;
+  --kb-count-bg: rgba(255, 255, 255, 0.14);
+  --kb-label-yellow: #f5cd47;
+  box-sizing: border-box;
+  min-width: min(12rem, 85vw);
+}

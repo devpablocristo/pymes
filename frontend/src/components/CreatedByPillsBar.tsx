@@ -24,7 +24,10 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
   }, [items]);
 
   const peerCreators = useMemo(
-    () => (selfId ? uniqueCreators.filter((a) => a !== selfId) : uniqueCreators),
+    () =>
+      (selfId ? uniqueCreators.filter((a) => a !== selfId) : uniqueCreators).filter(
+        (actor) => !isSeedActor(actor),
+      ),
     [uniqueCreators, selfId],
   );
 

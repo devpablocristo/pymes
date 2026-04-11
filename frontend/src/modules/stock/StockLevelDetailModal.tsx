@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { CrudResourceInventoryDetailModal } from '../crud/CrudResourceInventoryDetailModal';
-import type {
-  CrudResourceInventoryDetailPermissions,
-  CrudResourceInventoryDetailStrings,
-} from '../crud/crudResourceInventoryDetailContract';
+import {
+  CrudResourceInventoryDetailModal,
+  type CrudResourceInventoryDetailPermissions,
+  type CrudResourceInventoryDetailStrings,
+} from '../crud';
 import {
   buildStockInventoryDetailPorts,
   formatStockInventoryDateTime,

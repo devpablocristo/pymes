@@ -108,12 +108,12 @@ describe('CrudPage', () => {
     });
   });
 
-  it('translates shared scaffold text when the selected language changes', async () => {
+  it('usa textos i18n del scaffold según idioma inicial (es)', async () => {
     const list = vi.fn().mockResolvedValue([{ id: '1', name: 'Existing', active: true }]);
     const create = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <LanguageProvider initialLanguage="en">
+      <LanguageProvider initialLanguage="es">
         <CrudPage<SampleItem>
           label="item"
           labelPlural="items"
@@ -139,7 +139,7 @@ describe('CrudPage', () => {
 
     await screen.findByText('Existing');
 
-    expect(screen.getByRole('button', { name: '+ New item' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Nuevo item' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Buscar...')).toBeInTheDocument();
   });
 
@@ -172,7 +172,7 @@ describe('CrudPage', () => {
 
     await screen.findByText('Cliente uno');
 
-    expect(screen.getByRole('searchbox', { name: 'Buscar...' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Buscar...');
   });
 
   it('mantiene el hard delete como confirmación inline reforzada', async () => {

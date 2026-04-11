@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CrudInventoryLevelSnapshot, CrudLinkedEntityPatch, CrudLinkedEntitySnapshot } from '../crud/crudResourceInventoryDetailContract';
+import type { CrudInventoryLevelSnapshot, CrudLinkedEntityPatch, CrudLinkedEntitySnapshot } from '../crud';
 import { buildStockInventoryDetailPorts } from './stockInventoryDetailModalAdapter';
 
 function minimalLevel(overrides: Partial<CrudInventoryLevelSnapshot> = {}): CrudInventoryLevelSnapshot {

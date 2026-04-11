@@ -7,7 +7,7 @@ import type {
   CrudLinkedEntitySnapshot,
   CrudResourceInventoryDetailPorts,
   CrudResourceInventoryDetailStrings,
-} from '../crud/crudResourceInventoryDetailContract';
+} from '../crud';
 import { fetchStockLevelByProductId, type StockLevelRow } from './stockLevels';
 
 type ProductApiRow = {

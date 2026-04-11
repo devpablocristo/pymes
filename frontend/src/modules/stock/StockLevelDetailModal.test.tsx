@@ -1,6 +1,6 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CrudResourceInventoryDetailModalProps } from '../crud/crudResourceInventoryDetailContract';
+import type { CrudResourceInventoryDetailModalProps } from '../crud';
 
 const shell = vi.hoisted(() => ({
   lastProps: null as CrudResourceInventoryDetailModalProps | null,

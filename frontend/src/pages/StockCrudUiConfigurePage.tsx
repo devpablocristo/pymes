@@ -11,7 +11,7 @@ export function StockCrudUiConfigurePage() {
   return (
     <PageLayout
       title="Vistas del inventario"
-      lead="Solo afecta a lista, galería y tablero de inventario en este navegador."
+      lead="Solo afecta a lista, galería y tablero de inventario en este navegador. Los interruptores inferiores incluyen filtro por creador (Clerk) y la franja de píldoras en cabecera."
     >
       <CrudUiPreferencesPanel
         storageKey={CRUD_UI_STORAGE_KEY}

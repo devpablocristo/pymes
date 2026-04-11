@@ -17,6 +17,7 @@ import {
   CrudLinkedEntityImageGalleryStrip,
   crudLinkedEntityHasDisplayName,
 } from './crudLinkedEntityInventoryFormBlock';
+import { CrudInventoryQuantitiesNotesBlock } from './crudInventoryQuantitiesNotesBlock';
 import './CrudResourceInventoryDetailModal.css';
 
 function collectLinkedImageUrls(p: CrudLinkedEntitySnapshot | null): string[] {
@@ -180,6 +181,15 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     return () => window.removeEventListener('keydown', onKey);
   }, [linkedEntityId, onClose]);
 
+  /** Sin control de stock, las cantidades no se editan: volver a los valores del nivel. */
+  useEffect(() => {
+    if (!level || !editing) return;
+    if (!trackStockInput) {
+      setAbsoluteQtyInput(String(level.quantity ?? ''));
+      setMinInput(String(level.minQuantity ?? ''));
+    }
+  }, [trackStockInput, level, editing]);
+
   const minParsed = useMemo(() => {
     const n = Number(String(minInput).replace(',', '.'));
     return Number.isFinite(n) ? n : NaN;
@@ -218,19 +228,20 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   ]);
 
   const inventoryDirty = useMemo(() => {
-    if (!level || !flags.inventoryQuantities) return false;
+    if (!level || !flags.inventoryQuantities || !trackStockInput) return false;
     const minChanged = Number.isFinite(minParsed) && minParsed !== level.minQuantity;
     const qtyChanged = Number.isFinite(absoluteQtyParsed) && absoluteQtyParsed !== level.quantity;
     return minChanged || qtyChanged;
-  }, [level, minParsed, absoluteQtyParsed, flags.inventoryQuantities]);
+  }, [level, minParsed, absoluteQtyParsed, flags.inventoryQuantities, trackStockInput]);
 
   const dirty = productDirty || inventoryDirty;
 
   const canSave = useMemo(() => {
-    if (level == null || !dirty || notes.trim().length === 0 || saving || !editing) return false;
+    if (level == null || !dirty || saving || !editing) return false;
+    if (inventoryDirty && notes.trim().length === 0) return false;
     if (!crudLinkedEntityHasDisplayName(nameInput)) return false;
     return true;
-  }, [level, dirty, notes, saving, editing, nameInput]);
+  }, [level, dirty, inventoryDirty, notes, saving, editing, nameInput]);
 
   const cancelEditing = () => {
     if (level) {
@@ -243,10 +254,6 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
 
   const handleSave = async () => {
     if (!level || !canSave) return;
-    if (!notes.trim()) {
-      setFormError(strings.notesRequiredError);
-      return;
-    }
     const nameTrim = nameInput.trim();
     if (!crudLinkedEntityHasDisplayName(nameInput)) {
       setFormError(strings.nameRequiredError);
@@ -270,7 +277,12 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     }
 
     const hasProductPatch = flags.linkedEntityFields && Object.keys(patch).length > 0;
-    const hasInventoryChange = flags.inventoryQuantities && (minChanged || qtyChanged);
+    const hasInventoryChange = flags.inventoryQuantities && trackStockInput && (minChanged || qtyChanged);
+
+    if (hasInventoryChange && !notes.trim()) {
+      setFormError(strings.notesRequiredError);
+      return;
+    }
 
     if (!hasProductPatch && !hasInventoryChange) return;
 
@@ -450,38 +462,24 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
                           />
                         ) : null}
                         {flags.inventoryQuantities ? (
-                          <>
-                            <div className="crud-inv-detail-modal__field">
-                              <label htmlFor="crud-inv-detail-qty">{strings.fieldQuantityLabel}</label>
-                              <input
-                                id="crud-inv-detail-qty"
-                                type="number"
-                                step="any"
-                                value={absoluteQtyInput}
-                                onChange={(e) => setAbsoluteQtyInput(e.target.value)}
-                              />
-                            </div>
-                            <div className="crud-inv-detail-modal__field">
-                              <label htmlFor="crud-inv-detail-min">{strings.fieldMinQuantityLabel}</label>
-                              <input
-                                id="crud-inv-detail-min"
-                                type="number"
-                                step="any"
-                                value={minInput}
-                                onChange={(e) => setMinInput(e.target.value)}
-                              />
-                            </div>
-                            <div className="crud-inv-detail-modal__field" style={{ gridColumn: '1 / -1' }}>
-                              <p className="text-secondary text-sm u-mb-2">
-                                {strings.lastUpdatedPrefix} <strong>{formatDateTime(level.updatedAt)}</strong>
-                              </p>
-                            </div>
-                          </>
+                          <CrudInventoryQuantitiesNotesBlock
+                            strings={strings}
+                            formatDateTime={formatDateTime}
+                            updatedAtIso={level.updatedAt}
+                            quantityInputId="crud-inv-detail-qty"
+                            quantityValue={absoluteQtyInput}
+                            onQuantityChange={setAbsoluteQtyInput}
+                            quantityDisabled={!trackStockInput}
+                            minInputId="crud-inv-detail-min"
+                            minValue={minInput}
+                            onMinChange={setMinInput}
+                            minDisabled={!trackStockInput}
+                            notesInputId="crud-inv-detail-notes"
+                            notesValue={notes}
+                            onNotesChange={setNotes}
+                            notesRequired={inventoryDirty}
+                          />
                         ) : null}
-                        <div className="crud-inv-detail-modal__field" style={{ gridColumn: '1 / -1' }}>
-                          <label htmlFor="crud-inv-detail-notes">{strings.fieldNotesLabel}</label>
-                          <textarea id="crud-inv-detail-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-                        </div>
                       </div>
                       {strings.linkToAdvancedSettings && advancedSettingsHref ? (
                         <Link className="crud-inv-detail-modal__link" to={advancedSettingsHref}>

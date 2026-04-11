@@ -204,6 +204,10 @@
   margin-bottom: var(--space-4);
 }
 
+.crud-inv-detail-modal__form-grid > .crud-inv-qty-notes {
+  grid-column: 1 / -1;
+}
+
 @media (min-width: 520px) {
   .crud-inv-detail-modal__form-grid {
     grid-template-columns: 1fr 1fr;

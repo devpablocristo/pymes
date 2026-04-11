@@ -10,6 +10,7 @@ export * from './CrudViewModeSwitch';
 export * from './crudResourceInventoryDetailContract';
 export * from './CrudResourceInventoryDetailModal';
 export * from './crudLinkedEntityInventoryFormBlock';
+export * from './crudInventoryQuantitiesNotesBlock';
 export * from './crudButtonClass';
 export * from './crudKanbanDragPolicy';
 export * from './kanbanBoardState';

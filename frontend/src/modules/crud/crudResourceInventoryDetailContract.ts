@@ -77,7 +77,13 @@ export type CrudResourceInventoryDetailStrings = {
   fieldQuantityLabel: string;
   fieldMinQuantityLabel: string;
   fieldNotesLabel: string;
+  /** Texto auxiliar bajo el campo de notas (p. ej. cuándo es obligatorio). */
+  fieldNotesHelper?: string;
+  /** Título del subbloque «cantidades + notas» en modo edición. */
+  inventoryQuantitiesSectionTitle: string;
   lastUpdatedPrefix: string;
+  /** Plantilla opcional con `{datetime}` para la línea de última actualización al editar cantidades. */
+  lastUpdatedEditHintTemplate?: string;
   movementsHeading: string;
   movementsEmpty: string;
   movementsLoading: string;

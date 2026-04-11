@@ -114,7 +114,9 @@ export function CrudResourceShellHeader<T extends { id: string }>({
         title={showArchived ? titleArchivedView : titleActive}
         subtitle={subtitle}
         headerLeadSlot={
-          listHeaderInlineSlot && crudConfig?.featureFlags?.creatorFilter !== false ? (
+          listHeaderInlineSlot &&
+          crudConfig?.featureFlags?.headerQuickFilterStrip !== false &&
+          crudConfig?.featureFlags?.creatorFilter !== false ? (
             <div className="crud-list-header-lead">{listHeaderInlineSlot({ items })}</div>
           ) : undefined
         }

@@ -410,9 +410,6 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     allowEdit: false,
     allowDelete: false,
     supportsArchived: true,
-    featureFlags: {
-      creatorFilter: false,
-    },
     archivedEmptyState: 'No hay productos archivados en inventario.',
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay productos en el inventario.',

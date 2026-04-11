@@ -13,6 +13,7 @@ import {
   CrudResourceShellHeader,
   useCrudArchivedSearchParam,
 } from '../crud';
+import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
 import { StockLevelDetailModal } from './StockLevelDetailModal';
 import { fetchStockLevels, type StockLevelRow } from './stockLevels';
 import '../../pages/StockPage.css';
@@ -132,6 +133,7 @@ function StockKanbanCardPreview({ row }: { row: StockLevelRow }) {
 export function StockInventoryKanbanBoard() {
   const queryClient = useQueryClient();
   const { archived: showArchived } = useCrudArchivedSearchParam();
+  const { preSearchFilter } = useCrudListCreatedByMerge();
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [toolbarError, setToolbarError] = useState<string | null>(null);
   const [boardSearch, setBoardSearch] = useState('');
@@ -146,6 +148,10 @@ export function StockInventoryKanbanBoard() {
   });
 
   const items = stockQuery.data ?? [];
+  const itemsAfterCreator = useMemo(
+    () => (preSearchFilter ? preSearchFilter(items) : items),
+    [items, preSearchFilter],
+  );
   const loadError =
     stockQuery.error instanceof Error ? stockQuery.error.message : stockQuery.error ? String(stockQuery.error) : null;
   const combinedError = loadError ?? toolbarError;
@@ -195,16 +201,16 @@ export function StockInventoryKanbanBoard() {
 
   const filteredCount = useMemo(() => {
     const q = boardSearch.trim().toLowerCase();
-    if (!q) return items.length;
-    return items.filter((row) => filterRow(row, q)).length;
-  }, [boardSearch, items, filterRow]);
+    if (!q) return itemsAfterCreator.length;
+    return itemsAfterCreator.filter((row) => filterRow(row, q)).length;
+  }, [boardSearch, itemsAfterCreator, filterRow]);
 
   return (
     <>
       <CrudResourceShellHeader<StockLevelRow>
         resourceId="stock"
         preserveCsvToolbar
-        items={items}
+        items={itemsAfterCreator}
         subtitleCount={filteredCount}
         loading={stockQuery.isLoading}
         error={combinedError}
@@ -220,7 +226,7 @@ export function StockInventoryKanbanBoard() {
           columnIdSet={COLUMN_IDS}
           getRowColumnId={getRowColumnId}
           fallbackColumnId="wo_intake"
-          items={items}
+          items={itemsAfterCreator}
           loading={stockQuery.isLoading}
           error={null}
           onMoveCard={handleMoveCard}

@@ -8,7 +8,8 @@ type ListCtx = { items: Array<{ id: string; created_by?: string }> };
 
 /**
  * Props extra para `CrudPage` / `ConfiguredCrudPage`: filtro y píldoras por `created_by` (Clerk).
- * Sin Clerk no devuelve nada. Con Clerk, aplica a todos los listados CRUD.
+ * Sin Clerk no devuelve nada. Con Clerk, aplica a listados que no apaguen la franja con
+ * `featureFlags.headerQuickFilterStrip: false` o `creatorFilter: false` (p. ej. inventario).
  */
 export function useCrudListCreatedByMerge(): {
   preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];

@@ -119,7 +119,13 @@ export function ProductsGalleryModeContent() {
       <CrudPageShell
         title={title}
         subtitle={subtitle}
-        headerLeadSlot={listHeaderInlineSlot ? <div className="crud-list-header-lead">{listHeaderInlineSlot({ items })}</div> : undefined}
+        headerLeadSlot={
+          listHeaderInlineSlot &&
+          crudConfig?.featureFlags?.headerQuickFilterStrip !== false &&
+          crudConfig?.featureFlags?.creatorFilter !== false ? (
+            <div className="crud-list-header-lead">{listHeaderInlineSlot({ items })}</div>
+          ) : undefined
+        }
         search={{
           value: search,
           onChange: setSearch,

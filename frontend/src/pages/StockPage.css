@@ -17,6 +17,182 @@
   box-sizing: border-box;
 }
 
+/* Lista inventario: tabla a todo el ancho del host. */
+.stock-inventory-list-crud {
+  width: 100%;
+  min-width: 0;
+}
+
+.stock-inventory-list-crud .crud-page-host {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Lista inventario: columnas repartidas y fechas legibles (activos y archivados). */
+.stock-inventory-list-crud .crud-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.stock-inventory-list-crud .crud-table th,
+.stock-inventory-list-crud .crud-table td {
+  vertical-align: middle;
+}
+
+/*
+ * Cabeceras: anular el `thead th` global (uppercase + xs + muted) para que coincidan
+ * fuente, tamaño, color y mayúsculas con el resto de la UI del módulo.
+ */
+.stock-inventory-list-crud .crud-table thead th {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.stock-inventory-list-crud .crud-table th {
+  color: var(--color-text);
+}
+
+.stock-inventory-list-crud .crud-table__sort-btn {
+  color: var(--color-text);
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+.stock-inventory-list-crud .crud-table__sort-label {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+}
+
+.stock-inventory-list-crud .crud-table__sort-icons {
+  color: var(--color-text);
+  opacity: 0.95;
+}
+
+.stock-inventory-list-crud .crud-table__sort-icon {
+  opacity: 0.85;
+}
+
+.stock-inventory-list-crud .crud-table__sort-icon--active {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+/*
+ * Vista activa (sin columna acciones): % que suman 100% — «Actualizado» ancha
+ * (evita franja vacía a la derecha; no depende de :has(.stock-col-date) en el table).
+ */
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-product-name {
+  width: 16%;
+  overflow-wrap: anywhere;
+}
+
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-sku {
+  width: 14%;
+  overflow-wrap: anywhere;
+}
+
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-qty,
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-min {
+  width: 11%;
+  min-width: 4.25rem;
+}
+
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-estado {
+  width: 11%;
+}
+
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-date {
+  width: 37%;
+  min-width: 11rem;
+  max-width: none;
+}
+
+.stock-inventory-list-crud .crud-table:not(:has(.col-actions)) .stock-col-date .stock-datetime-cell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stock-inventory-list-crud .crud-table th.col-actions,
+.stock-inventory-list-crud .crud-table td.col-actions {
+  text-align: left;
+}
+
+.stock-inventory-list-crud .crud-table .col-actions {
+  width: auto;
+  min-width: 11rem;
+  max-width: 16rem;
+  vertical-align: middle;
+}
+
+.stock-inventory-list-crud .col-actions .crud-row-actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stock-inventory-list-crud .col-actions .crud-row-actions > .btn-sm {
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* Archivados: solo nombre + SKU + acciones — más ancho para nombre/SKU. */
+.stock-inventory-list-crud .crud-table:has(.col-actions):not(:has(.stock-col-date)) .stock-col-product-name {
+  width: 42%;
+}
+
+.stock-inventory-list-crud .crud-table:has(.col-actions):not(:has(.stock-col-date)) .stock-col-sku {
+  width: 36%;
+}
+
+.stock-datetime-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.3;
+}
+
+.stock-datetime-cell__date {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-datetime-cell__time {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  opacity: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-inventory-list-crud .stock-datetime-cell__date,
+.stock-inventory-list-crud .stock-datetime-cell__time {
+  color: var(--color-text);
+}
+
+.stock-sku-inline {
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.stock-status-cell {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+}
+
 .stock-col-num {
   text-align: right;
   width: 96px;

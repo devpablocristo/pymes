@@ -22,6 +22,21 @@ import {
   toRFC3339,
 } from './resourceConfigs.shared';
 
+function stockInventoryUpdatedCell(raw: string) {
+  const t = String(raw ?? '').trim();
+  if (!t) return '—';
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return t;
+  return (
+    <div className="stock-datetime-cell">
+      <span className="stock-datetime-cell__date">
+        {d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+      </span>
+      <span className="stock-datetime-cell__time">{d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
+    </div>
+  );
+}
+
 type ReturnRow = {
   id: string;
   number: string;
@@ -428,34 +443,49 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     columns: [
       {
         key: 'product_name',
-        header: 'Producto',
-        className: 'cell-name',
-        render: (_value, row: StockLevelRow) => (
-          <>
-            <strong>{row.product_name}</strong>
-            <div className="text-secondary">{row.sku || 'sin SKU'}</div>
-          </>
-        ),
+        header: 'Nombre',
+        className: 'cell-name stock-col-product-name',
+        render: (_value, row: StockLevelRow) => <strong>{row.product_name}</strong>,
       },
-      { key: 'quantity', header: 'Actual', className: 'stock-col-num' },
-      { key: 'min_quantity', header: 'Mínimo', className: 'stock-col-num' },
+      {
+        key: 'sku',
+        header: 'Sku',
+        className: 'stock-col-sku',
+        render: (_value, row: StockLevelRow) => <span className="stock-sku-inline">{row.sku?.trim() || '—'}</span>,
+      },
+      { key: 'quantity', header: 'Actual', className: 'stock-col-num stock-col-qty' },
+      { key: 'min_quantity', header: 'Mínimo', className: 'stock-col-num stock-col-min' },
       {
         key: 'is_low_stock',
         header: 'Estado',
+        className: 'stock-col-estado',
         render: (value) => (
-          <span className={value ? 'stock-status stock-status--warning' : 'stock-status'}>
-            {value ? 'Bajo mínimo' : 'Normal'}
-          </span>
+          <div className="stock-status-cell">
+            <span className={value ? 'stock-status stock-status--warning' : 'stock-status'}>
+              {value ? 'Bajo mínimo' : 'Normal'}
+            </span>
+          </div>
         ),
       },
-      { key: 'updated_at', header: 'Actualizado', className: 'stock-col-date', render: (value) => formatDate(String(value ?? '')) },
+      {
+        key: 'updated_at',
+        header: 'Actualizado',
+        className: 'stock-col-date',
+        render: (value) => stockInventoryUpdatedCell(String(value ?? '')),
+      },
     ],
     archivedColumns: [
       {
         key: 'product_name',
-        header: 'Producto',
-        className: 'cell-name',
+        header: 'Nombre',
+        className: 'cell-name stock-col-product-name',
         render: (_value, row: StockLevelRow) => <strong>{row.product_name}</strong>,
+      },
+      {
+        key: 'sku',
+        header: 'Sku',
+        className: 'stock-col-sku',
+        render: (_value, row: StockLevelRow) => <span className="stock-sku-inline">{row.sku?.trim() || '—'}</span>,
       },
     ],
     formFields: [],

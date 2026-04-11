@@ -145,6 +145,7 @@ export type CrudResourceInventoryDetailPorts<
   loadMovements: (linkedEntityId: string) => Promise<TMove[]>;
   patchLinkedEntity: (linkedEntityId: string, patch: CrudLinkedEntityPatch) => Promise<CrudLinkedEntitySnapshot>;
   postInventoryAdjust: (linkedEntityId: string, body: CrudInventoryAdjustPayload) => Promise<void>;
+  /** Archivado vía puerto; alternativa: prop `onArchive` en el modal. */
   archiveLinkedEntity?: (linkedEntityId: string) => Promise<void>;
 };
 
@@ -152,6 +153,11 @@ export type CrudResourceInventoryDetailPorts<
  * Props del shell de modal (la implementación del componente es otra tarea).
  * `linkedEntityId === null` ⇒ modal cerrado / sin render de contenido.
  */
+/** Permisos de UI para acciones secundarias; `undefined` en cada clave = permitido. */
+export type CrudResourceInventoryDetailPermissions = {
+  canArchive?: boolean;
+};
+
 export type CrudResourceInventoryDetailModalProps<
   TMove extends CrudInventoryMovementSnapshot = CrudInventoryMovementSnapshot,
 > = {
@@ -165,4 +171,12 @@ export type CrudResourceInventoryDetailModalProps<
   formatDateTime: (iso: string) => string;
   /** Si se define y `strings.linkToAdvancedSettings` también, el shell puede mostrar `<Link>`. */
   advancedSettingsHref?: string;
+  /**
+   * Archivar la entidad enlazada (p. ej. el vertical inyecta `apiRequest` aquí).
+   * Si está definido, tiene prioridad sobre `ports.archiveLinkedEntity`.
+   */
+  onArchive?: (linkedEntityId: string) => Promise<void>;
+  /** Tras cancelar edición y volver el formulario al estado del servidor. */
+  onCancelEdit?: () => void;
+  permissions?: CrudResourceInventoryDetailPermissions;
 };

@@ -1,5 +1,4 @@
 import { apiRequest } from '../../lib/api';
-import { formatProductImageURLsToForm } from '../../crud/resourceConfigs.shared';
 import type {
   CrudInventoryAdjustPayload,
   CrudInventoryLevelSnapshot,
@@ -147,43 +146,89 @@ export function formatStockInventoryMovementKind(kind: string): string {
   }
 }
 
-export function buildStockInventoryDetailPorts(): CrudResourceInventoryDetailPorts {
+/** Handlers HTTP por defecto del vertical inventario (misma semántica que `productId` del modal). */
+export type StockInventoryDetailHandlers = {
+  fetchLevel: (productId: string) => Promise<CrudInventoryLevelSnapshot>;
+  fetchEntity: (productId: string) => Promise<CrudLinkedEntitySnapshot>;
+  fetchMovements: (productId: string) => Promise<CrudInventoryMovementSnapshot[]>;
+  patchEntity: (productId: string, patch: CrudLinkedEntityPatch) => Promise<CrudLinkedEntitySnapshot>;
+  postAdjust: (productId: string, body: CrudInventoryAdjustPayload) => Promise<void>;
+  archiveEntity: (productId: string) => Promise<void>;
+};
+
+export async function defaultFetchStockInventoryLevel(productId: string): Promise<CrudInventoryLevelSnapshot> {
+  return mapLevel(await fetchStockLevelByProductId(productId));
+}
+
+export async function defaultFetchStockLinkedEntity(productId: string): Promise<CrudLinkedEntitySnapshot> {
+  const p = await apiRequest<ProductApiRow>(`/v1/products/${encodeURIComponent(productId)}`);
+  return mapLinked(p);
+}
+
+export async function defaultFetchStockInventoryMovements(productId: string): Promise<CrudInventoryMovementSnapshot[]> {
+  const data = await apiRequest<{ items?: MovementApiRow[] | null }>(
+    `/v1/inventory/movements?limit=50&product_id=${encodeURIComponent(productId)}`,
+  );
+  return (data.items ?? []).map(mapMovement);
+}
+
+export async function defaultPatchStockLinkedEntity(
+  productId: string,
+  patch: CrudLinkedEntityPatch,
+): Promise<CrudLinkedEntitySnapshot> {
+  const body: Record<string, unknown> = {};
+  if (patch.name !== undefined) body.name = patch.name;
+  if (patch.sku !== undefined) body.sku = patch.sku;
+  if (patch.imageUrls !== undefined) body.image_urls = patch.imageUrls;
+  if (patch.trackStock !== undefined) body.track_stock = patch.trackStock;
+  const p = await apiRequest<ProductApiRow>(`/v1/products/${encodeURIComponent(productId)}`, {
+    method: 'PATCH',
+    body,
+  });
+  return mapLinked(p);
+}
+
+export async function defaultPostStockInventoryAdjust(
+  productId: string,
+  body: CrudInventoryAdjustPayload,
+): Promise<void> {
+  await apiRequest(`/v1/inventory/${encodeURIComponent(productId)}/adjust`, {
+    method: 'POST',
+    body: {
+      quantity: body.quantityDelta,
+      notes: body.notes,
+      ...(body.minQuantity !== undefined ? { min_quantity: body.minQuantity } : {}),
+    },
+  });
+}
+
+export async function defaultArchiveStockLinkedEntity(productId: string): Promise<void> {
+  await apiRequest(`/v1/products/${encodeURIComponent(productId)}/archive`, { method: 'POST', body: {} });
+}
+
+const defaultStockInventoryDetailHandlers: StockInventoryDetailHandlers = {
+  fetchLevel: defaultFetchStockInventoryLevel,
+  fetchEntity: defaultFetchStockLinkedEntity,
+  fetchMovements: defaultFetchStockInventoryMovements,
+  patchEntity: defaultPatchStockLinkedEntity,
+  postAdjust: defaultPostStockInventoryAdjust,
+  archiveEntity: defaultArchiveStockLinkedEntity,
+};
+
+/**
+ * Puertos del modal genérico a partir de handlers del vertical.
+ * Sin argumentos usa los defaults HTTP; se pueden sobreescribir funciones sueltas (tests, otro backend).
+ */
+export function buildStockInventoryDetailPorts(
+  overrides?: Partial<StockInventoryDetailHandlers>,
+): CrudResourceInventoryDetailPorts {
+  const h = { ...defaultStockInventoryDetailHandlers, ...overrides };
   return {
-    loadInventoryLevel: async (linkedEntityId) => mapLevel(await fetchStockLevelByProductId(linkedEntityId)),
-    loadLinkedEntity: async (linkedEntityId) => {
-      const p = await apiRequest<ProductApiRow>(`/v1/products/${encodeURIComponent(linkedEntityId)}`);
-      return mapLinked(p);
-    },
-    loadMovements: async (linkedEntityId) => {
-      const data = await apiRequest<{ items?: MovementApiRow[] | null }>(
-        `/v1/inventory/movements?limit=50&product_id=${encodeURIComponent(linkedEntityId)}`,
-      );
-      return (data.items ?? []).map(mapMovement);
-    },
-    patchLinkedEntity: async (linkedEntityId, patch) => {
-      const body: Record<string, unknown> = {};
-      if (patch.name !== undefined) body.name = patch.name;
-      if (patch.sku !== undefined) body.sku = patch.sku;
-      if (patch.imageUrls !== undefined) body.image_urls = patch.imageUrls;
-      if (patch.trackStock !== undefined) body.track_stock = patch.trackStock;
-      const p = await apiRequest<ProductApiRow>(`/v1/products/${encodeURIComponent(linkedEntityId)}`, {
-        method: 'PATCH',
-        body,
-      });
-      return mapLinked(p);
-    },
-    postInventoryAdjust: async (linkedEntityId, body: CrudInventoryAdjustPayload) => {
-      await apiRequest(`/v1/inventory/${encodeURIComponent(linkedEntityId)}/adjust`, {
-        method: 'POST',
-        body: {
-          quantity: body.quantityDelta,
-          notes: body.notes,
-          ...(body.minQuantity !== undefined ? { min_quantity: body.minQuantity } : {}),
-        },
-      });
-    },
-    archiveLinkedEntity: async (linkedEntityId) => {
-      await apiRequest(`/v1/products/${encodeURIComponent(linkedEntityId)}/archive`, { method: 'POST', body: {} });
-    },
+    loadInventoryLevel: h.fetchLevel,
+    loadLinkedEntity: h.fetchEntity,
+    loadMovements: h.fetchMovements,
+    patchLinkedEntity: h.patchEntity,
+    postInventoryAdjust: h.postAdjust,
+    archiveLinkedEntity: h.archiveEntity,
   };
 }

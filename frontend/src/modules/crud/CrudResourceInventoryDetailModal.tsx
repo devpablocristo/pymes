@@ -2,15 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ImageFullscreenViewer } from '../../components/ImageFullscreenViewer';
-import { formatProductImageURLsToForm, parseImageURLList } from '../../crud/resourceConfigs.shared';
+import { formatProductImageURLsToForm as formatLinkedEntityImageUrlsToForm, parseImageURLList } from '../../crud/resourceConfigs.shared';
 import {
   defaultCrudResourceInventoryDetailFeatureFlags,
   type CrudInventoryLevelSnapshot,
   type CrudInventoryMovementSnapshot,
-  type CrudLinkedEntityPatch,
   type CrudLinkedEntitySnapshot,
   type CrudResourceInventoryDetailModalProps,
 } from './crudResourceInventoryDetailContract';
+import {
+  buildCrudInventoryAdjustPayload,
+  buildCrudInventoryDetailSavePatch,
+  computeCrudInventoryDetailDirty,
+  persistCrudInventoryDetailSave,
+  validateCrudInventoryDetailSave,
+} from './crudResourceInventoryDetailSaveOrchestration';
 import {
   CrudLinkedEntityEditBodyFields,
   CrudLinkedEntityEditHeaderFields,
@@ -34,14 +40,6 @@ function collectLinkedImageUrls(p: CrudLinkedEntitySnapshot | null): string[] {
   return out;
 }
 
-function imageUrlListsEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
 /**
  * Shell + contenido estándar: portal, backdrop, header, body con scroll, footer,
  * carga/error, lectura vs edición. Sin URLs de API: todo vía `ports` y `strings`.
@@ -56,6 +54,9 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   formatMovementKind,
   formatDateTime,
   advancedSettingsHref,
+  onArchive,
+  onCancelEdit,
+  permissions,
 }: CrudResourceInventoryDetailModalProps<TMove>) {
   const flags = useMemo(
     () => ({ ...defaultCrudResourceInventoryDetailFeatureFlags, ...flagsProp }),
@@ -83,6 +84,11 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const imageUrlsTouchedRef = useRef(false);
   const portsRef = useRef(ports);
   portsRef.current = ports;
+  const onArchiveRef = useRef(onArchive);
+  onArchiveRef.current = onArchive;
+
+  const canArchive = permissions?.canArchive !== false;
+  const archiveLinkedEntityFn = onArchive ?? ports.archiveLinkedEntity;
 
   const serverImageUrls = useMemo(() => collectLinkedImageUrls(linked), [linked]);
   const draftImageUrls = useMemo(() => parseImageURLList(imageUrlsInput), [imageUrlsInput]);
@@ -90,7 +96,7 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const syncFormFromServer = useCallback((lvl: CrudInventoryLevelSnapshot, lnk: CrudLinkedEntitySnapshot | null) => {
     setNameInput(String(lnk?.name ?? lvl.displayTitle ?? ''));
     setSkuInput(String(lnk?.sku ?? lvl.displaySubtitle ?? ''));
-    setImageUrlsInput(formatProductImageURLsToForm(lnk?.imageUrls, lnk?.legacyImageUrl));
+    setImageUrlsInput(formatLinkedEntityImageUrlsToForm(lnk?.imageUrls, lnk?.legacyImageUrl));
     setTrackStockInput(lvl.trackStock !== false);
   }, []);
 
@@ -167,7 +173,7 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
 
   useEffect(() => {
     if (!editing || !linked || imageUrlsTouchedRef.current) return;
-    const next = formatProductImageURLsToForm(linked.imageUrls, linked.legacyImageUrl);
+    const next = formatLinkedEntityImageUrlsToForm(linked.imageUrls, linked.legacyImageUrl);
     if (!next.trim()) return;
     setImageUrlsInput(next);
   }, [editing, linked]);
@@ -202,39 +208,33 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     return Number.isFinite(n) ? n : NaN;
   }, [absoluteQtyInput]);
 
-  const productDirty = useMemo(() => {
-    if (!level || !flags.linkedEntityFields) return false;
-    const nameBaseline = (linked?.name ?? level.displayTitle ?? '').trim();
-    const skuBaseline = (linked?.sku ?? level.displaySubtitle ?? '').trim();
-    const urlsBaseline = serverImageUrls;
-    const trackBaseline = level.trackStock !== false;
-    const trackDirty = flags.linkedEntityTrackStock && trackStockInput !== trackBaseline;
-    return (
-      nameInput.trim() !== nameBaseline ||
-      skuInput.trim() !== skuBaseline ||
-      !imageUrlListsEqual(draftImageUrls, urlsBaseline) ||
-      trackDirty
+  const { inventoryDirty, dirty } = useMemo(() => {
+    if (!level) {
+      return { productDirty: false, inventoryDirty: false, dirty: false };
+    }
+    return computeCrudInventoryDetailDirty(
+      level,
+      linked,
+      serverImageUrls,
+      draftImageUrls,
+      nameInput,
+      skuInput,
+      trackStockInput,
+      { minParsed, absoluteQtyParsed },
+      flags,
     );
   }, [
     level,
     linked,
+    serverImageUrls,
+    draftImageUrls,
     nameInput,
     skuInput,
-    draftImageUrls,
-    serverImageUrls,
     trackStockInput,
-    flags.linkedEntityFields,
-    flags.linkedEntityTrackStock,
+    minParsed,
+    absoluteQtyParsed,
+    flags,
   ]);
-
-  const inventoryDirty = useMemo(() => {
-    if (!level || !flags.inventoryQuantities || !trackStockInput) return false;
-    const minChanged = Number.isFinite(minParsed) && minParsed !== level.minQuantity;
-    const qtyChanged = Number.isFinite(absoluteQtyParsed) && absoluteQtyParsed !== level.quantity;
-    return minChanged || qtyChanged;
-  }, [level, minParsed, absoluteQtyParsed, flags.inventoryQuantities, trackStockInput]);
-
-  const dirty = productDirty || inventoryDirty;
 
   const canSave = useMemo(() => {
     if (level == null || !dirty || saving || !editing) return false;
@@ -250,73 +250,59 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     }
     imageUrlsTouchedRef.current = false;
     setEditing(false);
+    onCancelEdit?.();
   };
 
   const handleSave = async () => {
     if (!level || !canSave) return;
     const nameTrim = nameInput.trim();
-    if (!crudLinkedEntityHasDisplayName(nameInput)) {
-      setFormError(strings.nameRequiredError);
+    const skuTrim = skuInput.trim();
+    const notesTrim = notes.trim();
+    const build = buildCrudInventoryDetailSavePatch(
+      level,
+      linked,
+      serverImageUrls,
+      draftImageUrls,
+      nameTrim,
+      skuTrim,
+      trackStockInput,
+      { minParsed, absoluteQtyParsed },
+      flags,
+    );
+    const validation = validateCrudInventoryDetailSave(
+      build.hasProductPatch,
+      build.hasInventoryChange,
+      crudLinkedEntityHasDisplayName(nameInput),
+      notesTrim,
+    );
+    if (!validation.ok) {
+      if (validation.kind === 'noop') return;
+      if (validation.kind === 'name') setFormError(strings.nameRequiredError);
+      else setFormError(strings.notesRequiredError);
       return;
     }
-
-    const minChanged = Number.isFinite(minParsed) && minParsed !== level.minQuantity;
-    const qtyChanged = Number.isFinite(absoluteQtyParsed) && absoluteQtyParsed !== level.quantity;
-
-    const nameBaseline = (linked?.name ?? level.displayTitle ?? '').trim();
-    const skuBaseline = (linked?.sku ?? level.displaySubtitle ?? '').trim();
-    const urlsBaseline = serverImageUrls;
-    const trackBaseline = level.trackStock !== false;
-
-    const patch: CrudLinkedEntityPatch = {};
-    if (flags.linkedEntityFields) {
-      if (nameTrim !== nameBaseline) patch.name = nameTrim;
-      if (skuInput.trim() !== skuBaseline) patch.sku = skuInput.trim();
-      if (!imageUrlListsEqual(draftImageUrls, urlsBaseline)) patch.imageUrls = draftImageUrls;
-      if (flags.linkedEntityTrackStock && trackStockInput !== trackBaseline) patch.trackStock = trackStockInput;
-    }
-
-    const hasProductPatch = flags.linkedEntityFields && Object.keys(patch).length > 0;
-    const hasInventoryChange = flags.inventoryQuantities && trackStockInput && (minChanged || qtyChanged);
-
-    if (hasInventoryChange && !notes.trim()) {
-      setFormError(strings.notesRequiredError);
-      return;
-    }
-
-    if (!hasProductPatch && !hasInventoryChange) return;
 
     setSaving(true);
     setFormError('');
     try {
-      let nextLinked = linked;
-      if (hasProductPatch) {
-        nextLinked = await portsRef.current.patchLinkedEntity(level.linkedEntityId, patch);
-        setLinked(nextLinked);
-      }
-      if (hasInventoryChange) {
-        await portsRef.current.postInventoryAdjust(level.linkedEntityId, {
-          quantityDelta: qtyChanged ? absoluteQtyParsed - level.quantity : 0,
-          notes: notes.trim(),
-          ...(minChanged ? { minQuantity: minParsed } : {}),
-        });
-      }
-      const nextLevel = await portsRef.current.loadInventoryLevel(level.linkedEntityId);
+      const adjustPayload = buildCrudInventoryAdjustPayload(level, { minParsed, absoluteQtyParsed }, build, notesTrim);
+      const { level: nextLevel, linked: refreshedLinked, movements: mv } = await persistCrudInventoryDetailSave(
+        portsRef.current,
+        {
+          linkedEntityId: level.linkedEntityId,
+          hasProductPatch: build.hasProductPatch,
+          patch: build.patch,
+          hasInventoryChange: build.hasInventoryChange,
+          adjustPayload,
+        },
+      );
       setLevel(nextLevel);
+      setLinked(refreshedLinked);
       resetInventoryFields(nextLevel);
-      let refreshedLinked: CrudLinkedEntitySnapshot | null = nextLinked;
-      try {
-        refreshedLinked = await portsRef.current.loadLinkedEntity(level.linkedEntityId);
-        setLinked(refreshedLinked);
-      } catch {
-        setLinked(null);
-        refreshedLinked = null;
-      }
       syncFormFromServer(nextLevel, refreshedLinked);
       imageUrlsTouchedRef.current = false;
       setEditing(false);
-      const mv = await portsRef.current.loadMovements(level.linkedEntityId);
-      setMovements(mv);
+      setMovements(mv as TMove[]);
       onAfterSave?.();
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : strings.saveErrorGeneric);
@@ -326,12 +312,13 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   };
 
   const handleArchive = async () => {
-    if (!level || !ports.archiveLinkedEntity || !strings.archiveConfirm) return;
+    const runArchive = onArchiveRef.current ?? portsRef.current.archiveLinkedEntity;
+    if (!level || !runArchive || !strings.archiveConfirm) return;
     if (!window.confirm(strings.archiveConfirm)) return;
     setArchiving(true);
     setFormError('');
     try {
-      await portsRef.current.archiveLinkedEntity!(level.linkedEntityId);
+      await runArchive(level.linkedEntityId);
       onAfterSave?.();
       onClose();
     } catch (e: unknown) {
@@ -544,7 +531,7 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
 
         <footer className="crud-inv-detail-modal__footer">
           <div className="crud-inv-detail-modal__footer-actions">
-            {flags.archiveAction && ports.archiveLinkedEntity && strings.archiveLabel ? (
+            {flags.archiveAction && canArchive && archiveLinkedEntityFn && strings.archiveLabel ? (
               <button
                 type="button"
                 className="btn-sm btn-danger"

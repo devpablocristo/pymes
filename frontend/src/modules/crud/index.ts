@@ -8,6 +8,7 @@ export * from './CrudResourceShellHeader';
 export * from './CrudToolbarActionButtons';
 export * from './CrudViewModeSwitch';
 export * from './crudResourceInventoryDetailContract';
+export * from './crudResourceInventoryDetailSaveOrchestration';
 export * from './CrudResourceInventoryDetailModal';
 export * from './crudLinkedEntityInventoryFormBlock';
 export * from './crudInventoryQuantitiesNotesBlock';

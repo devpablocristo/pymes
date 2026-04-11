@@ -1,0 +1,47 @@
+/* Bloque agnóstico: ficha de entidad enlazada (nombre, SKU, imágenes, track). */
+
+.crud-linked-entity-form__name-error {
+  margin: var(--space-2) 0 0;
+}
+
+.crud-linked-entity-form__error {
+  margin: 0 0 var(--space-2);
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+.crud-linked-entity-form__field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.crud-linked-entity-form__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: var(--space-2) var(--space-2);
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.crud-linked-entity-form__field textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.crud-linked-entity-form__checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  grid-column: 1 / -1;
+}
+
+.crud-linked-entity-form__checkbox-row input[type='checkbox'] {
+  width: auto;
+}

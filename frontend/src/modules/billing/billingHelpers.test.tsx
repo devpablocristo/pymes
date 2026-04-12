@@ -148,6 +148,8 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/purchases');
     expect(config.labelPluralCap).toBe('Compras');
+    expect(config.viewModes?.map((mode) => mode.id)).toEqual(['list', 'gallery', 'kanban']);
+    expect(config.viewModes?.map((mode) => mode.path)).toEqual(['list', 'gallery', 'board']);
     expect(
       config.toBody?.({
         supplier_id: 's1',

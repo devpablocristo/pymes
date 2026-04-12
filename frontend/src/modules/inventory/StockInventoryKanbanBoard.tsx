@@ -12,8 +12,8 @@ import {
   CrudKanbanSurface,
   useCrudArchivedSearchParam,
 } from '../crud';
-import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { StockLevelDetailModal } from './StockLevelDetailModal';
 import { fetchStockLevels, type StockLevelRow } from './stockData';
 import '../../pages/InventoryPage.css';
@@ -131,10 +131,8 @@ function StockKanbanCardPreview({ row }: { row: StockLevelRow }) {
 export function StockInventoryKanbanBoard() {
   const queryClient = useQueryClient();
   const { archived: showArchived } = useCrudArchivedSearchParam();
-  const { preSearchFilter } = useCrudListCreatedByMerge();
   const [detailProductId, setDetailProductId] = useState<string | null>(null);
   const [toolbarError, setToolbarError] = useState<string | null>(null);
-  const [boardSearch, setBoardSearch] = useState('');
   const [manualColumnById, setManualColumnById] = useState<Record<string, string>>({});
 
   const stockQuery = useQuery<StockLevelRow[]>({
@@ -145,7 +143,6 @@ export function StockInventoryKanbanBoard() {
   });
 
   const items = stockQuery.data ?? [];
-  const itemsAfterCreator = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
   const loadError =
     stockQuery.error instanceof Error ? stockQuery.error.message : stockQuery.error ? String(stockQuery.error) : null;
   const combinedError = loadError ?? toolbarError;
@@ -187,27 +184,28 @@ export function StockInventoryKanbanBoard() {
   }, []);
 
   const statsLine = useCallback((_visible: number, _total: number) => '', []);
-
-  const filteredCount = useMemo(() => {
-    const q = boardSearch.trim().toLowerCase();
-    if (!q) return itemsAfterCreator.length;
-    return itemsAfterCreator.filter((row) => filterRow(row, q)).length;
-  }, [boardSearch, itemsAfterCreator, filterRow]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<StockLevelRow>({
+    resourceId: 'inventory',
+    items,
+    matchesSearch: filterRow,
+  });
 
   return (
     <>
       <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="inventory"
         preserveCsvToolbar
-        items={itemsAfterCreator}
-        subtitleCount={filteredCount}
+        items={visibleItems}
+        subtitleCount={visibleItems.length}
         loading={stockQuery.isLoading}
         error={combinedError}
         setError={setToolbarError}
         reload={reload}
-        searchValue={boardSearch}
-        onSearchChange={setBoardSearch}
+        searchValue={search}
+        onSearchChange={setSearch}
         onArchiveToggle={() => setDetailProductId(null)}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
       />
       <div className="stock-inventory-kanban__board-only">
         <CrudKanbanSurface<StockLevelRow>
@@ -215,7 +213,7 @@ export function StockInventoryKanbanBoard() {
           columnIdSet={COLUMN_IDS}
           getRowColumnId={getRowColumnId}
           fallbackColumnId="wo_intake"
-          items={itemsAfterCreator}
+          items={visibleItems}
           loading={stockQuery.isLoading}
           error={null}
           onMoveCard={handleMoveCard}
@@ -229,7 +227,7 @@ export function StockInventoryKanbanBoard() {
           )}
           renderOverlayCard={(row) => <StockKanbanCardPreview row={row} />}
           title="Inventario"
-          externalSearch={boardSearch}
+          externalSearch=""
           statsLine={statsLine}
           columnFooter={() =>
             showArchived ? null : (

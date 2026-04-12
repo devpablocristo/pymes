@@ -1,0 +1,3 @@
+.crud-value-kanban__board-only .m-kanban > .page-header.crud-page-shell__header {
+  display: none;
+}

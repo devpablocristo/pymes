@@ -9,32 +9,15 @@ import { loadLazyCrudPageConfig } from './lazyCrudPage';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import { crudModuleCatalog } from './crudModuleCatalog';
 
-const CANONICAL_VIEW_MODES: CrudViewModeConfig[] = [
-  { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Cambiar vista', isDefault: true },
-  { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Cambiar vista' },
-  { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Cambiar vista' },
-];
-
 function fallbackViewModes(resourceId: string): CrudViewModeConfig[] {
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
-}
-
-function mergeCanonicalViewModes<T extends { id: string }>(config: CrudPageConfig<T> | null): CrudViewModeConfig[] {
-  const declared = config?.viewModes ?? [];
-  const merged = CANONICAL_VIEW_MODES.map((canonical) => declared.find((mode) => mode.id === canonical.id) ?? canonical);
-  return merged;
 }
 
 function resolveViewModes<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T> | null,
-  options?: { includeCanonicalMissing?: boolean },
 ): CrudViewModeConfig[] {
-  const configWithModes =
-    config && options?.includeCanonicalMissing
-      ? { ...config, viewModes: mergeCanonicalViewModes(config) }
-      : config;
-  const resolved = configWithModes ? applyCrudUiOverride(resourceId, configWithModes) : configWithModes;
+  const resolved = config ? applyCrudUiOverride(resourceId, config) : config;
   const modes = resolved?.viewModes?.length ? resolved.viewModes : fallbackViewModes(resourceId);
   return [...modes].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
 }
@@ -129,7 +112,7 @@ export function ConfiguredCrudSection({
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config, { includeCanonicalMissing }),
+    () => resolveViewModes(resourceId, config),
     [config, includeCanonicalMissing, resourceId, uiConfigVersion],
   );
 
@@ -170,7 +153,7 @@ export function ConfiguredCrudModePage({
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config, { includeCanonicalMissing: allowGenericModeFallback }),
+    () => resolveViewModes(resourceId, config),
     [allowGenericModeFallback, config, resourceId, uiConfigVersion],
   );
   const activeMode = viewModes.find((mode) => mode.id === modeId) ?? null;
@@ -262,7 +245,7 @@ export function ConfiguredCrudStandalonePage({
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config, { includeCanonicalMissing: true }),
+    () => resolveViewModes(resourceId, config),
     [config, resourceId, uiConfigVersion],
   );
   const activeMode = viewModes[0]?.id ?? 'list';
@@ -304,7 +287,7 @@ export function ConfiguredCrudRouteModePage() {
   const { config, error, loading } = useCrudConfig(moduleId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(
-    () => resolveViewModes(moduleId, config, { includeCanonicalMissing: true }),
+    () => resolveViewModes(moduleId, config),
     [config, moduleId, uiConfigVersion],
   );
   const mode = viewModes.find((entry) => entry.path === modePath) ?? null;
@@ -356,7 +339,7 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config, { includeCanonicalMissing: true }),
+    () => resolveViewModes(resourceId, config),
     [config, resourceId, uiConfigVersion],
   );
   const mode = viewModes.find((entry) => entry.path === modePath) ?? null;

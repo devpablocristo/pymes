@@ -200,7 +200,7 @@ describe('configuredCrudViews', () => {
     expect(screen.queryByText('lazy:customers')).not.toBeInTheDocument();
   });
 
-  it('renders generic fallback mode pages for standalone CRUD routes', async () => {
+  it('rejects non-declared standalone CRUD routes', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'customers') {
         return {
@@ -221,10 +221,10 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('generic:customers:gallery')).toBeInTheDocument();
+    expect(await screen.findByText('customers no expone la ruta gallery.')).toBeInTheDocument();
   });
 
-  it('shows canonical missing modes in dedicated sections when enabled for that resource', async () => {
+  it('shows only declared modes in dedicated sections', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'bikeWorkOrders') {
         return {
@@ -251,11 +251,11 @@ describe('configuredCrudViews', () => {
     );
 
     expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
   });
 
-  it('renders generic fallback mode pages for dedicated nested CRUD routes', async () => {
+  it('rejects non-declared dedicated nested CRUD routes', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'bikeWorkOrders') {
         return {
@@ -279,7 +279,7 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('generic:bikeWorkOrders:gallery')).toBeInTheDocument();
+    expect(await screen.findByText('bikeWorkOrders no expone la ruta gallery.')).toBeInTheDocument();
   });
 
 });

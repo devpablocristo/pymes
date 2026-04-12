@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { apiRequest } from '../../lib/api';
 import { formatDate } from '../../crud/resourceConfigs.shared';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import {
   CrudTableSurface,
   buildCrudContextEntityPath,
@@ -13,7 +14,6 @@ import {
 import type { TimelineEntryRow } from './auditTrailHelpers';
 
 export function TimelineListModeContent() {
-  const [search, setSearch] = useState('');
   const context = getCrudContextEntityParams();
   const listPath = buildCrudContextEntityPath(context, '/timeline?limit=100');
   const notePath = buildCrudContextEntityPath(context, '/notes');
@@ -28,13 +28,16 @@ export function TimelineListModeContent() {
     loadErrorMessage: 'No se pudo cargar el historial.',
   });
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((row) =>
-      [row.title, row.description, row.event_type, row.actor, row.entity_type].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-  }, [items, search]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<TimelineEntryRow>({
+    resourceId: 'timeline',
+    items,
+    matchesSearch: (row, query) =>
+      [row.title, row.description, row.event_type, row.actor, row.entity_type]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<TimelineEntryRow>[]>(
     () => [
@@ -87,7 +90,7 @@ export function TimelineListModeContent() {
       <PymesCrudResourceShellHeader<TimelineEntryRow>
         resourceId="timeline"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -95,6 +98,8 @@ export function TimelineListModeContent() {
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           <button type="button" className="btn-primary btn-sm" onClick={() => void handleCreateNote()}>
             + Nota manual

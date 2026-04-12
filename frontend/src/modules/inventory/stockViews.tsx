@@ -1,10 +1,10 @@
 import { normalize } from '@devpablocristo/core-browser/search';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { useI18n } from '../../lib/i18n';
-import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
 import { CrudGallerySurface, useCrudRemoteGalleryPage } from '../crud';
 import { fetchStockLevels, type StockLevelRow } from './stockData';
 import { StockInventoryKanbanBoard } from './StockInventoryKanbanBoard';
@@ -41,14 +41,11 @@ function useStockRemoteState() {
 
 export function StockGalleryWorkspace() {
   const { t } = useI18n();
-  const { preSearchFilter } = useCrudListCreatedByMerge();
   const {
     items,
     loading,
     error,
     setError,
-    search,
-    setSearch,
     deferredSearch,
     selectedId: detailProductId,
     selectItem,
@@ -57,25 +54,24 @@ export function StockGalleryWorkspace() {
     handleArchiveToggle,
   } = useStockRemoteState();
 
-  const creatorFilteredItems = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
-
-  const visibleItems = useMemo(() => {
-    if (!deferredSearch) return creatorFilteredItems;
-    const q = normalize(deferredSearch);
-    return creatorFilteredItems.filter((row) => {
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<StockLevelRow>({
+    resourceId: 'inventory',
+    items,
+    matchesSearch: (row, query) => {
+      const q = normalize(query);
       const hay = normalize(
         [row.product_name, row.sku, String(row.quantity), String(row.min_quantity), row.is_low_stock ? 'bajo' : 'normal'].join(' '),
       );
       return hay.includes(q);
-    });
-  }, [creatorFilteredItems, deferredSearch]);
+    },
+  });
 
   return (
     <div className="stock-crud-surface-page">
       <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="inventory"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -84,6 +80,8 @@ export function StockGalleryWorkspace() {
         searchValue={search}
         onSearchChange={setSearch}
         onArchiveToggle={handleArchiveToggle}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
       />
       <CrudGallerySurface<StockLevelRow>
         items={visibleItems}

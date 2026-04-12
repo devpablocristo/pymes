@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { apiRequest, downloadAPIFile } from '../../lib/api';
 import { formatDate } from '../../crud/resourceConfigs.shared';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import {
   CrudTableSurface,
   buildCrudContextEntityPath,
@@ -14,7 +15,6 @@ import {
 import type { AttachmentRow } from './auditTrailHelpers';
 
 export function AttachmentsListModeContent() {
-  const [search, setSearch] = useState('');
   const context = getCrudContextEntityParams();
   const path = buildCrudContextEntityPath(context, '/attachments?limit=200');
 
@@ -28,13 +28,16 @@ export function AttachmentsListModeContent() {
     loadErrorMessage: 'No se pudieron cargar los adjuntos.',
   });
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((row) =>
-      [row.file_name, row.content_type, row.uploaded_by, String(row.size_bytes)].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-  }, [items, search]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<AttachmentRow>({
+    resourceId: 'attachments',
+    items,
+    matchesSearch: (row, query) =>
+      [row.file_name, row.content_type, row.uploaded_by, String(row.size_bytes)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<AttachmentRow>[]>(
     () => [
@@ -107,7 +110,7 @@ export function AttachmentsListModeContent() {
       <PymesCrudResourceShellHeader<AttachmentRow>
         resourceId="attachments"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -115,6 +118,8 @@ export function AttachmentsListModeContent() {
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
       />
       {loading ? (
         <div className="empty-state">

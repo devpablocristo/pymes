@@ -118,6 +118,11 @@
   flex-shrink: 0;
 }
 
+.crud-status-selector {
+  min-width: 140px;
+  height: 36px;
+}
+
 .page-header.crud-page-shell__header .crud-page-shell__header-actions > .actions-row {
   display: flex;
   flex-wrap: wrap;

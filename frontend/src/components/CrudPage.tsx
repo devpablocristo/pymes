@@ -37,6 +37,12 @@ export type CrudExplorerDetailConfig<T extends { id: string }> = {
   renderDetail: (row: T, ctx: { items: T[]; reload: () => Promise<void> }) => import('react').ReactNode;
 };
 
+export type CrudValueFilterOption<T extends { id: string }> = {
+  value: string;
+  label: string;
+  matches: (row: T) => boolean;
+};
+
 export type {
   CrudColumn,
   CrudDataSource,
@@ -56,6 +62,8 @@ export type CrudPageConfig<T extends { id: string }> = ModulesCrudPageConfig<T> 
   explorerDetail?: CrudExplorerDetailConfig<T>;
   /** Extensión Pymes: render de celda tags cuando el módulo CRUD lo soporta vía CSV/flags. */
   renderTagsCell?: (row: T) => import('react').ReactNode;
+  /** Filtros genéricos por valor para el header CRUD común. */
+  valueFilterOptions?: CrudValueFilterOption<T>[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapa heterogéneo: cada config tiene su propio tipo de record, TS no soporta tipos existenciales

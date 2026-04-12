@@ -15,7 +15,7 @@ import {
   useCrudRemoteArchivedListState,
 } from '../modules/crud';
 import { PymesCrudResourceShellHeader } from '../crud/PymesCrudResourceShellHeader';
-import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
+import { usePymesCrudHeaderFeatures } from '../crud/usePymesCrudHeaderFeatures';
 import {
   canonicalWorkOrderStatus,
   workOrderStatusBadgeLabel,
@@ -195,10 +195,8 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
   renderExtraToolbar,
   renderDetailModal,
 }: GenericWorkOrdersBoardProps<T>) {
-  const { preSearchFilter, listHeaderInlineSlot } = useCrudListCreatedByMerge();
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [boardSearch, setBoardSearch] = useState('');
 
   const {
     showArchived,
@@ -225,8 +223,6 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     setError(message);
     setQueryError(message);
   }, [setQueryError]);
-
-  const boardItems = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
 
   const archiveTerminalDragPolicy = useMemo(
     () =>
@@ -281,26 +277,28 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     return hay.includes(normalize(q));
   }, []);
 
-  const filteredCount = useMemo(() => {
-    const q = boardSearch.trim().toLowerCase();
-    if (!q) return boardItems.length;
-    return boardItems.filter((row) => filterRow(row, q)).length;
-  }, [boardItems, boardSearch, filterRow]);
+  const { search, setSearch, visibleItems, headerLeadSlot: creatorLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<T>({
+    resourceId,
+    items,
+    matchesSearch: (row, query) => filterRow(row, query),
+  });
 
   return (
     <>
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
         preserveCsvToolbar
-        items={items}
-        subtitleCount={filteredCount}
+        items={visibleItems}
+        subtitleCount={visibleItems.length}
         loading={loading}
         error={error ?? queryError}
         setError={setBoardError}
         reload={reload}
-        searchValue={boardSearch}
-        onSearchChange={setBoardSearch}
+        searchValue={search}
+        onSearchChange={setSearch}
         onArchiveToggle={() => setDetailOrderId(null)}
+        headerLeadSlot={headerLeadSlot ?? creatorLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={renderExtraToolbar?.({
           items,
           reload,
@@ -315,7 +313,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         columnIdSet={COLUMN_IDS}
         getRowColumnId={(row) => workOrderKanbanTransitionModel.getColumnIdForStatus(row.status)}
         fallbackColumnId="wo_intake"
-        items={boardItems}
+        items={visibleItems}
         loading={loading}
         error={null}
         onMoveCard={handleBoardMoveCard}
@@ -329,7 +327,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         )}
         renderOverlayCard={(row) => <CardPreview row={row} />}
         title=""
-        externalSearch={boardSearch}
+        externalSearch=""
         statsLine={() => ''}
         columnFooter={() => (
           <Link to={listPath} className="m-kanban__column-add" draggable={false}>

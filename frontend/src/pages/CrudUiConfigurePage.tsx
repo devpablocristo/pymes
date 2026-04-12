@@ -1,8 +1,8 @@
-import { CrudUiPreferencesPanel } from '@devpablocristo/modules-crud-ui';
 import { useMemo } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
 import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
+import { CrudUiPreferencesPanel } from '../modules/crud';
 import { CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { crudModuleCatalog } from '../crud/crudModuleCatalog';
 import './CrudUiConfigurePage.css';
@@ -10,7 +10,7 @@ import './CrudUiConfigurePage.css';
 const FEATURE_KEYS = [
   ['creatorFilter', 'Filtro de responsable'],
   ['headerQuickFilterStrip', 'Filtros rápidos en cabecera'],
-  ['statusSelector', 'Selector de estados'],
+  ['valueFilter', 'Filtro de valor'],
   ['csvToolbar', 'Acciones CSV'],
 ] as const;
 

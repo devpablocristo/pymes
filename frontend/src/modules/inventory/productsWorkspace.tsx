@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { apiRequest } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
-import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { usePymesCrudConfigQuery } from '../../crud/usePymesCrudConfigQuery';
 import {
   CrudCreateNavigationButton,
@@ -72,19 +72,15 @@ export function ProductsGalleryWorkspace() {
   const { t, localizeText } = useI18n();
   const crudConfigQuery = usePymesCrudConfigQuery<ProductRow>('products', { preserveCsvToolbar: true });
   const crudConfig = crudConfigQuery.data ?? null;
-  const { preSearchFilter } = useCrudListCreatedByMerge();
 
   const {
     items,
     loading,
     error,
     setError,
-    total,
     hasMore,
     loadingMore,
     loadMore,
-    search,
-    setSearch,
     selectedId: detailId,
     selectItem,
     closeDetail,
@@ -92,14 +88,23 @@ export function ProductsGalleryWorkspace() {
     handleArchiveToggle,
   } = useProductsRemoteState();
 
-  const visibleItems = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<ProductRow>({
+    resourceId: 'products',
+    items,
+    matchesSearch: (row, query) =>
+      [row.name, row.sku, row.unit, String(row.price ?? ''), String(row.cost_price ?? ''), row.currency]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  });
 
   return (
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<ProductRow>
         resourceId="products"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -108,6 +113,8 @@ export function ProductsGalleryWorkspace() {
         searchValue={search}
         onSearchChange={setSearch}
         onArchiveToggle={handleArchiveToggle}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           <CrudCreateNavigationButton
             to="/modules/products/list"
@@ -151,7 +158,6 @@ export function ProductsGalleryWorkspace() {
 
 export function ProductsListWorkspace() {
   const { t } = useI18n();
-  const { preSearchFilter } = useCrudListCreatedByMerge();
 
   const {
     items,
@@ -161,8 +167,6 @@ export function ProductsListWorkspace() {
     hasMore,
     loadingMore,
     loadMore,
-    search,
-    setSearch,
     selectedId,
     selectItem,
     closeDetail,
@@ -170,7 +174,16 @@ export function ProductsListWorkspace() {
     handleArchiveToggle,
   } = useProductsRemoteState();
 
-  const visibleItems = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<ProductRow>({
+    resourceId: 'products',
+    items,
+    matchesSearch: (row, query) =>
+      [row.name, row.sku, row.unit, String(row.price ?? ''), String(row.cost_price ?? ''), row.currency]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<ProductRow>[]>(
     () => [
@@ -217,7 +230,7 @@ export function ProductsListWorkspace() {
       <PymesCrudResourceShellHeader<ProductRow>
         resourceId="products"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -226,6 +239,8 @@ export function ProductsListWorkspace() {
         searchValue={search}
         onSearchChange={setSearch}
         onArchiveToggle={handleArchiveToggle}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={<CrudCreateNavigationButton to="/modules/products/list" label="+ Nuevo producto" />}
       />
 

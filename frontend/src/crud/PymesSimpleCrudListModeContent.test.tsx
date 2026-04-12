@@ -18,6 +18,24 @@ vi.mock('./usePymesCrudConfigQuery', () => ({
   }),
 }));
 
+vi.mock('./usePymesCrudHeaderFeatures', () => ({
+  usePymesCrudHeaderFeatures: ({
+    items,
+    search = '',
+    setSearch,
+  }: {
+    items: Array<{ id: string; name: string }>;
+    search?: string;
+    setSearch?: (value: string) => void;
+  }) => ({
+    search,
+    setSearch: setSearch ?? vi.fn(),
+    visibleItems: items,
+    headerLeadSlot: null,
+    searchInlineActions: null,
+  }),
+}));
+
 vi.mock('../modules/crud', () => ({
   useCrudArchivedSearchParam: () => ({ archived: false }),
   useCrudRemoteGalleryPage: () => ({
@@ -48,6 +66,7 @@ vi.mock('../modules/crud', () => ({
     </div>
   ),
   CrudGallerySurface: () => <div>gallery-surface</div>,
+  CrudValueKanbanSurface: ({ items }: { items: Array<{ id: string; name: string }> }) => <div>kanban-surface:{items.length}</div>,
   openCrudFormDialog: vi.fn(),
 }));
 
@@ -104,5 +123,26 @@ describe('PymesSimpleCrudListModeContent', () => {
 
     rerender(<PymesSimpleCrudListModeContent resourceId="services" />);
     expect(screen.getByText('cols:name:Nombre')).toBeInTheDocument();
+  });
+
+  it('usa la surface reusable de kanban en vez del bloque inline viejo', () => {
+    currentConfig = {
+      label: 'compra',
+      labelPlural: 'compras',
+      labelPluralCap: 'Compras',
+      basePath: '/v1/purchases',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      viewModes: [
+        { id: 'list', label: 'Lista', path: 'list', isDefault: true },
+        { id: 'kanban', label: 'Tablero', path: 'board' },
+      ],
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
+    expect(screen.getByText('kanban-surface:1')).toBeInTheDocument();
   });
 });

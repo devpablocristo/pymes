@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import { CrudArchivedSearchParamToggle } from './CrudArchivedSearchParamToggle';
 import { CrudToolbarActionButtons } from './CrudToolbarActionButtons';
 import { useCrudArchivedSearchParam } from './useCrudArchivedSearchParam';
+import type { CrudValueFilterOption } from '../../components/CrudPage';
 import './CrudResourceShellHeader.css';
 
 export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
@@ -22,8 +23,9 @@ export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
   featureFlags?: {
     headerQuickFilterStrip?: boolean;
     creatorFilter?: boolean;
-    statusSelector?: boolean;
+    valueFilter?: boolean;
   };
+  valueFilterOptions?: CrudValueFilterOption<T>[];
 };
 
 export type CrudResourceShellHeaderProps<T extends { id: string }> = {

@@ -1,10 +1,11 @@
-import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
+import type { CrudFieldValue, CrudPageConfig, CrudValueFilterOption } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
 import { asOptionalNumber, asOptionalString, asString, parseJSONArray } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { openCrudFormDialog, openCrudTextDialog } from '../crud';
+import { buildStandardCrudViewModes } from '../crud';
 import {
   invoiceInitials,
   nextInvoiceUid,
@@ -24,6 +25,16 @@ export function buildCommercialDocumentStatusOptions<TStatus extends string>(
     value,
     label: labels[value],
     badgeClass: badgeClasses[value],
+  }));
+}
+
+function buildStringValueFilterOptions<TRecord extends { id: string }>(
+  labels: Record<string, string>,
+): CrudValueFilterOption<TRecord>[] {
+  return Object.entries(labels).map(([value, label]) => ({
+    value,
+    label,
+    matches: (row: TRecord) => String((row as Record<string, unknown>).status ?? '').trim().toLowerCase() === value,
   }));
 }
 
@@ -198,13 +209,13 @@ export function createCommercialDocumentCrudConfig<
     | 'toFormValues'
     | 'isValid'
   > = {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList),
     label: opts.label,
     labelPlural: opts.labelPlural,
     labelPluralCap: opts.labelPluralCap,
     createLabel: opts.createLabel,
     searchPlaceholder: opts.searchPlaceholder ?? 'Buscar...',
-    featureFlags: { statusSelector: true },
+    featureFlags: { valueFilter: true },
     supportsArchived: true,
     columns: opts.columns,
     formFields: [],
@@ -289,6 +300,12 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
 export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
+  const valueFilterOptions = buildStringValueFilterOptions<TRecord>({
+    draft: 'Borrador',
+    sent: 'Enviado',
+    accepted: 'Aceptado',
+    rejected: 'Rechazado',
+  });
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes'>({
     resourceId: 'quotes',
     renderList: opts.renderList,
@@ -329,6 +346,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
     basePath: '/v1/quotes',
     supportsArchived: true,
     ...base.config,
+    valueFilterOptions,
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
       { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
@@ -395,6 +413,13 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
 export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
+  const valueFilterOptions = buildStringValueFilterOptions<TRecord>({
+    draft: 'Borrador',
+    paid: 'Pagada',
+    pending: 'Pendiente',
+    voided: 'Anulada',
+    cancelled: 'Cancelada',
+  });
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'payment_method' | 'notes'>({
     resourceId: 'sales',
     renderList: opts.renderList,
@@ -437,6 +462,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
     allowEdit: false,
     allowDelete: false,
     ...base.config,
+    valueFilterOptions,
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
       { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
@@ -585,6 +611,12 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
 export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
+  const valueFilterOptions = buildStringValueFilterOptions<TRecord>({
+    active: 'Activa',
+    partially_used: 'Parcialmente usada',
+    used: 'Usada',
+    expired: 'Vencida',
+  });
   return {
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: opts.renderList }],
     label: 'nota de crédito',
@@ -599,6 +631,8 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',
+    featureFlags: { valueFilter: true },
+    valueFilterOptions,
     columns: [
       {
         key: 'number',
@@ -678,6 +712,11 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
 export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
+  const valueFilterOptions = buildStringValueFilterOptions<TRecord>({
+    draft: 'Borrador',
+    received: 'Recibida',
+    cancelled: 'Cancelada',
+  });
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes'>({
     resourceId: 'purchases',
     renderList: opts.renderList,
@@ -718,6 +757,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     basePath: '/v1/purchases',
     allowDelete: false,
     ...base.config,
+    valueFilterOptions,
     formFields: [
       { key: 'supplier_id', label: 'Supplier ID' },
       { key: 'supplier_name', label: 'Proveedor', required: true, placeholder: 'Nombre del proveedor' },

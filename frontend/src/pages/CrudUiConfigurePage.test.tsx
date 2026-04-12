@@ -27,7 +27,7 @@ describe('CrudUiConfigurePage', () => {
     } as CrudPageConfig<{ id: string }>);
   });
 
-  it('always shows canonical view mode options in configure', async () => {
+  it('shows only the view modes actually declared by the resource', async () => {
     render(
       <MemoryRouter initialEntries={['/modules/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
@@ -38,8 +38,8 @@ describe('CrudUiConfigurePage', () => {
     );
 
     expect(await screen.findAllByText('Lista')).not.toHaveLength(0);
-    expect(screen.getAllByText('Galería')).not.toHaveLength(0);
-    expect(screen.getAllByText('Tablero')).not.toHaveLength(0);
+    expect(screen.queryByText('Galería')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tablero')).not.toBeInTheDocument();
     expect(screen.queryByText('Detalle')).not.toBeInTheDocument();
     expect(screen.getByText('Filtro de responsable')).toBeInTheDocument();
     expect(screen.getByText('Filtros rápidos en cabecera')).toBeInTheDocument();

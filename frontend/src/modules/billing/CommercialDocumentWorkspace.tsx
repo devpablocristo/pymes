@@ -2,6 +2,7 @@ import { confirmAction } from '@devpablocristo/core-browser';
 import { IconClose } from '@devpablocristo/modules-ui-data-display/icons';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { CrudTableSurface, type CrudTableSurfaceColumn, type CrudTableSurfaceRowAction } from '../crud';
 import { useCrudArchivedSearchParam } from '../crud';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
@@ -81,24 +82,35 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
   const { archived: showArchived } = useCrudArchivedSearchParam();
   const [view, setView] = useState<WorkspaceView>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TStatus | 'all'>('all');
 
   const selectedDocument = useMemo(
     () => (selectedId ? documents.find((document) => document.id === selectedId) ?? null : null),
     [documents, selectedId],
   );
 
-  const visibleDocuments = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return documents.filter((document) => {
-      if (showArchived !== isArchived(document)) return false;
-      if (statusFilter !== 'all' && document.status !== statusFilter) return false;
-      if (!query) return true;
-      return [document.number, document.customer, document.status].join(' ').toLowerCase().includes(query);
+  const scopedDocuments = useMemo(
+    () => documents.filter((document) => showArchived === isArchived(document)),
+    [documents, isArchived, showArchived],
+  );
+  const valueFilterOptions = useMemo(
+    () =>
+      shellConfig?.valueFilterOptions?.length
+        ? shellConfig.valueFilterOptions
+        : statusOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+            matches: (row: TRecord) => row.status === option.value,
+          })),
+    [shellConfig?.valueFilterOptions, statusOptions],
+  );
+  const { search, setSearch, visibleItems: visibleDocuments, headerLeadSlot, searchInlineActions } =
+    usePymesCrudHeaderFeatures<TRecord>({
+      resourceId,
+      items: scopedDocuments,
+      matchesSearch: (document, query) =>
+        [document.number, document.customer, document.status].join(' ').toLowerCase().includes(query),
+      valueFilterOptions,
     });
-  }, [documents, isArchived, search, showArchived, statusFilter]);
-  const showStatusSelector = shellConfig?.featureFlags?.statusSelector !== false;
 
   const columns = useMemo<CrudTableSurfaceColumn<TRecord>[]>(
     () => [
@@ -209,23 +221,8 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
-        searchInlineActions={
-          showStatusSelector ? (
-            <select
-              className="commercial-document__status-filter"
-              aria-label="Filtrar documentos por estado"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as TStatus | 'all')}
-            >
-              <option value="all">Todas</option>
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          ) : null
-        }
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           <>
             <button

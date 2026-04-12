@@ -1,14 +1,16 @@
 import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
 import { crudItemPath, type CrudFieldValue, type CrudHelpers, type CrudRowAction } from '@devpablocristo/modules-crud-ui';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
+import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
   CrudGallerySurface,
   CrudTableSurface,
+  CrudValueKanbanSurface,
   openCrudFormDialog,
   useCrudArchivedSearchParam,
   useCrudRemoteGalleryPage,
@@ -16,7 +18,14 @@ import {
   type CrudTableSurfaceColumn,
   type CrudTableSurfaceRowAction,
 } from '../modules/crud';
-import type { CrudColumn, CrudFormField, CrudFormValues, CrudPageConfig, CrudViewModeId } from '../components/CrudPage';
+import type {
+  CrudColumn,
+  CrudFormField,
+  CrudFormValues,
+  CrudPageConfig,
+  CrudValueFilterOption,
+  CrudViewModeId,
+} from '../components/CrudPage';
 
 type CrudListResponse<T> = {
   items: T[];
@@ -74,14 +83,6 @@ function pickStringValue(row: Record<string, unknown>, candidates: string[]) {
   return '';
 }
 
-function prettifyLabel(value: string) {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^\w/, (char) => char.toUpperCase());
-}
-
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   resourceId,
   mode = 'list',
@@ -132,8 +133,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     hasMore,
     loadingMore,
     loadMore,
-    search,
-    setSearch,
+    search: remoteSearch,
+    setSearch: setRemoteSearch,
     selectedId,
     selectItem,
     reload,
@@ -141,6 +142,18 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   } = useCrudRemoteGalleryPage<T>({
     pageSize: 100,
     fetchPage,
+  });
+
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<T>({
+    resourceId,
+    crudConfigOverride: crudConfig,
+    items,
+    search: remoteSearch,
+    setSearch: setRemoteSearch,
+    matchesSearch: (row, query) => {
+      const searchText = crudConfig?.searchText?.(row) ?? '';
+      return String(searchText).toLowerCase().includes(query);
+    },
   });
 
   const columns = useMemo<CrudTableSurfaceColumn<T>[]>(() => {
@@ -174,11 +187,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
     return mappedColumns;
   }, [archived, crudConfig]);
-
-  const selectedRow = useMemo(
-    () => items.find((row) => row.id === selectedId) ?? items[0] ?? null,
-    [items, selectedId],
-  );
 
   const runCreateOrEdit = useCallback(
     async (row?: T) => {
@@ -344,30 +352,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   const cardMeta = (row: T) =>
     pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
 
-  const kanbanField = useMemo(() => {
-    if (items.some((row) => typeof rowRecordValues(row).status === 'string')) return 'status';
-    if (items.some((row) => typeof rowRecordValues(row).payment_status === 'string')) return 'payment_status';
-    if (items.some((row) => typeof rowRecordValues(row).type === 'string')) return 'type';
-    if (items.some((row) => typeof rowRecordValues(row).is_active === 'boolean')) return 'is_active';
-    return null;
-  }, [items]);
-
-  const kanbanColumns = useMemo(() => {
-    if (!kanbanField) return [{ id: 'all', label: 'Todos' }];
-    const values = Array.from(
-      new Set(
-        items
-          .map((row) => {
-            const raw = rowRecordValues(row)[kanbanField];
-            if (typeof raw === 'boolean') return raw ? 'active' : 'inactive';
-            return String(raw ?? '').trim().toLowerCase();
-          })
-          .filter(Boolean),
-      ),
-    );
-    return values.length ? values.map((value) => ({ id: value, label: prettifyLabel(value) })) : [{ id: 'all', label: 'Todos' }];
-  }, [items, kanbanField]);
-
   if (!crudConfig) {
     return (
       <div className="empty-state">
@@ -380,8 +364,9 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
-        items={items}
-        subtitleCount={items.length}
+        headerLeadSlot={headerLeadSlot}
+        items={visibleItems}
+        subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
         setError={setError}
@@ -389,6 +374,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         searchValue={search}
         onSearchChange={setSearch}
         onArchiveToggle={handleArchiveToggle}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           !archived && canCreate ? (
             <button type="button" className="btn-primary btn-sm" onClick={() => void runCreateOrEdit()}>
@@ -402,13 +388,13 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         <div className="empty-state">
           <p>{t('crud.viewMode.gallery.loading')}</p>
         </div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <div className="empty-state">
           <p>{archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}</p>
         </div>
       ) : mode === 'gallery' ? (
         <CrudGallerySurface
-          items={items}
+          items={visibleItems}
           loading={loading}
           emptyLabel={crudConfig.emptyState ?? 'No hay datos para mostrar.'}
           loadingLabel={t('crud.viewMode.gallery.loading')}
@@ -427,49 +413,27 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           }}
         />
       ) : mode === 'kanban' ? (
-        <div className="crud-simple-board-grid">
-          {kanbanColumns.map((column) => {
-            const columnItems = items.filter((row) => {
-              if (!kanbanField) return true;
-              const raw = rowRecordValues(row)[kanbanField];
-              const value = typeof raw === 'boolean' ? (raw ? 'active' : 'inactive') : String(raw ?? '').trim().toLowerCase();
-              return value === column.id;
-            });
-            return (
-              <div key={column.id} className="m-kanban__column-body">
-                <div className="m-kanban__column-head">
-                  <span className="m-kanban__column-label">{column.label}</span>
-                  <div className="m-kanban__column-head-actions">
-                    <span className="m-kanban__column-count">{columnItems.length}</span>
-                  </div>
-                </div>
-                <div className="m-kanban__column-scroll">
-                  {columnItems.map((row) => (
-                    <button
-                      key={row.id}
-                      type="button"
-                      className="m-kanban__card"
-                      onClick={() => {
-                        if (!archived && canEdit) {
-                          void runCreateOrEdit(row);
-                          return;
-                        }
-                        selectItem(row.id);
-                      }}
-                    >
-                      <strong>{cardTitle(row)}</strong>
-                      {cardSubtitle(row) ? <div className="text-secondary">{cardSubtitle(row)}</div> : null}
-                      {cardMeta(row) ? <div className="text-secondary">{cardMeta(row)}</div> : null}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <CrudValueKanbanSurface<T>
+          items={visibleItems}
+          loading={loading}
+          title={crudConfig.labelPluralCap}
+          emptyLabel={archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}
+          valueFilterOptions={crudConfig.valueFilterOptions}
+          onCardOpen={(row) => {
+            if (!archived && canEdit) {
+              void runCreateOrEdit(row);
+              return;
+            }
+            selectItem(row.id);
+          }}
+          getCardTitle={cardTitle}
+          getCardSubtitle={cardSubtitle}
+          getCardMeta={cardMeta}
+          disableDrag={archived}
+        />
       ) : (
         <CrudTableSurface
-          items={items}
+          items={visibleItems}
           columns={columns}
           rowActions={rowActions}
           onRowClick={

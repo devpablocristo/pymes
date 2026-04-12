@@ -1,6 +1,7 @@
-import { useDeferredValue, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useI18n } from '../lib/i18n';
 import { usePymesCrudConfigQuery } from '../crud/usePymesCrudConfigQuery';
+import { usePymesCrudHeaderFeatures } from '../crud/usePymesCrudHeaderFeatures';
 import { formatDate } from '../crud/resourceConfigs.shared';
 import { formatWorkshopMoney, renderWorkshopWorkOrderStatusBadge } from '../crud/workshopsCrudHelpers';
 import {
@@ -51,9 +52,7 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
   const { localizeText: formatFieldText } = useI18n();
   const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
   const crudConfig = crudConfigQuery.data ?? null;
-  const [search, setSearch] = useState('');
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   const {
     showArchived,
@@ -72,9 +71,10 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
     loadErrorMessage: 'Error al cargar órdenes',
   });
 
-  const visibleItems = useMemo(() => {
-    if (!deferredSearch) return items;
-    return items.filter((row) =>
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<T>({
+    resourceId,
+    items,
+    matchesSearch: (row, query) =>
       [
         row.number,
         getAssetLabel(row),
@@ -86,9 +86,8 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(deferredSearch),
-    );
-  }, [deferredSearch, getAssetLabel, items]);
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<T>[]>(
     () => [
@@ -147,7 +146,7 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -155,6 +154,8 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           <>
             <CrudToolbarActionButtons

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatDate } from '../../crud/resourceConfigs.shared';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { createSalePayment, listSalePayments, type SalePaymentRow } from '../../lib/api';
 import {
   CrudTableSurface,
@@ -13,7 +14,6 @@ import {
 export function PaymentsListModeContent() {
   const [searchParams] = useSearchParams();
   const saleId = searchParams.get('sale_id')?.trim() || '';
-  const [search, setSearch] = useState('');
 
   const { items, error, setError, loading, reload } = useCrudRemoteListState<SalePaymentRow>({
     queryKey: ['payments', saleId || 'none'],
@@ -25,17 +25,16 @@ export function PaymentsListModeContent() {
     loadErrorMessage: 'No se pudieron cargar los pagos.',
   });
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((row) =>
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<SalePaymentRow>({
+    resourceId: 'payments',
+    items,
+    matchesSearch: (row, query) =>
       [row.method, row.notes, String(row.amount), row.received_at, row.id]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(q),
-    );
-  }, [items, search]);
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<SalePaymentRow>[]>(
     () => [
@@ -88,7 +87,7 @@ export function PaymentsListModeContent() {
       <PymesCrudResourceShellHeader<SalePaymentRow>
         resourceId="payments"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -96,6 +95,8 @@ export function PaymentsListModeContent() {
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
         extraHeaderActions={
           <button type="button" className="btn-primary btn-sm" onClick={() => void handleCreatePayment()}>
             + Registrar pago

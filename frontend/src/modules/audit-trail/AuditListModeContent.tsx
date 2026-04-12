@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { apiRequest } from '../../lib/api';
 import { formatDate } from '../../crud/resourceConfigs.shared';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
+import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { CrudTableSurface, useCrudRemoteListState, type CrudTableSurfaceColumn } from '../crud';
 import type { AuditEntryRow } from './auditTrailHelpers';
 
 export function AuditListModeContent() {
-  const [search, setSearch] = useState('');
   const { items, error, setError, loading, reload } = useCrudRemoteListState<AuditEntryRow>({
     queryKey: ['audit'],
     list: async () => {
@@ -16,13 +16,16 @@ export function AuditListModeContent() {
     loadErrorMessage: 'No se pudo cargar la auditoría.',
   });
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((row) =>
-      [row.action, row.resource_type, row.resource_id, row.actor, row.actor_label].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-  }, [items, search]);
+  const { search, setSearch, visibleItems, headerLeadSlot, searchInlineActions } = usePymesCrudHeaderFeatures<AuditEntryRow>({
+    resourceId: 'audit',
+    items,
+    matchesSearch: (row, query) =>
+      [row.action, row.resource_type, row.resource_id, row.actor, row.actor_label]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+  });
 
   const columns = useMemo<CrudTableSurfaceColumn<AuditEntryRow>[]>(
     () => [
@@ -49,7 +52,7 @@ export function AuditListModeContent() {
       <PymesCrudResourceShellHeader<AuditEntryRow>
         resourceId="audit"
         preserveCsvToolbar
-        items={items}
+        items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
         error={error}
@@ -57,6 +60,8 @@ export function AuditListModeContent() {
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
+        headerLeadSlot={headerLeadSlot}
+        searchInlineActions={searchInlineActions}
       />
       {loading ? (
         <div className="empty-state">

@@ -43,6 +43,7 @@ describe('CrudUiConfigurePage', () => {
     expect(screen.queryByText('Detalle')).not.toBeInTheDocument();
     expect(screen.getByText('Filtro de responsable')).toBeInTheDocument();
     expect(screen.getByText('Filtros rápidos en cabecera')).toBeInTheDocument();
+    expect(screen.getByText('Paginación')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver a clientes' })).toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ const FEATURE_KEYS = [
   ['creatorFilter', 'Filtro de responsable'],
   ['headerQuickFilterStrip', 'Filtros rápidos en cabecera'],
   ['valueFilter', 'Filtro de valor'],
+  ['pagination', 'Paginación'],
   ['csvToolbar', 'Acciones CSV'],
 ] as const;
 

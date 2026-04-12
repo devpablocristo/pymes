@@ -5,6 +5,7 @@ export * from './CrudExplorerPage';
 export * from './CrudGallerySurface';
 export * from './CrudImageFullscreenViewer';
 export * from './CrudKanbanSurface';
+export * from './CrudPaginationBar';
 export * from './CrudModuleSection';
 export * from './CrudUiPreferencesPanel';
 export * from './CrudResourceShellHeader';

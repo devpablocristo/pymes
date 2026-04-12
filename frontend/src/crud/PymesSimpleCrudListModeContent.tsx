@@ -9,6 +9,7 @@ import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
   CrudGallerySurface,
+  CrudPaginationBar,
   CrudTableSurface,
   CrudValueKanbanSurface,
   openCrudFormDialog,
@@ -130,6 +131,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     loading,
     error,
     setError,
+    total,
     hasMore,
     loadingMore,
     loadMore,
@@ -345,6 +347,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
   const canEdit = crudConfig?.allowEdit ?? Boolean(crudConfig?.formFields.length);
   const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
+  const paginationEnabled = crudConfig?.featureFlags?.pagination !== false;
   const rowRecordValues = (row: T) => row as Record<string, unknown>;
   const cardTitle = (row: T) => pickStringValue(rowRecordValues(row), ['name', 'number', 'description', 'title', 'code', 'id']) || row.id;
   const cardSubtitle = (row: T) =>
@@ -448,19 +451,17 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         />
       )}
 
-      {!loading && hasMore ? (
-        <div className="crud-load-more">
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={loadingMore}
-            onClick={() => {
-              void loadMore();
-            }}
-          >
-            {loadingMore ? t('crud.viewMode.gallery.loading') : t('crud.loadMore')}
-          </button>
-        </div>
+      {!loading && visibleItems.length > 0 ? (
+        <CrudPaginationBar
+          visibleCount={visibleItems.length}
+          totalCount={total || items.length}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => {
+            void loadMore();
+          }}
+          hidden={!paginationEnabled}
+        />
       ) : null}
     </div>
   );

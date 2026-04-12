@@ -66,6 +66,15 @@ vi.mock('../modules/crud', () => ({
     </div>
   ),
   CrudGallerySurface: () => <div>gallery-surface</div>,
+  CrudPaginationBar: ({
+    visibleCount,
+    totalCount,
+    hasMore,
+  }: {
+    visibleCount: number;
+    totalCount?: number;
+    hasMore?: boolean;
+  }) => <div>pagination:{visibleCount}:{String(totalCount ?? '')}:{String(Boolean(hasMore))}</div>,
   CrudValueKanbanSurface: ({ items }: { items: Array<{ id: string; name: string }> }) => <div>kanban-surface:{items.length}</div>,
   openCrudFormDialog: vi.fn(),
 }));
@@ -144,5 +153,6 @@ describe('PymesSimpleCrudListModeContent', () => {
 
     render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
     expect(screen.getByText('kanban-surface:1')).toBeInTheDocument();
+    expect(screen.getByText('pagination:1:1:false')).toBeInTheDocument();
   });
 });

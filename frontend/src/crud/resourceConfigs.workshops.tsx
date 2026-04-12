@@ -22,7 +22,9 @@ import {
   type WorkOrderLineItem as WorkOrderItem,
 } from '../lib/workOrdersApi';
 import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
+import { BikeWorkOrdersListModeContent } from '../pages/modes/BikeWorkOrdersListModeContent';
 import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
+import { CarWorkOrdersListModeContent } from '../pages/modes/CarWorkOrdersListModeContent';
 import { formatWorkshopMoney, renderWorkshopWorkOrderStatusBadge } from './workshopsCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
@@ -39,6 +41,8 @@ import {
   toDateTimeInput,
   toRFC3339,
 } from './resourceConfigs.shared';
+import { openCrudFormDialog } from '../modules/crud';
+import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
 type BikeWorkOrder = WorkOrder;
 type BikeWorkOrderItem = WorkOrderItem;
@@ -174,6 +178,15 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       asString(values.license_plate).trim().length >= 5 &&
       asString(values.make).trim().length >= 2 &&
       asString(values.model).trim().length >= 1,
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="workshopVehicles" />,
+      },
+    ],
   },
   carWorkOrders: {
     supportsArchived: true,
@@ -186,7 +199,7 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
         isDefault: true,
         render: () => <CarWorkOrdersKanbanModeContent />,
       },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista', render: () => <CarWorkOrdersListModeContent /> },
     ],
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
@@ -319,19 +332,40 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
         kind: 'secondary',
         isVisible: (row: WorkOrder) => !row.booking_id,
         onClick: async (row: WorkOrder, helpers) => {
-          const title = (
-            window.prompt('Titulo del turno', row.requested_work || `Servicio ${row.vehicle_plate || row.number}`) ?? ''
-          ).trim();
+          const values = await openCrudFormDialog({
+            title: 'Agendar turno',
+            subtitle: row.number || row.id,
+            submitLabel: 'Agendar',
+            fields: [
+              {
+                id: 'title',
+                label: 'Título del turno',
+                required: true,
+                defaultValue: row.requested_work || `Servicio ${row.vehicle_plate || row.number}`,
+              },
+              {
+                id: 'start_at',
+                label: 'Inicio',
+                type: 'datetime-local',
+                required: true,
+                defaultValue: toDateTimeInput(new Date(Date.now() + 60 * 60 * 1000).toISOString()),
+              },
+              {
+                id: 'duration',
+                label: 'Duración en minutos',
+                type: 'number',
+                required: true,
+                defaultValue: '60',
+                min: 1,
+              },
+            ],
+          });
+          if (!values) return;
+          const title = String(values.title ?? '').trim();
           if (!title) return;
-          const startAtInput = (
-            window.prompt(
-              'Inicio del turno (YYYY-MM-DDTHH:MM)',
-              toDateTimeInput(new Date(Date.now() + 60 * 60 * 1000).toISOString()),
-            ) ?? ''
-          ).trim();
+          const startAtInput = String(values.start_at ?? '').trim();
           if (!startAtInput) return;
-          const durationRaw = (window.prompt('Duracion en minutos', '60') ?? '60').trim();
-          const duration = Number(durationRaw || '60');
+          const duration = Number(values.duration || '60');
           const booking = await createWorkshopBooking({
             customer_id: row.customer_id,
             customer_name: row.customer_name || row.vehicle_plate || row.number,
@@ -434,7 +468,7 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
         isDefault: true,
         render: () => <BikeWorkOrdersKanbanModeContent />,
       },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista', render: () => <BikeWorkOrdersListModeContent /> },
     ],
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',

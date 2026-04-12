@@ -1,0 +1,482 @@
+import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
+import { crudItemPath, type CrudFieldValue, type CrudHelpers, type CrudRowAction } from '@devpablocristo/modules-crud-ui';
+import { useCallback, useMemo } from 'react';
+import './PymesSimpleCrudListModeContent.css';
+import { apiRequest } from '../lib/api';
+import { useI18n } from '../lib/i18n';
+import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
+import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
+import {
+  CrudGallerySurface,
+  CrudTableSurface,
+  openCrudFormDialog,
+  useCrudArchivedSearchParam,
+  useCrudRemoteGalleryPage,
+  type CrudActionDialogField,
+  type CrudTableSurfaceColumn,
+  type CrudTableSurfaceRowAction,
+} from '../modules/crud';
+import type { CrudColumn, CrudFormField, CrudFormValues, CrudPageConfig, CrudViewModeId } from '../components/CrudPage';
+
+type CrudListResponse<T> = {
+  items: T[];
+  has_more?: boolean;
+  next_cursor?: string | null;
+};
+
+function emptyValueForField(field: CrudFormField): CrudFieldValue {
+  return field.type === 'checkbox' ? false : '';
+}
+
+function toDialogField(field: CrudFormField, values: CrudFormValues): CrudActionDialogField {
+  return {
+    id: field.key,
+    label: field.label,
+    type:
+      field.type === 'email' ||
+      field.type === 'tel' ||
+      field.type === 'number' ||
+      field.type === 'textarea' ||
+      field.type === 'datetime-local' ||
+      field.type === 'select' ||
+      field.type === 'checkbox'
+        ? field.type
+        : 'text',
+    placeholder: field.placeholder,
+    required: field.required,
+    defaultValue: values[field.key] ?? emptyValueForField(field),
+    options: field.options,
+  };
+}
+
+function buildEmptyFormValues(fields: CrudFormField[]): CrudFormValues {
+  return Object.fromEntries(fields.map((field) => [field.key, emptyValueForField(field)]));
+}
+
+function activeFields(fields: CrudFormField[], editing: boolean) {
+  return fields.filter((field) => {
+    if (editing && field.createOnly) return false;
+    if (!editing && field.editOnly) return false;
+    return true;
+  });
+}
+
+function normalizeError(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function pickStringValue(row: Record<string, unknown>, candidates: string[]) {
+  for (const key of candidates) {
+    const raw = row[key];
+    if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
+  }
+  return '';
+}
+
+function prettifyLabel(value: string) {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\w/, (char) => char.toUpperCase());
+}
+
+export function PymesSimpleCrudListModeContent<T extends { id: string }>({
+  resourceId,
+  mode = 'list',
+}: {
+  resourceId: string;
+  mode?: CrudViewModeId;
+}) {
+  const { t } = useI18n();
+  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId, { preserveCsvToolbar: true });
+  const crudConfig = crudConfigQuery.data as CrudPageConfig<T> | null;
+  const { archived } = useCrudArchivedSearchParam();
+
+  const fetchPage = useCallback(
+    async ({
+      limit,
+      search,
+      archived: pageArchived,
+      after,
+      signal: _signal,
+    }: {
+      limit: number;
+      search: string;
+      archived: boolean;
+      after: string | null;
+      signal: AbortSignal;
+    }) => {
+      void _signal;
+      if (!crudConfig?.basePath) return { items: [], has_more: false, next_cursor: null };
+      const query = new URLSearchParams(crudConfig.listQuery ?? '');
+      query.set('limit', String(limit));
+      if (search) query.set('search', search);
+      if (pageArchived) query.set('archived', 'true');
+      if (after) query.set('after', after);
+      const data = await apiRequest<unknown>(`${crudConfig.basePath}?${query.toString()}`);
+      const page = parsePaginatedResponse<T>(data);
+      return { items: page.items, has_more: page.hasMore, next_cursor: page.nextCursor } satisfies CrudListResponse<T>;
+    },
+    [crudConfig],
+  );
+
+  const {
+    items,
+    loading,
+    error,
+    setError,
+    hasMore,
+    loadingMore,
+    loadMore,
+    search,
+    setSearch,
+    selectedId,
+    selectItem,
+    reload,
+    handleArchiveToggle,
+  } = useCrudRemoteGalleryPage<T>({
+    pageSize: 100,
+    fetchPage,
+  });
+
+  const columns = useMemo<CrudTableSurfaceColumn<T>[]>(() => {
+    if (!crudConfig) return [];
+    const sourceColumns = archived && crudConfig.archivedColumns?.length ? crudConfig.archivedColumns : crudConfig.columns;
+    return sourceColumns.map((column: CrudColumn<T>) => ({
+      id: column.key,
+      header: column.header,
+      className: column.className,
+      render: (row) => {
+        const value = row[column.key];
+        return column.render ? column.render(value, row) : String(value ?? '—');
+      },
+    }));
+  }, [archived, crudConfig]);
+
+  const selectedRow = useMemo(
+    () => items.find((row) => row.id === selectedId) ?? items[0] ?? null,
+    [items, selectedId],
+  );
+
+  const runCreateOrEdit = useCallback(
+    async (row?: T) => {
+      if (!crudConfig) return;
+      const editing = Boolean(row);
+      const fields = activeFields(crudConfig.formFields, editing);
+      if (fields.length === 0) return;
+      const values = await openCrudFormDialog({
+        title: editing ? `Editar ${crudConfig.label}` : crudConfig.createLabel ?? `Nuevo ${crudConfig.label}`,
+        subtitle: editing ? crudConfig.labelPluralCap : undefined,
+        submitLabel: editing ? 'Guardar' : 'Crear',
+        fields: fields.map((field) =>
+          toDialogField(field, editing && row ? crudConfig.toFormValues(row) : buildEmptyFormValues(fields)),
+        ),
+      });
+      if (!values) return;
+      if (!crudConfig.isValid(values)) {
+        setError(`Revisá los campos de ${crudConfig.label}.`);
+        return;
+      }
+
+      try {
+        if (editing && row) {
+          if (crudConfig.dataSource?.update) {
+            await crudConfig.dataSource.update(row, values);
+          } else if (crudConfig.basePath) {
+            await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
+              method: 'PUT',
+              body: crudConfig.toBody ? crudConfig.toBody(values) : (values as Record<string, unknown>),
+            });
+          }
+        } else if (crudConfig.dataSource?.create) {
+          await crudConfig.dataSource.create(values);
+        } else if (crudConfig.basePath) {
+          await apiRequest(crudConfig.basePath, {
+            method: 'POST',
+            body: crudConfig.toBody ? crudConfig.toBody(values) : (values as Record<string, unknown>),
+          });
+        }
+        await reload();
+      } catch (submitError) {
+        setError(normalizeError(submitError, `No se pudo guardar ${crudConfig.label}.`));
+      }
+    },
+    [crudConfig, reload, setError],
+  );
+
+  const rowActions = useMemo<CrudTableSurfaceRowAction<T>[]>(() => {
+    if (!crudConfig) return [];
+    const canEdit = crudConfig.allowEdit ?? Boolean(crudConfig.formFields.length > 0);
+    const canDelete = crudConfig.allowDelete ?? Boolean(crudConfig.supportsArchived);
+    const canRestore = crudConfig.allowRestore ?? Boolean(crudConfig.supportsArchived);
+    const canHardDelete = crudConfig.allowHardDelete ?? Boolean(crudConfig.supportsArchived);
+    const helpers: CrudHelpers<T> = {
+      items,
+      reload,
+      setError: (message: string) => setError(message),
+    };
+    const configRowActions: CrudTableSurfaceRowAction<T>[] = (crudConfig.rowActions ?? []).map((action: CrudRowAction<T>) => ({
+      id: action.id,
+      label: action.label,
+      kind: action.kind,
+      isVisible: (row) => action.isVisible?.(row, { archived }) ?? true,
+      onClick: async (row) => {
+        try {
+          await action.onClick(row, helpers);
+        } catch (actionError) {
+          setError(normalizeError(actionError, `No se pudo ejecutar ${action.label}.`));
+        }
+      },
+    }));
+    if (archived) {
+      return [
+        ...configRowActions,
+        ...(canRestore
+          ? [
+              {
+                id: 'restore',
+                label: 'Restaurar',
+                kind: 'success' as const,
+                onClick: async (row: T) => {
+                  try {
+                    if (crudConfig.dataSource?.restore) {
+                      await crudConfig.dataSource.restore(row);
+                    } else if (crudConfig.basePath) {
+                      await apiRequest(crudItemPath(crudConfig.basePath, row.id, 'restore'), { method: 'POST', body: {} });
+                    }
+                    await reload();
+                  } catch (actionError) {
+                    setError(normalizeError(actionError, `No se pudo restaurar ${crudConfig.label}.`));
+                  }
+                },
+              },
+            ]
+          : []),
+        ...(canHardDelete
+          ? [
+              {
+                id: 'hard-delete',
+                label: 'Eliminar',
+                kind: 'danger' as const,
+                onClick: async (row: T) => {
+                  try {
+                    if (crudConfig.dataSource?.hardDelete) {
+                      await crudConfig.dataSource.hardDelete(row);
+                    } else if (crudConfig.basePath) {
+                      await apiRequest(crudItemPath(crudConfig.basePath, row.id, 'hard'), { method: 'DELETE' });
+                    }
+                    await reload();
+                  } catch (actionError) {
+                    setError(normalizeError(actionError, `No se pudo eliminar ${crudConfig.label}.`));
+                  }
+                },
+              },
+            ]
+          : []),
+      ];
+    }
+    return [
+      ...configRowActions,
+      ...(canEdit
+        ? [
+            {
+              id: 'edit',
+              label: 'Editar',
+              onClick: async (row: T) => {
+                await runCreateOrEdit(row);
+              },
+            },
+          ]
+        : []),
+      ...(canDelete
+        ? [
+            {
+              id: 'archive',
+              label: 'Archivar',
+              kind: 'danger' as const,
+              isVisible: () => Boolean(crudConfig.supportsArchived),
+              onClick: async (row: T) => {
+                try {
+                  if (crudConfig.dataSource?.deleteItem) {
+                    await crudConfig.dataSource.deleteItem(row);
+                  } else if (crudConfig.basePath) {
+                    await apiRequest(crudItemPath(crudConfig.basePath, row.id), { method: 'DELETE' });
+                  }
+                  await reload();
+                } catch (actionError) {
+                  setError(normalizeError(actionError, `No se pudo archivar ${crudConfig.label}.`));
+                }
+              },
+            },
+          ]
+        : []),
+    ];
+  }, [archived, crudConfig, items, reload, runCreateOrEdit, setError]);
+
+  const canEdit = crudConfig?.allowEdit ?? Boolean(crudConfig?.formFields.length);
+  const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
+  const rowRecordValues = (row: T) => row as Record<string, unknown>;
+  const cardTitle = (row: T) => pickStringValue(rowRecordValues(row), ['name', 'number', 'description', 'title', 'code', 'id']) || row.id;
+  const cardSubtitle = (row: T) =>
+    pickStringValue(rowRecordValues(row), ['status', 'customer_name', 'supplier_name', 'contact_name', 'category', 'type']);
+  const cardMeta = (row: T) =>
+    pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
+
+  const kanbanField = useMemo(() => {
+    if (items.some((row) => typeof rowRecordValues(row).status === 'string')) return 'status';
+    if (items.some((row) => typeof rowRecordValues(row).payment_status === 'string')) return 'payment_status';
+    if (items.some((row) => typeof rowRecordValues(row).type === 'string')) return 'type';
+    if (items.some((row) => typeof rowRecordValues(row).is_active === 'boolean')) return 'is_active';
+    return null;
+  }, [items]);
+
+  const kanbanColumns = useMemo(() => {
+    if (!kanbanField) return [{ id: 'all', label: 'Todos' }];
+    const values = Array.from(
+      new Set(
+        items
+          .map((row) => {
+            const raw = rowRecordValues(row)[kanbanField];
+            if (typeof raw === 'boolean') return raw ? 'active' : 'inactive';
+            return String(raw ?? '').trim().toLowerCase();
+          })
+          .filter(Boolean),
+      ),
+    );
+    return values.length ? values.map((value) => ({ id: value, label: prettifyLabel(value) })) : [{ id: 'all', label: 'Todos' }];
+  }, [items, kanbanField]);
+
+  if (!crudConfig) {
+    return (
+      <div className="empty-state">
+        <p>Cargando configuración…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="products-crud-page">
+      <PymesCrudResourceShellHeader<T>
+        resourceId={resourceId}
+        preserveCsvToolbar
+        items={items}
+        subtitleCount={items.length}
+        loading={loading}
+        error={error}
+        setError={setError}
+        reload={reload}
+        searchValue={search}
+        onSearchChange={setSearch}
+        onArchiveToggle={handleArchiveToggle}
+        extraHeaderActions={
+          !archived && canCreate ? (
+            <button type="button" className="btn-primary btn-sm" onClick={() => void runCreateOrEdit()}>
+              {crudConfig.createLabel ?? `+ Nuevo ${crudConfig.label}`}
+            </button>
+          ) : null
+        }
+      />
+
+      {loading ? (
+        <div className="empty-state">
+          <p>{t('crud.viewMode.gallery.loading')}</p>
+        </div>
+      ) : items.length === 0 ? (
+        <div className="empty-state">
+          <p>{archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}</p>
+        </div>
+      ) : mode === 'gallery' ? (
+        <CrudGallerySurface
+          items={items}
+          loading={loading}
+          emptyLabel={crudConfig.emptyState ?? 'No hay datos para mostrar.'}
+          loadingLabel={t('crud.viewMode.gallery.loading')}
+          ariaLabel={crudConfig.labelPluralCap}
+          card={{
+            title: cardTitle,
+            subtitle: (row) => cardSubtitle(row),
+            meta: (row) => cardMeta(row),
+          }}
+          onSelect={(row) => {
+            if (!archived && canEdit) {
+              void runCreateOrEdit(row);
+              return;
+            }
+            selectItem(row.id);
+          }}
+        />
+      ) : mode === 'kanban' ? (
+        <div className="crud-simple-board-grid">
+          {kanbanColumns.map((column) => {
+            const columnItems = items.filter((row) => {
+              if (!kanbanField) return true;
+              const raw = rowRecordValues(row)[kanbanField];
+              const value = typeof raw === 'boolean' ? (raw ? 'active' : 'inactive') : String(raw ?? '').trim().toLowerCase();
+              return value === column.id;
+            });
+            return (
+              <div key={column.id} className="m-kanban__column-body">
+                <div className="m-kanban__column-head">
+                  <span className="m-kanban__column-label">{column.label}</span>
+                  <div className="m-kanban__column-head-actions">
+                    <span className="m-kanban__column-count">{columnItems.length}</span>
+                  </div>
+                </div>
+                <div className="m-kanban__column-scroll">
+                  {columnItems.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className="m-kanban__card"
+                      onClick={() => {
+                        if (!archived && canEdit) {
+                          void runCreateOrEdit(row);
+                          return;
+                        }
+                        selectItem(row.id);
+                      }}
+                    >
+                      <strong>{cardTitle(row)}</strong>
+                      {cardSubtitle(row) ? <div className="text-secondary">{cardSubtitle(row)}</div> : null}
+                      {cardMeta(row) ? <div className="text-secondary">{cardMeta(row)}</div> : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <CrudTableSurface
+          items={items}
+          columns={columns}
+          rowActions={rowActions}
+          onRowClick={
+            archived || !canEdit
+              ? undefined
+              : (row) => {
+                  void runCreateOrEdit(row);
+                }
+          }
+        />
+      )}
+
+      {!loading && hasMore ? (
+        <div className="crud-load-more">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={loadingMore}
+            onClick={() => {
+              void loadMore();
+            }}
+          >
+            {loadingMore ? t('crud.viewMode.gallery.loading') : t('crud.loadMore')}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -7,7 +7,7 @@ import { applyWorkOrderCreatorFilter, type CreatorFilterState } from './workOrde
 type ListCtx = { items: Array<{ id: string; created_by?: string }> };
 
 /**
- * Props extra para `CrudPage` / `ConfiguredCrudPage`: filtro y píldoras por `created_by` (Clerk).
+ * Props extra para `CrudPage` / `ConfiguredCrudPage`: filtro y píldoras de responsable vía `created_by` (Clerk).
  * Sin Clerk no devuelve nada. Con Clerk, aplica a listados que no apaguen la franja con
  * `featureFlags.headerQuickFilterStrip: false` o `creatorFilter: false` (p. ej. inventario).
  */

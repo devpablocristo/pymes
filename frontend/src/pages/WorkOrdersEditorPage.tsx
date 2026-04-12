@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
-import { WorkOrderEditor } from '../components/WorkOrderEditor';
+import { WorkOrderEditor } from '../modules/work-orders';
 import { useI18n } from '../lib/i18n';
 
 const LIST_PATH = '/modules/carWorkOrders/list';

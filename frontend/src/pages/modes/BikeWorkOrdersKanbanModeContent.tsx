@@ -3,8 +3,7 @@ import {
   CrudCreateNavigationButton,
   CrudToolbarActionButtons,
 } from '../../modules/crud';
-import { GenericWorkOrdersBoard, type GenericWorkOrder } from '../../components/GenericWorkOrdersBoard';
-import { WorkOrderKanbanDetailModal } from '../../components/WorkOrderKanbanDetailModal';
+import { GenericWorkOrdersBoard, type GenericWorkOrder, WorkOrderKanbanDetailModal } from '../../modules/work-orders';
 import { usePymesCrudConfigQuery } from '../../crud/usePymesCrudConfigQuery';
 import {
   getAllWorkOrders,
@@ -65,11 +64,11 @@ export function BikeWorkOrdersKanbanModeContent() {
 
   return (
     <GenericWorkOrdersBoard<BikeWorkOrder & GenericWorkOrder>
+      resourceId="bikeWorkOrders"
       listAll={async () => (await getAllWorkOrders({ target_type: 'bicycle' })).map(toGeneric)}
       listArchived={async () => (await getWorkOrdersArchived({ target_type: 'bicycle' })).map(toGeneric)}
       patchStatus={async (id, status) => toGeneric(await patchWorkOrder(id, { status }))}
       queryKey={['bike-shop', 'work-orders', 'kanban']}
-      title="Órdenes de trabajo (bicicletería)"
       listPath={LIST_PATH}
       renderExtraToolbar={renderExtraToolbar}
       renderDetailModal={({ orderId, onClose, onSaved, onRecordRemoved }) => (

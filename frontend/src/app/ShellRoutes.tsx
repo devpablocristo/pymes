@@ -1,30 +1,23 @@
 import { Route, Routes, Navigate } from 'react-router-dom';
 import {
-  AutoRepairWorkOrdersPage,
   BikeShopWorkOrdersBoard,
-  BikeShopWorkOrdersPage,
-  BikeShopWorkOrdersSection,
   CalendarPage,
+  ConfiguredCrudSectionPage,
   ConfiguredCrudIndexRedirect,
+  CrudUiConfigurePage,
   DashboardVisualPage,
-  InvoicesPage,
   ModulePage,
   NotificationsCenterPage,
-  ProductsGalleryPage,
-  ProductsListPage,
-  ProductsModuleSection,
   RestaurantTableSessionsPage,
   SettingsHubPage,
   ConfiguredCrudModePage,
-  StockCrudUiConfigurePage,
-  StockListPage,
-  StockModuleSection,
+  ConfiguredCrudNestedRouteModePage,
+  ConfiguredCrudRouteModePage,
   UnifiedChatPage,
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
   WorkOrdersEditorPage,
   WorkOrdersKanbanPanel,
-  WorkOrdersModuleSection,
   AutomationRulesPage,
   WatcherConfigPage,
 } from './lazyRoutes';
@@ -41,35 +34,76 @@ export function ShellRoutes() {
       <Route path="/assistant/commercial" element={<Navigate to="/chat" replace />} />
       <Route path="/admin" element={<Navigate to="/settings" replace />} />
       <Route path="/billing" element={<Navigate to="/settings?section=gateway" replace />} />
-      <Route path="/invoices" element={<InvoicesPage />} />
-      <Route path="/modules/carWorkOrders" element={<WorkOrdersModuleSection />}>
+      <Route path="/invoices" element={<Navigate to="/modules/invoices" replace />} />
+      <Route
+        path="/modules/carWorkOrders"
+        element={
+          <ConfiguredCrudSectionPage
+            resourceId="carWorkOrders"
+            baseRoute="/modules/carWorkOrders"
+            contextPatternByModeId={{ list: '/modules/carWorkOrders/edit/:orderId' }}
+            includeCanonicalMissing
+          />
+        }
+      >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />} />
         <Route path="board" element={<WorkOrdersKanbanPanel />} />
-        <Route path="list" element={<AutoRepairWorkOrdersPage />} />
+        <Route path="list" element={<ConfiguredCrudModePage resourceId="carWorkOrders" modeId="list" />} />
         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
+        <Route
+          path=":modePath"
+          element={<ConfiguredCrudNestedRouteModePage resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />}
+        />
       </Route>
-      <Route path="/modules/products" element={<ProductsModuleSection />}>
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="products" baseRoute="/modules/products" />} />
-        <Route path="list" element={<ProductsListPage />} />
-        <Route path="gallery" element={<ProductsGalleryPage />} />
+      <Route
+        path="/modules/inventory"
+        element={
+          <ConfiguredCrudSectionPage
+            resourceId="inventory"
+            baseRoute="/modules/inventory"
+            actionLink={{
+              to: '/modules/inventory/configure',
+              label: 'Configurar',
+              hideWhenActivePattern: '/modules/inventory/configure',
+              activeReplacement: {
+                to: '/modules/inventory/list',
+                label: 'Volver al inventario',
+              },
+            }}
+          />
+        }
+      >
+        <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute="/modules/inventory" />} />
+        <Route path="list" element={<ConfiguredCrudModePage resourceId="inventory" modeId="list" />} />
+        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route path="explorer" element={<Navigate to="/modules/inventory/list" replace />} />
+        <Route path="gallery" element={<ConfiguredCrudModePage resourceId="inventory" modeId="gallery" />} />
+        <Route path="board" element={<ConfiguredCrudModePage resourceId="inventory" modeId="kanban" />} />
       </Route>
-      <Route path="/modules/stock" element={<StockModuleSection />}>
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="stock" baseRoute="/modules/stock" />} />
-        <Route path="list" element={<StockListPage />} />
-        <Route path="configure" element={<StockCrudUiConfigurePage />} />
-        <Route path="explorer" element={<Navigate to="/modules/stock/list" replace />} />
-        <Route path="gallery" element={<ConfiguredCrudModePage resourceId="stock" modeId="gallery" />} />
-        <Route path="board" element={<ConfiguredCrudModePage resourceId="stock" modeId="kanban" />} />
-      </Route>
+      <Route path="/modules/:moduleId/configure" element={<CrudUiConfigurePage />} />
+      <Route path="/modules/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
       <Route path="/modules/:moduleId" element={<ModulePage />} />
       <Route path="/settings" element={<SettingsHubPage />} />
       <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
       <Route path="/settings/notifications" element={<Navigate to="/settings?section=notifications" replace />} />
       <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/carWorkOrders" replace />} />
-      <Route path="/workshops/bike-shop/orders" element={<BikeShopWorkOrdersSection />}>
+      <Route
+        path="/workshops/bike-shop/orders"
+        element={
+          <ConfiguredCrudSectionPage
+            resourceId="bikeWorkOrders"
+            baseRoute="/workshops/bike-shop/orders"
+            includeCanonicalMissing
+          />
+        }
+      >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />} />
         <Route path="board" element={<BikeShopWorkOrdersBoard />} />
-        <Route path="list" element={<BikeShopWorkOrdersPage />} />
+        <Route path="list" element={<ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="list" />} />
+        <Route
+          path=":modePath"
+          element={<ConfiguredCrudNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
+        />
       </Route>
       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
       <Route path="/automation-rules" element={<AutomationRulesPage />} />
@@ -79,9 +113,7 @@ export function ShellRoutes() {
       <Route path="/audit" element={<Navigate to="/settings?section=audit" replace />} />
       <Route path="/roles" element={<Navigate to="/settings?section=rbac" replace />} />
       <Route path="/dashboard" element={<DashboardVisualPage />} />
-      <Route path="/stock" element={<Navigate to="/modules/stock/list" replace />} />
-      <Route path="/modules/inventory" element={<Navigate to="/modules/stock/list" replace />} />
-      <Route path="/modules/inventoryMovements" element={<Navigate to="/modules/stock/list" replace />} />
+      <Route path="/modules/inventoryMovements" element={<Navigate to="/modules/inventory/list" replace />} />
       <Route path="/agenda" element={<CalendarPage />} />
       <Route path="/calendar" element={<Navigate to="/agenda" replace />} />
     </Routes>

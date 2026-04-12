@@ -4,7 +4,18 @@ import type { TenantSettings } from './types';
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
 export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'mixed';
-export type VerticalType = 'none' | 'professionals' | 'workshops' | 'bike_shop' | 'beauty' | 'restaurants';
+export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+export type SubVerticalType =
+  | 'teachers'
+  | 'consulting'
+  | 'auto_repair'
+  | 'bike_shop'
+  | 'salon'
+  | 'barbershop'
+  | 'aesthetics'
+  | 'restaurant'
+  | 'bar'
+  | 'cafe';
 
 export type TenantProfile = {
   businessName: string;
@@ -16,18 +27,53 @@ export type TenantProfile = {
   currency: string;
   paymentMethod: PaymentMethod;
   vertical: VerticalType;
+  subVertical?: SubVerticalType;
   completedAt: string;
+};
+
+const SUB_VERTICAL_BY_VERTICAL: Partial<Record<VerticalType, readonly SubVerticalType[]>> = {
+  professionals: ['teachers', 'consulting'],
+  workshops: ['auto_repair', 'bike_shop'],
+  beauty: ['salon', 'barbershop', 'aesthetics'],
+  restaurants: ['restaurant', 'bar', 'cafe'],
 };
 
 const STORAGE_KEY = 'pymes:tenant_profile';
 const storage = createBrowserStorageNamespace({ namespace: 'pymes-ui', hostAware: false });
 
+function normalizeTenantProfile(profile: TenantProfile | null): TenantProfile | null {
+  if (!profile) {
+    return null;
+  }
+
+  const { subVertical: rawSubVertical, ...rest } = profile;
+  const rawVertical = profile.vertical as VerticalType | 'bike_shop';
+  const normalizedVertical: VerticalType = rawVertical === 'bike_shop' ? 'workshops' : rawVertical;
+  const normalizedSubVertical =
+    rawVertical === 'bike_shop'
+      ? 'bike_shop'
+      : rawSubVertical && SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(rawSubVertical)
+        ? rawSubVertical
+        : undefined;
+
+  return {
+    ...rest,
+    vertical: normalizedVertical,
+    ...(normalizedSubVertical ? { subVertical: normalizedSubVertical } : {}),
+  };
+}
+
 export function getTenantProfile(): TenantProfile | null {
-  return storage.getJSON<TenantProfile>(STORAGE_KEY);
+  return normalizeTenantProfile(storage.getJSON<TenantProfile>(STORAGE_KEY));
 }
 
 export function saveTenantProfile(profile: TenantProfile): void {
-  storage.setJSON(STORAGE_KEY, profile);
+  const normalized = normalizeTenantProfile(profile);
+  if (!normalized) {
+    storage.remove(STORAGE_KEY);
+    return;
+  }
+  storage.setJSON(STORAGE_KEY, normalized);
 }
 
 export function clearTenantProfile(): void {
@@ -52,6 +98,15 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
     return null;
   }
 
+  const previousProfile = getTenantProfile();
+  const normalizedVertical = (vertical === 'bike_shop' ? 'workshops' : vertical) as VerticalType;
+  const preservedSubVertical =
+    previousProfile?.vertical === normalizedVertical &&
+    previousProfile.subVertical &&
+    SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(previousProfile.subVertical)
+      ? previousProfile.subVertical
+      : undefined;
+
   return {
     businessName: settings.business_name?.trim() || '',
     teamSize: teamSize as TeamSize,
@@ -61,7 +116,8 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
     usesBilling: Boolean(settings.uses_billing),
     currency: settings.currency?.trim() || 'ARS',
     paymentMethod: paymentMethod as PaymentMethod,
-    vertical: vertical as VerticalType,
+    vertical: normalizedVertical,
+    ...(preservedSubVertical ? { subVertical: preservedSubVertical } : {}),
     completedAt,
   };
 }

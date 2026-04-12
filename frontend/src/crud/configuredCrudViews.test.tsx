@@ -3,7 +3,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
 import { writeCrudUiConfigState } from '../lib/crudUiConfig';
-import { ConfiguredCrudIndexRedirect, ConfiguredCrudModePage, ConfiguredCrudSection } from './configuredCrudViews';
+import {
+  ConfiguredCrudIndexRedirect,
+  ConfiguredCrudModePage,
+  ConfiguredCrudNestedRouteModePage,
+  ConfiguredCrudRouteModePage,
+  ConfiguredCrudSection,
+} from './configuredCrudViews';
 
 const loadLazyCrudPageConfigMock = vi.fn<[string], Promise<CrudPageConfig<{ id: string }> | null>>();
 
@@ -12,7 +18,15 @@ vi.mock('./lazyCrudPage', () => ({
   LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
-function buildStockConfig(): CrudPageConfig<{ id: string }> {
+vi.mock('./PymesSimpleCrudListModeContent', () => ({
+  PymesSimpleCrudListModeContent: ({ resourceId, mode }: { resourceId: string; mode?: string }) => (
+    <div>
+      generic:{resourceId}:{mode ?? 'list'}
+    </div>
+  ),
+}));
+
+function buildInventoryConfig(): CrudPageConfig<{ id: string }> {
   return {
     label: 'item',
     labelPlural: 'items',
@@ -42,8 +56,8 @@ describe('configuredCrudViews', () => {
     window.localStorage.clear();
     loadLazyCrudPageConfigMock.mockReset();
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
-      if (resourceId === 'stock') {
-        return buildStockConfig();
+      if (resourceId === 'inventory') {
+        return buildInventoryConfig();
       }
       return null;
     });
@@ -51,16 +65,19 @@ describe('configuredCrudViews', () => {
 
   it('redirects to the configured default view', async () => {
     writeCrudUiConfigState({
-      stock: { enabledViewModeIds: ['list', 'gallery', 'kanban'], defaultViewModeId: 'kanban' },
+      inventory: { enabledViewModeIds: ['list', 'gallery', 'kanban'], defaultViewModeId: 'kanban' },
     });
 
     render(
-      <MemoryRouter initialEntries={['/modules/stock']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/modules/inventory']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/modules/stock" element={<ConfiguredCrudIndexRedirect resourceId="stock" baseRoute="/modules/stock" />} />
-          <Route path="/modules/stock/list" element={<div>list-screen</div>} />
-          <Route path="/modules/stock/gallery" element={<div>gallery-screen</div>} />
-          <Route path="/modules/stock/board" element={<div>board-screen</div>} />
+          <Route
+            path="/modules/inventory"
+            element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute="/modules/inventory" />}
+          />
+          <Route path="/modules/inventory/list" element={<div>list-screen</div>} />
+          <Route path="/modules/inventory/gallery" element={<div>gallery-screen</div>} />
+          <Route path="/modules/inventory/board" element={<div>board-screen</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -70,11 +87,11 @@ describe('configuredCrudViews', () => {
 
   it('updates visible tabs when CRUD UI preferences change', async () => {
     render(
-      <MemoryRouter initialEntries={['/modules/stock/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/modules/inventory/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route
-            path="/modules/stock"
-            element={<ConfiguredCrudSection resourceId="stock" baseRoute="/modules/stock" />}
+            path="/modules/inventory"
+            element={<ConfiguredCrudSection resourceId="inventory" baseRoute="/modules/inventory" />}
           >
             <Route path="list" element={<div>list-screen</div>} />
             <Route path="gallery" element={<div>gallery-screen</div>} />
@@ -89,7 +106,7 @@ describe('configuredCrudViews', () => {
     expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
 
     writeCrudUiConfigState({
-      stock: { enabledViewModeIds: ['list', 'kanban'], defaultViewModeId: 'kanban' },
+      inventory: { enabledViewModeIds: ['list', 'kanban'], defaultViewModeId: 'kanban' },
     });
 
     await waitFor(() => {
@@ -101,18 +118,18 @@ describe('configuredCrudViews', () => {
 
   it('invalidates a custom mode page when that mode is disabled by preferences', async () => {
     render(
-      <MemoryRouter initialEntries={['/modules/stock/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ConfiguredCrudModePage resourceId="stock" modeId="gallery" />
+      <MemoryRouter initialEntries={['/modules/inventory/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ConfiguredCrudModePage resourceId="inventory" modeId="gallery" />
       </MemoryRouter>,
     );
 
     expect(await screen.findByText('stock-gallery')).toBeInTheDocument();
 
     writeCrudUiConfigState({
-      stock: { enabledViewModeIds: ['list', 'kanban'], defaultViewModeId: 'list' },
+      inventory: { enabledViewModeIds: ['list', 'kanban'], defaultViewModeId: 'list' },
     });
 
-    expect(await screen.findByText('stock no expone el modo gallery.')).toBeInTheDocument();
+    expect(await screen.findByText('inventory no expone el modo gallery.')).toBeInTheDocument();
   });
 
   it('falls back to list mode when the resource has no declared view modes', async () => {
@@ -127,4 +144,119 @@ describe('configuredCrudViews', () => {
 
     expect(await screen.findByText('custom-list-screen')).toBeInTheDocument();
   });
+
+  it('renders a custom list mode when the resource declares one', async () => {
+    loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
+      if (resourceId === 'products') {
+        return {
+          label: 'producto',
+          labelPlural: 'productos',
+          labelPluralCap: 'Productos',
+          viewModes: [
+            {
+              id: 'list',
+              label: 'Lista',
+              path: 'list',
+              ariaLabel: 'Vistas de productos',
+              isDefault: true,
+              render: () => <div>products-custom-list</div>,
+            },
+          ],
+        } as CrudPageConfig<{ id: string }>;
+      }
+      return null;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/modules/products/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ConfiguredCrudModePage resourceId="products" modeId="list" />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('products-custom-list')).toBeInTheDocument();
+    expect(screen.queryByText('lazy:products')).not.toBeInTheDocument();
+  });
+
+  it('renders generic fallback mode pages for standalone CRUD routes', async () => {
+    loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
+      if (resourceId === 'customers') {
+        return {
+          label: 'cliente',
+          labelPlural: 'clientes',
+          labelPluralCap: 'Clientes',
+          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+        } as CrudPageConfig<{ id: string }>;
+      }
+      return null;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/modules/customers/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/modules/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('generic:customers:gallery')).toBeInTheDocument();
+  });
+
+  it('shows canonical missing modes in dedicated sections when enabled for that resource', async () => {
+    loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
+      if (resourceId === 'bikeWorkOrders') {
+        return {
+          label: 'orden',
+          labelPlural: 'órdenes',
+          labelPluralCap: 'Órdenes',
+          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+        } as CrudPageConfig<{ id: string }>;
+      }
+      return null;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/workshops/bike-shop/orders/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route
+            path="/workshops/bike-shop/orders"
+            element={<ConfiguredCrudSection resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" includeCanonicalMissing />}
+          >
+            <Route path="list" element={<div>bike-list-screen</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+  });
+
+  it('renders generic fallback mode pages for dedicated nested CRUD routes', async () => {
+    loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
+      if (resourceId === 'bikeWorkOrders') {
+        return {
+          label: 'orden',
+          labelPlural: 'órdenes',
+          labelPluralCap: 'Órdenes',
+          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+        } as CrudPageConfig<{ id: string }>;
+      }
+      return null;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/workshops/bike-shop/orders/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route
+            path="/workshops/bike-shop/orders/:modePath"
+            element={<ConfiguredCrudNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('generic:bikeWorkOrders:gallery')).toBeInTheDocument();
+  });
+
 });

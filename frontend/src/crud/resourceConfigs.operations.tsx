@@ -8,14 +8,24 @@ import {
   type SalePaymentRow,
 } from '../lib/api';
 import { getCrudSearchParam } from '../modules/crud';
-import { fetchStockLevels, type StockLevelRow } from '../modules/stock';
+import {
+  createStockCrudConfig,
+  fetchStockLevels,
+  StockBoardWorkspace,
+  StockGalleryWorkspace,
+  StockListWorkspace,
+  type StockRecord,
+  type StockLevelRow,
+} from '../modules/inventory';
+import { CreditNotesListModeContent, PaymentsListModeContent } from '../modules/billing';
+import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';
+import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import {
   formatOperationsMoney,
   parseReturnSaleItemsJson,
   renderOperationsActiveBadge,
   validateReturnForm,
 } from './operationsCrudHelpers';
-import { StockBoardView, StockGalleryView } from './stockVisualModes';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import { withCSVToolbar } from './csvToolbar';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
@@ -29,24 +39,6 @@ import {
   toRFC3339,
 } from './resourceConfigs.shared';
 
-function stockInventoryUpdatedCell(raw: string) {
-  const t = String(raw ?? '').trim();
-  if (!t) return '—';
-  const d = new Date(t);
-  if (Number.isNaN(d.getTime())) return t;
-  return (
-    <div className="stock-datetime-cell">
-      <span className="stock-datetime-cell__date">
-        {d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-      </span>
-      <span className="stock-datetime-cell__sep" aria-hidden>
-        {' · '}
-      </span>
-      <span className="stock-datetime-cell__time">{d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
-    </div>
-  );
-}
-
 type ReturnRow = {
   id: string;
   number: string;
@@ -57,19 +49,6 @@ type ReturnRow = {
   refund_method: string;
   status: string;
   created_at: string;
-};
-
-type CreditNoteRow = {
-  id: string;
-  number: string;
-  party_id: string;
-  return_id: string;
-  amount: number;
-  used_amount: number;
-  balance: number;
-  status: string;
-  created_at: string;
-  expires_at?: string;
 };
 
 type CashMovementRow = {
@@ -104,6 +83,15 @@ type RecurringExpense = {
 const operationsResourceConfigs: CrudResourceConfigMap = {
   returns: {
     basePath: '/v1/returns',
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="returns" />,
+      },
+    ],
     label: 'devolución',
     labelPlural: 'devoluciones',
     labelPluralCap: 'Devoluciones',
@@ -220,78 +208,21 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     ],
   },
   creditNotes: {
-    label: 'nota de crédito',
-    labelPlural: 'notas de crédito',
-    labelPluralCap: 'Notas de crédito',
-    supportsArchived: false,
-    allowRestore: false,
-    allowHardDelete: false,
-    allowCreate: true,
-    createLabel: '+ Nueva nota de crédito',
-    allowEdit: false,
-    allowDelete: false,
-    searchPlaceholder: 'Buscar...',
-    emptyState: 'No hay notas de crédito emitidas.',
-    columns: [
-      {
-        key: 'number',
-        header: 'Documento',
-        className: 'cell-name',
-        render: (_value, row: CreditNoteRow) => (
-          <>
-            <strong>{row.number}</strong>
-            <div className="text-secondary">{row.status}</div>
-          </>
-        ),
-      },
-      { key: 'balance', header: 'Saldo', render: (value) => formatOperationsMoney(value) },
-      { key: 'amount', header: 'Monto', render: (value) => formatOperationsMoney(value) },
-      { key: 'used_amount', header: 'Usado', render: (value) => formatOperationsMoney(value) },
-      {
-        key: 'return_id',
-        header: 'Devolución',
-        render: (value) => {
-          const v = String(value ?? '').trim().toLowerCase();
-          if (!v || v.startsWith('00000000-0000-0000-0000')) {
-            return '—';
-          }
-          return `${v.slice(0, 8)}…`;
-        },
-      },
-      { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
-    ],
-    formFields: [
-      { key: 'party_id', label: 'ID de entidad / cliente (UUID party)', required: true, placeholder: 'UUID party_id' },
-      { key: 'amount', label: 'Monto', type: 'number', required: true, placeholder: '0.00' },
-    ],
-    dataSource: {
-      list: async () => {
-        const data = await apiRequest<{ items?: CreditNoteRow[] | null }>('/v1/credit-notes');
-        return parseListItemsFromResponse<CreditNoteRow>(data);
-      },
-      create: async (values) => {
-        const party_id = asString(values.party_id).trim();
-        const amount = Number(asString(values.amount).trim());
-        await apiRequest('/v1/credit-notes', {
-          method: 'POST',
-          body: { party_id, amount },
-        });
-      },
-    },
-    searchText: (row: CreditNoteRow) =>
-      [row.number, row.party_id, row.return_id, row.status, String(row.amount), String(row.balance)].join(' '),
-    toFormValues: () =>
-      ({
-        party_id: '',
-        amount: '',
-      }) as CrudFormValues,
-    isValid: (values) =>
-      asString(values.party_id).trim().length >= 32 &&
-      Number.isFinite(Number(asString(values.amount).trim())) &&
-      Number(asString(values.amount).trim()) > 0,
+    ...createCreditNotesCrudConfig<CreditNoteRecord>({
+      renderList: () => <CreditNotesListModeContent />,
+    }),
   },
   cashflow: {
     basePath: '/v1/cashflow',
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="cashflow" />,
+      },
+    ],
     label: 'movimiento',
     labelPlural: 'movimientos',
     labelPluralCap: 'Movimientos de caja',
@@ -379,35 +310,12 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       return (ty === 'income' || ty === 'expense') && asNumber(values.amount) > 0;
     },
   },
-  stock: {
-    label: 'producto en el inventario',
-    labelPlural: 'productos en el inventario',
-    labelPluralCap: 'Inventario',
-    allowCreate: false,
-    allowEdit: false,
-    allowDelete: false,
-    supportsArchived: true,
-    archivedEmptyState: 'No hay productos archivados en inventario.',
-    searchPlaceholder: 'Buscar...',
-    emptyState: 'No hay productos en el inventario.',
-    viewModes: [
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de inventario', isDefault: true },
-      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de inventario', render: () => <StockGalleryView /> },
-      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de inventario', render: () => <StockBoardView /> },
-    ],
-    rowActions: [],
-    /** Alta de ítem de catálogo (otro módulo). CSV de inventario: solo export de esta vista (entidad stock). */
-    toolbarActions: [
-      {
-        id: 'stock-new-product',
-        label: '+ Nuevo producto',
-        kind: 'primary',
-        isVisible: ({ archived }) => !archived,
-        onClick: async () => {
-          window.location.assign('/modules/products/list');
-        },
-      },
-    ],
+  inventory: {
+    ...createStockCrudConfig<StockRecord>({
+      renderList: () => <StockListWorkspace />,
+      renderGallery: () => <StockGalleryWorkspace />,
+      renderBoard: () => <StockBoardWorkspace />,
+    }),
     dataSource: {
       list: async ({ archived }) => fetchStockLevels({ archived: Boolean(archived) }),
       restore: async (row: StockLevelRow) => {
@@ -417,54 +325,6 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         await apiRequest(`/v1/products/${row.product_id}`, { method: 'DELETE' });
       },
     },
-    columns: [
-      {
-        key: 'product_name',
-        header: 'Nombre',
-        className: 'cell-name stock-col-product-name',
-        render: (_value, row: StockLevelRow) => <strong>{row.product_name}</strong>,
-      },
-      {
-        key: 'sku',
-        header: 'Sku',
-        className: 'stock-col-sku',
-        render: (_value, row: StockLevelRow) => <span className="stock-sku-inline">{row.sku?.trim() || '—'}</span>,
-      },
-      { key: 'quantity', header: 'Actual', className: 'stock-col-num stock-col-qty' },
-      { key: 'min_quantity', header: 'Mínimo', className: 'stock-col-num stock-col-min' },
-      {
-        key: 'is_low_stock',
-        header: 'Estado',
-        className: 'stock-col-estado',
-        render: (value) => (
-          <div className="stock-status-cell">
-            <span className={value ? 'stock-status stock-status--warning' : 'stock-status'}>
-              {value ? 'Bajo mínimo' : 'Normal'}
-            </span>
-          </div>
-        ),
-      },
-      {
-        key: 'updated_at',
-        header: 'Actualizado',
-        className: 'stock-col-date',
-        render: (value) => stockInventoryUpdatedCell(String(value ?? '')),
-      },
-    ],
-    archivedColumns: [
-      {
-        key: 'product_name',
-        header: 'Nombre',
-        className: 'cell-name stock-col-product-name',
-        render: (_value, row: StockLevelRow) => <strong>{row.product_name}</strong>,
-      },
-      {
-        key: 'sku',
-        header: 'Sku',
-        className: 'stock-col-sku',
-        render: (_value, row: StockLevelRow) => <span className="stock-sku-inline">{row.sku?.trim() || '—'}</span>,
-      },
-    ],
     formFields: [],
     searchText: (row: StockLevelRow) => [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
     toFormValues: (row: StockLevelRow) => ({
@@ -479,6 +339,9 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     isValid: () => true,
   },
   payments: {
+    viewModes: [
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista pagos', isDefault: true, render: () => <PaymentsListModeContent /> },
+    ],
     label: 'pago',
     labelPlural: 'pagos',
     labelPluralCap: 'Pagos',
@@ -549,6 +412,15 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   recurring: {
     basePath: '/v1/recurring-expenses',
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="recurring" />,
+      },
+    ],
     label: 'gasto recurrente',
     labelPlural: 'gastos recurrentes',
     labelPluralCap: 'Gastos recurrentes',

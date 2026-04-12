@@ -76,7 +76,7 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
   const hasSeedRows = useMemo(() => items.some((row) => isSeedActor(row.created_by)), [items]);
 
   return (
-    <div className="crud-creator-badges" role="group" aria-label="Filtrar por creador del registro">
+    <div className="crud-creator-badges" role="group" aria-label="Filtrar por responsable del registro">
       <button
         type="button"
         className={`badge crud-creator-badge${isAllActive ? ' crud-creator-badge--active' : ''}`}
@@ -92,7 +92,7 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
           aria-pressed={isYoActive}
           onClick={selectOnlySelf}
         >
-          Yo
+          Asignado a mí
         </button>
       ) : null}
       {hasSeedRows ? (

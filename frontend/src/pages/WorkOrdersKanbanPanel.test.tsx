@@ -48,7 +48,10 @@ vi.mock('@devpablocristo/modules-kanban-board', () => ({
   ),
 }));
 
-vi.mock('../components/WorkOrderKanbanDetailModal', () => ({
+vi.mock('../modules/work-orders', async () => {
+  const actual = await vi.importActual<typeof import('../modules/work-orders')>('../modules/work-orders');
+  return {
+    ...actual,
   WorkOrderKanbanDetailModal: ({ orderId, onSaved, onRecordRemoved }: any) => {
     if (!orderId) return null;
     return (
@@ -72,7 +75,8 @@ vi.mock('../components/WorkOrderKanbanDetailModal', () => ({
       </div>
     );
   },
-}));
+  };
+});
 
 function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWorkOrder {
   return {

@@ -10,14 +10,12 @@ import { useCallback, useMemo, useState, type ReactNode, type RefObject } from '
 import { Link } from 'react-router-dom';
 import {
   createCrudKanbanArchiveTerminalDragPolicy,
-  CrudArchivedSearchParamToggle,
   CrudKanbanSurface,
   useCrudKanbanMove,
   useCrudRemoteArchivedListState,
 } from '../modules/crud';
-import { CreatedByPillsBar } from './CreatedByPillsBar';
-import { clerkEnabled } from '../lib/auth';
-import { applyWorkOrderCreatorFilter, type CreatorFilterState } from '../lib/workOrderCreatorFilter';
+import { PymesCrudResourceShellHeader } from '../crud/PymesCrudResourceShellHeader';
+import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 import {
   canonicalWorkOrderStatus,
   workOrderStatusBadgeLabel,
@@ -41,14 +39,13 @@ export type GenericWorkOrder = {
 };
 
 export type GenericWorkOrdersBoardProps<T extends GenericWorkOrder> = {
+  resourceId: 'carWorkOrders' | 'bikeWorkOrders';
   /** Funciones API */
   listAll: () => Promise<T[]>;
   listArchived: () => Promise<T[]>;
   patchStatus: (id: string, status: string) => Promise<T>;
   /** Query keys para react-query */
   queryKey: readonly unknown[];
-  /** Label del asset (ej. "Vehículo", "Bicicleta") */
-  title: string;
   /** Slot superior con switch board/list */
   headerLeadSlot?: ReactNode;
   /** Path a la vista lista */
@@ -188,21 +185,20 @@ function KanbanCardBody<T extends GenericWorkOrder>({
 }
 
 export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
+  resourceId,
   listAll,
   listArchived,
   patchStatus,
   queryKey,
-  title,
   headerLeadSlot,
   listPath,
   renderExtraToolbar,
   renderDetailModal,
 }: GenericWorkOrdersBoardProps<T>) {
-  const { user, isLoaded: clerkUserLoaded } = useUser();
-  const selfId = user?.id;
+  const { preSearchFilter, listHeaderInlineSlot } = useCrudListCreatedByMerge();
   const [error, setError] = useState<string | null>(null);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
+  const [boardSearch, setBoardSearch] = useState('');
 
   const {
     showArchived,
@@ -230,10 +226,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     setQueryError(message);
   }, [setQueryError]);
 
-  const boardItems = useMemo(
-    () => applyWorkOrderCreatorFilter(items, { authEnabled: clerkEnabled, authUserLoaded: clerkUserLoaded, selfId, creatorFilter }),
-    [items, creatorFilter, clerkUserLoaded, selfId],
-  );
+  const boardItems = useMemo(() => (preSearchFilter ? preSearchFilter(items) : items), [items, preSearchFilter]);
 
   const archiveTerminalDragPolicy = useMemo(
     () =>
@@ -288,18 +281,35 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     return hay.includes(normalize(q));
   }, []);
 
-  const statsLine = useCallback(
-    (visible: number) => visible === 1
-      ? `${visible} orden de trabajo${showArchived ? ' archivada' : ''}`
-      : `${visible} órdenes de trabajo${showArchived ? ' archivadas' : ''}`,
-    [showArchived],
-  );
-
-  const showCreatorBar = clerkEnabled && clerkUserLoaded && user != null;
+  const filteredCount = useMemo(() => {
+    const q = boardSearch.trim().toLowerCase();
+    if (!q) return boardItems.length;
+    return boardItems.filter((row) => filterRow(row, q)).length;
+  }, [boardItems, boardSearch, filterRow]);
 
   return (
     <>
-      <CrudKanbanSurface<T>
+      <PymesCrudResourceShellHeader<T>
+        resourceId={resourceId}
+        preserveCsvToolbar
+        items={items}
+        subtitleCount={filteredCount}
+        loading={loading}
+        error={error ?? queryError}
+        setError={setBoardError}
+        reload={reload}
+        searchValue={boardSearch}
+        onSearchChange={setBoardSearch}
+        onArchiveToggle={() => setDetailOrderId(null)}
+        extraHeaderActions={renderExtraToolbar?.({
+          items,
+          reload,
+          setError: setBoardError,
+          showArchived,
+        })}
+      />
+      <div className="work-orders-kanban__board-only">
+        <CrudKanbanSurface<T>
         leadSlot={headerLeadSlot}
         columns={COLUMN_ORDER}
         columnIdSet={COLUMN_IDS}
@@ -307,7 +317,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
         fallbackColumnId="wo_intake"
         items={boardItems}
         loading={loading}
-        error={error ?? queryError}
+        error={null}
         onMoveCard={handleBoardMoveCard}
         resolveDropColumnId={(overId) => resolveDropColumnId(overId, items)}
         filterRow={filterRow}
@@ -318,29 +328,9 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
           <KanbanCardBody row={row} onOpen={onOpen} suppressOpenRef={suppressOpenRef} />
         )}
         renderOverlayCard={(row) => <CardPreview row={row} />}
-        title={title}
-        subtitle={showArchived ? 'Archivadas' : undefined}
-        searchPlaceholder="Buscar..."
-        afterStats={showCreatorBar ? (
-          <CreatedByPillsBar items={items} creatorFilter={creatorFilter} onFilterChange={setCreatorFilter} selfId={selfId} />
-        ) : null}
-        toolbarButtonRow={
-          <>
-            {renderExtraToolbar?.({
-              items,
-              reload,
-              setError: setBoardError,
-              showArchived,
-            })}
-            <CrudArchivedSearchParamToggle
-              className="btn-secondary btn-sm"
-              showActiveLabel="Ver activas"
-              showArchivedLabel="Ver archivadas"
-              onToggle={() => setDetailOrderId(null)}
-            />
-          </>
-        }
-        statsLine={statsLine}
+        title=""
+        externalSearch={boardSearch}
+        statsLine={() => ''}
         columnFooter={() => (
           <Link to={listPath} className="m-kanban__column-add" draggable={false}>
             <span className="m-kanban__column-add-icon" aria-hidden="true">+</span>
@@ -348,6 +338,7 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
           </Link>
         )}
       />
+      </div>
       {renderDetailModal?.({
         orderId: detailOrderId,
         onClose: () => setDetailOrderId(null),

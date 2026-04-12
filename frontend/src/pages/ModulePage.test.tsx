@@ -10,7 +10,14 @@ const crudMocks = vi.hoisted(() => ({
 
 vi.mock('../crud/lazyCrudPage', () => ({
   hasLazyCrudResource: (...args: [string]) => crudMocks.hasLazyCrudResource(...args),
-  LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>CRUD {resourceId}</div>,
+}));
+
+vi.mock('../crud/configuredCrudViews', () => ({
+  ConfiguredCrudStandalonePage: ({ resourceId }: { resourceId: string }) => (
+    <div>
+      standalone:{resourceId}
+    </div>
+  ),
 }));
 
 function renderModulePage(initialPath: string) {
@@ -70,11 +77,11 @@ describe('ModulePage', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it('renderiza el CRUD lazy cuando el recurso pertenece al catálogo CRUD', async () => {
+  it('renderiza la shell CRUD standalone cuando el recurso pertenece al catálogo CRUD', async () => {
     crudMocks.hasLazyCrudResource.mockResolvedValueOnce(true);
 
     renderModulePage('/modules/customers');
 
-    expect(await screen.findByText('CRUD customers')).toBeInTheDocument();
+    expect(await screen.findByText('standalone:customers')).toBeInTheDocument();
   });
 });

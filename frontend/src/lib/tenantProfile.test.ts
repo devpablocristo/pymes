@@ -99,12 +99,41 @@ describe('getTenantProfile', () => {
     mockStorage.getJSON.mockReturnValue(null);
     expect(getTenantProfile()).toBeNull();
   });
+
+  it('normalizes legacy bike_shop profiles on read', () => {
+    mockStorage.getJSON.mockReturnValue({
+      ...FULL_PROFILE,
+      vertical: 'bike_shop',
+    });
+
+    expect(getTenantProfile()).toEqual(
+      expect.objectContaining({
+        vertical: 'workshops',
+        subVertical: 'bike_shop',
+      }),
+    );
+  });
 });
 
 describe('saveTenantProfile', () => {
   it('delegates to storage.setJSON', () => {
     saveTenantProfile(FULL_PROFILE);
     expect(mockStorage.setJSON).toHaveBeenCalledWith('pymes:tenant_profile', FULL_PROFILE);
+  });
+
+  it('normalizes legacy bike_shop profiles on save', () => {
+    saveTenantProfile({
+      ...FULL_PROFILE,
+      vertical: 'bike_shop' as never,
+    });
+
+    expect(mockStorage.setJSON).toHaveBeenCalledWith(
+      'pymes:tenant_profile',
+      expect.objectContaining({
+        vertical: 'workshops',
+        subVertical: 'bike_shop',
+      }),
+    );
   });
 });
 
@@ -164,6 +193,22 @@ describe('tenantProfileFromSettings', () => {
   it('uses scheduling_enabled for usesScheduling', () => {
     const result = tenantProfileFromSettings(makeSettings({ scheduling_enabled: true }));
     expect(result!.usesScheduling).toBe(true);
+  });
+
+  it('preserves a compatible local sub-vertical when syncing from backend settings', () => {
+    mockStorage.getJSON.mockReturnValue({
+      ...FULL_PROFILE,
+      vertical: 'workshops',
+      subVertical: 'bike_shop',
+    });
+
+    const result = tenantProfileFromSettings(makeSettings({ vertical: 'workshops' }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        vertical: 'workshops',
+        subVertical: 'bike_shop',
+      }),
+    );
   });
 
   it('defaults clientLabel to clientes when missing', () => {

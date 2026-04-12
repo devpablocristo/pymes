@@ -26,7 +26,11 @@ No existen deployables `pymes-core/ai` ni `professionals/ai`. El único runtime 
 ```bash
 cp .env.example .env
 make up
-# equivalente: docker compose up -d --build
+# equivalente: docker compose \
+#   --project-directory /home/pablo/Projects/Pablo/pymes \
+#   -f /home/pablo/Projects/Pablo/local-infra/docker-compose.yml \
+#   -f ./docker-compose.yml \
+#   up -d --build
 ```
 
 Prerequisitos locales:
@@ -41,7 +45,8 @@ Nota:
 
 Notas operativas del hardening:
 
-- `docker-compose.yml` ahora builda servicios propios con `context: .` y el repo tiene `.dockerignore`, para no enviar el árbol padre completo al daemon.
+- `docker-compose.yml` es compose de aplicación; `postgres`, `review-postgres` y `mailhog` vienen desde `local-infra`.
+- `docker-compose.yml` builda servicios propios con `context: .` y el repo tiene `.dockerignore`, para no enviar el árbol padre completo al daemon.
 - `ai/requirements.txt` contiene solo runtime; `ai/requirements-dev.txt` agrega `pytest`, `pytest-asyncio` y `ruff` para CI/desarrollo.
 - El frontend mantiene `package-lock.json` y en CI usa `npm ci` para reducir drift.
 
@@ -49,7 +54,7 @@ Notas operativas del hardening:
 
 **Identidad:** sin Clerk → API key local `psk_local_admin` (la crean los **seeds** del core, no las migraciones: `PYMES_SEED_DEMO=true` en Compose o `make seed` si necesitás resembrar). Con Clerk → [docs/AUTH.md](docs/AUTH.md) y [docs/CLERK_LOCAL.md](docs/CLERK_LOCAL.md).
 
-Servicios expuestos al host (con `docker compose` levantado):
+Servicios expuestos al host (con `make up`, que compone `local-infra` + `pymes`):
 
 - pymes-core backend: `http://localhost:8100`
 - professionals backend: `http://localhost:8181`
@@ -59,6 +64,7 @@ Servicios expuestos al host (con `docker compose` levantado):
 - frontend unificado: `http://localhost:5180`
 - AI unificado: `http://localhost:8200`
 - PostgreSQL: `localhost:5434`
+- Review PostgreSQL: `localhost:15434`
 - MailHog: `http://localhost:8025`
 
 API key local de desarrollo:
@@ -105,7 +111,7 @@ pymes/
 ## Solicitudes internas de compra (procurement)
 
 - Backend: `pymes-core/backend/internal/procurement` — `/v1/procurement-requests` (CRUD, archivado, submit/approve/reject), `/v1/procurement-policies` (CRUD de reglas CEL por org), evaluación al enviar con **core/governance**, webhooks outbound vía `outwebhooks`.
-- Frontend CRUD: `procurementRequests`, `procurementPolicies` en `frontend/src/crud/resourceConfigs.tsx` (incl. `dataSource` con `PATCH` y `?archived=true`).
+- Frontend: `procurementRequests`, `procurementPolicies` y `roles` se exponen desde adaptadores finos en `frontend/src/modules/nexus-governance/`; el ownership del dominio sigue siendo **Nexus**.
 - Agente IA: modo procurement con tools (`list_procurement_requests`, `create_procurement_request`, etc.); rol `contador` con permisos de solo lectura acotados (ver `ai/src/agents/policy.py`).
 
 ## CRUDs unificados
@@ -113,9 +119,10 @@ pymes/
 El frontend usa un blueprint unico de CRUD en:
 
 - `frontend/src/components/CrudPage.tsx`
-- `frontend/src/crud/resourceConfigs.tsx`
+- `frontend/src/crud/crudModuleCatalog.ts`
+- `frontend/src/crud/resourceConfigs.*.tsx`
 
-`customers` es la referencia de UX y configuración. El mismo motor cubre el core vía `rawResourceConfigs` + entradas en `crudModuleMeta` (módulos visibles en `/modules/:id`): entre otros `parties`, `customers`, `suppliers`, `products`, `priceLists`, `quotes`, `sales`, `purchases`, `procurementRequests`, `procurementPolicies`, `accounts`, `appointments`, `recurring`, `webhooks`, `roles`; además CRUDs verticales `professionals` (`teachers`, `specialties`, `intakes`, `sessions`) y `workshops/auto_repair` (órdenes, vehículos, servicios, citas). **Beauty** y **restaurants** usan páginas dedicadas y rutas en `App.tsx` (no entran en `crudModuleCatalog`). Acciones de fila (PDF, cobros, etc.) viven en `resourceConfigs.tsx`.
+`customers` es la referencia de UX y configuración. El mismo motor cubre el core y los dominios del frontend vía `crudModuleCatalog` + configuraciones por grupo (`resourceConfigs.commercial.tsx`, `resourceConfigs.operations.tsx`, etc.), con módulos de dominio explícitos en `frontend/src/modules/<dominio>`. **Restaurants** ya entra en el catálogo modular y **governance** (`procurement*`, `roles`) quedó como frontera externa hacia Nexus. Acciones de fila (PDF, cobros, etc.) viven en los builders/configs de cada dominio.
 
 Import / export masivo:
 
@@ -165,9 +172,10 @@ La documentacion canónica vive en `docs/`.
 `pymes` ya no levanta un `ollama` propio. Para usar modelos locales, arrancá el stack compartido:
 
 ```bash
-cd /home/pablo/Projects/Pablo/local-infra/ollama
-docker compose up -d
-docker compose exec -T ollama ollama pull gemma4:e4b
+docker compose --project-directory /home/pablo/Projects/Pablo/local-infra \
+  -f /home/pablo/Projects/Pablo/local-infra/docker-compose.ollama.yml \
+  up -d
+/home/pablo/Projects/Pablo/local-infra/scripts/pull-ollama-model.sh gemma4:e4b
 ```
 
 Atajos:

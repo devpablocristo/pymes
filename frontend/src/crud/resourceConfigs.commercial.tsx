@@ -6,14 +6,8 @@ import { withCSVToolbar } from './csvToolbar';
 import {
   formatCrudMoney,
   formatCrudPercent,
-  formatCrudAddress,
-  formatTagList,
-  parseCostCrudLineItems,
-  parsePricedCrudLineItems,
-  parseTagCsv,
   renderCrudActiveBadge,
   renderCrudBooleanBadge,
-  type CrudAddress,
 } from './commercialCrudHelpers';
 import {
   asBoolean,
@@ -26,10 +20,36 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from './resourceConfigs.shared';
-import { ProductsGalleryModeContent } from '../pages/modes/ProductsGalleryModeContent';
+import {
+  ProductsGalleryWorkspace,
+  ProductsListWorkspace,
+  createProductCrudConfig,
+  type ProductRecord,
+} from '../modules/inventory';
+import {
+  createCustomerCrudConfig,
+  createSupplierCrudConfig,
+  CustomersListModeContent,
+  formatPartyTagList,
+  parsePartyTagCsv,
+  SuppliersListModeContent,
+  type PartyAddress as CrudAddress,
+} from '../modules/parties';
+import {
+  createInvoicesCrudConfig as createBillingInvoicesCrudConfig,
+  createPurchasesCrudConfig,
+  createQuotesCrudConfig,
+  createSalesCrudConfig,
+  type PurchaseRecord,
+  type QuoteRecord,
+  type SaleRecord,
+} from '../modules/billing/billingHelpers';
+import { type InvoiceRecord as BillingInvoiceRecord } from '../modules/billing/invoicesDemo';
+import { InvoicesListModeContent, PurchasesListModeContent, QuotesListModeContent, SalesListModeContent } from '../modules/billing';
 import { renderTagBadges } from './crudTagBadges';
-import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../lib/api';
+import { apiRequest, downloadAPIFile } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
+import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
 type Customer = {
   id: string;
@@ -99,69 +119,6 @@ type PriceList = {
   items?: Array<{ product_id?: string; service_id?: string; price: number }>;
 };
 
-type Quote = {
-  id: string;
-  number: string;
-  customer_id?: string;
-  customer_name: string;
-  status: string;
-  total: number;
-  currency?: string;
-  valid_until?: string;
-  notes?: string;
-  items?: Array<{
-    product_id?: string;
-    service_id?: string;
-    description: string;
-    quantity: number;
-    unit_price: number;
-    tax_rate?: number;
-    sort_order?: number;
-  }>;
-};
-
-type Sale = {
-  id: string;
-  number: string;
-  customer_id?: string;
-  customer_name: string;
-  quote_id?: string;
-  status: string;
-  payment_method?: string;
-  total: number;
-  currency?: string;
-  notes?: string;
-  items?: Array<{
-    product_id?: string;
-    service_id?: string;
-    description: string;
-    quantity: number;
-    unit_price: number;
-    tax_rate?: number;
-    sort_order?: number;
-  }>;
-};
-
-type Purchase = {
-  id: string;
-  number: string;
-  supplier_id?: string;
-  supplier_name: string;
-  status: string;
-  payment_status: string;
-  total: number;
-  currency?: string;
-  notes?: string;
-  items?: Array<{
-    product_id?: string;
-    service_id?: string;
-    description: string;
-    quantity: number;
-    unit_cost: number;
-    tax_rate?: number;
-  }>;
-};
-
 /** Archive/restore/hard delete: el listado paginado va por `basePath` + httpClient del shell. */
 function buildArchivedMutationsOnly<T extends { id: string }>(basePath: string) {
   return {
@@ -199,190 +156,33 @@ const customerPlural = vocab('clientes');
 const customerPluralCap = vocab('Clientes');
 
 export const commercialResourceConfigs: CrudResourceConfigMap = {
+  invoices: {
+    ...createBillingInvoicesCrudConfig<BillingInvoiceRecord>({
+      renderList: () => <InvoicesListModeContent />,
+    }),
+  },
   customers: {
     basePath: '/v1/customers',
-    supportsArchived: true,
-    label: customerLabel,
-    labelPlural: customerPlural,
-    labelPluralCap: customerPluralCap,
-    createLabel: `+ Nuevo ${customerLabel}`,
-    searchPlaceholder: 'Buscar...',
-    columns: [
-      {
-        key: 'name',
-        header: 'Cliente',
-        className: 'cell-name',
-        render: (_value, row: Customer) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.type === 'company' ? 'Empresa' : 'Persona'} · {row.tax_id || 'Sin CUIT/CUIL'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'email',
-        header: 'Contacto',
-        render: (_value, row: Customer) => (
-          <>
-            <div>{row.email || '---'}</div>
-            <div className="text-secondary">{row.phone || '---'}</div>
-          </>
-        ),
-      },
-      {
-        key: 'tags',
-        header: 'Tags / Direccion',
-        render: (_value, row: Customer) => (
-          <>
-            <div>{formatTagList(row.tags) || '---'}</div>
-            <div className="text-secondary">{formatCrudAddress(row.address)}</div>
-          </>
-        ),
-      },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: [
-      {
-        key: 'type',
-        label: 'Tipo',
-        type: 'select',
-        placeholder: 'Seleccionar tipo...',
-        options: [
-          { label: 'Persona', value: 'person' },
-          { label: 'Empresa', value: 'company' },
-        ],
-      },
-      { key: 'name', label: 'Nombre', required: true, placeholder: `Nombre del ${customerLabel}` },
-      { key: 'tax_id', label: 'CUIT / CUIL', placeholder: '20-12345678-9' },
-      { key: 'email', label: 'Email', type: 'email', placeholder: 'email@ejemplo.com' },
-      { key: 'phone', label: 'Telefono', type: 'tel', placeholder: '+54 11 1234-5678' },
-      { key: 'tags', label: 'Tags', placeholder: 'vip, mayorista, mora' },
-      { key: 'address_street', label: 'Calle', fullWidth: true, placeholder: 'Direccion principal' },
-      { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad' },
-      { key: 'address_state', label: 'Provincia', placeholder: 'Provincia' },
-      { key: 'address_country', label: 'Pais', placeholder: 'Pais' },
-      { key: 'notes', label: 'Notas', type: 'textarea', placeholder: 'Notas internas...', fullWidth: true },
-    ],
-    searchText: (row: Customer) =>
-      [row.name, row.email, row.phone, row.tax_id, row.notes, formatTagList(row.tags), formatCrudAddress(row.address)]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Customer) => ({
-      type: row.type || 'person',
-      name: row.name ?? '',
-      tax_id: row.tax_id ?? '',
-      email: row.email ?? '',
-      phone: row.phone ?? '',
-      tags: formatTagList(row.tags),
-      address_street: row.address?.street ?? '',
-      address_city: row.address?.city ?? '',
-      address_state: row.address?.state ?? '',
-      address_country: row.address?.country ?? '',
-      notes: row.notes ?? '',
+    ...createCustomerCrudConfig<Customer>({
+      label: customerLabel,
+      labelPlural: customerPlural,
+      labelPluralCap: customerPluralCap,
+      createLabel: `+ Nuevo ${customerLabel}`,
+      render: () => <CustomersListModeContent />,
     }),
-    toBody: (values) => ({
-      type: asString(values.type) || 'person',
-      name: asString(values.name),
-      tax_id: asOptionalString(values.tax_id),
-      email: asOptionalString(values.email),
-      phone: asOptionalString(values.phone),
-      notes: asOptionalString(values.notes),
-      tags: parseTagCsv(values.tags),
-      address: {
-        street: asString(values.address_street),
-        city: asString(values.address_city),
-        state: asString(values.address_state),
-        country: asString(values.address_country),
-      },
-    }),
-    isValid: (values) => asString(values.name).trim().length >= 2,
   },
   suppliers: {
     basePath: '/v1/suppliers',
-    supportsArchived: true,
-    searchPlaceholder: 'Buscar...',
-    label: 'proveedor',
-    labelPlural: 'proveedores',
-    labelPluralCap: 'Proveedores',
-    columns: [
-      {
-        key: 'name',
-        header: 'Proveedor',
-        className: 'cell-name',
-        render: (_value, row: Supplier) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.contact_name || 'Sin contacto'} · {row.tax_id || 'Sin CUIT'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'email',
-        header: 'Contacto',
-        render: (_value, row: Supplier) => (
-          <>
-            <div>{row.email || '---'}</div>
-            <div className="text-secondary">{row.phone || '---'}</div>
-          </>
-        ),
-      },
-      { key: 'tags', header: 'Tags', render: (value) => formatTagList(value as string[]) || '---' },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del proveedor' },
-      { key: 'contact_name', label: 'Contacto', placeholder: 'Nombre de contacto' },
-      { key: 'tax_id', label: 'CUIT', placeholder: '30-12345678-9' },
-      { key: 'email', label: 'Email', type: 'email', placeholder: 'compras@proveedor.com' },
-      { key: 'phone', label: 'Telefono', type: 'tel', placeholder: '+54 11 1234-5678' },
-      { key: 'tags', label: 'Tags', placeholder: 'importado, insumos, logistico' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Supplier) =>
-      [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, formatTagList(row.tags)]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Supplier) => ({
-      name: row.name ?? '',
-      contact_name: row.contact_name ?? '',
-      tax_id: row.tax_id ?? '',
-      email: row.email ?? '',
-      phone: row.phone ?? '',
-      tags: formatTagList(row.tags),
-      notes: row.notes ?? '',
+    ...createSupplierCrudConfig<Supplier>({
+      render: () => <SuppliersListModeContent />,
     }),
-    toBody: (values) => ({
-      name: asString(values.name),
-      contact_name: asOptionalString(values.contact_name),
-      tax_id: asOptionalString(values.tax_id),
-      email: asOptionalString(values.email),
-      phone: asOptionalString(values.phone),
-      tags: parseTagCsv(values.tags),
-      notes: asOptionalString(values.notes),
-    }),
-    isValid: (values) => asString(values.name).trim().length >= 2,
   },
   products: {
     basePath: '/v1/products',
-    supportsArchived: true,
-    viewModes: [
-      {
-        id: 'gallery',
-        label: 'Galería',
-        path: 'gallery',
-        ariaLabel: 'Vista galería o lista',
-        isDefault: true,
-        render: () => <ProductsGalleryModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista galería o lista' },
-    ],
-    label: 'producto',
-    labelPlural: 'productos',
-    labelPluralCap: 'Productos',
+    ...createProductCrudConfig<ProductRecord>({
+      renderGallery: () => <ProductsGalleryWorkspace />,
+      renderList: () => <ProductsListWorkspace />,
+    }),
     dataSource: {
       create: async (values) => {
         await apiRequest('/v1/products', {
@@ -397,7 +197,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             tax_rate: asOptionalNumber(values.tax_rate),
             track_stock: asBoolean(values.track_stock),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseTagCsv(values.tags),
+            tags: parsePartyTagCsv(values.tags),
             description: asOptionalString(values.description),
             image_urls: parseImageURLList(values.image_urls),
           },
@@ -416,7 +216,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             tax_rate: asOptionalNumber(values.tax_rate),
             track_stock: asBoolean(values.track_stock),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseTagCsv(values.tags),
+            tags: parsePartyTagCsv(values.tags),
             description: asOptionalString(values.description),
             image_urls: parseImageURLList(values.image_urls),
           },
@@ -424,100 +224,19 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       },
       ...productsArchivedMutations,
     },
-    columns: [
-      {
-        key: 'name',
-        header: 'Producto',
-        className: 'cell-name',
-        render: (_value, row: Product) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">{row.sku || 'Sin SKU'} · {row.unit || 'unidad'}</div>
-          </>
-        ),
-      },
-      { key: 'price', header: 'Precio', render: (value, row) => formatCrudMoney(value, row.currency) },
-      { key: 'cost_price', header: 'Costo', render: (value, row) => formatCrudMoney(value, row.currency) },
-      {
-        key: 'tags',
-        header: 'Tags',
-        className: 'cell-tags',
-        render: (_value, row: Product) => renderTagBadges(row.tags),
-      },
-      {
-        key: 'track_stock',
-        header: 'Stock',
-        render: (value) => renderCrudActiveBadge(Boolean(value), 'Controlado', 'Sin control'),
-      },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => renderCrudActiveBadge(Boolean(value)),
-      },
-    ],
-    formFields: [
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
-      { key: 'sku', label: 'SKU', placeholder: 'SKU-001' },
-      { key: 'unit', label: 'Unidad', placeholder: 'unidad, kg, hora' },
-      { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
-      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
-      { key: 'track_stock', label: 'Controla stock', type: 'checkbox' },
-      {
-        key: 'is_active',
-        label: 'Estado comercial',
-        type: 'select',
-        options: [
-          { label: 'Activo', value: 'true' },
-          { label: 'Inactivo', value: 'false' },
-        ],
-      },
-      { key: 'tags', label: 'Tags', placeholder: 'nuevo, combo, premium' },
-      {
-        key: 'image_urls',
-        label: 'Imágenes (URLs)',
-        type: 'textarea',
-        fullWidth: true,
-        placeholder: 'Una URL por línea (hasta 20). La primera es la principal.',
-      },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Product) =>
-      [row.name, row.sku, row.description, row.unit, row.currency, formatTagList(row.tags)].filter(Boolean).join(' '),
-    toFormValues: (row: Product) => ({
-      name: row.name ?? '',
-      sku: row.sku ?? '',
-      unit: row.unit ?? '',
-      price: row.price?.toString() ?? '0',
-      currency: row.currency ?? 'ARS',
-      cost_price: row.cost_price?.toString() ?? '',
-      tax_rate: row.tax_rate?.toString() ?? '',
-      track_stock: row.track_stock ?? true,
-      is_active: row.is_active ? 'true' : 'false',
-      tags: formatTagList(row.tags),
-      image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
-      description: row.description ?? '',
-    }),
-    toBody: (values) => ({
-      name: asString(values.name),
-      sku: asOptionalString(values.sku),
-      unit: asOptionalString(values.unit),
-      price: asNumber(values.price),
-      currency: asOptionalString(values.currency) ?? 'ARS',
-      cost_price: asNumber(values.cost_price),
-      tax_rate: asOptionalNumber(values.tax_rate),
-      track_stock: asBoolean(values.track_stock),
-      is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-      tags: parseTagCsv(values.tags),
-      description: asOptionalString(values.description),
-      image_urls: parseImageURLList(values.image_urls),
-    }),
-    isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.price) || '0') >= 0,
   },
   services: {
     basePath: '/v1/services',
     supportsArchived: true,
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="services" />,
+      },
+    ],
     renderTagsCell: (row: Service) => renderTagBadges(row.tags),
     searchPlaceholder: 'Buscar...',
     label: 'servicio',
@@ -537,7 +256,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             currency: asOptionalString(values.currency) ?? 'ARS',
             default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseTagCsv(values.tags),
+            tags: parsePartyTagCsv(values.tags),
             description: asOptionalString(values.description),
           },
         });
@@ -555,7 +274,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
             currency: asOptionalString(values.currency) ?? 'ARS',
             default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
             is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parseTagCsv(values.tags),
+            tags: parsePartyTagCsv(values.tags),
             description: asOptionalString(values.description),
           },
         });
@@ -611,7 +330,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: Service) =>
-      [row.name, row.code, row.category_code, row.description, row.currency, formatTagList(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.code, row.category_code, row.description, row.currency, formatPartyTagList(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row: Service) => ({
       name: row.name ?? '',
       code: row.code ?? '',
@@ -622,7 +341,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       currency: row.currency ?? 'ARS',
       default_duration_minutes: row.default_duration_minutes?.toString() ?? '',
       is_active: row.is_active ? 'true' : 'false',
-      tags: formatTagList(row.tags),
+      tags: formatPartyTagList(row.tags),
       description: row.description ?? '',
     }),
     toBody: (values) => ({
@@ -635,13 +354,22 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       currency: asOptionalString(values.currency) ?? 'ARS',
       default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
       is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-      tags: parseTagCsv(values.tags),
+      tags: parsePartyTagCsv(values.tags),
       description: asOptionalString(values.description),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
   },
   priceLists: {
     basePath: '/v1/price-lists',
+    viewModes: [
+      {
+        id: 'list',
+        label: 'Lista',
+        path: 'list',
+        isDefault: true,
+        render: () => <PymesSimpleCrudListModeContent resourceId="priceLists" />,
+      },
+    ],
     searchPlaceholder: 'Buscar...',
     label: 'lista de precios',
     labelPlural: 'listas de precios',
@@ -704,307 +432,19 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
     isValid: (values) => asString(values.name).trim().length >= 2,
   },
   quotes: {
-    basePath: '/v1/quotes',
-    supportsArchived: true,
-    searchPlaceholder: 'Buscar...',
-    label: 'presupuesto',
-    labelPlural: 'presupuestos',
-    labelPluralCap: 'Presupuestos',
-    columns: [
-      {
-        key: 'number',
-        header: 'Presupuesto',
-        className: 'cell-name',
-        render: (_value, row: Quote) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row) => formatCrudMoney(value, row.currency),
-      },
-      { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '---' },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'customer_id', label: 'Customer ID' },
-      { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
-      { key: 'valid_until', label: 'Valido hasta', type: 'date' },
-      {
-        key: 'items_json',
-        label: 'Items JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Servicio","quantity":1,"unit_price":10000}]',
-      },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    rowActions: [
-      {
-        id: 'pdf',
-        label: 'PDF',
-        kind: 'secondary',
-        onClick: async (row: Quote) => {
-          await downloadAPIFile(`/v1/quotes/${row.id}/pdf`);
-        },
-      },
-      {
-        id: 'send',
-        label: 'Enviar',
-        kind: 'secondary',
-        isVisible: (row: Quote) => row.status === 'draft',
-        onClick: async (row: Quote, helpers) => {
-          await apiRequest(`/v1/quotes/${row.id}/send`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-      {
-        id: 'accept',
-        label: 'Aceptar',
-        kind: 'success',
-        isVisible: (row: Quote) => row.status === 'sent',
-        onClick: async (row: Quote, helpers) => {
-          await apiRequest(`/v1/quotes/${row.id}/accept`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-    ],
-    searchText: (row: Quote) => [row.number, row.customer_name, row.status, row.notes].filter(Boolean).join(' '),
-    toFormValues: (row: Quote) => ({
-      customer_id: row.customer_id ?? '',
-      customer_name: row.customer_name ?? '',
-      valid_until: row.valid_until ? String(row.valid_until).slice(0, 10) : '',
-      items_json: stringifyJSON(row.items ?? []),
-      notes: row.notes ?? '',
+    ...createQuotesCrudConfig<QuoteRecord>({
+      renderList: () => <QuotesListModeContent />,
     }),
-    toBody: (values) => ({
-      customer_id: asOptionalString(values.customer_id),
-      customer_name: asString(values.customer_name),
-      valid_until: asOptionalString(values.valid_until),
-      items: parsePricedCrudLineItems(values.items_json),
-      notes: asOptionalString(values.notes),
-    }),
-    isValid: (values) =>
-      asString(values.customer_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
   },
   sales: {
-    basePath: '/v1/sales',
-    allowEdit: false,
-    allowDelete: false,
-    searchPlaceholder: 'Buscar...',
-    label: 'venta',
-    labelPlural: 'ventas',
-    labelPluralCap: 'Ventas',
-    columns: [
-      {
-        key: 'number',
-        header: 'Venta',
-        className: 'cell-name',
-        render: (_value, row: Sale) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'payment_method', header: 'Cobro' },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row) => formatCrudMoney(value, row.currency),
-      },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'customer_id', label: 'Customer ID' },
-      { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
-      { key: 'quote_id', label: 'Quote ID' },
-      {
-        key: 'payment_method',
-        label: 'Metodo de cobro',
-        required: true,
-        placeholder: 'efectivo, transferencia, tarjeta',
-      },
-      {
-        key: 'items_json',
-        label: 'Items JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Producto","quantity":1,"unit_price":10000}]',
-      },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    rowActions: [
-      {
-        id: 'receipt-pdf',
-        label: 'Recibo PDF',
-        kind: 'secondary',
-        onClick: async (row: Sale) => {
-          await downloadAPIFile(`/v1/sales/${row.id}/receipt`);
-        },
-      },
-      {
-        id: 'payments',
-        label: 'Cobros',
-        kind: 'secondary',
-        onClick: async (row: Sale, helpers) => {
-          try {
-            const { items } = await listSalePayments(row.id);
-            if (!items?.length) {
-              helpers.setError('No hay cobros registrados para esta venta.');
-              return;
-            }
-            const lines = items.map(
-              (p) => `${p.method} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`,
-            );
-            const w = window.open('', '_blank', 'noopener,noreferrer,width=520,height=480');
-            if (w) {
-              w.document.write(
-                `<pre style="font:14px/1.4 system-ui;padding:12px;white-space:pre-wrap">${lines.join('\n')}</pre>`,
-              );
-              w.document.close();
-            }
-          } catch (err) {
-            helpers.setError(err instanceof Error ? err.message : 'No se pudieron cargar los cobros.');
-          }
-        },
-      },
-      {
-        id: 'add-payment',
-        label: 'Registrar cobro',
-        kind: 'success',
-        onClick: async (row: Sale, helpers) => {
-          const method = window.prompt('Método de cobro (ej. efectivo, transferencia, tarjeta):', 'efectivo');
-          if (method === null) return;
-          const trimmedMethod = method.trim();
-          if (!trimmedMethod) {
-            helpers.setError('El método de cobro es obligatorio.');
-            return;
-          }
-          const amountRaw = window.prompt('Monto cobrado:', '');
-          if (amountRaw === null) return;
-          const amount = Number(String(amountRaw).replace(',', '.'));
-          if (!Number.isFinite(amount) || amount <= 0) {
-            helpers.setError('El monto debe ser un número mayor a 0.');
-            return;
-          }
-          const notes = window.prompt('Notas (opcional):', '') ?? '';
-          try {
-            await createSalePayment(row.id, { method: trimmedMethod, amount, notes: notes.trim() || undefined });
-            await helpers.reload();
-          } catch (err) {
-            helpers.setError(err instanceof Error ? err.message : 'No se pudo registrar el cobro.');
-          }
-        },
-      },
-      {
-        id: 'void',
-        label: 'Anular',
-        kind: 'danger',
-        isVisible: (row: Sale) => !['voided', 'cancelled'].includes((row.status || '').toLowerCase()),
-        onClick: async (row: Sale, helpers) => {
-          await apiRequest(`/v1/sales/${row.id}/void`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-    ],
-    searchText: (row: Sale) =>
-      [row.number, row.customer_name, row.status, row.payment_method, row.notes].filter(Boolean).join(' '),
-    toFormValues: (row: Sale) => ({
-      customer_id: row.customer_id ?? '',
-      customer_name: row.customer_name ?? '',
-      quote_id: row.quote_id ?? '',
-      payment_method: row.payment_method ?? '',
-      items_json: stringifyJSON(row.items ?? []),
-      notes: row.notes ?? '',
+    ...createSalesCrudConfig<SaleRecord>({
+      renderList: () => <SalesListModeContent />,
     }),
-    toBody: (values) => ({
-      customer_id: asOptionalString(values.customer_id),
-      customer_name: asString(values.customer_name),
-      quote_id: asOptionalString(values.quote_id),
-      payment_method: asString(values.payment_method),
-      items: parsePricedCrudLineItems(values.items_json),
-      notes: asOptionalString(values.notes),
-    }),
-    isValid: (values) =>
-      asString(values.customer_name).trim().length >= 2 &&
-      asString(values.payment_method).trim().length >= 2 &&
-      asString(values.items_json).trim().length > 0,
   },
   purchases: {
-    basePath: '/v1/purchases',
-    allowDelete: false,
-    searchPlaceholder: 'Buscar...',
-    label: 'compra',
-    labelPlural: 'compras',
-    labelPluralCap: 'Compras',
-    columns: [
-      {
-        key: 'number',
-        header: 'Compra',
-        className: 'cell-name',
-        render: (_value, row: Purchase) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.supplier_name || 'Sin proveedor'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'payment_status', header: 'Pago' },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row) => formatCrudMoney(value, row.currency),
-      },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'supplier_id', label: 'Supplier ID' },
-      { key: 'supplier_name', label: 'Proveedor', required: true, placeholder: 'Nombre del proveedor' },
-      { key: 'status', label: 'Estado', placeholder: 'draft, received, cancelled' },
-      { key: 'payment_status', label: 'Estado de pago', placeholder: 'pending, partial, paid' },
-      {
-        key: 'items_json',
-        label: 'Items JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Insumo","quantity":1,"unit_cost":10000}]',
-      },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Purchase) =>
-      [row.number, row.supplier_name, row.status, row.payment_status, row.notes].filter(Boolean).join(' '),
-    toFormValues: (row: Purchase) => ({
-      supplier_id: row.supplier_id ?? '',
-      supplier_name: row.supplier_name ?? '',
-      status: row.status ?? '',
-      payment_status: row.payment_status ?? '',
-      items_json: stringifyJSON(row.items ?? []),
-      notes: row.notes ?? '',
+    ...createPurchasesCrudConfig<PurchaseRecord>({
+      renderList: () => <PurchasesListModeContent />,
     }),
-    toBody: (values) => ({
-      supplier_id: asOptionalString(values.supplier_id),
-      supplier_name: asString(values.supplier_name),
-      status: asOptionalString(values.status),
-      payment_status: asOptionalString(values.payment_status),
-      items: parseCostCrudLineItems(values.items_json),
-      notes: asOptionalString(values.notes),
-    }),
-    isValid: (values) =>
-      asString(values.supplier_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
   },
 };
 

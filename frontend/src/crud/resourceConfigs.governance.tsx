@@ -1,31 +1,22 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
-import { type CrudFieldValue, type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
+import { type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { apiRequest } from '../lib/api';
-import {
-  buildPartyFormValues,
-  buildPartySearchText,
-  formatActivePartyRoles,
-  formatGovernanceMoney,
-  formatGovernanceTagList,
-  parseGovernancePermissionInputs,
-  parseProcurementRequestLines,
-  partyCrudFormFields,
-  partyCrudFormToBody,
-  toProcurementPolicyCrudBody,
-  toProcurementRequestCrudBody,
-} from './governanceCrudHelpers';
 import { withCSVToolbar } from './csvToolbar';
-import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import {
-  asBoolean,
-  asNumber,
-  asOptionalNumber,
-  asOptionalString,
-  asString,
-  formatDate,
-  parseJSONArray,
-  stringifyJSON,
-} from './resourceConfigs.shared';
+  AccountsListModeContent,
+  createAccountCrudConfig,
+  createPartyCrudConfig,
+  EmployeesListModeContent,
+  PartiesListModeContent,
+  parsePartyPermissionInputs,
+} from '../modules/parties';
+import {
+  createNexusRolesCrudConfig,
+  createProcurementPoliciesCrudConfig,
+  createProcurementRequestsCrudConfig,
+} from '../modules/nexus-governance';
+import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
+import { formatDate } from './resourceConfigs.shared';
 
 type Address = {
   street?: string;
@@ -33,43 +24,6 @@ type Address = {
   state?: string;
   zip_code?: string;
   country?: string;
-};
-
-type ProcurementRequest = {
-  id: string;
-  org_id?: string;
-  requester_actor?: string;
-  title: string;
-  description?: string;
-  category?: string;
-  status: string;
-  estimated_total: number;
-  currency?: string;
-  lines?: Array<{
-    id?: string;
-    product_id?: string | null;
-    description: string;
-    quantity: number;
-    unit_price_estimate: number;
-  }>;
-  created_at?: string;
-  updated_at?: string;
-  archived_at?: string | null;
-};
-
-type ProcurementPolicy = {
-  id: string;
-  org_id?: string;
-  name: string;
-  expression: string;
-  effect: string;
-  priority: number;
-  mode: string;
-  enabled: boolean;
-  action_filter: string;
-  system_filter: string;
-  created_at?: string;
-  updated_at?: string;
 };
 
 type Account = {
@@ -81,21 +35,6 @@ type Account = {
   balance: number;
   currency?: string;
   credit_limit: number;
-  updated_at: string;
-};
-
-type RolePermission = {
-  resource: string;
-  action: string;
-};
-
-type Role = {
-  id: string;
-  name: string;
-  description?: string;
-  is_system: boolean;
-  permissions: RolePermission[];
-  created_at: string;
   updated_at: string;
 };
 
@@ -115,427 +54,41 @@ type Party = {
 };
 
 const governanceResourceConfigs: CrudResourceConfigMap = {
-  procurementRequests: {
-    supportsArchived: true,
-    label: 'solicitud de compra interna',
-    labelPlural: 'solicitudes de compra internas',
-    labelPluralCap: 'Solicitudes de compra internas',
-    dataSource: {
-      list: async ({ archived }) => {
-        const suffix = archived ? '?archived=true' : '';
-        const data = await apiRequest<{ items: ProcurementRequest[] }>(`/v1/procurement-requests${suffix}`);
-        return data.items ?? [];
-      },
-      create: async (values) => {
-        await apiRequest('/v1/procurement-requests', { method: 'POST', body: toProcurementRequestCrudBody(values) });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/procurement-requests/${row.id}`, {
-          method: 'PATCH',
-          body: toProcurementRequestCrudBody(values),
-        });
-      },
-      deleteItem: async (row) => {
-        await apiRequest(`/v1/procurement-requests/${row.id}/archive`, { method: 'POST', body: {} });
-      },
-      restore: async (row) => {
-        await apiRequest(`/v1/procurement-requests/${row.id}/restore`, { method: 'POST', body: {} });
-      },
-      hardDelete: async (row) => {
-        await apiRequest(`/v1/procurement-requests/${row.id}`, { method: 'DELETE' });
-      },
-    },
-    columns: [
-      {
-        key: 'title',
-        header: 'Solicitud',
-        className: 'cell-name',
-        render: (_value, row: ProcurementRequest) => (
-          <>
-            <strong>{row.title || row.id}</strong>
-            <div className="text-secondary">
-              {row.requester_actor || '—'} · {row.status || 'draft'} · {formatGovernanceMoney(row.estimated_total, row.currency)}
-            </div>
-          </>
-        ),
-      },
-      { key: 'category', header: 'Rubro', render: (v) => String(v ?? '').trim() || '—' },
-      { key: 'status', header: 'Estado' },
-    ],
-    formFields: [
-      { key: 'title', label: 'Título', required: true, placeholder: 'Ej. Repuestos oficina' },
-      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
-      { key: 'category', label: 'Categoría / rubro', placeholder: 'general, insumos, ...' },
-      { key: 'estimated_total', label: 'Total estimado', type: 'number' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      {
-        key: 'lines_json',
-        label: 'Líneas JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Item","quantity":1,"unit_price_estimate":1000}]',
-      },
-    ],
-    rowActions: [
-      {
-        id: 'submit',
-        label: 'Enviar',
-        kind: 'primary',
-        isVisible: (row, ctx) => !ctx.archived && row.status === 'draft',
-        onClick: async (row, helpers) => {
-          await apiRequest(`/v1/procurement-requests/${row.id}/submit`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-      {
-        id: 'approve',
-        label: 'Aprobar',
-        kind: 'success',
-        isVisible: (row, ctx) => !ctx.archived && row.status === 'pending_approval',
-        onClick: async (row, helpers) => {
-          await apiRequest(`/v1/procurement-requests/${row.id}/approve`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-      {
-        id: 'reject',
-        label: 'Rechazar',
-        kind: 'danger',
-        isVisible: (row, ctx) => !ctx.archived && row.status === 'pending_approval',
-        onClick: async (row, helpers) => {
-          await apiRequest(`/v1/procurement-requests/${row.id}/reject`, { method: 'POST', body: {} });
-          await helpers.reload();
-        },
-      },
-    ],
-    searchText: (row: ProcurementRequest) =>
-      [row.title, row.description, row.category, row.status, row.requester_actor].filter(Boolean).join(' '),
-    toFormValues: (row: ProcurementRequest) => ({
-      title: row.title ?? '',
-      description: row.description ?? '',
-      category: row.category ?? '',
-      estimated_total: row.estimated_total?.toString() ?? '0',
-      currency: row.currency ?? 'ARS',
-      lines_json: stringifyJSON(row.lines ?? []),
-    }),
-    isValid: (values) => asString(values.title).trim().length >= 2 && asString(values.lines_json).trim().length > 0,
-  },
-  procurementPolicies: {
-    label: 'política de compras',
-    labelPlural: 'políticas de compras',
-    labelPluralCap: 'Políticas de compras (governance)',
-    dataSource: {
-      list: async () => {
-        const data = await apiRequest<{ items: ProcurementPolicy[] }>('/v1/procurement-policies');
-        return data.items ?? [];
-      },
-      create: async (values) => {
-        await apiRequest('/v1/procurement-policies', { method: 'POST', body: toProcurementPolicyCrudBody(values) });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/procurement-policies/${row.id}`, {
-          method: 'PATCH',
-          body: toProcurementPolicyCrudBody(values),
-        });
-      },
-      deleteItem: async (row) => {
-        await apiRequest(`/v1/procurement-policies/${row.id}`, { method: 'DELETE' });
-      },
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Política',
-        className: 'cell-name',
-        render: (_value, row: ProcurementPolicy) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.effect} · prioridad {row.priority} · {row.mode} · {row.enabled ? 'activa' : 'inactiva'}
-            </div>
-          </>
-        ),
-      },
-      { key: 'action_filter', header: 'Acción', className: 'cell-notes' },
-    ],
-    formFields: [
-      { key: 'name', label: 'Nombre', required: true },
-      { key: 'expression', label: 'Expresión CEL', type: 'textarea', required: true, fullWidth: true },
-      { key: 'effect', label: 'Efecto', required: true, placeholder: 'allow | deny | require_approval' },
-      { key: 'priority', label: 'Prioridad', type: 'number' },
-      { key: 'mode', label: 'Modo', placeholder: 'enforce | shadow' },
-      { key: 'enabled', label: 'Activa', type: 'checkbox' },
-      { key: 'action_filter', label: 'Filtro de acción', placeholder: 'procurement.submit' },
-      { key: 'system_filter', label: 'Filtro de sistema', placeholder: 'pymes' },
-    ],
-    searchText: (row: ProcurementPolicy) =>
-      [row.name, row.expression, row.effect, row.action_filter].filter(Boolean).join(' '),
-    toFormValues: (row: ProcurementPolicy) => ({
-      name: row.name ?? '',
-      expression: row.expression ?? '',
-      effect: row.effect ?? '',
-      priority: row.priority?.toString() ?? '100',
-      mode: row.mode ?? 'enforce',
-      enabled: row.enabled ?? true,
-      action_filter: row.action_filter ?? '',
-      system_filter: row.system_filter ?? '',
-    }),
-    isValid: (values) =>
-      asString(values.name).trim().length >= 2 &&
-      asString(values.expression).trim().length > 0 &&
-      asString(values.effect).trim().length > 0,
-  },
+  procurementRequests: createProcurementRequestsCrudConfig(),
+  procurementPolicies: createProcurementPoliciesCrudConfig(),
   accounts: {
     basePath: '/v1/accounts',
-    allowCreate: true,
-    allowEdit: false,
-    allowDelete: false,
-    label: 'cuenta corriente',
-    labelPlural: 'cuentas corrientes',
-    labelPluralCap: 'Cuentas corrientes',
-    createLabel: '+ Nueva cuenta corriente',
-    searchPlaceholder: 'Buscar...',
-    columns: [
-      {
-        key: 'entity_name',
-        header: 'Cuenta',
-        className: 'cell-name',
-        render: (_value, row: Account) => (
-          <>
-            <strong>{row.entity_name}</strong>
-            <div className="text-secondary">
-              {row.type} · {row.entity_type}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'balance',
-        header: 'Saldo',
-        render: (value, row) => formatGovernanceMoney(value, row.currency),
-      },
-      {
-        key: 'credit_limit',
-        header: 'Limite',
-        render: (value, row) => formatGovernanceMoney(value, row.currency),
-      },
-      { key: 'updated_at', header: 'Actualizada', render: (value) => formatDate(String(value ?? '')) },
-    ],
-    formFields: [
-      { key: 'type', label: 'Tipo', required: true, placeholder: 'receivable, payable' },
-      { key: 'entity_type', label: 'Entity type', required: true, placeholder: 'customer, supplier' },
-      { key: 'entity_id', label: 'Entity ID', required: true, placeholder: 'UUID de la entidad' },
-      { key: 'entity_name', label: 'Nombre', required: true, placeholder: 'Nombre visible' },
-      { key: 'amount', label: 'Ajuste inicial', type: 'number', required: true, placeholder: '0.00' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'credit_limit', label: 'Limite de credito', type: 'number', placeholder: '0.00' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-    ],
-    searchText: (row: Account) => [row.entity_name, row.type, row.entity_type, row.entity_id].filter(Boolean).join(' '),
-    toFormValues: (row: Account) => ({
-      type: row.type ?? '',
-      entity_type: row.entity_type ?? '',
-      entity_id: row.entity_id ?? '',
-      entity_name: row.entity_name ?? '',
-      amount: '0',
-      currency: row.currency ?? 'ARS',
-      credit_limit: row.credit_limit?.toString() ?? '0',
-      description: '',
+    ...createAccountCrudConfig<Account>({
+      render: () => <AccountsListModeContent />,
+      formatUpdatedAt: (value) => formatDate(String(value ?? '')),
     }),
-    toBody: (values) => ({
-      type: asString(values.type),
-      entity_type: asString(values.entity_type),
-      entity_id: asString(values.entity_id),
-      entity_name: asString(values.entity_name),
-      amount: asNumber(values.amount),
-      currency: asOptionalString(values.currency) ?? 'ARS',
-      credit_limit: asOptionalNumber(values.credit_limit),
-      description: asOptionalString(values.description),
-    }),
-    isValid: (values) =>
-      asString(values.type).trim().length > 0 &&
-      asString(values.entity_type).trim().length > 0 &&
-      asString(values.entity_id).trim().length > 0 &&
-      asString(values.entity_name).trim().length >= 2,
   },
-  roles: {
-    allowCreate: true,
-    allowEdit: true,
-    allowDelete: true,
-    label: 'rol',
-    labelPlural: 'roles',
-    labelPluralCap: 'Roles',
-    dataSource: {
-      list: async () => (await apiRequest<{ items?: Role[] }>('/v1/roles')).items ?? [],
-      create: async (values) => {
-        await apiRequest('/v1/roles', {
-          method: 'POST',
-          body: {
-            name: asString(values.name),
-            description: asOptionalString(values.description) ?? '',
-            permissions: parseGovernancePermissionInputs(values.permissions_json),
-          },
-        });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/roles/${row.id}`, {
-          method: 'PUT',
-          body: {
-            description: asOptionalString(values.description),
-            permissions: parseGovernancePermissionInputs(values.permissions_json),
-          },
-        });
-      },
-      deleteItem: async (row) => {
-        await apiRequest(`/v1/roles/${row.id}`, { method: 'DELETE' });
-      },
-    },
-    columns: [
-      {
-        key: 'name',
-        header: 'Rol',
-        className: 'cell-name',
-        render: (_value, row: Role) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.is_system ? 'Sistema' : 'Custom'} · {row.permissions.length} permisos
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'permissions',
-        header: 'Permisos',
-        render: (_value, row: Role) =>
-          row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ') || '---',
-      },
-      { key: 'description', header: 'Descripcion', className: 'cell-notes' },
-      { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
-    ],
-    formFields: [
-      { key: 'name', label: 'Nombre', required: true, placeholder: 'operador-caja', createOnly: true },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
-      {
-        key: 'permissions_json',
-        label: 'Permisos JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"resource":"customers","action":"read"}]',
-      },
-    ],
-    searchText: (row: Role) =>
-      [
-        row.name,
-        row.description,
-        row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', '),
-      ]
-        .filter(Boolean)
-        .join(' '),
-    toFormValues: (row: Role) => ({
-      name: row.name ?? '',
-      description: row.description ?? '',
-      permissions_json: stringifyJSON(row.permissions ?? []),
-    }),
-    isValid: (values) => asString(values.name).trim().length > 0 && asString(values.permissions_json).trim().length > 0,
-  },
+  roles: createNexusRolesCrudConfig(),
   parties: {
     basePath: '/v1/parties',
-    label: 'entidad',
-    labelPlural: 'entidades',
-    labelPluralCap: 'Entidades',
-    columns: [
-      {
-        key: 'display_name',
-        header: 'Entidad',
-        className: 'cell-name',
-        render: (_value, row: Party) => (
-          <>
-            <strong>{row.display_name}</strong>
-            <div className="text-secondary">
-              {row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'email',
-        header: 'Contacto',
-        render: (_value, row: Party) => (
-          <>
-            <div>{row.email || '---'}</div>
-            <div className="text-secondary">{row.phone || '---'}</div>
-          </>
-        ),
-      },
-      {
-        key: 'roles',
-        header: 'Roles',
-        render: (_value, row: Party) => formatActivePartyRoles(row.roles),
-      },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: partyCrudFormFields,
-    searchText: buildPartySearchText,
-    toFormValues: buildPartyFormValues,
-    toBody: partyCrudFormToBody,
-    isValid: (values) =>
-      asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
+    ...createPartyCrudConfig<Party>({
+      label: 'entidad',
+      labelPlural: 'entidades',
+      labelPluralCap: 'Entidades',
+      header: 'Entidad',
+      render: () => <PartiesListModeContent />,
+    }),
   },
   employees: {
     basePath: '/v1/parties',
     listQuery: 'role=employee',
-    label: 'empleado',
-    labelPlural: 'empleados',
-    labelPluralCap: 'Empleados',
-    createLabel: '+ Nuevo empleado',
-    searchPlaceholder: 'Buscar...',
-    emptyState:
-      'No hay entidades con rol empleado. El alta crea una party en /v1/parties con rol employee. Los usuarios con acceso a la consola (miembros de org) se administran aparte.',
-    columns: [
-      {
-        key: 'display_name',
-        header: 'Empleado',
-        className: 'cell-name',
-        render: (_value, row: Party) => (
-          <>
-            <strong>{row.display_name}</strong>
-            <div className="text-secondary">
-              {row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'email',
-        header: 'Contacto',
-        render: (_value, row: Party) => (
-          <>
-            <div>{row.email || '---'}</div>
-            <div className="text-secondary">{row.phone || '---'}</div>
-          </>
-        ),
-      },
-      {
-        key: 'roles',
-        header: 'Roles',
-        render: (_value, row: Party) => formatActivePartyRoles(row.roles),
-      },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
-    ],
-    formFields: partyCrudFormFields.map((field) =>
-      field.key === 'tags' ? { ...field, placeholder: 'operaciones, campo' } : field,
-    ),
-    searchText: buildPartySearchText,
-    toFormValues: buildPartyFormValues,
-    toBody: (values) => ({
-      ...partyCrudFormToBody(values),
-      roles: [{ role: 'employee' }],
+    ...createPartyCrudConfig<Party>({
+      label: 'empleado',
+      labelPlural: 'empleados',
+      labelPluralCap: 'Empleados',
+      header: 'Empleado',
+      render: () => <EmployeesListModeContent />,
+      createLabel: '+ Nuevo empleado',
+      searchPlaceholder: 'Buscar...',
+      emptyState:
+        'No hay entidades con rol empleado. El alta crea una party en /v1/parties con rol employee. Los usuarios con acceso a la consola (miembros de org) se administran aparte.',
+      roleEmployee: true,
     }),
-    isValid: (values) =>
-      asString(values.display_name).trim().length >= 2 && asString(values.party_type).trim().length > 0,
   },
 };
 

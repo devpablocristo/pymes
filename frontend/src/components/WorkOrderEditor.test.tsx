@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
-import { WorkOrderEditor } from './WorkOrderEditor';
+import { WorkOrderEditor } from '../modules/work-orders';
 
 const apiMocks = vi.hoisted(() => ({
   getWorkOrder: vi.fn<[], Promise<AutoRepairWorkOrder>>(),

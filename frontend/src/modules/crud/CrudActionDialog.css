@@ -1,0 +1,111 @@
+.crud-action-dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.crud-action-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+  cursor: pointer;
+}
+
+.crud-action-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-z16, 0 12px 28px color-mix(in srgb, var(--color-text) 12%, transparent));
+  overflow: hidden;
+}
+
+.crud-action-dialog__header,
+.crud-action-dialog__footer {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.crud-action-dialog__footer {
+  border-bottom: none;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.crud-action-dialog__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.crud-action-dialog__subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.crud-action-dialog__form {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.crud-action-dialog__body {
+  padding: var(--space-4);
+  overflow: auto;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-action-dialog__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.crud-action-dialog__field span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.crud-action-dialog__field input,
+.crud-action-dialog__field textarea,
+.crud-action-dialog__text {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--space-2);
+}
+
+.crud-action-dialog__field textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.crud-action-dialog__text {
+  margin: 0;
+  min-height: 8rem;
+  white-space: pre-wrap;
+}

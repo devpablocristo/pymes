@@ -8,15 +8,23 @@ import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import {
+  saveTenantProfile,
   syncTenantProfileFromSettings,
   type PaymentMethod,
   type SellsType,
+  type SubVerticalType,
   type TeamSize,
   type TenantProfile,
   type VerticalType,
 } from '../lib/tenantProfile';
 
 type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+type OnboardingSubVerticalOption = {
+  value: string;
+  vertical: VerticalType;
+  labelKey: string;
+  descKey: string;
+};
 
 const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: string }[] = [
   { value: 'commercial', labelKey: 'onboarding.vertical.commercial', descKey: 'onboarding.vertical.commercialDesc' },
@@ -34,9 +42,76 @@ const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: st
   },
 ];
 
-const SUB_VERTICAL_KEYS: Partial<
-  Record<VerticalGroup, { value: VerticalType; labelKey: string; descKey: string }[]>
-> = {};
+const SUB_VERTICAL_KEYS: Partial<Record<VerticalGroup, OnboardingSubVerticalOption[]>> = {
+  professionals: [
+    {
+      value: 'teachers',
+      vertical: 'professionals',
+      labelKey: 'onboarding.vertical.teachers',
+      descKey: 'onboarding.vertical.teachersDesc',
+    },
+    {
+      value: 'consulting',
+      vertical: 'professionals',
+      labelKey: 'onboarding.vertical.consulting',
+      descKey: 'onboarding.vertical.consultingDesc',
+    },
+  ],
+  workshops: [
+    {
+      value: 'auto_repair',
+      vertical: 'workshops',
+      labelKey: 'onboarding.vertical.autoRepair',
+      descKey: 'onboarding.vertical.autoRepairDesc',
+    },
+    {
+      value: 'bike_shop',
+      vertical: 'workshops',
+      labelKey: 'onboarding.vertical.bikeShop',
+      descKey: 'onboarding.vertical.bikeShopDesc',
+    },
+  ],
+  beauty: [
+    {
+      value: 'salon',
+      vertical: 'beauty',
+      labelKey: 'onboarding.vertical.salon',
+      descKey: 'onboarding.vertical.salonDesc',
+    },
+    {
+      value: 'barbershop',
+      vertical: 'beauty',
+      labelKey: 'onboarding.vertical.barbershop',
+      descKey: 'onboarding.vertical.barbershopDesc',
+    },
+    {
+      value: 'aesthetics',
+      vertical: 'beauty',
+      labelKey: 'onboarding.vertical.aesthetics',
+      descKey: 'onboarding.vertical.aestheticsDesc',
+    },
+  ],
+  restaurants: [
+    {
+      value: 'restaurant',
+      vertical: 'restaurants',
+      labelKey: 'onboarding.vertical.restaurant',
+      descKey: 'onboarding.vertical.restaurantDesc',
+    },
+    {
+      value: 'bar',
+      vertical: 'restaurants',
+      labelKey: 'onboarding.vertical.bar',
+      descKey: 'onboarding.vertical.barDesc',
+    },
+    {
+      value: 'cafe',
+      vertical: 'restaurants',
+      labelKey: 'onboarding.vertical.cafe',
+      descKey: 'onboarding.vertical.cafeDesc',
+    },
+  ],
+};
 
 const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   commercial: 'none',
@@ -50,7 +125,6 @@ const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
   none: 'onboarding.vertical.commercial',
   professionals: 'onboarding.vertical.professionals',
   workshops: 'onboarding.vertical.workshops',
-  bike_shop: 'onboarding.vertical.bikeShop',
   beauty: 'onboarding.vertical.beauty',
   restaurants: 'onboarding.vertical.restaurants',
 };
@@ -135,25 +209,28 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
   const [currency, setCurrency] = useState('ARS');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [verticalGroup, setVerticalGroup] = useState<VerticalGroup | ''>('');
-  const [vertical, setVertical] = useState<VerticalType | ''>('');
+  const [subVertical, setSubVertical] = useState('');
 
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState('');
 
   const resolvedVertical: VerticalType | '' = verticalGroup
     ? SUB_VERTICAL_KEYS[verticalGroup]
-      ? vertical
+      ? (SUB_VERTICAL_KEYS[verticalGroup]!.find((opt) => opt.value === subVertical)?.vertical ?? '')
       : (GROUP_TO_VERTICAL[verticalGroup] ?? '')
     : '';
 
   const needsSubVertical = verticalGroup !== '' && !!SUB_VERTICAL_KEYS[verticalGroup];
+  const resolvedSubVerticalLabelKey = verticalGroup && subVertical
+    ? SUB_VERTICAL_KEYS[verticalGroup]?.find((opt) => opt.value === subVertical)?.labelKey ?? null
+    : null;
 
   const canNext: Record<Step, boolean> = {
     1:
       businessName.trim().length >= 2 &&
       teamSize !== '' &&
       verticalGroup !== '' &&
-      (!needsSubVertical || vertical !== ''),
+      (!needsSubVertical || subVertical !== ''),
     2:
       sells !== '' &&
       (clientLabel !== '' || customClientLabel.trim() !== '') &&
@@ -185,6 +262,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
       currency,
       paymentMethod: paymentMethod as PaymentMethod,
       vertical: resolvedVertical as VerticalType,
+      ...(subVertical ? { subVertical: subVertical as SubVerticalType } : {}),
       completedAt: new Date().toISOString(),
     };
 
@@ -225,7 +303,11 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         onboarding_completed_at: profile.completedAt,
       });
       queryClient.setQueryData(queryKeys.tenant.settings, updated);
-      syncTenantProfileFromSettings(updated);
+      const syncedProfile = syncTenantProfileFromSettings(updated);
+      saveTenantProfile({
+        ...(syncedProfile ?? profile),
+        ...(profile.subVertical ? { subVertical: profile.subVertical } : {}),
+      });
       navigate('/', { replace: true });
     } catch (err) {
       setFinishError(
@@ -298,7 +380,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                       className={`onboarding-option${verticalGroup === opt.value ? ' selected' : ''}`}
                       onClick={() => {
                         setVerticalGroup(opt.value);
-                        setVertical('');
+                        setSubVertical('');
                       }}
                     >
                       <strong>{t(opt.labelKey)}</strong>
@@ -316,8 +398,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                       <button
                         key={opt.value}
                         type="button"
-                        className={`onboarding-option${vertical === opt.value ? ' selected' : ''}`}
-                        onClick={() => setVertical(opt.value)}
+                        className={`onboarding-option${subVertical === opt.value ? ' selected' : ''}`}
+                        onClick={() => setSubVertical(opt.value)}
                       >
                         <strong>{t(opt.labelKey)}</strong>
                         <small>{t(opt.descKey)}</small>
@@ -478,7 +560,13 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
                 </div>
                 <div className="onboarding-summary-row">
                   <span>{t('onboarding.step4.verticalType')}</span>
-                  <strong>{resolvedVertical ? t(ALL_VERTICAL_LABEL_KEYS[resolvedVertical]) : '-'}</strong>
+                  <strong>
+                    {resolvedSubVerticalLabelKey
+                      ? t(resolvedSubVerticalLabelKey)
+                      : resolvedVertical
+                        ? t(ALL_VERTICAL_LABEL_KEYS[resolvedVertical])
+                        : '-'}
+                  </strong>
                 </div>
                 <div className="onboarding-summary-row">
                   <span>{t('onboarding.step4.sells')}</span>

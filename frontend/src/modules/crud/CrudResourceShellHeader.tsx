@@ -18,6 +18,7 @@ export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
   labelPluralCap?: string;
   searchPlaceholder?: string;
   toolbarActions?: CrudToolbarAction<T>[];
+  supportsArchived?: boolean;
   featureFlags?: {
     headerQuickFilterStrip?: boolean;
     creatorFilter?: boolean;
@@ -111,14 +112,16 @@ export function CrudResourceShellHeader<T extends { id: string }>({
               setError={setError}
               formatLabel={formatFieldText}
             />
-      <CrudArchivedSearchParamToggle
-        className="btn-secondary btn-sm"
-        showActiveLabel={str.toggleShowActive}
-        showArchivedLabel={str.toggleShowArchived}
-        onToggle={() => {
-          onArchiveToggle?.();
-        }}
-      />
+      {crudConfig?.supportsArchived ? (
+        <CrudArchivedSearchParamToggle
+          className="btn-secondary btn-sm"
+          showActiveLabel={str.toggleShowActive}
+          showArchivedLabel={str.toggleShowArchived}
+          onToggle={() => {
+            onArchiveToggle?.();
+          }}
+        />
+      ) : null}
       {extraHeaderActions}
     </CrudShellHeaderActionsColumn>
   );

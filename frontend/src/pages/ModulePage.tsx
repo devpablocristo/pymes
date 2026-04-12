@@ -4,7 +4,8 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
 import { ReportsResultView } from '../components/ReportsResultView';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
-import { LazyConfiguredCrudPage, hasLazyCrudResource } from '../crud/lazyCrudPage';
+import { hasLazyCrudResource } from '../crud/lazyCrudPage';
+import { ConfiguredCrudStandalonePage } from '../crud/configuredCrudViews';
 import {
   moduleCatalog,
   moduleList,
@@ -759,7 +760,7 @@ export function ModulePage() {
     );
   }
   if (crudModuleQuery.data) {
-    return <LazyConfiguredCrudPage resourceId={moduleId} />;
+    return <ConfiguredCrudStandalonePage resourceId={moduleId} baseRoute={`/modules/${moduleId}`} />;
   }
   return <ModuleExplorerPage moduleId={moduleId} />;
 }

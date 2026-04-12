@@ -1,7 +1,6 @@
 import { useMemo, type ReactElement } from 'react';
 import { CrudCreateNavigationButton, CrudToolbarActionButtons } from '../../modules/crud';
-import { GenericWorkOrdersBoard, type GenericWorkOrder } from '../../components/GenericWorkOrdersBoard';
-import { WorkOrderKanbanDetailModal } from '../../components/WorkOrderKanbanDetailModal';
+import { GenericWorkOrdersBoard, type GenericWorkOrder, WorkOrderKanbanDetailModal } from '../../modules/work-orders';
 import { usePymesCrudConfigQuery } from '../../crud/usePymesCrudConfigQuery';
 import {
   getAllWorkOrders,
@@ -81,11 +80,11 @@ export function CarWorkOrdersKanbanModeContent() {
 
   return (
     <GenericWorkOrdersBoard<AutoRepairKanbanWorkOrder>
+      resourceId="carWorkOrders"
       listAll={async () => (await getAllWorkOrders({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
       listArchived={async () => (await getWorkOrdersArchived({ target_type: 'vehicle' })).map(toGenericWorkOrder)}
       patchStatus={async (id, status) => toGenericWorkOrder(await patchWorkOrder(id, { status }))}
       queryKey={['car-work-orders', 'kanban']}
-      title="Órdenes de trabajo"
       listPath={listPath}
       renderExtraToolbar={renderExtraToolbar}
       renderDetailModal={({ orderId, onClose, onSaved, onRecordRemoved }) => (

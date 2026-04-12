@@ -14,12 +14,12 @@ describe('moduleCatalog CRUD split', () => {
 
   it('keeps work order screens on the lazy CRUD loader', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
-    const workOrdersListSrc = readFileSync(path.join(dir, '../pages/AutoRepairWorkOrdersPage.tsx'), 'utf8');
+    const workOrdersListSrc = readFileSync(path.join(dir, '../pages/modes/CarWorkOrdersListModeContent.tsx'), 'utf8');
     const kanbanSrc = readFileSync(path.join(dir, '../pages/WorkOrdersKanbanPanel.tsx'), 'utf8');
     const configuredCrudSrc = readFileSync(path.join(dir, '../crud/configuredCrudViews.tsx'), 'utf8');
 
     const usesLazyCrudBoundary = (src: string) =>
-      src.includes('../crud/lazyCrudPage') || src.includes('../crud/configuredCrudViews');
+      src.includes('../crud/configuredCrudViews') || src.includes('../modules/work-orders');
 
     expect(usesLazyCrudBoundary(workOrdersListSrc)).toBe(true);
     expect(workOrdersListSrc).not.toContain('../crud/resourceConfigs');

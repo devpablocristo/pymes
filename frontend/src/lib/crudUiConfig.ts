@@ -1,10 +1,11 @@
 import type { CrudPageConfig } from '../components/CrudPage';
+import { crudModuleCatalog } from '../crud/crudModuleCatalog';
 import { createCrudUiPreferencesApi, type CrudUiResourceOverride } from '@devpablocristo/modules-crud-ui';
 
 export const CRUD_UI_STORAGE_KEY = 'pymes.crud-ui-config.v1';
 export const CRUD_UI_CHANGE_EVENT = 'pymes:crud-ui-config-changed';
 
-export type CrudUiResourceId = 'products' | 'carWorkOrders' | 'bikeWorkOrders' | 'stock';
+export type CrudUiResourceId = string;
 
 export type CrudUiConfigState = Partial<Record<CrudUiResourceId, CrudUiResourceOverride>>;
 
@@ -14,10 +15,10 @@ export type CrudUiResourceDescriptor = {
 };
 
 export const CRUD_UI_RESOURCES: CrudUiResourceDescriptor[] = [
-  { resourceId: 'products', label: 'Productos' },
-  { resourceId: 'carWorkOrders', label: 'Órdenes auto' },
-  { resourceId: 'bikeWorkOrders', label: 'Órdenes bici' },
-  { resourceId: 'stock', label: 'Inventario' },
+  ...Object.entries(crudModuleCatalog).map(([resourceId, definition]) => ({
+    resourceId,
+    label: definition.title,
+  })),
 ];
 
 const crudUiApi = createCrudUiPreferencesApi({

@@ -1,45 +1,4 @@
 services:
-  postgres:
-    restart: unless-stopped
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: pymes
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5434:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  review-postgres:
-    restart: unless-stopped
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: nexus_review
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "15434:5432"
-    volumes:
-      - review_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_review"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  mailhog:
-    restart: unless-stopped
-    image: mailhog/mailhog:v1.0.1
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-
   review:
     restart: unless-stopped
     build:
@@ -311,8 +270,6 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:
-  review_pgdata:
   cp_backend_go_mod:
   cp_backend_go_build:
   prof_backend_go_mod:

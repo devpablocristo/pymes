@@ -9,6 +9,7 @@ import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 
 export function PymesCrudResourceShellHeader<T extends { id: string }>({
   resourceId,
+  crudConfigOverride,
   preserveCsvToolbar = false,
   items,
   subtitleCount,
@@ -22,6 +23,7 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
   extraHeaderActions,
 }: {
   resourceId: string;
+  crudConfigOverride?: CrudResourceShellHeaderConfigLike<T> | null;
   preserveCsvToolbar?: boolean;
   items: T[];
   subtitleCount?: number;
@@ -36,7 +38,7 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
 }) {
   const { t, localizeText, sentenceCase, language } = useI18n();
   const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId, { preserveCsvToolbar });
-  const crudConfig = (crudConfigQuery.data ?? null) as CrudResourceShellHeaderConfigLike<T> | null;
+  const crudConfig = (crudConfigOverride ?? crudConfigQuery.data ?? null) as CrudResourceShellHeaderConfigLike<T> | null;
   const { listHeaderInlineSlot } = useCrudListCreatedByMerge();
   const stringsBase = useMemo(() => buildPymesCrudStrings(language), [language]);
   const strings = useMemo<CrudStrings>(() => mergeCrudStrings(stringsBase, {}), [stringsBase]);

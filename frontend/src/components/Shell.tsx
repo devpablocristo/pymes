@@ -75,7 +75,7 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: '/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
+    () => [{ to: '/modules/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
     [t],
   );
 
@@ -104,7 +104,6 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
       { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
     [t],
@@ -137,6 +136,7 @@ export function Shell({ children }: { children: ReactNode }) {
     const visibleIds = getVisibleModuleIds();
     const profile = getTenantProfile();
     const vertical = profile?.vertical ?? 'none';
+    const subVertical = profile?.subVertical ?? null;
 
     const moduleNav = catalog.groups
       .map<AppShellNavSection>((group) => ({
@@ -165,10 +165,11 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav });
     }
     if (vertical === 'workshops') {
-      result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
-    }
-    if (vertical === 'bike_shop') {
-      result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
+      if (subVertical === 'bike_shop') {
+        result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
+      } else {
+        result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
+      }
     }
     if (vertical === 'beauty') {
       result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });

@@ -18,6 +18,7 @@ const navigationMocks = vi.hoisted(() => ({
 
 const profileMocks = vi.hoisted(() => ({
   syncTenantProfileFromSettings: vi.fn(),
+  saveTenantProfile: vi.fn(),
 }));
 
 vi.mock('../lib/auth', () => ({
@@ -33,6 +34,7 @@ vi.mock('../lib/tenantProfile', async () => {
   return {
     ...actual,
     syncTenantProfileFromSettings: (...args: unknown[]) => profileMocks.syncTenantProfileFromSettings(...args),
+    saveTenantProfile: (...args: unknown[]) => profileMocks.saveTenantProfile(...args),
   };
 });
 
@@ -122,6 +124,7 @@ describe('OnboardingPage scheduling setup', () => {
     apiMocks.updateTenantSettings.mockReset();
     navigationMocks.navigate.mockReset();
     profileMocks.syncTenantProfileFromSettings.mockReset();
+    profileMocks.saveTenantProfile.mockReset();
   });
 
   it('finishes onboarding using the canonical scheduling_enabled field', async () => {
@@ -134,6 +137,7 @@ describe('OnboardingPage scheduling setup', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Taller mec[aá]nico/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
     fireEvent.click(screen.getByRole('button', { name: /^Ambos/i }));
@@ -161,5 +165,82 @@ describe('OnboardingPage scheduling setup', () => {
 
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
+  });
+
+  it('shows workshop sub-verticals before allowing the next step', () => {
+    renderOnboardingPage();
+
+    fireEvent.change(screen.getByLabelText('¿Cómo se llama tu negocio o actividad?'), {
+      target: { value: 'Bicimax' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
+
+    expect(screen.getByRole('button', { name: /^Taller mec[aá]nico/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Bicicleter[ií]a/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+  });
+
+  it('persists bike shop as workshops in backend and keeps the local sub-vertical', async () => {
+    apiMocks.updateTenantSettings.mockResolvedValue(buildTenantSettings({ vertical: 'workshops' }));
+    profileMocks.syncTenantProfileFromSettings.mockReturnValue(buildTenantSettings({ vertical: 'workshops' }));
+
+    renderOnboardingPage();
+
+    fireEvent.change(screen.getByLabelText('¿Cómo se llama tu negocio o actividad?'), {
+      target: { value: 'Bicimax' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Bicicleter[ií]a/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Ambos/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sí, quiero saber quién me debe/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Mixto \(varios\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+
+    await waitFor(() => {
+      expect(apiMocks.updateTenantSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          business_name: 'Bicimax',
+          vertical: 'workshops',
+        }),
+      );
+    });
+
+    expect(profileMocks.saveTenantProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vertical: 'workshops',
+        subVertical: 'bike_shop',
+      }),
+    );
+  });
+
+  it('shows sub-vertical options for professionals, beauty and restaurants', () => {
+    renderOnboardingPage();
+
+    fireEvent.change(screen.getByLabelText('¿Cómo se llama tu negocio o actividad?'), {
+      target: { value: 'Demo' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Profesionales/i }));
+    expect(screen.getByRole('button', { name: /^Docencia \/ Academia/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Consultorio \/ Atenci[oó]n/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Belleza/i }));
+    expect(screen.getByRole('button', { name: /^Sal[oó]n de belleza/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Barber[ií]a/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Est[eé]tica \/ Gabinete/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Bares \/ Restaurantes/i }));
+    expect(screen.getByRole('button', { name: /^Restaurante/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Bar Barra/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Caf[eé] \/ Cafeter[ií]a/i })).toBeInTheDocument();
   });
 });

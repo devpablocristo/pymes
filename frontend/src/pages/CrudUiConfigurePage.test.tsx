@@ -41,6 +41,8 @@ describe('CrudUiConfigurePage', () => {
     expect(screen.getAllByText('Galería')).not.toHaveLength(0);
     expect(screen.getAllByText('Tablero')).not.toHaveLength(0);
     expect(screen.queryByText('Detalle')).not.toBeInTheDocument();
+    expect(screen.getByText('Filtro de responsable')).toBeInTheDocument();
+    expect(screen.getByText('Filtros rápidos en cabecera')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver a clientes' })).toBeInTheDocument();
   });
 });

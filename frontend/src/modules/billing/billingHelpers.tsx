@@ -189,6 +189,7 @@ export function createCommercialDocumentCrudConfig<
     | 'labelPluralCap'
     | 'createLabel'
     | 'searchPlaceholder'
+    | 'featureFlags'
     | 'supportsArchived'
     | 'dataSource'
     | 'columns'
@@ -203,6 +204,7 @@ export function createCommercialDocumentCrudConfig<
     labelPluralCap: opts.labelPluralCap,
     createLabel: opts.createLabel,
     searchPlaceholder: opts.searchPlaceholder ?? 'Buscar...',
+    featureFlags: { statusSelector: true },
     supportsArchived: true,
     columns: opts.columns,
     formFields: [],

@@ -35,7 +35,18 @@ vi.mock('../modules/crud', () => ({
     reload: vi.fn(),
     handleArchiveToggle: vi.fn(),
   }),
-  CrudTableSurface: ({ items }: { items: Array<{ id: string; name: string }> }) => <div>rows:{items.length}</div>,
+  CrudTableSurface: ({
+    items,
+    columns,
+  }: {
+    items: Array<{ id: string; name: string }>;
+    columns: Array<{ id: string; header: string }>;
+  }) => (
+    <div>
+      <div>rows:{items.length}</div>
+      <div>cols:{columns.map((column) => `${column.id}:${column.header}`).join('|')}</div>
+    </div>
+  ),
   CrudGallerySurface: () => <div>gallery-surface</div>,
   openCrudFormDialog: vi.fn(),
 }));
@@ -66,5 +77,32 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(() => rerender(<PymesSimpleCrudListModeContent resourceId="customers" />)).not.toThrow();
     expect(screen.getByText('crud-header')).toBeInTheDocument();
     expect(screen.getByText('rows:1')).toBeInTheDocument();
+  });
+
+  it('respeta el switch tagsColumn en la surface genérica', () => {
+    currentConfig = {
+      label: 'servicio',
+      labelPlural: 'servicios',
+      labelPluralCap: 'Servicios',
+      basePath: '/v1/services',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      renderTagsCell: () => 'vip',
+      featureFlags: { tagsColumn: true },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="services" />);
+    expect(screen.getByText('cols:name:Nombre|tags:Tags')).toBeInTheDocument();
+
+    currentConfig = {
+      ...currentConfig,
+      featureFlags: { tagsColumn: false },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    rerender(<PymesSimpleCrudListModeContent resourceId="services" />);
+    expect(screen.getByText('cols:name:Nombre')).toBeInTheDocument();
   });
 });

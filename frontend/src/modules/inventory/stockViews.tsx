@@ -1,7 +1,7 @@
 import { normalize } from '@devpablocristo/core-browser/search';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { LazyConfiguredCrudPage } from '../../crud/lazyCrudPage';
+import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
 import { useI18n } from '../../lib/i18n';
 import { useCrudListCreatedByMerge } from '../../lib/useCrudListCreatedByMerge';
@@ -116,12 +116,10 @@ export function StockListWorkspace() {
   return (
     <>
       <div className="stock-inventory-list-crud">
-        <LazyConfiguredCrudPage
+        <PymesSimpleCrudListModeContent<StockLevelRow>
           key={listKey}
           resourceId="inventory"
-          mergeConfig={{
-            onRowClick: (row: { id: string }) => setDetailProductId(row.id),
-          }}
+          onRowClick={(row) => setDetailProductId(row.id)}
         />
       </div>
       <StockLevelDetailModal productId={detailProductId} onClose={() => setDetailProductId(null)} onAfterSave={bumpList} />

@@ -177,6 +177,29 @@ describe('configuredCrudViews', () => {
     expect(screen.queryByText('lazy:products')).not.toBeInTheDocument();
   });
 
+  it('renders the generic shared list header path when the resource does not declare list.render', async () => {
+    loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
+      if (resourceId === 'customers') {
+        return {
+          label: 'cliente',
+          labelPlural: 'clientes',
+          labelPluralCap: 'Clientes',
+          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+        } as CrudPageConfig<{ id: string }>;
+      }
+      return null;
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/modules/customers/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ConfiguredCrudModePage resourceId="customers" modeId="list" />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('generic:customers:list')).toBeInTheDocument();
+    expect(screen.queryByText('lazy:customers')).not.toBeInTheDocument();
+  });
+
   it('renders generic fallback mode pages for standalone CRUD routes', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'customers') {

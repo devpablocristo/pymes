@@ -7,6 +7,13 @@ import { CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { crudModuleCatalog } from '../crud/crudModuleCatalog';
 import './CrudUiConfigurePage.css';
 
+const FEATURE_KEYS = [
+  ['creatorFilter', 'Filtro de responsable'],
+  ['headerQuickFilterStrip', 'Filtros rápidos en cabecera'],
+  ['statusSelector', 'Selector de estados'],
+  ['csvToolbar', 'Acciones CSV'],
+] as const;
+
 export function CrudUiConfigurePage() {
   const { moduleId = '' } = useParams();
   const moduleDefinition = crudModuleCatalog[moduleId];
@@ -29,10 +36,10 @@ export function CrudUiConfigurePage() {
         resources={resources}
         changeEventName={CRUD_UI_CHANGE_EVENT}
         loadPageConfig={loadLazyCrudPageConfig}
+        copy={{}}
         hideResourceCardHeader
-        copy={{
-          defaultViewLabel: 'Vista por defecto',
-        }}
+        hideDefaultViewSelector
+        featureKeys={FEATURE_KEYS}
         classes={{
           section: 'admin-settings-section stock-crud-prefs',
           hint: 'admin-settings-hint',

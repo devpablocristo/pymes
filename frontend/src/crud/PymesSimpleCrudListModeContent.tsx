@@ -85,12 +85,14 @@ function prettifyLabel(value: string) {
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   resourceId,
   mode = 'list',
+  onRowClick,
 }: {
   resourceId: string;
   mode?: CrudViewModeId;
+  onRowClick?: (row: T) => void;
 }) {
   const { t } = useI18n();
-  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId, { preserveCsvToolbar: true });
+  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
   const crudConfig = crudConfigQuery.data as CrudPageConfig<T> | null;
   const { archived } = useCrudArchivedSearchParam();
 
@@ -143,16 +145,34 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
   const columns = useMemo<CrudTableSurfaceColumn<T>[]>(() => {
     if (!crudConfig) return [];
+    const tagsEnabled = crudConfig.featureFlags?.tagsColumn !== false;
     const sourceColumns = archived && crudConfig.archivedColumns?.length ? crudConfig.archivedColumns : crudConfig.columns;
-    return sourceColumns.map((column: CrudColumn<T>) => ({
-      id: column.key,
-      header: column.header,
-      className: column.className,
-      render: (row) => {
-        const value = row[column.key];
-        return column.render ? column.render(value, row) : String(value ?? '—');
-      },
-    }));
+    const mappedColumns: CrudTableSurfaceColumn<T>[] = sourceColumns
+      .filter((column) => tagsEnabled || column.key !== 'tags')
+      .map((column: CrudColumn<T>) => ({
+        id: column.key,
+        header: column.header,
+        className: column.className,
+        render: (row: T) => {
+          const value = row[column.key];
+          return column.render ? column.render(value, row) : String(value ?? '—');
+        },
+      }));
+
+    if (
+      tagsEnabled &&
+      crudConfig.renderTagsCell &&
+      !mappedColumns.some((column) => column.id === 'tags')
+    ) {
+      mappedColumns.push({
+        id: 'tags',
+        header: 'Tags',
+        className: 'cell-tags',
+        render: (row) => crudConfig.renderTagsCell?.(row) ?? '—',
+      });
+    }
+
+    return mappedColumns;
   }, [archived, crudConfig]);
 
   const selectedRow = useMemo(
@@ -360,7 +380,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
-        preserveCsvToolbar
         items={items}
         subtitleCount={items.length}
         loading={loading}
@@ -454,11 +473,13 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           columns={columns}
           rowActions={rowActions}
           onRowClick={
-            archived || !canEdit
-              ? undefined
-              : (row) => {
-                  void runCreateOrEdit(row);
-                }
+            onRowClick
+              ? onRowClick
+              : archived || !canEdit
+                ? undefined
+                : (row) => {
+                    void runCreateOrEdit(row);
+                  }
           }
         />
       )}

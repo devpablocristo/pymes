@@ -1,5 +1,8 @@
 .stock-crud-prefs__stack > .card {
   overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
 }
 
 .crud-configure-page {
@@ -14,38 +17,26 @@
 }
 
 .stock-crud-prefs__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  align-items: stretch;
+  display: contents;
 }
 
-.stock-crud-prefs__grid:first-of-type > .form-group:first-child {
-  grid-column: 1 / -1;
-}
-
-.stock-crud-prefs__grid:first-of-type > .form-group:last-child {
-  display: none;
-}
-
-.stock-crud-prefs__grid:first-of-type .crud-ui-pref-stack {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  width: 100%;
+.stock-crud-prefs__grid .crud-ui-pref-grid,
+.stock-crud-prefs__grid .crud-ui-pref-stack {
+  display: contents;
 }
 
 .stock-crud-prefs__row {
   min-height: 44px;
   padding: 0;
-  width: 100%;
+  width: auto;
+  white-space: nowrap;
 }
 
 /* Etiqueta + switch juntos; evitar 1fr que separa el toggle al borde opuesto de la celda. */
 .stock-crud-prefs__row.crud-ui-pref-row {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-2);
@@ -55,24 +46,23 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
   flex: 0 1 auto;
+  white-space: nowrap;
 }
 
 @media (max-width: 1100px) {
-  .stock-crud-prefs__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stock-crud-prefs__grid:first-of-type .crud-ui-pref-stack {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stock-crud-prefs__stack > .card {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 720px) {
-  .stock-crud-prefs__grid {
-    grid-template-columns: minmax(0, 1fr);
+  .stock-crud-prefs__stack > .card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .stock-crud-prefs__grid:first-of-type .crud-ui-pref-stack {
+@media (max-width: 520px) {
+  .stock-crud-prefs__stack > .card {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -5,7 +5,7 @@ import { PageLayout } from '../components/PageLayout';
 import { CrudModuleSection } from '../modules/crud';
 import { applyCrudUiOverride, CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { Navigate } from 'react-router-dom';
-import { loadLazyCrudPageConfig, LazyConfiguredCrudPage } from './lazyCrudPage';
+import { loadLazyCrudPageConfig } from './lazyCrudPage';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import { crudModuleCatalog } from './crudModuleCatalog';
 
@@ -209,7 +209,7 @@ export function ConfiguredCrudModePage({
   }
 
   if (modeId === 'list') {
-    return <LazyConfiguredCrudPage resourceId={resourceId} mergeConfig={mergeConfig} />;
+    return <PymesSimpleCrudListModeContent resourceId={resourceId} />;
   }
 
   if (allowGenericModeFallback) {

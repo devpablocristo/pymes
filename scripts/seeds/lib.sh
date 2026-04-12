@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DEFAULT_LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/.." && pwd)/local-infra"
 
 # `make seed` y los scripts hijo corren en bash sin pasar por docker compose: leen `.env` de la raíz del monorepo.
 if [[ -f "$ROOT_DIR/.env" ]]; then
@@ -11,7 +12,8 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
   set +a
 fi
 
-DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
+LOCAL_INFRA_DIR="${LOCAL_INFRA_DIR:-$DEFAULT_LOCAL_INFRA_DIR}"
+DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose --project-directory $ROOT_DIR -f $LOCAL_INFRA_DIR/docker-compose.yml -f $ROOT_DIR/docker-compose.yml}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 REVIEW_DB_NAME="${REVIEW_DB_NAME:-nexus_review}"
@@ -100,5 +102,5 @@ run_review_sql_inline() {
   printf '%s\n' "$sql" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
 }
 
-export ROOT_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER
+export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER
 export REVIEW_DB_NAME REVIEW_DB_USER

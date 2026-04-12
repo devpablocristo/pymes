@@ -98,6 +98,7 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
       return [document.number, document.customer, document.status].join(' ').toLowerCase().includes(query);
     });
   }, [documents, isArchived, search, showArchived, statusFilter]);
+  const showStatusSelector = shellConfig?.featureFlags?.statusSelector !== false;
 
   const columns = useMemo<CrudTableSurfaceColumn<TRecord>[]>(
     () => [
@@ -208,9 +209,10 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
         reload={reload}
         searchValue={search}
         onSearchChange={setSearch}
-        extraHeaderActions={
-          <>
+        searchInlineActions={
+          showStatusSelector ? (
             <select
+              className="commercial-document__status-filter"
               aria-label="Filtrar documentos por estado"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as TStatus | 'all')}
@@ -222,6 +224,10 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
                 </option>
               ))}
             </select>
+          ) : null
+        }
+        extraHeaderActions={
+          <>
             <button
               type="button"
               className="btn-primary btn-sm"

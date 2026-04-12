@@ -33,6 +33,11 @@
   color: var(--color-text-secondary);
 }
 
+.commercial-document__status-filter {
+  min-width: 110px;
+  height: 36px;
+}
+
 .commercial-document__preview {
   max-width: 800px;
   margin: 0 auto;

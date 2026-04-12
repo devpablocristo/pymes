@@ -10,7 +10,7 @@ import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 export function PymesCrudResourceShellHeader<T extends { id: string }>({
   resourceId,
   crudConfigOverride,
-  preserveCsvToolbar = false,
+  preserveCsvToolbar: _preserveCsvToolbar = false,
   items,
   subtitleCount,
   loading,
@@ -20,6 +20,7 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
   searchValue,
   onSearchChange,
   onArchiveToggle,
+  searchInlineActions,
   extraHeaderActions,
 }: {
   resourceId: string;
@@ -34,10 +35,11 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
   searchValue: string;
   onSearchChange: (value: string) => void;
   onArchiveToggle?: () => void;
+  searchInlineActions?: ReactNode;
   extraHeaderActions?: ReactNode;
 }) {
   const { t, localizeText, sentenceCase, language } = useI18n();
-  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId, { preserveCsvToolbar });
+  const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
   const crudConfig = (crudConfigOverride ?? crudConfigQuery.data ?? null) as CrudResourceShellHeaderConfigLike<T> | null;
   const { listHeaderInlineSlot } = useCrudListCreatedByMerge();
   const stringsBase = useMemo(() => buildPymesCrudStrings(language), [language]);
@@ -59,6 +61,7 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
       sentenceCase={sentenceCase}
       searchPlaceholder={t('crud.search.placeholder')}
       headerLeadSlot={headerLeadSlot}
+      searchInlineActions={searchInlineActions}
       items={items}
       subtitleCount={subtitleCount}
       loading={loading}

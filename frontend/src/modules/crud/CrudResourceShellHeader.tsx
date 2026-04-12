@@ -22,6 +22,7 @@ export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
   featureFlags?: {
     headerQuickFilterStrip?: boolean;
     creatorFilter?: boolean;
+    statusSelector?: boolean;
   };
 };
 
@@ -34,6 +35,7 @@ export type CrudResourceShellHeaderProps<T extends { id: string }> = {
   sentenceCase?: (value: string) => string;
   searchPlaceholder?: string;
   headerLeadSlot?: React.ReactNode;
+  searchInlineActions?: ReactNode;
   extraHeaderActions?: ReactNode;
   items: T[];
   /** Conteo del subtítulo (p. ej. filas visibles); por defecto `items.length`. */
@@ -59,6 +61,7 @@ export function CrudResourceShellHeader<T extends { id: string }>({
   sentenceCase = (value) => value,
   searchPlaceholder,
   headerLeadSlot,
+  searchInlineActions,
   extraHeaderActions,
   items,
   subtitleCount,
@@ -103,6 +106,7 @@ export function CrudResourceShellHeader<T extends { id: string }>({
         placeholder: searchPlaceholder ?? str.searchPlaceholder,
         inputClassName: 'm-kanban__search crud-resource-shell-header__search',
       }}
+      searchInlineActions={searchInlineActions}
     >
       <CrudToolbarActionButtons
         actions={toolbarActions}

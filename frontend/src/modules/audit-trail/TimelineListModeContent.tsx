@@ -89,7 +89,6 @@ export function TimelineListModeContent() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<TimelineEntryRow>
         resourceId="timeline"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

@@ -51,7 +51,6 @@ export function AuditListModeContent() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<AuditEntryRow>
         resourceId="audit"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

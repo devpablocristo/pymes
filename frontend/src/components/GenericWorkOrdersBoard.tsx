@@ -287,7 +287,6 @@ export function GenericWorkOrdersBoard<T extends GenericWorkOrder>({
     <>
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

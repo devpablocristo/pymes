@@ -145,7 +145,6 @@ export function GenericWorkOrdersList<T extends GenericWorkOrderListRow>({
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<T>
         resourceId={resourceId}
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

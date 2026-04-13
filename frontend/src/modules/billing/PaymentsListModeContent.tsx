@@ -86,7 +86,6 @@ export function PaymentsListModeContent() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<SalePaymentRow>
         resourceId="payments"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

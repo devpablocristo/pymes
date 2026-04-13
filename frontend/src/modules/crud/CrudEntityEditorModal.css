@@ -1,0 +1,280 @@
+.crud-entity-editor-modal {
+  width: min(920px, 100%);
+}
+
+.crud-entity-editor-modal__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.crud-entity-editor-modal__title-block {
+  min-width: 0;
+}
+
+.crud-entity-editor-modal__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.crud-entity-editor-modal__subtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.94rem;
+}
+
+.crud-entity-editor-modal__body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.crud-entity-editor-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.crud-entity-editor-modal__loading,
+.crud-entity-editor-modal__error {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.crud-entity-editor-modal__error {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.crud-entity-editor-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.crud-entity-editor-modal__media {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-entity-editor-modal__media img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.crud-entity-editor-modal__stat {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.crud-entity-editor-modal__stat span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__stat strong {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.crud-entity-editor-modal__stat--info {
+  border-color: color-mix(in srgb, var(--color-info) 45%, var(--color-border));
+}
+
+.crud-entity-editor-modal__stat--warning {
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+}
+
+.crud-entity-editor-modal__stat--success {
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+}
+
+.crud-entity-editor-modal__stat--danger {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+}
+
+.crud-entity-editor-modal__section {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+}
+
+.crud-entity-editor-modal__section-head {
+  display: grid;
+  gap: 4px;
+}
+
+.crud-entity-editor-modal__section-head h3 {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.crud-entity-editor-modal__section-head p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.crud-entity-editor-modal__field {
+  display: grid;
+  gap: 6px;
+}
+
+.crud-entity-editor-modal__field--full {
+  grid-column: 1 / -1;
+}
+
+.crud-entity-editor-modal__field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__field input,
+.crud-entity-editor-modal__field select,
+.crud-entity-editor-modal__field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.crud-entity-editor-modal__read-value {
+  min-height: 40px;
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  line-height: 1.45;
+}
+
+.crud-entity-editor-modal__read-list {
+  display: grid;
+  gap: 6px;
+}
+
+.crud-entity-editor-modal__read-list-item {
+  display: grid;
+  gap: 2px;
+}
+
+.crud-entity-editor-modal__read-list-item strong {
+  font-size: 0.92rem;
+}
+
+.crud-entity-editor-modal__read-list-item span {
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__field textarea {
+  resize: vertical;
+}
+
+.crud-entity-editor-modal__field small {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.crud-entity-editor-modal__field--checkbox {
+  align-self: center;
+}
+
+.crud-entity-editor-modal__checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crud-entity-editor-modal__checkbox-row input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.crud-entity-editor-modal__checkbox-row span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.crud-entity-editor-modal__footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.crud-entity-editor-modal__footer-layout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.crud-entity-editor-modal__footer-layout--compact {
+  justify-content: flex-end;
+}
+
+.crud-entity-editor-modal__footer-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crud-entity-editor-modal__footer-group--start {
+  justify-content: flex-start;
+}
+
+.crud-entity-editor-modal__footer-group--end {
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .crud-entity-editor-modal__stats,
+  .crud-entity-editor-modal__fields {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { apiRequest } from '../lib/api';
 import { useI18n } from '../lib/i18n';
-import { collectCrudImageUrls, CrudImageFullscreenViewer } from '../modules/crud';
+import { collectCrudImageUrls, CrudEntityDetailModal, CrudImageFullscreenViewer } from '../modules/crud';
 import './ProductDetailModal.css';
 
 export type ProductDetailResponse = {
@@ -105,162 +104,137 @@ export function ProductDetailModal({ productId, onClose }: ProductDetailModalPro
   const fmtMoney = (n: number | undefined, cur: string | undefined) =>
     `${cur ?? 'ARS'} ${Number(n ?? 0).toFixed(2)}`;
 
+  const detailFields = product
+    ? [
+        { id: 'sku', label: t('crud.products.detail.sku'), value: product.sku?.trim() || '—' },
+        { id: 'unit', label: t('crud.products.detail.unit'), value: product.unit?.trim() || '—' },
+        { id: 'price', label: t('crud.products.detail.price'), value: fmtMoney(product.price, product.currency) },
+        { id: 'cost', label: t('crud.products.detail.cost'), value: fmtMoney(product.cost_price, product.currency) },
+        { id: 'tax', label: t('crud.products.detail.tax'), value: product.tax_rate != null ? `${product.tax_rate}%` : '—' },
+        {
+          id: 'stock',
+          label: t('crud.products.detail.stock'),
+          value: product.track_stock ? t('crud.products.detail.stockOn') : t('crud.products.detail.stockOff'),
+        },
+        {
+          id: 'active',
+          label: t('crud.products.detail.active'),
+          value: product.is_active ? t('crud.products.detail.activeYes') : t('crud.products.detail.activeNo'),
+        },
+        {
+          id: 'tags',
+          label: t('crud.products.detail.tags'),
+          value: product.tags?.length ? product.tags.join(', ') : '—',
+          fullWidth: true,
+        },
+        {
+          id: 'description',
+          label: t('crud.products.detail.description'),
+          value: product.description?.trim() || '—',
+          fullWidth: true,
+          valueClassName: 'product-detail-modal__description',
+        },
+        ...(product.metadata && Object.keys(product.metadata).length > 0
+          ? [
+              {
+                id: 'metadata',
+                label: t('crud.products.detail.metadata'),
+                value: <pre className="product-detail-modal__metadata">{JSON.stringify(product.metadata, null, 2)}</pre>,
+                fullWidth: true,
+              },
+            ]
+          : []),
+      ]
+    : [];
+
   const body = (
-    <div className="product-detail-modal-root">
-      <button
-        type="button"
-        className="product-detail-modal__backdrop"
-        aria-label={t('crud.products.detail.close')}
-        onClick={onClose}
-      />
-      <div
-        className="product-detail-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-detail-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="product-detail-modal__header">
-          <h2 id="product-detail-title" className="product-detail-modal__title">
-            {loading ? t('crud.products.detail.loading') : product?.name ?? '—'}
-          </h2>
-          <button type="button" className="product-detail-modal__close" onClick={onClose}>
-            {t('crud.products.detail.close')}
-          </button>
-        </header>
-        <div className="product-detail-modal__body">
-          {error ? (
-            <p className="product-detail-modal__error">{error}</p>
-          ) : (
-            <>
-              {urls.length > 0 ? (
-                <div className="product-detail-modal__media">
-                  <div className="product-detail-modal__main-image-wrap">
+    <CrudEntityDetailModal
+      open
+      titleId="product-detail-title"
+      title={loading ? t('crud.products.detail.loading') : product?.name ?? '—'}
+      onClose={onClose}
+      closeLabel={t('crud.products.detail.close')}
+      panelClassName="product-detail-modal"
+      media={
+        urls.length > 0 ? (
+          <div className="product-detail-modal__media">
+            <div className="product-detail-modal__main-image-wrap">
+              <img
+                src={urls[Math.min(slide, urls.length - 1)]!}
+                alt=""
+                className="product-detail-modal__main-image product-detail-modal__main-image--zoomable"
+                onClick={() => setLightboxUrl(urls[Math.min(slide, urls.length - 1)]!)}
+                onError={(e) => {
+                  const media = (e.currentTarget as HTMLImageElement).closest('.product-detail-modal__media');
+                  if (media) (media as HTMLElement).hidden = true;
+                }}
+              />
+              {urls.length > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    className="product-detail-modal__nav product-detail-modal__nav--prev"
+                    onClick={goPrev}
+                    aria-label={t('crud.products.detail.prevImage')}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    className="product-detail-modal__nav product-detail-modal__nav--next"
+                    onClick={goNext}
+                    aria-label={t('crud.products.detail.nextImage')}
+                  >
+                    ›
+                  </button>
+                  <span className="product-detail-modal__counter" aria-live="polite">
+                    {slide + 1} / {urls.length}
+                  </span>
+                </>
+              ) : null}
+            </div>
+            {urls.length > 1 ? (
+              <div className="product-detail-modal__thumbs" role="tablist" aria-label={t('crud.products.detail.thumbsAria')}>
+                {urls.map((u, idx) => (
+                  <button
+                    key={u + String(idx)}
+                    type="button"
+                    role="tab"
+                    aria-selected={idx === slide}
+                    className={`product-detail-modal__thumb${idx === slide ? ' product-detail-modal__thumb--active' : ''}`}
+                    onClick={() => setSlide(idx)}
+                    onDoubleClick={(ev) => {
+                      ev.preventDefault();
+                      setLightboxUrl(u);
+                    }}
+                    title={t('crud.products.detail.thumbDblClickZoom')}
+                  >
                     <img
-                      src={urls[Math.min(slide, urls.length - 1)]!}
+                      src={u}
                       alt=""
-                      className="product-detail-modal__main-image product-detail-modal__main-image--zoomable"
-                      onClick={() => setLightboxUrl(urls[Math.min(slide, urls.length - 1)]!)}
-                      onError={(e) => {
-                        const media = (e.currentTarget as HTMLImageElement).closest('.product-detail-modal__media');
-                        if (media) (media as HTMLElement).hidden = true;
+                      loading="lazy"
+                      onError={(ev) => {
+                        const btn = (ev.currentTarget as HTMLImageElement).closest('button');
+                        if (btn) btn.hidden = true;
                       }}
                     />
-                    {urls.length > 1 ? (
-                      <>
-                        <button
-                          type="button"
-                          className="product-detail-modal__nav product-detail-modal__nav--prev"
-                          onClick={goPrev}
-                          aria-label={t('crud.products.detail.prevImage')}
-                        >
-                          ‹
-                        </button>
-                        <button
-                          type="button"
-                          className="product-detail-modal__nav product-detail-modal__nav--next"
-                          onClick={goNext}
-                          aria-label={t('crud.products.detail.nextImage')}
-                        >
-                          ›
-                        </button>
-                        <span className="product-detail-modal__counter" aria-live="polite">
-                          {slide + 1} / {urls.length}
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
-                  {urls.length > 1 ? (
-                    <div className="product-detail-modal__thumbs" role="tablist" aria-label={t('crud.products.detail.thumbsAria')}>
-                      {urls.map((u, idx) => (
-                        <button
-                          key={u + String(idx)}
-                          type="button"
-                          role="tab"
-                          aria-selected={idx === slide}
-                          className={`product-detail-modal__thumb${idx === slide ? ' product-detail-modal__thumb--active' : ''}`}
-                          onClick={() => setSlide(idx)}
-                          onDoubleClick={(ev) => {
-                            ev.preventDefault();
-                            setLightboxUrl(u);
-                          }}
-                          title={t('crud.products.detail.thumbDblClickZoom')}
-                        >
-                          <img
-                            src={u}
-                            alt=""
-                            loading="lazy"
-                            onError={(ev) => {
-                              const btn = (ev.currentTarget as HTMLImageElement).closest('button');
-                              if (btn) btn.hidden = true;
-                            }}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {product && !loading ? (
-                <dl className="product-detail-modal__fields">
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.sku')}</dt>
-                    <dd>{product.sku?.trim() || '—'}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.unit')}</dt>
-                    <dd>{product.unit?.trim() || '—'}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.price')}</dt>
-                    <dd>{fmtMoney(product.price, product.currency)}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.cost')}</dt>
-                    <dd>{fmtMoney(product.cost_price, product.currency)}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.tax')}</dt>
-                    <dd>{product.tax_rate != null ? `${product.tax_rate}%` : '—'}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.stock')}</dt>
-                    <dd>{product.track_stock ? t('crud.products.detail.stockOn') : t('crud.products.detail.stockOff')}</dd>
-                  </div>
-                  <div className="product-detail-modal__row">
-                    <dt>{t('crud.products.detail.active')}</dt>
-                    <dd>{product.is_active ? t('crud.products.detail.activeYes') : t('crud.products.detail.activeNo')}</dd>
-                  </div>
-                  <div className="product-detail-modal__row product-detail-modal__row--full">
-                    <dt>{t('crud.products.detail.tags')}</dt>
-                    <dd>{product.tags?.length ? product.tags.join(', ') : '—'}</dd>
-                  </div>
-                  <div className="product-detail-modal__row product-detail-modal__row--full">
-                    <dt>{t('crud.products.detail.description')}</dt>
-                    <dd className="product-detail-modal__description">{product.description?.trim() || '—'}</dd>
-                  </div>
-                  {product.metadata && Object.keys(product.metadata).length > 0 ? (
-                    <div className="product-detail-modal__row product-detail-modal__row--full">
-                      <dt>{t('crud.products.detail.metadata')}</dt>
-                      <dd>
-                        <pre className="product-detail-modal__metadata">{JSON.stringify(product.metadata, null, 2)}</pre>
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-              ) : loading ? (
-                <p className="product-detail-modal__loading">{t('crud.products.detail.loading')}</p>
-              ) : null}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null
+      }
+      fields={detailFields}
+      error={error}
+      loading={loading}
+      loadingLabel={t('crud.products.detail.loading')}
+    />
   );
 
   return (
     <>
-      {createPortal(body, document.body)}
+      {body}
       <CrudImageFullscreenViewer
         imageUrl={lightboxUrl}
         onClose={() => setLightboxUrl(null)}

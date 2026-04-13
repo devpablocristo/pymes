@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   createCreditNotesCrudConfig,
+  createInvoicesCrudConfig,
+  createInvoicesShellConfig,
   createPurchasesCrudConfig,
   createQuotesCrudConfig,
   createSalesCrudConfig,
@@ -11,6 +13,7 @@ import {
   type QuoteRecord,
   type SaleRecord,
 } from './billingHelpers';
+import type { InvoiceRecord } from './invoicesDemo';
 
 describe('billingHelpers', () => {
   it('parses priced commercial line items', () => {
@@ -53,6 +56,22 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/quotes');
     expect(config.labelPluralCap).toBe('Presupuestos');
+    expect(config.stateMachine).toEqual({
+      field: 'status',
+      states: [
+        { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'sent', label: 'Enviado', columnId: 'sent', badgeVariant: 'info' },
+        { value: 'accepted', label: 'Aceptado', columnId: 'accepted', badgeVariant: 'success' },
+        { value: 'rejected', label: 'Rechazado', columnId: 'rejected', badgeVariant: 'danger' },
+      ],
+      columns: [
+        { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'sent', label: 'Enviado', defaultState: 'sent' },
+        { id: 'accepted', label: 'Aceptado', defaultState: 'accepted' },
+        { id: 'rejected', label: 'Rechazado', defaultState: 'rejected' },
+      ],
+    });
+    expect(config.valueFilterOptions).toBeUndefined();
     expect(config.rowActions?.map((action) => action.id)).toEqual(['pdf', 'send', 'accept']);
     expect(
       config.toBody?.({
@@ -81,11 +100,51 @@ describe('billingHelpers', () => {
     });
   });
 
+  it('builds invoices state machine for list and shell configs', () => {
+    const config = createInvoicesCrudConfig<InvoiceRecord>({ renderList: () => <></> });
+    const shellConfig = createInvoicesShellConfig<InvoiceRecord>();
+
+    expect(config.stateMachine).toEqual({
+      field: 'status',
+      states: [
+        { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
+        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
+        { value: 'overdue', label: 'Vencida', columnId: 'overdue', badgeVariant: 'danger' },
+      ],
+      columns: [
+        { id: 'paid', label: 'Pagada', defaultState: 'paid' },
+        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
+        { id: 'overdue', label: 'Vencida', defaultState: 'overdue' },
+      ],
+    });
+    expect(shellConfig.stateMachine).toEqual(config.stateMachine);
+    expect('valueFilterOptions' in config ? config.valueFilterOptions : undefined).toBeUndefined();
+    expect(shellConfig.valueFilterOptions).toBeUndefined();
+  });
+
   it('builds sales config from billing domain', () => {
     const config = createSalesCrudConfig<SaleRecord>({ renderList: () => <></> });
 
     expect(config.basePath).toBe('/v1/sales');
     expect(config.labelPluralCap).toBe('Ventas');
+    expect(config.stateMachine).toEqual({
+      field: 'status',
+      states: [
+        { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
+        { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
+        { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
+        { value: 'cancelled', label: 'Cancelada', columnId: 'cancelled', badgeVariant: 'danger' },
+      ],
+      columns: [
+        { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'paid', label: 'Pagada', defaultState: 'paid' },
+        { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
+        { id: 'voided', label: 'Anulada', defaultState: 'voided' },
+        { id: 'cancelled', label: 'Cancelada', defaultState: 'cancelled' },
+      ],
+    });
+    expect(config.valueFilterOptions).toBeUndefined();
     expect(config.rowActions?.map((action) => action.id)).toEqual(['receipt-pdf', 'payments', 'add-payment', 'void']);
     expect(
       config.toBody?.({
@@ -122,6 +181,22 @@ describe('billingHelpers', () => {
     expect(config.labelPluralCap).toBe('Notas de crédito');
     expect(config.emptyState).toBe('No hay notas de crédito emitidas.');
     expect(config.allowEdit).toBe(false);
+    expect(config.stateMachine).toEqual({
+      field: 'status',
+      states: [
+        { value: 'active', label: 'Activa', columnId: 'active', badgeVariant: 'info' },
+        { value: 'partially_used', label: 'Parcialmente usada', columnId: 'partially_used', badgeVariant: 'warning' },
+        { value: 'used', label: 'Usada', columnId: 'used', badgeVariant: 'success' },
+        { value: 'expired', label: 'Vencida', columnId: 'expired', badgeVariant: 'danger' },
+      ],
+      columns: [
+        { id: 'active', label: 'Activa', defaultState: 'active' },
+        { id: 'partially_used', label: 'Parcialmente usada', defaultState: 'partially_used' },
+        { id: 'used', label: 'Usada', defaultState: 'used' },
+        { id: 'expired', label: 'Vencida', defaultState: 'expired' },
+      ],
+    });
+    expect(config.valueFilterOptions).toBeUndefined();
     expect(
       config.toFormValues?.({
         id: '1',
@@ -177,6 +252,33 @@ describe('billingHelpers', () => {
         persistMove: expect.any(Function),
       }),
     );
+    expect(config.editorModal).toEqual(
+      expect.objectContaining({
+        eyebrow: 'Compras',
+        sections: [
+          {
+            id: 'summary',
+            title: 'Resumen de la compra',
+            fieldKeys: ['number', 'supplier_name', 'status', 'payment_status', 'total', 'received_at'],
+          },
+          {
+            id: 'items',
+            title: '',
+            fieldKeys: ['purchase_items'],
+          },
+          {
+            id: 'notes',
+            title: 'Notas',
+            fieldKeys: ['notes'],
+          },
+        ],
+      }),
+    );
+    expect(config.editorModal?.stats).toBeUndefined();
+    expect(config.formFields.find((field) => field.key === 'number')).toEqual({
+      key: 'number',
+      label: 'Comprobante',
+    });
     expect(config.formFields.find((field) => field.key === 'status')).toEqual({
       key: 'status',
       label: 'Estado',
@@ -188,13 +290,32 @@ describe('billingHelpers', () => {
         { value: 'voided', label: 'Anulada' },
       ],
     });
+    expect(config.formFields.find((field) => field.key === 'supplier_id')).toBeUndefined();
+    expect(config.formFields.find((field) => field.key === 'payment_status')).toEqual({
+      key: 'payment_status',
+      label: 'Pago',
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pendiente' },
+        { value: 'partial', label: 'Parcial' },
+        { value: 'paid', label: 'Pagado' },
+      ],
+    });
+    expect(config.formFields.find((field) => field.key === 'total')).toEqual({
+      key: 'total',
+      label: 'Total',
+    });
+    expect(config.formFields.find((field) => field.key === 'received_at')).toEqual({
+      key: 'received_at',
+      label: 'Fecha de recepción',
+    });
     expect(
       config.toBody?.({
         supplier_id: 's1',
         supplier_name: 'Proveedor',
         status: 'draft',
         payment_status: 'pending',
-        items_json: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
+        purchase_items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
         notes: 'ok',
       }),
     ).toEqual({

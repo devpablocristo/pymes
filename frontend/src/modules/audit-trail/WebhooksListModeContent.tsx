@@ -68,7 +68,6 @@ export function WebhooksListModeContent() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<WebhookEndpoint>
         resourceId="webhooks"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

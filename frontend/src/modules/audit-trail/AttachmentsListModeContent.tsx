@@ -109,7 +109,6 @@ export function AttachmentsListModeContent() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<AttachmentRow>
         resourceId="attachments"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

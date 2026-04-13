@@ -1,24 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { createPortal } from 'react-dom';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import type { ReactNode } from 'react';
+import {
+  CrudEntityFormModal,
+  type CrudEntityFormModalField,
+} from './CrudEntityFormModal';
+import type { CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
+import { CrudEntityModalShell } from './CrudEntityModalShell';
 import './CrudActionDialog.css';
 
-export type CrudActionDialogField = {
-  id: string;
-  label: string;
-  type?: 'text' | 'email' | 'tel' | 'number' | 'textarea' | 'datetime-local' | 'select' | 'checkbox';
-  placeholder?: string;
-  required?: boolean;
-  defaultValue?: CrudFieldValue;
-  min?: number;
-  step?: number | 'any';
-  rows?: number;
-  options?: Array<{ label: string; value: string }>;
-};
+export type CrudActionDialogField = CrudEntityFormModalField;
 
 type CrudActionDialogBaseProps = {
   title: string;
   subtitle?: string;
+  eyebrow?: ReactNode;
+  mediaUrls?: string[];
+  mediaFieldId?: string;
   cancelLabel?: string;
   onCancel: () => void;
 };
@@ -26,6 +23,33 @@ type CrudActionDialogBaseProps = {
 type CrudActionDialogFormProps = CrudActionDialogBaseProps & {
   mode: 'form';
   fields: CrudActionDialogField[];
+  sections?: CrudEntityEditorModalSection[];
+  stats?: CrudEntityEditorModalStat[];
+  error?: string;
+  loading?: boolean;
+  loadingLabel?: string;
+  disableSubmit?: boolean;
+  dialogMode?: 'create' | 'update';
+  editLabel?: string;
+  cancelEditLabel?: string;
+  closeLabel?: string;
+  confirmDiscard?: {
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  };
+  archiveAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onArchive: () => Promise<void> | void;
+  };
   submitLabel?: string;
   onSubmit: (values: Record<string, CrudFieldValue>) => void;
 };
@@ -39,124 +63,62 @@ type CrudActionDialogTextProps = CrudActionDialogBaseProps & {
 export type CrudActionDialogProps = CrudActionDialogFormProps | CrudActionDialogTextProps;
 
 export function CrudActionDialog(props: CrudActionDialogProps) {
-  const [mounted, setMounted] = useState(false);
+  if (props.mode === 'form') {
+    return (
+      <CrudEntityFormModal
+        open
+        title={props.title}
+        subtitle={props.subtitle}
+        eyebrow={props.eyebrow}
+        mediaUrls={props.mediaUrls}
+        mediaFieldId={props.mediaFieldId}
+        mode={props.dialogMode}
+        editLabel={props.editLabel}
+        cancelEditLabel={props.cancelEditLabel}
+        closeLabel={props.closeLabel}
+        fields={props.fields}
+        sections={props.sections}
+        stats={props.stats}
+        error={props.error}
+        loading={props.loading}
+        loadingLabel={props.loadingLabel}
+        disableSubmit={props.disableSubmit}
+        confirmDiscard={props.confirmDiscard}
+        archiveAction={props.archiveAction}
+        submitLabel={props.submitLabel}
+        cancelLabel={props.cancelLabel}
+        onCancel={props.onCancel}
+        onSubmit={props.onSubmit}
+      />
+    );
+  }
 
-  useEffect(() => {
-    setMounted(true);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') props.onCancel();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [props]);
-
-  const initialValues = useMemo(
-    () =>
-      props.mode === 'form'
-        ? Object.fromEntries(props.fields.map((field) => [field.id, field.defaultValue ?? (field.type === 'checkbox' ? false : '')]))
-        : {},
-    [props],
+  return (
+    <CrudEntityModalShell
+      open
+      titleId="crud-action-dialog-title"
+      onRequestClose={props.onCancel}
+      rootClassName="crud-action-dialog-root"
+      backdropClassName="crud-action-dialog__backdrop"
+      panelClassName="crud-action-dialog"
+      headerClassName="crud-action-dialog__header"
+      bodyClassName="crud-action-dialog__body"
+      footerClassName="crud-action-dialog__footer"
+      header={
+        <div className="crud-action-dialog__title-block">
+          <h2 className="crud-action-dialog__title" id="crud-action-dialog-title">
+            {props.title}
+          </h2>
+          {props.subtitle ? <p className="crud-action-dialog__subtitle">{props.subtitle}</p> : null}
+        </div>
+      }
+      footer={
+        <button type="button" className="btn btn-primary" onClick={props.onCancel}>
+          {props.closeLabel ?? 'Cerrar'}
+        </button>
+      }
+    >
+      <pre className="crud-action-dialog__text">{props.textContent}</pre>
+    </CrudEntityModalShell>
   );
-  const [values, setValues] = useState<Record<string, CrudFieldValue>>(initialValues);
-
-  useEffect(() => {
-    setValues(initialValues);
-  }, [initialValues]);
-
-  if (!mounted || typeof document === 'undefined') return null;
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (props.mode !== 'form') return;
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    props.onSubmit(values);
-  };
-
-  const body = (
-    <div className="crud-action-dialog-root" role="presentation">
-      <button className="crud-action-dialog__backdrop" type="button" aria-label="Cerrar" onClick={props.onCancel} />
-      <div className="crud-action-dialog" role="dialog" aria-modal="true" aria-labelledby="crud-action-dialog-title">
-        <header className="crud-action-dialog__header">
-          <div className="crud-action-dialog__title-block">
-            <h2 className="crud-action-dialog__title" id="crud-action-dialog-title">
-              {props.title}
-            </h2>
-            {props.subtitle ? <p className="crud-action-dialog__subtitle">{props.subtitle}</p> : null}
-          </div>
-        </header>
-
-        {props.mode === 'form' ? (
-          <form className="crud-action-dialog__form" onSubmit={handleSubmit}>
-            <div className="crud-action-dialog__body">
-              {props.fields.map((field) => (
-                <label key={field.id} className="crud-action-dialog__field">
-                  <span>{field.label}</span>
-                  {field.type === 'textarea' ? (
-                    <textarea
-                      value={String(values[field.id] ?? '')}
-                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                      placeholder={field.placeholder}
-                      required={field.required}
-                      rows={field.rows ?? 4}
-                    />
-                  ) : field.type === 'select' ? (
-                    <select
-                      value={String(values[field.id] ?? '')}
-                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                      required={field.required}
-                    >
-                      <option value="">{field.placeholder ?? 'Seleccionar...'}</option>
-                      {(field.options ?? []).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : field.type === 'checkbox' ? (
-                    <input
-                      type="checkbox"
-                      checked={Boolean(values[field.id])}
-                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.checked }))}
-                    />
-                  ) : (
-                    <input
-                      type={field.type ?? 'text'}
-                      value={String(values[field.id] ?? '')}
-                      onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}
-                      placeholder={field.placeholder}
-                      required={field.required}
-                      min={field.min}
-                      step={field.step}
-                    />
-                  )}
-                </label>
-              ))}
-            </div>
-            <footer className="crud-action-dialog__footer">
-              <button type="button" className="btn btn-secondary" onClick={props.onCancel}>
-                {props.cancelLabel ?? 'Cancelar'}
-              </button>
-              <button type="submit" className="btn btn-primary">
-                {props.submitLabel ?? 'Guardar'}
-              </button>
-            </footer>
-          </form>
-        ) : (
-          <>
-            <div className="crud-action-dialog__body">
-              <pre className="crud-action-dialog__text">{props.textContent}</pre>
-            </div>
-            <footer className="crud-action-dialog__footer">
-              <button type="button" className="btn btn-primary" onClick={props.onCancel}>
-                {props.closeLabel ?? 'Cerrar'}
-              </button>
-            </footer>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  return createPortal(body, document.body);
 }

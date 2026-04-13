@@ -100,12 +100,24 @@ vi.mock('../modules/crud', () => ({
   CrudValueKanbanSurface: ({
     items,
     columnFooter,
+    getCardTitle,
+    getCardSubtitle,
+    getCardMeta,
   }: {
     items: Array<{ id: string; name: string }>;
     columnFooter?: (columnId: string) => ReactNode;
+    getCardTitle?: (row: { id: string; name: string }) => string;
+    getCardSubtitle?: (row: { id: string; name: string }) => string;
+    getCardMeta?: (row: { id: string; name: string }) => string;
   }) => (
     <div>
       <div>kanban-surface:{items.length}</div>
+      {items[0] ? (
+        <div>
+          kanban-card:
+          {getCardTitle?.(items[0]) ?? ''}|{getCardSubtitle?.(items[0]) ?? ''}|{getCardMeta?.(items[0]) ?? ''}
+        </div>
+      ) : null}
       <div>{columnFooter?.('received')}</div>
     </div>
   ),
@@ -268,7 +280,12 @@ describe('PymesSimpleCrudListModeContent', () => {
         { id: 'list', label: 'Lista', path: 'list', isDefault: true },
         { id: 'kanban', label: 'Tablero', path: 'board' },
       ],
-      kanban: { field: 'name', createFooterLabel: 'Añadir compra' },
+      stateMachine: {
+        field: 'name',
+        states: [{ value: 'cliente uno', label: 'Cliente Uno', columnId: 'cliente-uno' }],
+        columns: [{ id: 'cliente-uno', label: 'Cliente Uno', defaultState: 'cliente uno' }],
+      },
+      kanban: { createFooterLabel: 'Añadir compra' },
       createLabel: '+ Nueva compra',
       allowCreate: true,
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
@@ -277,5 +294,30 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('kanban-surface:1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Añadir compra' })).toBeInTheDocument();
     expect(screen.getByText('pagination:1:1:false')).toBeInTheDocument();
+  });
+
+  it('permite definir el contenido de la card del kanban desde la config del recurso', () => {
+    currentConfig = {
+      label: 'compra',
+      labelPlural: 'compras',
+      labelPluralCap: 'Compras',
+      basePath: '/v1/purchases',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      kanban: {
+        createFooterLabel: 'Añadir compra',
+        card: {
+          title: () => 'Titulo explicito',
+          subtitle: () => 'Subtitulo explicito',
+          meta: () => 'Meta explicita',
+        },
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
+    expect(screen.getByText('kanban-card:Titulo explicito|Subtitulo explicito|Meta explicita')).toBeInTheDocument();
   });
 });

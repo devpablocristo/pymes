@@ -19,33 +19,18 @@ function withoutCsvToolbarActions<T extends { id: string }>(config: CrudPageConf
   };
 }
 
-export type GetCrudPageConfigFromMapOptions = {
-  /**
-   * Vistas custom (galería, tablero) que deben conservar acciones CSV aunque el usuario haya
-   * desactivado «CSV toolbar» en preferencias del recurso (el listado sí respeta la preferencia).
-   */
-  preserveCsvToolbar?: boolean;
-};
-
 export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: string }>(
   resourceConfigs: ResourceConfigMap,
   resourceId: string,
-  options?: GetCrudPageConfigFromMapOptions,
 ): CrudPageConfig<TRecord> | null {
   const config = resourceConfigs[resourceId];
   if (!config) {
     return null;
   }
-  let merged = applyCrudUiOverride(
+  const merged = applyCrudUiOverride(
     resourceId,
     mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>),
   );
-  if (options?.preserveCsvToolbar && merged.featureFlags?.csvToolbar === false) {
-    merged = {
-      ...merged,
-      featureFlags: { ...merged.featureFlags, csvToolbar: true },
-    };
-  }
   return withoutCsvToolbarActions(merged);
 }
 

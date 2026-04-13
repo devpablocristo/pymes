@@ -10,6 +10,53 @@
   max-height: min(90vh, 900px);
 }
 
+.wo-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wo-modal__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.wo-modal__eyebrow {
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.wo-modal__title {
+  margin: 0;
+  font-size: var(--text-role-section-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.wo-modal__close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.wo-modal__close:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
 .wo-modal__header-trailing {
   display: flex;
   flex-wrap: wrap;
@@ -24,6 +71,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-4);
 }
 
 .wo-modal__grid {
@@ -94,6 +142,8 @@
 }
 
 .wo-modal__footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
   gap: var(--space-2);
 }
 

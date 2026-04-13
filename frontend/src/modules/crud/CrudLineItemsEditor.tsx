@@ -1,0 +1,122 @@
+import { useMemo } from 'react';
+import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import { asString, parseJSONArray } from '../../crud/resourceConfigs.shared';
+import './CrudLineItemsEditor.css';
+
+type CrudLineItemDraft = {
+  description: string;
+  quantity: number;
+  unit_cost: number;
+  product_id?: string;
+  service_id?: string;
+  tax_rate?: number;
+};
+
+function normalizeItems(value: CrudFieldValue | undefined): CrudLineItemDraft[] {
+  try {
+    return parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON').map((item) => ({
+      description: String(item.description ?? '').trim(),
+      quantity: Number(item.quantity ?? 1),
+      unit_cost: Number(item.unit_cost ?? 0),
+      product_id: typeof item.product_id === 'string' ? item.product_id : undefined,
+      service_id: typeof item.service_id === 'string' ? item.service_id : undefined,
+      tax_rate: typeof item.tax_rate === 'number' ? item.tax_rate : undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function toStoredValue(items: CrudLineItemDraft[]) {
+  return JSON.stringify(
+    items
+      .map((item) => ({
+        description: item.description.trim(),
+        quantity: Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1,
+        unit_cost: Number.isFinite(item.unit_cost) && item.unit_cost >= 0 ? item.unit_cost : 0,
+        product_id: item.product_id || undefined,
+        service_id: item.service_id || undefined,
+        tax_rate: item.tax_rate,
+      }))
+      .filter((item) => item.description.length > 0),
+  );
+}
+
+export function CrudLineItemsEditor({
+  value,
+  onChange,
+}: {
+  value: CrudFieldValue | undefined;
+  onChange: (nextValue: string) => void;
+}) {
+  const items = useMemo(() => {
+    const parsed = normalizeItems(value);
+    return parsed.length > 0 ? parsed : [{ description: '', quantity: 1, unit_cost: 0 }];
+  }, [value]);
+
+  const updateItems = (nextItems: CrudLineItemDraft[]) => {
+    onChange(toStoredValue(nextItems));
+  };
+
+  const setItem = (index: number, patch: Partial<CrudLineItemDraft>) => {
+    updateItems(items.map((item, currentIndex) => (currentIndex === index ? { ...item, ...patch } : item)));
+  };
+
+  return (
+    <div className="crud-line-items-editor">
+      {items.map((item, index) => (
+        <div key={index} className="crud-line-items-editor__row">
+          <div className="crud-line-items-editor__field crud-line-items-editor__field--full">
+            <span>Concepto</span>
+            <input
+              type="text"
+              value={item.description}
+              onChange={(event) => setItem(index, { description: event.target.value })}
+              placeholder="Qué se compró"
+            />
+          </div>
+          <div className="crud-line-items-editor__field">
+            <span>Cantidad</span>
+            <input
+              type="number"
+              min="1"
+              step="any"
+              value={Number.isFinite(item.quantity) ? item.quantity : 1}
+              onChange={(event) => setItem(index, { quantity: Number(asString(event.target.value)) || 1 })}
+            />
+          </div>
+          <div className="crud-line-items-editor__field">
+            <span>Costo unitario</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={Number.isFinite(item.unit_cost) ? item.unit_cost : 0}
+              onChange={(event) => setItem(index, { unit_cost: Number(asString(event.target.value)) || 0 })}
+            />
+          </div>
+          <div className="crud-line-items-editor__actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                updateItems(items.length === 1 ? [{ description: '', quantity: 1, unit_cost: 0 }] : items.filter((_, i) => i !== index))
+              }
+            >
+              Quitar
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className="crud-line-items-editor__footer">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => updateItems([...items, { description: '', quantity: 1, unit_cost: 0 }])}
+        >
+          Añadir renglón
+        </button>
+      </div>
+    </div>
+  );
+}

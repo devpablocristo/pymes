@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { PymesCrudResourceShellHeader } from '../../crud/PymesCrudResourceShellHeader';
 import { usePymesCrudHeaderFeatures } from '../../crud/usePymesCrudHeaderFeatures';
 import { CrudTableSurface, type CrudTableSurfaceColumn, type CrudTableSurfaceRowAction } from '../crud';
+import { buildCrudValueFilterOptionsFromStateMachine } from '../crud';
 import { useCrudArchivedSearchParam } from '../crud';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
 import {
@@ -94,14 +95,16 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
   );
   const valueFilterOptions = useMemo(
     () =>
-      shellConfig?.valueFilterOptions?.length
-        ? shellConfig.valueFilterOptions
-        : statusOptions.map((option) => ({
-            value: option.value,
-            label: option.label,
-            matches: (row: TRecord) => row.status === option.value,
-          })),
-    [shellConfig?.valueFilterOptions, statusOptions],
+      shellConfig?.stateMachine
+        ? buildCrudValueFilterOptionsFromStateMachine(shellConfig.stateMachine)
+        : shellConfig?.valueFilterOptions?.length
+          ? shellConfig.valueFilterOptions
+          : statusOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+              matches: (row: TRecord) => row.status === option.value,
+            })),
+    [shellConfig?.stateMachine, shellConfig?.valueFilterOptions, statusOptions],
   );
   const { search, setSearch, visibleItems: visibleDocuments, headerLeadSlot, searchInlineActions } =
     usePymesCrudHeaderFeatures<TRecord>({
@@ -212,7 +215,6 @@ export function CommercialDocumentWorkspace<TStatus extends string, TRecord exte
       <PymesCrudResourceShellHeader<TRecord>
         resourceId={resourceId}
         crudConfigOverride={shellConfig}
-        preserveCsvToolbar
         items={visibleDocuments}
         subtitleCount={visibleDocuments.length}
         loading={false}

@@ -194,7 +194,6 @@ export function StockInventoryKanbanBoard() {
     <>
       <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="inventory"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={stockQuery.isLoading}

@@ -1,0 +1,96 @@
+.crud-entity-media-carousel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-entity-media-carousel__hero {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.crud-entity-media-carousel--read .crud-entity-media-carousel__hero {
+  min-height: 320px;
+}
+
+.crud-entity-media-carousel--edit .crud-entity-media-carousel__hero {
+  min-height: 180px;
+}
+
+.crud-entity-media-carousel__hero img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 420px;
+  object-fit: cover;
+}
+
+.crud-entity-media-carousel--edit .crud-entity-media-carousel__hero img {
+  max-height: 220px;
+}
+
+.crud-entity-media-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  color: var(--color-text);
+  font-size: 1.25rem;
+}
+
+.crud-entity-media-carousel__nav--prev {
+  left: 12px;
+}
+
+.crud-entity-media-carousel__nav--next {
+  right: 12px;
+}
+
+.crud-entity-media-carousel__counter {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.crud-entity-media-carousel__thumbs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.crud-entity-media-carousel__thumb {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.crud-entity-media-carousel__thumb--active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 42%, transparent);
+}
+
+.crud-entity-media-carousel__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

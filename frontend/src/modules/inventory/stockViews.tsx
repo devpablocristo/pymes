@@ -70,7 +70,6 @@ export function StockGalleryWorkspace() {
     <div className="stock-crud-surface-page">
       <PymesCrudResourceShellHeader<StockLevelRow>
         resourceId="inventory"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

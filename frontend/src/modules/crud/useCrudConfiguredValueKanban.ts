@@ -1,20 +1,15 @@
 import { crudItemPath } from '@devpablocristo/modules-crud-ui';
 import { useCallback, useMemo } from 'react';
-import type { CrudPageConfig, CrudValueFilterOption } from '../../components/CrudPage';
+import type { CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
-import { buildCrudKanbanTransitionModelFromStateMachine, resolveCrudValueFilterOptions } from './crudStateMachine';
+import { buildCrudKanbanTransitionModelFromStateMachine, normalizeCrudStateValue } from './crudStateMachine';
 import { createCrudKanbanArchiveTerminalDragPolicy } from './crudKanbanDragPolicy';
-import { createCrudKanbanTransitionModel } from './kanbanTransitionModel';
 import { useCrudKanbanMove } from './useCrudKanbanMove';
 
 const NO_KANBAN_DRAG = {
   isRowDraggable: () => false,
   isColumnDroppable: () => false,
 } as const;
-
-function normalizeKanbanValue(raw: unknown) {
-  return String(raw ?? '').trim().toLowerCase();
-}
 
 type Options<T extends { id: string }> = {
   crudConfig: CrudPageConfig<T> | null;
@@ -23,7 +18,6 @@ type Options<T extends { id: string }> = {
   reload: () => Promise<void>;
   setError: (message: string | null) => void;
   archived: boolean;
-  valueFilterOptions?: CrudValueFilterOption<T>[];
 };
 
 export function useCrudConfiguredValueKanban<T extends { id: string }>({
@@ -33,33 +27,20 @@ export function useCrudConfiguredValueKanban<T extends { id: string }>({
   reload,
   setError,
   archived,
-  valueFilterOptions,
 }: Options<T>) {
-  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig, valueFilterOptions);
   const stateMachine = crudConfig?.stateMachine ?? null;
   const kanbanConfig = crudConfig?.kanban ?? null;
-  const kanbanField = stateMachine?.field ?? kanbanConfig?.field ?? null;
+  const kanbanField = stateMachine?.field ?? null;
 
   const transitionModel = useMemo(() => {
-    if (stateMachine) {
-      return buildCrudKanbanTransitionModelFromStateMachine(stateMachine);
-    }
-    if (!kanbanConfig || resolvedValueFilterOptions.length === 0) return null;
-    return createCrudKanbanTransitionModel({
-      normalizeStatus: normalizeKanbanValue,
-      columns: resolvedValueFilterOptions.map((option) => ({
-        columnId: option.value,
-        statuses: [option.value],
-        defaultStatus: option.value,
-      })),
-      terminalStatuses: (kanbanConfig.terminalValues ?? []).map(normalizeKanbanValue),
-    });
-  }, [kanbanConfig, resolvedValueFilterOptions, stateMachine]);
+    if (!stateMachine) return null;
+    return buildCrudKanbanTransitionModelFromStateMachine(stateMachine);
+  }, [stateMachine]);
 
   const getItemStatus = useCallback(
     (row: T) => {
       if (!kanbanField) return '';
-      return normalizeKanbanValue((row as Record<string, unknown>)[kanbanField]);
+      return normalizeCrudStateValue((row as Record<string, unknown>)[kanbanField]);
     },
     [kanbanField],
   );
@@ -80,7 +61,7 @@ export function useCrudConfiguredValueKanban<T extends { id: string }>({
 
   const persistStatusChange = useCallback(
     async (itemId: string, nextStatus: string) => {
-      if (!crudConfig || !kanbanField) throw new Error('Recurso sin configuración de kanban.');
+      if (!crudConfig || !kanbanField || !stateMachine) throw new Error('Recurso sin máquina de estados para kanban.');
       const row = items.find((item) => item.id === itemId);
       if (!row) throw new Error('No se encontró el registro a mover.');
 
@@ -112,7 +93,7 @@ export function useCrudConfiguredValueKanban<T extends { id: string }>({
 
       return { ...row, [kanbanField]: nextStatus } as T;
     },
-    [crudConfig, items, kanbanConfig, kanbanField],
+    [crudConfig, items, kanbanConfig, kanbanField, stateMachine],
   );
 
   const handleMoveCard = useCrudKanbanMove<T, string>({

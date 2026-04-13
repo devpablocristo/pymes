@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmAction } from '@devpablocristo/core-browser';
-import { createPortal } from 'react-dom';
 import {
   archiveWorkOrder,
   getWorkOrder,
@@ -8,6 +7,7 @@ import {
   updateWorkOrder,
   type WorkOrder as UnifiedWorkOrder,
 } from '../lib/workOrdersApi';
+import { CrudEntityModalShell } from '../modules/crud';
 
 type AutoRepairWorkOrder = UnifiedWorkOrder;
 import { parseWorkOrderItemsJson, stringifyWorkOrderItems } from '../lib/workOrderItemsJson';
@@ -530,7 +530,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
 
   const footerActions =
     wo && draft && !loading ? (
-      <div className="wo-modal__footer app-modal__footer wo-modal__footer--split">
+      <>
         <div className="wo-modal__footer-start">
           {!isArchived ? (
             <button
@@ -555,7 +555,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         <div className="wo-modal__footer-end">
           <button
             type="button"
-            className="wo-modal__btn wo-modal__btn--ghost app-modal__action"
+            className="wo-modal__btn wo-modal__btn--ghost"
             onClick={requestClose}
             disabled={closeDisabled}
           >
@@ -563,21 +563,21 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
           </button>
           <button
             type="button"
-            className="wo-modal__btn wo-modal__btn--primary app-modal__action"
+            className="wo-modal__btn wo-modal__btn--primary"
             disabled={!canSave}
             onClick={() => void handleSave()}
           >
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
-      </div>
+      </>
     ) : null;
 
   const header = (
-    <div className="wo-modal__header app-modal__header">
-      <div className="wo-modal__title-block app-modal__title-block">
-        <div className="wo-modal__eyebrow app-modal__eyebrow">Orden de trabajo</div>
-        <h2 id="wo-modal-title" className="wo-modal__title app-modal__title">
+    <>
+      <div className="wo-modal__title-block">
+        <div className="wo-modal__eyebrow">Orden de trabajo</div>
+        <h2 id="wo-modal-title" className="wo-modal__title">
           {loading ? 'Cargando…' : (wo?.number ?? '—')}
         </h2>
       </div>
@@ -585,7 +585,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         {variant === 'modal' ? (
           <button
             type="button"
-            className="wo-modal__close app-modal__close"
+            className="wo-modal__close"
             onClick={requestClose}
             aria-label="Cerrar"
             disabled={closeDisabled}
@@ -594,43 +594,54 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
           </button>
         ) : null}
       </div>
-    </div>
+    </>
   );
 
-  const body = <div className="wo-modal__body app-modal__body">{formInner}</div>;
+  const body = formInner;
 
   if (variant === 'page') {
     return (
-      <div className="wo-editor-page">
-        <div className="wo-editor-page__toolbar">
+      <CrudEntityModalShell
+        open
+        variant="page"
+        titleId="wo-modal-title"
+        onRequestClose={requestClose}
+        disableClose={closeDisabled}
+        rootClassName="wo-editor-page"
+        pageToolbarClassName="wo-editor-page__toolbar"
+        pageToolbar={
           <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={closeDisabled}>
             ← Volver a la lista
           </button>
-        </div>
-        <div className="wo-modal wo-modal--embedded app-modal" role="dialog" aria-modal="false" aria-labelledby="wo-modal-title">
-          {header}
-          {body}
-          {footerActions}
-        </div>
-      </div>
+        }
+        panelClassName="wo-modal wo-modal--embedded"
+        headerClassName="wo-modal__header"
+        bodyClassName="wo-modal__body"
+        footerClassName="wo-modal__footer wo-modal__footer--split"
+        header={header}
+        footer={footerActions}
+      >
+        {body}
+      </CrudEntityModalShell>
     );
   }
 
-  const modal = (
-    <div
-      className="wo-modal-backdrop app-modal-backdrop"
-      role="presentation"
-      onMouseDown={(ev) => {
-        if (ev.target === ev.currentTarget) requestClose();
-      }}
+  return (
+    <CrudEntityModalShell
+      open
+      titleId="wo-modal-title"
+      onRequestClose={requestClose}
+      disableClose={closeDisabled}
+      rootClassName="wo-modal-root"
+      backdropClassName="wo-modal-backdrop"
+      panelClassName="wo-modal"
+      headerClassName="wo-modal__header"
+      bodyClassName="wo-modal__body"
+      footerClassName="wo-modal__footer wo-modal__footer--split"
+      header={header}
+      footer={footerActions}
     >
-      <div className="wo-modal app-modal" role="dialog" aria-modal="true" aria-labelledby="wo-modal-title">
-        {header}
-        {body}
-        {footerActions}
-      </div>
-    </div>
+      {body}
+    </CrudEntityModalShell>
   );
-
-  return createPortal(modal, document.body);
 }

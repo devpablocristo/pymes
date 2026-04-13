@@ -1,4 +1,4 @@
-import { mergeCrudStrings, type CrudStrings } from '@devpablocristo/modules-crud-ui';
+import type { CrudStrings } from '@devpablocristo/modules-crud-ui';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { CrudResourceShellHeader, type CrudResourceShellHeaderConfigLike } from '../modules/crud';
@@ -9,7 +9,6 @@ import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 export function PymesCrudResourceShellHeader<T extends { id: string }>({
   resourceId,
   crudConfigOverride,
-  preserveCsvToolbar: _preserveCsvToolbar = false,
   items,
   subtitleCount,
   loading,
@@ -25,7 +24,6 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
 }: {
   resourceId: string;
   crudConfigOverride?: CrudResourceShellHeaderConfigLike<T> | null;
-  preserveCsvToolbar?: boolean;
   items: T[];
   subtitleCount?: number;
   loading: boolean;
@@ -43,7 +41,7 @@ export function PymesCrudResourceShellHeader<T extends { id: string }>({
   const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
   const crudConfig = (crudConfigOverride ?? crudConfigQuery.data ?? null) as CrudResourceShellHeaderConfigLike<T> | null;
   const stringsBase = useMemo(() => buildPymesCrudStrings(language), [language]);
-  const strings = useMemo<CrudStrings>(() => mergeCrudStrings(stringsBase, {}), [stringsBase]);
+  const strings = useMemo<CrudStrings>(() => stringsBase, [stringsBase]);
 
   return (
     <CrudResourceShellHeader<T>

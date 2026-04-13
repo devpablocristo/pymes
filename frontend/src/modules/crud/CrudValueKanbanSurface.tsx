@@ -1,6 +1,6 @@
 import type { KanbanColumnDef, SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { useCallback, useEffect, useMemo, useState, type RefObject, type ReactNode } from 'react';
-import type { CrudStateMachineConfig, CrudValueFilterOption } from '../../components/CrudPage';
+import type { CrudStateMachineConfig } from '../../components/CrudPage';
 import { CrudKanbanSurface } from './CrudKanbanSurface';
 import { CrudStateBadge } from './CrudStateBadge';
 import { findCrudStateMachineStateForRow } from './crudStateMachine';
@@ -18,7 +18,6 @@ type Props<T extends { id: string }> = {
   title: string;
   emptyLabel: string;
   stateMachine?: CrudStateMachineConfig<T>;
-  valueFilterOptions?: CrudValueFilterOption<T>[];
   onCardOpen: (row: T) => void;
   getCardTitle: (row: T) => string;
   getCardSubtitle?: (row: T) => string;
@@ -182,7 +181,6 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
   title,
   emptyLabel,
   stateMachine,
-  valueFilterOptions = [],
   onCardOpen,
   getCardTitle,
   getCardSubtitle,
@@ -201,14 +199,14 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
 
   const columns = useMemo<ValueColumn<T>[]>(
     () =>
-      valueFilterOptions.length > 0
-        ? valueFilterOptions.map((option) => ({
-            id: option.value,
-            label: option.label,
-            matches: option.matches,
+      stateMachine
+        ? stateMachine.columns.map((column) => ({
+            id: column.id,
+            label: column.label,
+            matches: (row: T) => findCrudStateMachineStateForRow(stateMachine, row)?.columnId === column.id,
           }))
         : inferColumnsFromRows(items),
-    [items, valueFilterOptions],
+    [items, stateMachine],
   );
 
   const kanbanColumns = useMemo<KanbanColumnDef[]>(() => columns.map((column) => ({ id: column.id, label: column.label })), [columns]);

@@ -70,7 +70,7 @@ function useProductsRemoteState() {
 
 export function ProductsGalleryWorkspace() {
   const { t, localizeText } = useI18n();
-  const crudConfigQuery = usePymesCrudConfigQuery<ProductRow>('products', { preserveCsvToolbar: true });
+  const crudConfigQuery = usePymesCrudConfigQuery<ProductRow>('products');
   const crudConfig = crudConfigQuery.data ?? null;
 
   const {
@@ -103,7 +103,6 @@ export function ProductsGalleryWorkspace() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<ProductRow>
         resourceId="products"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}
@@ -229,7 +228,6 @@ export function ProductsListWorkspace() {
     <div className="products-crud-page">
       <PymesCrudResourceShellHeader<ProductRow>
         resourceId="products"
-        preserveCsvToolbar
         items={visibleItems}
         subtitleCount={visibleItems.length}
         loading={loading}

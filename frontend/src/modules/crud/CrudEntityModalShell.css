@@ -1,0 +1,63 @@
+.crud-entity-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.crud-entity-modal-shell__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+  cursor: pointer;
+}
+
+.crud-entity-modal-shell__panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(92vh, 920px);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-z16, 0 24px 48px color-mix(in srgb, var(--color-text) 18%, transparent));
+  overflow: hidden;
+}
+
+.crud-entity-modal-shell__header,
+.crud-entity-modal-shell__footer {
+  flex-shrink: 0;
+}
+
+.crud-entity-modal-shell__body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.crud-entity-modal-shell--page {
+  position: static;
+  inset: auto;
+  display: block;
+  padding: 0;
+}
+
+.crud-entity-modal-shell--page .crud-entity-modal-shell__panel {
+  position: static;
+  max-height: none;
+  width: 100%;
+}
+
+.crud-entity-modal-shell__page-toolbar {
+  margin-bottom: var(--space-3);
+}

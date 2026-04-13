@@ -1,13 +1,45 @@
 import { createRoot } from 'react-dom/client';
+import type { ReactNode } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { CrudActionDialog, type CrudActionDialogField } from './CrudActionDialog';
+import type { CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
 
 type CrudFormDialogOptions = {
   title: string;
   subtitle?: string;
+  eyebrow?: ReactNode;
+  mediaUrls?: string[];
+  mediaFieldId?: string;
+  dialogMode?: 'create' | 'update';
   submitLabel?: string;
   cancelLabel?: string;
+  editLabel?: string;
+  cancelEditLabel?: string;
+  closeLabel?: string;
   fields: CrudActionDialogField[];
+  sections?: CrudEntityEditorModalSection[];
+  stats?: CrudEntityEditorModalStat[];
+  error?: string;
+  loading?: boolean;
+  loadingLabel?: string;
+  disableSubmit?: boolean;
+  confirmDiscard?: {
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  };
+  archiveAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onArchive: () => Promise<void> | void;
+  };
 };
 
 type CrudTextDialogOptions = {
@@ -39,7 +71,32 @@ export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Reco
       mode="form"
       title={options.title}
       subtitle={options.subtitle}
+      eyebrow={options.eyebrow}
+      mediaUrls={options.mediaUrls}
+      mediaFieldId={options.mediaFieldId}
+      dialogMode={options.dialogMode}
       fields={options.fields}
+      sections={options.sections}
+      stats={options.stats}
+      error={options.error}
+      loading={options.loading}
+      loadingLabel={options.loadingLabel}
+      disableSubmit={options.disableSubmit}
+      editLabel={options.editLabel}
+      cancelEditLabel={options.cancelEditLabel}
+      closeLabel={options.closeLabel}
+      confirmDiscard={options.confirmDiscard}
+      archiveAction={
+        options.archiveAction
+          ? {
+              ...options.archiveAction,
+              onArchive: async () => {
+                await options.archiveAction?.onArchive();
+                finish(null);
+              },
+            }
+          : undefined
+      }
       submitLabel={options.submitLabel}
       cancelLabel={options.cancelLabel}
       onCancel={() => finish(null)}

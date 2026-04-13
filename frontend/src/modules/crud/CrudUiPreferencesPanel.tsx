@@ -11,7 +11,6 @@ export type CrudUiPreferenceFeatureKey = readonly [keyof CrudFeatureFlags, strin
 export type CrudUiPreferencesPanelCopy = {
   title?: string;
   hint?: string;
-  enabledViewsLabel?: string;
   defaultViewLabel?: string;
 };
 

@@ -17,7 +17,7 @@ import {
   type StockRecord,
   type StockLevelRow,
 } from '../modules/inventory';
-import { CreditNotesListModeContent, PaymentsListModeContent } from '../modules/billing';
+import { PaymentsListModeContent } from '../modules/billing';
 import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import {
@@ -209,7 +209,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   creditNotes: {
     ...createCreditNotesCrudConfig<CreditNoteRecord>({
-      renderList: () => <CreditNotesListModeContent />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="creditNotes" />,
     }),
   },
   cashflow: {

@@ -20,6 +20,23 @@ export function formatCrudMoney(value: unknown, currency?: string): string {
   return `${currency || 'ARS'} ${Number(value ?? 0).toFixed(2)}`;
 }
 
+export function formatCrudLocalizedMoney(
+  value: unknown,
+  currency = 'ARS',
+  locale = 'es-AR',
+  minimumFractionDigits = 0,
+) {
+  return Number(value ?? 0).toLocaleString(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits,
+  });
+}
+
 export function formatCrudPercent(value: unknown): string {
   return `${Number(value ?? 0).toFixed(2)}%`;
+}
+
+export function hasReadableCrudValue(value: unknown): boolean {
+  return String(value ?? '').trim().length > 0;
 }

@@ -9,8 +9,7 @@ import {
 } from '../../lib/restaurantsApi';
 import type { RestaurantDiningArea, RestaurantDiningTable } from '../../lib/restaurantTypes';
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
-import { RestaurantDiningAreasListModeContent } from './RestaurantDiningAreasListModeContent';
-import { RestaurantDiningTablesListModeContent } from './RestaurantDiningTablesListModeContent';
+import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export function renderRestaurantTableStatusBadge(value: unknown) {
   const status = String(value ?? '');
@@ -58,7 +57,7 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
       sort_order: String(row.sort_order ?? 0),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <RestaurantDiningAreasListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningAreas" /> }],
   };
 }
 
@@ -148,6 +147,6 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
       notes: row.notes ?? '',
     }),
     isValid: (values) => asString(values.area_id).trim().length > 0 && asString(values.code).trim().length >= 1,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <RestaurantDiningTablesListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningTables" /> }],
   };
 }

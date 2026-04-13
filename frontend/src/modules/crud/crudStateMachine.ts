@@ -31,6 +31,31 @@ export function buildCrudSelectFieldOptionsFromStateMachine<T extends { id: stri
   }));
 }
 
+export function buildSimpleStatusStateMachine<T extends { id: string; status: string }>(
+  states: Array<{
+    value: string;
+    label: string;
+    badgeVariant?: NonNullable<
+      NonNullable<CrudPageConfig<T>['stateMachine']>['states'][number]['badgeVariant']
+    >;
+  }>,
+): CrudStateMachineConfig<T> {
+  return {
+    field: 'status',
+    states: states.map((state) => ({
+      value: state.value,
+      label: state.label,
+      columnId: state.value,
+      badgeVariant: state.badgeVariant,
+    })),
+    columns: states.map((state) => ({
+      id: state.value,
+      label: state.label,
+      defaultState: state.value,
+    })),
+  };
+}
+
 export function findCrudStateMachineStateByValue<T extends { id: string }>(
   stateMachine: CrudStateMachineConfig<T>,
   rawValue: unknown,

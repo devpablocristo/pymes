@@ -4,7 +4,16 @@ import { asOptionalNumber, asOptionalString, asString, formatDate, parseJSONArra
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
-import { CrudLineItemsEditor, buildCrudSelectFieldOptionsFromStateMachine, buildStandardCrudViewModes, openCrudFormDialog, openCrudTextDialog } from '../crud';
+import {
+  CrudLineItemsEditor,
+  buildCrudSelectFieldOptionsFromStateMachine,
+  buildSimpleStatusStateMachine,
+  buildStandardCrudViewModes,
+  formatCrudLocalizedMoney,
+  hasReadableCrudValue,
+  openCrudFormDialog,
+  openCrudTextDialog,
+} from '../crud';
 import {
   INVOICE_STATUS_LABELS,
   invoiceInitials,
@@ -26,31 +35,6 @@ export function buildCommercialDocumentStatusOptions<TStatus extends string>(
     label: labels[value],
     badgeClass: badgeClasses[value],
   }));
-}
-
-function buildSimpleStatusStateMachine<TRecord extends { id: string; status: string }>(
-  states: Array<{
-    value: string;
-    label: string;
-    badgeVariant?: NonNullable<
-      NonNullable<CrudPageConfig<TRecord>['stateMachine']>['states'][number]['badgeVariant']
-    >;
-  }>,
-): NonNullable<CrudPageConfig<TRecord>['stateMachine']> {
-  return {
-    field: 'status',
-    states: states.map((state) => ({
-      value: state.value,
-      label: state.label,
-      columnId: state.value,
-      badgeVariant: state.badgeVariant,
-    })),
-    columns: states.map((state) => ({
-      id: state.value,
-      label: state.label,
-      defaultState: state.value,
-    })),
-  };
 }
 
 export type CommercialPricedLineItem = {
@@ -191,45 +175,6 @@ export function parseCommercialCostLineItems(value: CrudFieldValue | undefined):
       tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
     }))
     .filter((item) => item.description && item.quantity > 0);
-}
-
-function formatPurchasePaymentStatusLabel(value: string) {
-  const normalized = value.trim().toLowerCase();
-  switch (normalized) {
-    case 'pending':
-      return 'Pendiente';
-    case 'partial':
-      return 'Parcial';
-    case 'paid':
-      return 'Pagado';
-    default:
-      return value.trim() || 'Sin definir';
-  }
-}
-
-function renderPurchaseItemsReadValue(value: CrudFieldValue | undefined) {
-  const items = parseCommercialCostLineItems(value);
-  if (!items.length) return 'Sin productos cargados';
-  return (
-    <div className="crud-entity-editor-modal__read-list">
-      {items.map((item, index) => (
-        <div key={`${item.description}-${index}`} className="crud-entity-editor-modal__read-list-item">
-          <strong>{item.description}</strong>
-          <span>
-            {item.quantity} x {Number(item.unit_cost ?? 0).toLocaleString('es-AR', {
-              style: 'currency',
-              currency: 'ARS',
-              minimumFractionDigits: 0,
-            })}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function hasReadableValue(value: CrudFieldValue | undefined) {
-  return String(value ?? '').trim().length > 0;
 }
 
 export function createCommercialDocumentCrudConfig<
@@ -399,12 +344,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       {
         key: 'total',
         header: 'Total',
-        render: (value, row: TRecord) =>
-          Number(value ?? 0).toLocaleString('es-AR', {
-            style: 'currency',
-            currency: row.currency || 'ARS',
-            minimumFractionDigits: 0,
-          }),
+        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
       },
       { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '---' },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
@@ -514,12 +454,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       {
         key: 'total',
         header: 'Total',
-        render: (value, row: TRecord) =>
-          Number(value ?? 0).toLocaleString('es-AR', {
-            style: 'currency',
-            currency: row.currency || 'ARS',
-            minimumFractionDigits: 0,
-          }),
+        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -549,7 +484,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         fullWidth: true,
         placeholder: '[{"description":"Producto","quantity":1,"unit_price":10000}]',
       },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true, rows: 2 },
     ],
     rowActions: [
       {
@@ -716,20 +651,17 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
       {
         key: 'balance',
         header: 'Saldo',
-        render: (value) =>
-          Number(value ?? 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }),
+        render: (value) => formatCrudLocalizedMoney(value),
       },
       {
         key: 'amount',
         header: 'Monto',
-        render: (value) =>
-          Number(value ?? 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }),
+        render: (value) => formatCrudLocalizedMoney(value),
       },
       {
         key: 'used_amount',
         header: 'Usado',
-        render: (value) =>
-          Number(value ?? 0).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }),
+        render: (value) => formatCrudLocalizedMoney(value),
       },
       {
         key: 'return_id',
@@ -828,12 +760,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       {
         key: 'total',
         header: 'Total',
-        render: (value, row: TRecord) =>
-          Number(value ?? 0).toLocaleString('es-AR', {
-            style: 'currency',
-            currency: row.currency || 'ARS',
-            minimumFractionDigits: 0,
-          }),
+        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
       },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -852,11 +779,11 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
           title: 'Resumen de la compra',
           fieldKeys: ['number', 'supplier_name', 'status', 'payment_status', 'total', 'received_at'],
         },
-        {
-          id: 'items',
-          title: '',
-          fieldKeys: ['purchase_items'],
-        },
+        // {
+        //   id: 'items',
+        //   title: '',
+        //   fieldKeys: ['purchase_items'],
+        // },
         {
           id: 'notes',
           title: 'Notas',
@@ -867,28 +794,28 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
         number: {
           sectionId: 'summary',
           readOnly: true,
-          visible: ({ value }) => hasReadableValue(value),
+          visible: ({ value }) => hasReadableCrudValue(value),
         },
         total: {
           sectionId: 'summary',
           readOnly: true,
-          visible: ({ value }) => hasReadableValue(value),
+          visible: ({ value }) => hasReadableCrudValue(value),
         },
         received_at: {
           sectionId: 'summary',
           readOnly: true,
-          visible: ({ value }) => hasReadableValue(value),
+          visible: ({ value }) => hasReadableCrudValue(value),
         },
         purchase_items: {
           sectionId: 'items',
           fullWidth: true,
-          readValue: ({ value }) => renderPurchaseItemsReadValue(value),
+          visible: ({ editing }) => editing,
           editControl: ({ value, setValue }) => <CrudLineItemsEditor value={value} onChange={setValue} />,
         },
         notes: {
           sectionId: 'notes',
           fullWidth: true,
-          visible: ({ value }) => hasReadableValue(value),
+          visible: ({ value }) => hasReadableCrudValue(value),
         },
         supplier_name: {
           sectionId: 'summary',
@@ -898,7 +825,6 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
         },
         payment_status: {
           sectionId: 'summary',
-          readValue: ({ value }) => formatPurchasePaymentStatusLabel(String(value ?? '')),
         },
       },
       confirmDiscard: {
@@ -946,18 +872,15 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       },
       { key: 'total', label: 'Total' },
       { key: 'received_at', label: 'Fecha de recepción' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      // { key: 'purchase_items', label: 'Detalle', type: 'textarea', fullWidth: true, required: true },
+      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true, rows: 2 },
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
       supplier_name: row.supplier_name ?? '',
       status: row.status ?? '',
       payment_status: row.payment_status ?? '',
-      total: Number(row.total ?? 0).toLocaleString('es-AR', {
-        style: 'currency',
-        currency: row.currency || 'ARS',
-        minimumFractionDigits: 0,
-      }),
+      total: formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
       received_at: row.received_at ? formatDate(row.received_at) : '',
       purchase_items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',

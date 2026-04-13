@@ -3,11 +3,8 @@ import { type CrudPageConfig, type CrudResourceConfigMap } from '../components/C
 import { apiRequest } from '../lib/api';
 import { withCSVToolbar } from './csvToolbar';
 import {
-  AccountsListModeContent,
   createAccountCrudConfig,
   createPartyCrudConfig,
-  EmployeesListModeContent,
-  PartiesListModeContent,
   parsePartyPermissionInputs,
 } from '../modules/parties';
 import {
@@ -17,6 +14,7 @@ import {
 } from '../modules/nexus-governance';
 import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
 import { formatDate } from './resourceConfigs.shared';
+import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
 type Address = {
   street?: string;
@@ -59,7 +57,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
   accounts: {
     basePath: '/v1/accounts',
     ...createAccountCrudConfig<Account>({
-      render: () => <AccountsListModeContent />,
+      render: () => <PymesSimpleCrudListModeContent resourceId="accounts" />,
       formatUpdatedAt: (value) => formatDate(String(value ?? '')),
     }),
   },
@@ -71,7 +69,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       labelPlural: 'entidades',
       labelPluralCap: 'Entidades',
       header: 'Entidad',
-      render: () => <PartiesListModeContent />,
+      render: () => <PymesSimpleCrudListModeContent resourceId="parties" />,
     }),
   },
   employees: {
@@ -82,7 +80,7 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       labelPlural: 'empleados',
       labelPluralCap: 'Empleados',
       header: 'Empleado',
-      render: () => <EmployeesListModeContent />,
+      render: () => <PymesSimpleCrudListModeContent resourceId="employees" />,
       createLabel: '+ Nuevo empleado',
       searchPlaceholder: 'Buscar...',
       emptyState:

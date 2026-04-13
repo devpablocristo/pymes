@@ -18,10 +18,7 @@ import {
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../../lib/teachersTypes';
 import { openCrudFormDialog } from '../crud';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from '../../crud/resourceConfigs.shared';
-import { IntakesListModeContent } from './IntakesListModeContent';
-import { ProfessionalsListModeContent } from './ProfessionalsListModeContent';
-import { SessionsListModeContent } from './SessionsListModeContent';
-import { SpecialtiesListModeContent } from './SpecialtiesListModeContent';
+import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export function renderSchedulingBooleanBadge(
   value: boolean,
@@ -150,7 +147,7 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
       accepts_new_clients: row.accepts_new_clients ?? true,
     }),
     isValid: (values) => asString(values.party_id).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <ProfessionalsListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="professionals" /> }],
   };
 }
 
@@ -212,7 +209,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
       is_active: row.is_active ?? true,
     }),
     isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <SpecialtiesListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="specialties" /> }],
   };
 }
 
@@ -264,7 +261,7 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
       notes: row.notes ?? '',
     }),
     isValid: (values) => asString(values.profile_id).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <IntakesListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="intakes" /> }],
   };
 }
 
@@ -362,6 +359,6 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
       asString(values.booking_id).trim().length > 0 &&
       asString(values.profile_id).trim().length > 0 &&
       Boolean(toRFC3339(values.started_at)),
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <SessionsListModeContent /> }],
+    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="sessions" /> }],
   };
 }

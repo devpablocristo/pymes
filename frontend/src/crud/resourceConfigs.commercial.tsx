@@ -29,10 +29,8 @@ import {
 import {
   createCustomerCrudConfig,
   createSupplierCrudConfig,
-  CustomersListModeContent,
   formatPartyTagList,
   parsePartyTagCsv,
-  SuppliersListModeContent,
   type PartyAddress as CrudAddress,
 } from '../modules/parties';
 import {
@@ -45,7 +43,7 @@ import {
   type SaleRecord,
 } from '../modules/billing/billingHelpers';
 import { type InvoiceRecord as BillingInvoiceRecord } from '../modules/billing/invoicesDemo';
-import { InvoicesListModeContent, PurchasesListModeContent, QuotesListModeContent, SalesListModeContent } from '../modules/billing';
+import { InvoicesListModeContent } from '../modules/billing';
 import { renderTagBadges } from './crudTagBadges';
 import { apiRequest, downloadAPIFile } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
@@ -168,13 +166,13 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       labelPlural: customerPlural,
       labelPluralCap: customerPluralCap,
       createLabel: `+ Nuevo ${customerLabel}`,
-      render: () => <CustomersListModeContent />,
+      render: () => <PymesSimpleCrudListModeContent resourceId="customers" />,
     }),
   },
   suppliers: {
     basePath: '/v1/suppliers',
     ...createSupplierCrudConfig<Supplier>({
-      render: () => <SuppliersListModeContent />,
+      render: () => <PymesSimpleCrudListModeContent resourceId="suppliers" />,
     }),
   },
   products: {
@@ -433,17 +431,17 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
   quotes: {
     ...createQuotesCrudConfig<QuoteRecord>({
-      renderList: () => <QuotesListModeContent />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="quotes" />,
     }),
   },
   sales: {
     ...createSalesCrudConfig<SaleRecord>({
-      renderList: () => <SalesListModeContent />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="sales" />,
     }),
   },
   purchases: {
     ...createPurchasesCrudConfig<PurchaseRecord>({
-      renderList: () => <PurchasesListModeContent />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="purchases" />,
     }),
   },
 };

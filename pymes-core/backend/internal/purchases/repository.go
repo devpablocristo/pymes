@@ -89,12 +89,16 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 }
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+	return r.getByIDWithDB(ctx, r.db, orgID, id)
+}
+
+func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 	var row models.PurchaseModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	if err := db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
 	var items []models.PurchaseItemModel
-	if err := r.db.WithContext(ctx).Where("purchase_id = ?", id).Order("sort_order ASC").Find(&items).Error; err != nil {
+	if err := db.WithContext(ctx).Where("purchase_id = ?", id).Order("sort_order ASC").Find(&items).Error; err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
 	return toDomain(row, items), nil
@@ -136,7 +140,7 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 				return err
 			}
 		}
-		updated, err := r.GetByID(ctx, in.OrgID, in.ID)
+		updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
 		if err != nil {
 			return err
 		}
@@ -147,6 +151,91 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 		return purchasesdomain.Purchase{}, err
 	}
 	return out, nil
+}
+
+func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error) {
+	var out purchasesdomain.Purchase
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var current models.PurchaseModel
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Take(&current).Error; err != nil {
+			return err
+		}
+
+		updates := map[string]any{
+			"status":     in.Status,
+			"updated_at": time.Now().UTC(),
+		}
+		if in.Status == "received" && current.ReceivedAt == nil {
+			updates["received_at"] = time.Now().UTC()
+		} else if in.Status != "received" && current.ReceivedAt != nil {
+			updates["received_at"] = nil
+		}
+		if err := tx.Model(&models.PurchaseModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		if current.Status == in.Status {
+			updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
+			if err != nil {
+				return err
+			}
+			out = updated
+			return nil
+		}
+
+		needsStockApply := current.Status != "received" && in.Status == "received"
+		needsStockRevert := current.Status == "received" && in.Status != "received"
+		if needsStockApply || needsStockRevert {
+			var items []models.PurchaseItemModel
+			if err := tx.Where("purchase_id = ?", in.ID).Order("sort_order ASC").Find(&items).Error; err != nil {
+				return err
+			}
+			if needsStockRevert {
+				if err := r.reverseStock(ctx, tx, in.OrgID, in.ID, items, current.CreatedBy); err != nil {
+					return err
+				}
+			}
+			if needsStockApply {
+				if err := r.applyStock(ctx, tx, in.OrgID, in.ID, items, current.CreatedBy); err != nil {
+					return err
+				}
+			}
+		}
+
+		updated, err := r.getByIDWithDB(ctx, tx, in.OrgID, in.ID)
+		if err != nil {
+			return err
+		}
+		out = updated
+		return nil
+	})
+	if err != nil {
+		return purchasesdomain.Purchase{}, err
+	}
+	return out, nil
+}
+
+func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, orgID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
+	for _, item := range items {
+		if item.ProductID == nil || *item.ProductID == uuid.Nil || item.Quantity <= 0 {
+			continue
+		}
+		if err := tx.Exec(`
+			INSERT INTO stock_levels (product_id, org_id, quantity, min_quantity, updated_at)
+			VALUES (?, ?, ?, 0, now())
+			ON CONFLICT (org_id, product_id)
+			DO UPDATE SET quantity = stock_levels.quantity + EXCLUDED.quantity, updated_at = now()
+		`, *item.ProductID, orgID, -item.Quantity).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+			VALUES (gen_random_uuid(), ?, ?, 'out', ?, 'purchase_revert', ?, ?, ?, now())
+		`, orgID, *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error) {

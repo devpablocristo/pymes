@@ -1,0 +1,35 @@
+.crud-state-badge {
+  display: inline-block;
+  font-size: var(--text-role-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, transparent);
+}
+
+.crud-state-badge--info {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
+}
+
+.crud-state-badge--warning {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+.crud-state-badge--success {
+  background: var(--color-success-subtle);
+  color: var(--color-alert-success-text);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+
+.crud-state-badge--danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
+}

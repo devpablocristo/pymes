@@ -1,3 +1,37 @@
 .crud-value-kanban__board-only .m-kanban > .page-header.crud-page-shell__header {
   display: none;
 }
+
+.crud-value-kanban__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.crud-value-kanban__board-only .crud-kanban__column-add {
+  width: 100%;
+  justify-content: flex-start;
+  padding-left: 2rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--kb-card-border) 70%, rgba(255, 255, 255, 0.18));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--kb-card-bg) 88%, rgba(255, 255, 255, 0.03));
+  color: var(--kb-text-muted);
+  cursor: pointer;
+}
+
+.crud-value-kanban__board-only .crud-kanban__column-add:hover {
+  background: color-mix(in srgb, var(--kb-card-bg) 74%, rgba(87, 157, 255, 0.12));
+  border-color: color-mix(in srgb, var(--kb-accent-blue) 52%, var(--kb-card-border));
+  color: var(--kb-text);
+}
+
+.crud-value-kanban__board-only .crud-kanban__column-add:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--kb-accent-blue) 78%, transparent);
+  outline-offset: 2px;
+}
+
+.crud-value-kanban__board-only .crud-kanban__column-add-icon {
+  opacity: 0.82;
+}

@@ -17,3 +17,7 @@ type CreatePurchaseRequest struct {
 	Notes         string                `json:"notes,omitempty"`
 	Items         []PurchaseItemPayload `json:"items" binding:"required"`
 }
+
+type UpdatePurchaseStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+}

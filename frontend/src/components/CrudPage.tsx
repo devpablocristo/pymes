@@ -43,6 +43,61 @@ export type CrudValueFilterOption<T extends { id: string }> = {
   matches: (row: T) => boolean;
 };
 
+export type CrudStateMachineStateConfig<Status extends string = string, ColumnId extends string = string> = {
+  value: Status;
+  label: string;
+  columnId: ColumnId;
+  badgeVariant?: 'default' | 'info' | 'warning' | 'success' | 'danger';
+  terminal?: boolean;
+};
+
+export type CrudStateMachineColumnConfig<Status extends string = string, ColumnId extends string = string> = {
+  id: ColumnId;
+  label: string;
+  defaultState: Status;
+};
+
+export type CrudStateMachineTransitionConfig<Status extends string = string> = {
+  from: Status;
+  to: Status[];
+};
+
+export type CrudStateMachineConfig<
+  T extends { id: string },
+  Status extends string = string,
+  ColumnId extends string = string,
+> = {
+  field: keyof T & string;
+  states: CrudStateMachineStateConfig<Status, ColumnId>[];
+  columns: CrudStateMachineColumnConfig<Status, ColumnId>[];
+  transitions?: CrudStateMachineTransitionConfig<Status>[];
+};
+
+export type CrudKanbanConfig<T extends { id: string }> = {
+  /**
+   * CTA reusable al pie de cada columna para crear desde el tablero.
+   */
+  createFooterLabel?: string;
+  /**
+   * Persistencia dedicada del valor movido en el kanban.
+   * Permite que el tablero actualice solo el campo de estado/valor sin reconstruir
+   * un PUT completo del recurso desde una fila parcial del listado.
+   */
+  persistMove?: (args: {
+    row: T;
+    field: keyof T & string;
+    nextValue: string;
+  }) => Promise<T>;
+  /**
+   * Compatibilidad legacy hasta migrar todos los recursos al contrato `stateMachine`.
+   */
+  field?: keyof T & string;
+  /**
+   * Compatibilidad legacy hasta migrar todos los recursos al contrato `stateMachine`.
+   */
+  terminalValues?: string[];
+};
+
 export type {
   CrudColumn,
   CrudDataSource,
@@ -64,6 +119,10 @@ export type CrudPageConfig<T extends { id: string }> = ModulesCrudPageConfig<T> 
   renderTagsCell?: (row: T) => import('react').ReactNode;
   /** Filtros genéricos por valor para el header CRUD común. */
   valueFilterOptions?: CrudValueFilterOption<T>[];
+  /** Máquina de estados canónica del recurso. */
+  stateMachine?: CrudStateMachineConfig<T>;
+  /** Configuración reusable del kanban genérico del recurso. */
+  kanban?: CrudKanbanConfig<T>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapa heterogéneo: cada config tiene su propio tipo de record, TS no soporta tipos existenciales

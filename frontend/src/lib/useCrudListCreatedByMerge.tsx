@@ -15,6 +15,17 @@ export function useCrudListCreatedByMerge(): {
   preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
   listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
 } {
+  if (!clerkEnabled) {
+    return {};
+  }
+
+  return useCrudListCreatedByMergeWithClerk();
+}
+
+function useCrudListCreatedByMergeWithClerk(): {
+  preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
+  listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
+} {
   const { user, isLoaded: clerkUserLoaded } = useUser();
   const selfId = user?.id;
   // Por defecto "Todos": semillas/API usan created_by distinto al user id de Clerk (ej. "seed");
@@ -22,9 +33,6 @@ export function useCrudListCreatedByMerge(): {
   const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
   return useMemo(() => {
-    if (!clerkEnabled) {
-      return {};
-    }
     const opts = {
       authEnabled: clerkEnabled,
       authUserLoaded: clerkUserLoaded,

@@ -20,6 +20,7 @@ type usecasesPort interface {
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -31,6 +32,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
 	auth.PUT("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
+	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -102,6 +104,29 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) UpdateStatus(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	var req dto.UpdatePurchaseStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
+		ID:     id,
+		OrgID:  orgID,
+		Status: strings.TrimSpace(req.Status),
+	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

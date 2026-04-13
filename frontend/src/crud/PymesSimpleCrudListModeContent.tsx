@@ -9,11 +9,15 @@ import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
   CrudGallerySurface,
+  CrudKanbanColumnCreateButton,
   CrudPaginationBar,
   CrudTableSurface,
   CrudValueKanbanSurface,
+  getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
+  resolveCrudValueFilterOptions,
   useCrudArchivedSearchParam,
+  useCrudConfiguredValueKanban,
   useCrudRemoteGalleryPage,
   type CrudActionDialogField,
   type CrudTableSurfaceColumn,
@@ -135,6 +139,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     hasMore,
     loadingMore,
     loadMore,
+    setItems,
     search: remoteSearch,
     setSearch: setRemoteSearch,
     selectedId,
@@ -156,6 +161,16 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
       const searchText = crudConfig?.searchText?.(row) ?? '';
       return String(searchText).toLowerCase().includes(query);
     },
+  });
+  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
+
+  const valueKanban = useCrudConfiguredValueKanban<T>({
+    crudConfig,
+    items,
+    setItems,
+    reload,
+    setError,
+    archived,
   });
 
   const columns = useMemo<CrudTableSurfaceColumn<T>[]>(() => {
@@ -191,21 +206,26 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   }, [archived, crudConfig]);
 
   const runCreateOrEdit = useCallback(
-    async (row?: T) => {
+    async (row?: T, createDefaults: CrudFormValues = {}) => {
       if (!crudConfig) return;
       const editing = Boolean(row);
       const fields = activeFields(crudConfig.formFields, editing);
       if (fields.length === 0) return;
+      const createInitialValues = {
+        ...buildEmptyFormValues(fields),
+        ...createDefaults,
+      };
       const values = await openCrudFormDialog({
         title: editing ? `Editar ${crudConfig.label}` : crudConfig.createLabel ?? `Nuevo ${crudConfig.label}`,
         subtitle: editing ? crudConfig.labelPluralCap : undefined,
         submitLabel: editing ? 'Guardar' : 'Crear',
         fields: fields.map((field) =>
-          toDialogField(field, editing && row ? crudConfig.toFormValues(row) : buildEmptyFormValues(fields)),
+          toDialogField(field, editing && row ? crudConfig.toFormValues(row) : createInitialValues),
         ),
       });
       if (!values) return;
-      if (!crudConfig.isValid(values)) {
+      const submittedValues = editing ? values : { ...createDefaults, ...values };
+      if (!crudConfig.isValid(submittedValues)) {
         setError(`Revisá los campos de ${crudConfig.label}.`);
         return;
       }
@@ -213,19 +233,19 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
       try {
         if (editing && row) {
           if (crudConfig.dataSource?.update) {
-            await crudConfig.dataSource.update(row, values);
+            await crudConfig.dataSource.update(row, submittedValues);
           } else if (crudConfig.basePath) {
             await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
               method: 'PUT',
-              body: crudConfig.toBody ? crudConfig.toBody(values) : (values as Record<string, unknown>),
+              body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
             });
           }
         } else if (crudConfig.dataSource?.create) {
-          await crudConfig.dataSource.create(values);
+          await crudConfig.dataSource.create(submittedValues);
         } else if (crudConfig.basePath) {
           await apiRequest(crudConfig.basePath, {
             method: 'POST',
-            body: crudConfig.toBody ? crudConfig.toBody(values) : (values as Record<string, unknown>),
+            body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
           });
         }
         await reload();
@@ -236,9 +256,30 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     [crudConfig, reload, setError],
   );
 
+  const canEdit = crudConfig?.allowEdit ?? Boolean(crudConfig?.formFields.length);
+  const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
+  const paginationEnabled = crudConfig?.featureFlags?.pagination !== false;
+  const kanbanCreateFooterLabel = crudConfig?.kanban?.createFooterLabel ?? `Añadir ${crudConfig?.label ?? 'registro'}`;
+  const getKanbanCreateDefaults = useCallback(
+    (columnId: string): CrudFormValues => {
+      if (!crudConfig?.stateMachine) return {};
+      const nextState = getCrudStateMachineColumnDefaultState(crudConfig.stateMachine, columnId);
+      if (!nextState) return {};
+      return { [crudConfig.stateMachine.field]: nextState };
+    },
+    [crudConfig],
+  );
+
+  const resolvedTableRowClick = useMemo(() => {
+    if (onRowClick) return onRowClick;
+    if (archived || !canEdit) return undefined;
+    return (row: T) => {
+      void runCreateOrEdit(row);
+    };
+  }, [archived, canEdit, onRowClick, runCreateOrEdit]);
+
   const rowActions = useMemo<CrudTableSurfaceRowAction<T>[]>(() => {
     if (!crudConfig) return [];
-    const canEdit = crudConfig.allowEdit ?? Boolean(crudConfig.formFields.length > 0);
     const canDelete = crudConfig.allowDelete ?? Boolean(crudConfig.supportsArchived);
     const canRestore = crudConfig.allowRestore ?? Boolean(crudConfig.supportsArchived);
     const canHardDelete = crudConfig.allowHardDelete ?? Boolean(crudConfig.supportsArchived);
@@ -310,7 +351,9 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     return [
       ...configRowActions,
       ...(canEdit
-        ? [
+        ? resolvedTableRowClick
+          ? []
+          : [
             {
               id: 'edit',
               label: 'Editar',
@@ -343,15 +386,17 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           ]
         : []),
     ];
-  }, [archived, crudConfig, items, reload, runCreateOrEdit, setError]);
+  }, [archived, canEdit, crudConfig, items, reload, resolvedTableRowClick, runCreateOrEdit, setError]);
 
-  const canEdit = crudConfig?.allowEdit ?? Boolean(crudConfig?.formFields.length);
-  const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
-  const paginationEnabled = crudConfig?.featureFlags?.pagination !== false;
   const rowRecordValues = (row: T) => row as Record<string, unknown>;
   const cardTitle = (row: T) => pickStringValue(rowRecordValues(row), ['name', 'number', 'description', 'title', 'code', 'id']) || row.id;
-  const cardSubtitle = (row: T) =>
-    pickStringValue(rowRecordValues(row), ['status', 'customer_name', 'supplier_name', 'contact_name', 'category', 'type']);
+  const cardSubtitle = (row: T) => {
+    const stateField = crudConfig?.stateMachine?.field;
+    const candidates = ['status', 'customer_name', 'supplier_name', 'contact_name', 'category', 'type'].filter(
+      (key) => key !== stateField,
+    );
+    return pickStringValue(rowRecordValues(row), candidates);
+  };
   const cardMeta = (row: T) =>
     pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
 
@@ -421,7 +466,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           loading={loading}
           title={crudConfig.labelPluralCap}
           emptyLabel={archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}
-          valueFilterOptions={crudConfig.valueFilterOptions}
+          stateMachine={crudConfig.stateMachine}
+          valueFilterOptions={resolvedValueFilterOptions}
           onCardOpen={(row) => {
             if (!archived && canEdit) {
               void runCreateOrEdit(row);
@@ -433,21 +479,28 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           getCardSubtitle={cardSubtitle}
           getCardMeta={cardMeta}
           disableDrag={archived}
+          onMoveCard={valueKanban.enabled ? valueKanban.onMoveCard : undefined}
+          isRowDraggable={valueKanban.enabled ? valueKanban.isRowDraggable : undefined}
+          isColumnDroppable={valueKanban.enabled ? valueKanban.isColumnDroppable : undefined}
+          columnFooter={
+            !archived && canCreate
+              ? (columnId) => (
+                  <CrudKanbanColumnCreateButton
+                    label={kanbanCreateFooterLabel}
+                    onClick={() => {
+                      void runCreateOrEdit(undefined, getKanbanCreateDefaults(columnId));
+                    }}
+                  />
+                )
+              : undefined
+          }
         />
       ) : (
         <CrudTableSurface
           items={visibleItems}
           columns={columns}
           rowActions={rowActions}
-          onRowClick={
-            onRowClick
-              ? onRowClick
-              : archived || !canEdit
-                ? undefined
-                : (row) => {
-                    void runCreateOrEdit(row);
-                  }
-          }
+          onRowClick={resolvedTableRowClick}
         />
       )}
 

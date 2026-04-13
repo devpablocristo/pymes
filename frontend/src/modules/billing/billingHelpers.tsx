@@ -6,6 +6,7 @@ import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { openCrudFormDialog, openCrudTextDialog } from '../crud';
 import { buildStandardCrudViewModes } from '../crud';
+import { buildCrudSelectFieldOptionsFromStateMachine } from '../crud';
 import {
   invoiceInitials,
   nextInvoiceUid,
@@ -712,11 +713,28 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
 export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const valueFilterOptions = buildStringValueFilterOptions<TRecord>({
-    draft: 'Borrador',
-    received: 'Recibida',
-    cancelled: 'Cancelada',
-  });
+  const stateMachine = {
+    field: 'status',
+    states: [
+      { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+      { value: 'partial', label: 'Parcial', columnId: 'partial', badgeVariant: 'warning' },
+      { value: 'received', label: 'Recibida', columnId: 'received', badgeVariant: 'info' },
+      { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
+    ],
+    columns: [
+      { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+      { id: 'partial', label: 'Parcial', defaultState: 'partial' },
+      { id: 'received', label: 'Recibida', defaultState: 'received' },
+      { id: 'voided', label: 'Anulada', defaultState: 'voided' },
+    ],
+    transitions: [
+      { from: 'draft', to: ['partial', 'received', 'voided'] },
+      { from: 'partial', to: ['draft', 'received', 'voided'] },
+      { from: 'received', to: ['draft', 'partial', 'voided'] },
+      { from: 'voided', to: ['draft', 'partial', 'received'] },
+    ],
+  } satisfies NonNullable<CrudPageConfig<TRecord>['stateMachine']>;
+
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes'>({
     resourceId: 'purchases',
     renderList: opts.renderList,
@@ -757,11 +775,24 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     basePath: '/v1/purchases',
     allowDelete: false,
     ...base.config,
-    valueFilterOptions,
+    stateMachine,
+    kanban: {
+      createFooterLabel: 'Añadir compra',
+      persistMove: async ({ row, nextValue }) =>
+        apiRequest<TRecord>(`/v1/purchases/${row.id}/status`, {
+          method: 'PATCH',
+          body: { status: nextValue },
+        }),
+    },
     formFields: [
       { key: 'supplier_id', label: 'Supplier ID' },
       { key: 'supplier_name', label: 'Proveedor', required: true, placeholder: 'Nombre del proveedor' },
-      { key: 'status', label: 'Estado', placeholder: 'draft, received, cancelled' },
+      {
+        key: 'status',
+        label: 'Estado',
+        type: 'select',
+        options: buildCrudSelectFieldOptionsFromStateMachine<TRecord>(stateMachine),
+      },
       { key: 'payment_status', label: 'Estado de pago', placeholder: 'pending, partial, paid' },
       {
         key: 'items_json',

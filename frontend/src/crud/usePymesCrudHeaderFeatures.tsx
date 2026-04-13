@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import type { CrudPageConfig, CrudValueFilterOption } from '../components/CrudPage';
-import { CrudValueFilterSelector } from '../modules/crud';
+import { CrudValueFilterSelector, resolveCrudValueFilterOptions } from '../modules/crud';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 
@@ -45,7 +45,10 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [creatorFilterEnabled, items, preSearchFilter],
   );
 
-  const resolvedValueFilterOptions = (valueFilterOptions ?? crudConfig?.valueFilterOptions ?? []) as CrudValueFilterOption<T>[];
+  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(
+    crudConfig,
+    valueFilterOptions as CrudValueFilterOption<T>[] | undefined,
+  );
   const valueFilterEnabled =
     resolvedValueFilterOptions.length > 0 && crudConfig?.featureFlags?.valueFilter !== false;
 

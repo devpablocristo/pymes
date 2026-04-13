@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
 let currentConfig: CrudPageConfig<{ id: string; name: string }> | null = null;
+const { openCrudFormDialogMock } = vi.hoisted(() => ({
+  openCrudFormDialogMock: vi.fn(),
+}));
 
 vi.mock('../lib/i18n', () => ({
   useI18n: () => ({
@@ -40,6 +44,7 @@ vi.mock('../modules/crud', () => ({
   useCrudArchivedSearchParam: () => ({ archived: false }),
   useCrudRemoteGalleryPage: () => ({
     items: [{ id: '1', name: 'Cliente Uno' }],
+    setItems: vi.fn(),
     loading: false,
     error: null,
     setError: vi.fn(),
@@ -56,13 +61,19 @@ vi.mock('../modules/crud', () => ({
   CrudTableSurface: ({
     items,
     columns,
+    rowActions,
+    onRowClick,
   }: {
     items: Array<{ id: string; name: string }>;
     columns: Array<{ id: string; header: string }>;
+    rowActions?: Array<{ id: string; label: string }>;
+    onRowClick?: (row: { id: string; name: string }) => void;
   }) => (
     <div>
       <div>rows:{items.length}</div>
       <div>cols:{columns.map((column) => `${column.id}:${column.header}`).join('|')}</div>
+      <div>actions:{rowActions?.map((action) => action.id).join('|') ?? ''}</div>
+      <div>row-click:{String(Boolean(onRowClick))}</div>
     </div>
   ),
   CrudGallerySurface: () => <div>gallery-surface</div>,
@@ -75,8 +86,40 @@ vi.mock('../modules/crud', () => ({
     totalCount?: number;
     hasMore?: boolean;
   }) => <div>pagination:{visibleCount}:{String(totalCount ?? '')}:{String(Boolean(hasMore))}</div>,
-  CrudValueKanbanSurface: ({ items }: { items: Array<{ id: string; name: string }> }) => <div>kanban-surface:{items.length}</div>,
-  openCrudFormDialog: vi.fn(),
+  CrudKanbanColumnCreateButton: ({
+    label,
+    onClick,
+  }: {
+    label: string;
+    onClick: () => void;
+  }) => (
+    <button type="button" onClick={onClick}>
+      {label}
+    </button>
+  ),
+  CrudValueKanbanSurface: ({
+    items,
+    columnFooter,
+  }: {
+    items: Array<{ id: string; name: string }>;
+    columnFooter?: (columnId: string) => ReactNode;
+  }) => (
+    <div>
+      <div>kanban-surface:{items.length}</div>
+      <div>{columnFooter?.('received')}</div>
+    </div>
+  ),
+  openCrudFormDialog: openCrudFormDialogMock,
+  getCrudStateMachineColumnDefaultState: (stateMachine: { columns: Array<{ id: string; defaultState: string }> }, columnId: string) =>
+    stateMachine.columns.find((column) => column.id === columnId)?.defaultState ?? null,
+  useCrudConfiguredValueKanban: () => ({
+    enabled: false,
+    onMoveCard: vi.fn(),
+    isRowDraggable: vi.fn(),
+    isColumnDroppable: vi.fn(),
+  }),
+  resolveCrudValueFilterOptions: (config: CrudPageConfig<{ id: string; name: string }> | null) =>
+    config?.valueFilterOptions ?? [],
 }));
 
 vi.mock('./PymesCrudResourceShellHeader', () => ({
@@ -84,6 +127,63 @@ vi.mock('./PymesCrudResourceShellHeader', () => ({
 }));
 
 describe('PymesSimpleCrudListModeContent', () => {
+  beforeEach(() => {
+    openCrudFormDialogMock.mockReset();
+  });
+
+  it('preconfigura el estado al crear desde el pie de una columna kanban', async () => {
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    currentConfig = {
+      label: 'compra',
+      labelPlural: 'compras',
+      labelPluralCap: 'Compras',
+      basePath: '/v1/purchases',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [
+        { key: 'supplier_name', label: 'Proveedor' },
+        {
+          key: 'status',
+          label: 'Estado',
+          type: 'select',
+          options: [
+            { value: 'draft', label: 'Borrador' },
+            { value: 'received', label: 'Recibida' },
+          ],
+        },
+      ],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      allowCreate: true,
+      stateMachine: {
+        field: 'status',
+        states: [
+          { value: 'draft', label: 'Borrador', columnId: 'draft' },
+          { value: 'received', label: 'Recibida', columnId: 'received', badgeVariant: 'info' },
+        ],
+        columns: [
+          { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+          { id: 'received', label: 'Recibida', defaultState: 'received' },
+        ],
+      },
+      kanban: { createFooterLabel: 'Añadir compra' },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir compra' }));
+
+    expect(openCrudFormDialogMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fields: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'status',
+            defaultValue: 'received',
+          }),
+        ]),
+      }),
+    );
+  });
+
   it('mantiene orden de hooks cuando la config llega después del primer render', () => {
     currentConfig = null;
     const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="customers" />);
@@ -134,6 +234,25 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('cols:name:Nombre')).toBeInTheDocument();
   });
 
+  it('no genera la columna de acciones si la fila ya abre editar', () => {
+    currentConfig = {
+      label: 'compra',
+      labelPlural: 'compras',
+      labelPluralCap: 'Compras',
+      basePath: '/v1/purchases',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      allowEdit: true,
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="purchases" />);
+    expect(screen.getByText('actions:')).toBeInTheDocument();
+    expect(screen.getByText('row-click:true')).toBeInTheDocument();
+  });
+
   it('usa la surface reusable de kanban en vez del bloque inline viejo', () => {
     currentConfig = {
       label: 'compra',
@@ -149,10 +268,14 @@ describe('PymesSimpleCrudListModeContent', () => {
         { id: 'list', label: 'Lista', path: 'list', isDefault: true },
         { id: 'kanban', label: 'Tablero', path: 'board' },
       ],
+      kanban: { field: 'name', createFooterLabel: 'Añadir compra' },
+      createLabel: '+ Nueva compra',
+      allowCreate: true,
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
 
     render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
     expect(screen.getByText('kanban-surface:1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Añadir compra' })).toBeInTheDocument();
     expect(screen.getByText('pagination:1:1:false')).toBeInTheDocument();
   });
 });

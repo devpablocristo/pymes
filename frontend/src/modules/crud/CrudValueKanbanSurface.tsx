@@ -1,7 +1,9 @@
 import type { KanbanColumnDef, SuppressCardOpen } from '@devpablocristo/modules-kanban-board';
 import { useCallback, useEffect, useMemo, useState, type RefObject, type ReactNode } from 'react';
-import type { CrudValueFilterOption } from '../../components/CrudPage';
+import type { CrudStateMachineConfig, CrudValueFilterOption } from '../../components/CrudPage';
 import { CrudKanbanSurface } from './CrudKanbanSurface';
+import { CrudStateBadge } from './CrudStateBadge';
+import { findCrudStateMachineStateForRow } from './crudStateMachine';
 import './CrudValueKanbanSurface.css';
 
 type ValueColumn<T extends { id: string }> = {
@@ -15,6 +17,7 @@ type Props<T extends { id: string }> = {
   loading: boolean;
   title: string;
   emptyLabel: string;
+  stateMachine?: CrudStateMachineConfig<T>;
   valueFilterOptions?: CrudValueFilterOption<T>[];
   onCardOpen: (row: T) => void;
   getCardTitle: (row: T) => string;
@@ -22,6 +25,9 @@ type Props<T extends { id: string }> = {
   getCardMeta?: (row: T) => string;
   disableDrag?: boolean;
   columnFooter?: (columnId: string) => ReactNode;
+  onMoveCard?: (id: string, targetColumnId: string, overItemId?: string) => void;
+  isRowDraggable?: (row: T) => boolean;
+  isColumnDroppable?: (columnId: string) => boolean;
 };
 
 function prettifyLabel(value: string) {
@@ -94,6 +100,7 @@ function CrudValueKanbanCard<T extends { id: string }>({
   getCardTitle,
   getCardSubtitle,
   getCardMeta,
+  stateMachine,
 }: {
   row: T;
   onOpen: () => void;
@@ -101,6 +108,7 @@ function CrudValueKanbanCard<T extends { id: string }>({
   getCardTitle: (row: T) => string;
   getCardSubtitle?: (row: T) => string;
   getCardMeta?: (row: T) => string;
+  stateMachine?: CrudStateMachineConfig<T>;
 }) {
   const handleClick = () => {
     const suppress = suppressOpenRef.current;
@@ -110,6 +118,7 @@ function CrudValueKanbanCard<T extends { id: string }>({
 
   const subtitle = getCardSubtitle?.(row) ?? '';
   const meta = getCardMeta?.(row) ?? '';
+  const state = stateMachine ? findCrudStateMachineStateForRow(stateMachine, row) : null;
 
   return (
     <div
@@ -126,6 +135,11 @@ function CrudValueKanbanCard<T extends { id: string }>({
       draggable={false}
     >
       <strong>{getCardTitle(row)}</strong>
+      {state ? (
+        <div className="crud-value-kanban__badges">
+          <CrudStateBadge label={state.label} variant={state.badgeVariant} />
+        </div>
+      ) : null}
       {subtitle ? <div className="m-kanban__card-meta">{subtitle}</div> : null}
       {meta ? <div className="m-kanban__card-meta">{meta}</div> : null}
     </div>
@@ -137,17 +151,25 @@ function CrudValueKanbanOverlayCard<T extends { id: string }>({
   getCardTitle,
   getCardSubtitle,
   getCardMeta,
+  stateMachine,
 }: {
   row: T;
   getCardTitle: (row: T) => string;
   getCardSubtitle?: (row: T) => string;
   getCardMeta?: (row: T) => string;
+  stateMachine?: CrudStateMachineConfig<T>;
 }) {
   const subtitle = getCardSubtitle?.(row) ?? '';
   const meta = getCardMeta?.(row) ?? '';
+  const state = stateMachine ? findCrudStateMachineStateForRow(stateMachine, row) : null;
   return (
     <div className="m-kanban__card m-kanban__card--overlay" aria-hidden="true">
       <strong>{getCardTitle(row)}</strong>
+      {state ? (
+        <div className="crud-value-kanban__badges">
+          <CrudStateBadge label={state.label} variant={state.badgeVariant} />
+        </div>
+      ) : null}
       {subtitle ? <div className="m-kanban__card-meta">{subtitle}</div> : null}
       {meta ? <div className="m-kanban__card-meta">{meta}</div> : null}
     </div>
@@ -159,6 +181,7 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
   loading,
   title,
   emptyLabel,
+  stateMachine,
   valueFilterOptions = [],
   onCardOpen,
   getCardTitle,
@@ -166,6 +189,9 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
   getCardMeta,
   disableDrag = false,
   columnFooter,
+  onMoveCard,
+  isRowDraggable,
+  isColumnDroppable,
 }: Props<T>) {
   const [manualColumnById, setManualColumnById] = useState<Record<string, string>>({});
 
@@ -191,20 +217,34 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
 
   const getRowColumnId = useCallback(
     (row: T) => {
-      const manual = manualColumnById[row.id];
-      if (manual && columnIdSet.has(manual)) return manual;
+      if (onMoveCard == null) {
+        const manual = manualColumnById[row.id];
+        if (manual && columnIdSet.has(manual)) return manual;
+      }
       const resolved = columns.find((column) => column.matches(row))?.id;
       return resolved && columnIdSet.has(resolved) ? resolved : fallbackColumnId;
     },
-    [columnIdSet, columns, fallbackColumnId, manualColumnById],
+    [columnIdSet, columns, fallbackColumnId, manualColumnById, onMoveCard],
   );
 
-  const handleMoveCard = useCallback(
+  const handleInternalMoveCard = useCallback(
     (id: string, targetColumnId: string) => {
       if (disableDrag || !columnIdSet.has(targetColumnId)) return;
       setManualColumnById((current) => ({ ...current, [id]: targetColumnId }));
     },
     [columnIdSet, disableDrag],
+  );
+
+  const handleMoveCard = useCallback(
+    (id: string, targetColumnId: string, overItemId?: string) => {
+      if (disableDrag || !columnIdSet.has(targetColumnId)) return;
+      if (onMoveCard) {
+        onMoveCard(id, targetColumnId, overItemId);
+        return;
+      }
+      handleInternalMoveCard(id, targetColumnId);
+    },
+    [columnIdSet, disableDrag, handleInternalMoveCard, onMoveCard],
   );
 
   return (
@@ -227,6 +267,7 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
             getCardTitle={getCardTitle}
             getCardSubtitle={getCardSubtitle}
             getCardMeta={getCardMeta}
+            stateMachine={stateMachine}
           />
         )}
         renderOverlayCard={(row) => (
@@ -235,6 +276,7 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
             getCardTitle={getCardTitle}
             getCardSubtitle={getCardSubtitle}
             getCardMeta={getCardMeta}
+            stateMachine={stateMachine}
           />
         )}
         onCardOpen={onCardOpen}
@@ -242,8 +284,8 @@ export function CrudValueKanbanSurface<T extends { id: string }>({
         externalSearch=""
         statsLine={() => ''}
         emptyState={<div className="empty-state"><p>{emptyLabel}</p></div>}
-        isRowDraggable={() => !disableDrag}
-        isColumnDroppable={() => !disableDrag}
+        isRowDraggable={(row) => !disableDrag && (isRowDraggable?.(row) ?? true)}
+        isColumnDroppable={(columnId) => !disableDrag && (isColumnDroppable?.(columnId) ?? true)}
         columnFooter={columnFooter}
       />
     </div>

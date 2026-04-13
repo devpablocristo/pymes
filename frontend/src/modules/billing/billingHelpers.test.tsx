@@ -150,6 +150,44 @@ describe('billingHelpers', () => {
     expect(config.labelPluralCap).toBe('Compras');
     expect(config.viewModes?.map((mode) => mode.id)).toEqual(['list', 'gallery', 'kanban']);
     expect(config.viewModes?.map((mode) => mode.path)).toEqual(['list', 'gallery', 'board']);
+    expect(config.stateMachine).toEqual({
+      field: 'status',
+      states: [
+        { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'partial', label: 'Parcial', columnId: 'partial', badgeVariant: 'warning' },
+        { value: 'received', label: 'Recibida', columnId: 'received', badgeVariant: 'info' },
+        { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
+      ],
+      columns: [
+        { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'partial', label: 'Parcial', defaultState: 'partial' },
+        { id: 'received', label: 'Recibida', defaultState: 'received' },
+        { id: 'voided', label: 'Anulada', defaultState: 'voided' },
+      ],
+      transitions: [
+        { from: 'draft', to: ['partial', 'received', 'voided'] },
+        { from: 'partial', to: ['draft', 'received', 'voided'] },
+        { from: 'received', to: ['draft', 'partial', 'voided'] },
+        { from: 'voided', to: ['draft', 'partial', 'received'] },
+      ],
+    });
+    expect(config.kanban).toEqual(
+      expect.objectContaining({
+        createFooterLabel: 'Añadir compra',
+        persistMove: expect.any(Function),
+      }),
+    );
+    expect(config.formFields.find((field) => field.key === 'status')).toEqual({
+      key: 'status',
+      label: 'Estado',
+      type: 'select',
+      options: [
+        { value: 'draft', label: 'Borrador' },
+        { value: 'partial', label: 'Parcial' },
+        { value: 'received', label: 'Recibida' },
+        { value: 'voided', label: 'Anulada' },
+      ],
+    });
     expect(
       config.toBody?.({
         supplier_id: 's1',

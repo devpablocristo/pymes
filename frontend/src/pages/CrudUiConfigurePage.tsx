@@ -8,11 +8,12 @@ import { crudModuleCatalog } from '../crud/crudModuleCatalog';
 import './CrudUiConfigurePage.css';
 
 const FEATURE_KEYS = [
+  ['searchBar', 'Buscador'],
   ['creatorFilter', 'Filtro de responsable'],
-  ['headerQuickFilterStrip', 'Filtros rápidos en cabecera'],
-  ['valueFilter', 'Filtro de valor'],
-  ['pagination', 'Paginación'],
+  ['archivedToggle', 'Ver archivados'],
+  ['createAction', 'Acción crear'],
   ['csvToolbar', 'Acciones CSV'],
+  ['pagination', 'Paginación'],
 ] as const;
 
 export function CrudUiConfigurePage() {

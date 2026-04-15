@@ -35,10 +35,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   const creatorFilterEnabled = enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false;
-  const headerQuickFilterStripEnabled =
-    creatorFilterEnabled &&
-    listHeaderInlineSlot != null &&
-    crudConfig?.featureFlags?.headerQuickFilterStrip !== false;
+  const headerQuickFilterStripEnabled = creatorFilterEnabled && listHeaderInlineSlot != null;
 
   const creatorFilteredItems = useMemo(
     () => (creatorFilterEnabled && preSearchFilter ? preSearchFilter(items) : items),
@@ -49,8 +46,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     crudConfig,
     valueFilterOptions as CrudValueFilterOption<T>[] | undefined,
   );
-  const valueFilterEnabled =
-    resolvedValueFilterOptions.length > 0 && crudConfig?.featureFlags?.valueFilter !== false;
+  const valueFilterEnabled = creatorFilterEnabled;
 
   const valueFilteredItems = useMemo(() => {
     if (!valueFilterEnabled || valueFilter === 'all') return creatorFilteredItems;

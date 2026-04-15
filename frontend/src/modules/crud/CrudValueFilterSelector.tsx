@@ -17,7 +17,6 @@ export function CrudValueFilterSelector<T extends { id: string }>({
   ariaLabel = 'Filtrar por valor',
   className,
 }: Props<T>) {
-  if (options.length === 0) return null;
   return (
     <select
       className={className}

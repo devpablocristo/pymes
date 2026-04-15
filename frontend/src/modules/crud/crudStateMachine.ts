@@ -56,6 +56,24 @@ export function buildSimpleStatusStateMachine<T extends { id: string; status: st
   };
 }
 
+export function buildFullyConnectedStatusStateMachine<T extends { id: string; status: string }>(
+  states: Array<{
+    value: string;
+    label: string;
+    badgeVariant?: NonNullable<
+      NonNullable<CrudPageConfig<T>['stateMachine']>['states'][number]['badgeVariant']
+    >;
+  }>,
+): CrudStateMachineConfig<T> {
+  return {
+    ...buildSimpleStatusStateMachine(states),
+    transitions: states.map((state) => ({
+      from: state.value,
+      to: states.filter((candidate) => candidate.value !== state.value).map((candidate) => candidate.value),
+    })),
+  };
+}
+
 export function findCrudStateMachineStateByValue<T extends { id: string }>(
   stateMachine: CrudStateMachineConfig<T>,
   rawValue: unknown,

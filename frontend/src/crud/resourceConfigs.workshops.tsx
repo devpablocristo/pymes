@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
-import type { CrudFieldValue, CrudPageConfig, CrudResourceConfigMap } from '../components/CrudPage';
+import type { CrudFieldValue, CrudResourceConfigMap } from '../components/CrudPage';
 import {
   createWorkshopVehicle,
   updateWorkshopVehicle,
@@ -21,13 +21,8 @@ import {
   type WorkOrder,
   type WorkOrderLineItem as WorkOrderItem,
 } from '../lib/workOrdersApi';
-import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
-import { BikeWorkOrdersListModeContent } from '../pages/modes/BikeWorkOrdersListModeContent';
-import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
-import { CarWorkOrdersListModeContent } from '../pages/modes/CarWorkOrdersListModeContent';
 import { formatWorkshopMoney, renderWorkshopWorkOrderStatusBadge } from './workshopsCrudHelpers';
-import { withCSVToolbar } from './csvToolbar';
-import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
+import { defineCrudDomain } from './defineCrudDomain';
 import {
   asBoolean,
   asNumber,
@@ -42,13 +37,38 @@ import {
   toRFC3339,
 } from './resourceConfigs.shared';
 import { openCrudFormDialog } from '../modules/crud';
+import { buildStandardCrudViewModes } from '../modules/crud';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
+import type { CrudStateMachineConfig } from '../components/CrudPage';
 
 type BikeWorkOrder = WorkOrder;
-type BikeWorkOrderItem = WorkOrderItem;
 const createBikeQuote = createWorkOrderQuote;
 const createBikeSale = createWorkOrderSale;
 const createBikePaymentLink = createWorkOrderPaymentLink;
+
+const WORK_ORDER_STATE_MACHINE: CrudStateMachineConfig<WorkOrder> = {
+  field: 'status',
+  states: [
+    { value: 'received', label: 'Recibido', columnId: 'wo_intake', badgeVariant: 'info' as const },
+    { value: 'diagnosing', label: 'Diagnóstico', columnId: 'wo_intake', badgeVariant: 'warning' as const },
+    { value: 'quote_pending', label: 'Presupuesto', columnId: 'wo_quote', badgeVariant: 'warning' as const },
+    { value: 'awaiting_parts', label: 'Repuestos', columnId: 'wo_quote', badgeVariant: 'warning' as const },
+    { value: 'in_progress', label: 'En taller', columnId: 'wo_shop', badgeVariant: 'info' as const },
+    { value: 'quality_check', label: 'Control', columnId: 'wo_shop', badgeVariant: 'info' as const },
+    { value: 'on_hold', label: 'En pausa', columnId: 'wo_shop', badgeVariant: 'warning' as const },
+    { value: 'ready_for_pickup', label: 'Listo retiro', columnId: 'wo_exit', badgeVariant: 'success' as const },
+    { value: 'delivered', label: 'Entregado', columnId: 'wo_exit', badgeVariant: 'success' as const },
+    { value: 'invoiced', label: 'Facturado', columnId: 'wo_closed', badgeVariant: 'success' as const, terminal: true },
+    { value: 'cancelled', label: 'Cancelado', columnId: 'wo_closed', badgeVariant: 'danger' as const, terminal: true },
+  ],
+  columns: [
+    { id: 'wo_intake', label: 'Ingreso', defaultState: 'received' },
+    { id: 'wo_quote', label: 'Presupuesto / repuestos', defaultState: 'quote_pending' },
+    { id: 'wo_shop', label: 'Taller', defaultState: 'in_progress' },
+    { id: 'wo_exit', label: 'Salida', defaultState: 'ready_for_pickup' },
+    { id: 'wo_closed', label: 'Cerradas', defaultState: 'invoiced' },
+  ],
+};
 
 function parseWorkOrderItems(value: CrudFieldValue | undefined): WorkOrderItem[] {
   const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
@@ -70,24 +90,115 @@ function parseWorkOrderItems(value: CrudFieldValue | undefined): WorkOrderItem[]
     .filter((item) => item.description && item.quantity > 0);
 }
 
-function parseBikeWorkOrderItems(value: CrudFieldValue | undefined): BikeWorkOrderItem[] {
-  const parsed = parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
-  return parsed
-    .map((item, index) => ({
-      item_type: item.item_type === 'part' ? ('part' as const) : ('service' as const),
-      service_id: asOptionalString(item.service_id as CrudFieldValue),
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_price: Number(item.unit_price ?? 0),
-      tax_rate: item.tax_rate === undefined || item.tax_rate === null ? 21 : Number(item.tax_rate),
-      sort_order: Number(item.sort_order ?? index),
-      metadata:
-        item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
-          ? (item.metadata as Record<string, unknown>)
-          : {},
-    }))
-    .filter((item) => item.description && item.quantity > 0);
+type WorkOrderTargetKind = 'vehicle' | 'bicycle';
+
+type WorkOrderPayloadFields = {
+  targetType: WorkOrderTargetKind;
+  targetIdKey: string;
+  targetLabelKey: string;
+};
+
+const CAR_WORK_ORDER_FIELDS: WorkOrderPayloadFields = {
+  targetType: 'vehicle',
+  targetIdKey: 'vehicle_id',
+  targetLabelKey: 'vehicle_plate',
+};
+
+const BIKE_WORK_ORDER_FIELDS: WorkOrderPayloadFields = {
+  targetType: 'bicycle',
+  targetIdKey: 'bicycle_id',
+  targetLabelKey: 'bicycle_label',
+};
+
+function buildWorkOrderCreatePayload(
+  fields: WorkOrderPayloadFields,
+  values: Record<string, CrudFieldValue | undefined>,
+) {
+  const base = {
+    number: asOptionalString(values.number),
+    target_type: fields.targetType,
+    target_id: asString(values[fields.targetIdKey]),
+    target_label: asOptionalString(values[fields.targetLabelKey]),
+    customer_id: asOptionalString(values.customer_id),
+    customer_name: asOptionalString(values.customer_name),
+    booking_id: fields.targetType === 'vehicle' ? asOptionalString(values.booking_id) : undefined,
+    status: asOptionalString(values.status) ?? 'received',
+    requested_work: asOptionalString(values.requested_work),
+    diagnosis: asOptionalString(values.diagnosis),
+    notes: asOptionalString(values.notes),
+    internal_notes: asOptionalString(values.internal_notes),
+    currency: asOptionalString(values.currency) ?? 'ARS',
+    opened_at: toRFC3339(values.opened_at) ?? new Date().toISOString(),
+    promised_at: toRFC3339(values.promised_at),
+    items: parseWorkOrderItems(values.items),
+  };
+  return base;
+}
+
+function buildWorkOrderUpdatePayload(
+  fields: WorkOrderPayloadFields,
+  values: Record<string, CrudFieldValue | undefined>,
+) {
+  return {
+    target_id: asOptionalString(values[fields.targetIdKey]),
+    target_label: asOptionalString(values[fields.targetLabelKey]),
+    customer_id: asOptionalString(values.customer_id),
+    customer_name: asOptionalString(values.customer_name),
+    booking_id: fields.targetType === 'vehicle' ? asOptionalString(values.booking_id) : undefined,
+    status: asOptionalString(values.status),
+    requested_work: asOptionalString(values.requested_work),
+    diagnosis: asOptionalString(values.diagnosis),
+    notes: asOptionalString(values.notes),
+    internal_notes: asOptionalString(values.internal_notes),
+    currency: asOptionalString(values.currency),
+    promised_at: toRFC3339(values.promised_at),
+    items: parseWorkOrderItems(values.items),
+  };
+}
+
+const workOrderArchiveMutations = {
+  deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
+  restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
+  hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
+};
+
+function buildWorkOrderListSource(targetType: WorkOrderTargetKind) {
+  return async ({ archived }: { archived: boolean }) => {
+    if (archived) {
+      return (await getUnifiedWorkOrdersArchived({ target_type: targetType })) as unknown as WorkOrder[];
+    }
+    return (await getAllUnifiedWorkOrders({ target_type: targetType })) as unknown as WorkOrder[];
+  };
+}
+
+function buildVehicleCreatePayload(values: Record<string, CrudFieldValue | undefined>) {
+  return {
+    customer_id: asOptionalString(values.customer_id),
+    customer_name: asOptionalString(values.customer_name),
+    license_plate: asString(values.license_plate),
+    vin: asOptionalString(values.vin),
+    make: asString(values.make),
+    model: asString(values.model),
+    year: asNumber(values.year),
+    kilometers: asNumber(values.kilometers),
+    color: asOptionalString(values.color),
+    notes: asOptionalString(values.notes),
+  };
+}
+
+function buildVehicleUpdatePayload(values: Record<string, CrudFieldValue | undefined>) {
+  return {
+    customer_id: asOptionalString(values.customer_id),
+    customer_name: asOptionalString(values.customer_name),
+    license_plate: asOptionalString(values.license_plate),
+    vin: asOptionalString(values.vin),
+    make: asOptionalString(values.make),
+    model: asOptionalString(values.model),
+    year: asOptionalNumber(values.year),
+    kilometers: asOptionalNumber(values.kilometers),
+    color: asOptionalString(values.color),
+    notes: asOptionalString(values.notes),
+  };
 }
 
 const workshopsResourceConfigs: CrudResourceConfigMap = {
@@ -101,32 +212,10 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
     dataSource: {
       list: async (opts) => workshopVehiclesArchivedCrud.list<WorkshopVehicle>(opts),
       create: async (values) => {
-        await createWorkshopVehicle({
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          license_plate: asString(values.license_plate),
-          vin: asOptionalString(values.vin),
-          make: asString(values.make),
-          model: asString(values.model),
-          year: asNumber(values.year),
-          kilometers: asNumber(values.kilometers),
-          color: asOptionalString(values.color),
-          notes: asOptionalString(values.notes),
-        });
+        await createWorkshopVehicle(buildVehicleCreatePayload(values));
       },
       update: async (row: WorkshopVehicle, values) => {
-        await updateWorkshopVehicle(row.id, {
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          license_plate: asOptionalString(values.license_plate),
-          vin: asOptionalString(values.vin),
-          make: asOptionalString(values.make),
-          model: asOptionalString(values.model),
-          year: asOptionalNumber(values.year),
-          kilometers: asOptionalNumber(values.kilometers),
-          color: asOptionalString(values.color),
-          notes: asOptionalString(values.notes),
-        });
+        await updateWorkshopVehicle(row.id, buildVehicleUpdatePayload(values));
       },
       deleteItem: workshopVehiclesArchivedCrud.deleteItem,
       restore: workshopVehiclesArchivedCrud.restore,
@@ -178,82 +267,40 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       asString(values.license_plate).trim().length >= 5 &&
       asString(values.make).trim().length >= 2 &&
       asString(values.model).trim().length >= 1,
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="workshopVehicles" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="workshopVehicles" />),
   },
   carWorkOrders: {
     supportsArchived: true,
-    viewModes: [
+    viewModes: buildStandardCrudViewModes(
+      () => <PymesSimpleCrudListModeContent resourceId="carWorkOrders" />,
       {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <CarWorkOrdersKanbanModeContent />,
+        defaultModeId: 'kanban',
+        renderKanban: () => <PymesSimpleCrudListModeContent resourceId="carWorkOrders" mode="kanban" />,
+        ariaLabel: 'Navegación tablero / lista / galería',
       },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista', render: () => <CarWorkOrdersListModeContent /> },
-    ],
+    ),
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo',
     createLabel: '+ Nueva orden de trabajo',
     searchPlaceholder: 'Buscar...',
+    stateMachine: WORK_ORDER_STATE_MACHINE,
+    kanban: {
+      persistMove: async ({ row, nextValue }) => {
+        await updateUnifiedWorkOrder(row.id, { status: nextValue });
+        return { ...row, status: nextValue } as WorkOrder;
+      },
+    },
     dataSource: {
       // Auto-repair pasa al endpoint unificado /v1/work-orders con target_type='vehicle'.
-      list: async ({ archived }) => {
-        if (archived) {
-          return (await getUnifiedWorkOrdersArchived({ target_type: 'vehicle' })) as unknown as WorkOrder[];
-        }
-        return (await getAllUnifiedWorkOrders({ target_type: 'vehicle' })) as unknown as WorkOrder[];
-      },
+      list: buildWorkOrderListSource('vehicle'),
       create: async (values) => {
-        await createUnifiedWorkOrder({
-          number: asOptionalString(values.number),
-          target_type: 'vehicle',
-          target_id: asString(values.vehicle_id),
-          target_label: asOptionalString(values.vehicle_plate),
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          booking_id: asOptionalString(values.booking_id),
-          status: asOptionalString(values.status) ?? 'received',
-          requested_work: asOptionalString(values.requested_work),
-          diagnosis: asOptionalString(values.diagnosis),
-          notes: asOptionalString(values.notes),
-          internal_notes: asOptionalString(values.internal_notes),
-          currency: asOptionalString(values.currency) ?? 'ARS',
-          opened_at: toRFC3339(values.opened_at) ?? new Date().toISOString(),
-          promised_at: toRFC3339(values.promised_at),
-          items: parseWorkOrderItems(values.items_json),
-        });
+        await createUnifiedWorkOrder(buildWorkOrderCreatePayload(CAR_WORK_ORDER_FIELDS, values));
       },
       update: async (row: WorkOrder, values) => {
-        await updateUnifiedWorkOrder(row.id, {
-          target_id: asOptionalString(values.vehicle_id),
-          target_label: asOptionalString(values.vehicle_plate),
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          booking_id: asOptionalString(values.booking_id),
-          status: asOptionalString(values.status),
-          requested_work: asOptionalString(values.requested_work),
-          diagnosis: asOptionalString(values.diagnosis),
-          notes: asOptionalString(values.notes),
-          internal_notes: asOptionalString(values.internal_notes),
-          currency: asOptionalString(values.currency),
-          promised_at: toRFC3339(values.promised_at),
-          items: parseWorkOrderItems(values.items_json),
-        });
+        await updateUnifiedWorkOrder(row.id, buildWorkOrderUpdatePayload(CAR_WORK_ORDER_FIELDS, values));
       },
-      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
-      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
-      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
+      ...workOrderArchiveMutations,
     },
     columns: [
       {
@@ -315,8 +362,8 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       { key: 'notes', label: 'Notas para cliente', type: 'textarea', fullWidth: true, createOnly: true },
       { key: 'internal_notes', label: 'Notas internas', type: 'textarea', fullWidth: true, createOnly: true },
       {
-        key: 'items_json',
-        label: 'Items JSON',
+        key: 'items',
+        label: 'Items',
         type: 'textarea',
         required: true,
         fullWidth: true,
@@ -447,79 +494,48 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       diagnosis: row.diagnosis ?? '',
       notes: row.notes ?? '',
       internal_notes: row.internal_notes ?? '',
-      items_json: stringifyJSON(row.items ?? []),
+      items: stringifyJSON(row.items ?? []),
     }),
     isValid: (values) =>
       asString(values.vehicle_id).trim().length > 0 &&
       Boolean(toRFC3339(values.opened_at)) &&
-      asString(values.items_json).trim().length > 0,
+      asString(values.items).trim().length > 0,
   },
 
   // ── Bicicletería ──
 
   bikeWorkOrders: {
     supportsArchived: true,
-    viewModes: [
+    viewModes: buildStandardCrudViewModes(
+      () => <PymesSimpleCrudListModeContent resourceId="bikeWorkOrders" />,
       {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <BikeWorkOrdersKanbanModeContent />,
+        defaultModeId: 'kanban',
+        renderKanban: () => <PymesSimpleCrudListModeContent resourceId="bikeWorkOrders" mode="kanban" />,
+        ariaLabel: 'Navegación tablero / lista / galería',
       },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista', render: () => <BikeWorkOrdersListModeContent /> },
-    ],
+    ),
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',
     labelPluralCap: 'Órdenes de trabajo (bicicletería)',
     createLabel: '+ Nueva orden',
     searchPlaceholder: 'Buscar...',
+    stateMachine: WORK_ORDER_STATE_MACHINE,
+    kanban: {
+      persistMove: async ({ row, nextValue }) => {
+        await updateUnifiedWorkOrder(row.id, { status: nextValue });
+        return { ...row, status: nextValue } as BikeWorkOrder;
+      },
+    },
     dataSource: {
       // Bike-shop pasa al endpoint unificado /v1/work-orders con target_type='bicycle'.
-      list: async ({ archived }) => {
-        if (archived) {
-          return (await getUnifiedWorkOrdersArchived({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
-        }
-        return (await getAllUnifiedWorkOrders({ target_type: 'bicycle' })) as unknown as BikeWorkOrder[];
-      },
+      list: buildWorkOrderListSource('bicycle'),
       create: async (values) => {
-        await createUnifiedWorkOrder({
-          target_type: 'bicycle',
-          target_id: asString(values.bicycle_id),
-          target_label: asOptionalString(values.bicycle_label),
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          status: asOptionalString(values.status) ?? 'received',
-          requested_work: asOptionalString(values.requested_work),
-          diagnosis: asOptionalString(values.diagnosis),
-          notes: asOptionalString(values.notes),
-          internal_notes: asOptionalString(values.internal_notes),
-          currency: asOptionalString(values.currency) ?? 'ARS',
-          opened_at: toRFC3339(values.opened_at) ?? new Date().toISOString(),
-          promised_at: toRFC3339(values.promised_at),
-          items: parseBikeWorkOrderItems(values.items_json),
-        });
+        await createUnifiedWorkOrder(buildWorkOrderCreatePayload(BIKE_WORK_ORDER_FIELDS, values));
       },
       update: async (row: BikeWorkOrder, values) => {
-        await updateUnifiedWorkOrder(row.id, {
-          target_id: asOptionalString(values.bicycle_id),
-          target_label: asOptionalString(values.bicycle_label),
-          customer_id: asOptionalString(values.customer_id),
-          customer_name: asOptionalString(values.customer_name),
-          status: asOptionalString(values.status),
-          requested_work: asOptionalString(values.requested_work),
-          diagnosis: asOptionalString(values.diagnosis),
-          notes: asOptionalString(values.notes),
-          internal_notes: asOptionalString(values.internal_notes),
-          currency: asOptionalString(values.currency),
-          promised_at: toRFC3339(values.promised_at),
-          items: parseBikeWorkOrderItems(values.items_json),
-        });
+        await updateUnifiedWorkOrder(row.id, buildWorkOrderUpdatePayload(BIKE_WORK_ORDER_FIELDS, values));
       },
-      deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
-      restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
-      hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
+      ...workOrderArchiveMutations,
     },
     columns: [
       {
@@ -579,8 +595,8 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       { key: 'notes', label: 'Notas para cliente', type: 'textarea', fullWidth: true, createOnly: true },
       { key: 'internal_notes', label: 'Notas internas', type: 'textarea', fullWidth: true, createOnly: true },
       {
-        key: 'items_json',
-        label: 'Items JSON',
+        key: 'items',
+        label: 'Items',
         type: 'textarea',
         required: true,
         fullWidth: true,
@@ -639,33 +655,21 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
       diagnosis: row.diagnosis ?? '',
       notes: row.notes ?? '',
       internal_notes: row.internal_notes ?? '',
-      items_json: stringifyJSON(row.items ?? []),
+      items: stringifyJSON(row.items ?? []),
     }),
     isValid: (values) =>
       asString(values.bicycle_id).trim().length > 0 &&
       Boolean(toRFC3339(values.opened_at)) &&
-      asString(values.items_json).trim().length > 0,
+      asString(values.items).trim().length > 0,
   },
 };
 
-const resourceConfigs = Object.fromEntries(
-  Object.entries(workshopsResourceConfigs).map(([resourceId, config]) => {
-    const csvOpts =
-      resourceId === 'carWorkOrders' || resourceId === 'bikeWorkOrders'
-        ? { mode: 'client' as const, allowImport: false, allowExport: true }
-        : { mode: 'client' as const };
-    return [resourceId, withCSVToolbar(resourceId, config, csvOpts)];
-  }),
-) as CrudResourceConfigMap;
-
-export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
-
-export function hasCrudResource(resourceId: string): boolean {
-  return hasCrudResourceInMap(resourceConfigs, resourceId);
-}
-
-export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
-  resourceId: string,
-): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
-}
+export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain(
+  workshopsResourceConfigs,
+  {
+    csvOverrides: {
+      carWorkOrders: { mode: 'client', allowImport: false, allowExport: true },
+      bikeWorkOrders: { mode: 'client', allowImport: false, allowExport: true },
+    },
+  },
+);

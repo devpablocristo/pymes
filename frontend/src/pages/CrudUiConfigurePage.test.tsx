@@ -27,7 +27,7 @@ describe('CrudUiConfigurePage', () => {
     } as CrudPageConfig<{ id: string }>);
   });
 
-  it('shows only the view modes actually declared by the resource', async () => {
+  it('shows canonical CRUD views and the full reusable feature set', async () => {
     render(
       <MemoryRouter initialEntries={['/modules/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
@@ -38,12 +38,18 @@ describe('CrudUiConfigurePage', () => {
     );
 
     expect(await screen.findAllByText('Lista')).not.toHaveLength(0);
-    expect(screen.queryByText('Galería')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tablero')).not.toBeInTheDocument();
+    expect(screen.getByText('Galería')).toBeInTheDocument();
+    expect(screen.getByText('Tablero')).toBeInTheDocument();
     expect(screen.queryByText('Detalle')).not.toBeInTheDocument();
+    expect(screen.getByText('Buscador')).toBeInTheDocument();
     expect(screen.getByText('Filtro de responsable')).toBeInTheDocument();
-    expect(screen.getByText('Filtros rápidos en cabecera')).toBeInTheDocument();
+    expect(screen.queryByText('Filtros rápidos en cabecera')).not.toBeInTheDocument();
+    expect(screen.queryByText('Filtro de valor')).not.toBeInTheDocument();
+    expect(screen.getByText('Ver archivados')).toBeInTheDocument();
+    expect(screen.getByText('Acción crear')).toBeInTheDocument();
+    expect(screen.queryByText('Configurar')).not.toBeInTheDocument();
     expect(screen.getByText('Paginación')).toBeInTheDocument();
+    expect(screen.getByText('Acciones CSV')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Volver a clientes' })).toBeInTheDocument();
   });
 });

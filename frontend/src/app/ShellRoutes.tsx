@@ -1,6 +1,5 @@
 import { Route, Routes, Navigate } from 'react-router-dom';
 import {
-  BikeShopWorkOrdersBoard,
   CalendarPage,
   ConfiguredCrudSectionPage,
   ConfiguredCrudIndexRedirect,
@@ -17,7 +16,6 @@ import {
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
   WorkOrdersEditorPage,
-  WorkOrdersKanbanPanel,
   AutomationRulesPage,
   WatcherConfigPage,
 } from './lazyRoutes';
@@ -42,12 +40,21 @@ export function ShellRoutes() {
             resourceId="carWorkOrders"
             baseRoute="/modules/carWorkOrders"
             contextPatternByModeId={{ list: '/modules/carWorkOrders/edit/:orderId' }}
+            actionLink={{
+              to: '/modules/carWorkOrders/configure',
+              label: 'Configurar',
+              hideWhenActivePattern: '/modules/carWorkOrders/configure',
+              activeReplacement: {
+                to: '/modules/carWorkOrders/list',
+                label: 'Volver a órdenes de trabajo',
+              },
+            }}
             includeCanonicalMissing
           />
         }
       >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />} />
-        <Route path="board" element={<WorkOrdersKanbanPanel />} />
+        <Route path="board" element={<ConfiguredCrudModePage resourceId="carWorkOrders" modeId="kanban" />} />
         <Route path="list" element={<ConfiguredCrudModePage resourceId="carWorkOrders" modeId="list" />} />
         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
         <Route
@@ -93,12 +100,21 @@ export function ShellRoutes() {
           <ConfiguredCrudSectionPage
             resourceId="bikeWorkOrders"
             baseRoute="/workshops/bike-shop/orders"
+            actionLink={{
+              to: '/modules/bikeWorkOrders/configure',
+              label: 'Configurar',
+              hideWhenActivePattern: '/modules/bikeWorkOrders/configure',
+              activeReplacement: {
+                to: '/workshops/bike-shop/orders/list',
+                label: 'Volver a órdenes de trabajo',
+              },
+            }}
             includeCanonicalMissing
           />
         }
       >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />} />
-        <Route path="board" element={<BikeShopWorkOrdersBoard />} />
+        <Route path="board" element={<ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
         <Route path="list" element={<ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="list" />} />
         <Route
           path=":modePath"

@@ -72,13 +72,25 @@ describe('billingHelpers', () => {
       ],
     });
     expect(config.valueFilterOptions).toBeUndefined();
+    expect(config.editorModal).toEqual({
+      blocks: [
+        {
+          id: 'items',
+          kind: 'lineItems',
+          field: 'items',
+          sectionId: 'items',
+          visible: expect.any(Function),
+        },
+      ],
+      sections: [{ id: 'default' }, { id: 'items' }],
+    });
     expect(config.rowActions?.map((action) => action.id)).toEqual(['pdf', 'send', 'accept']);
     expect(
       config.toBody?.({
         customer_id: 'c1',
         customer_name: 'Cliente',
         valid_until: '2026-04-11',
-        items_json: '[{"description":"Servicio","quantity":1,"unit_price":1000}]',
+        items: '[{"description":"Servicio","quantity":1,"unit_price":1000}]',
         notes: 'ok',
       }),
     ).toEqual({
@@ -118,6 +130,57 @@ describe('billingHelpers', () => {
       ],
     });
     expect(shellConfig.stateMachine).toEqual(config.stateMachine);
+    expect(config.allowCreate).toBe(true);
+    expect(config.allowEdit).toBe(false);
+    expect(config.formFields).toEqual([
+      { key: 'number', label: 'Comprobante' },
+      { key: 'customer', label: 'Cliente', placeholder: 'Nombre del cliente', required: true },
+      { key: 'issuedDate', label: 'Fecha de emisión', type: 'date' },
+      { key: 'dueDate', label: 'Fecha de vencimiento', type: 'date' },
+      {
+        key: 'status',
+        label: 'Estado',
+        type: 'select',
+        options: [
+          { value: 'paid', label: 'Pagada' },
+          { value: 'pending', label: 'Pendiente' },
+          { value: 'overdue', label: 'Vencida' },
+        ],
+      },
+      { key: 'discount', label: 'Descuento (%)', type: 'number' },
+      { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+      {
+        key: 'items',
+        label: 'Detalle',
+        type: 'textarea',
+        fullWidth: true,
+        required: true,
+        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+      },
+    ]);
+    expect(config.toFormValues?.({
+      id: '1',
+      number: 'INV-1',
+      customer: 'Cliente Demo',
+      initials: 'CD',
+      issuedDate: '2026-04-14',
+      dueDate: '2026-04-20',
+      status: 'pending',
+      items: [{ id: '1', description: 'Servicio', qty: 1, unit: 'unidad', unitPrice: 1000 }],
+      discount: 0,
+      tax: 21,
+    })).toEqual({
+      number: 'INV-1',
+      customer: 'Cliente Demo',
+      issuedDate: '2026-04-14',
+      dueDate: '2026-04-20',
+      status: 'pending',
+      discount: '0',
+      tax: '21',
+      items: '[{"id":"1","description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+    });
+    expect(config.isValid?.({ customer: 'Cliente Demo', items: '[{"description":"Servicio"}]' })).toBe(true);
+    expect(config.isValid?.({ customer: '', items: '' })).toBe(false);
     expect('valueFilterOptions' in config ? config.valueFilterOptions : undefined).toBeUndefined();
     expect(shellConfig.valueFilterOptions).toBeUndefined();
   });
@@ -145,6 +208,18 @@ describe('billingHelpers', () => {
       ],
     });
     expect(config.valueFilterOptions).toBeUndefined();
+    expect(config.editorModal).toEqual({
+      blocks: [
+        {
+          id: 'items',
+          kind: 'lineItems',
+          field: 'items',
+          sectionId: 'items',
+          visible: expect.any(Function),
+        },
+      ],
+      sections: [{ id: 'default' }, { id: 'items' }],
+    });
     expect(config.rowActions?.map((action) => action.id)).toEqual(['receipt-pdf', 'payments', 'add-payment', 'void']);
     expect(
       config.toBody?.({
@@ -152,7 +227,7 @@ describe('billingHelpers', () => {
         customer_name: 'Cliente',
         quote_id: 'q1',
         payment_method: 'efectivo',
-        items_json: '[{"description":"Producto","quantity":1,"unit_price":1000}]',
+        items: '[{"description":"Producto","quantity":1,"unit_price":1000}]',
         notes: 'ok',
       }),
     ).toEqual({
@@ -255,6 +330,15 @@ describe('billingHelpers', () => {
     expect(config.editorModal).toEqual(
       expect.objectContaining({
         eyebrow: 'Compras',
+        blocks: [
+          {
+            id: 'items',
+            kind: 'lineItems',
+            field: 'items',
+            sectionId: 'items',
+            visible: expect.any(Function),
+          },
+        ],
         sections: [
           {
             id: 'summary',
@@ -263,8 +347,6 @@ describe('billingHelpers', () => {
           },
           {
             id: 'items',
-            title: '',
-            fieldKeys: ['purchase_items'],
           },
           {
             id: 'notes',
@@ -315,7 +397,7 @@ describe('billingHelpers', () => {
         supplier_name: 'Proveedor',
         status: 'draft',
         payment_status: 'pending',
-        purchase_items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
+        items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
         notes: 'ok',
       }),
     ).toEqual({

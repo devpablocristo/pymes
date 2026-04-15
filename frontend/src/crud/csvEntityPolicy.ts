@@ -64,7 +64,7 @@ export const CRUD_CSV_RESOURCE_EXTRAS: Record<string, Partial<CSVToolbarOptions>
       { key: 'status', label: 'status' },
       { key: 'discount', label: 'discount' },
       { key: 'tax', label: 'tax' },
-      { key: 'items_json', label: 'items_json' },
+      { key: 'items', label: 'items' },
     ],
   },
   creditNotes: {

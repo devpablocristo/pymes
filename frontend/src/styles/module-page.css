@@ -455,3 +455,66 @@ table.report-data-table {
   border: 1px solid var(--color-border);
 }
 
+.reports-filters {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.reports-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 140px;
+}
+
+.reports-filter-field span {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.reports-filter-field input {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.reports-summary-grid {
+  margin-bottom: var(--space-4);
+}
+
+.reports-summary-card {
+  border: 1px solid var(--color-border);
+}
+
+.reports-summary-card--sales {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)) 0%, var(--color-surface) 100%);
+}
+
+.reports-summary-card--inventory {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-success) 10%, var(--color-surface)) 0%, var(--color-surface) 100%);
+}
+
+.reports-summary-card--finance {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-warning) 10%, var(--color-surface)) 0%, var(--color-surface) 100%);
+}
+
+.reports-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.reports-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.reports-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

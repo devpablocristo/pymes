@@ -4,6 +4,7 @@ import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
 import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
+import { CrudLineItemsEditor } from './CrudLineItemsEditor';
 import './CrudEntityEditorModal.css';
 
 function cx(...parts: Array<string | false | null | undefined>) {
@@ -53,11 +54,27 @@ export type CrudEntityEditorModalStat = {
   tone?: 'default' | 'info' | 'warning' | 'success' | 'danger';
 };
 
+export type CrudEntityEditorModalBlock = {
+  id: string;
+  kind: 'lineItems';
+  field: string;
+  sectionId: string;
+  label?: ReactNode;
+  required?: boolean;
+  visible?: (ctx: {
+    values: Record<string, CrudFieldValue>;
+    editing: boolean;
+    row?: unknown;
+  }) => boolean;
+};
+
 export type CrudEntityEditorModalProps = {
   open: boolean;
   title: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
+  variant?: 'modal' | 'page';
+  editBehavior?: 'read-edit' | 'edit-only';
   mediaUrls?: string[];
   mediaFieldId?: string;
   mode?: 'create' | 'update';
@@ -67,12 +84,27 @@ export type CrudEntityEditorModalProps = {
   cancelEditLabel?: string;
   closeLabel?: string;
   fields: CrudEntityEditorModalField[];
+  blocks?: CrudEntityEditorModalBlock[];
   sections?: CrudEntityEditorModalSection[];
   stats?: CrudEntityEditorModalStat[];
+  initialValues?: Record<string, CrudFieldValue>;
+  row?: unknown;
   error?: ReactNode;
   loading?: boolean;
   loadingLabel?: ReactNode;
   disableSubmit?: boolean;
+  disableSubmitWhenPristine?: boolean;
+  headerActions?:
+    | ReactNode
+    | ((ctx: {
+        dirty: boolean;
+        requestCancel: () => void;
+      }) => ReactNode);
+  editingStartActions?: ReactNode | ((ctx: { dirty: boolean }) => ReactNode);
+  rootClassName?: string;
+  panelClassName?: string;
+  pageToolbar?: ReactNode;
+  pageToolbarClassName?: string;
   confirmDiscard?: {
     title: string;
     description: string;
@@ -96,6 +128,7 @@ export type CrudEntityEditorModalProps = {
 
 type ResolvedSection = CrudEntityEditorModalSection & {
   fields: CrudEntityEditorModalField[];
+  blocks: CrudEntityEditorModalBlock[];
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -119,23 +152,29 @@ function areCrudFieldValuesEqual(left: unknown, right: unknown): boolean {
 
 function resolveSections(
   fields: CrudEntityEditorModalField[],
+  blocks: CrudEntityEditorModalBlock[],
   sections: CrudEntityEditorModalSection[] | undefined,
 ): ResolvedSection[] {
   if (sections?.length) {
-    const used = new Set<string>();
+    const usedFields = new Set<string>();
+    const usedBlocks = new Set<string>();
     const resolved = sections
       .map((section) => {
         const sectionFields = fields.filter((field) => field.sectionId === section.id);
-        sectionFields.forEach((field) => used.add(field.id));
-        return { ...section, fields: sectionFields };
+        const sectionBlocks = blocks.filter((block) => block.sectionId === section.id);
+        sectionFields.forEach((field) => usedFields.add(field.id));
+        sectionBlocks.forEach((block) => usedBlocks.add(block.id));
+        return { ...section, fields: sectionFields, blocks: sectionBlocks };
       })
-      .filter((section) => section.fields.length > 0);
+      .filter((section) => section.fields.length > 0 || section.blocks.length > 0);
 
-    const rest = fields.filter((field) => !used.has(field.id));
-    if (rest.length) {
+    const restFields = fields.filter((field) => !usedFields.has(field.id));
+    const restBlocks = blocks.filter((block) => !usedBlocks.has(block.id));
+    if (restFields.length || restBlocks.length) {
       resolved.unshift({
         id: 'general',
-        fields: rest,
+        fields: restFields,
+        blocks: restBlocks,
       });
     }
     return resolved;
@@ -145,6 +184,7 @@ function resolveSections(
     {
       id: 'general',
       fields,
+      blocks,
     },
   ];
 }
@@ -161,6 +201,8 @@ export function CrudEntityEditorModal({
   title,
   subtitle,
   eyebrow,
+  variant = 'modal',
+  editBehavior = 'read-edit',
   mediaUrls,
   mediaFieldId,
   mode = 'create',
@@ -170,12 +212,22 @@ export function CrudEntityEditorModal({
   cancelEditLabel = 'Cancelar edición',
   closeLabel = 'Cerrar',
   fields,
+  blocks = [],
   sections,
   stats,
+  initialValues: initialValuesProp,
+  row,
   error,
   loading = false,
   loadingLabel = 'Cargando…',
   disableSubmit = false,
+  disableSubmitWhenPristine = false,
+  headerActions,
+  editingStartActions,
+  rootClassName,
+  panelClassName,
+  pageToolbar,
+  pageToolbarClassName,
   confirmDiscard,
   archiveAction,
   onCancel,
@@ -184,25 +236,27 @@ export function CrudEntityEditorModal({
   const titleId = 'crud-entity-editor-modal-title';
   const formId = 'crud-entity-editor-modal-form';
   const initialValues = useMemo(
-    () =>
-      Object.fromEntries(fields.map((field) => [field.id, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])),
-    [fields],
+    () => ({
+      ...Object.fromEntries(fields.map((field) => [field.id, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])),
+      ...(initialValuesProp ?? {}),
+    }),
+    [fields, initialValuesProp],
   );
   const [values, setValues] = useState<Record<string, CrudFieldValue>>(initialValues);
-  const [isEditing, setIsEditing] = useState(mode === 'create');
+  const [isEditing, setIsEditing] = useState(mode === 'create' || editBehavior === 'edit-only');
   const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     setValues(initialValues);
-    setIsEditing(mode === 'create');
-  }, [initialValues]);
+    setIsEditing(mode === 'create' || editBehavior === 'edit-only');
+  }, [editBehavior, initialValues, mode]);
 
   const dirty = useMemo(
     () => !areCrudFieldValuesEqual(values, initialValues),
     [initialValues, values],
   );
 
-  const resolvedSections = useMemo(() => resolveSections(fields, sections), [fields, sections]);
+  const resolvedSections = useMemo(() => resolveSections(fields, blocks, sections), [blocks, fields, sections]);
   const hasHeaderContent = Boolean(eyebrow || title || subtitle);
   const resolvedMediaUrls = useMemo(() => {
     if (mediaFieldId) {
@@ -218,7 +272,7 @@ export function CrudEntityEditorModal({
   }, [mediaFieldId, mediaUrls, values]);
 
   const requestCancel = async () => {
-    if (mode === 'update' && isEditing) {
+    if (mode === 'update' && editBehavior !== 'edit-only' && isEditing) {
       if (!dirty) {
         setValues(initialValues);
         setIsEditing(false);
@@ -256,6 +310,18 @@ export function CrudEntityEditorModal({
     if (confirmed) onCancel();
   };
 
+  const resolvedEditingStartActions =
+    typeof editingStartActions === 'function' ? editingStartActions({ dirty }) : editingStartActions;
+  const resolvedHeaderActions =
+    typeof headerActions === 'function'
+      ? headerActions({
+          dirty,
+          requestCancel: () => {
+            void requestCancel();
+          },
+        })
+      : headerActions;
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -284,7 +350,7 @@ export function CrudEntityEditorModal({
   };
 
   const footer =
-    mode === 'update' && !isEditing ? (
+    mode === 'update' && editBehavior !== 'edit-only' && !isEditing ? (
       <div className="crud-entity-editor-modal__footer-layout">
         <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--start">
           {archiveAction ? (
@@ -304,11 +370,19 @@ export function CrudEntityEditorModal({
       </div>
     ) : (
       <div className="crud-entity-editor-modal__footer-layout crud-entity-editor-modal__footer-layout--compact">
+        <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--start">
+          {resolvedEditingStartActions}
+        </div>
         <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--end">
           <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
-            {mode === 'update' ? cancelEditLabel : cancelLabel}
+            {mode === 'update' && editBehavior !== 'edit-only' ? cancelEditLabel : cancelLabel}
           </button>
-          <button type="submit" form={formId} className="btn btn-primary" disabled={disableSubmit || loading}>
+          <button
+            type="submit"
+            form={formId}
+            className="btn btn-primary"
+            disabled={disableSubmit || loading || (disableSubmitWhenPristine && !dirty)}
+          >
             {submitLabel}
           </button>
         </div>
@@ -331,26 +405,49 @@ export function CrudEntityEditorModal({
     return stringValue || '—';
   };
 
+  const renderBlock = (block: CrudEntityEditorModalBlock) => {
+    if (!isEditing) return null;
+    if (block.kind === 'lineItems') {
+      const setValue = (nextValue: CrudFieldValue) =>
+        setValues((current) => ({ ...current, [block.field]: nextValue }));
+      return (
+        <div key={block.id} className="crud-entity-editor-modal__field crud-entity-editor-modal__field--full">
+          {block.label ? <span>{block.label}</span> : null}
+          <CrudLineItemsEditor value={values[block.field]} onChange={setValue} />
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <CrudEntityModalShell
       open={open}
+      variant={variant}
       titleId={titleId}
       ariaLabel={typeof title === 'string' && title.trim().length > 0 ? title : 'Detalle'}
       onRequestClose={() => void requestCancel()}
-      rootClassName="crud-entity-editor-modal-root"
+      rootClassName={cx('crud-entity-editor-modal-root', rootClassName)}
       backdropClassName="crud-entity-editor-modal__backdrop"
-      panelClassName="crud-entity-editor-modal"
+      panelClassName={cx('crud-entity-editor-modal', panelClassName)}
       headerClassName="crud-entity-editor-modal__header"
       bodyClassName="crud-entity-editor-modal__body"
       footerClassName="crud-entity-editor-modal__footer"
+      pageToolbar={pageToolbar}
+      pageToolbarClassName={pageToolbarClassName}
       header={
         hasHeaderContent ? (
-          <div className="crud-entity-editor-modal__title-block">
-            {eyebrow ? <p className="crud-entity-editor-modal__eyebrow">{eyebrow}</p> : null}
-            <h2 className="crud-entity-editor-modal__title" id={titleId}>
-              {title}
-            </h2>
-            {subtitle ? <p className="crud-entity-editor-modal__subtitle">{subtitle}</p> : null}
+          <div className="crud-entity-editor-modal__header-layout">
+            <div className="crud-entity-editor-modal__title-block">
+              {eyebrow ? <p className="crud-entity-editor-modal__eyebrow">{eyebrow}</p> : null}
+              <h2 className="crud-entity-editor-modal__title" id={titleId}>
+                {title}
+              </h2>
+              {subtitle ? <p className="crud-entity-editor-modal__subtitle">{subtitle}</p> : null}
+            </div>
+            {resolvedHeaderActions ? (
+              <div className="crud-entity-editor-modal__header-actions">{resolvedHeaderActions}</div>
+            ) : null}
           </div>
         ) : undefined
       }
@@ -385,7 +482,10 @@ export function CrudEntityEditorModal({
               const visibleFields = section.fields.filter((field) =>
                 field.visible ? field.visible({ value: values[field.id], values, editing: isEditing }) : true,
               );
-              if (visibleFields.length === 0) return null;
+              const visibleBlocks = section.blocks.filter((block) =>
+                block.visible ? block.visible({ values, editing: isEditing, row }) : isEditing,
+              );
+              if (visibleFields.length === 0 && visibleBlocks.length === 0) return null;
               return (
                 <section key={section.id} className="crud-entity-editor-modal__section">
                   <div className="crud-entity-editor-modal__fields">
@@ -432,7 +532,7 @@ export function CrudEntityEditorModal({
                                 }
                                 placeholder={field.placeholder}
                                 required={field.required}
-                                rows={field.rows ?? 4}
+                                rows={field.rows ?? (field.id === 'notes' ? 2 : 4)}
                                 readOnly={field.readOnly}
                               />
                             ) : field.type === 'select' ? (
@@ -470,6 +570,7 @@ export function CrudEntityEditorModal({
                         {isEditing && field.helperText ? <small>{field.helperText}</small> : null}
                       </label>
                     ))}
+                    {visibleBlocks.map((block) => renderBlock(block))}
                   </div>
                 </section>
               );

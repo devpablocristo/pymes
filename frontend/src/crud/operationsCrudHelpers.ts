@@ -36,6 +36,6 @@ export function validateReturnForm(values: CrudFormValues): boolean {
   return (
     asString(values.sale_id).trim().length >= 32 &&
     isValidReturnRefundMethod(asString(values.refund_method)) &&
-    asString(values.items_json).trim().length >= 2
+    asString(values.items).trim().length >= 2
   );
 }

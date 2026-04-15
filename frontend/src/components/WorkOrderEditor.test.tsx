@@ -80,9 +80,14 @@ describe('WorkOrderEditor', () => {
 
     expect(await screen.findByLabelText('Cliente')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    const closeButton = document.querySelector<HTMLButtonElement>('.wo-editor__close');
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(closeButton).not.toBeNull();
+    fireEvent.click(closeButton!);
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
     expect(apiMocks.confirmAction).not.toHaveBeenCalled();
   });
 

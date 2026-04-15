@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CrudFeatureFlags, CrudPageConfig, CrudViewModeId } from '../../components/CrudPage';
 import {
+  CRUD_UI_PREFERENCES_FEATURE_KEYS,
   createCrudUiPreferencesApi,
   type CrudUiResourceOverride,
 } from '@devpablocristo/modules-crud-ui';
@@ -32,7 +33,11 @@ export type CrudUiPreferencesPanelProps = {
   };
 };
 
-const FALLBACK_VIEW_MODES: Array<{ id: CrudViewModeId; label: string }> = [{ id: 'list', label: 'Lista' }];
+const CANONICAL_VIEW_MODES: Array<{ id: CrudViewModeId; label: string }> = [
+  { id: 'list', label: 'Lista' },
+  { id: 'gallery', label: 'Galería' },
+  { id: 'kanban', label: 'Tablero' },
+];
 
 export function CrudUiPreferencesPanel({
   storageKey,
@@ -42,7 +47,7 @@ export function CrudUiPreferencesPanel({
   copy = {},
   hideResourceCardHeader = false,
   hideDefaultViewSelector = false,
-  featureKeys = [],
+  featureKeys = CRUD_UI_PREFERENCES_FEATURE_KEYS,
   classes = {},
 }: CrudUiPreferencesPanelProps) {
   const api = useMemo(
@@ -63,14 +68,13 @@ export function CrudUiPreferencesPanel({
     void Promise.all(
       resources.map(async (resource) => {
         const config = await loadPageConfig(resource.resourceId);
-        const viewModes =
-          config?.viewModes?.length
-            ? config.viewModes.map((mode) => ({ id: mode.id, label: mode.label }))
-            : FALLBACK_VIEW_MODES;
         return {
           resourceId: resource.resourceId,
           label: resource.label,
-          viewModes,
+          viewModes: CANONICAL_VIEW_MODES.map((mode) => ({
+            id: mode.id,
+            label: config?.viewModes?.find((entry) => entry.id === mode.id)?.label ?? mode.label,
+          })),
         };
       }),
     ).then((rows) => {

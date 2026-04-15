@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmAction } from '@devpablocristo/core-browser';
+import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import {
   archiveWorkOrder,
   getWorkOrder,
@@ -7,12 +8,15 @@ import {
   updateWorkOrder,
   type WorkOrder as UnifiedWorkOrder,
 } from '../lib/workOrdersApi';
-import { CrudEntityModalShell } from '../modules/crud';
+import {
+  CrudEntityEditorModal,
+  type CrudEntityEditorModalField,
+  type CrudEntityEditorModalStat,
+} from '../modules/crud';
+import { parseWorkOrderItemsJson, stringifyWorkOrderItems } from '../lib/workOrderItemsJson';
+import './WorkOrderEditor.css';
 
 type AutoRepairWorkOrder = UnifiedWorkOrder;
-import { parseWorkOrderItemsJson, stringifyWorkOrderItems } from '../lib/workOrderItemsJson';
-import './WorkOrderKanbanDetailModal.css';
-import './WorkOrderEditor.css';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'received', label: 'Recibido' },
@@ -27,6 +31,32 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'on_hold', label: 'En pausa' },
   { value: 'cancelled', label: 'Cancelado' },
 ];
+
+type Draft = {
+  status: string;
+  vehicle_id: string;
+  vehicle_plate: string;
+  customer_id: string;
+  customer_name: string;
+  booking_id: string;
+  requested_work: string;
+  diagnosis: string;
+  notes: string;
+  internal_notes: string;
+  currency: string;
+  promised_at_local: string;
+  ready_at_local: string;
+  delivered_at_local: string;
+  items: string;
+};
+
+export type WorkOrderEditorProps = {
+  orderId: string;
+  variant: 'modal' | 'page';
+  onClose: () => void;
+  onSaved: (wo: AutoRepairWorkOrder) => void;
+  onRecordRemoved?: (id: string) => void;
+};
 
 function toDatetimeLocalValue(iso: string | undefined): string {
   if (!iso) return '';
@@ -44,31 +74,28 @@ function fromDatetimeLocal(s: string): string | undefined {
   return d.toISOString();
 }
 
-type Draft = {
-  status: string;
-  vehicle_id: string;
-  vehicle_plate: string;
-  customer_id: string;
-  customer_name: string;
-  booking_id: string;
-  requested_work: string;
-  diagnosis: string;
-  notes: string;
-  internal_notes: string;
-  currency: string;
-  promised_at_local: string;
-  ready_at_local: string;
-  delivered_at_local: string;
-  items_json: string;
-};
+function textValue(value: CrudFieldValue | undefined): string {
+  return typeof value === 'string' ? value : String(value ?? '');
+}
 
-function itemsJsonDirty(json: string, wo: AutoRepairWorkOrder): boolean {
-  try {
-    const parsed = parseWorkOrderItemsJson(json);
-    return JSON.stringify(parsed) !== JSON.stringify(wo.items ?? []);
-  } catch {
-    return true;
-  }
+function valuesToDraft(values: Record<string, CrudFieldValue>): Draft {
+  return {
+    status: textValue(values.status),
+    vehicle_id: textValue(values.vehicle_id),
+    vehicle_plate: textValue(values.vehicle_plate),
+    customer_id: textValue(values.customer_id),
+    customer_name: textValue(values.customer_name),
+    booking_id: textValue(values.booking_id),
+    requested_work: textValue(values.requested_work),
+    diagnosis: textValue(values.diagnosis),
+    notes: textValue(values.notes),
+    internal_notes: textValue(values.internal_notes),
+    currency: textValue(values.currency),
+    promised_at_local: textValue(values.promised_at_local),
+    ready_at_local: textValue(values.ready_at_local),
+    delivered_at_local: textValue(values.delivered_at_local),
+    items: textValue(values.items),
+  };
 }
 
 function woToDraft(wo: AutoRepairWorkOrder): Draft {
@@ -87,28 +114,138 @@ function woToDraft(wo: AutoRepairWorkOrder): Draft {
     promised_at_local: toDatetimeLocalValue(wo.promised_at),
     ready_at_local: toDatetimeLocalValue(wo.ready_at),
     delivered_at_local: toDatetimeLocalValue(wo.delivered_at),
-    items_json: stringifyWorkOrderItems(wo.items),
+    items: stringifyWorkOrderItems(wo.items),
   };
 }
 
-export type WorkOrderEditorProps = {
-  orderId: string;
-  /** modal: portal oscuro; page: tarjeta embebida (misma UI de formulario). */
-  variant: 'modal' | 'page';
-  onClose: () => void;
-  onSaved: (wo: AutoRepairWorkOrder) => void;
-  /** Tras archivar (p. ej. quitar tarjeta del Kanban). */
-  onRecordRemoved?: (id: string) => void;
-};
+function buildFields(): CrudEntityEditorModalField[] {
+  return [
+    {
+      id: 'status',
+      label: 'Estado',
+      type: 'select',
+      options: STATUS_OPTIONS,
+    },
+    {
+      id: 'currency',
+      label: 'Moneda',
+    },
+    {
+      id: 'vehicle_id',
+      label: 'Vehículo (UUID)',
+      fullWidth: true,
+    },
+    {
+      id: 'vehicle_plate',
+      label: 'Patente',
+    },
+    {
+      id: 'customer_name',
+      label: 'Cliente',
+    },
+    {
+      id: 'customer_id',
+      label: 'Cliente / Party (UUID)',
+      fullWidth: true,
+    },
+    {
+      id: 'booking_id',
+      label: 'Turno (Appointment UUID)',
+      fullWidth: true,
+    },
+    {
+      id: 'promised_at_local',
+      label: 'Prometida para',
+      type: 'datetime-local',
+    },
+    {
+      id: 'ready_at_local',
+      label: 'Listo en',
+      type: 'datetime-local',
+    },
+    {
+      id: 'delivered_at_local',
+      label: 'Entregado en',
+      type: 'datetime-local',
+    },
+    {
+      id: 'requested_work',
+      label: 'Trabajo solicitado',
+      type: 'textarea',
+      fullWidth: true,
+      rows: 3,
+    },
+    {
+      id: 'diagnosis',
+      label: 'Diagnóstico',
+      type: 'textarea',
+      fullWidth: true,
+      rows: 3,
+    },
+    {
+      id: 'notes',
+      label: 'Notas',
+      type: 'textarea',
+      fullWidth: true,
+      rows: 2,
+    },
+    {
+      id: 'internal_notes',
+      label: 'Notas internas',
+      type: 'textarea',
+      fullWidth: true,
+      rows: 3,
+    },
+    {
+      id: 'items',
+      label: 'Ítems',
+      fullWidth: true,
+      editControl: ({ value, setValue }) => (
+        <textarea
+          className="wo-editor__items-textarea"
+          value={textValue(value)}
+          onChange={(event) => setValue(event.target.value)}
+          spellCheck={false}
+          rows={8}
+        />
+      ),
+      readValue: '—',
+    },
+  ];
+}
 
-/**
- * Único editor de OT (estado, vínculos, textos, fechas, ítems JSON).
- */
+function buildStats(wo: AutoRepairWorkOrder | null): CrudEntityEditorModalStat[] {
+  if (!wo) return [];
+  return [
+    {
+      id: 'services',
+      label: 'Servicios',
+      value: `${wo.subtotal_services.toLocaleString()} ${wo.currency ?? 'ARS'}`,
+    },
+    {
+      id: 'parts',
+      label: 'Repuestos',
+      value: `${wo.subtotal_parts.toLocaleString()} ${wo.currency ?? 'ARS'}`,
+    },
+    {
+      id: 'tax',
+      label: 'IVA',
+      value: `${wo.tax_total.toLocaleString()} ${wo.currency ?? 'ARS'}`,
+    },
+    {
+      id: 'total',
+      label: 'Total',
+      value: `${wo.total.toLocaleString()} ${wo.currency ?? 'ARS'}`,
+      tone: 'info',
+    },
+  ];
+}
+
 export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRemoved }: WorkOrderEditorProps) {
+  const fields = useMemo(() => buildFields(), []);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [wo, setWo] = useState<AutoRepairWorkOrder | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [restoreBusy, setRestoreBusy] = useState(false);
@@ -119,10 +256,8 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     try {
       const data = await getWorkOrder(id);
       setWo(data);
-      setDraft(woToDraft(data));
     } catch (e) {
       setWo(null);
-      setDraft(null);
       setError(e instanceof Error ? e.message : 'No se pudo cargar la orden');
     } finally {
       setLoading(false);
@@ -133,111 +268,47 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     void load(orderId);
   }, [orderId, load]);
 
-  const isDirty = useMemo(() => {
-    if (!wo || !draft) return false;
-    const nextPromised = fromDatetimeLocal(draft.promised_at_local);
-    const prevPromised = wo.promised_at;
-    const promisedDiffers = (nextPromised ?? '') !== (prevPromised ?? '');
-    const onlyClearingPromised = !!prevPromised && !nextPromised;
-
-    const nextReady = fromDatetimeLocal(draft.ready_at_local);
-    const nextDelivered = fromDatetimeLocal(draft.delivered_at_local);
-
-    return (
-      draft.status !== wo.status ||
-      draft.vehicle_id !== (wo.vehicle_id ?? '') ||
-      draft.vehicle_plate !== (wo.vehicle_plate ?? '') ||
-      draft.customer_id !== (wo.customer_id ?? '') ||
-      draft.customer_name !== (wo.customer_name ?? '') ||
-      draft.booking_id !== (wo.booking_id ?? '') ||
-      draft.requested_work !== (wo.requested_work ?? '') ||
-      draft.diagnosis !== (wo.diagnosis ?? '') ||
-      draft.notes !== (wo.notes ?? '') ||
-      draft.internal_notes !== (wo.internal_notes ?? '') ||
-      draft.currency !== (wo.currency ?? '') ||
-      (promisedDiffers && !onlyClearingPromised) ||
-      (nextReady ?? '') !== (wo.ready_at ?? '') ||
-      (nextDelivered ?? '') !== (wo.delivered_at ?? '') ||
-      itemsJsonDirty(draft.items_json, wo)
-    );
-  }, [wo, draft]);
-
   const isArchived = Boolean(wo?.archived_at);
-  const canSave = isDirty && !saving && !loading && wo != null && draft != null;
   const closeDisabled = saving || archiveBusy || restoreBusy;
+  const stats = useMemo(() => buildStats(wo), [wo]);
 
-  const requestClose = useCallback(() => {
-    if (closeDisabled) {
-      return;
-    }
-
-    void (async () => {
-      if (!isDirty) {
-        onClose();
-        return;
+  const handleArchive = useCallback(
+    async (dirty: boolean) => {
+      if (!wo) return;
+      if (dirty) {
+        const discardChanges = await confirmAction({
+          title: 'Descartar cambios',
+          description: 'Hay cambios sin guardar. ¿Archivar sin guardar?',
+          confirmLabel: 'Sí, archivar',
+          cancelLabel: 'Seguir editando',
+          tone: 'danger',
+        });
+        if (!discardChanges) return;
       }
-
       const confirmed = await confirmAction({
-        title: 'Cancelar edición',
-        description: '¿Realmente querés cancelar? Se perderán los cambios no guardados.',
-        confirmLabel: 'Sí, cancelar',
-        cancelLabel: 'Seguir editando',
-      });
-      if (!confirmed) {
-        return;
-      }
-
-      onClose();
-    })();
-  }, [closeDisabled, isDirty, onClose]);
-
-  useEffect(() => {
-    if (variant !== 'modal') return;
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Escape') {
-        return;
-      }
-      ev.preventDefault();
-      requestClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [requestClose, variant]);
-
-  const handleArchive = async () => {
-    if (!wo) return;
-    if (isDirty) {
-      const discardChanges = await confirmAction({
-        title: 'Descartar cambios',
-        description: 'Hay cambios sin guardar. ¿Archivar sin guardar?',
-        confirmLabel: 'Sí, archivar',
-        cancelLabel: 'Seguir editando',
+        title: 'Archivar orden de trabajo',
+        description: '¿Archivar esta orden de trabajo? Va a salir del listado activo.',
+        confirmLabel: 'Archivar',
+        cancelLabel: 'Cancelar',
         tone: 'danger',
       });
-      if (!discardChanges) return;
-    }
-    const confirmed = await confirmAction({
-      title: 'Archivar orden de trabajo',
-      description: '¿Archivar esta orden de trabajo? Va a salir del listado activo.',
-      confirmLabel: 'Archivar',
-      cancelLabel: 'Cancelar',
-      tone: 'danger',
-    });
-    if (!confirmed) return;
-    setArchiveBusy(true);
-    setError(null);
-    try {
-      await archiveWorkOrder(wo.id);
-      onRecordRemoved?.(wo.id);
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo archivar');
-    } finally {
-      setArchiveBusy(false);
-    }
-  };
+      if (!confirmed) return;
+      setArchiveBusy(true);
+      setError(null);
+      try {
+        await archiveWorkOrder(wo.id);
+        onRecordRemoved?.(wo.id);
+        onClose();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo archivar');
+      } finally {
+        setArchiveBusy(false);
+      }
+    },
+    [onClose, onRecordRemoved, wo],
+  );
 
-  const handleRestore = async () => {
+  const handleRestore = useCallback(async () => {
     if (!wo) return;
     const confirmed = await confirmAction({
       title: 'Restaurar orden de trabajo',
@@ -250,398 +321,154 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setError(null);
     try {
       await restoreWorkOrder(wo.id);
-      const data = await getWorkOrder(wo.id);
-      setWo(data);
-      setDraft(woToDraft(data));
-      onSaved(data);
+      const restored = await getWorkOrder(wo.id);
+      setWo(restored);
+      onSaved(restored);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo restaurar');
     } finally {
       setRestoreBusy(false);
     }
-  };
+  }, [onSaved, wo]);
 
-  const handleSave = async () => {
-    if (!wo || !draft) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const body: Parameters<typeof updateWorkOrder>[1] = {};
-      if (draft.status !== wo.status) body.status = draft.status;
-      if (draft.vehicle_id.trim() !== (wo.vehicle_id ?? '').trim()) {
-        body.vehicle_id = draft.vehicle_id.trim();
-      }
-      if (draft.vehicle_plate !== (wo.vehicle_plate ?? '')) body.vehicle_plate = draft.vehicle_plate;
-      if (draft.customer_id.trim() !== (wo.customer_id ?? '').trim()) {
-        const c = draft.customer_id.trim();
-        body.customer_id = c.length > 0 ? c : undefined;
-      }
-      if (draft.customer_name !== (wo.customer_name ?? '')) body.customer_name = draft.customer_name;
-      if (draft.booking_id.trim() !== (wo.booking_id ?? '').trim()) {
-        const a = draft.booking_id.trim();
-        body.booking_id = a.length > 0 ? a : undefined;
-      }
-      if (draft.requested_work !== (wo.requested_work ?? '')) body.requested_work = draft.requested_work;
-      if (draft.diagnosis !== (wo.diagnosis ?? '')) body.diagnosis = draft.diagnosis;
-      if (draft.notes !== (wo.notes ?? '')) body.notes = draft.notes;
-      if (draft.internal_notes !== (wo.internal_notes ?? '')) body.internal_notes = draft.internal_notes;
-      if (draft.currency !== (wo.currency ?? '')) body.currency = draft.currency;
-
-      const nextPromised = fromDatetimeLocal(draft.promised_at_local);
-      if ((nextPromised ?? '') !== (wo.promised_at ?? '')) {
-        if (nextPromised) body.promised_at = nextPromised;
-      }
-
-      const nextReady = fromDatetimeLocal(draft.ready_at_local);
-      if ((nextReady ?? '') !== (wo.ready_at ?? '')) {
-        if (nextReady) body.ready_at = nextReady;
-      }
-
-      const nextDelivered = fromDatetimeLocal(draft.delivered_at_local);
-      if ((nextDelivered ?? '') !== (wo.delivered_at ?? '')) {
-        if (nextDelivered) body.delivered_at = nextDelivered;
-      }
-
-      const parsedItems = parseWorkOrderItemsJson(draft.items_json);
-      if (JSON.stringify(parsedItems) !== JSON.stringify(wo.items ?? [])) {
-        body.items = parsedItems;
-      }
-
-      if (Object.keys(body).length === 0) {
-        onClose();
-        return;
-      }
-
-      const updated = await updateWorkOrder(orderId, body);
-      setWo(updated);
-      setDraft(woToDraft(updated));
-      onSaved(updated);
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const formInner = (
-    <>
-      {error ? (
-        <p className="wo-modal__error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {loading || !wo || !draft ? (
-        <p className="wo-modal__loading">{loading ? 'Cargando datos…' : null}</p>
-      ) : (
-        <>
-          <div className="wo-modal__grid">
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-status">
-                Estado
-              </label>
-              <select
-                id="wo-status"
-                className="wo-modal__select"
-                value={draft.status}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, status: ev.target.value } : d))}
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-currency">
-                Moneda
-              </label>
-              <input
-                id="wo-currency"
-                className="wo-modal__input"
-                value={draft.currency}
-                onChange={(ev) =>
-                  setDraft((d) => (d ? { ...d, currency: ev.target.value.toUpperCase().slice(0, 8) } : d))
-                }
-                maxLength={8}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-vehicle-id">
-                Vehículo (UUID)
-              </label>
-              <input
-                id="wo-vehicle-id"
-                className="wo-modal__input"
-                value={draft.vehicle_id}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, vehicle_id: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-plate">
-                Patente
-              </label>
-              <input
-                id="wo-plate"
-                className="wo-modal__input"
-                value={draft.vehicle_plate}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, vehicle_plate: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-customer">
-                Cliente
-              </label>
-              <input
-                id="wo-customer"
-                className="wo-modal__input"
-                value={draft.customer_name}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, customer_name: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-customer-id">
-                Cliente / Party (UUID)
-              </label>
-              <input
-                id="wo-customer-id"
-                className="wo-modal__input"
-                value={draft.customer_id}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, customer_id: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-booking-id">
-                Turno (Appointment UUID)
-              </label>
-              <input
-                id="wo-booking-id"
-                className="wo-modal__input"
-                value={draft.booking_id}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, booking_id: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-promised">
-                Prometida para
-              </label>
-              <input
-                id="wo-promised"
-                type="datetime-local"
-                className="wo-modal__input"
-                value={draft.promised_at_local}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, promised_at_local: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-ready">
-                Listo en
-              </label>
-              <input
-                id="wo-ready"
-                type="datetime-local"
-                className="wo-modal__input"
-                value={draft.ready_at_local}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, ready_at_local: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field">
-              <label className="wo-modal__label" htmlFor="wo-delivered">
-                Entregado en
-              </label>
-              <input
-                id="wo-delivered"
-                type="datetime-local"
-                className="wo-modal__input"
-                value={draft.delivered_at_local}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, delivered_at_local: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-requested">
-                Trabajo solicitado
-              </label>
-              <textarea
-                id="wo-requested"
-                className="wo-modal__textarea"
-                value={draft.requested_work}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, requested_work: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-diagnosis">
-                Diagnóstico
-              </label>
-              <textarea
-                id="wo-diagnosis"
-                className="wo-modal__textarea"
-                value={draft.diagnosis}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, diagnosis: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-notes">
-                Notas
-              </label>
-              <textarea
-                id="wo-notes"
-                className="wo-modal__textarea"
-                value={draft.notes}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, notes: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-internal">
-                Notas internas
-              </label>
-              <textarea
-                id="wo-internal"
-                className="wo-modal__textarea"
-                value={draft.internal_notes}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, internal_notes: ev.target.value } : d))}
-              />
-            </div>
-            <div className="wo-modal__field wo-modal__field--full">
-              <label className="wo-modal__label" htmlFor="wo-items-json">
-                Ítems (JSON)
-              </label>
-              <textarea
-                id="wo-items-json"
-                className="wo-modal__textarea wo-modal__textarea--items"
-                value={draft.items_json}
-                onChange={(ev) => setDraft((d) => (d ? { ...d, items_json: ev.target.value } : d))}
-                spellCheck={false}
-              />
-            </div>
-          </div>
-
-          <div className="wo-modal__field wo-modal__field--full">
-            <span className="wo-modal__label">Totales (solo lectura)</span>
-            <p className="wo-modal__readonly">
-              Servicios {wo.subtotal_services.toLocaleString()} · Repuestos {wo.subtotal_parts.toLocaleString()} · IVA{' '}
-              {wo.tax_total.toLocaleString()} · Total {wo.total.toLocaleString()} {wo.currency}
-            </p>
-          </div>
-        </>
-      )}
-    </>
-  );
-
-  const footerActions =
-    wo && draft && !loading ? (
-      <>
-        <div className="wo-modal__footer-start">
-          {!isArchived ? (
-            <button
-              type="button"
-              className="wo-modal__btn wo-modal__btn--danger"
-              disabled={archiveBusy || saving}
-              onClick={() => void handleArchive()}
-            >
-              {archiveBusy ? 'Archivando…' : 'Archivar'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="wo-modal__btn wo-modal__btn--restore"
-              disabled={restoreBusy || saving}
-              onClick={() => void handleRestore()}
-            >
-              {restoreBusy ? 'Restaurando…' : 'Restaurar'}
-            </button>
-          )}
-        </div>
-        <div className="wo-modal__footer-end">
-          <button
-            type="button"
-            className="wo-modal__btn wo-modal__btn--ghost"
-            onClick={requestClose}
-            disabled={closeDisabled}
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="wo-modal__btn wo-modal__btn--primary"
-            disabled={!canSave}
-            onClick={() => void handleSave()}
-          >
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
-        </div>
-      </>
-    ) : null;
-
-  const header = (
-    <>
-      <div className="wo-modal__title-block">
-        <div className="wo-modal__eyebrow">Orden de trabajo</div>
-        <h2 id="wo-modal-title" className="wo-modal__title">
-          {loading ? 'Cargando…' : (wo?.number ?? '—')}
-        </h2>
-      </div>
-      <div className="wo-modal__header-trailing">
-        {variant === 'modal' ? (
-          <button
-            type="button"
-            className="wo-modal__close"
-            onClick={requestClose}
-            aria-label="Cerrar"
-            disabled={closeDisabled}
-          >
-            ×
-          </button>
-        ) : null}
-      </div>
-    </>
-  );
-
-  const body = formInner;
-
-  if (variant === 'page') {
-    return (
-      <CrudEntityModalShell
-        open
-        variant="page"
-        titleId="wo-modal-title"
-        onRequestClose={requestClose}
-        disableClose={closeDisabled}
-        rootClassName="wo-editor-page"
-        pageToolbarClassName="wo-editor-page__toolbar"
-        pageToolbar={
-          <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={closeDisabled}>
-            ← Volver a la lista
-          </button>
+  const handleSave = useCallback(
+    async (values: Record<string, CrudFieldValue>) => {
+      if (!wo) return;
+      const draft = valuesToDraft(values);
+      setSaving(true);
+      setError(null);
+      try {
+        const body: Parameters<typeof updateWorkOrder>[1] = {};
+        if (draft.status !== wo.status) body.status = draft.status;
+        if (draft.vehicle_id.trim() !== (wo.vehicle_id ?? '').trim()) {
+          body.vehicle_id = draft.vehicle_id.trim();
         }
-        panelClassName="wo-modal wo-modal--embedded"
-        headerClassName="wo-modal__header"
-        bodyClassName="wo-modal__body"
-        footerClassName="wo-modal__footer wo-modal__footer--split"
-        header={header}
-        footer={footerActions}
-      >
-        {body}
-      </CrudEntityModalShell>
-    );
-  }
+        if (draft.vehicle_plate !== (wo.vehicle_plate ?? '')) body.vehicle_plate = draft.vehicle_plate;
+        if (draft.customer_id.trim() !== (wo.customer_id ?? '').trim()) {
+          const customerId = draft.customer_id.trim();
+          body.customer_id = customerId.length > 0 ? customerId : undefined;
+        }
+        if (draft.customer_name !== (wo.customer_name ?? '')) body.customer_name = draft.customer_name;
+        if (draft.booking_id.trim() !== (wo.booking_id ?? '').trim()) {
+          const bookingId = draft.booking_id.trim();
+          body.booking_id = bookingId.length > 0 ? bookingId : undefined;
+        }
+        if (draft.requested_work !== (wo.requested_work ?? '')) body.requested_work = draft.requested_work;
+        if (draft.diagnosis !== (wo.diagnosis ?? '')) body.diagnosis = draft.diagnosis;
+        if (draft.notes !== (wo.notes ?? '')) body.notes = draft.notes;
+        if (draft.internal_notes !== (wo.internal_notes ?? '')) body.internal_notes = draft.internal_notes;
+        if (draft.currency !== (wo.currency ?? '')) body.currency = draft.currency;
+
+        const nextPromised = fromDatetimeLocal(draft.promised_at_local);
+        if ((nextPromised ?? '') !== (wo.promised_at ?? '') && nextPromised) {
+          body.promised_at = nextPromised;
+        }
+
+        const nextReady = fromDatetimeLocal(draft.ready_at_local);
+        if ((nextReady ?? '') !== (wo.ready_at ?? '') && nextReady) {
+          body.ready_at = nextReady;
+        }
+
+        const nextDelivered = fromDatetimeLocal(draft.delivered_at_local);
+        if ((nextDelivered ?? '') !== (wo.delivered_at ?? '') && nextDelivered) {
+          body.delivered_at = nextDelivered;
+        }
+
+        const parsedItems = parseWorkOrderItemsJson(draft.items);
+        if (JSON.stringify(parsedItems) !== JSON.stringify(wo.items ?? [])) {
+          body.items = parsedItems;
+        }
+
+        if (Object.keys(body).length === 0) {
+          onClose();
+          return;
+        }
+
+        const updated = await updateWorkOrder(orderId, body);
+        setWo(updated);
+        onSaved(updated);
+        onClose();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo guardar');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onClose, onSaved, orderId, wo],
+  );
 
   return (
-    <CrudEntityModalShell
+    <CrudEntityEditorModal
       open
-      titleId="wo-modal-title"
-      onRequestClose={requestClose}
-      disableClose={closeDisabled}
-      rootClassName="wo-modal-root"
-      backdropClassName="wo-modal-backdrop"
-      panelClassName="wo-modal"
-      headerClassName="wo-modal__header"
-      bodyClassName="wo-modal__body"
-      footerClassName="wo-modal__footer wo-modal__footer--split"
-      header={header}
-      footer={footerActions}
-    >
-      {body}
-    </CrudEntityModalShell>
+      variant={variant}
+      editBehavior="edit-only"
+      mode="update"
+      title={loading ? 'Cargando…' : wo?.number ?? '—'}
+      eyebrow="Orden de trabajo"
+      fields={fields}
+      stats={stats}
+      initialValues={wo ? woToDraft(wo) : undefined}
+      loading={loading}
+      loadingLabel="Cargando datos…"
+      error={error}
+      disableSubmit={!wo || saving || archiveBusy || restoreBusy}
+      disableSubmitWhenPristine
+      submitLabel={saving ? 'Guardando…' : 'Guardar'}
+      cancelLabel="Cancelar"
+      onCancel={onClose}
+      onSubmit={(values) => void handleSave(values)}
+      confirmDiscard={{
+        title: 'Cancelar edición',
+        description: '¿Realmente querés cancelar? Se perderán los cambios no guardados.',
+        confirmLabel: 'Sí, cancelar',
+        cancelLabel: 'Seguir editando',
+      }}
+      headerActions={
+        variant === 'modal'
+          ? ({ requestCancel }) => (
+              <button
+                type="button"
+                className="wo-editor__close"
+                onClick={requestCancel}
+                aria-label="Cerrar"
+                disabled={closeDisabled}
+              >
+                ×
+              </button>
+            )
+          : null
+      }
+      editingStartActions={({ dirty }) =>
+        !wo ? null : !isArchived ? (
+          <button
+            type="button"
+            className="btn btn-danger"
+            disabled={archiveBusy || saving || restoreBusy}
+            onClick={() => void handleArchive(dirty)}
+          >
+            {archiveBusy ? 'Archivando…' : 'Archivar'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={restoreBusy || saving || archiveBusy}
+            onClick={() => void handleRestore()}
+          >
+            {restoreBusy ? 'Restaurando…' : 'Restaurar'}
+          </button>
+        )
+      }
+      rootClassName={variant === 'page' ? 'wo-editor-page' : 'wo-editor-root'}
+      panelClassName={variant === 'page' ? 'wo-editor-panel wo-editor-panel--page' : 'wo-editor-panel'}
+      pageToolbarClassName="wo-editor-page__toolbar"
+      pageToolbar={
+        variant === 'page' ? (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={closeDisabled}>
+            ← Volver a la lista
+          </button>
+        ) : undefined
+      }
+    />
   );
 }

@@ -178,28 +178,23 @@ describe('CrudEntityEditorModal', () => {
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });
 
-  it('renders custom edit controls for complex business fields', () => {
+  it('renders line item blocks only in edit mode', () => {
     render(
       <CrudEntityEditorModal
         open
-        title="Nueva compra"
-        fields={[
-          {
-            id: 'items_json',
-            label: 'Detalle de la compra',
-            defaultValue: '[]',
-            editControl: ({ setValue }) => (
-              <button type="button" onClick={() => setValue('[{"description":"Insumo","quantity":1,"unit_cost":1000}]')}>
-                Cargar detalle
-              </button>
-            ),
-          },
-        ]}
+        title="CPA-001"
+        mode="update"
+        initialValues={{ items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]' }}
+        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo', sectionId: 'summary' }]}
+        sections={[{ id: 'summary', title: 'Resumen' }, { id: 'items' }]}
+        blocks={[{ id: 'items', kind: 'lineItems', field: 'items', sectionId: 'items', visible: ({ editing }) => editing }]}
         onCancel={vi.fn()}
         onSubmit={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Cargar detalle')).toBeInTheDocument();
+    expect(screen.queryByText('Añadir renglón')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    expect(screen.getByText('Añadir renglón')).toBeInTheDocument();
   });
 });

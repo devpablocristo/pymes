@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
-import { type CrudFieldValue, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
-import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
+import { type CrudFieldValue, type CrudFormValues, type CrudResourceConfigMap } from '../components/CrudPage';
+import { defineCrudDomain } from './defineCrudDomain';
+import { buildRestCrudDataSource } from './restCrudDataSource';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
-import { withCSVToolbar } from './csvToolbar';
 import {
   formatCrudMoney,
   formatCrudPercent,
@@ -21,8 +21,6 @@ import {
   stringifyJSON,
 } from './resourceConfigs.shared';
 import {
-  ProductsGalleryWorkspace,
-  ProductsListWorkspace,
   createProductCrudConfig,
   type ProductRecord,
 } from '../modules/inventory';
@@ -43,11 +41,10 @@ import {
   type SaleRecord,
 } from '../modules/billing/billingHelpers';
 import { type InvoiceRecord as BillingInvoiceRecord } from '../modules/billing/invoicesDemo';
-import { InvoicesListModeContent } from '../modules/billing';
 import { renderTagBadges } from './crudTagBadges';
-import { apiRequest, downloadAPIFile } from '../lib/api';
 import { vocab } from '../lib/vocabulary';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
+import { buildStandardCrudViewModes } from '../modules/crud';
 
 type Customer = {
   id: string;
@@ -117,23 +114,38 @@ type PriceList = {
   items?: Array<{ product_id?: string; service_id?: string; price: number }>;
 };
 
-/** Archive/restore/hard delete: el listado paginado va por `basePath` + httpClient del shell. */
-function buildArchivedMutationsOnly<T extends { id: string }>(basePath: string) {
+function productToBody(values: CrudFormValues): Record<string, unknown> {
   return {
-    deleteItem: async (row: T) => {
-      await apiRequest(`${basePath}/${row.id}/archive`, { method: 'POST', body: {} });
-    },
-    restore: async (row: T) => {
-      await apiRequest(`${basePath}/${row.id}/restore`, { method: 'POST', body: {} });
-    },
-    hardDelete: async (row: T) => {
-      await apiRequest(`${basePath}/${row.id}`, { method: 'DELETE' });
-    },
+    name: asString(values.name),
+    sku: asOptionalString(values.sku),
+    unit: asOptionalString(values.unit),
+    price: asNumber(values.price),
+    currency: asOptionalString(values.currency) ?? 'ARS',
+    cost_price: asNumber(values.cost_price),
+    tax_rate: asOptionalNumber(values.tax_rate),
+    track_stock: asBoolean(values.track_stock),
+    is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+    tags: parsePartyTagCsv(values.tags),
+    description: asOptionalString(values.description),
+    image_urls: parseImageURLList(values.image_urls),
   };
 }
 
-const productsArchivedMutations = buildArchivedMutationsOnly<Product>('/v1/products');
-const servicesArchivedMutations = buildArchivedMutationsOnly<Service>('/v1/services');
+function serviceToBody(values: CrudFormValues): Record<string, unknown> {
+  return {
+    name: asString(values.name),
+    code: asOptionalString(values.code),
+    category_code: asOptionalString(values.category_code),
+    sale_price: asNumber(values.sale_price),
+    cost_price: asNumber(values.cost_price),
+    tax_rate: asOptionalNumber(values.tax_rate),
+    currency: asOptionalString(values.currency) ?? 'ARS',
+    default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
+    is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
+    tags: parsePartyTagCsv(values.tags),
+    description: asOptionalString(values.description),
+  };
+}
 
 function parsePriceListItems(value: CrudFieldValue | undefined): Array<{ product_id?: string; service_id?: string; price: number }> {
   const parsed = parseJSONArray<{ product_id?: string; service_id?: string; price: number }>(
@@ -156,7 +168,7 @@ const customerPluralCap = vocab('Clientes');
 export const commercialResourceConfigs: CrudResourceConfigMap = {
   invoices: {
     ...createBillingInvoicesCrudConfig<BillingInvoiceRecord>({
-      renderList: () => <InvoicesListModeContent />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="invoices" />,
     }),
   },
   customers: {
@@ -178,107 +190,21 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   products: {
     basePath: '/v1/products',
     ...createProductCrudConfig<ProductRecord>({
-      renderGallery: () => <ProductsGalleryWorkspace />,
-      renderList: () => <ProductsListWorkspace />,
+      renderGallery: () => <PymesSimpleCrudListModeContent resourceId="products" mode="gallery" />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="products" />,
     }),
-    dataSource: {
-      create: async (values) => {
-        await apiRequest('/v1/products', {
-          method: 'POST',
-          body: {
-            name: asString(values.name),
-            sku: asOptionalString(values.sku),
-            unit: asOptionalString(values.unit),
-            price: asNumber(values.price),
-            currency: asOptionalString(values.currency) ?? 'ARS',
-            cost_price: asNumber(values.cost_price),
-            tax_rate: asOptionalNumber(values.tax_rate),
-            track_stock: asBoolean(values.track_stock),
-            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parsePartyTagCsv(values.tags),
-            description: asOptionalString(values.description),
-            image_urls: parseImageURLList(values.image_urls),
-          },
-        });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/products/${row.id}`, {
-          method: 'PATCH',
-          body: {
-            name: asString(values.name),
-            sku: asOptionalString(values.sku),
-            unit: asOptionalString(values.unit),
-            price: asNumber(values.price),
-            currency: asOptionalString(values.currency) ?? 'ARS',
-            cost_price: asNumber(values.cost_price),
-            tax_rate: asOptionalNumber(values.tax_rate),
-            track_stock: asBoolean(values.track_stock),
-            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parsePartyTagCsv(values.tags),
-            description: asOptionalString(values.description),
-            image_urls: parseImageURLList(values.image_urls),
-          },
-        });
-      },
-      ...productsArchivedMutations,
-    },
+    dataSource: buildRestCrudDataSource<Product>({ basePath: '/v1/products', toBody: productToBody }),
   },
   services: {
     basePath: '/v1/services',
     supportsArchived: true,
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="services" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="services" />),
     renderTagsCell: (row: Service) => renderTagBadges(row.tags),
     searchPlaceholder: 'Buscar...',
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
-    dataSource: {
-      create: async (values) => {
-        await apiRequest('/v1/services', {
-          method: 'POST',
-          body: {
-            name: asString(values.name),
-            code: asOptionalString(values.code),
-            category_code: asOptionalString(values.category_code),
-            sale_price: asNumber(values.sale_price),
-            cost_price: asNumber(values.cost_price),
-            tax_rate: asOptionalNumber(values.tax_rate),
-            currency: asOptionalString(values.currency) ?? 'ARS',
-            default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
-            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parsePartyTagCsv(values.tags),
-            description: asOptionalString(values.description),
-          },
-        });
-      },
-      update: async (row, values) => {
-        await apiRequest(`/v1/services/${row.id}`, {
-          method: 'PATCH',
-          body: {
-            name: asString(values.name),
-            code: asOptionalString(values.code),
-            category_code: asOptionalString(values.category_code),
-            sale_price: asNumber(values.sale_price),
-            cost_price: asNumber(values.cost_price),
-            tax_rate: asOptionalNumber(values.tax_rate),
-            currency: asOptionalString(values.currency) ?? 'ARS',
-            default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
-            is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-            tags: parsePartyTagCsv(values.tags),
-            description: asOptionalString(values.description),
-          },
-        });
-      },
-      ...servicesArchivedMutations,
-    },
+    dataSource: buildRestCrudDataSource<Service>({ basePath: '/v1/services', toBody: serviceToBody }),
     columns: [
       {
         key: 'name',
@@ -342,32 +268,12 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       tags: formatPartyTagList(row.tags),
       description: row.description ?? '',
     }),
-    toBody: (values) => ({
-      name: asString(values.name),
-      code: asOptionalString(values.code),
-      category_code: asOptionalString(values.category_code),
-      sale_price: asNumber(values.sale_price),
-      cost_price: asNumber(values.cost_price),
-      tax_rate: asOptionalNumber(values.tax_rate),
-      currency: asOptionalString(values.currency) ?? 'ARS',
-      default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
-      is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-      tags: parsePartyTagCsv(values.tags),
-      description: asOptionalString(values.description),
-    }),
+    toBody: serviceToBody,
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
   },
   priceLists: {
     basePath: '/v1/price-lists',
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="priceLists" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="priceLists" />),
     searchPlaceholder: 'Buscar...',
     label: 'lista de precios',
     labelPlural: 'listas de precios',
@@ -403,8 +309,8 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       { key: 'is_default', label: 'Lista default', type: 'checkbox' },
       { key: 'is_active', label: 'Activa', type: 'checkbox' },
       {
-        key: 'items_json',
-        label: 'Items JSON',
+        key: 'items',
+        label: 'Items',
         type: 'textarea',
         fullWidth: true,
         placeholder: '[{"product_id":"uuid","price":1200}]',
@@ -417,7 +323,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       markup: row.markup?.toString() ?? '0',
       is_default: row.is_default ?? false,
       is_active: row.is_active ?? true,
-      items_json: stringifyJSON(row.items ?? []),
+      items: stringifyJSON(row.items ?? []),
     }),
     toBody: (values) => ({
       name: asString(values.name),
@@ -425,7 +331,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       markup: asNumber(values.markup),
       is_default: asBoolean(values.is_default),
       is_active: asBoolean(values.is_active),
-      items: parsePriceListItems(values.items_json),
+      items: parsePriceListItems(values.items),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,
   },
@@ -446,21 +352,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
   },
 };
 
-const resourceConfigs = Object.fromEntries(
-  Object.entries(commercialResourceConfigs).map(([resourceId, config]) => [
-    resourceId,
-    withCSVToolbar(resourceId, config, mergeCsvOptionsForResource(resourceId, config)),
-  ]),
-) as CrudResourceConfigMap;
-
-export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
-
-export function hasCrudResource(resourceId: string): boolean {
-  return hasCrudResourceInMap(resourceConfigs, resourceId);
-}
-
-export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
-  resourceId: string,
-): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
-}
+export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain(
+  commercialResourceConfigs,
+  { csvResolver: mergeCsvOptionsForResource },
+);

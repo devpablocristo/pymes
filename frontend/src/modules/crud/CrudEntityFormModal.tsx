@@ -1,4 +1,10 @@
-import { CrudEntityEditorModal, type CrudEntityEditorModalField, type CrudEntityEditorModalSection, type CrudEntityEditorModalStat } from './CrudEntityEditorModal';
+import {
+  CrudEntityEditorModal,
+  type CrudEntityEditorModalBlock,
+  type CrudEntityEditorModalField,
+  type CrudEntityEditorModalSection,
+  type CrudEntityEditorModalStat,
+} from './CrudEntityEditorModal';
 
 export type CrudEntityFormModalField = CrudEntityEditorModalField;
 
@@ -16,8 +22,11 @@ export type CrudEntityFormModalProps = {
   cancelEditLabel?: string;
   closeLabel?: string;
   fields: CrudEntityFormModalField[];
+  blocks?: CrudEntityEditorModalBlock[];
   sections?: CrudEntityEditorModalSection[];
   stats?: CrudEntityEditorModalStat[];
+  initialValues?: Record<string, import('@devpablocristo/modules-crud-ui').CrudFieldValue>;
+  row?: unknown;
   error?: string;
   loading?: boolean;
   loadingLabel?: string;
@@ -57,8 +66,11 @@ export function CrudEntityFormModal({
   cancelEditLabel,
   closeLabel,
   fields,
+  blocks,
   sections,
   stats,
+  initialValues,
+  row,
   error,
   loading,
   loadingLabel,
@@ -83,8 +95,11 @@ export function CrudEntityFormModal({
       cancelEditLabel={cancelEditLabel}
       closeLabel={closeLabel}
       fields={fields}
+      blocks={blocks}
       sections={sections}
       stats={stats}
+      initialValues={initialValues}
+      row={row}
       error={error}
       loading={loading}
       loadingLabel={loadingLabel}

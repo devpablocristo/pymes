@@ -1,18 +1,14 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
-import { type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
-import { apiRequest } from '../lib/api';
-import { withCSVToolbar } from './csvToolbar';
 import {
   createAccountCrudConfig,
   createPartyCrudConfig,
-  parsePartyPermissionInputs,
 } from '../modules/parties';
 import {
   createNexusRolesCrudConfig,
   createProcurementPoliciesCrudConfig,
   createProcurementRequestsCrudConfig,
 } from '../modules/nexus-governance';
-import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
+import { defineCrudDomain } from './defineCrudDomain';
 import { formatDate } from './resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
@@ -51,7 +47,7 @@ type Party = {
   roles?: Array<{ role: string; is_active: boolean }>;
 };
 
-const governanceResourceConfigs: CrudResourceConfigMap = {
+export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain({
   procurementRequests: createProcurementRequestsCrudConfig(),
   procurementPolicies: createProcurementPoliciesCrudConfig(),
   accounts: {
@@ -88,23 +84,4 @@ const governanceResourceConfigs: CrudResourceConfigMap = {
       roleEmployee: true,
     }),
   },
-};
-
-const resourceConfigs = Object.fromEntries(
-  Object.entries(governanceResourceConfigs).map(([resourceId, config]) => [
-    resourceId,
-    withCSVToolbar(resourceId, config, {}),
-  ]),
-) as CrudResourceConfigMap;
-
-export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
-
-export function hasCrudResource(resourceId: string): boolean {
-  return hasCrudResourceInMap(resourceConfigs, resourceId);
-}
-
-export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
-  resourceId: string,
-): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
-}
+});

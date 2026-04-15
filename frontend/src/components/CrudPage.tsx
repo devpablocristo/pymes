@@ -102,9 +102,23 @@ export type CrudKanbanConfig<T extends { id: string }> = {
 
 export type CrudEditorModalSectionConfig = {
   id: string;
-  title: ReactNode;
+  title?: ReactNode;
   description?: ReactNode;
-  fieldKeys: string[];
+  fieldKeys?: string[];
+};
+
+export type CrudEditorModalBlockConfig<T extends { id: string }> = {
+  id: string;
+  kind: 'lineItems';
+  field: string;
+  sectionId: string;
+  label?: ReactNode;
+  required?: boolean;
+  visible?: (ctx: {
+    values: ModulesCrudFormValues;
+    editing: boolean;
+    row?: T;
+  }) => boolean;
 };
 
 export type CrudEditorModalStatConfig<T extends { id: string }> = {
@@ -144,6 +158,7 @@ export type CrudEditorModalConfig<T extends { id: string }> = {
   eyebrow?: ReactNode;
   loadRecord?: (row: T) => Promise<T>;
   mediaFieldKey?: string;
+  blocks?: CrudEditorModalBlockConfig<T>[];
   sections?: CrudEditorModalSectionConfig[];
   fieldConfig?: Record<string, CrudEditorModalFieldConfig>;
   stats?: CrudEditorModalStatConfig<T>[];

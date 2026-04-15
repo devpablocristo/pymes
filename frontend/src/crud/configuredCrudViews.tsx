@@ -13,12 +13,27 @@ function fallbackViewModes(resourceId: string): CrudViewModeConfig[] {
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
 }
 
+function NoEnabledViews({ resourceId }: { resourceId: string }) {
+  return (
+    <PageLayout title="Módulo" lead="No hay vistas activas para este recurso.">
+      <div className="empty-state">
+        <p>{resourceId} no tiene vistas habilitadas en la configuración actual.</p>
+      </div>
+    </PageLayout>
+  );
+}
+
 function resolveViewModes<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T> | null,
 ): CrudViewModeConfig[] {
   const resolved = config ? applyCrudUiOverride(resourceId, config) : config;
-  const modes = resolved?.viewModes?.length ? resolved.viewModes : fallbackViewModes(resourceId);
+  const modes =
+    resolved == null
+      ? fallbackViewModes(resourceId)
+      : resolved.viewModes
+        ? resolved.viewModes
+        : fallbackViewModes(resourceId);
   return [...modes].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
 }
 
@@ -75,7 +90,14 @@ function useCrudConfig(resourceId: string) {
   return { config, error, loading };
 }
 
-function modeActionLink(resourceId: string) {
+function resolveCrudConfig<T extends { id: string }>(
+  resourceId: string,
+  config: CrudPageConfig<T> | null,
+): CrudPageConfig<T> | null {
+  return config ? applyCrudUiOverride(resourceId, config) : config;
+}
+
+function modeActionLink<T extends { id: string }>(resourceId: string, config: CrudPageConfig<T> | null) {
   const title = crudModuleCatalog[resourceId]?.title?.trim() || resourceId;
   return {
     to: `/modules/${resourceId}/configure`,
@@ -111,6 +133,7 @@ export function ConfiguredCrudSection({
 }) {
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
   const viewModes = useMemo(
     () => resolveViewModes(resourceId, config),
     [config, includeCanonicalMissing, resourceId, uiConfigVersion],
@@ -121,9 +144,13 @@ export function ConfiguredCrudSection({
       <CrudModuleSection
         modes={[{ path: `${baseRoute}/list`, label: '...' }]}
         groupAriaLabel="Cargando vistas"
-        actionLink={actionLink}
+        actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
       />
     );
+  }
+
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
   }
 
   return (
@@ -134,7 +161,7 @@ export function ConfiguredCrudSection({
         contextPattern: contextPatternByModeId?.[mode.id],
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={actionLink}
+      actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
     />
   );
 }
@@ -174,6 +201,10 @@ export function ConfiguredCrudModePage({
         </div>
       </PageLayout>
     );
+  }
+
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
   }
 
   if (!activeMode) {
@@ -232,6 +263,10 @@ export function ConfiguredCrudIndexRedirect({
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
   return <Navigate to={`${baseRoute}/${target}`} replace />;
 }
 
@@ -244,6 +279,7 @@ export function ConfiguredCrudStandalonePage({
 }) {
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
   const viewModes = useMemo(
     () => resolveViewModes(resourceId, config),
     [config, resourceId, uiConfigVersion],
@@ -268,6 +304,10 @@ export function ConfiguredCrudStandalonePage({
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
   return (
     <CrudModuleSection
       modes={viewModes.map((mode) => ({
@@ -275,7 +315,7 @@ export function ConfiguredCrudStandalonePage({
         label: mode.label,
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(resourceId)}
+      actionLink={modeActionLink(resourceId, resolvedConfig)}
     >
       <ConfiguredCrudModePage resourceId={resourceId} modeId={activeMode} allowGenericModeFallback />
     </CrudModuleSection>
@@ -286,6 +326,7 @@ export function ConfiguredCrudRouteModePage() {
   const { moduleId = '', modePath = '' } = useParams();
   const { config, error, loading } = useCrudConfig(moduleId);
   const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(moduleId, config), [config, moduleId, uiConfigVersion]);
   const viewModes = useMemo(
     () => resolveViewModes(moduleId, config),
     [config, moduleId, uiConfigVersion],
@@ -310,6 +351,10 @@ export function ConfiguredCrudRouteModePage() {
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={moduleId} />;
+  }
+
   if (!mode) {
     return (
       <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
@@ -327,7 +372,7 @@ export function ConfiguredCrudRouteModePage() {
         label: entry.label,
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(moduleId)}
+      actionLink={modeActionLink(moduleId, resolvedConfig)}
     >
       <ConfiguredCrudModePage resourceId={moduleId} modeId={mode.id} allowGenericModeFallback />
     </CrudModuleSection>
@@ -338,6 +383,7 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
   const { modePath = '' } = useParams();
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
   const viewModes = useMemo(
     () => resolveViewModes(resourceId, config),
     [config, resourceId, uiConfigVersion],
@@ -362,6 +408,10 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
   if (!mode) {
     return (
       <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
@@ -379,7 +429,7 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
         label: entry.label,
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(resourceId)}
+      actionLink={modeActionLink(resourceId, resolvedConfig)}
     >
       <ConfiguredCrudModePage resourceId={resourceId} modeId={mode.id} allowGenericModeFallback />
     </CrudModuleSection>

@@ -4,12 +4,8 @@
 import { lazy } from 'react';
 
 export const Shell = lazy(() => import('../components/Shell').then((mod) => ({ default: mod.Shell })));
-export const BikeShopWorkOrdersBoard = lazy(() => import('../pages/BikeShopWorkOrdersBoard'));
 export const ConfiguredCrudSectionPage = lazy(() =>
   import('../pages/ConfiguredCrudSectionPage').then((mod) => ({ default: mod.ConfiguredCrudSectionPage })),
-);
-export const WorkOrdersKanbanPanel = lazy(() =>
-  import('../pages/WorkOrdersKanbanPanel').then((mod) => ({ default: mod.WorkOrdersKanbanPanel })),
 );
 export const WorkOrdersEditorPage = lazy(() =>
   import('../pages/WorkOrdersEditorPage').then((mod) => ({ default: mod.WorkOrdersEditorPage })),

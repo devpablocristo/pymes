@@ -11,14 +11,6 @@ vi.mock('../crud/lazyCrudPage', () => ({
   LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
-vi.mock('./modes/CarWorkOrdersKanbanModeContent', () => ({
-  CarWorkOrdersKanbanModeContent: () => <div>car-work-orders-fallback</div>,
-}));
-
-vi.mock('./modes/BikeWorkOrdersKanbanModeContent', () => ({
-  BikeWorkOrdersKanbanModeContent: () => <div>bike-work-orders-fallback</div>,
-}));
-
 function buildInventoryConfig(): CrudPageConfig<{ id: string }> {
   return {
     label: 'item',

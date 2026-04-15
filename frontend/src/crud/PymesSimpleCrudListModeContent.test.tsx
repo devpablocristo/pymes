@@ -5,8 +5,9 @@ import type { CrudPageConfig } from '../components/CrudPage';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 
 let currentConfig: CrudPageConfig<{ id: string; name: string }> | null = null;
-const { openCrudFormDialogMock } = vi.hoisted(() => ({
+const { openCrudFormDialogMock, headerPropsSpy } = vi.hoisted(() => ({
   openCrudFormDialogMock: vi.fn(),
+  headerPropsSpy: vi.fn(),
 }));
 
 vi.mock('../lib/i18n', () => ({
@@ -61,18 +62,15 @@ vi.mock('../modules/crud', () => ({
   CrudTableSurface: ({
     items,
     columns,
-    rowActions,
     onRowClick,
   }: {
     items: Array<{ id: string; name: string }>;
     columns: Array<{ id: string; header: string }>;
-    rowActions?: Array<{ id: string; label: string }>;
     onRowClick?: (row: { id: string; name: string }) => void;
   }) => (
     <div>
       <div>rows:{items.length}</div>
       <div>cols:{columns.map((column) => `${column.id}:${column.header}`).join('|')}</div>
-      <div>actions:{rowActions?.map((action) => action.id).join('|') ?? ''}</div>
       <div>row-click:{String(Boolean(onRowClick))}</div>
     </div>
   ),
@@ -81,11 +79,13 @@ vi.mock('../modules/crud', () => ({
     visibleCount,
     totalCount,
     hasMore,
+    hidden,
   }: {
     visibleCount: number;
     totalCount?: number;
     hasMore?: boolean;
-  }) => <div>pagination:{visibleCount}:{String(totalCount ?? '')}:{String(Boolean(hasMore))}</div>,
+    hidden?: boolean;
+  }) => <div>pagination:{visibleCount}:{String(totalCount ?? '')}:{String(Boolean(hasMore))}:{String(Boolean(hidden))}</div>,
   CrudKanbanColumnCreateButton: ({
     label,
     onClick,
@@ -135,12 +135,23 @@ vi.mock('../modules/crud', () => ({
 }));
 
 vi.mock('./PymesCrudResourceShellHeader', () => ({
-  PymesCrudResourceShellHeader: () => <div>crud-header</div>,
+  PymesCrudResourceShellHeader: (props: Record<string, unknown>) => {
+    headerPropsSpy(props);
+    return (
+      <div>
+        crud-header
+        <div>search-inline:{String(Boolean(props.searchInlineActions))}</div>
+        <div>lead-slot:{String(Boolean(props.headerLeadSlot))}</div>
+        <div>extra-actions:{String(Boolean(props.extraHeaderActions))}</div>
+      </div>
+    );
+  },
 }));
 
 describe('PymesSimpleCrudListModeContent', () => {
   beforeEach(() => {
     openCrudFormDialogMock.mockReset();
+    headerPropsSpy.mockReset();
   });
 
   it('preconfigura el estado al crear desde el pie de una columna kanban', async () => {
@@ -246,7 +257,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('cols:name:Nombre')).toBeInTheDocument();
   });
 
-  it('no genera la columna de acciones si la fila ya abre editar', () => {
+  it('abre edición desde la fila sin depender de acciones inline', () => {
     currentConfig = {
       label: 'compra',
       labelPlural: 'compras',
@@ -261,7 +272,6 @@ describe('PymesSimpleCrudListModeContent', () => {
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
 
     render(<PymesSimpleCrudListModeContent resourceId="purchases" />);
-    expect(screen.getByText('actions:')).toBeInTheDocument();
     expect(screen.getByText('row-click:true')).toBeInTheDocument();
   });
 
@@ -293,7 +303,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
     expect(screen.getByText('kanban-surface:1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Añadir compra' })).toBeInTheDocument();
-    expect(screen.getByText('pagination:1:1:false')).toBeInTheDocument();
+    expect(screen.getByText('pagination:1:1:false:false')).toBeInTheDocument();
   });
 
   it('permite definir el contenido de la card del kanban desde la config del recurso', () => {
@@ -319,5 +329,37 @@ describe('PymesSimpleCrudListModeContent', () => {
 
     render(<PymesSimpleCrudListModeContent resourceId="purchases" mode="kanban" />);
     expect(screen.getByText('kanban-card:Titulo explicito|Subtitulo explicito|Meta explicita')).toBeInTheDocument();
+  });
+
+  it('apaga los features de cabecera y create cuando la config los deshabilita', () => {
+    currentConfig = {
+      label: 'factura',
+      labelPlural: 'facturas',
+      labelPluralCap: 'Facturación',
+      basePath: '/v1/invoices',
+      supportsArchived: true,
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      allowCreate: true,
+      featureFlags: {
+        searchBar: false,
+        creatorFilter: false,
+        valueFilter: false,
+        archivedToggle: false,
+        createAction: false,
+        pagination: false,
+        csvToolbar: false,
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="invoices" />);
+
+    expect(screen.getByText('search-inline:false')).toBeInTheDocument();
+    expect(screen.getByText('lead-slot:false')).toBeInTheDocument();
+    expect(screen.getByText('extra-actions:false')).toBeInTheDocument();
+    expect(screen.getByText('pagination:1:1:false:true')).toBeInTheDocument();
   });
 });

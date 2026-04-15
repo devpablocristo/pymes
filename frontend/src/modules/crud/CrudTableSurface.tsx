@@ -51,7 +51,6 @@ export function CrudTableSurface<T>({
                 {column.header}
               </th>
             ))}
-            {rowActions.length ? <th className="col-actions">Acciones</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -69,26 +68,6 @@ export function CrudTableSurface<T>({
                     {column.render(row)}
                   </td>
                 ))}
-                {rowActions.length ? (
-                  <td className="col-actions" onClick={(event) => event.stopPropagation()}>
-                    <div className="crud-row-actions">
-                      {rowActions
-                        .filter((action) => action.isVisible?.(row) ?? true)
-                        .map((action) => (
-                          <button
-                            key={action.id}
-                            type="button"
-                            className={buttonClass(action.kind)}
-                            onClick={() => {
-                              void action.onClick(row);
-                            }}
-                          >
-                            {action.label}
-                          </button>
-                        ))}
-                    </div>
-                  </td>
-                ) : null}
               </tr>
             );
           })}

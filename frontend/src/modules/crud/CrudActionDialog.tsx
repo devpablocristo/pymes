@@ -4,7 +4,7 @@ import {
   CrudEntityFormModal,
   type CrudEntityFormModalField,
 } from './CrudEntityFormModal';
-import type { CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
+import type { CrudEntityEditorModalBlock, CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
 import './CrudActionDialog.css';
 
@@ -50,7 +50,10 @@ type CrudActionDialogFormProps = CrudActionDialogBaseProps & {
     };
     onArchive: () => Promise<void> | void;
   };
+  blocks?: CrudEntityEditorModalBlock[];
   submitLabel?: string;
+  initialValues?: Record<string, CrudFieldValue>;
+  row?: unknown;
   onSubmit: (values: Record<string, CrudFieldValue>) => void;
 };
 
@@ -77,8 +80,11 @@ export function CrudActionDialog(props: CrudActionDialogProps) {
         cancelEditLabel={props.cancelEditLabel}
         closeLabel={props.closeLabel}
         fields={props.fields}
+        blocks={props.blocks}
         sections={props.sections}
         stats={props.stats}
+        initialValues={props.initialValues}
+        row={props.row}
         error={props.error}
         loading={props.loading}
         loadingLabel={props.loadingLabel}

@@ -5,14 +5,15 @@ import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import {
-  CrudLineItemsEditor,
   buildCrudSelectFieldOptionsFromStateMachine,
+  buildFullyConnectedStatusStateMachine,
   buildSimpleStatusStateMachine,
   buildStandardCrudViewModes,
   formatCrudLocalizedMoney,
   hasReadableCrudValue,
   openCrudFormDialog,
   openCrudTextDialog,
+  renderCrudPrimaryCell,
 } from '../crud';
 import {
   INVOICE_STATUS_LABELS,
@@ -24,7 +25,12 @@ import {
   type InvoiceRecord,
   type InvoiceStatus,
 } from './invoicesDemo';
-import type { CommercialDocumentStatusOption } from './CommercialDocumentWorkspace';
+
+export type CommercialDocumentStatusOption<TStatus extends string> = {
+  value: TStatus;
+  label: string;
+  badgeClass: string;
+};
 
 export function buildCommercialDocumentStatusOptions<TStatus extends string>(
   labels: Record<TStatus, string>,
@@ -110,6 +116,49 @@ export type PurchaseRecord = {
   items?: CommercialCostLineItem[];
 };
 
+function buildCrudNotesField() {
+  return { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true };
+}
+
+function buildCrudNameField(
+  key: 'customer_name' | 'supplier_name',
+  label: 'Cliente' | 'Proveedor',
+  placeholder: string,
+) {
+  return { key, label, required: true, placeholder };
+}
+
+function buildCommercialLineItemsBlock(sectionId = 'items') {
+  return {
+    id: 'items',
+    kind: 'lineItems' as const,
+    field: 'items',
+    sectionId,
+    visible: ({ editing }: { editing: boolean }) => editing,
+  };
+}
+
+const purchasePaymentStatusOptions = [
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'partial', label: 'Parcial' },
+  { value: 'paid', label: 'Pagado' },
+];
+
+function buildCrudSummaryReadOnlyField(sectionId = 'summary') {
+  return {
+    sectionId,
+    readOnly: true,
+    visible: ({ value }: { value: unknown }) => hasReadableCrudValue(value),
+  };
+}
+
+function buildCrudSectionField(sectionId: string, extra?: Record<string, unknown>) {
+  return {
+    sectionId,
+    ...(extra ?? {}),
+  };
+}
+
 export function parseInvoiceStatus(value: CrudFieldValue | undefined): InvoiceStatus {
   const raw = asOptionalString(value);
   if (raw === 'paid' || raw === 'pending' || raw === 'overdue') return raw;
@@ -143,7 +192,7 @@ export async function createDemoInvoiceFromCrudValues(values: Record<string, Cru
       status: parseInvoiceStatus(values.status),
       discount: asOptionalNumber(values.discount) ?? 0,
       tax: asOptionalNumber(values.tax) ?? 21,
-      items: createInvoiceCrudLineItems(values.items_json),
+      items: createInvoiceCrudLineItems(values.items),
       archived_at: null,
     },
     ...invoices,
@@ -253,6 +302,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
   | 'createLabel'
   | 'searchPlaceholder'
   | 'supportsArchived'
+  | 'allowCreate'
+  | 'allowEdit'
   | 'dataSource'
   | 'columns'
   | 'formFields'
@@ -282,7 +333,50 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       { key: 'status', header: 'Estado' },
     ],
   }).config;
-  return { ...base, stateMachine };
+  return {
+    ...base,
+    allowCreate: true,
+    allowEdit: false,
+    stateMachine,
+    formFields: [
+      { key: 'number', label: 'Comprobante' },
+      { key: 'customer', label: 'Cliente', placeholder: 'Nombre del cliente', required: true },
+      { key: 'issuedDate', label: 'Fecha de emisión', type: 'date' },
+      { key: 'dueDate', label: 'Fecha de vencimiento', type: 'date' },
+      {
+        key: 'status',
+        label: 'Estado',
+        type: 'select',
+        options: [
+          { value: 'paid', label: INVOICE_STATUS_LABELS.paid },
+          { value: 'pending', label: INVOICE_STATUS_LABELS.pending },
+          { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue },
+        ],
+      },
+      { key: 'discount', label: 'Descuento (%)', type: 'number' },
+      { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+      {
+        key: 'items',
+        label: 'Detalle',
+        type: 'textarea',
+        fullWidth: true,
+        required: true,
+        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+      },
+    ],
+    toFormValues: (row: TRecord) => ({
+      number: row.number ?? '',
+      customer: row.customer ?? '',
+      issuedDate: row.issuedDate ? String(row.issuedDate).slice(0, 10) : '',
+      dueDate: row.dueDate ? String(row.dueDate).slice(0, 10) : '',
+      status: row.status ?? 'pending',
+      discount: String(row.discount ?? 0),
+      tax: String(row.tax ?? 21),
+      items: JSON.stringify(row.items ?? []),
+    }),
+    isValid: (values) =>
+      asString(values.customer).trim().length >= 2 && asString(values.items).trim().length > 0,
+  };
 }
 
 export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): CrudResourceShellHeaderConfigLike<TRecord> {
@@ -332,14 +426,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
         key: 'number',
         header: 'Presupuesto',
         className: 'cell-name',
-        render: (_value, row: TRecord) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
+        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.customer_name || 'Sin cliente'} · ${row.status || 'draft'}`),
       },
       {
         key: 'total',
@@ -355,19 +442,18 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
     supportsArchived: true,
     ...base.config,
     stateMachine,
+    editorModal: {
+      blocks: [buildCommercialLineItemsBlock()],
+      sections: [
+        { id: 'default' },
+        { id: 'items' },
+      ],
+    },
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
-      { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
+      buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'valid_until', label: 'Valido hasta', type: 'date' },
-      {
-        key: 'items_json',
-        label: 'Items JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Servicio","quantity":1,"unit_price":10000}]',
-      },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true, rows: 2 },
+      buildCrudNotesField(),
     ],
     rowActions: [
       {
@@ -403,18 +489,18 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
       valid_until: row.valid_until ? String(row.valid_until).slice(0, 10) : '',
-      items_json: JSON.stringify(row.items ?? []),
+      items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
       customer_id: asOptionalString(values.customer_id),
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
-      items: parseCommercialPricedLineItems(values.items_json),
+      items: parseCommercialPricedLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
-      asString(values.customer_name).trim().length >= 2 && asString(values.items_json).trim().length > 0,
+      asString(values.customer_name).trim().length >= 2 && asString(values.items).trim().length > 0,
   };
 }
 
@@ -441,14 +527,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         key: 'number',
         header: 'Venta',
         className: 'cell-name',
-        render: (_value, row: TRecord) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.customer_name || 'Sin cliente'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
+        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.customer_name || 'Sin cliente'} · ${row.status || 'draft'}`),
       },
       { key: 'payment_method', header: 'Cobro' },
       {
@@ -466,9 +545,16 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
     allowDelete: false,
     ...base.config,
     stateMachine,
+    editorModal: {
+      blocks: [buildCommercialLineItemsBlock()],
+      sections: [
+        { id: 'default' },
+        { id: 'items' },
+      ],
+    },
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
-      { key: 'customer_name', label: 'Cliente', required: true, placeholder: 'Nombre del cliente' },
+      buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'quote_id', label: 'Quote ID' },
       {
         key: 'payment_method',
@@ -476,15 +562,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         required: true,
         placeholder: 'efectivo, transferencia, tarjeta',
       },
-      {
-        key: 'items_json',
-        label: 'Items JSON',
-        type: 'textarea',
-        required: true,
-        fullWidth: true,
-        placeholder: '[{"description":"Producto","quantity":1,"unit_price":10000}]',
-      },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true, rows: 2 },
+      buildCrudNotesField(),
     ],
     rowActions: [
       {
@@ -593,7 +671,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       customer_name: row.customer_name ?? '',
       quote_id: row.quote_id ?? '',
       payment_method: row.payment_method ?? '',
-      items_json: JSON.stringify(row.items ?? []),
+      items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -601,13 +679,13 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       customer_name: asString(values.customer_name),
       quote_id: asOptionalString(values.quote_id),
       payment_method: asString(values.payment_method),
-      items: parseCommercialPricedLineItems(values.items_json),
+      items: parseCommercialPricedLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
       asString(values.customer_name).trim().length >= 2 &&
       asString(values.payment_method).trim().length >= 2 &&
-      asString(values.items_json).trim().length > 0,
+      asString(values.items).trim().length > 0,
   };
 }
 
@@ -621,7 +699,7 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     { value: 'expired', label: 'Vencida', badgeVariant: 'danger' },
   ]);
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList),
     label: 'nota de crédito',
     labelPlural: 'notas de crédito',
     labelPluralCap: 'Notas de crédito',
@@ -641,12 +719,7 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
         key: 'number',
         header: 'Documento',
         className: 'cell-name',
-        render: (_value, row: TRecord) => (
-          <>
-            <strong>{row.number}</strong>
-            <div className="text-secondary">{row.status}</div>
-          </>
-        ),
+        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number, row.status),
       },
       {
         key: 'balance',
@@ -712,27 +785,12 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
 export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = {
-    field: 'status',
-    states: [
-      { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
-      { value: 'partial', label: 'Parcial', columnId: 'partial', badgeVariant: 'warning' },
-      { value: 'received', label: 'Recibida', columnId: 'received', badgeVariant: 'info' },
-      { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
-    ],
-    columns: [
-      { id: 'draft', label: 'Borrador', defaultState: 'draft' },
-      { id: 'partial', label: 'Parcial', defaultState: 'partial' },
-      { id: 'received', label: 'Recibida', defaultState: 'received' },
-      { id: 'voided', label: 'Anulada', defaultState: 'voided' },
-    ],
-    transitions: [
-      { from: 'draft', to: ['partial', 'received', 'voided'] },
-      { from: 'partial', to: ['draft', 'received', 'voided'] },
-      { from: 'received', to: ['draft', 'partial', 'voided'] },
-      { from: 'voided', to: ['draft', 'partial', 'received'] },
-    ],
-  } satisfies NonNullable<CrudPageConfig<TRecord>['stateMachine']>;
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
+    { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+    { value: 'partial', label: 'Parcial', badgeVariant: 'warning' },
+    { value: 'received', label: 'Recibida', badgeVariant: 'info' },
+    { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
+  ]);
 
   const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes'>({
     resourceId: 'purchases',
@@ -747,14 +805,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
         key: 'number',
         header: 'Compra',
         className: 'cell-name',
-        render: (_value, row: TRecord) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">
-              {row.supplier_name || 'Sin proveedor'} · {row.status || 'draft'}
-            </div>
-          </>
-        ),
+        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.supplier_name || 'Sin proveedor'} · ${row.status || 'draft'}`),
       },
       { key: 'payment_status', header: 'Pago' },
       {
@@ -773,17 +824,24 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
+      blocks: [
+        {
+          id: 'items',
+          kind: 'lineItems',
+          field: 'items',
+          sectionId: 'items',
+          visible: ({ editing }) => editing,
+        },
+      ],
       sections: [
         {
           id: 'summary',
           title: 'Resumen de la compra',
           fieldKeys: ['number', 'supplier_name', 'status', 'payment_status', 'total', 'received_at'],
         },
-        // {
-        //   id: 'items',
-        //   title: '',
-        //   fieldKeys: ['purchase_items'],
-        // },
+        {
+          id: 'items',
+        },
         {
           id: 'notes',
           title: 'Notas',
@@ -791,41 +849,16 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
         },
       ],
       fieldConfig: {
-        number: {
-          sectionId: 'summary',
-          readOnly: true,
-          visible: ({ value }) => hasReadableCrudValue(value),
-        },
-        total: {
-          sectionId: 'summary',
-          readOnly: true,
-          visible: ({ value }) => hasReadableCrudValue(value),
-        },
-        received_at: {
-          sectionId: 'summary',
-          readOnly: true,
-          visible: ({ value }) => hasReadableCrudValue(value),
-        },
-        purchase_items: {
-          sectionId: 'items',
+        number: buildCrudSummaryReadOnlyField(),
+        total: buildCrudSummaryReadOnlyField(),
+        received_at: buildCrudSummaryReadOnlyField(),
+        notes: buildCrudSectionField('notes', {
           fullWidth: true,
-          visible: ({ editing }) => editing,
-          editControl: ({ value, setValue }) => <CrudLineItemsEditor value={value} onChange={setValue} />,
-        },
-        notes: {
-          sectionId: 'notes',
-          fullWidth: true,
-          visible: ({ value }) => hasReadableCrudValue(value),
-        },
-        supplier_name: {
-          sectionId: 'summary',
-        },
-        status: {
-          sectionId: 'summary',
-        },
-        payment_status: {
-          sectionId: 'summary',
-        },
+          visible: ({ value }: { value: unknown }) => hasReadableCrudValue(value),
+        }),
+        supplier_name: buildCrudSectionField('summary'),
+        status: buildCrudSectionField('summary'),
+        payment_status: buildCrudSectionField('summary'),
       },
       confirmDiscard: {
         title: 'Descartar cambios',
@@ -853,7 +886,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     },
     formFields: [
       { key: 'number', label: 'Comprobante' },
-      { key: 'supplier_name', label: 'Proveedor', required: true, placeholder: 'Nombre del proveedor' },
+      buildCrudNameField('supplier_name', 'Proveedor', 'Nombre del proveedor'),
       {
         key: 'status',
         label: 'Estado',
@@ -864,16 +897,11 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
         key: 'payment_status',
         label: 'Pago',
         type: 'select',
-        options: [
-          { value: 'pending', label: 'Pendiente' },
-          { value: 'partial', label: 'Parcial' },
-          { value: 'paid', label: 'Pagado' },
-        ],
+        options: purchasePaymentStatusOptions,
       },
       { key: 'total', label: 'Total' },
       { key: 'received_at', label: 'Fecha de recepción' },
-      // { key: 'purchase_items', label: 'Detalle', type: 'textarea', fullWidth: true, required: true },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true, rows: 2 },
+      buildCrudNotesField(),
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -882,7 +910,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       payment_status: row.payment_status ?? '',
       total: formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
       received_at: row.received_at ? formatDate(row.received_at) : '',
-      purchase_items: JSON.stringify(row.items ?? []),
+      items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -890,10 +918,10 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),
       payment_status: asOptionalString(values.payment_status),
-      items: parseCommercialCostLineItems(values.purchase_items),
+      items: parseCommercialCostLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
-      asString(values.supplier_name).trim().length >= 2 && asString(values.purchase_items).trim().length > 0,
+      asString(values.supplier_name).trim().length >= 2 && asString(values.items).trim().length > 0,
   };
 }

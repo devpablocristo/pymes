@@ -1,5 +1,5 @@
 import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
-import { formatCrudMoney } from '../crud';
+import { buildStandardCrudViewModes, formatCrudMoney } from '../crud';
 import {
   asBoolean,
   asNumber,
@@ -531,7 +531,7 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
 > {
   return {
     supportsArchived: true,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: options.render }],
+    viewModes: buildStandardCrudViewModes(options.render),
     label: options.label,
     labelPlural: options.labelPlural,
     labelPluralCap: options.labelPluralCap,
@@ -565,7 +565,7 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
 > {
   return {
     supportsArchived: true,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: options.render }],
+    viewModes: buildStandardCrudViewModes(options.render),
     searchPlaceholder: 'Buscar...',
     label: 'proveedor',
     labelPlural: 'proveedores',
@@ -618,7 +618,7 @@ export function createPartyCrudConfig<T extends PartyRecord>(options: {
     toFormValues: buildPartyFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: options.roleEmployee ? roleEmployeeBody : partyFormToBody,
     isValid: isValidPartyForm,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: options.render }],
+    viewModes: buildStandardCrudViewModes(options.render),
   };
 }
 
@@ -658,6 +658,6 @@ export function createAccountCrudConfig<T extends AccountRecord & { updated_at?:
     toFormValues: buildAccountFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: accountFormToBody,
     isValid: isValidAccountForm,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: options.render }],
+    viewModes: buildStandardCrudViewModes(options.render),
   };
 }

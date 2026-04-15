@@ -1,6 +1,7 @@
 import { type CrudColumn, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
 import { renderTagBadges } from '../../crud/crudTagBadges';
+import { buildStandardCrudViewModes } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
@@ -168,17 +169,11 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
 > {
   return {
     supportsArchived: true,
-    viewModes: [
-      {
-        id: 'gallery',
-        label: 'Galería',
-        path: 'gallery',
-        ariaLabel: 'Vista galería o lista',
-        isDefault: true,
-        render: options.renderGallery,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista galería o lista', render: options.renderList },
-    ],
+    viewModes: buildStandardCrudViewModes(options.renderList, {
+      defaultModeId: 'gallery',
+      renderGallery: options.renderGallery,
+      ariaLabel: 'Vista galería, lista o tablero',
+    }),
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',

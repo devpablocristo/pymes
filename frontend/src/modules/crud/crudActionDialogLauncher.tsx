@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 import type { ReactNode } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { CrudActionDialog, type CrudActionDialogField } from './CrudActionDialog';
-import type { CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
+import type { CrudEntityEditorModalBlock, CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
 
 type CrudFormDialogOptions = {
   title: string;
@@ -17,8 +17,11 @@ type CrudFormDialogOptions = {
   cancelEditLabel?: string;
   closeLabel?: string;
   fields: CrudActionDialogField[];
+  blocks?: CrudEntityEditorModalBlock[];
   sections?: CrudEntityEditorModalSection[];
   stats?: CrudEntityEditorModalStat[];
+  initialValues?: Record<string, CrudFieldValue>;
+  row?: unknown;
   error?: string;
   loading?: boolean;
   loadingLabel?: string;
@@ -76,8 +79,11 @@ export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Reco
       mediaFieldId={options.mediaFieldId}
       dialogMode={options.dialogMode}
       fields={options.fields}
+      blocks={options.blocks}
       sections={options.sections}
       stats={options.stats}
+      initialValues={options.initialValues}
+      row={options.row}
       error={options.error}
       loading={options.loading}
       loadingLabel={options.loadingLabel}

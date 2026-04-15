@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
-import { type CrudFormValues, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
+import { type CrudFormValues, type CrudResourceConfigMap } from '../components/CrudPage';
 import {
   apiRequest,
   createSalePayment,
@@ -11,15 +11,12 @@ import { getCrudSearchParam } from '../modules/crud';
 import {
   createStockCrudConfig,
   fetchStockLevels,
-  StockBoardWorkspace,
-  StockGalleryWorkspace,
-  StockListWorkspace,
   type StockRecord,
   type StockLevelRow,
 } from '../modules/inventory';
-import { PaymentsListModeContent } from '../modules/billing';
 import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
+import { buildStandardCrudViewModes } from '../modules/crud';
 import {
   formatOperationsMoney,
   parseReturnSaleItemsJson,
@@ -27,8 +24,7 @@ import {
   validateReturnForm,
 } from './operationsCrudHelpers';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
-import { withCSVToolbar } from './csvToolbar';
-import { buildConfiguredCrudPage, getCrudPageConfigFromMap, hasCrudResourceInMap } from './resourceConfigs.runtime';
+import { defineCrudDomain } from './defineCrudDomain';
 import {
   asBoolean,
   asNumber,
@@ -83,15 +79,7 @@ type RecurringExpense = {
 const operationsResourceConfigs: CrudResourceConfigMap = {
   returns: {
     basePath: '/v1/returns',
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="returns" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="returns" />),
     label: 'devolución',
     labelPlural: 'devoluciones',
     labelPluralCap: 'Devoluciones',
@@ -156,8 +144,8 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       },
       { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
       {
-        key: 'items_json',
-        label: 'Ítems (JSON)',
+        key: 'items',
+        label: 'Ítems',
         type: 'textarea',
         fullWidth: true,
         required: true,
@@ -170,7 +158,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         const refund_method = asString(values.refund_method).trim().toLowerCase();
         const reason = asString(values.reason).trim().toLowerCase() || 'other';
         const notes = asString(values.notes).trim();
-        const raw = asString(values.items_json).trim();
+        const raw = asString(values.items).trim();
         const items = parseReturnSaleItemsJson(raw);
         await apiRequest(`/v1/sales/${saleId}/return`, {
           method: 'POST',
@@ -191,7 +179,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         refund_method: 'cash',
         reason: 'other',
         notes: '',
-        items_json: '[{"sale_item_id":"","quantity":1}]',
+        items: '[{"sale_item_id":"","quantity":1}]',
       }) as CrudFormValues,
     isValid: validateReturnForm,
     rowActions: [
@@ -214,15 +202,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   cashflow: {
     basePath: '/v1/cashflow',
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="cashflow" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="cashflow" />),
     label: 'movimiento',
     labelPlural: 'movimientos',
     labelPluralCap: 'Movimientos de caja',
@@ -312,9 +292,9 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   inventory: {
     ...createStockCrudConfig<StockRecord>({
-      renderList: () => <StockListWorkspace />,
-      renderGallery: () => <StockGalleryWorkspace />,
-      renderBoard: () => <StockBoardWorkspace />,
+      renderList: () => <PymesSimpleCrudListModeContent resourceId="inventory" />,
+      renderGallery: () => <PymesSimpleCrudListModeContent resourceId="inventory" mode="gallery" />,
+      renderBoard: () => <PymesSimpleCrudListModeContent resourceId="inventory" mode="kanban" />,
     }),
     dataSource: {
       list: async ({ archived }) => fetchStockLevels({ archived: Boolean(archived) }),
@@ -339,9 +319,9 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     isValid: () => true,
   },
   payments: {
-    viewModes: [
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista pagos', isDefault: true, render: () => <PaymentsListModeContent /> },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="payments" />, {
+      ariaLabel: 'Vista pagos',
+    }),
     label: 'pago',
     labelPlural: 'pagos',
     labelPluralCap: 'Pagos',
@@ -412,15 +392,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   recurring: {
     basePath: '/v1/recurring-expenses',
-    viewModes: [
-      {
-        id: 'list',
-        label: 'Lista',
-        path: 'list',
-        isDefault: true,
-        render: () => <PymesSimpleCrudListModeContent resourceId="recurring" />,
-      },
-    ],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="recurring" />),
     label: 'gasto recurrente',
     labelPlural: 'gastos recurrentes',
     labelPluralCap: 'Gastos recurrentes',
@@ -495,21 +467,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
 };
 
-const resourceConfigs = Object.fromEntries(
-  Object.entries(operationsResourceConfigs).map(([resourceId, config]) => [
-    resourceId,
-    withCSVToolbar(resourceId, config, mergeCsvOptionsForResource(resourceId, config)),
-  ]),
-) as CrudResourceConfigMap;
-
-export const ConfiguredCrudPage = buildConfiguredCrudPage(resourceConfigs);
-
-export function hasCrudResource(resourceId: string): boolean {
-  return hasCrudResourceInMap(resourceConfigs, resourceId);
-}
-
-export function getCrudPageConfig<TRecord extends { id: string } = { id: string }>(
-  resourceId: string,
-): CrudPageConfig<TRecord> | null {
-  return getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId);
-}
+export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain(
+  operationsResourceConfigs,
+  { csvResolver: mergeCsvOptionsForResource },
+);

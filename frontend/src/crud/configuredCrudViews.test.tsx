@@ -9,6 +9,7 @@ import {
   ConfiguredCrudNestedRouteModePage,
   ConfiguredCrudRouteModePage,
   ConfiguredCrudSection,
+  ConfiguredCrudStandalonePage,
 } from './configuredCrudViews';
 
 const loadLazyCrudPageConfigMock = vi.fn<[string], Promise<CrudPageConfig<{ id: string }> | null>>();
@@ -116,6 +117,35 @@ describe('configuredCrudViews', () => {
     expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
   });
 
+  it('shows the shared empty state in dedicated sections when preferences disable every view mode', async () => {
+    render(
+      <MemoryRouter initialEntries={['/modules/inventory/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route
+            path="/modules/inventory"
+            element={<ConfiguredCrudSection resourceId="inventory" baseRoute="/modules/inventory" />}
+          >
+            <Route path="list" element={<div>list-screen</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
+
+    writeCrudUiConfigState({
+      inventory: { enabledViewModeIds: [] },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('No hay vistas activas para este recurso.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Configurar' })).not.toBeInTheDocument();
+  });
+
   it('invalidates a custom mode page when that mode is disabled by preferences', async () => {
     render(
       <MemoryRouter initialEntries={['/modules/inventory/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -143,6 +173,37 @@ describe('configuredCrudViews', () => {
     );
 
     expect(await screen.findByText('custom-list-screen')).toBeInTheDocument();
+  });
+
+  it('shows the shared empty state when preferences disable every standalone view mode', async () => {
+    writeCrudUiConfigState({
+      inventory: { enabledViewModeIds: [] },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/modules/inventory']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ConfiguredCrudStandalonePage resourceId="inventory" baseRoute="/modules/inventory" />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('No hay vistas activas para este recurso.')).toBeInTheDocument();
+    expect(screen.getByText('inventory no tiene vistas habilitadas en la configuración actual.')).toBeInTheDocument();
+    expect(screen.queryByText('generic:inventory:list')).not.toBeInTheDocument();
+  });
+
+  it('keeps configure action visible even if preferences try to disable it', async () => {
+    writeCrudUiConfigState({
+      inventory: { featureFlags: { configureAction: false } },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/modules/inventory']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ConfiguredCrudStandalonePage resourceId="inventory" baseRoute="/modules/inventory" />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('generic:inventory:list')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Configurar' })).toBeInTheDocument();
   });
 
   it('renders a custom list mode when the resource declares one', async () => {

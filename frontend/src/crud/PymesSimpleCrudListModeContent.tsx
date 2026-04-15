@@ -1,5 +1,5 @@
 import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
-import { crudItemPath, type CrudFieldValue, type CrudHelpers, type CrudRowAction } from '@devpablocristo/modules-crud-ui';
+import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { useCallback, useMemo, useState } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
@@ -21,10 +21,10 @@ import {
   useCrudConfiguredValueKanban,
   useCrudRemoteGalleryPage,
   type CrudActionDialogField,
+  type CrudEntityEditorModalBlock,
   type CrudEntityEditorModalSection,
   type CrudEntityEditorModalStat,
   type CrudTableSurfaceColumn,
-  type CrudTableSurfaceRowAction,
 } from '../modules/crud';
 import type {
   CrudColumn,
@@ -133,7 +133,23 @@ function resolveEditorSectionId<T extends { id: string }>(
   crudConfig: CrudPageConfig<T>,
   fieldKey: string,
 ): string | undefined {
-  return crudConfig.editorModal?.sections?.find((section) => section.fieldKeys.includes(fieldKey))?.id;
+  return crudConfig.editorModal?.sections?.find((section) => section.fieldKeys?.includes(fieldKey))?.id;
+}
+
+function buildEditorBlocks<T extends { id: string }>(
+  crudConfig: CrudPageConfig<T>,
+): CrudEntityEditorModalBlock[] | undefined {
+  return crudConfig.editorModal?.blocks?.map((block) => ({
+    id: block.id,
+    kind: block.kind,
+    field: block.field,
+    sectionId: block.sectionId,
+    label: block.label,
+    required: block.required,
+    visible: block.visible
+      ? ({ values, editing, row }) => Boolean(block.visible?.({ values, editing, row: row as T | undefined }))
+      : undefined,
+  }));
 }
 
 function buildEditorStats<T extends { id: string }>(
@@ -308,7 +324,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         }
       }
       const fields = activeFields(crudConfig.formFields, editing);
-      if (fields.length === 0) return;
+      const blocks = buildEditorBlocks(crudConfig);
+      if (fields.length === 0 && !(blocks?.length)) return;
       const createInitialValues = {
         ...buildEmptyFormValues(fields),
         ...createDefaults,
@@ -332,6 +349,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         editLabel: 'Editar',
         cancelEditLabel: 'Cancelar edición',
         closeLabel: 'Cerrar',
+        initialValues: currentValues,
         fields: visibleFields.map((field) =>
           toDialogField(
             field,
@@ -340,8 +358,10 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             resolveEditorSectionId(crudConfig, field.key),
           ),
         ),
+        blocks,
         sections: buildEditorSections(crudConfig),
         stats: buildEditorStats(crudConfig, editorRow, currentValues, editing),
+        row: editorRow,
         confirmDiscard: crudConfig.editorModal?.confirmDiscard,
         archiveAction:
           editing && editorRow && crudConfig.supportsArchived
@@ -425,116 +445,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     };
   }, [archived, canEdit, onRowClick, runCreateOrEdit]);
 
-  const rowActions = useMemo<CrudTableSurfaceRowAction<T>[]>(() => {
-    if (!crudConfig) return [];
-    const canDelete = crudConfig.allowDelete ?? Boolean(crudConfig.supportsArchived);
-    const canRestore = crudConfig.allowRestore ?? Boolean(crudConfig.supportsArchived);
-    const canHardDelete = crudConfig.allowHardDelete ?? Boolean(crudConfig.supportsArchived);
-    const helpers: CrudHelpers<T> = {
-      items,
-      reload,
-      setError: (message: string) => setError(message),
-    };
-    const configRowActions: CrudTableSurfaceRowAction<T>[] = (crudConfig.rowActions ?? []).map((action: CrudRowAction<T>) => ({
-      id: action.id,
-      label: action.label,
-      kind: action.kind,
-      isVisible: (row) => action.isVisible?.(row, { archived }) ?? true,
-      onClick: async (row) => {
-        try {
-          await action.onClick(row, helpers);
-        } catch (actionError) {
-          setError(normalizeError(actionError, `No se pudo ejecutar ${action.label}.`));
-        }
-      },
-    }));
-    if (archived) {
-      return [
-        ...configRowActions,
-        ...(canRestore
-          ? [
-              {
-                id: 'restore',
-                label: 'Restaurar',
-                kind: 'success' as const,
-                onClick: async (row: T) => {
-                  try {
-                    if (crudConfig.dataSource?.restore) {
-                      await crudConfig.dataSource.restore(row);
-                    } else if (crudConfig.basePath) {
-                      await apiRequest(crudItemPath(crudConfig.basePath, row.id, 'restore'), { method: 'POST', body: {} });
-                    }
-                    await reload();
-                  } catch (actionError) {
-                    setError(normalizeError(actionError, `No se pudo restaurar ${crudConfig.label}.`));
-                  }
-                },
-              },
-            ]
-          : []),
-        ...(canHardDelete
-          ? [
-              {
-                id: 'hard-delete',
-                label: 'Eliminar',
-                kind: 'danger' as const,
-                onClick: async (row: T) => {
-                  try {
-                    if (crudConfig.dataSource?.hardDelete) {
-                      await crudConfig.dataSource.hardDelete(row);
-                    } else if (crudConfig.basePath) {
-                      await apiRequest(crudItemPath(crudConfig.basePath, row.id, 'hard'), { method: 'DELETE' });
-                    }
-                    await reload();
-                  } catch (actionError) {
-                    setError(normalizeError(actionError, `No se pudo eliminar ${crudConfig.label}.`));
-                  }
-                },
-              },
-            ]
-          : []),
-      ];
-    }
-    return [
-      ...configRowActions,
-      ...(canEdit
-        ? resolvedTableRowClick
-          ? []
-          : [
-            {
-              id: 'edit',
-              label: 'Editar',
-              onClick: async (row: T) => {
-                await runCreateOrEdit(row);
-              },
-            },
-          ]
-        : []),
-      ...(canDelete
-        ? [
-            {
-              id: 'archive',
-              label: 'Archivar',
-              kind: 'danger' as const,
-              isVisible: () => Boolean(crudConfig.supportsArchived),
-              onClick: async (row: T) => {
-                try {
-                  if (crudConfig.dataSource?.deleteItem) {
-                    await crudConfig.dataSource.deleteItem(row);
-                  } else if (crudConfig.basePath) {
-                    await apiRequest(crudItemPath(crudConfig.basePath, row.id), { method: 'DELETE' });
-                  }
-                  await reload();
-                } catch (actionError) {
-                  setError(normalizeError(actionError, `No se pudo archivar ${crudConfig.label}.`));
-                }
-              },
-            },
-          ]
-        : []),
-    ];
-  }, [archived, canEdit, crudConfig, items, reload, resolvedTableRowClick, runCreateOrEdit, setError]);
-
   const rowRecordValues = (row: T) => row as Record<string, unknown>;
   const kanbanCardConfig = crudConfig?.kanban?.card;
   const cardTitle = (row: T) =>
@@ -580,7 +490,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         onArchiveToggle={handleArchiveToggle}
         searchInlineActions={searchInlineActions}
         extraHeaderActions={
-          !archived && canCreate ? (
+          !archived && canCreate && crudConfig.featureFlags?.createAction !== false ? (
             <button type="button" className="btn-primary btn-sm" onClick={() => void runCreateOrEdit()}>
               {crudConfig.createLabel ?? `+ Nuevo ${crudConfig.label}`}
             </button>
@@ -654,7 +564,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         <CrudTableSurface
           items={visibleItems}
           columns={columns}
-          rowActions={rowActions}
           onRowClick={resolvedTableRowClick}
         />
       )}

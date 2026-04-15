@@ -21,9 +21,12 @@ export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
   toolbarActions?: CrudToolbarAction<T>[];
   supportsArchived?: boolean;
   featureFlags?: {
+    searchBar?: boolean;
     headerQuickFilterStrip?: boolean;
     creatorFilter?: boolean;
     valueFilter?: boolean;
+    archivedToggle?: boolean;
+    createAction?: boolean;
   };
   valueFilterOptions?: CrudValueFilterOption<T>[];
   stateMachine?: CrudStateMachineConfig<T>;
@@ -100,15 +103,21 @@ export function CrudResourceShellHeader<T extends { id: string }>({
     : `${count} ${count === 1 ? labelOne : labelMany}`;
 
   const toolbarActions = (crudConfig?.toolbarActions ?? []) as CrudToolbarAction<T>[];
+  const searchEnabled = crudConfig?.featureFlags?.searchBar !== false;
+  const archivedToggleEnabled = crudConfig?.featureFlags?.archivedToggle !== false;
 
   const headerActionsResolved = (
     <CrudShellHeaderActionsColumn
-      search={{
-        value: searchValue,
-        onChange: onSearchChange,
-        placeholder: searchPlaceholder ?? str.searchPlaceholder,
-        inputClassName: 'm-kanban__search crud-resource-shell-header__search',
-      }}
+      search={
+        searchEnabled
+          ? {
+              value: searchValue,
+              onChange: onSearchChange,
+              placeholder: searchPlaceholder ?? str.searchPlaceholder,
+              inputClassName: 'm-kanban__search crud-resource-shell-header__search',
+            }
+          : undefined
+      }
       searchInlineActions={searchInlineActions}
     >
       <CrudToolbarActionButtons
@@ -119,7 +128,7 @@ export function CrudResourceShellHeader<T extends { id: string }>({
               setError={setError}
               formatLabel={formatFieldText}
             />
-      {crudConfig?.supportsArchived ? (
+      {crudConfig?.supportsArchived && archivedToggleEnabled ? (
         <CrudArchivedSearchParamToggle
           className="btn-secondary btn-sm"
           showActiveLabel={str.toggleShowActive}

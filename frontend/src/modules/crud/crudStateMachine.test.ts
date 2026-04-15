@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CrudStateMachineConfig } from '../../components/CrudPage';
 import {
+  buildFullyConnectedStatusStateMachine,
   buildCrudKanbanTransitionModelFromStateMachine,
   buildCrudSelectFieldOptionsFromStateMachine,
   buildCrudValueFilterOptionsFromStateMachine,
@@ -77,5 +78,21 @@ describe('crudStateMachine', () => {
       badgeVariant: 'info',
     });
     expect(getCrudStateMachineColumnDefaultState(purchaseStateMachine, 'voided')).toBe('voided');
+  });
+
+  it('builds fully connected transitions for status machines', () => {
+    const machine = buildFullyConnectedStatusStateMachine<PurchaseLike>([
+      { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+      { value: 'partial', label: 'Parcial', badgeVariant: 'warning' },
+      { value: 'received', label: 'Recibida', badgeVariant: 'info' },
+      { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
+    ]);
+
+    expect(machine.transitions).toEqual([
+      { from: 'draft', to: ['partial', 'received', 'voided'] },
+      { from: 'partial', to: ['draft', 'received', 'voided'] },
+      { from: 'received', to: ['draft', 'partial', 'voided'] },
+      { from: 'voided', to: ['draft', 'partial', 'received'] },
+    ]);
   });
 });

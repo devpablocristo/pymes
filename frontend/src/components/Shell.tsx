@@ -19,6 +19,17 @@ type ModuleListItem = {
   icon: string;
   customRoute?: string;
 };
+
+const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
+  'customers',
+  'products',
+  'services',
+  'sales',
+  'purchases',
+  'inventory',
+  'cashflow',
+  'reports',
+]);
 // Decisión de producto: TODOS los items del sidebar usan el mismo glyph
 // (un círculo simple). La diferenciación es por label, no por icono. Esto
 // elimina ruido visual y forza al usuario a leer la etiqueta. Si en el
@@ -138,11 +149,33 @@ export function Shell({ children }: { children: ReactNode }) {
     const vertical = profile?.vertical ?? 'none';
     const subVertical = profile?.subVertical ?? null;
 
+    const commercialModuleItems = catalog.modules
+      .filter(
+        (module) =>
+          module.group === 'commercial' &&
+          visibleIds.has(module.id) &&
+          PRIMARY_SIDEBAR_MODULE_IDS.has(module.id),
+      )
+      .sort((left, right) =>
+        localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
+      )
+      .map((module) => ({
+        to: module.customRoute ?? `/modules/${module.id}`,
+        label: localizeUiText(vocab(module.navLabel)),
+        icon: dotIcon,
+      }));
+
     const moduleNav = catalog.groups
       .map<AppShellNavSection>((group) => ({
         label: localizeUiText(group.label),
         items: catalog.modules
-          .filter((module) => module.group === group.id && visibleIds.has(module.id))
+          .filter(
+            (module) =>
+              group.id !== 'commercial' &&
+              module.group === group.id &&
+              visibleIds.has(module.id) &&
+              PRIMARY_SIDEBAR_MODULE_IDS.has(module.id),
+          )
           .sort((left, right) =>
             localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
           )
@@ -157,7 +190,7 @@ export function Shell({ children }: { children: ReactNode }) {
     const result: AppShellNavSection[] = [
       { label: sentenceCase(t('shell.sections.home')), items: homeNav },
       { label: sentenceCase(t('shell.sections.daily')), items: dailyNav },
-      { label: sentenceCase(t('shell.sections.commercial')), items: commercialNav },
+      { label: sentenceCase(t('shell.sections.commercial')), items: [...commercialNav, ...commercialModuleItems] },
       { label: sentenceCase(t('shell.sections.whatsapp')), items: whatsappNav },
     ];
 

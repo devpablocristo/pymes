@@ -40,3 +40,12 @@ export function formatCrudPercent(value: unknown): string {
 export function hasReadableCrudValue(value: unknown): boolean {
   return String(value ?? '').trim().length > 0;
 }
+
+export function renderCrudPrimaryCell(title: unknown, subtitle: unknown) {
+  return (
+    <>
+      <strong>{String(title ?? '').trim() || '—'}</strong>
+      <div className="text-secondary">{String(subtitle ?? '').trim() || '—'}</div>
+    </>
+  );
+}

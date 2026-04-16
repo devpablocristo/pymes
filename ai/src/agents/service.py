@@ -2416,7 +2416,6 @@ async def run_internal_orchestrated_chat(
     confirmed = {item.strip().lower() for item in (confirmed_actions or []) if item.strip()}
     tokens_in = estimate_tokens(sanitized_message)
 
-    assistant_parts: list[str] = []
     tool_calls: list[str] = []
     pending_confirmations: list[str] = []
     routed_agent = PRODUCT_AGENT_NAME

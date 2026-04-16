@@ -23,6 +23,9 @@ function NoEnabledViews({ resourceId }: { resourceId: string }) {
   );
 }
 
+/** Orden canónico fijo de tabs CRUD: Lista → Galería → Tablero. */
+const CANONICAL_VIEW_MODE_ORDER: Record<string, number> = { list: 0, gallery: 1, kanban: 2 };
+
 function resolveViewModes<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T> | null,
@@ -34,7 +37,11 @@ function resolveViewModes<T extends { id: string }>(
       : resolved.viewModes
         ? resolved.viewModes
         : fallbackViewModes(resourceId);
-  return [...modes].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
+  return [...modes].sort((a, b) => {
+    const orderA = CANONICAL_VIEW_MODE_ORDER[a.id] ?? 99;
+    const orderB = CANONICAL_VIEW_MODE_ORDER[b.id] ?? 99;
+    return orderA - orderB;
+  });
 }
 
 function useCrudUiConfigVersion() {
@@ -251,7 +258,8 @@ export function ConfiguredCrudIndexRedirect({
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
-  const target = viewModes[0]?.path || 'list';
+  const defaultMode = viewModes.find((mode) => mode.isDefault) ?? viewModes[0];
+  const target = defaultMode?.path || 'list';
 
   if (loading && config == null) {
     return (

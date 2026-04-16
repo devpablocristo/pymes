@@ -10,5 +10,7 @@ export function useCrudConfigQuery<TConfig = unknown>(
   return useQuery<TConfig | null>({
     queryKey: ['crud-config', resourceId, JSON.stringify(options ?? null)],
     queryFn: () => loadConfig(resourceId, options),
+    staleTime: 0,
+    gcTime: 0,
   });
 }

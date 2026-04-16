@@ -117,7 +117,11 @@ describe('configuredCrudViews', () => {
     expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
   });
 
-  it('shows the shared empty state in dedicated sections when preferences disable every view mode', async () => {
+  it('auto-recovers when preferences have empty enabledViewModeIds (shows all views)', async () => {
+    writeCrudUiConfigState({
+      inventory: { enabledViewModeIds: [] },
+    });
+
     render(
       <MemoryRouter initialEntries={['/modules/inventory/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
@@ -132,18 +136,6 @@ describe('configuredCrudViews', () => {
     );
 
     expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-
-    writeCrudUiConfigState({
-      inventory: { enabledViewModeIds: [] },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
-    });
-    expect(screen.getByText('No hay vistas activas para este recurso.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Configurar' })).not.toBeInTheDocument();
   });
 
   it('invalidates a custom mode page when that mode is disabled by preferences', async () => {
@@ -175,7 +167,7 @@ describe('configuredCrudViews', () => {
     expect(await screen.findByText('custom-list-screen')).toBeInTheDocument();
   });
 
-  it('shows the shared empty state when preferences disable every standalone view mode', async () => {
+  it('auto-recovers standalone page when preferences have empty enabledViewModeIds', async () => {
     writeCrudUiConfigState({
       inventory: { enabledViewModeIds: [] },
     });
@@ -186,9 +178,7 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('No hay vistas activas para este recurso.')).toBeInTheDocument();
-    expect(screen.getByText('inventory no tiene vistas habilitadas en la configuración actual.')).toBeInTheDocument();
-    expect(screen.queryByText('generic:inventory:list')).not.toBeInTheDocument();
+    expect(await screen.findByText('generic:inventory:list')).toBeInTheDocument();
   });
 
   it('keeps configure action visible even if preferences try to disable it', async () => {

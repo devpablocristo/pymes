@@ -39,10 +39,37 @@ export function readCrudUiResourceOverride(resourceId: string): CrudUiResourceOv
   return crudUiApi.readOverride(resourceId);
 }
 
+/**
+ * Aplica el override de UI al config del CRUD.
+ * Defensivo: descarta `enabledViewModeIds` que referencian vistas que el CRUD actual NO declara
+ * (evita quedar trabado con estado viejo de localStorage que apagó vistas que luego se removieron).
+ */
 export function applyCrudUiOverride<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T>,
 ): CrudPageConfig<T> {
+  const declaredIds = new Set((config.viewModes ?? []).map((m) => m.id));
+  const override = crudUiApi.readOverride(resourceId);
+
+  if (override && Array.isArray(override.enabledViewModeIds)) {
+    const filteredEnabled = override.enabledViewModeIds.filter((id) => declaredIds.has(id));
+    if (filteredEnabled.length === 0) {
+      try {
+        const raw = localStorage.getItem(CRUD_UI_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          const entry = parsed[resourceId] as Record<string, unknown> | undefined;
+          if (entry) {
+            delete entry.enabledViewModeIds;
+            delete entry.defaultViewModeId;
+            if (Object.keys(entry).length === 0) delete parsed[resourceId];
+            localStorage.setItem(CRUD_UI_STORAGE_KEY, JSON.stringify(parsed));
+          }
+        }
+      } catch { /* localStorage unavailable */ }
+    }
+  }
+
   return crudUiApi.applyCrudUiOverride(resourceId, config);
 }
 

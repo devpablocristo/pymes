@@ -1,4 +1,7 @@
 import { Route, Routes, Navigate } from 'react-router-dom';
+import type { CrudViewModeId } from '../components/CrudPage';
+import { PageLayout } from '../components/PageLayout';
+import { useBranchSelection } from '../lib/branchContext';
 import {
   CalendarPage,
   ConfiguredCrudSectionPage,
@@ -19,6 +22,64 @@ import {
   AutomationRulesPage,
   WatcherConfigPage,
 } from './lazyRoutes';
+
+function BranchSelectionLoading() {
+  return (
+    <PageLayout title="Sucursal activa" lead="Cargando sucursal seleccionada.">
+      <div className="card">
+        <p>Cargando sucursal…</p>
+      </div>
+    </PageLayout>
+  );
+}
+
+function BranchAwareWorkOrdersModePage({
+  resourceId,
+  modeId,
+}: {
+  resourceId: 'carWorkOrders' | 'bikeWorkOrders';
+  modeId: CrudViewModeId;
+}) {
+  const { isLoading, selectedBranchId } = useBranchSelection();
+  if (isLoading) {
+    return <BranchSelectionLoading />;
+  }
+  return (
+    <ConfiguredCrudModePage
+      key={`${resourceId}:${modeId}:${selectedBranchId ?? 'all'}`}
+      resourceId={resourceId}
+      modeId={modeId}
+    />
+  );
+}
+
+function BranchAwareWorkOrdersNestedRouteModePage({
+  resourceId,
+  baseRoute,
+}: {
+  resourceId: 'carWorkOrders' | 'bikeWorkOrders';
+  baseRoute: string;
+}) {
+  const { isLoading, selectedBranchId } = useBranchSelection();
+  if (isLoading) {
+    return <BranchSelectionLoading />;
+  }
+  return (
+    <ConfiguredCrudNestedRouteModePage
+      key={`${resourceId}:nested:${selectedBranchId ?? 'all'}`}
+      resourceId={resourceId}
+      baseRoute={baseRoute}
+    />
+  );
+}
+
+function BranchAwareInventoryModePage({ modeId }: { modeId: CrudViewModeId }) {
+  const { isLoading, selectedBranchId } = useBranchSelection();
+  if (isLoading) {
+    return <BranchSelectionLoading />;
+  }
+  return <ConfiguredCrudModePage key={`inventory:${modeId}:${selectedBranchId ?? 'all'}`} resourceId="inventory" modeId={modeId} />;
+}
 
 /**
  * Rutas bajo el Shell autenticado (producto).
@@ -54,12 +115,39 @@ export function ShellRoutes() {
         }
       >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />} />
-        <Route path="board" element={<ConfiguredCrudModePage resourceId="carWorkOrders" modeId="kanban" />} />
-        <Route path="list" element={<ConfiguredCrudModePage resourceId="carWorkOrders" modeId="list" />} />
+        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="carWorkOrders" modeId="kanban" />} />
+        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="carWorkOrders" modeId="list" />} />
         <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
         <Route
           path=":modePath"
-          element={<ConfiguredCrudNestedRouteModePage resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />}
+          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />}
+        />
+      </Route>
+      <Route
+        path="/modules/bikeWorkOrders"
+        element={
+          <ConfiguredCrudSectionPage
+            resourceId="bikeWorkOrders"
+            baseRoute="/modules/bikeWorkOrders"
+            actionLink={{
+              to: '/modules/bikeWorkOrders/configure',
+              label: 'Configurar',
+              hideWhenActivePattern: '/modules/bikeWorkOrders/configure',
+              activeReplacement: {
+                to: '/modules/bikeWorkOrders/list',
+                label: 'Volver a órdenes de trabajo',
+              },
+            }}
+            includeCanonicalMissing
+          />
+        }
+      >
+        <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/modules/bikeWorkOrders" />} />
+        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
+        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="list" />} />
+        <Route
+          path=":modePath"
+          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/modules/bikeWorkOrders" />}
         />
       </Route>
       <Route
@@ -81,11 +169,11 @@ export function ShellRoutes() {
         }
       >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute="/modules/inventory" />} />
-        <Route path="list" element={<ConfiguredCrudModePage resourceId="inventory" modeId="list" />} />
+        <Route path="list" element={<BranchAwareInventoryModePage modeId="list" />} />
         <Route path="configure" element={<CrudUiConfigurePage />} />
         <Route path="explorer" element={<Navigate to="/modules/inventory/list" replace />} />
-        <Route path="gallery" element={<ConfiguredCrudModePage resourceId="inventory" modeId="gallery" />} />
-        <Route path="board" element={<ConfiguredCrudModePage resourceId="inventory" modeId="kanban" />} />
+        <Route path="gallery" element={<BranchAwareInventoryModePage modeId="gallery" />} />
+        <Route path="board" element={<BranchAwareInventoryModePage modeId="kanban" />} />
       </Route>
       <Route path="/modules/:moduleId/configure" element={<CrudUiConfigurePage />} />
       <Route path="/modules/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
@@ -114,11 +202,11 @@ export function ShellRoutes() {
         }
       >
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />} />
-        <Route path="board" element={<ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
-        <Route path="list" element={<ConfiguredCrudModePage resourceId="bikeWorkOrders" modeId="list" />} />
+        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
+        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="list" />} />
         <Route
           path=":modePath"
-          element={<ConfiguredCrudNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
+          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
         />
       </Route>
       <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />

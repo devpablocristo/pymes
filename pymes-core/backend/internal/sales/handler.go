@@ -50,6 +50,15 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	var customerID *uuid.UUID
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
 	if v := strings.TrimSpace(c.Query("customer_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
@@ -72,6 +81,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		Limit:         limit,
 		After:         after,
 		CustomerID:    customerID,
@@ -113,6 +123,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	var customerID *uuid.UUID
+	var branchID *uuid.UUID
 	if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.CustomerID))
 		if err != nil {
@@ -129,6 +140,14 @@ func (h *Handler) Create(c *gin.Context) {
 			return
 		}
 		quoteID = &id
+	}
+	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
+		id, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
 	}
 
 	items := make([]CreateSaleItemInput, 0, len(req.Items))
@@ -164,6 +183,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	out, err := h.uc.Create(c.Request.Context(), CreateSaleInput{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		CustomerID:    customerID,
 		CustomerName:  req.CustomerName,
 		QuoteID:       quoteID,
@@ -236,6 +256,9 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 		Notes:         in.Notes,
 		CreatedBy:     in.CreatedBy,
 		CreatedAt:     in.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if in.BranchID != nil {
+		resp.BranchID = in.BranchID.String()
 	}
 	if in.CustomerID != nil {
 		resp.CustomerID = in.CustomerID.String()

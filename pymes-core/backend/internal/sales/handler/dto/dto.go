@@ -11,6 +11,7 @@ type SaleItemPayload struct {
 }
 
 type CreateSaleRequest struct {
+	BranchID      *string           `json:"branch_id"`
 	CustomerID    *string           `json:"customer_id"`
 	CustomerName  string            `json:"customer_name"`
 	QuoteID       *string           `json:"quote_id"`
@@ -36,6 +37,7 @@ type SaleItemResponse struct {
 type SaleResponse struct {
 	ID            string             `json:"id"`
 	OrgID         string             `json:"org_id"`
+	BranchID      string             `json:"branch_id,omitempty"`
 	Number        string             `json:"number"`
 	CustomerID    string             `json:"customer_id,omitempty"`
 	CustomerName  string             `json:"customer_name"`

@@ -21,6 +21,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
 	OrgID    uuid.UUID
+	BranchID *uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Type     string
@@ -29,30 +30,68 @@ type ListParams struct {
 	To       *time.Time
 }
 
+func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
+	if branchID == nil || *branchID == uuid.Nil {
+		return nil
+	}
+	return branchID
+}
+
+func resolvedBranchExpr(alias string) string {
+	return `COALESCE(` + alias + `.branch_id,
+		CASE
+			WHEN ` + alias + `.reference_type = 'sale' THEN (
+				SELECT s.branch_id
+				FROM sales s
+				WHERE s.org_id = ` + alias + `.org_id
+				  AND s.id = ` + alias + `.reference_id
+			)
+			WHEN ` + alias + `.reference_type = 'return' THEN (
+				SELECT s.branch_id
+				FROM returns r
+				JOIN sales s ON s.id = r.sale_id AND s.org_id = r.org_id
+				WHERE r.org_id = ` + alias + `.org_id
+				  AND r.id = ` + alias + `.reference_id
+			)
+			ELSE NULL
+		END
+	)`
+}
+
+func applyBranchFilter(db *gorm.DB, alias string, branchID *uuid.UUID) *gorm.DB {
+	normalizedBranchID := normalizeBranchID(branchID)
+	if normalizedBranchID == nil {
+		return db
+	}
+	expr := resolvedBranchExpr(alias)
+	return db.Where("("+expr+" = ? OR "+expr+" IS NULL)", *normalizedBranchID)
+}
+
 func (r *Repository) List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Table("cash_movements cm").Where("cm.org_id = ?", p.OrgID)
+	q = applyBranchFilter(q, "cm", p.BranchID)
 	if t := strings.TrimSpace(p.Type); t != "" {
-		q = q.Where("type = ?", t)
+		q = q.Where("cm.type = ?", t)
 	}
 	if c := strings.TrimSpace(p.Category); c != "" {
-		q = q.Where("category = ?", c)
+		q = q.Where("cm.category = ?", c)
 	}
 	if p.From != nil {
-		q = q.Where("created_at >= ?", *p.From)
+		q = q.Where("cm.created_at >= ?", *p.From)
 	}
 	if p.To != nil {
-		q = q.Where("created_at <= ?", *p.To)
+		q = q.Where("cm.created_at <= ?", *p.To)
 	}
 	if p.After != nil && *p.After != uuid.Nil {
-		q = q.Where("id < ?", *p.After)
+		q = q.Where("cm.id < ?", *p.After)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, false, nil, err
 	}
 	var rows []models.CashMovementModel
-	if err := q.Order("created_at DESC").Order("id DESC").Limit(limit + 1).Find(&rows).Error; err != nil {
+	if err := q.Select("cm.*").Order("cm.created_at DESC").Order("cm.id DESC").Limit(limit + 1).Scan(&rows).Error; err != nil {
 		return nil, 0, false, nil, err
 	}
 	hasMore := len(rows) > limit
@@ -75,6 +114,7 @@ func (r *Repository) Create(ctx context.Context, in cashdomain.CashMovement) (ca
 	row := models.CashMovementModel{
 		ID:            uuid.New(),
 		OrgID:         in.OrgID,
+		BranchID:      normalizeBranchID(in.BranchID),
 		Type:          in.Type,
 		Amount:        in.Amount,
 		Currency:      in.Currency,
@@ -100,15 +140,17 @@ func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
 	return strings.TrimSpace(v)
 }
 
-func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
+func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
 	type row struct {
 		Income  float64 `gorm:"column:income"`
 		Expense float64 `gorm:"column:expense"`
 	}
 	var agg row
-	if err := r.db.WithContext(ctx).Table("cash_movements").
+	q := r.db.WithContext(ctx).Table("cash_movements cm")
+	q = applyBranchFilter(q, "cm", branchID)
+	if err := q.
 		Select("COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("org_id = ? AND created_at >= ? AND created_at <= ?", orgID, from, to).
+		Where("cm.org_id = ? AND cm.created_at >= ? AND cm.created_at <= ?", orgID, from, to).
 		Take(&agg).Error; err != nil {
 		return cashdomain.CashSummary{}, err
 	}
@@ -116,7 +158,7 @@ func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID, from, to time
 	return cashdomain.CashSummary{OrgID: orgID, PeriodStart: from, PeriodEnd: to, TotalIncome: agg.Income, TotalExpense: agg.Expense, Balance: agg.Income - agg.Expense, Currency: cur}, nil
 }
 
-func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
+func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
 	if days <= 0 {
 		days = 30
 	}
@@ -129,10 +171,11 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, days int
 		Expense float64   `gorm:"column:expense"`
 	}
 	var rows []dailyRow
-	if err := r.db.WithContext(ctx).
-		Table("cash_movements").
+	q := r.db.WithContext(ctx).Table("cash_movements cm")
+	q = applyBranchFilter(q, "cm", branchID)
+	if err := q.
 		Select("date_trunc('day', created_at) as day, COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("org_id = ? AND created_at >= ?", orgID, start).
+		Where("cm.org_id = ? AND cm.created_at >= ?", orgID, start).
 		Group("day").
 		Order("day ASC").
 		Find(&rows).Error; err != nil {
@@ -166,6 +209,7 @@ func toDomain(row models.CashMovementModel) cashdomain.CashMovement {
 	return cashdomain.CashMovement{
 		ID:            row.ID,
 		OrgID:         row.OrgID,
+		BranchID:      row.BranchID,
 		Type:          row.Type,
 		Amount:        row.Amount,
 		Currency:      row.Currency,

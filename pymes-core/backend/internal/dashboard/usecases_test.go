@@ -15,6 +15,7 @@ type fakeDashboardRepo struct {
 	widgets        []dashboarddomain.WidgetDefinition
 	topServices    dashboarddomain.TopServicesData
 	topServicesErr error
+	lastBranchID   *uuid.UUID
 }
 
 func (f *fakeDashboardRepo) ListWidgets(ctx context.Context) ([]dashboarddomain.WidgetDefinition, error) {
@@ -22,45 +23,52 @@ func (f *fakeDashboardRepo) ListWidgets(ctx context.Context) ([]dashboarddomain.
 	return append([]dashboarddomain.WidgetDefinition(nil), f.widgets...), nil
 }
 
-func (f *fakeDashboardRepo) LoadSalesSummary(ctx context.Context, orgID uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
+func (f *fakeDashboardRepo) LoadSalesSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.SalesSummaryData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
+func (f *fakeDashboardRepo) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.CashflowSummaryData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
+func (f *fakeDashboardRepo) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.QuotesPipelineData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadLowStock(ctx context.Context, orgID uuid.UUID) (dashboarddomain.LowStockData, error) {
+func (f *fakeDashboardRepo) LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.LowStockData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadRecentSales(ctx context.Context, orgID uuid.UUID) (dashboarddomain.RecentSalesData, error) {
+func (f *fakeDashboardRepo) LoadRecentSales(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.RecentSalesData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadTopProducts(ctx context.Context, orgID uuid.UUID) (dashboarddomain.TopProductsData, error) {
+func (f *fakeDashboardRepo) LoadTopProducts(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return dashboarddomain.TopProductsData{}, nil
 }
 
-func (f *fakeDashboardRepo) LoadTopServices(ctx context.Context, orgID uuid.UUID) (dashboarddomain.TopServicesData, error) {
+func (f *fakeDashboardRepo) LoadTopServices(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error) {
 	_ = ctx
 	_ = orgID
+	f.lastBranchID = branchID
 	return f.topServices, f.topServicesErr
 }
 
@@ -199,5 +207,34 @@ func TestGetWidgetDataAllowsScopedViewerWithoutRole(t *testing.T) {
 	}
 	if len(data.Items) != 1 || data.Items[0].ServiceID != "svc-2" {
 		t.Fatalf("unexpected top services payload: %+v", data.Items)
+	}
+}
+
+func TestGetWidgetDataForwardsViewerBranchID(t *testing.T) {
+	repo := &fakeDashboardRepo{
+		widgets: []dashboarddomain.WidgetDefinition{
+			{
+				WidgetKey:         "services.top",
+				Title:             "Servicios top",
+				DataEndpoint:      "/v1/dashboard-data/top-services",
+				Status:            "active",
+				AllowedRoles:      []string{"admin"},
+				SupportedContexts: []string{"home"},
+			},
+		},
+	}
+	uc := NewUsecases(repo)
+	branchID := uuid.New()
+
+	if _, err := uc.GetWidgetData(context.Background(), dashboarddomain.Viewer{
+		OrgID:    uuid.New(),
+		BranchID: &branchID,
+		Role:     "admin",
+	}, "home", "top-services"); err != nil {
+		t.Fatalf("GetWidgetData() error = %v", err)
+	}
+
+	if repo.lastBranchID == nil || *repo.lastBranchID != branchID {
+		t.Fatalf("lastBranchID = %v; want %v", repo.lastBranchID, branchID)
 	}
 }

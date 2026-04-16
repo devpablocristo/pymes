@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
+import { BranchSwitcher } from './BranchSwitcher';
 import { dotIcon } from './ShellIcons';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
@@ -237,6 +238,11 @@ export function Shell({ children }: { children: ReactNode }) {
       brandTitle="Pymes SaaS"
       brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
       sections={sections}
+      footerContent={
+        <div className="sidebar-footer-controls">
+          <BranchSwitcher />
+        </div>
+      }
       searchPlaceholder={t('shell.search.placeholder')}
       skipLinkLabel={t('shell.skipLink')}
     >

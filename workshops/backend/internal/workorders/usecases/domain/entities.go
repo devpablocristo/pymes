@@ -11,9 +11,10 @@ import (
 // Cada vertical (auto_repair, bike_shop) consume el mismo dominio y enriquece comportamiento
 // vía hooks (workorders.Hook).
 type WorkOrder struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Number string
+	ID       uuid.UUID
+	OrgID    uuid.UUID
+	BranchID *uuid.UUID
+	Number   string
 
 	// Polimorfismo: a qué activo apunta esta OT.
 	TargetType  string    // 'vehicle' | 'bicycle' (extensible)

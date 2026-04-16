@@ -4,9 +4,11 @@ import { asNumber, asOptionalString, asString, formatDate } from '../../crud/res
 import { formatOperationsMoney } from '../../crud/operationsCrudHelpers';
 import { buildStandardCrudViewModes } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
+import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 
 type CashMovementRow = {
   id: string;
+  branch_id?: string;
   type: string;
   amount: number;
   currency: string;
@@ -96,6 +98,7 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
       currency: row.currency ?? '',
     }),
     toBody: (values) => ({
+      branch_id: readActiveBranchId() ?? undefined,
       type: asString(values.type),
       amount: asNumber(values.amount),
       category: asOptionalString(values.category) ?? undefined,

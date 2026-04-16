@@ -15,10 +15,10 @@ import (
 
 type RepositoryPort interface {
 	EnsureStockLevel(ctx context.Context, orgID, productID uuid.UUID) error
-	GetLevel(ctx context.Context, orgID, productID uuid.UUID) (inventorydomain.StockLevel, error)
+	GetLevel(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error)
 	ListLevels(ctx context.Context, p ListStockParams) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
 	ListMovements(ctx context.Context, p ListMovementParams) ([]inventorydomain.StockMovement, int64, bool, *uuid.UUID, error)
-	AdjustAndMove(ctx context.Context, orgID, productID uuid.UUID, delta float64, reason string, referenceID *uuid.UUID, notes, actor string, minQuantity *float64, movementType string) error
+	AdjustAndMove(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64, reason string, referenceID *uuid.UUID, notes, actor string, minQuantity *float64, movementType string) error
 }
 
 type AuditPort interface {
@@ -47,8 +47,8 @@ func (u *Usecases) List(ctx context.Context, p ListStockParams) ([]inventorydoma
 	return u.repo.ListLevels(ctx, p)
 }
 
-func (u *Usecases) GetByProduct(ctx context.Context, orgID, productID uuid.UUID) (inventorydomain.StockLevel, error) {
-	out, err := u.repo.GetLevel(ctx, orgID, productID)
+func (u *Usecases) GetByProduct(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error) {
+	out, err := u.repo.GetLevel(ctx, orgID, branchID, productID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return inventorydomain.StockLevel{}, fmt.Errorf("stock not found: %w", httperrors.ErrNotFound)
@@ -58,17 +58,17 @@ func (u *Usecases) GetByProduct(ctx context.Context, orgID, productID uuid.UUID)
 	return out, nil
 }
 
-func (u *Usecases) AdjustManual(ctx context.Context, orgID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error) {
+func (u *Usecases) AdjustManual(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error) {
 	if strings.TrimSpace(notes) == "" {
 		return inventorydomain.StockLevel{}, fmt.Errorf("notes required: %w", httperrors.ErrBadInput)
 	}
-	if err := u.repo.AdjustAndMove(ctx, orgID, productID, quantity, "adjustment", nil, notes, actor, minQuantity, "adjustment"); err != nil {
+	if err := u.repo.AdjustAndMove(ctx, orgID, branchID, productID, quantity, "adjustment", nil, notes, actor, minQuantity, "adjustment"); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return inventorydomain.StockLevel{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
 		return inventorydomain.StockLevel{}, err
 	}
-	out, err := u.repo.GetLevel(ctx, orgID, productID)
+	out, err := u.repo.GetLevel(ctx, orgID, branchID, productID)
 	if err != nil {
 		return inventorydomain.StockLevel{}, err
 	}
@@ -89,8 +89,8 @@ func (u *Usecases) ListMovements(ctx context.Context, p ListMovementParams) ([]i
 	return u.repo.ListMovements(ctx, p)
 }
 
-func (u *Usecases) LowStock(ctx context.Context, orgID uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error) {
-	return u.repo.ListLevels(ctx, ListStockParams{OrgID: orgID, Limit: limit, After: after, LowStock: true, Order: "desc"})
+func (u *Usecases) LowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error) {
+	return u.repo.ListLevels(ctx, ListStockParams{OrgID: orgID, BranchID: branchID, Limit: limit, After: after, LowStock: true, Order: "desc"})
 }
 
 type SaleItemStock struct {
@@ -98,26 +98,26 @@ type SaleItemStock struct {
 	Quantity  float64
 }
 
-func (u *Usecases) ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []SaleItemStock) error {
+func (u *Usecases) ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []SaleItemStock) error {
 	for _, it := range items {
 		if it.ProductID == nil || *it.ProductID == uuid.Nil || it.Quantity == 0 {
 			continue
 		}
 		qty := -abs(it.Quantity)
-		if err := u.repo.AdjustAndMove(ctx, orgID, *it.ProductID, qty, "sale", &saleID, "sale stock deduction", actor, nil, "out"); err != nil {
+		if err := u.repo.AdjustAndMove(ctx, orgID, branchID, *it.ProductID, qty, "sale", &saleID, "sale stock deduction", actor, nil, "out"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (u *Usecases) ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []SaleItemStock) error {
+func (u *Usecases) ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []SaleItemStock) error {
 	for _, it := range items {
 		if it.ProductID == nil || *it.ProductID == uuid.Nil || it.Quantity == 0 {
 			continue
 		}
 		qty := abs(it.Quantity)
-		if err := u.repo.AdjustAndMove(ctx, orgID, *it.ProductID, qty, "void", &saleID, "sale void stock reversal", actor, nil, "in"); err != nil {
+		if err := u.repo.AdjustAndMove(ctx, orgID, branchID, *it.ProductID, qty, "void", &saleID, "sale void stock reversal", actor, nil, "in"); err != nil {
 			return err
 		}
 	}

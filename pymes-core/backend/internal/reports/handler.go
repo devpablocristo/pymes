@@ -16,15 +16,15 @@ import (
 )
 
 type usecasesPort interface {
-	SalesSummary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.SalesSummary, error)
-	SalesByProduct(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByProductItem, error)
-	SalesByService(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error)
-	SalesByCustomer(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error)
-	SalesByPayment(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]reportdomain.SalesByPaymentItem, error)
-	InventoryValuation(ctx context.Context, orgID uuid.UUID) ([]reportdomain.InventoryValuationItem, float64, error)
-	LowStock(ctx context.Context, orgID uuid.UUID) ([]reportdomain.LowStockItem, error)
-	CashflowSummary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.CashflowSummary, error)
-	ProfitMargin(ctx context.Context, orgID uuid.UUID, from, to time.Time) (reportdomain.ProfitMargin, error)
+	SalesSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (reportdomain.SalesSummary, error)
+	SalesByProduct(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) ([]reportdomain.SalesByProductItem, error)
+	SalesByService(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) ([]reportdomain.SalesByServiceItem, error)
+	SalesByCustomer(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) ([]reportdomain.SalesByCustomerItem, error)
+	SalesByPayment(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) ([]reportdomain.SalesByPaymentItem, error)
+	InventoryValuation(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]reportdomain.InventoryValuationItem, float64, error)
+	LowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]reportdomain.LowStockItem, error)
+	CashflowSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (reportdomain.CashflowSummary, error)
+	ProfitMargin(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (reportdomain.ProfitMargin, error)
 }
 
 type Handler struct {
@@ -50,7 +50,11 @@ func (h *Handler) SalesSummary(c *gin.Context) {
 	if !ok {
 		return
 	}
-	data, err := h.uc.SalesSummary(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	data, err := h.uc.SalesSummary(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -67,7 +71,11 @@ func (h *Handler) SalesByProduct(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.SalesByProduct(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.SalesByProduct(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -84,7 +92,11 @@ func (h *Handler) SalesByService(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.SalesByService(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.SalesByService(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -101,7 +113,11 @@ func (h *Handler) SalesByCustomer(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.SalesByCustomer(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.SalesByCustomer(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -118,7 +134,11 @@ func (h *Handler) SalesByPayment(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.SalesByPayment(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.SalesByPayment(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -135,7 +155,11 @@ func (h *Handler) InventoryValuation(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, total, err := h.uc.InventoryValuation(c.Request.Context(), orgID)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, total, err := h.uc.InventoryValuation(c.Request.Context(), orgID, branchID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -151,7 +175,11 @@ func (h *Handler) LowStock(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.LowStock(c.Request.Context(), orgID)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	items, err := h.uc.LowStock(c.Request.Context(), orgID, branchID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -164,7 +192,11 @@ func (h *Handler) CashflowSummary(c *gin.Context) {
 	if !ok {
 		return
 	}
-	data, err := h.uc.CashflowSummary(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	data, err := h.uc.CashflowSummary(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -181,7 +213,11 @@ func (h *Handler) ProfitMargin(c *gin.Context) {
 	if !ok {
 		return
 	}
-	data, err := h.uc.ProfitMargin(c.Request.Context(), orgID, from, to)
+	branchID, ok := h.readBranchID(c)
+	if !ok {
+		return
+	}
+	data, err := h.uc.ProfitMargin(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -201,6 +237,19 @@ func (h *Handler) readAuth(c *gin.Context) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	return orgID, true
+}
+
+func (h *Handler) readBranchID(c *gin.Context) (*uuid.UUID, bool) {
+	raw := strings.TrimSpace(c.Query("branch_id"))
+	if raw == "" {
+		return nil, true
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return nil, false
+	}
+	return &id, true
 }
 
 func (h *Handler) readAuthAndRange(c *gin.Context) (uuid.UUID, time.Time, time.Time, bool) {

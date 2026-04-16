@@ -6,6 +6,7 @@
  * propios (vehículos, etc.) en sus respectivos clientes.
  */
 import { createVerticalRequest } from './verticalApi';
+import { readActiveBranchId } from './branchSelectionStorage';
 
 function translateWorkOrdersError(message: string): string {
   const trimmed = message.trim();
@@ -33,6 +34,14 @@ const workOrdersRequest = createVerticalRequest({
 
 const WORK_ORDERS_PREFIX = '/v1/work-orders';
 
+function resolveBranchId(branchId?: string | null): string | undefined {
+  const explicit = branchId?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  return readActiveBranchId() ?? undefined;
+}
+
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
 export type WorkOrderTargetType = 'vehicle' | 'bicycle' | string;
@@ -53,6 +62,7 @@ export type WorkOrderLineItem = {
 export type WorkOrder = {
   id: string;
   org_id: string;
+  branch_id?: string;
   number: string;
 
   // Forma unificada (preferida).
@@ -108,6 +118,7 @@ type ListResponse = {
 };
 
 export type ListWorkOrdersParams = {
+  branch_id?: string;
   target_type?: WorkOrderTargetType;
   limit?: number;
   search?: string;
@@ -119,6 +130,8 @@ export type ListWorkOrdersParams = {
 
 export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<ListResponse> {
   const q = new URLSearchParams();
+  const branchId = resolveBranchId(params?.branch_id);
+  if (branchId) q.set('branch_id', branchId);
   if (params?.target_type) q.set('target_type', params.target_type);
   if (params?.limit != null) q.set('limit', String(params.limit));
   if (params?.search) q.set('search', params.search);
@@ -129,6 +142,7 @@ export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<List
 }
 
 export async function getAllWorkOrders(params?: {
+  branch_id?: string;
   target_type?: WorkOrderTargetType;
   search?: string;
   status?: string;
@@ -145,9 +159,12 @@ export async function getAllWorkOrders(params?: {
 }
 
 export async function getWorkOrdersArchived(params?: {
+  branch_id?: string;
   target_type?: WorkOrderTargetType;
 }): Promise<WorkOrder[]> {
   const q = new URLSearchParams();
+  const branchId = resolveBranchId(params?.branch_id);
+  if (branchId) q.set('branch_id', branchId);
   if (params?.target_type) q.set('target_type', params.target_type);
   const suffix = q.toString() ? `?${q.toString()}` : '';
   const data = await workOrdersRequest<{ items?: WorkOrder[] }>(
@@ -165,6 +182,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrder> {
 // ── Crear ──────────────────────────────────────────────────────────────────
 
 export type CreateWorkOrderInput = {
+  branch_id?: string;
   number?: string;
   target_type: WorkOrderTargetType;
   target_id: string;
@@ -185,12 +203,17 @@ export type CreateWorkOrderInput = {
 };
 
 export async function createWorkOrder(data: CreateWorkOrderInput): Promise<WorkOrder> {
-  return workOrdersRequest(WORK_ORDERS_PREFIX, { method: 'POST', body: data });
+  const branchId = resolveBranchId(data.branch_id);
+  return workOrdersRequest(WORK_ORDERS_PREFIX, {
+    method: 'POST',
+    body: branchId ? { ...data, branch_id: branchId } : data,
+  });
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────
 
 export type UpdateWorkOrderInput = Partial<{
+  branch_id: string;
   target_id: string;
   target_label: string;
   // Aliases legacy aceptados por el backend (mapean a target_id/target_label).
@@ -254,7 +277,14 @@ export type WorkOrderPaymentLink = {
 export async function createWorkshopBooking(
   data: Record<string, unknown>,
 ): Promise<{ id: string; [key: string]: unknown }> {
-  return workOrdersRequest('/v1/workshop-bookings', { method: 'POST', body: data });
+  const branchId =
+    typeof data.branch_id === 'string' && data.branch_id.trim()
+      ? data.branch_id.trim()
+      : resolveBranchId();
+  return workOrdersRequest('/v1/workshop-bookings', {
+    method: 'POST',
+    body: branchId ? { ...data, branch_id: branchId } : data,
+  });
 }
 
 export async function createWorkOrderQuote(workOrderId: string): Promise<{ id: string }> {

@@ -45,10 +45,20 @@ func readViewer(c *gin.Context) (dashboarddomain.Viewer, bool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return dashboarddomain.Viewer{}, false
 	}
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return dashboarddomain.Viewer{}, false
+		}
+		branchID = &id
+	}
 	return dashboarddomain.Viewer{
-		OrgID:  orgID,
-		Actor:  strings.TrimSpace(authCtx.Actor),
-		Role:   strings.TrimSpace(authCtx.Role),
-		Scopes: authCtx.Scopes,
+		OrgID:    orgID,
+		BranchID: branchID,
+		Actor:    strings.TrimSpace(authCtx.Actor),
+		Role:     strings.TrimSpace(authCtx.Role),
+		Scopes:   authCtx.Scopes,
 	}, true
 }

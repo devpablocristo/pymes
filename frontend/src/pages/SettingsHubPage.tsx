@@ -52,6 +52,7 @@ const NotificationPreferencesPage = lazy(() =>
 
 type Section =
   | null
+  | 'branches'
   | 'profile'
   | 'rbac'
   | 'audit'
@@ -69,6 +70,7 @@ type SectionCard = SectionHubSection<Exclude<Section, null>>;
 
 const SETTING_SECTIONS: SectionCard[] = [
   { id: 'profile', label: 'Perfil', desc: 'Datos personales y cuenta', icon: <IconUsers /> },
+  { id: 'branches', label: 'Sucursales', desc: 'Sucursal principal del tenant', icon: <IconBuilding /> },
   { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: <IconBuilding /> },
   { id: 'rbac', label: 'Roles y permisos', desc: 'Accesos administrativos y catálogo RBAC', icon: <IconEdit /> },
   { id: 'audit', label: 'Auditoría', desc: 'Actividad del espacio y exportación CSV', icon: <IconTrash /> },
@@ -227,6 +229,14 @@ function CompanyTab() {
           Guardar
         </button>
       </div>
+    </div>
+  );
+}
+
+function BranchesTab() {
+  return (
+    <div className="card stg__card-mb">
+      <p className="text-secondary u-m-0 u-text-base">Hay 1 sucursal por defecto.</p>
     </div>
   );
 }
@@ -650,6 +660,7 @@ export function SettingsHubPage() {
           <ProfilePage embedded />
         </Suspense>
       )}
+      {section === 'branches' && <BranchesTab />}
       {section === 'notifications' && (
         <>
           <div className="card stg__card-mb">

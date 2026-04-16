@@ -10,6 +10,7 @@ type PurchaseItemPayload struct {
 }
 
 type CreatePurchaseRequest struct {
+	BranchID      *string               `json:"branch_id,omitempty"`
 	SupplierID    *string               `json:"supplier_id,omitempty"`
 	SupplierName  string                `json:"supplier_name"`
 	Status        string                `json:"status,omitempty"`

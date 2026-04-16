@@ -3,7 +3,7 @@
  * Dashboard fijo con datos reales desde /v1/dashboard-data/*
  */
 import { useQuery } from '@tanstack/react-query';
-import { SchedulingDaySummary, createSchedulingClient } from '@devpablocristo/modules-scheduling';
+import { createSchedulingClient } from '@devpablocristo/modules-scheduling';
 import '@devpablocristo/modules-scheduling/styles.css';
 import { HttpError } from '@devpablocristo/core-authn/http/fetch';
 import { useDashboardDataEndpoint } from '../dashboard/hooks/useDashboardDataEndpoint';
@@ -18,6 +18,7 @@ import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
+import { BranchSchedulingDaySummary } from '../modules/scheduling/BranchSchedulingDaySummary';
 import { IconAlert, IconArrowDown, IconArrowUp } from '@devpablocristo/modules-ui-data-display/icons';
 import { apiRequest } from '../lib/api';
 import type {
@@ -554,7 +555,7 @@ export function DashboardVisualPage() {
       <div className="dash__grid--3">
         <CashflowChart />
         <QuotesPipeline />
-        <SchedulingDaySummary client={schedulingClient} locale={localeForLanguage(language)} />
+        <BranchSchedulingDaySummary client={schedulingClient} locale={localeForLanguage(language)} />
       </div>
 
       <div className="dash__grid--3">

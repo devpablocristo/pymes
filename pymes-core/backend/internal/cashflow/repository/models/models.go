@@ -9,6 +9,7 @@ import (
 type CashMovementModel struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
 	OrgID         uuid.UUID `gorm:"type:uuid;index;not null"`
+	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Type          string    `gorm:"not null"`
 	Amount        float64   `gorm:"type:numeric(15,2);not null"`
 	Currency      string    `gorm:"not null"`

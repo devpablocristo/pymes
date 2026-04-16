@@ -104,6 +104,7 @@ type CreateItemInput struct {
 
 type CreateInput struct {
 	OrgID        uuid.UUID
+	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
 	Subtotal     float64
@@ -128,6 +129,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 		quoteRow := models.QuoteModel{
 			ID:           uuid.New(),
 			OrgID:        in.OrgID,
+			BranchID:     in.BranchID,
 			Number:       number,
 			CustomerID:   in.CustomerID,
 			CustomerName: strings.TrimSpace(in.CustomerName),
@@ -186,6 +188,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 
 type ListParams struct {
 	OrgID      uuid.UUID
+	BranchID   *uuid.UUID
 	Limit      int
 	After      *uuid.UUID
 	Status     string
@@ -198,6 +201,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
+	if p.BranchID != nil && *p.BranchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
+	}
 	if s := strings.TrimSpace(p.Status); s != "" {
 		q = q.Where("status = ?", s)
 	}
@@ -243,10 +249,14 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 }
 
 // ListArchived devuelve presupuestos con archivo lógico (misma convención que clientes/proveedores).
-func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
+	q := r.db.WithContext(ctx).Where("org_id = ? AND archived_at IS NOT NULL", orgID)
+	if branchID != nil && *branchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
+	}
+
 	var rows []models.QuoteModel
-	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+	if err := q.
 		Order("updated_at DESC").
 		Limit(200).
 		Find(&rows).Error; err != nil {
@@ -543,6 +553,7 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 	return quotedomain.Quote{
 		ID:           quoteRow.ID,
 		OrgID:        quoteRow.OrgID,
+		BranchID:     quoteRow.BranchID,
 		Number:       quoteRow.Number,
 		CustomerID:   quoteRow.CustomerID,
 		CustomerName: quoteRow.CustomerName,

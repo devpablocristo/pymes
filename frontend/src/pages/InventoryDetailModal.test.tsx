@@ -53,12 +53,13 @@ function renderModal() {
 
 describe('StockLevelDetailModal', () => {
   beforeEach(() => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
     apiMocks.apiRequest.mockReset();
     apiMocks.apiRequest.mockImplementation((path: string) => {
-      if (path === '/v1/inventory/prod-1') {
+      if (path === '/v1/inventory/prod-1?branch_id=branch-active') {
         return Promise.resolve(buildLevel());
       }
-      if (path === '/v1/inventory/movements?limit=50&product_id=prod-1') {
+      if (path === '/v1/inventory/movements?limit=50&product_id=prod-1&branch_id=branch-active') {
         return Promise.resolve({ items: [buildMovement()] });
       }
       if (path === '/v1/products/prod-1') {

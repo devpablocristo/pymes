@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
-import { updateTenantSettings } from '../lib/api';
+import { createSchedulingBranch, listSchedulingBranches, updateTenantSettings } from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
@@ -130,6 +130,33 @@ const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
 };
 
 type Step = 1 | 2 | 3 | 4;
+
+function resolveDefaultBranchTimezone(): string {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+  return timezone || 'UTC';
+}
+
+async function ensureDefaultBranchExists(): Promise<void> {
+  const current = await listSchedulingBranches();
+  if ((current.items ?? []).length > 0) {
+    return;
+  }
+  const payload = {
+    code: 'principal',
+    name: 'Principal',
+    timezone: resolveDefaultBranchTimezone(),
+    active: true,
+  };
+  try {
+    await createSchedulingBranch(payload);
+  } catch (error) {
+    const refreshed = await listSchedulingBranches();
+    if ((refreshed.items ?? []).length > 0) {
+      return;
+    }
+    throw error;
+  }
+}
 
 const TEAM_KEYS: { value: TeamSize; labelKey: string; descKey: string }[] = [
   { value: 'solo', labelKey: 'onboarding.team.solo', descKey: 'onboarding.team.soloDesc' },
@@ -290,6 +317,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     }
 
     try {
+      await ensureDefaultBranchExists();
       const updated = await updateTenantSettings({
         business_name: profile.businessName,
         team_size: profile.teamSize,

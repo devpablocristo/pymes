@@ -25,13 +25,13 @@ type RepositoryPort interface {
 }
 
 type InventoryPort interface {
-	ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []inventory.SaleItemStock) error
-	ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []inventory.SaleItemStock) error
+	ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
+	ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
 }
 
 type CashflowPort interface {
-	RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error
-	RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error
+	RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
+	RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
 }
 
 type AuditPort interface {
@@ -88,6 +88,7 @@ type CreateSaleItemInput struct {
 
 type CreateSaleInput struct {
 	OrgID         uuid.UUID
+	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
 	QuoteID       *uuid.UUID
@@ -212,6 +213,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	total := subtotal + taxTotal
 	out, err := u.repo.Create(ctx, CreateInput{
 		OrgID:         in.OrgID,
+		BranchID:      in.BranchID,
 		CustomerID:    in.CustomerID,
 		CustomerName:  strings.TrimSpace(in.CustomerName),
 		QuoteID:       in.QuoteID,
@@ -229,12 +231,12 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	}
 
 	if u.inventory != nil {
-		if err := u.inventory.ApplySaleItems(ctx, in.OrgID, out.ID, in.CreatedBy, stockItems); err != nil {
+		if err := u.inventory.ApplySaleItems(ctx, in.OrgID, out.ID, in.BranchID, in.CreatedBy, stockItems); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.cashflow != nil {
-		if err := u.cashflow.RecordSaleIncome(ctx, in.OrgID, out.ID, out.Total, out.Currency, out.PaymentMethod, in.CreatedBy); err != nil {
+		if err := u.cashflow.RecordSaleIncome(ctx, in.OrgID, out.ID, out.BranchID, out.Total, out.Currency, out.PaymentMethod, in.CreatedBy); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
@@ -296,12 +298,12 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 	}
 
 	if u.inventory != nil {
-		if err := u.inventory.ReverseSaleItems(ctx, orgID, saleID, actor, stockItems); err != nil {
+		if err := u.inventory.ReverseSaleItems(ctx, orgID, saleID, current.BranchID, actor, stockItems); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.cashflow != nil {
-		if err := u.cashflow.RecordSaleVoidExpense(ctx, orgID, saleID, current.Total, current.Currency, current.PaymentMethod, actor); err != nil {
+		if err := u.cashflow.RecordSaleVoidExpense(ctx, orgID, saleID, current.BranchID, current.Total, current.Currency, current.PaymentMethod, actor); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}

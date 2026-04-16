@@ -10,8 +10,17 @@ const pageSearchMocks = vi.hoisted(() => ({
   usePageSearch: vi.fn(),
 }));
 
+const branchMocks = vi.hoisted(() => ({
+  useBranchSelection: vi.fn(),
+}));
+
 const schedulingMocks = vi.hoisted(() => {
-  const capturedCalendarProps: Array<{ client: unknown; locale?: string; searchQuery?: string }> = [];
+  const capturedCalendarProps: Array<{
+    client: unknown;
+    locale?: string;
+    searchQuery?: string;
+    initialBranchId?: string;
+  }> = [];
   const capturedQueueProps: Array<{ client: unknown; locale?: string; searchQuery?: string }> = [];
   const client = { kind: 'internal-scheduling-client' };
   return {
@@ -28,6 +37,10 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../components/PageSearch', () => ({
   usePageSearch: () => pageSearchMocks.usePageSearch(),
+}));
+
+vi.mock('../lib/branchContext', () => ({
+  useBranchSelection: () => branchMocks.useBranchSelection(),
 }));
 
 vi.mock('../components/PageLayout', () => ({
@@ -52,7 +65,7 @@ vi.mock('@devpablocristo/modules-scheduling/styles.next.css', () => ({}));
 
 vi.mock('@devpablocristo/modules-scheduling/next', () => ({
   createSchedulingClient: (...args: unknown[]) => schedulingMocks.createSchedulingClient(...args),
-  SchedulingCalendar: (props: { client: unknown; locale?: string; searchQuery?: string }) => {
+  SchedulingCalendar: (props: { client: unknown; locale?: string; searchQuery?: string; initialBranchId?: string }) => {
     schedulingMocks.capturedCalendarProps.push(props);
     return (
       <div data-testid="scheduling-calendar">
@@ -74,10 +87,14 @@ describe('CalendarPage', () => {
   beforeEach(() => {
     vi.resetModules();
     pageSearchMocks.usePageSearch.mockReset();
+    branchMocks.useBranchSelection.mockReset();
     schedulingMocks.createSchedulingClient.mockClear();
     schedulingMocks.capturedCalendarProps.length = 0;
     schedulingMocks.capturedQueueProps.length = 0;
     pageSearchMocks.usePageSearch.mockReturnValue('cliente demo');
+    branchMocks.useBranchSelection.mockReturnValue({
+      selectedBranchId: 'branch-central',
+    });
   });
 
   it('mounts scheduling calendar with the shared client, locale and page search query', async () => {
@@ -104,13 +121,14 @@ describe('CalendarPage', () => {
     });
     expect(pageSearchMocks.usePageSearch).toHaveBeenCalled();
     expect(schedulingMocks.createSchedulingClient).toHaveBeenCalledTimes(1);
-    expect(schedulingMocks.capturedCalendarProps.at(-1)).toEqual(
-      expect.objectContaining({
-        client: schedulingMocks.client,
-        locale: 'es',
-        searchQuery: 'cliente demo',
-      }),
-    );
+      expect(schedulingMocks.capturedCalendarProps.at(-1)).toEqual(
+        expect.objectContaining({
+          client: schedulingMocks.client,
+          locale: 'es',
+          searchQuery: 'cliente demo',
+          initialBranchId: 'branch-central',
+        }),
+      );
     // QueueOperatorBoard se removió de CalendarPage en Stage 3.
     // Si en el futuro vuelve, va en su propia página (no embebido en agenda).
     expect(screen.queryByTestId('queue-operator-board')).toBeNull();

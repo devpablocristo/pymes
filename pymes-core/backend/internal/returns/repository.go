@@ -24,6 +24,7 @@ type returnWithPartyRow struct {
 }
 
 type saleForReturnRow struct {
+	BranchID      *uuid.UUID `gorm:"column:branch_id"`
 	Number        string
 	PartyID       *uuid.UUID `gorm:"column:party_id"`
 	PartyName     string     `gorm:"column:party_name"`
@@ -51,7 +52,8 @@ type saleItemForReturnRow struct {
 }
 
 type saleForVoidRow struct {
-	AmountPaid    float64 `gorm:"column:amount_paid"`
+	BranchID      *uuid.UUID `gorm:"column:branch_id"`
+	AmountPaid    float64    `gorm:"column:amount_paid"`
 	Total         float64
 	Currency      string
 	PaymentMethod string `gorm:"column:payment_method"`
@@ -67,9 +69,74 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
+func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
+	if branchID == nil || *branchID == uuid.Nil {
+		return nil
+	}
+	return branchID
+}
+
 type CreateReturnItemInput struct {
 	SaleItemID uuid.UUID
 	Quantity   float64
+}
+
+func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
+	normalizedBranchID := normalizeBranchID(branchID)
+	now := time.Now().UTC()
+	updates := map[string]any{
+		"quantity":   gorm.Expr("quantity + ?", delta),
+		"updated_at": now,
+	}
+
+	if normalizedBranchID != nil {
+		res := tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id = ?", orgID, productID, *normalizedBranchID).
+			Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+		res = tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Updates(map[string]any{
+				"branch_id":  *normalizedBranchID,
+				"quantity":   gorm.Expr("quantity + ?", delta),
+				"updated_at": now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+	}
+
+	if normalizedBranchID == nil {
+		res := tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+	}
+
+	return tx.WithContext(ctx).Exec(
+		`INSERT INTO stock_levels (product_id, org_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
+		productID,
+		orgID,
+		normalizedBranchID,
+		delta,
+		now,
+	).Error
 }
 
 type CreateReturnInput struct {
@@ -165,7 +232,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			return err
 		}
 		var sale saleForReturnRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("branch_id, number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if len(in.Items) == 0 {
@@ -229,7 +296,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if method == "original_method" {
 				method = defaultString(sale.PaymentMethod, "other")
 			}
-			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, 'expense', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, in.OrgID, total, defaultString(sale.Currency, "ARS"), defaultString(in.Notes, "sale return refund"), method, returnID, in.CreatedBy).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'expense', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, in.OrgID, normalizeBranchID(sale.BranchID), total, defaultString(sale.Currency, "ARS"), defaultString(in.Notes, "sale return refund"), method, returnID, in.CreatedBy).Error; err != nil {
 				return err
 			}
 			newAmountPaid := sale.AmountPaid - total
@@ -251,13 +318,10 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if item.ProductID == nil || *item.ProductID == uuid.Nil {
 				continue
 			}
-			if err := tx.Exec(`INSERT INTO stock_levels (product_id, org_id, quantity, min_quantity, updated_at) VALUES (?, ?, 0, 0, now()) ON CONFLICT (product_id, org_id) DO NOTHING`, *item.ProductID, in.OrgID).Error; err != nil {
+			if err := r.adjustStockLevel(ctx, tx, in.OrgID, sale.BranchID, *item.ProductID, item.Quantity); err != nil {
 				return err
 			}
-			if err := tx.Exec(`UPDATE stock_levels SET quantity = quantity + ?, updated_at = now() WHERE product_id = ? AND org_id = ?`, item.Quantity, *item.ProductID, in.OrgID).Error; err != nil {
-				return err
-			}
-			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'in', ?, 'return', ?, ?, ?, now())`, in.OrgID, *item.ProductID, item.Quantity, returnID, "sale return restock", in.CreatedBy).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'in', ?, 'return', ?, ?, ?, now())`, in.OrgID, normalizeBranchID(sale.BranchID), *item.ProductID, item.Quantity, returnID, "sale return restock", in.CreatedBy).Error; err != nil {
 				return err
 			}
 		}
@@ -283,7 +347,7 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			return nil
 		}
 		var sale saleForVoidRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", orgID, item.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("branch_id, amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", orgID, item.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&returnmodels.ReturnModel{}).Where("org_id = ? AND id = ?", orgID, id).Update("status", "voided").Error; err != nil {
@@ -298,7 +362,7 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			if method == "original_method" {
 				method = defaultString(sale.PaymentMethod, "other")
 			}
-			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, 'income', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, orgID, item.Total, defaultString(sale.Currency, "ARS"), "return void reversal", method, id, actor).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'income', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, orgID, normalizeBranchID(sale.BranchID), item.Total, defaultString(sale.Currency, "ARS"), "return void reversal", method, id, actor).Error; err != nil {
 				return err
 			}
 			newAmountPaid := sale.AmountPaid + item.Total
@@ -316,10 +380,10 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			if ri.ProductID == nil || *ri.ProductID == uuid.Nil {
 				continue
 			}
-			if err := tx.Exec(`UPDATE stock_levels SET quantity = quantity - ?, updated_at = now() WHERE product_id = ? AND org_id = ?`, ri.Quantity, *ri.ProductID, orgID).Error; err != nil {
+			if err := r.adjustStockLevel(ctx, tx, orgID, sale.BranchID, *ri.ProductID, -ri.Quantity); err != nil {
 				return err
 			}
-			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'out', ?, 'return_void', ?, ?, ?, now())`, orgID, *ri.ProductID, ri.Quantity, id, "return void stock reversal", actor).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'out', ?, 'return_void', ?, ?, ?, now())`, orgID, normalizeBranchID(sale.BranchID), *ri.ProductID, ri.Quantity, id, "return void stock reversal", actor).Error; err != nil {
 				return err
 			}
 		}

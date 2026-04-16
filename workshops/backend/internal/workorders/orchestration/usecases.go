@@ -61,6 +61,9 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 		"notes":         order.Notes,
 		"items":         toCommercialItems(order.Items),
 	}
+	if order.BranchID != nil {
+		payload["branch_id"] = order.BranchID.String()
+	}
 	if order.CustomerID != nil {
 		payload["customer_id"] = order.CustomerID.String()
 	}
@@ -92,6 +95,9 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 		"payment_method": "transfer",
 		"notes":          order.Notes,
 		"items":          toCommercialItems(order.Items),
+	}
+	if order.BranchID != nil {
+		payload["branch_id"] = order.BranchID.String()
 	}
 	if order.CustomerID != nil {
 		payload["customer_id"] = order.CustomerID.String()

@@ -4,6 +4,7 @@ import { asOptionalNumber, asOptionalString, asString, formatDate, parseJSONArra
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
+import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
   buildFullyConnectedStatusStateMachine,
@@ -67,6 +68,7 @@ export type CommercialCostLineItem = {
 
 export type QuoteRecord = {
   id: string;
+  branch_id?: string;
   number: string;
   customer_id?: string;
   customer_name: string;
@@ -80,6 +82,7 @@ export type QuoteRecord = {
 
 export type SaleRecord = {
   id: string;
+  branch_id?: string;
   number: string;
   customer_id?: string;
   customer_name: string;
@@ -107,6 +110,7 @@ export type CreditNoteRecord = {
 
 export type PurchaseRecord = {
   id: string;
+  branch_id?: string;
   number: string;
   supplier_id?: string;
   supplier_name: string;
@@ -527,6 +531,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
+      branch_id: readActiveBranchId() ?? undefined,
       customer_id: asOptionalString(values.customer_id),
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
@@ -710,6 +715,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
+      branch_id: readActiveBranchId() ?? undefined,
       customer_id: asOptionalString(values.customer_id),
       customer_name: asString(values.customer_name),
       quote_id: asOptionalString(values.quote_id),
@@ -948,6 +954,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
+      branch_id: readActiveBranchId() ?? undefined,
       supplier_id: asOptionalString(values.supplier_id),
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),

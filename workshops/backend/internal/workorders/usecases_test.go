@@ -25,6 +25,9 @@ func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, in
 		if wo.OrgID != p.OrgID || wo.ArchivedAt != nil {
 			continue
 		}
+		if p.BranchID != nil && (wo.BranchID == nil || *wo.BranchID != *p.BranchID) {
+			continue
+		}
 		if p.TargetType != "" && wo.TargetType != p.TargetType {
 			continue
 		}
@@ -32,10 +35,13 @@ func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, in
 	}
 	return out, int64(len(out)), false, nil, nil
 }
-func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
 	out := make([]domain.WorkOrder, 0)
 	for _, wo := range r.store {
 		if wo.OrgID != orgID || wo.ArchivedAt == nil {
+			continue
+		}
+		if branchID != nil && (wo.BranchID == nil || *wo.BranchID != *branchID) {
 			continue
 		}
 		if targetType != "" && wo.TargetType != targetType {
@@ -193,5 +199,43 @@ func TestListFiltersByTargetType(t *testing.T) {
 	}
 	if len(got) != 2 {
 		t.Errorf("expected 2 vehicle, got %d", len(got))
+	}
+}
+
+func TestListFiltersByBranch(t *testing.T) {
+	t.Parallel()
+	repo := newFakeRepo()
+	uc := NewUsecases(repo, nil, nil, nil)
+	orgID := uuid.New()
+	branchA := uuid.New()
+	branchB := uuid.New()
+
+	for _, branchID := range []*uuid.UUID{&branchA, &branchB, nil} {
+		_, err := uc.Create(context.Background(), domain.WorkOrder{
+			OrgID:       orgID,
+			BranchID:    branchID,
+			Number:      "OT-" + uuid.NewString(),
+			TargetType:  "vehicle",
+			TargetID:    uuid.New(),
+			TargetLabel: "x",
+			Status:      "received",
+			Items: []domain.WorkOrderItem{{
+				ItemType: "service", Description: "x", Quantity: 1, UnitPrice: 1, TaxRate: 0,
+			}},
+		}, "tester")
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+	}
+
+	got, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID, BranchID: &branchA})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 work order for branch A, got %d", len(got))
+	}
+	if got[0].BranchID == nil || *got[0].BranchID != branchA {
+		t.Fatalf("expected branch A in result, got %#v", got[0].BranchID)
 	}
 }

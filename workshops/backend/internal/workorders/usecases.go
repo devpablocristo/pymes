@@ -20,6 +20,7 @@ import (
 // TargetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
 type ListParams struct {
 	OrgID      uuid.UUID
+	BranchID   *uuid.UUID
 	Limit      int
 	After      *uuid.UUID
 	Search     string
@@ -30,6 +31,7 @@ type ListParams struct {
 // UpdateInput agrupa los campos parcheables. TargetID/TargetLabel pueden cambiar
 // si se reasigna la OT a otro asset (mover a otro vehículo/bici).
 type UpdateInput struct {
+	BranchID      *string
 	TargetID      *string
 	TargetLabel   *string
 	CustomerID    *string
@@ -50,7 +52,7 @@ type UpdateInput struct {
 // RepositoryPort define el contrato del adapter de persistencia.
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
@@ -105,8 +107,8 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, 
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
-	return u.repo.ListArchived(ctx, orgID, targetType)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID, targetType)
 }
 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
@@ -186,6 +188,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			return domain.WorkOrder{}, fmt.Errorf("target_id is invalid: %w", httperrors.ErrBadInput)
 		}
 		next.TargetID = parsed
+	}
+	if in.BranchID != nil {
+		next.BranchID = vertvalues.ParseOptionalUUID(*in.BranchID)
 	}
 	if in.TargetLabel != nil {
 		next.TargetLabel = strings.TrimSpace(*in.TargetLabel)

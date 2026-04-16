@@ -18,7 +18,7 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
 	Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error)
@@ -62,6 +62,7 @@ type QuoteItemInput struct {
 
 type CreateQuoteInput struct {
 	OrgID        uuid.UUID
+	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
 	Items        []QuoteItemInput
@@ -74,8 +75,8 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]quotedomain.Quote,
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]quotedomain.Quote, error) {
-	return u.repo.ListArchived(ctx, orgID)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error) {
@@ -92,6 +93,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 	}
 	out, err := u.repo.Create(ctx, CreateInput{
 		OrgID:        in.OrgID,
+		BranchID:     in.BranchID,
 		CustomerID:   in.CustomerID,
 		CustomerName: in.CustomerName,
 		Subtotal:     subtotal,
@@ -345,6 +347,7 @@ func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, payment
 
 	saleOut, err := u.sales.Create(ctx, sales.CreateSaleInput{
 		OrgID:         orgID,
+		BranchID:      q.BranchID,
 		CustomerID:    q.CustomerID,
 		CustomerName:  q.CustomerName,
 		QuoteID:       &q.ID,

@@ -31,6 +31,29 @@ export async function updateTenantSettings(payload: TenantSettingsUpdatePayload)
   return normalizeTenantSettings(response);
 }
 
+export type SchedulingBranchSummary = {
+  id: string;
+  code: string;
+  name: string;
+  timezone: string;
+  address?: string;
+  active: boolean;
+};
+
+export async function listSchedulingBranches(): Promise<{ items: SchedulingBranchSummary[] }> {
+  return request('/v1/scheduling/branches');
+}
+
+export async function createSchedulingBranch(payload: {
+  code: string;
+  name: string;
+  timezone: string;
+  address?: string;
+  active?: boolean;
+}): Promise<SchedulingBranchSummary> {
+  return request('/v1/scheduling/branches', { method: 'POST', body: payload });
+}
+
 export async function getBillingStatus(): Promise<BillingStatus> {
   return request('/v1/billing/status');
 }

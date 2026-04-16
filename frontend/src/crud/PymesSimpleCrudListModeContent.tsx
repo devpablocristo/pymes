@@ -3,8 +3,11 @@ import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-
 import { useCallback, useMemo, useState } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
+import { useOptionalBranchSelection } from '../lib/branchContext';
+import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { useI18n } from '../lib/i18n';
 import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
+import { appendBranchIdToCrudListQuery, isBranchScopedCrudResource } from './branchScopedCrud';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
@@ -206,6 +209,10 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   const { t } = useI18n();
   const crudConfigQuery = usePymesCrudConfigQuery<T>(resourceId);
   const crudConfig = crudConfigQuery.data as CrudPageConfig<T> | null;
+  const branchSelection = useOptionalBranchSelection();
+  const selectedBranchId = isBranchScopedCrudResource(resourceId)
+    ? branchSelection?.selectedBranchId ?? readActiveBranchId()
+    : null;
   const { archived } = useCrudArchivedSearchParam();
 
   const fetchPage = useCallback(
@@ -231,6 +238,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         return { items: [], has_more: false, next_cursor: null };
       }
       const query = new URLSearchParams(crudConfig.listQuery ?? '');
+      appendBranchIdToCrudListQuery(resourceId, query, selectedBranchId);
       query.set('limit', String(limit));
       if (search) query.set('search', search);
       if (pageArchived) query.set('archived', 'true');
@@ -239,7 +247,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
       const page = parsePaginatedResponse<T>(data);
       return { items: page.items, has_more: page.hasMore, next_cursor: page.nextCursor } satisfies CrudListResponse<T>;
     },
-    [crudConfig],
+    [crudConfig, resourceId, selectedBranchId],
   );
 
   const {

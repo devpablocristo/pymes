@@ -10,6 +10,8 @@ import { OnboardingPage } from './OnboardingPage';
 
 const apiMocks = vi.hoisted(() => ({
   updateTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
+  listSchedulingBranches: vi.fn<[], Promise<{ items: Array<Record<string, unknown>> }>>(),
+  createSchedulingBranch: vi.fn<[], Promise<Record<string, unknown>>>(),
 }));
 
 const navigationMocks = vi.hoisted(() => ({
@@ -27,6 +29,8 @@ vi.mock('../lib/auth', () => ({
 
 vi.mock('../lib/api', () => ({
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
+  listSchedulingBranches: (...args: unknown[]) => apiMocks.listSchedulingBranches(...args),
+  createSchedulingBranch: (...args: unknown[]) => apiMocks.createSchedulingBranch(...args),
 }));
 
 vi.mock('../lib/tenantProfile', async () => {
@@ -122,9 +126,19 @@ function renderOnboardingPage() {
 describe('OnboardingPage scheduling setup', () => {
   beforeEach(() => {
     apiMocks.updateTenantSettings.mockReset();
+    apiMocks.listSchedulingBranches.mockReset();
+    apiMocks.createSchedulingBranch.mockReset();
     navigationMocks.navigate.mockReset();
     profileMocks.syncTenantProfileFromSettings.mockReset();
     profileMocks.saveTenantProfile.mockReset();
+    apiMocks.listSchedulingBranches.mockResolvedValue({ items: [] });
+    apiMocks.createSchedulingBranch.mockResolvedValue({
+      id: 'branch-principal',
+      code: 'principal',
+      name: 'Principal',
+      timezone: 'UTC',
+      active: true,
+    });
   });
 
   it('finishes onboarding using the canonical scheduling_enabled field', async () => {
@@ -163,6 +177,14 @@ describe('OnboardingPage scheduling setup', () => {
       );
     });
 
+    expect(apiMocks.listSchedulingBranches).toHaveBeenCalled();
+    expect(apiMocks.createSchedulingBranch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'principal',
+        name: 'Principal',
+        active: true,
+      }),
+    );
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
   });
@@ -219,6 +241,38 @@ describe('OnboardingPage scheduling setup', () => {
         subVertical: 'bike_shop',
       }),
     );
+  });
+
+  it('does not create the default branch when one already exists', async () => {
+    apiMocks.updateTenantSettings.mockResolvedValue(buildTenantSettings());
+    apiMocks.listSchedulingBranches.mockResolvedValue({
+      items: [{ id: 'branch-existing', code: 'principal', name: 'Principal', timezone: 'UTC', active: true }],
+    });
+
+    renderOnboardingPage();
+
+    fireEvent.change(screen.getByLabelText('¿Cómo se llama tu negocio o actividad?'), {
+      target: { value: 'Taller Norte' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^2 a 5/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Talleres/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Taller mec[aá]nico/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Ambos/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sí, quiero saber quién me debe/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Mixto \(varios\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }));
+
+    await waitFor(() => {
+      expect(apiMocks.updateTenantSettings).toHaveBeenCalled();
+    });
+
+    expect(apiMocks.createSchedulingBranch).not.toHaveBeenCalled();
   });
 
   it('shows sub-vertical options for professionals, beauty and restaurants', () => {

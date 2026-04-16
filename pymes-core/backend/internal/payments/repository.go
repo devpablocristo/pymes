@@ -34,12 +34,13 @@ func (r *Repository) CreateSalePayment(ctx context.Context, orgID, saleID uuid.U
 	var out paymentsdomain.Payment
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var sale struct {
+			BranchID      *uuid.UUID `gorm:"column:branch_id"`
 			Total         float64
 			AmountPaid    float64 `gorm:"column:amount_paid"`
 			Currency      string
 			PaymentMethod string `gorm:"column:payment_method"`
 		}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("total, amount_paid, currency, payment_method").Where("org_id = ? AND id = ?", orgID, saleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("branch_id, total, amount_paid, currency, payment_method").Where("org_id = ? AND id = ?", orgID, saleID).Take(&sale).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFoundf("sale", saleID.String())
 			}
@@ -78,9 +79,9 @@ func (r *Repository) CreateSalePayment(ctx context.Context, orgID, saleID uuid.U
 			return err
 		}
 		if err := tx.Exec(`
-			INSERT INTO cash_movements (id, org_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at)
-			VALUES (gen_random_uuid(), ?, 'income', ?, ?, 'sale', ?, ?, 'sale', ?, ?, now())
-		`, orgID, in.Amount, sale.Currency, defaultString(in.Notes, "sale payment"), in.Method, saleID, in.CreatedBy).Error; err != nil {
+			INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at)
+			VALUES (gen_random_uuid(), ?, ?, 'income', ?, ?, 'sale', ?, ?, 'sale', ?, ?, now())
+		`, orgID, sale.BranchID, in.Amount, sale.Currency, defaultString(in.Notes, "sale payment"), in.Method, saleID, in.CreatedBy).Error; err != nil {
 			return err
 		}
 		out = paymentsdomain.Payment{ID: paymentID, OrgID: orgID, ReferenceType: "sale", ReferenceID: saleID, Method: in.Method, Amount: in.Amount, Notes: in.Notes, ReceivedAt: in.ReceivedAt.UTC(), CreatedBy: in.CreatedBy, CreatedAt: createdAt}

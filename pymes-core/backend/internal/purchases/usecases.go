@@ -14,7 +14,7 @@ import (
 )
 
 type RepositoryPort interface {
-	List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
@@ -58,6 +58,7 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases
 
 type CreateInput struct {
 	OrgID         uuid.UUID
+	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
 	Status        string
@@ -70,6 +71,7 @@ type CreateInput struct {
 type UpdateInput struct {
 	ID            uuid.UUID
 	OrgID         uuid.UUID
+	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
 	Status        string
@@ -84,8 +86,8 @@ type UpdateStatusInput struct {
 	Status string
 }
 
-func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
-	return u.repo.List(ctx, orgID, strings.TrimSpace(status), limit)
+func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	return u.repo.List(ctx, orgID, branchID, strings.TrimSpace(status), limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -131,11 +133,11 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	if current.Status != "draft" {
 		return purchasesdomain.Purchase{}, domainerr.BusinessRule("only draft purchases can be updated")
 	}
-	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
+	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, BranchID: in.BranchID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, Notes: prepared.Notes, Items: prepared.Items})
+	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, Notes: prepared.Notes, Items: prepared.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}

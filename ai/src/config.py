@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
+    gemini_vertex_project: str = ""
+    gemini_vertex_location: str = "us-central1"
     ollama_base_url: str = "http://ollama:11434"
     ollama_model: str = "gemma4:e4b"
     ollama_timeout_seconds: float = 240.0

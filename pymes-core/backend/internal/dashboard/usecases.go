@@ -15,13 +15,13 @@ import (
 
 type RepositoryPort interface {
 	ListWidgets(ctx context.Context) ([]dashboarddomain.WidgetDefinition, error)
-	LoadSalesSummary(ctx context.Context, orgID uuid.UUID) (dashboarddomain.SalesSummaryData, error)
-	LoadCashflowSummary(ctx context.Context, orgID uuid.UUID) (dashboarddomain.CashflowSummaryData, error)
-	LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID) (dashboarddomain.QuotesPipelineData, error)
-	LoadLowStock(ctx context.Context, orgID uuid.UUID) (dashboarddomain.LowStockData, error)
-	LoadRecentSales(ctx context.Context, orgID uuid.UUID) (dashboarddomain.RecentSalesData, error)
-	LoadTopProducts(ctx context.Context, orgID uuid.UUID) (dashboarddomain.TopProductsData, error)
-	LoadTopServices(ctx context.Context, orgID uuid.UUID) (dashboarddomain.TopServicesData, error)
+	LoadSalesSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error)
+	LoadCashflowSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error)
+	LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error)
+	LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error)
+	LoadRecentSales(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error)
+	LoadTopProducts(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error)
+	LoadTopServices(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error)
 	LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error)
 	LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (dashboarddomain.AuditActivityData, error)
 }
@@ -42,19 +42,19 @@ func (u *Usecases) GetWidgetData(ctx context.Context, viewer dashboarddomain.Vie
 
 	switch widget.WidgetKey {
 	case "sales.summary":
-		return u.repo.LoadSalesSummary(ctx, viewer.OrgID)
+		return u.repo.LoadSalesSummary(ctx, viewer.OrgID, viewer.BranchID)
 	case "cashflow.summary":
-		return u.repo.LoadCashflowSummary(ctx, viewer.OrgID)
+		return u.repo.LoadCashflowSummary(ctx, viewer.OrgID, viewer.BranchID)
 	case "quotes.pipeline":
-		return u.repo.LoadQuotesPipeline(ctx, viewer.OrgID)
+		return u.repo.LoadQuotesPipeline(ctx, viewer.OrgID, viewer.BranchID)
 	case "inventory.low_stock":
-		return u.repo.LoadLowStock(ctx, viewer.OrgID)
+		return u.repo.LoadLowStock(ctx, viewer.OrgID, viewer.BranchID)
 	case "sales.recent":
-		return u.repo.LoadRecentSales(ctx, viewer.OrgID)
+		return u.repo.LoadRecentSales(ctx, viewer.OrgID, viewer.BranchID)
 	case "products.top":
-		return u.repo.LoadTopProducts(ctx, viewer.OrgID)
+		return u.repo.LoadTopProducts(ctx, viewer.OrgID, viewer.BranchID)
 	case "services.top":
-		return u.repo.LoadTopServices(ctx, viewer.OrgID)
+		return u.repo.LoadTopServices(ctx, viewer.OrgID, viewer.BranchID)
 	case "billing.subscription":
 		return u.repo.LoadBillingStatus(ctx, viewer.OrgID)
 	case "audit.activity":

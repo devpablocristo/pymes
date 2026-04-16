@@ -18,10 +18,10 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListStockParams) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
-	GetByProduct(ctx context.Context, orgID, productID uuid.UUID) (inventorydomain.StockLevel, error)
-	AdjustManual(ctx context.Context, orgID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error)
+	GetByProduct(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error)
+	AdjustManual(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, quantity float64, minQuantity *float64, notes, actor string) (inventorydomain.StockLevel, error)
 	ListMovements(ctx context.Context, p ListMovementParams) ([]inventorydomain.StockMovement, int64, bool, *uuid.UUID, error)
-	LowStock(ctx context.Context, orgID uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
+	LowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, limit int, after *uuid.UUID) ([]inventorydomain.StockLevel, int64, bool, *uuid.UUID, error)
 }
 
 type Handler struct {
@@ -50,8 +50,18 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListStockParams{
 		OrgID:    orgID,
+		BranchID: branchID,
 		Limit:    limit,
 		After:    after,
 		LowStock: c.Query("low_stock") == "true",
@@ -84,7 +94,16 @@ func (h *Handler) Get(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
 		return
 	}
-	out, err := h.uc.GetByProduct(c.Request.Context(), orgID, productID)
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	out, err := h.uc.GetByProduct(c.Request.Context(), orgID, branchID, productID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -109,7 +128,16 @@ func (h *Handler) Adjust(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	out, err := h.uc.AdjustManual(c.Request.Context(), orgID, productID, req.Quantity, req.MinQuantity, req.Notes, a.Actor)
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	out, err := h.uc.AdjustManual(c.Request.Context(), orgID, branchID, productID, req.Quantity, req.MinQuantity, req.Notes, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -138,7 +166,23 @@ func (h *Handler) ListMovements(c *gin.Context) {
 		}
 		productID = &id
 	}
-	items, total, hasMore, next, err := h.uc.ListMovements(c.Request.Context(), ListMovementParams{OrgID: orgID, Limit: limit, After: after, ProductID: productID, Type: c.Query("type")})
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	items, total, hasMore, next, err := h.uc.ListMovements(c.Request.Context(), ListMovementParams{
+		OrgID:     orgID,
+		BranchID:  branchID,
+		Limit:     limit,
+		After:     after,
+		ProductID: productID,
+		Type:      c.Query("type"),
+	})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -165,7 +209,16 @@ func (h *Handler) LowStock(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, total, hasMore, next, err := h.uc.LowStock(c.Request.Context(), orgID, limit, after)
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	items, total, hasMore, next, err := h.uc.LowStock(c.Request.Context(), orgID, branchID, limit, after)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -181,7 +234,7 @@ func (h *Handler) LowStock(c *gin.Context) {
 }
 
 func toStockLevelItem(in inventorydomain.StockLevel) dto.StockLevelItem {
-	return dto.StockLevelItem{
+	out := dto.StockLevelItem{
 		ProductID:   in.ProductID.String(),
 		OrgID:       in.OrgID.String(),
 		ProductName: in.ProductName,
@@ -192,6 +245,10 @@ func toStockLevelItem(in inventorydomain.StockLevel) dto.StockLevelItem {
 		IsLowStock:  in.IsLowStock,
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+	if in.BranchID != nil {
+		out.BranchID = in.BranchID.String()
+	}
+	return out
 }
 
 func toStockMovementItem(in inventorydomain.StockMovement) dto.StockMovementItem {
@@ -206,6 +263,9 @@ func toStockMovementItem(in inventorydomain.StockMovement) dto.StockMovementItem
 		Notes:       in.Notes,
 		CreatedBy:   in.CreatedBy,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if in.BranchID != nil {
+		out.BranchID = in.BranchID.String()
 	}
 	if in.ReferenceID != nil {
 		out.ReferenceID = in.ReferenceID.String()

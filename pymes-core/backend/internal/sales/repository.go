@@ -103,6 +103,7 @@ type CreateItemInput struct {
 
 type CreateInput struct {
 	OrgID         uuid.UUID
+	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
 	QuoteID       *uuid.UUID
@@ -129,6 +130,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 		saleRow := models.SaleModel{
 			ID:            uuid.New(),
 			OrgID:         in.OrgID,
+			BranchID:      in.BranchID,
 			Number:        number,
 			CustomerID:    in.CustomerID,
 			CustomerName:  strings.TrimSpace(in.CustomerName),
@@ -189,6 +191,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 
 type ListParams struct {
 	OrgID         uuid.UUID
+	BranchID      *uuid.UUID
 	Limit         int
 	After         *uuid.UUID
 	CustomerID    *uuid.UUID
@@ -201,6 +204,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]saledomain.Sale,
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
 	q := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ?", p.OrgID)
+	if p.BranchID != nil && *p.BranchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
+	}
 	if p.CustomerID != nil && *p.CustomerID != uuid.Nil {
 		q = q.Where("party_id = ?", *p.CustomerID)
 	}
@@ -380,6 +386,7 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 	return saledomain.Sale{
 		ID:            saleRow.ID,
 		OrgID:         saleRow.OrgID,
+		BranchID:      saleRow.BranchID,
 		Number:        saleRow.Number,
 		CustomerID:    saleRow.CustomerID,
 		CustomerName:  saleRow.CustomerName,

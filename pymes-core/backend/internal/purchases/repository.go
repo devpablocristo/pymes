@@ -27,9 +27,19 @@ type tenantSettings struct {
 	TaxRate            float64 `gorm:"column:tax_rate"`
 }
 
-func (r *Repository) List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
+	if branchID == nil || *branchID == uuid.Nil {
+		return nil
+	}
+	return branchID
+}
+
+func (r *Repository) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ?", orgID)
+	if branchID != nil && *branchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
+	}
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -53,7 +63,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 		}
 		number := fmt.Sprintf("%s-%05d", tenant.PurchasePrefix, tenant.NextPurchaseNumber)
 		subtotal, taxTotal, total := totals(in.Items)
-		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 		if err := tx.Create(&purchaseRow).Error; err != nil {
 			return err
 		}
@@ -75,7 +85,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 			return err
 		}
 		if in.Status == "received" {
-			if err := r.applyStock(ctx, tx, in.OrgID, purchaseRow.ID, items, in.CreatedBy); err != nil {
+			if err := r.applyStock(ctx, tx, in.OrgID, in.BranchID, purchaseRow.ID, items, in.CreatedBy); err != nil {
 				return err
 			}
 		}
@@ -111,8 +121,14 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Take(&current).Error; err != nil {
 			return err
 		}
+		var currentItems []models.PurchaseItemModel
+		if current.Status == "received" {
+			if err := tx.Where("purchase_id = ?", in.ID).Order("sort_order ASC").Find(&currentItems).Error; err != nil {
+				return err
+			}
+		}
 		subtotal, taxTotal, total := totals(in.Items)
-		updates := map[string]any{"party_id": in.SupplierID, "party_name": in.SupplierName, "status": in.Status, "payment_status": in.PaymentStatus, "subtotal": subtotal, "tax_total": taxTotal, "total": total, "notes": in.Notes, "updated_at": time.Now().UTC()}
+		updates := map[string]any{"party_id": in.SupplierID, "party_name": in.SupplierName, "branch_id": in.BranchID, "status": in.Status, "payment_status": in.PaymentStatus, "subtotal": subtotal, "tax_total": taxTotal, "total": total, "notes": in.Notes, "updated_at": time.Now().UTC()}
 		if in.Status == "received" && current.ReceivedAt == nil {
 			updates["received_at"] = time.Now().UTC()
 		}
@@ -135,8 +151,13 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 				return err
 			}
 		}
-		if current.Status != "received" && in.Status == "received" {
-			if err := r.applyStock(ctx, tx, in.OrgID, in.ID, items, current.CreatedBy); err != nil {
+		if current.Status == "received" {
+			if err := r.reverseStock(ctx, tx, in.OrgID, current.BranchID, in.ID, currentItems, current.CreatedBy); err != nil {
+				return err
+			}
+		}
+		if in.Status == "received" {
+			if err := r.applyStock(ctx, tx, in.OrgID, in.BranchID, in.ID, items, current.CreatedBy); err != nil {
 				return err
 			}
 		}
@@ -191,12 +212,12 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 				return err
 			}
 			if needsStockRevert {
-				if err := r.reverseStock(ctx, tx, in.OrgID, in.ID, items, current.CreatedBy); err != nil {
+				if err := r.reverseStock(ctx, tx, in.OrgID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
 					return err
 				}
 			}
 			if needsStockApply {
-				if err := r.applyStock(ctx, tx, in.OrgID, in.ID, items, current.CreatedBy); err != nil {
+				if err := r.applyStock(ctx, tx, in.OrgID, current.BranchID, in.ID, items, current.CreatedBy); err != nil {
 					return err
 				}
 			}
@@ -215,23 +236,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 	return out, nil
 }
 
-func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, orgID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
+func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
 	for _, item := range items {
 		if item.ProductID == nil || *item.ProductID == uuid.Nil || item.Quantity <= 0 {
 			continue
 		}
-		if err := tx.Exec(`
-			INSERT INTO stock_levels (product_id, org_id, quantity, min_quantity, updated_at)
-			VALUES (?, ?, ?, 0, now())
-			ON CONFLICT (org_id, product_id)
-			DO UPDATE SET quantity = stock_levels.quantity + EXCLUDED.quantity, updated_at = now()
-		`, *item.ProductID, orgID, -item.Quantity).Error; err != nil {
+		if err := r.adjustStockLevel(ctx, tx, orgID, branchID, *item.ProductID, -item.Quantity); err != nil {
 			return err
 		}
 		if err := tx.Exec(`
-			INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
-			VALUES (gen_random_uuid(), ?, ?, 'out', ?, 'purchase_revert', ?, ?, ?, now())
-		`, orgID, *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
+			INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+			VALUES (gen_random_uuid(), ?, ?, ?, 'out', ?, 'purchase_revert', ?, ?, ?, now())
+		`, orgID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
 			return err
 		}
 	}
@@ -299,23 +315,76 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	return r.loadTenant(ctx, tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
 }
 
-func (r *Repository) applyStock(ctx context.Context, tx *gorm.DB, orgID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
+func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
+	normalizedBranchID := normalizeBranchID(branchID)
+	now := time.Now().UTC()
+	updates := map[string]any{
+		"quantity":   gorm.Expr("quantity + ?", delta),
+		"updated_at": now,
+	}
+
+	if normalizedBranchID != nil {
+		res := tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id = ?", orgID, productID, *normalizedBranchID).
+			Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+		res = tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Updates(map[string]any{
+				"branch_id":  *normalizedBranchID,
+				"quantity":   gorm.Expr("quantity + ?", delta),
+				"updated_at": now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+	}
+
+	if normalizedBranchID == nil {
+		res := tx.WithContext(ctx).
+			Table("stock_levels").
+			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Updates(updates)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected > 0 {
+			return nil
+		}
+	}
+
+	return tx.WithContext(ctx).Exec(
+		`INSERT INTO stock_levels (product_id, org_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
+		productID,
+		orgID,
+		normalizedBranchID,
+		delta,
+		now,
+	).Error
+}
+
+func (r *Repository) applyStock(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
 	for _, item := range items {
 		if item.ProductID == nil || *item.ProductID == uuid.Nil || item.Quantity <= 0 {
 			continue
 		}
-		if err := tx.Exec(`
-			INSERT INTO stock_levels (product_id, org_id, quantity, min_quantity, updated_at)
-			VALUES (?, ?, ?, 0, now())
-			ON CONFLICT (org_id, product_id)
-			DO UPDATE SET quantity = stock_levels.quantity + EXCLUDED.quantity, updated_at = now()
-		`, *item.ProductID, orgID, item.Quantity).Error; err != nil {
+		if err := r.adjustStockLevel(ctx, tx, orgID, branchID, *item.ProductID, item.Quantity); err != nil {
 			return err
 		}
 		if err := tx.Exec(`
-			INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
-			VALUES (gen_random_uuid(), ?, ?, 'in', ?, 'purchase', ?, ?, ?, now())
-		`, orgID, *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
+			INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+			VALUES (gen_random_uuid(), ?, ?, ?, 'in', ?, 'purchase', ?, ?, ?, now())
+		`, orgID, normalizeBranchID(branchID), *item.ProductID, item.Quantity, purchaseID, item.Description, actor).Error; err != nil {
 			return err
 		}
 	}
@@ -334,7 +403,7 @@ func totals(items []purchasesdomain.PurchaseItem) (float64, float64, float64) {
 }
 
 func toDomain(row models.PurchaseModel, items []models.PurchaseItemModel) purchasesdomain.Purchase {
-	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range items {
 		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 	}

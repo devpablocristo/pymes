@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getTenantSettings, updateTenantSettings } from './api';
+import { createSchedulingBranch, getTenantSettings, listSchedulingBranches, updateTenantSettings } from './api';
 import type { TenantSettings } from './types';
 
 const fetchMocks = vi.hoisted(() => ({
@@ -90,5 +90,35 @@ describe('tenant settings API', () => {
       body: { scheduling_enabled: true },
     });
     expect(settings.scheduling_enabled).toBe(true);
+  });
+
+  it('lists scheduling branches', async () => {
+    fetchMocks.request.mockResolvedValue({ items: [{ id: 'branch-1', code: 'principal', name: 'Principal', timezone: 'UTC', active: true }] });
+
+    const result = await listSchedulingBranches();
+
+    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/scheduling/branches');
+    expect(result.items).toHaveLength(1);
+  });
+
+  it('creates a scheduling branch', async () => {
+    fetchMocks.request.mockResolvedValue({ id: 'branch-1', code: 'principal', name: 'Principal', timezone: 'UTC', active: true });
+
+    await createSchedulingBranch({
+      code: 'principal',
+      name: 'Principal',
+      timezone: 'UTC',
+      active: true,
+    });
+
+    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/scheduling/branches', {
+      method: 'POST',
+      body: {
+        code: 'principal',
+        name: 'Principal',
+        timezone: 'UTC',
+        active: true,
+      },
+    });
   });
 });

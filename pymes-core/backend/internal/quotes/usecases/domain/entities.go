@@ -9,6 +9,7 @@ import (
 type Quote struct {
 	ID           uuid.UUID   `json:"id"`
 	OrgID        uuid.UUID   `json:"org_id"`
+	BranchID     *uuid.UUID  `json:"branch_id,omitempty"`
 	Number       string      `json:"number"`
 	CustomerID   *uuid.UUID  `json:"customer_id,omitempty"`
 	CustomerName string      `json:"customer_name"`

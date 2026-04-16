@@ -8,6 +8,8 @@ import type { TenantSettings } from '../lib/types';
 
 const apiMocks = vi.hoisted(() => ({
   getTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
+  getSession: vi.fn(),
+  apiRequest: vi.fn(),
 }));
 
 vi.mock('../components/AuthTokenBridge', () => ({
@@ -28,6 +30,8 @@ vi.mock('../lib/auth', () => ({
 
 vi.mock('../lib/api', () => ({
   getTenantSettings: () => apiMocks.getTenantSettings(),
+  getSession: () => apiMocks.getSession(),
+  apiRequest: (...args: unknown[]) => apiMocks.apiRequest(...args),
 }));
 
 vi.mock('./lazyRoutes', () => ({
@@ -120,6 +124,21 @@ describe('App onboarding gating', () => {
   beforeEach(() => {
     localStorage.clear();
     apiMocks.getTenantSettings.mockReset();
+    apiMocks.getSession.mockReset();
+    apiMocks.apiRequest.mockReset();
+    apiMocks.getSession.mockResolvedValue({
+      auth: {
+        org_id: '00000000-0000-0000-0000-000000000001',
+        org_name: 'Org Demo',
+        tenant_id: '00000000-0000-0000-0000-000000000001',
+        role: 'admin',
+        product_role: 'admin',
+        scopes: [],
+        actor: 'user-1',
+        auth_method: 'jwt',
+      },
+    });
+    apiMocks.apiRequest.mockResolvedValue({ items: [] });
   });
 
   it('hidrata el perfil local desde tenant settings y deja pasar al shell', async () => {

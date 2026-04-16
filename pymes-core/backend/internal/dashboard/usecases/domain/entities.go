@@ -8,6 +8,7 @@ import (
 
 type Viewer struct {
 	OrgID  uuid.UUID
+	BranchID *uuid.UUID
 	Actor  string
 	Role   string
 	Scopes []string

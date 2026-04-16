@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createCreditNotesCrudConfig,
   createInvoicesCrudConfig,
@@ -16,6 +16,10 @@ import {
 import type { InvoiceRecord } from './invoicesDemo';
 
 describe('billingHelpers', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('parses priced commercial line items', () => {
     expect(
       parseCommercialPricedLineItems(
@@ -52,6 +56,7 @@ describe('billingHelpers', () => {
   });
 
   it('builds quotes config from billing domain', () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
     const config = createQuotesCrudConfig<QuoteRecord>({ renderList: () => <></> });
 
     expect(config.basePath).toBe('/v1/quotes');
@@ -93,6 +98,7 @@ describe('billingHelpers', () => {
         notes: 'ok',
       }),
     ).toEqual({
+      branch_id: 'branch-active',
       customer_id: 'c1',
       customer_name: 'Cliente',
       valid_until: '2026-04-11',
@@ -183,6 +189,7 @@ describe('billingHelpers', () => {
   });
 
   it('builds sales config from billing domain', () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
     const config = createSalesCrudConfig<SaleRecord>({ renderList: () => <></> });
 
     expect(config.basePath).toBe('/v1/sales');
@@ -229,6 +236,7 @@ describe('billingHelpers', () => {
         notes: 'ok',
       }),
     ).toEqual({
+      branch_id: 'branch-active',
       customer_id: 'c1',
       customer_name: 'Cliente',
       quote_id: 'q1',
@@ -291,6 +299,7 @@ describe('billingHelpers', () => {
   });
 
   it('builds purchases config from billing domain', () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
     const config = createPurchasesCrudConfig<PurchaseRecord>({ renderList: () => <></> });
 
     expect(config.basePath).toBe('/v1/purchases');
@@ -398,6 +407,7 @@ describe('billingHelpers', () => {
         notes: 'ok',
       }),
     ).toEqual({
+      branch_id: 'branch-active',
       supplier_id: 's1',
       supplier_name: 'Proveedor',
       status: 'draft',

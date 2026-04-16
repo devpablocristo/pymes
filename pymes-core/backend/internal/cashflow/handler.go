@@ -20,8 +20,8 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error)
 	CreateManual(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
-	Summary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
-	DailySummary(ctx context.Context, orgID uuid.UUID, days int) ([]cashdomain.CashSummary, error)
+	Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
+	DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
 }
 
 type Handler struct {
@@ -59,7 +59,12 @@ func (h *Handler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to date"})
 		return
 	}
-	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{OrgID: orgID, Limit: limit, After: after, Type: c.Query("type"), Category: c.Query("category"), From: from, To: to})
+	branchID, err := parseBranchID(c.Query("branch_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
+	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{OrgID: orgID, BranchID: branchID, Limit: limit, After: after, Type: c.Query("type"), Category: c.Query("category"), From: from, To: to})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -95,12 +100,18 @@ func (h *Handler) Create(c *gin.Context) {
 		}
 		refID = &id
 	}
+	branchID, err := parseBranchID(rawStringPtr(req.BranchID))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
 	currency := ""
 	if req.Currency != nil {
 		currency = *req.Currency
 	}
 	out, err := h.uc.CreateManual(c.Request.Context(), cashdomain.CashMovement{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		Type:          req.Type,
 		Amount:        req.Amount,
 		Currency:      currency,
@@ -135,7 +146,12 @@ func (h *Handler) Summary(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
 		return
 	}
-	sum, err := h.uc.Summary(c.Request.Context(), orgID, from, to)
+	branchID, err := parseBranchID(c.Query("branch_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
+	sum, err := h.uc.Summary(c.Request.Context(), orgID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -151,7 +167,12 @@ func (h *Handler) DailySummary(c *gin.Context) {
 		return
 	}
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
-	items, err := h.uc.DailySummary(c.Request.Context(), orgID, days)
+	branchID, err := parseBranchID(c.Query("branch_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
+	items, err := h.uc.DailySummary(c.Request.Context(), orgID, branchID, days)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -165,10 +186,32 @@ func (h *Handler) DailySummary(c *gin.Context) {
 
 func toCashMovementItem(in cashdomain.CashMovement) dto.CashMovementItem {
 	out := dto.CashMovementItem{ID: in.ID.String(), OrgID: in.OrgID.String(), Type: in.Type, Amount: in.Amount, Currency: in.Currency, Category: in.Category, Description: in.Description, PaymentMethod: in.PaymentMethod, ReferenceType: in.ReferenceType, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339)}
+	if in.BranchID != nil {
+		out.BranchID = in.BranchID.String()
+	}
 	if in.ReferenceID != nil {
 		out.ReferenceID = in.ReferenceID.String()
 	}
 	return out
+}
+
+func rawStringPtr(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return strings.TrimSpace(*v)
+}
+
+func parseBranchID(raw string) (*uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 func parseDate(raw string, def time.Time) (time.Time, error) {

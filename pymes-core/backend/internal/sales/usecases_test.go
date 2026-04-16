@@ -45,37 +45,45 @@ func (m *mockRepo) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid
 }
 
 type mockInventory struct {
-	applyCalled   int
-	reverseCalled int
-	lastApply     []inventory.SaleItemStock
-	lastReverse   []inventory.SaleItemStock
+	applyCalled       int
+	reverseCalled     int
+	lastApplyBranch   *uuid.UUID
+	lastReverseBranch *uuid.UUID
+	lastApply         []inventory.SaleItemStock
+	lastReverse       []inventory.SaleItemStock
 }
 
-func (m *mockInventory) ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []inventory.SaleItemStock) error {
+func (m *mockInventory) ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
 	m.applyCalled++
+	m.lastApplyBranch = branchID
 	m.lastApply = items
 	return nil
 }
-func (m *mockInventory) ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, actor string, items []inventory.SaleItemStock) error {
+func (m *mockInventory) ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
 	m.reverseCalled++
+	m.lastReverseBranch = branchID
 	m.lastReverse = items
 	return nil
 }
 
 type mockCashflow struct {
-	incomeCalled int
-	voidCalled   int
-	lastIncome   float64
-	lastVoid     float64
+	incomeCalled     int
+	voidCalled       int
+	lastIncomeBranch *uuid.UUID
+	lastVoidBranch   *uuid.UUID
+	lastIncome       float64
+	lastVoid         float64
 }
 
-func (m *mockCashflow) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (m *mockCashflow) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	m.incomeCalled++
+	m.lastIncomeBranch = branchID
 	m.lastIncome = amount
 	return nil
 }
-func (m *mockCashflow) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (m *mockCashflow) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	m.voidCalled++
+	m.lastVoidBranch = branchID
 	m.lastVoid = amount
 	return nil
 }
@@ -88,6 +96,7 @@ func (m *mockAudit) Log(ctx context.Context, orgID string, actor, action, resour
 
 func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 	orgID := uuid.New()
+	branchID := uuid.New()
 	productID := uuid.New()
 	saleID := uuid.New()
 
@@ -106,6 +115,9 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 			}, nil
 		},
 		createFn: func(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
+			if in.BranchID == nil || *in.BranchID != branchID {
+				t.Fatalf("expected branch_id %s, got %#v", branchID, in.BranchID)
+			}
 			if in.Subtotal != 200 {
 				t.Fatalf("expected subtotal 200, got %v", in.Subtotal)
 			}
@@ -115,6 +127,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 			return saledomain.Sale{
 				ID:            saleID,
 				OrgID:         in.OrgID,
+				BranchID:      in.BranchID,
 				Status:        "completed",
 				PaymentMethod: "cash",
 				Total:         in.Total,
@@ -142,6 +155,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 
 	_, err := uc.Create(context.Background(), CreateSaleInput{
 		OrgID:         orgID,
+		BranchID:      &branchID,
 		PaymentMethod: "cash",
 		Items: []CreateSaleItemInput{
 			{
@@ -158,8 +172,14 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 	if inv.applyCalled != 1 {
 		t.Fatalf("expected inventory apply once, got %d", inv.applyCalled)
 	}
+	if inv.lastApplyBranch == nil || *inv.lastApplyBranch != branchID {
+		t.Fatalf("expected inventory apply branch %s, got %#v", branchID, inv.lastApplyBranch)
+	}
 	if cash.incomeCalled != 1 {
 		t.Fatalf("expected cashflow income once, got %d", cash.incomeCalled)
+	}
+	if cash.lastIncomeBranch == nil || *cash.lastIncomeBranch != branchID {
+		t.Fatalf("expected cashflow income branch %s, got %#v", branchID, cash.lastIncomeBranch)
 	}
 	if cash.lastIncome != 242 {
 		t.Fatalf("expected income amount 242, got %v", cash.lastIncome)
@@ -172,6 +192,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 	orgID := uuid.New()
 	saleID := uuid.New()
+	branchID := uuid.New()
 	productID := uuid.New()
 	getByIDCalls := 0
 
@@ -190,6 +211,7 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 			return saledomain.Sale{
 				ID:            inSaleID,
 				OrgID:         orgID,
+				BranchID:      &branchID,
 				Status:        "completed",
 				PaymentMethod: "transfer",
 				Total:         500,
@@ -228,8 +250,14 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 	if inv.reverseCalled != 1 {
 		t.Fatalf("expected inventory reverse once, got %d", inv.reverseCalled)
 	}
+	if inv.lastReverseBranch == nil || *inv.lastReverseBranch != branchID {
+		t.Fatalf("expected inventory reverse branch %s, got %#v", branchID, inv.lastReverseBranch)
+	}
 	if cash.voidCalled != 1 {
 		t.Fatalf("expected cashflow void once, got %d", cash.voidCalled)
+	}
+	if cash.lastVoidBranch == nil || *cash.lastVoidBranch != branchID {
+		t.Fatalf("expected cashflow void branch %s, got %#v", branchID, cash.lastVoidBranch)
 	}
 	if cash.lastVoid != 500 {
 		t.Fatalf("expected void amount 500, got %v", cash.lastVoid)

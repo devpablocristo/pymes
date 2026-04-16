@@ -16,7 +16,7 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
@@ -41,7 +41,16 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.List(c.Request.Context(), orgID, c.Query("status"), limit)
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	items, err := h.uc.List(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -103,7 +112,7 @@ func (h *Handler) Update(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -135,6 +144,14 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 }
 
 func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor string) (CreateInput, error) {
+	var branchID *uuid.UUID
+	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
+		parsed, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
+		if err != nil {
+			return CreateInput{}, httperrors.ErrBadInput
+		}
+		branchID = &parsed
+	}
 	var supplierID *uuid.UUID
 	if req.SupplierID != nil && strings.TrimSpace(*req.SupplierID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*req.SupplierID))
@@ -167,7 +184,7 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 		}
 		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
-	return CreateInput{OrgID: orgID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
+	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {

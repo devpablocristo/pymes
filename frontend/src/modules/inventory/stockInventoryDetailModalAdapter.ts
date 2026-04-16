@@ -1,4 +1,5 @@
 import { apiRequest } from '../../lib/api';
+import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 import type {
   CrudInventoryAdjustPayload,
   CrudInventoryLevelSnapshot,
@@ -178,8 +179,11 @@ export async function defaultFetchStockLinkedEntity(productId: string): Promise<
 }
 
 export async function defaultFetchStockInventoryMovements(productId: string): Promise<CrudInventoryMovementSnapshot[]> {
+  const query = new URLSearchParams({ limit: '50', product_id: productId });
+  const branchId = readActiveBranchId();
+  if (branchId) query.set('branch_id', branchId);
   const data = await apiRequest<{ items?: MovementApiRow[] | null }>(
-    `/v1/inventory/movements?limit=50&product_id=${encodeURIComponent(productId)}`,
+    `/v1/inventory/movements?${query.toString()}`,
   );
   return (data.items ?? []).map(mapMovement);
 }
@@ -240,7 +244,11 @@ export async function defaultUploadStockLinkedEntityImages(productId: string, fi
 }
 
 export async function defaultPostStockInventoryAdjust(productId: string, body: CrudInventoryAdjustPayload): Promise<void> {
-  await apiRequest(`/v1/inventory/${encodeURIComponent(productId)}/adjust`, {
+  const query = new URLSearchParams();
+  const branchId = readActiveBranchId();
+  if (branchId) query.set('branch_id', branchId);
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  await apiRequest(`/v1/inventory/${encodeURIComponent(productId)}/adjust${suffix}`, {
     method: 'POST',
     body: {
       quantity: body.quantityDelta,

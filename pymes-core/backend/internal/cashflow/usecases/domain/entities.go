@@ -9,6 +9,7 @@ import (
 type CashMovement struct {
 	ID            uuid.UUID  `json:"id"`
 	OrgID         uuid.UUID  `json:"org_id"`
+	BranchID      *uuid.UUID `json:"branch_id,omitempty"`
 	Type          string     `json:"type"`
 	Amount        float64    `json:"amount"`
 	Currency      string     `json:"currency"`

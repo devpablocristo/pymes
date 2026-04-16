@@ -56,7 +56,10 @@ vi.mock('../components/PageLayout', () => ({
 
 vi.mock('@devpablocristo/modules-scheduling', () => ({
   createSchedulingClient: (...args: unknown[]) => schedulingMocks.createSchedulingClient(...args),
-  SchedulingDaySummary: (props: { client: unknown; locale?: string }) => {
+}));
+
+vi.mock('../modules/scheduling/BranchSchedulingDaySummary', () => ({
+  BranchSchedulingDaySummary: (props: { client: unknown; locale?: string }) => {
     schedulingMocks.capturedProps.push(props);
     return <div data-testid="scheduling-day-summary">summary:{props.locale}</div>;
   },
@@ -89,6 +92,7 @@ describe('DashboardVisualPage', () => {
     pageSearchMocks.usePageSearch.mockReset();
     schedulingMocks.createSchedulingClient.mockClear();
     schedulingMocks.capturedProps.length = 0;
+    window.localStorage.clear();
 
     apiMocks.apiRequest.mockImplementation((path: string) => {
       if (String(path).includes('/v1/accounts/debtors')) {
@@ -152,5 +156,26 @@ describe('DashboardVisualPage', () => {
       expect(apiMocks.apiRequest).toHaveBeenCalledWith('/v1/accounts/debtors');
       expect(screen.queryByText('No pudimos cargar el dashboard.')).not.toBeInTheDocument();
     });
+  });
+
+  it('appends branch_id to dashboard endpoints when a branch is active', async () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
+
+    await renderDashboardVisualPage();
+
+    await waitFor(() => {
+      expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+        '/v1/dashboard-data/recent-sales?context=home&branch_id=branch-active',
+      );
+    });
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/top-products?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/top-services?context=home&branch_id=branch-active',
+    );
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/dashboard-data/low-stock?context=home&branch_id=branch-active',
+    );
   });
 });

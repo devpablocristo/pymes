@@ -24,13 +24,13 @@ from src.domains.professionals.teachers.public_router import router as teachers_
 from src.domains.workshops.auto_repair.backend_client import AutoRepairBackendClient
 from src.domains.workshops.auto_repair.internal_router import router as auto_repair_chat_router
 from src.domains.workshops.auto_repair.public_router import router as auto_repair_public_router
-from runtime.provider_factory import create_provider
 from runtime.auth import AuthMiddleware, AuthSettings, AuthContext
 from runtime.rate_limit import RateLimitMiddleware, RateLimitSettings
 from runtime.logging import bind_request_context, clear_request_context, configure_logging, get_logger
 from src.api.review_callback import router as review_callback_router
 from src.observability.otel import configure_opentelemetry
 from runtime.clients.review import ReviewClient, ReviewRequester
+from src.runtime_bootstrap import ClerkBearerVerifier, build_llm_provider
 
 settings = get_settings()
 configure_logging(settings.ai_log_level, json_logs=settings.ai_log_json)
@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
         base_url=settings.workshops_backend_url,
         internal_token=settings.internal_service_token,
     )
-    app.state.llm_provider = create_provider(settings)
+    app.state.llm_provider = build_llm_provider(settings)
     # Nexus Review — gobernanza de acciones (opcional)
     if settings.review_enabled:
         app.state.review_client = ReviewClient(
@@ -141,6 +141,16 @@ app.add_middleware(
     AuthMiddleware,
     settings=AuthSettings(allow_api_key=settings.auth_allow_api_key),
     protected_prefixes=("/v1/chat", "/v1/notifications"),
+    bearer_verifier=(
+        ClerkBearerVerifier(
+            jwks_url=settings.jwks_url,
+            jwt_issuer=settings.jwt_issuer,
+            backend_url=settings.backend_url,
+            internal_token=settings.internal_service_token,
+        )
+        if settings.jwks_url.strip()
+        else None
+    ),
     api_key_verifier=(
         LocalAPIKeyVerifier(
             backend_url=settings.backend_url,

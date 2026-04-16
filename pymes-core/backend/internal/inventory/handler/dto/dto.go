@@ -3,6 +3,7 @@ package dto
 type StockLevelItem struct {
 	ProductID   string  `json:"product_id"`
 	OrgID       string  `json:"org_id"`
+	BranchID    string  `json:"branch_id,omitempty"`
 	ProductName string  `json:"product_name"`
 	SKU         string  `json:"sku,omitempty"`
 	Quantity    float64 `json:"quantity"`
@@ -28,6 +29,7 @@ type AdjustStockRequest struct {
 type StockMovementItem struct {
 	ID          string  `json:"id"`
 	OrgID       string  `json:"org_id"`
+	BranchID    string  `json:"branch_id,omitempty"`
 	ProductID   string  `json:"product_id"`
 	ProductName string  `json:"product_name"`
 	Type        string  `json:"type"`

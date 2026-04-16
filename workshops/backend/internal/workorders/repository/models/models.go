@@ -8,9 +8,10 @@ import (
 
 // WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
 type WorkOrderModel struct {
-	ID     uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID  uuid.UUID `gorm:"type:uuid;index;not null"`
-	Number string    `gorm:"not null"`
+	ID       uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
+	BranchID *uuid.UUID `gorm:"type:uuid;index"`
+	Number   string     `gorm:"not null"`
 
 	TargetType  string    `gorm:"not null"`
 	TargetID    uuid.UUID `gorm:"type:uuid;not null"`

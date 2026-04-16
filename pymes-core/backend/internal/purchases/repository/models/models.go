@@ -7,8 +7,9 @@ import (
 )
 
 type PurchaseModel struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID         uuid.UUID `gorm:"type:uuid;index;not null"`
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
+	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Number        string
 	SupplierID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
 	SupplierName  string     `gorm:"column:party_name"`

@@ -45,6 +45,12 @@ Además:
 - `modules/scheduling` conserva `scheduling_services` como capa operativa y ahora puede enlazar opcionalmente `commercial_service_id` hacia `services.id`.
 - Las verticales (`workshops.services`, `beauty.salon_services`) agregan `linked_service_id` para referenciar el catálogo horizontal.
 
+## Scope de sucursales (`branch`)
+
+- Catálogos y datos maestros siguen siendo globales del tenant.
+- Los dominios operativos se vuelven branch-aware solo cuando la sucursal cambia la ejecución real del negocio.
+- Matriz y rollout: **[BRANCH_SCOPE.md](./BRANCH_SCOPE.md)**.
+
 ## Integración externa librería `core`
 
 El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). El runtime reusable de AI también vive en `../../core/ai/python/src/runtime/`. Detalle de criterios y `replace` locales: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.

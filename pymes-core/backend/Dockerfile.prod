@@ -1,0 +1,36 @@
+# Build de producción para Cloud Run (stateless, binario estático).
+# Contexto esperado: directorio que contiene `pymes/` y `core/` como hermanos,
+# para resolver las replace directives en pymes/go.mod (core/scheduling/go).
+#
+# Build:
+#   gcloud builds submit <ctx> \
+#     --config pymes/pymes-core/backend/cloudbuild.yaml \
+#     --project <PROJECT_ID>
+
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOPROXY=https://proxy.golang.org,direct
+
+WORKDIR /workspace
+
+COPY pymes /workspace/pymes
+COPY core/scheduling/go /workspace/core/scheduling/go
+
+WORKDIR /workspace/pymes/pymes-core/backend
+
+RUN go mod download
+RUN go build -trimpath -ldflags="-s -w" -o /out/pymes-core ./cmd/local
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /out/pymes-core /pymes-core
+
+ENV PORT=8080
+EXPOSE 8080
+
+USER nonroot:nonroot
+ENTRYPOINT ["/pymes-core"]

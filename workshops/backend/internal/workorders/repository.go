@@ -28,6 +28,10 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 250})
 	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
+	if p.BranchID != nil && *p.BranchID != uuid.Nil {
+		// Durante la migración conviene seguir mostrando OTs legacy sin branch asignada.
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
+	}
 	if targetType := strings.TrimSpace(p.TargetType); targetType != "" {
 		q = q.Where("target_type = ?", targetType)
 	}
@@ -71,10 +75,13 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
 	q := r.db.WithContext(ctx).
 		Model(&models.WorkOrderModel{}).
 		Where("org_id = ? AND archived_at IS NOT NULL", orgID)
+	if branchID != nil && *branchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
+	}
 	if t := strings.TrimSpace(targetType); t != "" {
 		q = q.Where("target_type = ?", t)
 	}
@@ -99,6 +106,7 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 		row := models.WorkOrderModel{
 			ID:               uuid.New(),
 			OrgID:            in.OrgID,
+			BranchID:         in.BranchID,
 			Number:           in.Number,
 			TargetType:       in.TargetType,
 			TargetID:         in.TargetID,
@@ -158,6 +166,7 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		metadata, _ := json.Marshal(in.Metadata)
 		updates := map[string]any{
+			"branch_id":         in.BranchID,
 			"target_id":         in.TargetID,
 			"target_label":      in.TargetLabel,
 			"customer_id":       in.CustomerID,
@@ -351,6 +360,7 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 	return domain.WorkOrder{
 		ID:               row.ID,
 		OrgID:            row.OrgID,
+		BranchID:         row.BranchID,
 		Number:           row.Number,
 		TargetType:       row.TargetType,
 		TargetID:         row.TargetID,

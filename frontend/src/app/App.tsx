@@ -6,6 +6,7 @@ import { ClerkSessionOrgSync } from '../components/ClerkSessionOrgSync';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
 import { getTenantSettings } from '../lib/api';
+import { BranchProvider } from '../lib/branchContext';
 import { queryKeys } from '../lib/queryKeys';
 import { hasCompletedOnboarding, syncTenantProfileFromSettings } from '../lib/tenantProfile';
 import { LoginPage, OnboardingPage, Shell, SignupPage } from './lazyRoutes';
@@ -114,11 +115,13 @@ export function App() {
             <StrictDevShell>
               <ProtectedRoute>
                 <RequireOnboarding>
-                  <Suspended>
-                    <Shell>
-                      <ShellRoutes />
-                    </Shell>
-                  </Suspended>
+                  <BranchProvider>
+                    <Suspended>
+                      <Shell>
+                        <ShellRoutes />
+                      </Shell>
+                    </Suspended>
+                  </BranchProvider>
                 </RequireOnboarding>
               </ProtectedRoute>
             </StrictDevShell>

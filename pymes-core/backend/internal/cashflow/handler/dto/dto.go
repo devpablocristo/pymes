@@ -3,6 +3,7 @@ package dto
 type CashMovementItem struct {
 	ID            string  `json:"id"`
 	OrgID         string  `json:"org_id"`
+	BranchID      string  `json:"branch_id,omitempty"`
 	Type          string  `json:"type"`
 	Amount        float64 `json:"amount"`
 	Currency      string  `json:"currency"`
@@ -25,6 +26,7 @@ type ListCashMovementsResponse struct {
 type CreateCashMovementRequest struct {
 	Type          string  `json:"type" binding:"required"`
 	Amount        float64 `json:"amount" binding:"required"`
+	BranchID      *string `json:"branch_id"`
 	Category      string  `json:"category"`
 	Description   string  `json:"description"`
 	PaymentMethod string  `json:"payment_method"`

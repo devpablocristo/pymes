@@ -11,6 +11,7 @@ type QuoteItemPayload struct {
 }
 
 type CreateQuoteRequest struct {
+	BranchID     *string            `json:"branch_id"`
 	CustomerID   *string            `json:"customer_id"`
 	CustomerName string             `json:"customer_name"`
 	Items        []QuoteItemPayload `json:"items" binding:"required"`
@@ -47,6 +48,7 @@ type QuoteItemResponse struct {
 type QuoteResponse struct {
 	ID           string              `json:"id"`
 	OrgID        string              `json:"org_id"`
+	BranchID     string              `json:"branch_id,omitempty"`
 	Number       string              `json:"number"`
 	CustomerID   string              `json:"customer_id,omitempty"`
 	CustomerName string              `json:"customer_name"`

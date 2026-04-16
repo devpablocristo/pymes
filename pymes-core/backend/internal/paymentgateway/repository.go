@@ -54,6 +54,7 @@ type quoteSnapshotRow struct {
 }
 
 type salePaymentRow struct {
+	BranchID      *uuid.UUID `gorm:"column:branch_id"`
 	Number        string
 	Total         float64
 	AmountPaid    float64 `gorm:"column:amount_paid"`
@@ -374,7 +375,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 		if err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE"}).
 			Table("sales").
-			Select("number, total, amount_paid, currency, payment_method").
+			Select("branch_id, number, total, amount_paid, currency, payment_method").
 			Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).
 			Take(&sale).Error; err != nil {
 			return err
@@ -450,13 +451,13 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 
 		if err := tx.Exec(`
 			INSERT INTO cash_movements (
-				id, org_id, type, amount, currency, category, description,
+				id, org_id, branch_id, type, amount, currency, category, description,
 				payment_method, reference_type, reference_id, created_by, created_at
 			) VALUES (
-				gen_random_uuid(), ?, 'income', ?, ?, 'sale', ?,
+				gen_random_uuid(), ?, ?, 'income', ?, ?, 'sale', ?,
 				'mercadopago', 'sale', ?, 'payment-gateway:webhook', now()
 			)
-		`, in.OrgID, applied, coalesce(sale.Currency, "ARS"), note, in.SaleID).Error; err != nil {
+		`, in.OrgID, sale.BranchID, applied, coalesce(sale.Currency, "ARS"), note, in.SaleID).Error; err != nil {
 			return err
 		}
 

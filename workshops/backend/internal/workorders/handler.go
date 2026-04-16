@@ -21,7 +21,7 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder, actor string) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error)
@@ -68,8 +68,14 @@ func (h *Handler) List(c *gin.Context) {
 		}
 		after = &parsed
 	}
+	branchID, err := parseOptionalUUIDQuery(c, "branch_id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:      orgID,
+		BranchID:   branchID,
 		Limit:      limit,
 		After:      after,
 		Search:     c.Query("search"),
@@ -92,7 +98,12 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, c.Query("target_type"))
+	branchID, err := parseOptionalUUIDQuery(c, "branch_id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		return
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, c.Query("target_type"))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -110,6 +121,11 @@ func (h *Handler) Create(c *gin.Context) {
 	var req dto.CreateWorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	branchID, err := parseOptionalUUIDQueryValue(req.BranchID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
 		return
 	}
 
@@ -142,6 +158,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	out, err := h.uc.Create(c.Request.Context(), domain.WorkOrder{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		Number:        req.Number,
 		TargetType:    targetType,
 		TargetID:      targetID,
@@ -191,6 +208,12 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
+		if _, err := uuid.Parse(strings.TrimSpace(*req.BranchID)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+	}
 	promisedAt, err := verticalgin.ParseOptionalRFC3339Ptr(req.PromisedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid promised_at"})
@@ -214,6 +237,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 	targetID, targetLabel := resolveTargetFromUpdate(req)
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
+		BranchID:      req.BranchID,
 		TargetID:      targetID,
 		TargetLabel:   targetLabel,
 		CustomerID:    req.CustomerID,
@@ -352,6 +376,9 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		UpdatedAt:        item.UpdatedAt.UTC().Format(time.RFC3339),
 		Items:            toWorkOrderLineItems(item.Items),
 	}
+	if item.BranchID != nil {
+		result.BranchID = item.BranchID.String()
+	}
 	// Aliases por compat: solo se llenan según target_type.
 	switch item.TargetType {
 	case "vehicle":
@@ -398,6 +425,30 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		result.ArchivedAt = &s
 	}
 	return result
+}
+
+func parseOptionalUUIDQuery(c *gin.Context, param string) (*uuid.UUID, error) {
+	raw := strings.TrimSpace(c.Query(param))
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func parseOptionalUUIDQueryValue(raw string) (*uuid.UUID, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 func toWorkOrderLineItems(items []domain.WorkOrderItem) []dto.WorkOrderLineItem {

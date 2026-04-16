@@ -16,8 +16,8 @@ type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
-	Summary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
-	DailySummary(ctx context.Context, orgID uuid.UUID, days int) ([]cashdomain.CashSummary, error)
+	Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
+	DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
 }
 
 type AuditPort interface {
@@ -70,23 +70,24 @@ func (u *Usecases) CreateManual(ctx context.Context, in cashdomain.CashMovement)
 	return out, nil
 }
 
-func (u *Usecases) Summary(ctx context.Context, orgID uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
+func (u *Usecases) Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error) {
 	if to.Before(from) {
 		return cashdomain.CashSummary{}, fmt.Errorf("invalid date range: %w", httperrors.ErrBadInput)
 	}
-	return u.repo.Summary(ctx, orgID, from, to)
+	return u.repo.Summary(ctx, orgID, branchID, from, to)
 }
 
-func (u *Usecases) DailySummary(ctx context.Context, orgID uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
+func (u *Usecases) DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error) {
 	if days <= 0 {
 		days = 30
 	}
-	return u.repo.DailySummary(ctx, orgID, days)
+	return u.repo.DailySummary(ctx, orgID, branchID, days)
 }
 
-func (u *Usecases) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (u *Usecases) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	out, err := u.repo.Create(ctx, cashdomain.CashMovement{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		Type:          "income",
 		Amount:        amount,
 		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, orgID)),
@@ -106,9 +107,10 @@ func (u *Usecases) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID
 	return err
 }
 
-func (u *Usecases) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (u *Usecases) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	out, err := u.repo.Create(ctx, cashdomain.CashMovement{
 		OrgID:         orgID,
+		BranchID:      branchID,
 		Type:          "expense",
 		Amount:        amount,
 		Currency:      coalesce(currency, u.repo.GetCurrency(ctx, orgID)),

@@ -252,6 +252,7 @@ export function createWorkOrdersCrudConfig({
         if (!startAtInput) return;
         const duration = Number(values.duration || '60');
         const booking = await createWorkshopBooking({
+          branch_id: row.branch_id,
           customer_id: row.customer_id,
           customer_name: row.customer_name || row.vehicle_plate || row.number,
           title,

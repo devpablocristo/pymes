@@ -10,15 +10,19 @@ import (
 )
 
 type mockPurchasesRepo struct {
+	createFn       func(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	getByIDFn      func(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	updateStatusFn func(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
 }
 
-func (m *mockPurchasesRepo) List(context.Context, uuid.UUID, string, int) ([]purchasesdomain.Purchase, error) {
+func (m *mockPurchasesRepo) List(context.Context, uuid.UUID, *uuid.UUID, string, int) ([]purchasesdomain.Purchase, error) {
 	return nil, nil
 }
-func (m *mockPurchasesRepo) Create(context.Context, CreateInput) (purchasesdomain.Purchase, error) {
-	return purchasesdomain.Purchase{}, nil
+func (m *mockPurchasesRepo) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
+	if m.createFn == nil {
+		return purchasesdomain.Purchase{}, nil
+	}
+	return m.createFn(ctx, in)
 }
 func (m *mockPurchasesRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 	return m.getByIDFn(ctx, orgID, id)
@@ -114,5 +118,42 @@ func TestUpdateStatus_RejectsInvalidStatus(t *testing.T) {
 	}, "tester")
 	if err == nil {
 		t.Fatalf("expected business rule error")
+	}
+}
+
+func TestCreate_PreservesSelectedBranch(t *testing.T) {
+	orgID := uuid.New()
+	branchID := uuid.New()
+	repo := &mockPurchasesRepo{
+		createFn: func(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
+			if in.BranchID == nil || *in.BranchID != branchID {
+				t.Fatalf("expected branch_id %s, got %#v", branchID, in.BranchID)
+			}
+			return purchasesdomain.Purchase{
+				ID:           uuid.New(),
+				OrgID:        in.OrgID,
+				BranchID:     in.BranchID,
+				Number:       "CPA-00003",
+				Status:       in.Status,
+				SupplierName: in.SupplierName,
+			}, nil
+		},
+	}
+
+	uc := NewUsecases(repo, nil)
+	out, err := uc.Create(context.Background(), CreateInput{
+		OrgID:        orgID,
+		BranchID:     &branchID,
+		SupplierName: "Proveedor Demo",
+		Items: []purchasesdomain.PurchaseItem{
+			{Description: "Insumo", Quantity: 1, UnitCost: 100},
+		},
+		CreatedBy: "tester",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if out.BranchID == nil || *out.BranchID != branchID {
+		t.Fatalf("expected output branch_id %s, got %#v", branchID, out.BranchID)
 	}
 }

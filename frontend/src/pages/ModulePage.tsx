@@ -4,6 +4,8 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { PageLayout } from '../components/PageLayout';
 import { ReportsResultView } from '../components/ReportsResultView';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
+import { useOptionalBranchSelection } from '../lib/branchContext';
+import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { hasLazyCrudResource } from '../crud/lazyCrudPage';
 import { ConfiguredCrudStandalonePage } from '../crud/configuredCrudViews';
 import {
@@ -58,6 +60,15 @@ function buildPath(
     path += `${path.includes('?') ? '&' : '?'}${params.toString()}`;
   }
   return path;
+}
+
+function appendBranchIdToReportPath(path: string, branchId: string | null | undefined): string {
+  const normalizedBranchId = branchId?.trim();
+  if (!normalizedBranchId || !isReportDatasetPath(path)) {
+    return path;
+  }
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}branch_id=${encodeURIComponent(normalizedBranchId)}`;
 }
 
 function buildBody(fields: ModuleField[] | undefined, values: Record<string, string>): Record<string, unknown> {
@@ -662,6 +673,8 @@ function reportCardTone(section: 'sales' | 'inventory' | 'finance'): string {
 function ReportsBusinessPage() {
   const { language } = useI18n();
   const module = moduleCatalog.reports;
+  const branchSelection = useOptionalBranchSelection();
+  const selectedBranchId = branchSelection?.selectedBranchId ?? readActiveBranchId();
   const runtime = useMemo(() => currentRuntimeContext(), []);
   const [draftRange, setDraftRange] = useState(() => ({ from: runtime.monthStart, to: runtime.today }));
   const [range, setRange] = useState(() => ({ from: runtime.monthStart, to: runtime.today }));
@@ -669,7 +682,7 @@ function ReportsBusinessPage() {
   const datasets = module.datasets ?? [];
   const queries = useQueries({
     queries: datasets.map((dataset) => ({
-      queryKey: ['reports', dataset.id ?? dataset.path, range.from, range.to],
+      queryKey: ['reports', dataset.id ?? dataset.path, range.from, range.to, selectedBranchId],
       queryFn: async () => {
         const values = buildInitialValues(dataset.fields, { ...runtime, monthStart: range.from, today: range.to });
         if (dataset.fields?.some((field) => field.name === 'from')) {
@@ -678,7 +691,10 @@ function ReportsBusinessPage() {
         if (dataset.fields?.some((field) => field.name === 'to')) {
           values.to = range.to;
         }
-        const path = buildPath(dataset.path, dataset.fields, values, { ...runtime, monthStart: range.from, today: range.to });
+        const path = appendBranchIdToReportPath(
+          buildPath(dataset.path, dataset.fields, values, { ...runtime, monthStart: range.from, today: range.to }),
+          selectedBranchId,
+        );
         return apiRequest(path);
       },
       retry: false,

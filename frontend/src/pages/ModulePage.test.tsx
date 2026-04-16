@@ -60,12 +60,20 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function currentReportWindow() {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  return { today, monthStart };
+}
+
 describe('ModulePage', () => {
   afterEach(() => {
     crudMocks.hasLazyCrudResource.mockReset();
     apiMocks.apiRequest.mockReset();
     apiMocks.getSession.mockReset();
     apiMocks.downloadAPIFile.mockReset();
+    window.localStorage.clear();
   });
 
   it('muestra estado de carga mientras resuelve si el módulo es CRUD', () => {
@@ -141,5 +149,23 @@ describe('ModulePage', () => {
     expect(screen.queryByText('Ruta en la consola')).not.toBeInTheDocument();
     expect(screen.queryByText('Org activa')).not.toBeInTheDocument();
     expect(screen.queryByText('/v1/reports/sales-summary')).not.toBeInTheDocument();
+  });
+
+  it('agrega branch_id a los reportes cuando hay una sucursal activa', async () => {
+    const { today, monthStart } = currentReportWindow();
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
+    crudMocks.hasLazyCrudResource.mockResolvedValueOnce(false);
+    apiMocks.apiRequest.mockResolvedValue({});
+
+    renderModulePage('/modules/reports');
+
+    await waitFor(() => {
+      expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+        `/v1/reports/sales-summary?from=${monthStart}&to=${today}&branch_id=branch-active`,
+      );
+    });
+    expect(apiMocks.apiRequest).toHaveBeenCalledWith(
+      '/v1/reports/inventory-valuation?branch_id=branch-active',
+    );
   });
 });

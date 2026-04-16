@@ -51,4 +51,4 @@ Criterio: *¿otro producto podría usarlo sin conocer “Pymes”?*
 
 ## Módulos en la consola (`/modules/:id`)
 
-El catálogo mezcla `staticModuleCatalog` y `crudModuleCatalog`. Si un `resourceId` existe en CRUD, **gana la definición del CRUD**. Los **datasets** y **actions** del explorador de API para módulos CRUD (p. ej. `procurementRequests`, `procurementPolicies`) se configuran en `frontend/src/crud/resourceConfigs.tsx` (`crudModuleMeta`), no duplicados en `moduleCatalog.ts` para el mismo id.
+El catálogo mezcla `staticModuleCatalog` y `crudModuleCatalog`. Si un `resourceId` existe en CRUD, **gana la definición del CRUD**. Las configuraciones viven hoy en `frontend/src/crud/resourceConfigs.*.tsx`, apoyadas por módulos de dominio en `frontend/src/modules/<dominio>`. Los recursos de governance (`procurementRequests`, `procurementPolicies`, `roles`) no son dominio local: este repo solo mantiene adaptadores finos hacia Nexus.

@@ -190,6 +190,29 @@ describe('persistCrudInventoryDetailSave', () => {
     expect(ports.postInventoryAdjust).toHaveBeenCalledTimes(1);
   });
 
+  it('conserva el resultado del PATCH si recargar la entidad enlazada falla', async () => {
+    const patched = { ...linkedBase, name: 'Renombrado tras patch' };
+    const ports = {
+      patchLinkedEntity: vi.fn(async () => patched),
+      postInventoryAdjust: vi.fn(),
+      loadInventoryLevel: vi.fn(async () => levelBase),
+      loadLinkedEntity: vi.fn(async () => {
+        throw new Error('temporary linked reload failure');
+      }),
+      loadMovements: vi.fn(async () => []),
+    };
+
+    const result = await persistCrudInventoryDetailSave(ports as never, {
+      linkedEntityId: 'p1',
+      hasProductPatch: true,
+      patch: { name: patched.name },
+      hasInventoryChange: false,
+      adjustPayload: null,
+    });
+
+    expect(result.linked).toEqual(patched);
+  });
+
   it('lanza si hay cambio de inventario pero falta adjustPayload', async () => {
     const ports = {
       patchLinkedEntity: vi.fn(),

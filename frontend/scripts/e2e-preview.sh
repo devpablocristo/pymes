@@ -9,6 +9,7 @@ export VITE_API_KEY=e2e-test-key
 export VITE_API_ACTOR=e2e-admin
 export VITE_API_ROLE=admin
 export VITE_API_URL=http://127.0.0.1:9999
+export E2E_OUT_DIR="${E2E_OUT_DIR:-/tmp/pymes-frontend-e2e-dist}"
 
-npx vite build --mode development
-exec npx vite preview --host 127.0.0.1 --port 4173
+npx vite build --mode development --outDir "$E2E_OUT_DIR"
+exec npx vite preview --host 127.0.0.1 --port 4173 --outDir "$E2E_OUT_DIR"

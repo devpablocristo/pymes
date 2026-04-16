@@ -19,12 +19,14 @@ type Options<Status extends string, ColumnId extends string> = {
   normalizeStatus: (raw: string) => Status;
   columns: readonly ColumnStatusMapping<Status, ColumnId>[];
   terminalStatuses?: readonly Status[];
+  transitions?: readonly { from: Status; to: readonly Status[] }[];
 };
 
 export function createCrudKanbanTransitionModel<Status extends string, ColumnId extends string>({
   normalizeStatus,
   columns,
   terminalStatuses = [],
+  transitions = [],
 }: Options<Status, ColumnId>): CrudKanbanTransitionModel<Status, ColumnId> {
   const statusToColumn = new Map<Status, ColumnId>();
   const defaultStatusByColumn = new Map<ColumnId, Status | null>();
@@ -37,7 +39,7 @@ export function createCrudKanbanTransitionModel<Status extends string, ColumnId 
   }
 
   const firstColumnId = columns[0]?.columnId;
-  const transitionMachine = buildTransitionMachine(columns, terminalStatuses);
+  const transitionMachine = buildTransitionMachine(columns, terminalStatuses, transitions);
 
   const canonicalizeStatus = (raw: string): Status => normalizeStatus(raw);
 
@@ -48,10 +50,17 @@ export function createCrudKanbanTransitionModel<Status extends string, ColumnId 
 
   const getDefaultStatusForColumn = (columnId: ColumnId): Status | null => defaultStatusByColumn.get(columnId) ?? null;
 
-  const isTerminalStatus = (raw: string): boolean => transitionMachine.isTerminal(canonicalizeStatus(raw));
+  const isTerminalStatus = (raw: string): boolean => {
+    const canonical = canonicalizeStatus(raw);
+    if (!statusToColumn.has(canonical)) return false;
+    return transitionMachine.isTerminal(canonical);
+  };
 
-  const canTransitionToStatus = (fromStatus: string, toStatus: string): boolean =>
-    transitionMachine.canTransition(canonicalizeStatus(fromStatus), canonicalizeStatus(toStatus));
+  const canTransitionToStatus = (fromStatus: string, toStatus: string): boolean => {
+    const from = canonicalizeStatus(fromStatus);
+    if (!statusToColumn.has(from)) return true;
+    return transitionMachine.canTransition(from, canonicalizeStatus(toStatus));
+  };
 
   const canMoveToColumn = (fromStatus: string, targetColumnId: ColumnId): boolean => {
     const nextStatus = getDefaultStatusForColumn(targetColumnId);
@@ -72,16 +81,25 @@ export function createCrudKanbanTransitionModel<Status extends string, ColumnId 
 function buildTransitionMachine<Status extends string, ColumnId extends string>(
   columns: readonly ColumnStatusMapping<Status, ColumnId>[],
   terminalStatuses: readonly Status[],
+  transitions: readonly { from: Status; to: readonly Status[] }[],
 ): StringMachine {
   const builder = new Builder();
   if (terminalStatuses.length > 0) {
     builder.terminal(...terminalStatuses);
   }
-  const defaultStatuses = columns
-    .map((column) => column.defaultStatus)
-    .filter((status): status is Status => status != null);
-  for (const status of defaultStatuses) {
-    builder.allowAnyTo(status);
+  if (transitions.length > 0) {
+    for (const transition of transitions) {
+      for (const target of transition.to) {
+        builder.allow(transition.from, target);
+      }
+    }
+  } else {
+    const defaultStatuses = columns
+      .map((column) => column.defaultStatus)
+      .filter((status): status is Status => status != null);
+    for (const status of defaultStatuses) {
+      builder.allowAnyTo(status);
+    }
   }
   return builder.build();
 }

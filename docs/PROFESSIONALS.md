@@ -17,7 +17,7 @@
 ## Piezas vigentes
 
 - backend: `professionals/backend`
-- infra: `professionals/infra`
+- infra AWS: `professionals/infra/aws` (otros clouds como subdirs hermanos)
 
 ### Autenticación
 

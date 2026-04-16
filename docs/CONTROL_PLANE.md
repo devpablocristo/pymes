@@ -15,7 +15,7 @@
 
 - backend: `pymes-core/backend`
 - shared backend: `pymes-core/shared/backend`
-- infra: `pymes-core/infra`
+- infra AWS: `pymes-core/infra/aws` (otros clouds como subdirs hermanos)
 
 El frontend y el AI no viven ya dentro de `pymes-core/`; hoy son deployables unificados en `frontend/` y `ai/`. El runtime reusable de AI vive en `../../core/ai/python/src/runtime/`.
 

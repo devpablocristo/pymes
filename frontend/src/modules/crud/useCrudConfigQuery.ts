@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import type { CrudPageConfig } from '../../components/CrudPage';
-import { loadLazyCrudPageConfig, type LoadLazyCrudPageConfigOptions } from '../../crud/lazyCrudPage';
 
-export function useCrudConfigQuery<TRecord extends { id: string } = { id: string }>(
+export type CrudConfigQueryLoader<TConfig> = (resourceId: string, options?: unknown) => Promise<TConfig | null>;
+
+export function useCrudConfigQuery<TConfig = unknown>(
   resourceId: string,
-  options?: LoadLazyCrudPageConfigOptions,
+  loadConfig: CrudConfigQueryLoader<TConfig>,
+  options?: unknown,
 ) {
-  return useQuery<CrudPageConfig<TRecord> | null>({
-    queryKey: ['crud-config', resourceId, options?.preserveCsvToolbar ?? false],
-    queryFn: () => loadLazyCrudPageConfig<TRecord>(resourceId, options),
+  return useQuery<TConfig | null>({
+    queryKey: ['crud-config', resourceId, JSON.stringify(options ?? null)],
+    queryFn: () => loadConfig(resourceId, options),
+    staleTime: 0,
+    gcTime: 0,
   });
 }

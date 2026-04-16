@@ -26,7 +26,19 @@
       "Bash(find /home/pablo/Projects/Pablo -name \"*.go\" -type f -exec grep -l \"github\\\\.com/devpablocristo/core/saas/go\" {})",
       "Bash(rm /home/pablo/Projects/Pablo/core/backend/go/validation/validation_test.go)",
       "Bash(rmdir /home/pablo/Projects/Pablo/core/backend/go/validation/)",
-      "Bash(make up:*)"
+      "Bash(make up:*)",
+      "Bash(ls -1 /home/pablo/Projects/Pablo/pymes/pymes-core/backend/migrations/*.up.sql)",
+      "Bash([ -f \"/home/pablo/Projects/Pablo/core/$d/go.mod\" ])",
+      "Bash([ -d \"/home/pablo/Projects/Pablo/core/$d/ts\" ])",
+      "Bash([ -d \"/home/pablo/Projects/Pablo/core/$d/ts/src\" ])",
+      "Bash(grep -h '\"@devpablocristo/modules' /home/pablo/Projects/Pablo/modules/*/ts/package.json /home/pablo/Projects/Pablo/modules/*/*/ts/package.json)",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && head -15 {}')",
+      "Bash(grep -h '\"@devpablocristo/core' /home/pablo/Projects/Pablo/modules/*/ts/package.json /home/pablo/Projects/Pablo/modules/*/*/ts/package.json)",
+      "Bash(grep -E \"\\\\.tsx?$\")",
+      "Bash(grep -n \"export.*create.*CrudConfig\\\\|export function create\" /home/pablo/Projects/Pablo/pymes/frontend/src/modules/inventory/*.tsx)",
+      "Bash(ls /home/pablo/Projects/Pablo/pymes/frontend/src/pages/CrudUiConfigurePage.*)",
+      "Bash(ls /home/pablo/Projects/Pablo/modules/crud/ui/ts/tests/ /home/pablo/Projects/Pablo/modules/crud/ui/ts/src/*.test.*)",
+      "Bash(git stash:*)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",
@@ -37,7 +49,8 @@
       "/home/pablo/Projects/Pablo/core/ai/python/src/runtime",
       "/home/pablo/Projects/Pablo/core/backend/gin/go",
       "/home/pablo/Projects/Pablo/core/backend/go/validate",
-      "/home/pablo/Projects/Pablo/modules/scheduling/go"
+      "/home/pablo/Projects/Pablo/modules/scheduling/go",
+      "/home/pablo/Projects/Pablo/modules/crud/ui/ts/tests"
     ]
   }
 }

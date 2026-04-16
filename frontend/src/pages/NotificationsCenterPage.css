@@ -1,113 +1,61 @@
-/* Notifications center — incluye avisos normales y aprobaciones en el feed unificado. */
-
-.notifications-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-surface) 90%, #0b1220 10%),
-    color-mix(in srgb, var(--color-surface-hover) 86%, #0f172a 14%)
-  );
-}
-
-.notifications-toolbar__hint {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
-@media (max-width: 720px) {
-  .notifications-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
+/* Notifications center — feed unificado de avisos y aprobaciones.
+   Las cards usan los mismos tokens que el resto de la app (kanban/CRUD).
+   Botones: .btn-success / .btn-danger / .btn-secondary (globales).
+   Badge de riesgo: <CrudStateBadge />. */
 
 .notifications-feed {
-  --m-notification-feed-paper: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-surface) 92%, #0f172a 8%),
-    color-mix(in srgb, var(--color-surface-hover) 88%, #0b1220 12%)
-  );
+  --m-notification-feed-paper: var(--color-surface);
   --m-notification-feed-ink: var(--color-text);
   --m-notification-feed-muted: var(--color-text-secondary);
-  --m-notification-feed-line: color-mix(in srgb, var(--color-text) 10%, transparent);
-  --m-notification-feed-shadow: 0 18px 42px rgba(6, 12, 24, 0.16);
+  --m-notification-feed-line: var(--color-border);
+  --m-notification-feed-shadow: var(--shadow-z8);
 }
 
 .notifications-feed .m-notification-feed__summary {
-  background: color-mix(in srgb, var(--color-surface) 82%, #0f172a 18%);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
-  box-shadow: 0 10px 24px rgba(6, 12, 24, 0.12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-z4);
 }
 
 .notifications-feed .m-notification-feed__empty {
-  background: color-mix(in srgb, var(--color-surface) 84%, #0f172a 16%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .notifications-feed .m-notification-feed__card {
-  backdrop-filter: blur(8px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
 }
 
 .notifications-feed .m-notification-feed__card--default::before {
-  background: color-mix(in srgb, var(--color-accent-indigo) 74%, white 6%);
+  background: var(--color-primary);
 }
 
 .notifications-feed .m-notification-feed__card--attention::before {
-  background: color-mix(in srgb, var(--color-warning) 82%, white 4%);
+  background: var(--color-warning);
 }
 
 .notifications-feed .m-notification-feed__card--critical::before {
-  background: color-mix(in srgb, var(--color-danger) 84%, white 4%);
+  background: var(--color-danger);
 }
 
 .notifications-feed .m-notification-feed__card--success::before {
-  background: color-mix(in srgb, var(--color-success) 80%, white 6%);
+  background: var(--color-success);
 }
 
 .notifications-feed .m-notification-feed__card--unread {
-  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
-  box-shadow:
-    0 18px 42px rgba(6, 12, 24, 0.18),
-    inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
 }
 
 .notifications-feed .m-notification-feed__card--unread::after {
   background: var(--color-primary);
-  box-shadow: 0 0 0 0.3rem color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 .notifications-feed .m-notification-feed__eyebrow {
-  color: color-mix(in srgb, var(--color-warning) 78%, white 8%);
-}
-
-.risk-badge {
-  display: inline-block;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-role-caption);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-}
-
-.risk-badge.low {
-  background: color-mix(in srgb, var(--color-success) 18%, transparent);
-  color: color-mix(in srgb, var(--color-success) 78%, white 6%);
-}
-
-.risk-badge.medium {
-  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
-  color: color-mix(in srgb, var(--color-warning) 84%, white 4%);
-}
-
-.risk-badge.high {
-  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
-  color: color-mix(in srgb, var(--color-danger) 88%, white 4%);
+  color: var(--color-text-secondary);
 }
 
 .approval-reason {
@@ -122,7 +70,7 @@
   font-style: italic;
   margin-bottom: var(--space-3);
   padding: var(--space-2);
-  background: color-mix(in srgb, var(--color-surface-hover) 82%, #0b1220 18%);
+  background: var(--color-surface-hover);
   border-radius: var(--radius-sm);
 }
 
@@ -146,40 +94,4 @@
 
 .note-input::placeholder {
   color: var(--color-text-muted);
-}
-
-.btn-approve {
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-success);
-  color: var(--color-on-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-role-body);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-}
-
-.btn-approve:hover {
-  filter: brightness(0.95);
-}
-
-.btn-reject {
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-danger);
-  color: var(--color-on-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-role-body);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-}
-
-.btn-reject:hover {
-  background: var(--color-danger-hover);
-}
-
-.btn-approve:disabled,
-.btn-reject:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }

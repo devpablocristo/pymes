@@ -1,6 +1,7 @@
 import type { ModuleDefinition } from '../lib/moduleCatalog.types';
 
 type CrudModuleId =
+  | 'invoices'
   | 'customers'
   | 'suppliers'
   | 'products'
@@ -11,7 +12,7 @@ type CrudModuleId =
   | 'returns'
   | 'creditNotes'
   | 'cashflow'
-  | 'stock'
+  | 'inventory'
   | 'payments'
   | 'attachments'
   | 'audit'
@@ -45,6 +46,7 @@ type CrudModuleMeta = Pick<ModuleDefinition, 'group' | 'icon' | 'summary'> &
   Partial<Pick<ModuleDefinition, 'title' | 'navLabel' | 'badge' | 'notes' | 'datasets' | 'actions' | 'customRoute'>>;
 
 const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
+  invoices: { title: 'Facturación', navLabel: 'Facturación', labelPlural: 'facturas' },
   customers: { title: 'Clientes', navLabel: 'Clientes', labelPlural: 'clientes' },
   suppliers: { title: 'Proveedores', navLabel: 'Proveedores', labelPlural: 'proveedores' },
   products: { title: 'Productos', navLabel: 'Productos', labelPlural: 'productos' },
@@ -55,7 +57,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   returns: { title: 'Devoluciones', navLabel: 'Devoluciones', labelPlural: 'devoluciones' },
   creditNotes: { title: 'Notas de crédito', navLabel: 'Notas de crédito', labelPlural: 'notas de crédito' },
   cashflow: { title: 'Caja', navLabel: 'Caja', labelPlural: 'movimientos de caja' },
-  stock: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'productos en el inventario' },
+  inventory: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'productos en el inventario' },
   payments: { title: 'Pagos', navLabel: 'Pagos', labelPlural: 'pagos' },
   attachments: { title: 'Adjuntos', navLabel: 'Adjuntos', labelPlural: 'adjuntos' },
   audit: { title: 'Auditoría', navLabel: 'Auditoría', labelPlural: 'eventos de auditoría' },
@@ -67,7 +69,7 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     labelPlural: 'solicitudes de compra internas',
   },
   procurementPolicies: {
-    title: 'Políticas de compras (governance)',
+    title: 'Políticas de compras (Nexus Governance)',
     navLabel: 'Políticas compras',
     labelPlural: 'políticas de compras',
   },
@@ -112,6 +114,12 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'commercial',
     icon: 'CL',
     summary: 'Base de clientes con historial comercial e importación/exportación CSV.',
+  },
+  invoices: {
+    group: 'commercial',
+    icon: 'FC',
+    summary: 'Facturas, vista previa, edición y evolución del módulo de billing sobre la shell CRUD.',
+    customRoute: '/invoices',
   },
   suppliers: {
     group: 'commercial',
@@ -158,7 +166,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'CJ',
     summary: 'Movimientos de caja manuales (ingreso/egreso). Resúmenes agregados en reportes.',
   },
-  stock: {
+  inventory: {
     group: 'operations',
     icon: 'ST',
     summary: 'Productos en inventario, cantidades, ajustes manuales y movimientos.',
@@ -193,7 +201,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   procurementRequests: {
     group: 'operations',
     icon: 'SC',
-    summary: 'Solicitudes internas, aprobación y políticas CEL (governance).',
+    summary: 'Solicitudes internas adaptadas desde este frontend, con ownership de governance en Nexus.',
     datasets: [
       {
         id: 'procurement-requests-active',
@@ -276,7 +284,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'GP',
     title: 'Políticas de compras',
     navLabel: 'Políticas compras',
-    summary: 'Reglas CEL por organización para el circuito de solicitudes (motor governance).',
+    summary: 'Políticas CEL por organización; este frontend solo adapta la frontera HTTP/UI hacia Nexus Governance.',
     datasets: [
       {
         id: 'procurement-policies-list',
@@ -312,7 +320,7 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     icon: 'RB',
     title: 'RBAC',
     navLabel: 'RBAC',
-    summary: 'Roles, permisos efectivos y asignación operativa.',
+    summary: 'Roles, permisos efectivos y asignación operativa como adaptador fino de la frontera Nexus/RBAC.',
   },
   webhooks: {
     group: 'integrations',

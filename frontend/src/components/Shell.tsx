@@ -19,6 +19,17 @@ type ModuleListItem = {
   icon: string;
   customRoute?: string;
 };
+
+const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
+  'customers',
+  'products',
+  'services',
+  'sales',
+  'purchases',
+  'inventory',
+  'cashflow',
+  'reports',
+]);
 // Decisión de producto: TODOS los items del sidebar usan el mismo glyph
 // (un círculo simple). La diferenciación es por label, no por icono. Esto
 // elimina ruido visual y forza al usuario a leer la etiqueta. Si en el
@@ -75,7 +86,7 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: '/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
+    () => [{ to: '/modules/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
     [t],
   );
 
@@ -104,7 +115,6 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/workshopVehicles', label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
       { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
     [t],
@@ -137,12 +147,35 @@ export function Shell({ children }: { children: ReactNode }) {
     const visibleIds = getVisibleModuleIds();
     const profile = getTenantProfile();
     const vertical = profile?.vertical ?? 'none';
+    const subVertical = profile?.subVertical ?? null;
+
+    const commercialModuleItems = catalog.modules
+      .filter(
+        (module) =>
+          module.group === 'commercial' &&
+          visibleIds.has(module.id) &&
+          PRIMARY_SIDEBAR_MODULE_IDS.has(module.id),
+      )
+      .sort((left, right) =>
+        localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
+      )
+      .map((module) => ({
+        to: module.customRoute ?? `/modules/${module.id}`,
+        label: localizeUiText(vocab(module.navLabel)),
+        icon: dotIcon,
+      }));
 
     const moduleNav = catalog.groups
       .map<AppShellNavSection>((group) => ({
         label: localizeUiText(group.label),
         items: catalog.modules
-          .filter((module) => module.group === group.id && visibleIds.has(module.id))
+          .filter(
+            (module) =>
+              group.id !== 'commercial' &&
+              module.group === group.id &&
+              visibleIds.has(module.id) &&
+              PRIMARY_SIDEBAR_MODULE_IDS.has(module.id),
+          )
           .sort((left, right) =>
             localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
           )
@@ -157,7 +190,7 @@ export function Shell({ children }: { children: ReactNode }) {
     const result: AppShellNavSection[] = [
       { label: sentenceCase(t('shell.sections.home')), items: homeNav },
       { label: sentenceCase(t('shell.sections.daily')), items: dailyNav },
-      { label: sentenceCase(t('shell.sections.commercial')), items: commercialNav },
+      { label: sentenceCase(t('shell.sections.commercial')), items: [...commercialNav, ...commercialModuleItems] },
       { label: sentenceCase(t('shell.sections.whatsapp')), items: whatsappNav },
     ];
 
@@ -165,10 +198,11 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.professionals')), items: professionalsNav });
     }
     if (vertical === 'workshops') {
-      result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
-    }
-    if (vertical === 'bike_shop') {
-      result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
+      if (subVertical === 'bike_shop') {
+        result.push({ label: sentenceCase(t('shell.sections.bikeShop')), items: bikeShopNav });
+      } else {
+        result.push({ label: sentenceCase(t('shell.sections.workshops')), items: workshopsNav });
+      }
     }
     if (vertical === 'beauty') {
       result.push({ label: sentenceCase(t('shell.sections.beauty')), items: beautyNav });

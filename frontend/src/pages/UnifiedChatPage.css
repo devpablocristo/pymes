@@ -12,8 +12,8 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  min-height: 520px;
-  height: clamp(560px, calc(100vh - 220px), 820px);
+  min-height: 420px;
+  height: clamp(460px, calc(100vh - 260px), 720px);
   max-height: calc(100vh - 160px);
   background: var(--color-surface);
 }
@@ -21,81 +21,6 @@
 [data-theme='dark'] .cht__layout {
   background: color-mix(in srgb, var(--color-surface) 85%, transparent);
   border-color: color-mix(in srgb, var(--color-text) 8%, transparent);
-}
-
-.cht__contacts {
-  width: 260px;
-  border-right: 1px solid var(--color-border-subtle);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  min-height: 0;
-}
-
-[data-theme='dark'] .cht__contacts {
-  border-right-color: color-mix(in srgb, var(--color-text) 6%, transparent);
-}
-
-@media (max-width: 700px) {
-  .cht__contacts {
-    width: 60px;
-  }
-
-  .cht__contact-name,
-  .cht__contact-preview {
-    display: none;
-  }
-}
-
-.cht__contacts-list {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.cht__contact {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  width: 100%;
-  text-align: left;
-}
-
-.cht__contact:hover {
-  background: var(--color-surface-hover);
-}
-
-[data-theme='dark'] .cht__contact:hover {
-  background: color-mix(in srgb, var(--color-text) 4%, transparent);
-}
-
-.cht__contact--active {
-  background: var(--color-primary-subtle);
-}
-
-[data-theme='dark'] .cht__contact--active {
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.cht__contact-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-on-primary);
-  flex-shrink: 0;
-  background: var(--cht-avatar-bg, var(--color-primary));
-}
-
-.cht__contact-avatar--saved {
-  background: var(--color-accent-indigo);
 }
 
 .cht__form-error-chat {
@@ -106,31 +31,13 @@
   margin: var(--space-4) auto;
 }
 
-.cht__contact-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.cht__contact-name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-
-.cht__contact-preview {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .cht__main {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
 .cht__header {
@@ -505,15 +412,4 @@
     height: calc(100vh - 150px);
     border-radius: var(--radius-md);
   }
-}
-
-.cht__conversations-divider {
-  padding: var(--space-3) var(--space-4) calc(var(--space-2) * 0.7);
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-  font-weight: var(--font-weight-semibold);
-  border-top: 1px solid var(--color-border-subtle);
-  margin-top: var(--space-1);
 }

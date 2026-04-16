@@ -598,7 +598,7 @@ export function SettingsHubPage() {
 
   useEffect(() => {
     if (requestedSection === 'crudUi') {
-      navigate('/modules/stock/configure', { replace: true });
+      navigate('/modules/inventory/configure', { replace: true });
     }
   }, [navigate, requestedSection]);
 

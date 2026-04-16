@@ -14,17 +14,18 @@ describe('moduleCatalog CRUD split', () => {
 
   it('keeps work order screens on the lazy CRUD loader', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
-    const workOrdersListSrc = readFileSync(path.join(dir, '../pages/AutoRepairWorkOrdersPage.tsx'), 'utf8');
-    const kanbanSrc = readFileSync(path.join(dir, '../pages/WorkOrdersKanbanPanel.tsx'), 'utf8');
+    const workshopsCrudSrc = readFileSync(path.join(dir, '../crud/resourceConfigs.workshops.tsx'), 'utf8');
+    const workOrdersFactorySrc = readFileSync(path.join(dir, '../modules/work-orders/workOrdersCrudFactory.tsx'), 'utf8');
+    const shellRoutesSrc = readFileSync(path.join(dir, '../app/ShellRoutes.tsx'), 'utf8');
     const configuredCrudSrc = readFileSync(path.join(dir, '../crud/configuredCrudViews.tsx'), 'utf8');
 
     const usesLazyCrudBoundary = (src: string) =>
-      src.includes('../crud/lazyCrudPage') || src.includes('../crud/configuredCrudViews');
+      src.includes('PymesSimpleCrudListModeContent') || src.includes('ConfiguredCrudModePage');
 
-    expect(usesLazyCrudBoundary(workOrdersListSrc)).toBe(true);
-    expect(workOrdersListSrc).not.toContain('../crud/resourceConfigs');
-    expect(usesLazyCrudBoundary(kanbanSrc)).toBe(true);
-    expect(kanbanSrc).not.toContain('../crud/resourceConfigs');
+    expect(workshopsCrudSrc).not.toContain('../pages/modes/CarWorkOrders');
+    expect(usesLazyCrudBoundary(workOrdersFactorySrc)).toBe(true);
+    expect(usesLazyCrudBoundary(shellRoutesSrc)).toBe(true);
+    expect(shellRoutesSrc).not.toContain('WorkOrdersKanbanPanel');
     expect(configuredCrudSrc).toContain('./lazyCrudPage');
   });
 

@@ -74,10 +74,11 @@ Si necesitás resembrar datos demo con el stack levantado: `make seed`.
 El blueprint reusable de CRUD vive en:
 
 - `frontend/src/components/CrudPage.tsx`
-- `frontend/src/crud/resourceConfigs.tsx`
-- Catálogo de módulos: `frontend/src/lib/moduleCatalog.ts` + `crudModuleCatalog` (generado desde `crudModuleMeta` en `resourceConfigs.tsx`)
+- `frontend/src/crud/crudModuleCatalog.ts`
+- `frontend/src/crud/resourceConfigs.*.tsx`
+- Catálogo de módulos: `frontend/src/lib/moduleCatalog.ts` + `crudModuleCatalog`
 
-La regla práctica es: si un recurso es CRUD real, primero se modela como configuración del blueprint antes de crear una página bespoke. Cubre recursos del core listados en `crudModuleMeta` dentro de `resourceConfigs.tsx` (incl. procurement), los CRUD verticales de **professionals** y **workshops**, y variantes parciales con acciones custom (`sales` con PDF/cobros, etc.). **Beauty** y **restaurants** hoy usan páginas y rutas propias en `App.tsx`, no el catálogo CRUD modular.
+La regla práctica es: si un recurso es CRUD real, primero se modela como configuración del blueprint antes de crear una página bespoke. Esa configuración hoy se apoya en módulos de dominio explícitos (`billing`, `inventory`, `parties`, `audit-trail`, `messaging`, `scheduling`, `restaurant`, `work-orders`) y en los `resourceConfigs.*.tsx` por grupo. Los flujos de **governance** (`procurement*`, `roles`) son frontera externa hacia Nexus: acá solo viven adaptadores finos.
 
 Import / export:
 

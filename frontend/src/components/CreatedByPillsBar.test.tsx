@@ -15,4 +15,19 @@ describe('CreatedByPillsBar', () => {
 
     expect(screen.getAllByRole('button', { name: 'Seeds' })).toHaveLength(1);
   });
+
+  it('mantiene visibles los filtros base aunque no haya selfId ni seeds', () => {
+    render(
+      <CreatedByPillsBar
+        items={[{ created_by: 'user-1' }]}
+        creatorFilter={{ mode: 'all' }}
+        onFilterChange={vi.fn()}
+        selfId={undefined}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Todos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Asignado a mí' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Seeds' })).toBeDisabled();
+  });
 });

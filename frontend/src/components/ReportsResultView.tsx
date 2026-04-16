@@ -15,6 +15,7 @@ import {
 type Props = {
   data: unknown;
   datasetPath: string;
+  showRawJson?: boolean;
 };
 
 function kpiFieldOrder(datasetPath: string): string[] | null {
@@ -30,7 +31,7 @@ function kpiFieldOrder(datasetPath: string): string[] | null {
   return null;
 }
 
-export function ReportsResultView({ data, datasetPath }: Props) {
+export function ReportsResultView({ data, datasetPath, showRawJson = true }: Props) {
   const { t, language, sentenceCase } = useI18n();
   const { from, to } = readReportPeriod(data);
 
@@ -60,7 +61,7 @@ export function ReportsResultView({ data, datasetPath }: Props) {
               </div>
             ))}
           </div>
-          <RawJsonDetails data={data} />
+          {showRawJson ? <RawJsonDetails data={data} /> : null}
         </div>
       );
     }
@@ -86,7 +87,7 @@ export function ReportsResultView({ data, datasetPath }: Props) {
           ) : (
             <ReportItemsTable rows={rows} datasetPath={datasetPath} />
           )}
-          <RawJsonDetails data={data} />
+          {showRawJson ? <RawJsonDetails data={data} /> : null}
         </div>
       );
     }
@@ -109,12 +110,12 @@ export function ReportsResultView({ data, datasetPath }: Props) {
           </p>
         ) : null}
         <ReportItemsTable rows={rows} datasetPath={datasetPath} />
-        <RawJsonDetails data={data} />
+        {showRawJson ? <RawJsonDetails data={data} /> : null}
       </div>
     );
   }
 
-  return <GenericObjectFallback data={data} />;
+  return <GenericObjectFallback data={data} showRawJson={showRawJson} />;
 }
 
 function ReportItemsTable({
@@ -211,7 +212,7 @@ function RawJsonDetails({ data }: { data: unknown }) {
   );
 }
 
-function GenericObjectFallback({ data }: { data: unknown }) {
+function GenericObjectFallback({ data, showRawJson }: { data: unknown; showRawJson: boolean }) {
   const { t, sentenceCase } = useI18n();
   if (data && typeof data === 'object') {
     const entries = Object.entries(data as Record<string, unknown>);
@@ -231,10 +232,12 @@ function GenericObjectFallback({ data }: { data: unknown }) {
             ))}
           </div>
         )}
-        <details className="report-raw-json">
-          <summary>{sentenceCase(t('module.reports.rawJson'))}</summary>
-          <pre className="mono">{JSON.stringify(data, null, 2)}</pre>
-        </details>
+        {showRawJson ? (
+          <details className="report-raw-json">
+            <summary>{sentenceCase(t('module.reports.rawJson'))}</summary>
+            <pre className="mono">{JSON.stringify(data, null, 2)}</pre>
+          </details>
+        ) : null}
       </>
     );
   }

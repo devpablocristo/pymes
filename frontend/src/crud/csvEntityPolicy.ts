@@ -54,6 +54,19 @@ export function mergeCsvOptionsForResource<T extends { id: string }>(
  * Cualquier recurso nuevo puede declararse aquí sin tocar el `Object.entries` del mapa.
  */
 export const CRUD_CSV_RESOURCE_EXTRAS: Record<string, Partial<CSVToolbarOptions> | undefined> = {
+  invoices: {
+    fileName: 'facturacion.csv',
+    columns: [
+      { key: 'number', label: 'number' },
+      { key: 'customer', label: 'customer' },
+      { key: 'issuedDate', label: 'issuedDate' },
+      { key: 'dueDate', label: 'dueDate' },
+      { key: 'status', label: 'status' },
+      { key: 'discount', label: 'discount' },
+      { key: 'tax', label: 'tax' },
+      { key: 'items', label: 'items' },
+    ],
+  },
   creditNotes: {
     columns: [
       { key: 'party_id', label: 'party_id (UUID)' },
@@ -61,7 +74,7 @@ export const CRUD_CSV_RESOURCE_EXTRAS: Record<string, Partial<CSVToolbarOptions>
     ],
   },
   /** Inventario: export desde filas cargadas; import vía dataio del catálogo `products`. */
-  stock: {
+  inventory: {
     allowImport: true,
     importUsesServer: true,
     importEntity: 'products',

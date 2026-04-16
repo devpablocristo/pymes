@@ -8,7 +8,7 @@ Backend transversal del producto. **Owner funcional**: dominio comercial y opera
 |------|-----|
 | `pymes-core/backend/` | API Go (Gin), migraciones SQL, `cmd/local` y `cmd/lambda` |
 | `pymes-core/shared/backend/` | Auth, app, middleware reutilizable por verticales |
-| `pymes-core/infra/` | Terraform / variables de despliegue del control plane |
+| `pymes-core/infra/aws/` | Terraform AWS (Lambda + API Gateway + CloudFront + S3) del control plane. Otros clouds como subdirectorios hermanos (`infra/gcp/`, etc.) |
 
 ## Módulos HTTP (`internal/`)
 
@@ -111,4 +111,4 @@ Variables: ver `.env.example` (no commitear secretos). Para ejecutar solo el bin
 
 ## Frontend y consola de módulos
 
-Los CRUD unificados para recursos de core viven en `frontend/src/crud/resourceConfigs.tsx` (`procurementRequests`, `procurementPolicies`, etc.). El catálogo de módulos mezcla `staticModuleCatalog` y `crudModuleCatalog`; **datasets/actions** enriquecidos para CRUD se definen en `crudModuleMeta` (ver `docs/CORE_INTEGRATION.md`).
+Los CRUD unificados para recursos de core viven en `frontend/src/crud/resourceConfigs.*.tsx`, apoyados por módulos de dominio en `frontend/src/modules/<dominio>`. El catálogo de módulos mezcla `staticModuleCatalog` y `crudModuleCatalog`. Los recursos de governance (`procurementRequests`, `procurementPolicies`, `roles`) ya no se implementan como dominio local: este repo solo mantiene adaptadores finos hacia Nexus (ver `docs/CORE_INTEGRATION.md`).

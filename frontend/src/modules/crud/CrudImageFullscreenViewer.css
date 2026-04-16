@@ -1,0 +1,44 @@
+.crud-image-fs-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+}
+
+.crud-image-fs-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(8, 12, 20, 0.78);
+}
+
+.crud-image-fs-frame {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 1200px);
+  height: min(92vh, 900px);
+  margin: 4vh auto;
+  display: grid;
+  place-items: center;
+}
+
+.crud-image-fs-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+}
+
+.crud-image-fs-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+}

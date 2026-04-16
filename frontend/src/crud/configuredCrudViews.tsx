@@ -1,63 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import type { CrudPageConfig, CrudViewModeConfig, CrudViewModeId } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
-import { CrudExplorerPage, CrudModuleSection } from '../modules/crud';
-import { apiRequest } from '../lib/api';
+import { CrudModuleSection } from '../modules/crud';
 import { applyCrudUiOverride, CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { Navigate } from 'react-router-dom';
-import { BikeWorkOrdersKanbanModeContent } from '../pages/modes/BikeWorkOrdersKanbanModeContent';
-import { CarWorkOrdersKanbanModeContent } from '../pages/modes/CarWorkOrdersKanbanModeContent';
-import { ProductsGalleryModeContent } from '../pages/modes/ProductsGalleryModeContent';
-import { loadLazyCrudPageConfig, LazyConfiguredCrudPage } from './lazyCrudPage';
+import { loadLazyCrudPageConfig } from './lazyCrudPage';
+import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
+import { crudModuleCatalog } from './crudModuleCatalog';
 
 function fallbackViewModes(resourceId: string): CrudViewModeConfig[] {
-  if (resourceId === 'products') {
-    return [
-      {
-        id: 'gallery',
-        label: 'Galería',
-        path: 'gallery',
-        ariaLabel: 'Vista galería o lista',
-        isDefault: true,
-        render: () => <ProductsGalleryModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista galería o lista' },
-    ];
-  }
-  if (resourceId === 'carWorkOrders') {
-    return [
-      {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <CarWorkOrdersKanbanModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
-    ];
-  }
-  if (resourceId === 'bikeWorkOrders') {
-    return [
-      {
-        id: 'kanban',
-        label: 'Tablero',
-        path: 'board',
-        ariaLabel: 'Navegación tablero / lista',
-        isDefault: true,
-        render: () => <BikeWorkOrdersKanbanModeContent />,
-      },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Navegación tablero / lista' },
-    ];
-  }
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
 }
 
-function resolveViewModes<T extends { id: string }>(resourceId: string, config: CrudPageConfig<T> | null): CrudViewModeConfig[] {
+function NoEnabledViews({ resourceId }: { resourceId: string }) {
+  return (
+    <PageLayout title="Módulo" lead="No hay vistas activas para este recurso.">
+      <div className="empty-state">
+        <p>{resourceId} no tiene vistas habilitadas en la configuración actual.</p>
+      </div>
+    </PageLayout>
+  );
+}
+
+/** Orden canónico fijo de tabs CRUD: Lista → Galería → Tablero. */
+const CANONICAL_VIEW_MODE_ORDER: Record<string, number> = { list: 0, gallery: 1, kanban: 2 };
+
+function resolveViewModes<T extends { id: string }>(
+  resourceId: string,
+  config: CrudPageConfig<T> | null,
+): CrudViewModeConfig[] {
   const resolved = config ? applyCrudUiOverride(resourceId, config) : config;
-  const modes = resolved?.viewModes?.length ? resolved.viewModes : fallbackViewModes(resourceId);
-  return [...modes].sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
+  const modes =
+    resolved == null
+      ? fallbackViewModes(resourceId)
+      : resolved.viewModes
+        ? resolved.viewModes
+        : fallbackViewModes(resourceId);
+  return [...modes].sort((a, b) => {
+    const orderA = CANONICAL_VIEW_MODE_ORDER[a.id] ?? 99;
+    const orderB = CANONICAL_VIEW_MODE_ORDER[b.id] ?? 99;
+    return orderA - orderB;
+  });
 }
 
 function useCrudUiConfigVersion() {
@@ -113,11 +97,32 @@ function useCrudConfig(resourceId: string) {
   return { config, error, loading };
 }
 
+function resolveCrudConfig<T extends { id: string }>(
+  resourceId: string,
+  config: CrudPageConfig<T> | null,
+): CrudPageConfig<T> | null {
+  return config ? applyCrudUiOverride(resourceId, config) : config;
+}
+
+function modeActionLink<T extends { id: string }>(resourceId: string, config: CrudPageConfig<T> | null) {
+  const title = crudModuleCatalog[resourceId]?.title?.trim() || resourceId;
+  return {
+    to: `/modules/${resourceId}/configure`,
+    label: 'Configurar',
+    hideWhenActivePattern: `/modules/${resourceId}/configure`,
+    activeReplacement: {
+      to: `/modules/${resourceId}`,
+      label: `Volver a ${title.toLowerCase()}`,
+    },
+  };
+}
+
 export function ConfiguredCrudSection({
   resourceId,
   baseRoute,
   contextPatternByModeId,
   actionLink,
+  includeCanonicalMissing = false,
 }: {
   resourceId: string;
   baseRoute: string;
@@ -131,19 +136,28 @@ export function ConfiguredCrudSection({
       label: string;
     };
   };
+  includeCanonicalMissing?: boolean;
 }) {
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const viewModes = useMemo(
+    () => resolveViewModes(resourceId, config),
+    [config, includeCanonicalMissing, resourceId, uiConfigVersion],
+  );
 
   if (loading && config == null) {
     return (
       <CrudModuleSection
         modes={[{ path: `${baseRoute}/list`, label: '...' }]}
         groupAriaLabel="Cargando vistas"
-        actionLink={actionLink}
+        actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
       />
     );
+  }
+
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
   }
 
   return (
@@ -154,7 +168,7 @@ export function ConfiguredCrudSection({
         contextPattern: contextPatternByModeId?.[mode.id],
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={actionLink}
+      actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
     />
   );
 }
@@ -163,16 +177,19 @@ export function ConfiguredCrudModePage({
   resourceId,
   modeId,
   mergeConfig,
+  allowGenericModeFallback = false,
 }: {
   resourceId: string;
   modeId: CrudViewModeId;
   mergeConfig?: Record<string, unknown>;
+  allowGenericModeFallback?: boolean;
 }) {
-  const [searchParams] = useSearchParams();
-  const explorerSelectedId = searchParams.get('selected')?.trim() || undefined;
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const viewModes = useMemo(
+    () => resolveViewModes(resourceId, config),
+    [allowGenericModeFallback, config, resourceId, uiConfigVersion],
+  );
   const activeMode = viewModes.find((mode) => mode.id === modeId) ?? null;
 
   if (error) {
@@ -181,10 +198,6 @@ export function ConfiguredCrudModePage({
         <div className="alert alert-error">{error}</div>
       </PageLayout>
     );
-  }
-
-  if (modeId === 'list') {
-    return <LazyConfiguredCrudPage resourceId={resourceId} mergeConfig={mergeConfig} />;
   }
 
   if (loading && config == null) {
@@ -197,6 +210,10 @@ export function ConfiguredCrudModePage({
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
   if (!activeMode) {
     return (
       <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
@@ -207,19 +224,17 @@ export function ConfiguredCrudModePage({
     );
   }
 
-  if (modeId === 'table-detail' && config?.explorerDetail) {
-    return (
-      <ConfiguredCrudTableDetailPage
-        resourceId={resourceId}
-        config={config}
-        initialSelectedId={explorerSelectedId}
-      />
-    );
-  }
-
   const custom = activeMode.render?.();
   if (custom) {
     return custom;
+  }
+
+  if (modeId === 'list') {
+    return <PymesSimpleCrudListModeContent resourceId={resourceId} />;
+  }
+
+  if (allowGenericModeFallback) {
+    return <PymesSimpleCrudListModeContent resourceId={resourceId} mode={modeId} />;
   }
 
   return (
@@ -243,7 +258,8 @@ export function ConfiguredCrudIndexRedirect({
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
-  const target = viewModes[0]?.path || 'list';
+  const defaultMode = viewModes.find((mode) => mode.isDefault) ?? viewModes[0];
+  const target = defaultMode?.path || 'list';
 
   if (loading && config == null) {
     return (
@@ -255,125 +271,175 @@ export function ConfiguredCrudIndexRedirect({
     );
   }
 
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
   return <Navigate to={`${baseRoute}/${target}`} replace />;
 }
 
-function ConfiguredCrudTableDetailPage<T extends { id: string }>({
+export function ConfiguredCrudStandalonePage({
   resourceId,
-  config,
-  initialSelectedId,
+  baseRoute,
 }: {
   resourceId: string;
-  config: CrudPageConfig<T>;
-  initialSelectedId?: string;
+  baseRoute: string;
 }) {
-  const [items, setItems] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { config, error, loading } = useCrudConfig(resourceId);
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const viewModes = useMemo(
+    () => resolveViewModes(resourceId, config),
+    [config, resourceId, uiConfigVersion],
+  );
+  const activeMode = viewModes[0]?.id ?? 'list';
 
-  const reload = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (config.dataSource?.list) {
-        setItems(await config.dataSource.list({ archived: false }));
-      } else if (config.basePath) {
-        const data = await apiRequest<{ items?: T[] | null }>(`${config.basePath}?limit=500`);
-        setItems(data.items ?? []);
-      } else {
-        setItems([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (error) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo cargar la configuración de vistas.">
+        <div className="alert alert-error">{error}</div>
+      </PageLayout>
+    );
+  }
 
-  useEffect(() => {
-    void reload();
-  }, [resourceId]);
+  if (loading && config == null) {
+    return (
+      <PageLayout title="Módulo" lead="Cargando vista configurada.">
+        <div className="card">
+          <p>Cargando módulo…</p>
+        </div>
+      </PageLayout>
+    );
+  }
 
-  const detail = config.explorerDetail;
-  const metrics = (detail?.metrics ?? []).map((metric) => ({
-    id: metric.id,
-    label: metric.label,
-    value: metric.value(items),
-    tone: metric.tone,
-    helper: typeof metric.helper === 'function' ? metric.helper(items) : metric.helper,
-  }));
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
 
   return (
-    <CrudExplorerPage<T>
-      key={initialSelectedId ?? '__stock_explorer__'}
-      title={config.labelPluralCap}
-      singularLabel={config.label}
-      pluralLabel={config.labelPlural}
-      items={items}
-      loading={loading}
-      error={error ? <div className="alert alert-error">{error}</div> : undefined}
-      searchText={config.searchText}
-      searchPlaceholder={config.searchPlaceholder ?? 'Buscar...'}
-      emptyState={config.emptyState ?? `No hay ${config.labelPlural} registrados.`}
-      metrics={metrics}
-      filters={detail?.filters}
-      columns={(config.columns ?? []).map((column) => ({
-        id: column.key,
-        header: column.header,
-        className: column.className,
-        render: (row: T) => (column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '') || '---'),
+    <CrudModuleSection
+      modes={viewModes.map((mode) => ({
+        path: `${baseRoute}/${mode.path}`,
+        label: mode.label,
       }))}
-      rowActions={(config.rowActions ?? []).map((action) => ({
-        id: action.id,
-        label: action.label,
-        kind: action.kind,
-        isVisible: (row: T) => action.isVisible?.(row, { archived: false }) ?? true,
-        onClick: async (row: T) => {
-          await action.onClick(row, {
-            items,
-            reload,
-            setError,
-          });
-        },
+      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
+      actionLink={modeActionLink(resourceId, resolvedConfig)}
+    >
+      <ConfiguredCrudModePage resourceId={resourceId} modeId={activeMode} allowGenericModeFallback />
+    </CrudModuleSection>
+  );
+}
+
+export function ConfiguredCrudRouteModePage() {
+  const { moduleId = '', modePath = '' } = useParams();
+  const { config, error, loading } = useCrudConfig(moduleId);
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(moduleId, config), [config, moduleId, uiConfigVersion]);
+  const viewModes = useMemo(
+    () => resolveViewModes(moduleId, config),
+    [config, moduleId, uiConfigVersion],
+  );
+  const mode = viewModes.find((entry) => entry.path === modePath) ?? null;
+
+  if (error) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo cargar la configuración de vistas.">
+        <div className="alert alert-error">{error}</div>
+      </PageLayout>
+    );
+  }
+
+  if (loading && config == null) {
+    return (
+      <PageLayout title="Módulo" lead="Cargando vista configurada.">
+        <div className="card">
+          <p>Cargando módulo…</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={moduleId} />;
+  }
+
+  if (!mode) {
+    return (
+      <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
+        <div className="empty-state">
+          <p>{moduleId} no expone la ruta {modePath}.</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <CrudModuleSection
+      modes={viewModes.map((entry) => ({
+        path: `/modules/${moduleId}/${entry.path}`,
+        label: entry.label,
       }))}
-      toolbarActions={[
-        ...(config.toolbarActions ?? [])
-          .filter((action) => action.isVisible?.({ archived: false, items }) ?? true)
-          .map((action) => ({
-            id: action.id,
-            label: action.label,
-            kind: action.kind,
-            isVisible: ({ items: ctxItems }: { items: T[]; selectedItem: T | null }) =>
-              action.isVisible?.({ archived: false, items: ctxItems }) ?? true,
-            onClick: async (_ctx: { items: T[]; selectedItem: T | null }) => {
-              await action.onClick({
-                items,
-                reload,
-                setError: (msg: string) => {
-                  setError(msg);
-                },
-              });
-            },
-          })),
-        {
-          id: 'reload',
-          label: 'Recargar',
-          kind: 'secondary',
-          onClick: async (_ctx: { items: T[]; selectedItem: T | null }) => {
-            await reload();
-          },
-        },
-      ]}
-      viewModes={[
-        { id: 'table-detail', label: detail?.title ?? 'Detalle' },
-        { id: 'list', label: 'Lista' },
-      ]}
-      initialViewMode="table-detail"
-      detailTitle={detail?.title ?? 'Detalle'}
-      detailEmptyState={detail?.emptyState}
-      renderDetail={detail ? (row) => detail.renderDetail(row, { items, reload }) : undefined}
-      initialSelectedId={initialSelectedId}
-    />
+      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
+      actionLink={modeActionLink(moduleId, resolvedConfig)}
+    >
+      <ConfiguredCrudModePage resourceId={moduleId} modeId={mode.id} allowGenericModeFallback />
+    </CrudModuleSection>
+  );
+}
+
+export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { resourceId: string; baseRoute: string }) {
+  const { modePath = '' } = useParams();
+  const { config, error, loading } = useCrudConfig(resourceId);
+  const uiConfigVersion = useCrudUiConfigVersion();
+  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const viewModes = useMemo(
+    () => resolveViewModes(resourceId, config),
+    [config, resourceId, uiConfigVersion],
+  );
+  const mode = viewModes.find((entry) => entry.path === modePath) ?? null;
+
+  if (error) {
+    return (
+      <PageLayout title="Módulo" lead="No se pudo cargar la configuración de vistas.">
+        <div className="alert alert-error">{error}</div>
+      </PageLayout>
+    );
+  }
+
+  if (loading && config == null) {
+    return (
+      <PageLayout title="Módulo" lead="Cargando vista configurada.">
+        <div className="card">
+          <p>Cargando módulo…</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (viewModes.length === 0) {
+    return <NoEnabledViews resourceId={resourceId} />;
+  }
+
+  if (!mode) {
+    return (
+      <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
+        <div className="empty-state">
+          <p>{resourceId} no expone la ruta {modePath}.</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <CrudModuleSection
+      modes={viewModes.map((entry) => ({
+        path: `${baseRoute}/${entry.path}`,
+        label: entry.label,
+      }))}
+      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
+      actionLink={modeActionLink(resourceId, resolvedConfig)}
+    >
+      <ConfiguredCrudModePage resourceId={resourceId} modeId={mode.id} allowGenericModeFallback />
+    </CrudModuleSection>
   );
 }

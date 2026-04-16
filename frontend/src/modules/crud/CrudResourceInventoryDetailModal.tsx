@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ImageFullscreenViewer } from '../../components/ImageFullscreenViewer';
-import { formatProductImageURLsToForm as formatLinkedEntityImageUrlsToForm, parseImageURLList } from '../../crud/resourceConfigs.shared';
+import { CrudEntityModalShell } from './CrudEntityModalShell';
+import { CrudImageFullscreenViewer } from './CrudImageFullscreenViewer';
+import {
+  collectCrudImageUrls,
+  formatCrudLinkedEntityImageUrlsToForm,
+} from './crudLinkedEntityImageUrls';
 import {
   defaultCrudResourceInventoryDetailFeatureFlags,
   type CrudInventoryLevelSnapshot,
@@ -25,20 +28,6 @@ import {
 } from './crudLinkedEntityInventoryFormBlock';
 import { CrudInventoryQuantitiesNotesBlock } from './crudInventoryQuantitiesNotesBlock';
 import './CrudResourceInventoryDetailModal.css';
-
-function collectLinkedImageUrls(p: CrudLinkedEntitySnapshot | null): string[] {
-  if (!p) return [];
-  const raw = p.imageUrls?.length ? p.imageUrls : p.legacyImageUrl?.trim() ? [p.legacyImageUrl.trim()] : [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const u of raw) {
-    const t = (u ?? '').trim();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-  }
-  return out;
-}
 
 /**
  * Shell + contenido estándar: portal, backdrop, header, body con scroll, footer,
@@ -79,8 +68,9 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
-  const [imageUrlsInput, setImageUrlsInput] = useState('');
+  const [imageUrlsInput, setImageUrlsInput] = useState<string[]>([]);
   const [trackStockInput, setTrackStockInput] = useState(true);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const imageUrlsTouchedRef = useRef(false);
   const portsRef = useRef(ports);
   portsRef.current = ports;
@@ -90,15 +80,25 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
   const canArchive = permissions?.canArchive !== false;
   const archiveLinkedEntityFn = onArchive ?? ports.archiveLinkedEntity;
 
-  const serverImageUrls = useMemo(() => collectLinkedImageUrls(linked), [linked]);
-  const draftImageUrls = useMemo(() => parseImageURLList(imageUrlsInput), [imageUrlsInput]);
+  const serverImageUrls = useMemo(
+    () => collectCrudImageUrls({ imageUrls: linked?.imageUrls, legacyImageUrl: linked?.legacyImageUrl }),
+    [linked],
+  );
+  const draftImageUrls = imageUrlsInput;
+
+  const toImageUrlArray = useCallback((lnk: CrudLinkedEntitySnapshot | null): string[] => {
+    return formatCrudLinkedEntityImageUrlsToForm(lnk?.imageUrls, lnk?.legacyImageUrl)
+      .split('\n')
+      .map((url) => url.trim())
+      .filter(Boolean);
+  }, []);
 
   const syncFormFromServer = useCallback((lvl: CrudInventoryLevelSnapshot, lnk: CrudLinkedEntitySnapshot | null) => {
     setNameInput(String(lnk?.name ?? lvl.displayTitle ?? ''));
     setSkuInput(String(lnk?.sku ?? lvl.displaySubtitle ?? ''));
-    setImageUrlsInput(formatLinkedEntityImageUrlsToForm(lnk?.imageUrls, lnk?.legacyImageUrl));
+    setImageUrlsInput(toImageUrlArray(lnk));
     setTrackStockInput(lvl.trackStock !== false);
-  }, []);
+  }, [toImageUrlArray]);
 
   const resetInventoryFields = useCallback((lvl: CrudInventoryLevelSnapshot) => {
     setMinInput(String(lvl.minQuantity ?? ''));
@@ -173,10 +173,10 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
 
   useEffect(() => {
     if (!editing || !linked || imageUrlsTouchedRef.current) return;
-    const next = formatLinkedEntityImageUrlsToForm(linked.imageUrls, linked.legacyImageUrl);
-    if (!next.trim()) return;
+    const next = toImageUrlArray(linked);
+    if (!next.length) return;
     setImageUrlsInput(next);
-  }, [editing, linked]);
+  }, [editing, linked, toImageUrlArray]);
 
   useEffect(() => {
     if (!linkedEntityId) return;
@@ -252,6 +252,31 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     setEditing(false);
     onCancelEdit?.();
   };
+
+  const handleUploadImages = useCallback(
+    async (files: File[]) => {
+      if (!level || !portsRef.current.uploadLinkedEntityImages || files.length === 0) return;
+      setUploadingImages(true);
+      setFormError('');
+      try {
+        const uploadedUrls = await portsRef.current.uploadLinkedEntityImages(level.linkedEntityId, files);
+        setImageUrlsInput((current) => {
+          const merged = [...current];
+          for (const url of uploadedUrls) {
+            const trimmed = url.trim();
+            if (!trimmed || merged.includes(trimmed)) continue;
+            merged.push(trimmed);
+          }
+          return merged;
+        });
+      } catch (e: unknown) {
+        setFormError(e instanceof Error ? e.message : strings.saveErrorGeneric);
+      } finally {
+        setUploadingImages(false);
+      }
+    },
+    [level, strings.saveErrorGeneric],
+  );
 
   const handleSave = async () => {
     if (!level || !canSave) return;
@@ -336,200 +361,49 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
     editing && flags.linkedEntityFields && formError === strings.nameRequiredError ? formError : undefined;
 
   const body = (
-    <div className="crud-inv-detail-modal-root">
-      <button type="button" className="crud-inv-detail-modal__backdrop" aria-label={strings.closeLabel} onClick={onClose} />
-      <div
-        className="crud-inv-detail-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={dialogTitleId}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="crud-inv-detail-modal__header">
-          <div className="crud-inv-detail-modal__title-block">
-            {loading ? (
-              <h2 id={dialogTitleId} className="crud-inv-detail-modal__title">
-                {strings.dialogLoadingTitle}
-              </h2>
-            ) : editing && level && flags.linkedEntityFields ? (
-              <CrudLinkedEntityEditHeaderFields
-                strings={strings}
-                titleInputId={dialogTitleId}
-                skuInputId="crud-inv-detail-modal-sku"
-                name={nameInput}
-                onNameChange={setNameInput}
-                sku={skuInput}
-                onSkuChange={setSkuInput}
-                titleInputClassName="crud-inv-detail-modal__title-input"
-                subtitleInputClassName="crud-inv-detail-modal__subtitle-input"
-                nameFieldError={nameFieldError}
-              />
-            ) : (
-              <>
-                <h2 id={dialogTitleId} className="crud-inv-detail-modal__title">
-                  {level?.displayTitle ?? strings.dialogFallbackTitle}
-                </h2>
-                {level ? (
-                  <p className="crud-inv-detail-modal__subtitle">{level.displaySubtitle.trim() || '—'}</p>
-                ) : null}
-              </>
-            )}
-          </div>
-        </header>
-
-        <div className="crud-inv-detail-modal__body">
-          {!editing && readGalleryUrls.length > 0 ? (
-            <CrudLinkedEntityImageGalleryStrip
-              urls={readGalleryUrls}
-              ariaLabel={strings.galleryAriaLabel}
-              openImageLabel={strings.openImageFullscreenLabel}
-              onOpenImage={setLightboxUrl}
-              rootClassName="crud-inv-detail-modal__gallery"
-              itemClassName="crud-inv-detail-modal__gallery-item"
-              zoomButtonClassName="crud-inv-detail-modal__gallery-zoom"
+    <CrudEntityModalShell
+      open
+      titleId={dialogTitleId}
+      onRequestClose={onClose}
+      rootClassName="crud-inv-detail-modal-root"
+      backdropClassName="crud-inv-detail-modal__backdrop"
+      panelClassName="crud-inv-detail-modal"
+      headerClassName="crud-inv-detail-modal__header"
+      bodyClassName="crud-inv-detail-modal__body"
+      footerClassName="crud-inv-detail-modal__footer"
+      header={
+        <div className="crud-inv-detail-modal__title-block">
+          {loading ? (
+            <h2 id={dialogTitleId} className="crud-inv-detail-modal__title">
+              {strings.dialogLoadingTitle}
+            </h2>
+          ) : editing && level && flags.linkedEntityFields ? (
+            <CrudLinkedEntityEditHeaderFields
+              strings={strings}
+              titleInputId={dialogTitleId}
+              skuInputId="crud-inv-detail-modal-sku"
+              name={nameInput}
+              onNameChange={setNameInput}
+              sku={skuInput}
+              onSkuChange={setSkuInput}
+              titleInputClassName="crud-inv-detail-modal__title-input"
+              subtitleInputClassName="crud-inv-detail-modal__subtitle-input"
+              nameFieldError={nameFieldError}
             />
-          ) : null}
-
-          <div className="crud-inv-detail-modal__main">
-            {loadError ? <p className="crud-inv-detail-modal__error">{loadError}</p> : null}
-            {level && !loading ? (
-              <>
-                {formError && !editing ? <p className="crud-inv-detail-modal__error">{formError}</p> : null}
-
-                <div className="crud-inv-detail-modal__detail">
-                  {flags.inventoryQuantities && level.isLowStock ? (
-                    <div style={{ marginBottom: 'var(--space-3)' }}>
-                      <span className="crud-inv-detail-modal__badge-low">{strings.badgeLowStock}</span>
-                    </div>
-                  ) : null}
-
-                  {!editing ? (
-                    flags.inventoryQuantities ? (
-                      <>
-                        <div className="crud-inv-detail-modal__stats">
-                          <div className="crud-inv-detail-modal__stat">
-                            <span>{strings.statCurrentLabel}</span>
-                            <strong>{level.quantity}</strong>
-                          </div>
-                          <div className="crud-inv-detail-modal__stat">
-                            <span>{strings.statMinLabel}</span>
-                            <strong>{level.minQuantity}</strong>
-                          </div>
-                          <div className="crud-inv-detail-modal__stat">
-                            <span>{strings.statUpdatedLabel}</span>
-                            <strong>{formatDateTime(level.updatedAt)}</strong>
-                          </div>
-                        </div>
-                        <p className="crud-inv-detail-modal__muted">{strings.readHintEdit}</p>
-                      </>
-                    ) : null
-                  ) : (
-                    <div className="crud-inv-detail-modal__section">
-                      <h4>{strings.sectionEditHeading}</h4>
-                      {formError ? <p className="crud-inv-detail-modal__error">{formError}</p> : null}
-                      <div className="crud-inv-detail-modal__form-grid">
-                        {flags.linkedEntityFields ? (
-                          <CrudLinkedEntityEditBodyFields
-                            strings={strings}
-                            imageUrlsInputId="crud-inv-detail-image-urls"
-                            imageUrlsText={imageUrlsInput}
-                            onImageUrlsTextChange={setImageUrlsInput}
-                            onImageUrlsInput={() => {
-                              imageUrlsTouchedRef.current = true;
-                            }}
-                            trackStockInputId="crud-inv-detail-track"
-                            trackStock={trackStockInput}
-                            onTrackStockChange={setTrackStockInput}
-                            showTrackStock={flags.linkedEntityTrackStock}
-                            previewUrls={draftImageUrls}
-                            onOpenPreviewImage={setLightboxUrl}
-                            galleryRootClassName="crud-inv-detail-modal__gallery"
-                            galleryItemClassName="crud-inv-detail-modal__gallery-item"
-                            galleryZoomClassName="crud-inv-detail-modal__gallery-zoom"
-                          />
-                        ) : null}
-                        {flags.inventoryQuantities ? (
-                          <CrudInventoryQuantitiesNotesBlock
-                            strings={strings}
-                            formatDateTime={formatDateTime}
-                            updatedAtIso={level.updatedAt}
-                            quantityInputId="crud-inv-detail-qty"
-                            quantityValue={absoluteQtyInput}
-                            onQuantityChange={setAbsoluteQtyInput}
-                            quantityDisabled={!trackStockInput}
-                            minInputId="crud-inv-detail-min"
-                            minValue={minInput}
-                            onMinChange={setMinInput}
-                            minDisabled={!trackStockInput}
-                            notesInputId="crud-inv-detail-notes"
-                            notesValue={notes}
-                            onNotesChange={setNotes}
-                            notesRequired={inventoryDirty}
-                          />
-                        ) : null}
-                      </div>
-                      {strings.linkToAdvancedSettings && advancedSettingsHref ? (
-                        <Link className="crud-inv-detail-modal__link" to={advancedSettingsHref}>
-                          {strings.linkToAdvancedSettings}
-                        </Link>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {flags.movementsTable ? (
-                    <div className="crud-inv-detail-modal__section">
-                      <h4>{strings.movementsHeading}</h4>
-                      {movementsLoading ? (
-                        <p className="text-secondary">{strings.movementsLoading}</p>
-                      ) : movements.length === 0 ? (
-                        <p className="crud-inv-detail-modal__empty">{strings.movementsEmpty}</p>
-                      ) : (
-                        <table className="crud-inv-detail-modal__movements-table">
-                          <thead>
-                            <tr>
-                              <th>{strings.movementColumns.kind}</th>
-                              <th className="crud-inv-detail-modal__col-num">{strings.movementColumns.quantity}</th>
-                              <th>{strings.movementColumns.reason}</th>
-                              <th>{strings.movementColumns.user}</th>
-                              <th className="crud-inv-detail-modal__col-date">{strings.movementColumns.date}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {movements.map((movement) => (
-                              <tr key={movement.id}>
-                                <td>{formatMovementKind(movement.kind)}</td>
-                                <td className="crud-inv-detail-modal__col-num">
-                                  <span
-                                    className={
-                                      movement.kind === 'in'
-                                        ? 'crud-inv-detail-modal__qty--in'
-                                        : movement.kind === 'out'
-                                          ? 'crud-inv-detail-modal__qty--out'
-                                          : ''
-                                    }
-                                  >
-                                    {movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}
-                                  </span>
-                                </td>
-                                <td>{movement.reason || movement.notes || '—'}</td>
-                                <td>{movement.actorLabel || '—'}</td>
-                                <td className="crud-inv-detail-modal__col-date">{formatDateTime(movement.createdAt)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </>
-            ) : loading ? (
-              <p className="text-secondary">{strings.loadingBodyLabel}</p>
-            ) : null}
-          </div>
+          ) : (
+            <>
+              <h2 id={dialogTitleId} className="crud-inv-detail-modal__title">
+                {level?.displayTitle ?? strings.dialogFallbackTitle}
+              </h2>
+              {level ? (
+                <p className="crud-inv-detail-modal__subtitle">{level.displaySubtitle.trim() || '—'}</p>
+              ) : null}
+            </>
+          )}
         </div>
-
-        <footer className="crud-inv-detail-modal__footer">
+      }
+      footer={
+        <>
           <div className="crud-inv-detail-modal__footer-actions">
             {flags.archiveAction && canArchive && archiveLinkedEntityFn && strings.archiveLabel ? (
               <button
@@ -579,15 +453,166 @@ export function CrudResourceInventoryDetailModal<TMove extends CrudInventoryMove
               </>
             )}
           </div>
-        </footer>
+        </>
+      }
+    >
+      {!editing && readGalleryUrls.length > 0 ? (
+        <CrudLinkedEntityImageGalleryStrip
+          urls={readGalleryUrls}
+          ariaLabel={strings.galleryAriaLabel}
+          openImageLabel={strings.openImageFullscreenLabel}
+          onOpenImage={setLightboxUrl}
+          rootClassName="crud-inv-detail-modal__gallery"
+          itemClassName="crud-inv-detail-modal__gallery-item"
+          zoomButtonClassName="crud-inv-detail-modal__gallery-zoom"
+        />
+      ) : null}
+
+      <div className="crud-inv-detail-modal__main">
+        {loadError ? <p className="crud-inv-detail-modal__error">{loadError}</p> : null}
+        {level && !loading ? (
+          <>
+            {formError && !editing ? <p className="crud-inv-detail-modal__error">{formError}</p> : null}
+
+            <div className="crud-inv-detail-modal__detail">
+              {flags.inventoryQuantities && level.isLowStock ? (
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <span className="crud-inv-detail-modal__badge-low">{strings.badgeLowStock}</span>
+                </div>
+              ) : null}
+
+              {!editing ? (
+                flags.inventoryQuantities ? (
+                  <>
+                    <div className="crud-inv-detail-modal__stats">
+                      <div className="crud-inv-detail-modal__stat">
+                        <span>{strings.statCurrentLabel}</span>
+                        <strong>{level.quantity}</strong>
+                      </div>
+                      <div className="crud-inv-detail-modal__stat">
+                        <span>{strings.statMinLabel}</span>
+                        <strong>{level.minQuantity}</strong>
+                      </div>
+                      <div className="crud-inv-detail-modal__stat">
+                        <span>{strings.statUpdatedLabel}</span>
+                        <strong>{formatDateTime(level.updatedAt)}</strong>
+                      </div>
+                    </div>
+                    <p className="crud-inv-detail-modal__muted">{strings.readHintEdit}</p>
+                  </>
+                ) : null
+              ) : (
+                <div className="crud-inv-detail-modal__section">
+                  <h4>{strings.sectionEditHeading}</h4>
+                  {formError ? <p className="crud-inv-detail-modal__error">{formError}</p> : null}
+                  <div className="crud-inv-detail-modal__form-grid">
+                    {flags.linkedEntityFields ? (
+                      <CrudLinkedEntityEditBodyFields
+                        strings={strings}
+                        imageUrlsInputId="crud-inv-detail-image-urls"
+                        imageUrls={imageUrlsInput}
+                        onImageUrlsChange={setImageUrlsInput}
+                        onImageUrlsInput={() => {
+                          imageUrlsTouchedRef.current = true;
+                        }}
+                        onUploadImages={ports.uploadLinkedEntityImages ? handleUploadImages : undefined}
+                        imageUploadDisabled={uploadingImages || saving}
+                        trackStockInputId="crud-inv-detail-track"
+                        trackStock={trackStockInput}
+                        onTrackStockChange={setTrackStockInput}
+                        showTrackStock={flags.linkedEntityTrackStock}
+                        onOpenPreviewImage={setLightboxUrl}
+                        galleryRootClassName="crud-inv-detail-modal__gallery"
+                        galleryItemClassName="crud-inv-detail-modal__gallery-item"
+                        galleryZoomClassName="crud-inv-detail-modal__gallery-zoom"
+                      />
+                    ) : null}
+                    {flags.inventoryQuantities ? (
+                      <CrudInventoryQuantitiesNotesBlock
+                        strings={strings}
+                        formatDateTime={formatDateTime}
+                        updatedAtIso={level.updatedAt}
+                        quantityInputId="crud-inv-detail-qty"
+                        quantityValue={absoluteQtyInput}
+                        onQuantityChange={setAbsoluteQtyInput}
+                        quantityDisabled={!trackStockInput}
+                        minInputId="crud-inv-detail-min"
+                        minValue={minInput}
+                        onMinChange={setMinInput}
+                        minDisabled={!trackStockInput}
+                        notesInputId="crud-inv-detail-notes"
+                        notesValue={notes}
+                        onNotesChange={setNotes}
+                        notesRequired={inventoryDirty}
+                      />
+                    ) : null}
+                  </div>
+                  {strings.linkToAdvancedSettings && advancedSettingsHref ? (
+                    <Link className="crud-inv-detail-modal__link" to={advancedSettingsHref}>
+                      {strings.linkToAdvancedSettings}
+                    </Link>
+                  ) : null}
+                </div>
+              )}
+
+              {flags.movementsTable ? (
+                <div className="crud-inv-detail-modal__section">
+                  <h4>{strings.movementsHeading}</h4>
+                  {movementsLoading ? (
+                    <p className="text-secondary">{strings.movementsLoading}</p>
+                  ) : movements.length === 0 ? (
+                    <p className="crud-inv-detail-modal__empty">{strings.movementsEmpty}</p>
+                  ) : (
+                    <table className="crud-inv-detail-modal__movements-table">
+                      <thead>
+                        <tr>
+                          <th>{strings.movementColumns.kind}</th>
+                          <th className="crud-inv-detail-modal__col-num">{strings.movementColumns.quantity}</th>
+                          <th>{strings.movementColumns.reason}</th>
+                          <th>{strings.movementColumns.user}</th>
+                          <th className="crud-inv-detail-modal__col-date">{strings.movementColumns.date}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {movements.map((movement) => (
+                          <tr key={movement.id}>
+                            <td>{formatMovementKind(movement.kind)}</td>
+                            <td className="crud-inv-detail-modal__col-num">
+                              <span
+                                className={
+                                  movement.kind === 'in'
+                                    ? 'crud-inv-detail-modal__qty--in'
+                                    : movement.kind === 'out'
+                                      ? 'crud-inv-detail-modal__qty--out'
+                                      : ''
+                                }
+                              >
+                                {movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}
+                              </span>
+                            </td>
+                            <td>{movement.reason || movement.notes || '—'}</td>
+                            <td>{movement.actorLabel || '—'}</td>
+                            <td className="crud-inv-detail-modal__col-date">{formatDateTime(movement.createdAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : loading ? (
+          <p className="text-secondary">{strings.loadingBodyLabel}</p>
+        ) : null}
       </div>
-    </div>
+    </CrudEntityModalShell>
   );
 
   return (
     <>
-      {createPortal(body, document.body)}
-      <ImageFullscreenViewer
+      {body}
+      <CrudImageFullscreenViewer
         imageUrl={lightboxUrl}
         onClose={() => setLightboxUrl(null)}
         contentLabel={nameInput.trim() || level?.displayTitle}

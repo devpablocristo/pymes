@@ -88,12 +88,12 @@ pymes-core/
 ├── shared/                         # runtime y utilidades compartidas entre verticales
 │   ├── backend/                    # Go: auth, config, middleware
 │   └── ai/                         # Python: AI runtime
-├── infra/
+├── infra/aws/                      # Terraform por cloud (hermanos: gcp/, azure/...)
 frontend/                           # consola React unificada
 ai/                                 # servicio FastAPI
-professionals/                      # vertical (backend + infra)
-workshops/                          # vertical (backend + infra)
-beauty/                             # vertical (backend + infra)
+professionals/                      # vertical (backend + infra/aws)
+workshops/                          # vertical (backend + infra/aws)
+beauty/                             # vertical (backend + infra/aws)
 restaurants/                        # vertical (backend/; infra opcional por vertical)
 ```
 

@@ -1,5 +1,9 @@
 /* Badges de estado fino en tarjetas del Kanban de OT (columnas = fases macro) */
 
+.work-orders-kanban__board-only .m-kanban > .page-header.crud-page-shell__header {
+  display: none;
+}
+
 .wo-kanban__badges {
   display: flex;
   flex-wrap: wrap;

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
-import { WorkOrderEditor } from './WorkOrderEditor';
+import { WorkOrderEditor } from '../modules/work-orders';
 
 const apiMocks = vi.hoisted(() => ({
   getWorkOrder: vi.fn<[], Promise<AutoRepairWorkOrder>>(),
@@ -80,9 +80,14 @@ describe('WorkOrderEditor', () => {
 
     expect(await screen.findByLabelText('Cliente')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    const closeButton = document.querySelector<HTMLButtonElement>('.wo-editor__close');
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(closeButton).not.toBeNull();
+    fireEvent.click(closeButton!);
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
     expect(apiMocks.confirmAction).not.toHaveBeenCalled();
   });
 

@@ -5,7 +5,7 @@ import type { CrudKanbanTransitionModel } from './kanbanTransitionModel';
 type Options<T extends { id: string }, ColumnId extends string> = {
   items: T[];
   setItems: React.Dispatch<React.SetStateAction<T[]>>;
-  transitionModel: CrudKanbanTransitionModel<string, ColumnId>;
+  transitionModel: CrudKanbanTransitionModel<string, ColumnId> | null;
   getItemColumnId: (item: T) => ColumnId;
   getItemStatus: (item: T) => string;
   setItemStatus: (item: T, status: string) => T;
@@ -29,6 +29,7 @@ export function useCrudKanbanMove<T extends { id: string }, ColumnId extends str
 }: Options<T, ColumnId>) {
   return useCallback(
     (itemId: string, targetColumnId: ColumnId, overItemId?: string) => {
+      if (transitionModel == null) return;
       const card = items.find((item) => item.id === itemId);
       if (!card) return;
 

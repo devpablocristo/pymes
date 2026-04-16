@@ -76,7 +76,7 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
   const hasSeedRows = useMemo(() => items.some((row) => isSeedActor(row.created_by)), [items]);
 
   return (
-    <div className="crud-creator-badges" role="group" aria-label="Filtrar por creador del registro">
+    <div className="crud-creator-badges" role="group" aria-label="Filtrar por responsable del registro">
       <button
         type="button"
         className={`badge crud-creator-badge${isAllActive ? ' crud-creator-badge--active' : ''}`}
@@ -85,26 +85,24 @@ export function CreatedByPillsBar({ items, creatorFilter, onFilterChange, selfId
       >
         Todos
       </button>
-      {selfId ? (
-        <button
-          type="button"
-          className={`badge crud-creator-badge${isYoActive ? ' crud-creator-badge--active' : ''}`}
-          aria-pressed={isYoActive}
-          onClick={selectOnlySelf}
-        >
-          Yo
-        </button>
-      ) : null}
-      {hasSeedRows ? (
-        <button
-          type="button"
-          className={`badge crud-creator-badge${isSeedsActive ? ' crud-creator-badge--active' : ''}`}
-          aria-pressed={isSeedsActive}
-          onClick={setFilterSeeds}
-        >
-          Seeds
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className={`badge crud-creator-badge${isYoActive ? ' crud-creator-badge--active' : ''}`}
+        aria-pressed={isYoActive}
+        onClick={selectOnlySelf}
+        disabled={!selfId}
+      >
+        Asignado a mí
+      </button>
+      <button
+        type="button"
+        className={`badge crud-creator-badge${isSeedsActive ? ' crud-creator-badge--active' : ''}`}
+        aria-pressed={isSeedsActive}
+        onClick={setFilterSeeds}
+        disabled={!hasSeedRows}
+      >
+        Seeds
+      </button>
       {peerCreators.map((actor) => {
         const active = creatorFilter.mode === 'pick' && creatorFilter.actors.has(actor);
         return (

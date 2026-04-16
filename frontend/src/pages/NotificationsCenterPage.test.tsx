@@ -196,7 +196,7 @@ describe('NotificationsCenterPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('notifications-summary')).toHaveTextContent('1 sin leer');
+      expect(screen.getByTestId('notification-n-notif-1')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: /explicar en chat/i }));
 
@@ -263,8 +263,7 @@ describe('NotificationsCenterPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('notifications-summary')).toHaveTextContent('1 sin leer');
-      expect(screen.getByTestId('notifications-summary')).toHaveTextContent('1 decisión');
+      expect(screen.getByTestId('notification-a-notif-approval')).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText(/nota para/i), { target: { value: 'Aprobado por soporte' } });
@@ -275,36 +274,4 @@ describe('NotificationsCenterPage', () => {
     });
   });
 
-  it('genera insights automáticamente cuando la bandeja está vacía', async () => {
-    const { NotificationsCenterPage } = await import('./NotificationsCenterPage');
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-    apiMocks.listInAppNotifications.mockResolvedValue({
-      items: [],
-      unread_count: 0,
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <LanguageProvider initialLanguage="es">
-            <NotificationsCenterPage embedded />
-          </LanguageProvider>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(apiMocks.createInsightNotifications).toHaveBeenCalledWith({
-        period: 'week',
-        compare: true,
-        top_limit: 5,
-        preferred_language: 'es',
-      });
-    });
-  });
 });

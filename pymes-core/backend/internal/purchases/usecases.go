@@ -18,6 +18,7 @@ type RepositoryPort interface {
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
+	UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
 	GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error)
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 	GetTaxRate(ctx context.Context, orgID uuid.UUID) float64
@@ -75,6 +76,12 @@ type UpdateInput struct {
 	PaymentStatus string
 	Notes         string
 	Items         []purchasesdomain.PurchaseItem
+}
+
+type UpdateStatusInput struct {
+	ID     uuid.UUID
+	OrgID  uuid.UUID
+	Status string
 }
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
@@ -144,6 +151,41 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	return out, nil
 }
 
+func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error) {
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
+		}
+		return purchasesdomain.Purchase{}, err
+	}
+	nextStatus, err := normalizePurchaseStatus(in.Status, "")
+	if err != nil {
+		return purchasesdomain.Purchase{}, err
+	}
+	if !canTransitionPurchaseStatus(current.Status, nextStatus) {
+		return purchasesdomain.Purchase{}, domainerr.BusinessRule("purchase status transition is not allowed")
+	}
+	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
+		ID:     in.ID,
+		OrgID:  in.OrgID,
+		Status: nextStatus,
+	})
+	if err != nil {
+		return purchasesdomain.Purchase{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), actor, "purchase.status_updated", "purchase", out.ID.String(), map[string]any{"status": out.Status})
+	}
+	if u.timeline != nil && out.SupplierID != nil {
+		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.SupplierID, "purchase.status_updated", "Estado de compra actualizado", out.Number, actor, map[string]any{"purchase_id": out.ID.String(), "status": out.Status})
+	}
+	if u.webhooks != nil {
+		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
+	}
+	return out, nil
+}
+
 func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInput, error) {
 	if in.OrgID == uuid.Nil {
 		return CreateInput{}, domainerr.Validation("org_id is required")
@@ -159,10 +201,11 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 	if strings.TrimSpace(in.SupplierName) == "" {
 		in.SupplierName = "Proveedor sin nombre"
 	}
-	in.Status = defaultString(strings.ToLower(in.Status), "draft")
-	if in.Status != "draft" && in.Status != "received" && in.Status != "partial" && in.Status != "voided" {
-		return CreateInput{}, domainerr.Validation("invalid status")
+	status, err := normalizePurchaseStatus(in.Status, "draft")
+	if err != nil {
+		return CreateInput{}, err
 	}
+	in.Status = status
 	in.PaymentStatus = defaultString(strings.ToLower(in.PaymentStatus), "pending")
 	currency := u.repo.GetCurrency(ctx, in.OrgID)
 	defaultTax := u.repo.GetTaxRate(ctx, in.OrgID)
@@ -184,6 +227,42 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 	_ = currency
 	in.Items = items
 	return in, nil
+}
+
+func normalizePurchaseStatus(raw, defaultValue string) (string, error) {
+	status := strings.TrimSpace(strings.ToLower(raw))
+	if status == "" {
+		status = strings.TrimSpace(strings.ToLower(defaultValue))
+	}
+	switch status {
+	case "draft", "received", "partial", "voided":
+		return status, nil
+	default:
+		return "", domainerr.Validation("invalid status")
+	}
+}
+
+func canTransitionPurchaseStatus(from, to string) bool {
+	fromStatus, err := normalizePurchaseStatus(from, "")
+	if err != nil {
+		return false
+	}
+	toStatus, err := normalizePurchaseStatus(to, "")
+	if err != nil {
+		return false
+	}
+	switch fromStatus {
+	case "draft":
+		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
+	case "partial":
+		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
+	case "received":
+		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
+	case "voided":
+		return toStatus == "draft" || toStatus == "partial" || toStatus == "received" || toStatus == "voided"
+	default:
+		return false
+	}
 }
 
 func defaultString(v, def string) string {

@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { CrudViewModeSwitch } from './CrudViewModeSwitch';
 import '../../pages/WorkOrdersModuleSection.css';
 
@@ -19,12 +20,14 @@ type Props = {
       label: string;
     };
   };
+  children?: ReactNode;
 };
 
 export function CrudModuleSection(props: Props) {
   return (
     <div className="wo-mod-orders">
       <CrudViewModeSwitch {...props} />
+      {props.children}
       <Outlet />
     </div>
   );

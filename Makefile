@@ -8,8 +8,8 @@
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-DC = docker compose
-LOCAL_OLLAMA_DIR = /home/pablo/Projects/Pablo/local-infra/ollama
+LOCAL_INFRA_DIR = /home/pablo/Projects/Pablo/local-infra
+DC = docker compose --project-directory $(CURDIR) -f $(LOCAL_INFRA_DIR)/docker-compose.yml -f $(CURDIR)/docker-compose.yml
 
 # Calidad
 
@@ -53,13 +53,13 @@ modules-check:
 
 # Levanta Ollama compartido del ecosistema local
 llm-up:
-	cd $(LOCAL_OLLAMA_DIR) && docker compose up -d
+	docker compose --project-directory $(LOCAL_INFRA_DIR) -f $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml up -d
 
 # Asegura el modelo LLM local por defecto en el Ollama compartido
 llm-pull:
-	cd $(LOCAL_OLLAMA_DIR) && ./scripts/pull-model.sh gemma4:e4b
+	$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh gemma4:e4b
 
-# Levanta stack local (Postgres Pymes, Review, cp-backend, 4 verticales Go, frontend, AI)
+# Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
 up:
 	@$(MAKE) llm-up
 	@$(MAKE) llm-pull

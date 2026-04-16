@@ -18,12 +18,12 @@ type CrudModule =
 const crudModulePromises = new Map<string, Promise<CrudModule>>();
 
 function resolveCrudModuleGroup(resourceId: string): string {
-  if (['customers', 'suppliers', 'products', 'services', 'priceLists', 'quotes', 'sales', 'purchases'].includes(resourceId)) {
+  if (['invoices', 'customers', 'suppliers', 'products', 'services', 'priceLists', 'quotes', 'sales', 'purchases'].includes(resourceId)) {
     return 'commercial';
   }
   if (
     [
-      'stock',
+      'inventory',
       'returns',
       'creditNotes',
       'cashflow',
@@ -111,16 +111,11 @@ export async function loadCrudResourceConfig(resourceId: string) {
   return { ConfiguredCrudPage: mod.ConfiguredCrudPage };
 }
 
-export type LoadLazyCrudPageConfigOptions = {
-  preserveCsvToolbar?: boolean;
-};
-
 export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { id: string }>(
   resourceId: string,
-  options?: LoadLazyCrudPageConfigOptions,
 ): Promise<CrudPageConfig<TRecord> | null> {
   const mod = await loadCrudModule(resourceId);
-  return mod.getCrudPageConfig<TRecord>(resourceId, options);
+  return mod.getCrudPageConfig<TRecord>(resourceId);
 }
 
 export function LazyConfiguredCrudPage({
@@ -165,10 +160,9 @@ export function LazyConfiguredCrudPage({
         <div className="alert alert-error">
           <p>{loadError}</p>
           <p className="text-secondary text-sm">
-            Revisá la consola del navegador: el código CRUD vive en el repo hermano{' '}
-            <code>modules/crud/ui/ts</code> (mismo directorio padre que <code>pymes/</code>) o instalá{' '}
-            <code>@devpablocristo/modules-crud-ui</code> en <code>node_modules</code>. En Docker,{' '}
-            <code>MODULES_REPO_PATH</code> debe apuntar a ese checkout.
+            Revisá la instalación del frontend: <code>@devpablocristo/modules-crud-ui</code> debe estar resuelto
+            desde <code>node_modules</code>. Si corrés Docker, reconstruí la imagen para refrescar dependencias y
+            lockfile.
           </p>
         </div>
       </PageLayout>

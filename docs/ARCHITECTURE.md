@@ -57,11 +57,12 @@ Que `frontend` y `ai` sean unificados no cambia el ownership funcional: siguen e
 
 - si un recurso es CRUD, primero se modela como configuracion del blueprint comun
 - el blueprint vive en `frontend/src/components/CrudPage.tsx`
-- las configuraciones viven en `frontend/src/crud/resourceConfigs.tsx`
-- el catálogo de módulos (`frontend/src/lib/moduleCatalog.ts`) fusiona definiciones estáticas y `crudModuleCatalog`; para un mismo `resourceId` **gana** el CRUD — datasets/actions extra del explorador API se declaran en `crudModuleMeta` dentro de `resourceConfigs.tsx`
+- las configuraciones viven en `frontend/src/crud/resourceConfigs.*.tsx`
+- el catálogo de módulos (`frontend/src/lib/moduleCatalog.ts`) fusiona definiciones estáticas y `crudModuleCatalog`; para un mismo `resourceId` **gana** el CRUD
 - el motor soporta CRUD completos y recursos parciales con acciones custom o formularios create/edit diferenciados
 - `dataSource` opcional: listados con query (`?archived=true`), `PATCH` en updates, etc., cuando el backend no coincide con el default `PUT`/`GET` del blueprint
 - paginas bespoke solo cuando el flujo deja de ser CRUD puro
+- los dominios compartidos viven en `frontend/src/modules/<dominio>`; la entidad concreta queda como adaptador fino
 - las capacidades transversales no se duplican dentro de cada CRUD: import/export, documentos, pagos, timeline, attachments y webhooks se montan como acciones contextuales sobre servicios centrales
 
 ## Documentación

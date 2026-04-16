@@ -4,34 +4,14 @@
 import { lazy } from 'react';
 
 export const Shell = lazy(() => import('../components/Shell').then((mod) => ({ default: mod.Shell })));
-export const AutoRepairWorkOrdersPage = lazy(() =>
-  import('../pages/AutoRepairWorkOrdersPage').then((mod) => ({ default: mod.AutoRepairWorkOrdersPage })),
-);
-export const BikeShopWorkOrdersPage = lazy(() =>
-  import('../pages/BikeShopWorkOrdersPage').then((mod) => ({ default: mod.BikeShopWorkOrdersPage })),
-);
-export const BikeShopWorkOrdersBoard = lazy(() => import('../pages/BikeShopWorkOrdersBoard'));
-export const BikeShopWorkOrdersSection = lazy(() => import('../pages/BikeShopWorkOrdersSection'));
-export const WorkOrdersModuleSection = lazy(() =>
-  import('../pages/WorkOrdersModuleSection').then((mod) => ({ default: mod.WorkOrdersModuleSection })),
-);
-export const WorkOrdersKanbanPanel = lazy(() =>
-  import('../pages/WorkOrdersKanbanPanel').then((mod) => ({ default: mod.WorkOrdersKanbanPanel })),
+export const ConfiguredCrudSectionPage = lazy(() =>
+  import('../pages/ConfiguredCrudSectionPage').then((mod) => ({ default: mod.ConfiguredCrudSectionPage })),
 );
 export const WorkOrdersEditorPage = lazy(() =>
   import('../pages/WorkOrdersEditorPage').then((mod) => ({ default: mod.WorkOrdersEditorPage })),
 );
-export const ProductsModuleSection = lazy(() =>
-  import('../pages/ProductsModuleSection').then((mod) => ({ default: mod.ProductsModuleSection })),
-);
 export const ConfiguredCrudIndexRedirect = lazy(() =>
   import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudIndexRedirect })),
-);
-export const ProductsListPage = lazy(() =>
-  import('../pages/ProductsListPage').then((mod) => ({ default: mod.ProductsListPage })),
-);
-export const ProductsGalleryPage = lazy(() =>
-  import('../pages/ProductsGalleryPage').then((mod) => ({ default: mod.ProductsGalleryPage })),
 );
 export const UnifiedChatPage = lazy(() =>
   import('../pages/UnifiedChatPage').then((mod) => ({ default: mod.UnifiedChatPage })),
@@ -60,17 +40,18 @@ export const CalendarPage = lazy(() => import('../pages/CalendarPage').then((mod
 export const ConfiguredCrudModePage = lazy(() =>
   import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudModePage })),
 );
-export const StockModuleSection = lazy(() =>
-  import('../pages/StockModuleSection').then((mod) => ({ default: mod.StockModuleSection })),
+export const ConfiguredCrudRouteModePage = lazy(() =>
+  import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudRouteModePage })),
 );
-export const StockListPage = lazy(() => import('../pages/StockListPage').then((mod) => ({ default: mod.StockListPage })));
-export const StockCrudUiConfigurePage = lazy(() =>
-  import('../pages/StockCrudUiConfigurePage').then((mod) => ({ default: mod.StockCrudUiConfigurePage })),
+export const ConfiguredCrudNestedRouteModePage = lazy(() =>
+  import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudNestedRouteModePage })),
+);
+export const CrudUiConfigurePage = lazy(() =>
+  import('../pages/CrudUiConfigurePage').then((mod) => ({ default: mod.CrudUiConfigurePage })),
 );
 export const DashboardVisualPage = lazy(() =>
   import('../pages/DashboardVisualPage').then((mod) => ({ default: mod.DashboardVisualPage })),
 );
-export const InvoicesPage = lazy(() => import('../pages/InvoicesPage').then((mod) => ({ default: mod.InvoicesPage })));
 export const SettingsHubPage = lazy(() =>
   import('../pages/SettingsHubPage').then((mod) => ({ default: mod.SettingsHubPage })),
 );

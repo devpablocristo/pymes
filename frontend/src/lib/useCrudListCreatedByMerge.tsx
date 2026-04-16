@@ -7,11 +7,48 @@ import { applyWorkOrderCreatorFilter, type CreatorFilterState } from './workOrde
 type ListCtx = { items: Array<{ id: string; created_by?: string }> };
 
 /**
- * Props extra para `CrudPage` / `ConfiguredCrudPage`: filtro y píldoras por `created_by` (Clerk).
- * Sin Clerk no devuelve nada. Con Clerk, aplica a listados que no apaguen la franja con
- * `featureFlags.headerQuickFilterStrip: false` o `creatorFilter: false` (p. ej. inventario).
+ * Props extra para `CrudPage` / `ConfiguredCrudPage`: filtro y píldoras de responsable vía `created_by` (Clerk).
+ * Sin Clerk no devuelve nada. La franja rápida de cabecera queda gobernada por el mismo toggle
+ * que el filtro de responsable (`creatorFilter`), para no duplicar controles en preferencias.
  */
 export function useCrudListCreatedByMerge(): {
+  preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
+  listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
+} {
+  if (!clerkEnabled) {
+    return useCrudListCreatedByMergeWithoutClerk();
+  }
+
+  return useCrudListCreatedByMergeWithClerk();
+}
+
+function useCrudListCreatedByMergeWithoutClerk(): {
+  preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
+  listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
+} {
+  const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
+
+  return useMemo(() => {
+    const preSearchFilter = <T extends { id: string; created_by?: string }>(rows: T[]) =>
+      applyWorkOrderCreatorFilter(rows, {
+        authEnabled: false,
+        authUserLoaded: true,
+        selfId: undefined,
+        creatorFilter,
+      });
+    const listHeaderInlineSlot = ({ items }: ListCtx) => (
+      <CreatedByPillsBar
+        items={items}
+        creatorFilter={creatorFilter}
+        onFilterChange={setCreatorFilter}
+        selfId={undefined}
+      />
+    );
+    return { preSearchFilter, listHeaderInlineSlot };
+  }, [creatorFilter]);
+}
+
+function useCrudListCreatedByMergeWithClerk(): {
   preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
   listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
 } {
@@ -22,9 +59,6 @@ export function useCrudListCreatedByMerge(): {
   const [creatorFilter, setCreatorFilter] = useState<CreatorFilterState>(() => ({ mode: 'all' }));
 
   return useMemo(() => {
-    if (!clerkEnabled) {
-      return {};
-    }
     const opts = {
       authEnabled: clerkEnabled,
       authUserLoaded: clerkUserLoaded,

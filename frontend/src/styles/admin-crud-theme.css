@@ -131,11 +131,11 @@
   color: var(--color-primary, #2563eb);
 }
 
-.crud-table .cell-name {
+.crud-table td.cell-name {
   font-weight: var(--font-weight-semibold);
 }
 
-.crud-table .cell-notes {
+.crud-table td.cell-notes {
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;

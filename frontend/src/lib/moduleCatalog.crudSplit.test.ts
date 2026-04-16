@@ -15,14 +15,15 @@ describe('moduleCatalog CRUD split', () => {
   it('keeps work order screens on the lazy CRUD loader', () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const workshopsCrudSrc = readFileSync(path.join(dir, '../crud/resourceConfigs.workshops.tsx'), 'utf8');
+    const workOrdersFactorySrc = readFileSync(path.join(dir, '../modules/work-orders/workOrdersCrudFactory.tsx'), 'utf8');
     const shellRoutesSrc = readFileSync(path.join(dir, '../app/ShellRoutes.tsx'), 'utf8');
     const configuredCrudSrc = readFileSync(path.join(dir, '../crud/configuredCrudViews.tsx'), 'utf8');
 
     const usesLazyCrudBoundary = (src: string) =>
-      src.includes('./PymesSimpleCrudListModeContent') || src.includes('ConfiguredCrudModePage');
+      src.includes('PymesSimpleCrudListModeContent') || src.includes('ConfiguredCrudModePage');
 
-    expect(usesLazyCrudBoundary(workshopsCrudSrc)).toBe(true);
     expect(workshopsCrudSrc).not.toContain('../pages/modes/CarWorkOrders');
+    expect(usesLazyCrudBoundary(workOrdersFactorySrc)).toBe(true);
     expect(usesLazyCrudBoundary(shellRoutesSrc)).toBe(true);
     expect(shellRoutesSrc).not.toContain('WorkOrdersKanbanPanel');
     expect(configuredCrudSrc).toContain('./lazyCrudPage');

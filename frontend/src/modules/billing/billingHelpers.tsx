@@ -7,7 +7,6 @@ import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
   buildFullyConnectedStatusStateMachine,
-  buildSimpleStatusStateMachine,
   buildStandardCrudViewModes,
   formatCrudLocalizedMoney,
   hasReadableCrudValue,
@@ -17,9 +16,13 @@ import {
 } from '../crud';
 import {
   INVOICE_STATUS_LABELS,
+  archiveInvoice,
   invoiceInitials,
   nextInvoiceUid,
   readDemoInvoices,
+  removeDemoInvoice,
+  restoreInvoice,
+  updateDemoInvoice,
   writeDemoInvoices,
   type InvoiceLineItem,
   type InvoiceRecord,
@@ -264,7 +267,6 @@ export function createCommercialDocumentCrudConfig<
     labelPluralCap: opts.labelPluralCap,
     createLabel: opts.createLabel,
     searchPlaceholder: opts.searchPlaceholder ?? 'Buscar...',
-    featureFlags: { valueFilter: true },
     supportsArchived: true,
     columns: opts.columns,
     formFields: [],
@@ -309,10 +311,11 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
   | 'formFields'
   | 'searchText'
   | 'stateMachine'
+  | 'kanban'
   | 'toFormValues'
   | 'isValid'
 > {
-  const stateMachine = buildSimpleStatusStateMachine<TRecord>([
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
     { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
@@ -333,11 +336,42 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       { key: 'status', header: 'Estado' },
     ],
   }).config;
+  const existingDataSource = base.dataSource ?? {};
   return {
     ...base,
     allowCreate: true,
     allowEdit: false,
     stateMachine,
+    // Demo localStorage: expone list/update/archive/restore/delete contra el store.
+    dataSource: {
+      ...existingDataSource,
+      list: async ({ archived }) => {
+        const rows = readDemoInvoices();
+        const matchesArchived = (r: InvoiceRecord) => (archived ? r.archived_at != null : r.archived_at == null);
+        return rows.filter(matchesArchived) as TRecord[];
+      },
+      update: async (row, values) => {
+        updateDemoInvoice(row.id, (r) => ({
+          ...r,
+          status: parseInvoiceStatus(values.status),
+          discount: asOptionalNumber(values.discount) ?? r.discount,
+          tax: asOptionalNumber(values.tax) ?? r.tax,
+          issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
+          dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
+        }));
+      },
+      deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
+      restore: async (row) => updateDemoInvoice(row.id, restoreInvoice),
+      hardDelete: async (row) => removeDemoInvoice(row.id),
+    },
+    supportsArchived: true,
+    kanban: {
+      persistMove: async ({ row, nextValue }: { row: TRecord; field: string; nextValue: string }) => {
+        const status = parseInvoiceStatus(nextValue);
+        updateDemoInvoice(row.id, (r) => ({ ...r, status }));
+        return { ...(row as InvoiceRecord), status } as TRecord;
+      },
+    },
     formFields: [
       { key: 'number', label: 'Comprobante' },
       { key: 'customer', label: 'Cliente', placeholder: 'Nombre del cliente', required: true },
@@ -380,7 +414,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
 }
 
 export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): CrudResourceShellHeaderConfigLike<TRecord> {
-  const stateMachine = buildSimpleStatusStateMachine<TRecord>([
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
     { value: 'paid', label: INVOICE_STATUS_LABELS.paid, badgeVariant: 'success' },
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
@@ -407,7 +441,7 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
 export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildSimpleStatusStateMachine<TRecord>([
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
     { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
     { value: 'sent', label: 'Enviado', badgeVariant: 'info' },
     { value: 'accepted', label: 'Aceptado', badgeVariant: 'success' },
@@ -507,8 +541,9 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
 export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildSimpleStatusStateMachine<TRecord>([
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
     { value: 'draft', label: 'Borrador', badgeVariant: 'default' },
+    { value: 'completed', label: 'Completada', badgeVariant: 'success' },
     { value: 'paid', label: 'Pagada', badgeVariant: 'success' },
     { value: 'pending', label: 'Pendiente', badgeVariant: 'warning' },
     { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
@@ -692,7 +727,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
 export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(opts: {
   renderList: NonNullable<CrudPageConfig<TRecord>['viewModes']>[number]['render'];
 }): CrudPageConfig<TRecord> {
-  const stateMachine = buildSimpleStatusStateMachine<TRecord>([
+  const stateMachine = buildFullyConnectedStatusStateMachine<TRecord>([
     { value: 'active', label: 'Activa', badgeVariant: 'info' },
     { value: 'partially_used', label: 'Parcialmente usada', badgeVariant: 'warning' },
     { value: 'used', label: 'Usada', badgeVariant: 'success' },
@@ -712,7 +747,6 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',
-    featureFlags: { valueFilter: true },
     stateMachine,
     columns: [
       {

@@ -24,11 +24,9 @@ export type CrudResourceShellHeaderConfigLike<T extends { id: string }> = {
     searchBar?: boolean;
     headerQuickFilterStrip?: boolean;
     creatorFilter?: boolean;
-    valueFilter?: boolean;
     archivedToggle?: boolean;
     createAction?: boolean;
   };
-  valueFilterOptions?: CrudValueFilterOption<T>[];
   stateMachine?: CrudStateMachineConfig<T>;
 };
 

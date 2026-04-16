@@ -122,6 +122,12 @@ vi.mock('../modules/crud', () => ({
     </div>
   ),
   openCrudFormDialog: openCrudFormDialogMock,
+  buildFreeMovementStateMachine: (field: string, states: Array<{ value: string; label: string }>) => ({
+    field,
+    states: states.map((s) => ({ value: s.value, label: s.label, columnId: s.value })),
+    columns: states.map((s) => ({ id: s.value, label: s.label, defaultState: s.value })),
+    transitions: states.map((s) => ({ from: s.value, to: states.filter((o) => o.value !== s.value).map((o) => o.value) })),
+  }),
   getCrudStateMachineColumnDefaultState: (stateMachine: { columns: Array<{ id: string; defaultState: string }> }, columnId: string) =>
     stateMachine.columns.find((column) => column.id === columnId)?.defaultState ?? null,
   useCrudConfiguredValueKanban: () => ({
@@ -130,8 +136,7 @@ vi.mock('../modules/crud', () => ({
     isRowDraggable: vi.fn(),
     isColumnDroppable: vi.fn(),
   }),
-  resolveCrudValueFilterOptions: (config: CrudPageConfig<{ id: string; name: string }> | null) =>
-    config?.valueFilterOptions ?? [],
+  resolveCrudValueFilterOptions: () => [],
 }));
 
 vi.mock('./PymesCrudResourceShellHeader', () => ({

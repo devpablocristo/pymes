@@ -189,8 +189,6 @@ export type CrudPageConfig<T extends { id: string }> = ModulesCrudPageConfig<T> 
   explorerDetail?: CrudExplorerDetailConfig<T>;
   /** Extensión Pymes: render de celda tags cuando el módulo CRUD lo soporta vía CSV/flags. */
   renderTagsCell?: (row: T) => import('react').ReactNode;
-  /** @deprecated Migrar el recurso a `stateMachine` o a un filtro de valor no ligado al estado. */
-  valueFilterOptions?: CrudValueFilterOption<T>[];
   /** Máquina de estados canónica del recurso. */
   stateMachine?: CrudStateMachineConfig<T>;
   /** Configuración reusable del kanban genérico del recurso. */

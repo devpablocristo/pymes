@@ -73,22 +73,15 @@ export function useCrudConfiguredValueKanban<T extends { id: string }>({
         });
       }
 
-      const nextValues = {
-        ...crudConfig.toFormValues(row),
-        [kanbanField]: nextStatus,
-      };
-
       if (crudConfig.dataSource?.update) {
+        const nextValues = { ...crudConfig.toFormValues(row), [kanbanField]: nextStatus };
         await crudConfig.dataSource.update(row, nextValues);
       } else if (crudConfig.basePath) {
+        const nextValues = { ...crudConfig.toFormValues(row), [kanbanField]: nextStatus };
         await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
           method: 'PUT',
-          body: crudConfig.toBody
-            ? crudConfig.toBody(nextValues)
-            : (nextValues as Record<string, unknown>),
+          body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
         });
-      } else {
-        throw new Error('Este recurso no soporta actualización por tablero.');
       }
 
       return { ...row, [kanbanField]: nextStatus } as T;

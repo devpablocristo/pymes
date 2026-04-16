@@ -23,9 +23,32 @@ const transitionModel = createCrudKanbanTransitionModel<string, ColumnId>({
 const getItemColumnId = (row: Row): ColumnId => transitionModel.getColumnIdForStatus(row.status);
 
 describe('reorderCrudKanbanItems', () => {
-  it('reorders inside the same column', () => {
+  it('reorders bottom → top (drag up)', () => {
     const rows = [{ id: '1', status: 'todo' }, { id: '2', status: 'todo' }, { id: '3', status: 'doing' }];
     expect(reorderCrudKanbanItems(rows, '2', '1').map((row) => row.id)).toEqual(['2', '1', '3']);
+  });
+
+  it('reorders top → bottom (drag down)', () => {
+    const rows = [{ id: '1', status: 'todo' }, { id: '2', status: 'todo' }, { id: '3', status: 'doing' }];
+    expect(reorderCrudKanbanItems(rows, '1', '2').map((row) => row.id)).toEqual(['2', '1', '3']);
+  });
+
+  it('reorders across more than two cards — drag from top to bottom of column', () => {
+    const rows = [
+      { id: 'a', status: 'todo' },
+      { id: 'b', status: 'todo' },
+      { id: 'c', status: 'todo' },
+    ];
+    expect(reorderCrudKanbanItems(rows, 'a', 'c').map((row) => row.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('reorders across more than two cards — drag from bottom to top of column', () => {
+    const rows = [
+      { id: 'a', status: 'todo' },
+      { id: 'b', status: 'todo' },
+      { id: 'c', status: 'todo' },
+    ];
+    expect(reorderCrudKanbanItems(rows, 'c', 'a').map((row) => row.id)).toEqual(['c', 'a', 'b']);
   });
 });
 

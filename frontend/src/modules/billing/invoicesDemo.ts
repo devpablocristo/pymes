@@ -218,3 +218,11 @@ export function readDemoInvoices(): InvoiceRecord[] {
 export function writeDemoInvoices(invoices: InvoiceRecord[]): void {
   writeCommercialDocumentDemoRecords(STORAGE_KEY, invoices);
 }
+
+export function updateDemoInvoice(id: string, mutator: (invoice: InvoiceRecord) => InvoiceRecord): void {
+  writeDemoInvoices(readDemoInvoices().map((r) => (r.id === id ? mutator(r) : r)));
+}
+
+export function removeDemoInvoice(id: string): void {
+  writeDemoInvoices(readDemoInvoices().filter((r) => r.id !== id));
+}

@@ -31,7 +31,7 @@ export function buildCrudSelectFieldOptionsFromStateMachine<T extends { id: stri
   }));
 }
 
-export function buildSimpleStatusStateMachine<T extends { id: string; status: string }>(
+function buildSimpleStatusStateMachine<T extends { id: string; status: string }>(
   states: Array<{
     value: string;
     label: string;
@@ -74,6 +74,64 @@ export function buildFullyConnectedStatusStateMachine<T extends { id: string; st
   };
 }
 
+/**
+ * Agrupa múltiples estados bajo la misma columna. Cada columna tiene label propio y un defaultState.
+ * Cubre kanbans con estados finos (p. ej. órdenes de trabajo con varias fases por columna).
+ */
+export function buildGroupedStatusStateMachine<T extends { id: string }, V extends string = string>(
+  field: keyof T & string,
+  columns: Array<{
+    id: string;
+    label: string;
+    defaultState: V;
+    states: Array<{
+      value: V;
+      label: string;
+      badgeVariant?: CrudStateMachineStateConfig['badgeVariant'];
+      terminal?: boolean;
+    }>;
+  }>,
+  transitions?: Array<{ from: V; to: readonly V[] }>,
+): CrudStateMachineConfig<T> {
+  return {
+    field,
+    states: columns.flatMap((column) =>
+      column.states.map((state) => ({
+        value: state.value,
+        label: state.label,
+        columnId: column.id,
+        badgeVariant: state.badgeVariant,
+        terminal: state.terminal,
+      })),
+    ),
+    columns: columns.map((column) => ({
+      id: column.id,
+      label: column.label,
+      defaultState: column.defaultState,
+    })),
+    transitions: transitions?.map((t) => ({ from: t.from, to: [...t.to] })),
+  };
+}
+
+/**
+ * Estado libre: todas las columnas son intercambiables, sin terminales, sin restricciones.
+ * Ideal para probar kanban sin configurar transiciones reales.
+ */
+export function buildFreeMovementStateMachine<T extends { id: string }>(
+  field: keyof T & string,
+  states: Array<{ value: string; label: string; badgeVariant?: CrudStateMachineStateConfig['badgeVariant'] }>,
+): CrudStateMachineConfig<T> {
+  return {
+    field,
+    states: states.map((s) => ({ value: s.value, label: s.label, columnId: s.value, badgeVariant: s.badgeVariant })),
+    columns: states.map((s) => ({ id: s.value, label: s.label, defaultState: s.value })),
+    transitions: states.map((s) => ({
+      from: s.value,
+      to: states.filter((o) => o.value !== s.value).map((o) => o.value),
+    })),
+  };
+}
+
 export function findCrudStateMachineStateByValue<T extends { id: string }>(
   stateMachine: CrudStateMachineConfig<T>,
   rawValue: unknown,
@@ -107,7 +165,7 @@ export function resolveCrudValueFilterOptions<T extends { id: string }>(
   if (crudConfig?.stateMachine) {
     return buildCrudValueFilterOptionsFromStateMachine(crudConfig.stateMachine);
   }
-  return crudConfig?.valueFilterOptions ?? [];
+  return [];
 }
 
 export function buildCrudKanbanTransitionModelFromStateMachine<T extends { id: string }>(

@@ -6,12 +6,12 @@ import {
   hasCrudResourceInMap,
 } from './resourceConfigs.runtime';
 
-export type CsvOptionsResolver = <T extends { id: string }>(
+type CsvOptionsResolver = <T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T>,
 ) => CSVToolbarOptions;
 
-export type DefineCrudDomainOptions = {
+type DefineCrudDomainOptions = {
   /**
    * Override CSV por recurso. Lo declarado acá sustituye al resolver para ese resourceId.
    * Usar para excepciones (ej. audit con server export dedicado).
@@ -25,18 +25,10 @@ export type DefineCrudDomainOptions = {
   csvResolver?: CsvOptionsResolver;
 };
 
-export type DefineCrudDomainResult = {
-  ConfiguredCrudPage: ReturnType<typeof buildConfiguredCrudPage>;
-  hasCrudResource: (resourceId: string) => boolean;
-  getCrudPageConfig: <TRecord extends { id: string } = { id: string }>(
-    resourceId: string,
-  ) => CrudPageConfig<TRecord> | null;
-};
-
 export function defineCrudDomain(
   resources: CrudResourceConfigMap,
   options: DefineCrudDomainOptions = {},
-): DefineCrudDomainResult {
+) {
   const csvOverrides = options.csvOverrides ?? {};
   const csvResolver = options.csvResolver;
   const resourceConfigs = Object.fromEntries(
@@ -50,7 +42,7 @@ export function defineCrudDomain(
 
   return {
     ConfiguredCrudPage: buildConfiguredCrudPage(resourceConfigs),
-    hasCrudResource: (resourceId) => hasCrudResourceInMap(resourceConfigs, resourceId),
+    hasCrudResource: (resourceId: string) => hasCrudResourceInMap(resourceConfigs, resourceId),
     getCrudPageConfig: <TRecord extends { id: string } = { id: string }>(resourceId: string) =>
       getCrudPageConfigFromMap<TRecord>(resourceConfigs, resourceId),
   };

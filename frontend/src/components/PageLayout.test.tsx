@@ -42,7 +42,7 @@ describe('PageLayout', () => {
       </PageSearchProvider>,
     );
 
-    expect(screen.getByRole('searchbox', { name: 'Buscar...' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Buscar...')).toBeInTheDocument();
     expect(document.querySelector('.crud-page-shell__header .page-search__input')).toBeTruthy();
   });
 });

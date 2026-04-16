@@ -17,6 +17,7 @@ import {
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
   resolveCrudValueFilterOptions,
+  buildFreeMovementStateMachine,
   useCrudArchivedSearchParam,
   useCrudConfiguredValueKanban,
   useCrudRemoteGalleryPage,
@@ -222,7 +223,13 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
       signal: AbortSignal;
     }) => {
       void _signal;
-      if (!crudConfig?.basePath) return { items: [], has_more: false, next_cursor: null };
+      if (!crudConfig?.basePath) {
+        if (crudConfig?.dataSource?.list) {
+          const rows = await crudConfig.dataSource.list({ archived: pageArchived });
+          return { items: rows as T[], has_more: false, next_cursor: null };
+        }
+        return { items: [], has_more: false, next_cursor: null };
+      }
       const query = new URLSearchParams(crudConfig.listQuery ?? '');
       query.set('limit', String(limit));
       if (search) query.set('search', search);
@@ -269,8 +276,43 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   });
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
 
+  const kanbanReadyConfig = useMemo(() => {
+    if (!crudConfig) return crudConfig;
+    if (crudConfig.stateMachine) {
+      if (crudConfig.kanban?.persistMove) return crudConfig;
+      return {
+        ...crudConfig,
+        kanban: {
+          ...crudConfig.kanban,
+          persistMove: async ({ row, field: f, nextValue }: { row: T; field: keyof T & string; nextValue: string }) =>
+            ({ ...row, [f]: nextValue }) as T,
+        },
+      };
+    }
+    const allValues = items.map((r) => {
+      const rec = r as Record<string, unknown>;
+      if (typeof rec.status === 'string') return { field: 'status' as keyof T & string, value: rec.status };
+      return { field: 'is_active' as keyof T & string, value: String(rec.is_active ?? 'true') };
+    });
+    const field = allValues[0]?.field ?? ('status' as keyof T & string);
+    const uniqueValues = [...new Set(allValues.map((v) => v.value))];
+    if (uniqueValues.length === 0) uniqueValues.push('unknown');
+    return {
+      ...crudConfig,
+      stateMachine: buildFreeMovementStateMachine<T>(field, uniqueValues.map((v) => ({
+        value: v,
+        label: v.charAt(0).toUpperCase() + v.slice(1),
+      }))),
+      kanban: {
+        ...crudConfig.kanban,
+        persistMove: async ({ row, field: f, nextValue }) =>
+          ({ ...row, [f]: nextValue }) as T,
+      },
+    };
+  }, [crudConfig, items]);
+
   const valueKanban = useCrudConfiguredValueKanban<T>({
-    crudConfig,
+    crudConfig: kanbanReadyConfig,
     items,
     setItems,
     reload,
@@ -532,7 +574,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           loading={loading}
           title={crudConfig.labelPluralCap}
           emptyLabel={archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}
-          stateMachine={crudConfig.stateMachine}
+          stateMachine={kanbanReadyConfig?.stateMachine}
           onCardOpen={(row) => {
             if (!archived && canEdit) {
               void runCreateOrEdit(row);

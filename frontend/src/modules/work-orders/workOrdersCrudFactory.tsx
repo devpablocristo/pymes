@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
-import type { CrudFieldValue, CrudPageConfig, CrudStateMachineConfig, CrudRowAction } from '../../components/CrudPage';
+import type { CrudFieldValue, CrudPageConfig, CrudRowAction } from '../../components/CrudPage';
 import {
   archiveWorkOrder as archiveUnifiedWorkOrder,
   createWorkOrder as createUnifiedWorkOrder,
@@ -26,34 +26,59 @@ import {
   toDateTimeInput,
   toRFC3339,
 } from '../../crud/resourceConfigs.shared';
-import { buildStandardCrudViewModes, openCrudFormDialog } from '../crud';
+import { buildGroupedStatusStateMachine, buildStandardCrudViewModes, openCrudFormDialog } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
-export type WorkOrderTargetKind = 'vehicle' | 'bicycle';
+type WorkOrderTargetKind = 'vehicle' | 'bicycle';
 
-export const WORK_ORDER_STATE_MACHINE: CrudStateMachineConfig<WorkOrder> = {
-  field: 'status',
-  states: [
-    { value: 'received', label: 'Recibido', columnId: 'wo_intake', badgeVariant: 'info' as const },
-    { value: 'diagnosing', label: 'Diagnóstico', columnId: 'wo_intake', badgeVariant: 'warning' as const },
-    { value: 'quote_pending', label: 'Presupuesto', columnId: 'wo_quote', badgeVariant: 'warning' as const },
-    { value: 'awaiting_parts', label: 'Repuestos', columnId: 'wo_quote', badgeVariant: 'warning' as const },
-    { value: 'in_progress', label: 'En taller', columnId: 'wo_shop', badgeVariant: 'info' as const },
-    { value: 'quality_check', label: 'Control', columnId: 'wo_shop', badgeVariant: 'info' as const },
-    { value: 'on_hold', label: 'En pausa', columnId: 'wo_shop', badgeVariant: 'warning' as const },
-    { value: 'ready_for_pickup', label: 'Listo retiro', columnId: 'wo_exit', badgeVariant: 'success' as const },
-    { value: 'delivered', label: 'Entregado', columnId: 'wo_exit', badgeVariant: 'success' as const },
-    { value: 'invoiced', label: 'Facturado', columnId: 'wo_closed', badgeVariant: 'success' as const, terminal: true },
-    { value: 'cancelled', label: 'Cancelado', columnId: 'wo_closed', badgeVariant: 'danger' as const, terminal: true },
-  ],
-  columns: [
-    { id: 'wo_intake', label: 'Ingreso', defaultState: 'received' },
-    { id: 'wo_quote', label: 'Presupuesto / repuestos', defaultState: 'quote_pending' },
-    { id: 'wo_shop', label: 'Taller', defaultState: 'in_progress' },
-    { id: 'wo_exit', label: 'Salida', defaultState: 'ready_for_pickup' },
-    { id: 'wo_closed', label: 'Cerradas', defaultState: 'invoiced' },
-  ],
-};
+const WORK_ORDER_STATE_MACHINE = buildGroupedStatusStateMachine<WorkOrder>('status', [
+  {
+    id: 'wo_intake',
+    label: 'Ingreso',
+    defaultState: 'received',
+    states: [
+      { value: 'received', label: 'Recibido', badgeVariant: 'info' },
+      { value: 'diagnosing', label: 'Diagnóstico', badgeVariant: 'warning' },
+    ],
+  },
+  {
+    id: 'wo_quote',
+    label: 'Presupuesto / repuestos',
+    defaultState: 'quote_pending',
+    states: [
+      { value: 'quote_pending', label: 'Presupuesto', badgeVariant: 'warning' },
+      { value: 'awaiting_parts', label: 'Repuestos', badgeVariant: 'warning' },
+    ],
+  },
+  {
+    id: 'wo_shop',
+    label: 'Taller',
+    defaultState: 'in_progress',
+    states: [
+      { value: 'in_progress', label: 'En taller', badgeVariant: 'info' },
+      { value: 'quality_check', label: 'Control', badgeVariant: 'info' },
+      { value: 'on_hold', label: 'En pausa', badgeVariant: 'warning' },
+    ],
+  },
+  {
+    id: 'wo_exit',
+    label: 'Salida',
+    defaultState: 'ready_for_pickup',
+    states: [
+      { value: 'ready_for_pickup', label: 'Listo retiro', badgeVariant: 'success' },
+      { value: 'delivered', label: 'Entregado', badgeVariant: 'success' },
+    ],
+  },
+  {
+    id: 'wo_closed',
+    label: 'Cerradas',
+    defaultState: 'invoiced',
+    states: [
+      { value: 'invoiced', label: 'Facturado', badgeVariant: 'success', terminal: true },
+      { value: 'cancelled', label: 'Cancelado', badgeVariant: 'danger', terminal: true },
+    ],
+  },
+]);
 
 const STATUS_OPTIONS = [
   { label: 'Recibido', value: 'received' },
@@ -164,7 +189,7 @@ const archiveMutations = {
   hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
 };
 
-export type WorkOrdersCrudFactoryOptions = {
+type WorkOrdersCrudFactoryOptions = {
   resourceId: string;
   targetType: WorkOrderTargetKind;
   labelPluralCap: string;

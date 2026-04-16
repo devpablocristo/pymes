@@ -69,15 +69,18 @@ export function reorderCrudKanbanItems<T extends { id: string }>(
   overItemId?: string,
 ): T[] {
   if (!overItemId) return items;
-  const idx = items.findIndex((item) => item.id === itemId);
-  if (idx === -1) return items;
-  const targetIdx = items.findIndex((item) => item.id === overItemId);
-  if (targetIdx === -1 || idx === targetIdx) return items;
+  const fromIdx = items.findIndex((item) => item.id === itemId);
+  if (fromIdx === -1) return items;
+  const toIdx = items.findIndex((item) => item.id === overItemId);
+  if (toIdx === -1 || fromIdx === toIdx) return items;
 
-  const moved = items[idx];
-  const without = [...items.slice(0, idx), ...items.slice(idx + 1)];
-  const insertionIdx = without.findIndex((item) => item.id === overItemId);
-  if (insertionIdx === -1) return items;
+  const moved = items[fromIdx];
+  const without = [...items.slice(0, fromIdx), ...items.slice(fromIdx + 1)];
+  const overNewIdx = without.findIndex((item) => item.id === overItemId);
+  if (overNewIdx === -1) return items;
+  // Drag hacia abajo (fromIdx < toIdx): al sacar el moved, el target subió una pos,
+  // así que insertamos DESPUÉS del target para que quede abajo. Drag hacia arriba: insertamos AT.
+  const insertionIdx = fromIdx < toIdx ? overNewIdx + 1 : overNewIdx;
   without.splice(insertionIdx, 0, moved);
   return without;
 }

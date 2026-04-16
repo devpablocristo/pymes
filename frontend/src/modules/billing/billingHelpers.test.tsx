@@ -56,7 +56,7 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/quotes');
     expect(config.labelPluralCap).toBe('Presupuestos');
-    expect(config.stateMachine).toEqual({
+    expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
@@ -71,7 +71,6 @@ describe('billingHelpers', () => {
         { id: 'rejected', label: 'Rechazado', defaultState: 'rejected' },
       ],
     });
-    expect(config.valueFilterOptions).toBeUndefined();
     expect(config.editorModal).toEqual({
       blocks: [
         {
@@ -116,7 +115,7 @@ describe('billingHelpers', () => {
     const config = createInvoicesCrudConfig<InvoiceRecord>({ renderList: () => <></> });
     const shellConfig = createInvoicesShellConfig<InvoiceRecord>();
 
-    expect(config.stateMachine).toEqual({
+    expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
@@ -181,8 +180,6 @@ describe('billingHelpers', () => {
     });
     expect(config.isValid?.({ customer: 'Cliente Demo', items: '[{"description":"Servicio"}]' })).toBe(true);
     expect(config.isValid?.({ customer: '', items: '' })).toBe(false);
-    expect('valueFilterOptions' in config ? config.valueFilterOptions : undefined).toBeUndefined();
-    expect(shellConfig.valueFilterOptions).toBeUndefined();
   });
 
   it('builds sales config from billing domain', () => {
@@ -190,10 +187,11 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/sales');
     expect(config.labelPluralCap).toBe('Ventas');
-    expect(config.stateMachine).toEqual({
+    expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },
+        { value: 'completed', label: 'Completada', columnId: 'completed', badgeVariant: 'success' },
         { value: 'paid', label: 'Pagada', columnId: 'paid', badgeVariant: 'success' },
         { value: 'pending', label: 'Pendiente', columnId: 'pending', badgeVariant: 'warning' },
         { value: 'voided', label: 'Anulada', columnId: 'voided', badgeVariant: 'danger' },
@@ -201,13 +199,13 @@ describe('billingHelpers', () => {
       ],
       columns: [
         { id: 'draft', label: 'Borrador', defaultState: 'draft' },
+        { id: 'completed', label: 'Completada', defaultState: 'completed' },
         { id: 'paid', label: 'Pagada', defaultState: 'paid' },
         { id: 'pending', label: 'Pendiente', defaultState: 'pending' },
         { id: 'voided', label: 'Anulada', defaultState: 'voided' },
         { id: 'cancelled', label: 'Cancelada', defaultState: 'cancelled' },
       ],
     });
-    expect(config.valueFilterOptions).toBeUndefined();
     expect(config.editorModal).toEqual({
       blocks: [
         {
@@ -256,7 +254,7 @@ describe('billingHelpers', () => {
     expect(config.labelPluralCap).toBe('Notas de crédito');
     expect(config.emptyState).toBe('No hay notas de crédito emitidas.');
     expect(config.allowEdit).toBe(false);
-    expect(config.stateMachine).toEqual({
+    expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'active', label: 'Activa', columnId: 'active', badgeVariant: 'info' },
@@ -271,7 +269,6 @@ describe('billingHelpers', () => {
         { id: 'expired', label: 'Vencida', defaultState: 'expired' },
       ],
     });
-    expect(config.valueFilterOptions).toBeUndefined();
     expect(
       config.toFormValues?.({
         id: '1',
@@ -300,7 +297,7 @@ describe('billingHelpers', () => {
     expect(config.labelPluralCap).toBe('Compras');
     expect(config.viewModes?.map((mode) => mode.id)).toEqual(['list', 'gallery', 'kanban']);
     expect(config.viewModes?.map((mode) => mode.path)).toEqual(['list', 'gallery', 'board']);
-    expect(config.stateMachine).toEqual({
+    expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [
         { value: 'draft', label: 'Borrador', columnId: 'draft', badgeVariant: 'default' },

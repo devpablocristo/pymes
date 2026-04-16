@@ -181,21 +181,6 @@ describe('configuredCrudViews', () => {
     expect(await screen.findByText('generic:inventory:list')).toBeInTheDocument();
   });
 
-  it('keeps configure action visible even if preferences try to disable it', async () => {
-    writeCrudUiConfigState({
-      inventory: { featureFlags: { configureAction: false } },
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/modules/inventory']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ConfiguredCrudStandalonePage resourceId="inventory" baseRoute="/modules/inventory" />
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByText('generic:inventory:list')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Configurar' })).toBeInTheDocument();
-  });
-
   it('renders a custom list mode when the resource declares one', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'products') {

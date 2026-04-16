@@ -50,10 +50,17 @@ export function createCrudKanbanTransitionModel<Status extends string, ColumnId 
 
   const getDefaultStatusForColumn = (columnId: ColumnId): Status | null => defaultStatusByColumn.get(columnId) ?? null;
 
-  const isTerminalStatus = (raw: string): boolean => transitionMachine.isTerminal(canonicalizeStatus(raw));
+  const isTerminalStatus = (raw: string): boolean => {
+    const canonical = canonicalizeStatus(raw);
+    if (!statusToColumn.has(canonical)) return false;
+    return transitionMachine.isTerminal(canonical);
+  };
 
-  const canTransitionToStatus = (fromStatus: string, toStatus: string): boolean =>
-    transitionMachine.canTransition(canonicalizeStatus(fromStatus), canonicalizeStatus(toStatus));
+  const canTransitionToStatus = (fromStatus: string, toStatus: string): boolean => {
+    const from = canonicalizeStatus(fromStatus);
+    if (!statusToColumn.has(from)) return true;
+    return transitionMachine.canTransition(from, canonicalizeStatus(toStatus));
+  };
 
   const canMoveToColumn = (fromStatus: string, targetColumnId: ColumnId): boolean => {
     const nextStatus = getDefaultStatusForColumn(targetColumnId);

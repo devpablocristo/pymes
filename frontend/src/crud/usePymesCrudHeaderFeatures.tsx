@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import type { CrudPageConfig, CrudValueFilterOption } from '../components/CrudPage';
+import type { CrudPageConfig } from '../components/CrudPage';
 import { CrudValueFilterSelector, resolveCrudValueFilterOptions } from '../modules/crud';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
@@ -8,7 +8,6 @@ type Options<T extends { id: string }> = {
   resourceId: string;
   items: T[];
   matchesSearch: (row: T, query: string) => boolean;
-  valueFilterOptions?: CrudValueFilterOption<T>[];
   enableCreatorFilter?: boolean;
   crudConfigOverride?: CrudPageConfig<T> | null;
   search?: string;
@@ -19,7 +18,6 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   resourceId,
   items,
   matchesSearch,
-  valueFilterOptions,
   enableCreatorFilter = true,
   crudConfigOverride,
   search: externalSearch,
@@ -42,10 +40,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [creatorFilterEnabled, items, preSearchFilter],
   );
 
-  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(
-    crudConfig,
-    valueFilterOptions as CrudValueFilterOption<T>[] | undefined,
-  );
+  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
   const valueFilterEnabled = creatorFilterEnabled;
 
   const valueFilteredItems = useMemo(() => {

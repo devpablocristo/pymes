@@ -21,7 +21,8 @@ describe('useCrudListCreatedByMerge', () => {
   it('no toca Clerk cuando el runtime está sin Clerk', () => {
     const { result } = renderHook(() => useCrudListCreatedByMerge());
 
-    expect(result.current).toEqual({});
+    expect(typeof result.current.preSearchFilter).toBe('function');
+    expect(typeof result.current.listHeaderInlineSlot).toBe('function');
     expect(useUser).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@ Backend transversal del producto. **Owner funcional**: dominio comercial y opera
 |------|-----|
 | `pymes-core/backend/` | API Go (Gin), migraciones SQL, `cmd/local` y `cmd/lambda` |
 | `pymes-core/shared/backend/` | Auth, app, middleware reutilizable por verticales |
-| `pymes-core/infra/` | Terraform / variables de despliegue del control plane |
+| `pymes-core/infra/aws/` | Terraform AWS (Lambda + API Gateway + CloudFront + S3) del control plane. Otros clouds como subdirectorios hermanos (`infra/gcp/`, etc.) |
 
 ## Módulos HTTP (`internal/`)
 

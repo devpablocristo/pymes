@@ -35,8 +35,9 @@ Público:
 
 ## Infraestructura (AWS)
 
-- Terraform: `beauty/infra/` (Lambda + API Gateway HTTP + SSM + IAM + alarmas).
-- Ver `beauty/infra/README.md` para `terraform init/apply` y variables.
+- Terraform: `beauty/infra/aws/` (Lambda + API Gateway HTTP + SSM + IAM + alarmas).
+- Ver `beauty/infra/aws/README.md` para `terraform init/apply` y variables.
+- Otros clouds como subdirectorios hermanos (`beauty/infra/gcp/`, etc.) cuando se agreguen.
 - El frontend unificado no se empaqueta aquí; solo se configura `VITE_BEAUTY_API_URL` contra la URL del API Gateway (o dominio custom).
 
 ## Frontend

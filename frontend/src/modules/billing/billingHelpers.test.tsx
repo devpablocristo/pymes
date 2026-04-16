@@ -130,7 +130,7 @@ describe('billingHelpers', () => {
     });
     expect(shellConfig.stateMachine).toEqual(config.stateMachine);
     expect(config.allowCreate).toBe(true);
-    expect(config.allowEdit).toBe(false);
+    expect(config.allowEdit).toBe(true);
     expect(config.formFields).toEqual([
       { key: 'number', label: 'Comprobante' },
       { key: 'customer', label: 'Cliente', placeholder: 'Nombre del cliente', required: true },

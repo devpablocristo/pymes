@@ -340,7 +340,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
   return {
     ...base,
     allowCreate: true,
-    allowEdit: false,
+    allowEdit: true,
     stateMachine,
     // Demo localStorage: expone list/update/archive/restore/delete contra el store.
     dataSource: {

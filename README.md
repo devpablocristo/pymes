@@ -88,21 +88,21 @@ pymes/
 ├── pymes-core/
 │   ├── backend/
 │   ├── docs/              # p. ej. FRAUD_PREVENTION.md, SAAS en backend/docs
-│   ├── infra/
+│   ├── infra/aws/         # Terraform por cloud (hermanos: gcp/, azure/...)
 │   └── shared/
 ├── beauty/
 │   ├── backend/
-│   └── infra/
+│   └── infra/aws/
 ├── docs/                  # índice canónico: docs/README.md
 ├── frontend/
 ├── professionals/
 │   ├── backend/
-│   └── infra/
+│   └── infra/aws/
 ├── restaurants/
 │   └── backend/           # sin `infra/` en el repo hoy
 ├── workshops/
 │   ├── backend/
-│   └── infra/
+│   └── infra/aws/
 ├── docker-compose.yml
 ├── go.mod
 └── Makefile

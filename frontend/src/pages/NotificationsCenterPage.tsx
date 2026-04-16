@@ -13,6 +13,7 @@ import { listInAppNotifications, markInAppNotificationRead, type InAppNotificati
 import { labelForApprovalAction } from '../lib/approvalActionLabels';
 import { humanInsightScopeLabel, humanRoutedLabel } from '../lib/aiLabels';
 import { PageLayout } from '../components/PageLayout';
+import { CrudStateBadge } from '../modules/crud';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
@@ -162,6 +163,12 @@ function toneForApproval(riskLevel: string): NotificationFeedTone {
   }
 }
 
+function badgeVariantForApproval(riskLevel: string): 'default' | 'warning' | 'danger' {
+  if (riskLevel === 'high') return 'danger';
+  if (riskLevel === 'medium') return 'warning';
+  return 'default';
+}
+
 function labelForRiskLevel(riskLevel: string, t: (key: string, variables?: Record<string, string | number>) => string): string {
   if (riskLevel === 'high') return t('ai.notifications.approval.risk.high');
   if (riskLevel === 'medium') return t('ai.notifications.approval.risk.medium');
@@ -306,7 +313,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
             {approval.target_resource ? ` — ${approval.target_resource}` : ''}
           </>
         ),
-        badge: <span className={`risk-badge ${approval.risk_level}`}>{riskLabel}</span>,
+        badge: <CrudStateBadge label={riskLabel} variant={badgeVariantForApproval(approval.risk_level)} />,
         body: (
           <>
             <div className="approval-reason">{approval.reason}</div>
@@ -343,7 +350,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
             />
             <button
               type="button"
-              className="btn-approve"
+              className="btn-success btn-sm"
               disabled={isProcessing}
               onClick={() => void handleApprove(approval.id)}
             >
@@ -351,7 +358,7 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
             </button>
             <button
               type="button"
-              className="btn-reject"
+              className="btn-danger btn-sm"
               disabled={isProcessing}
               onClick={() => void handleReject(approval.id)}
             >

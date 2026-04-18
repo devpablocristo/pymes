@@ -263,7 +263,7 @@ export function UnifiedChatPage() {
   });
   const chatMutation = useMutation({
     mutationFn: pymesAssistantChat,
-    onSuccess: async (reply) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.ai.conversations.list(30) });
     },
   });

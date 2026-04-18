@@ -77,19 +77,9 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
       },
     },
     columns: [
-      {
-        key: 'headline',
-        header: 'Teacher',
-        className: 'cell-name',
-        render: (_value, row: TeacherProfile) => (
-          <>
-            <strong>{row.headline || row.party_id}</strong>
-            <div className="text-secondary">
-              {row.public_slug || 'Sin slug'} · {row.party_id}
-            </div>
-          </>
-        ),
-      },
+      { key: 'headline', header: 'Teacher', className: 'cell-name', render: (_v, row: TeacherProfile) => row.headline || row.party_id },
+      { key: 'public_slug', header: 'Slug', render: (_v, row: TeacherProfile) => row.public_slug || '—' },
+      { key: 'party_id', header: 'Party ID', render: (_v, row: TeacherProfile) => row.party_id ? row.party_id.slice(0, 8) + '…' : '—' },
       {
         key: 'specialties',
         header: 'Especialidades',
@@ -284,24 +274,10 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
       },
     },
     columns: [
-      {
-        key: 'profile_id',
-        header: 'Sesion',
-        className: 'cell-name',
-        render: (_value, row: TeacherSession) => (
-          <>
-            <strong>{row.profile_id}</strong>
-            <div className="text-secondary">
-              {row.booking_id} · {row.summary || 'Sin resumen'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'status',
-        header: 'Estado',
-        render: (value) => renderSchedulingStatusBadge(value),
-      },
+      { key: 'profile_id', header: 'Teacher', className: 'cell-name', render: (_v, row: TeacherSession) => row.profile_id ? row.profile_id.slice(0, 8) + '…' : '—' },
+      { key: 'booking_id', header: 'Booking', render: (_v, row: TeacherSession) => row.booking_id ? row.booking_id.slice(0, 8) + '…' : '—' },
+      { key: 'summary', header: 'Resumen', render: (_v, row: TeacherSession) => row.summary || '—' },
+      { key: 'status', header: 'Estado', render: (value) => renderSchedulingStatusBadge(value) },
       { key: 'started_at', header: 'Inicio', render: (value) => formatDate(String(value ?? '')) },
       { key: 'ended_at', header: 'Fin', render: (value) => formatDate(String(value ?? '')) },
     ],

@@ -208,14 +208,32 @@ func validateParty(in partydomain.Party) error {
 
 func normalizeParty(in partydomain.Party) partydomain.Party {
 	in.DisplayName = strings.TrimSpace(in.DisplayName)
-	in.Email = strings.TrimSpace(in.Email)
+	// Email case-insensitive por RFC y para que búsquedas / unicidad sean consistentes.
+	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	in.Phone = strings.TrimSpace(in.Phone)
-	in.TaxID = strings.TrimSpace(in.TaxID)
+	// Tax ID: quitamos separadores comunes ("20-12345678-9" → "20123456789") para
+	// evitar duplicados por formato y facilitar matching entre sistemas.
+	in.TaxID = normalizeTaxID(in.TaxID)
 	in.Notes = strings.TrimSpace(in.Notes)
 	if in.Metadata == nil {
 		in.Metadata = map[string]any{}
 	}
 	return in
+}
+
+func normalizeTaxID(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	var out strings.Builder
+	out.Grow(len(trimmed))
+	for _, r := range trimmed {
+		if r >= '0' && r <= '9' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+			out.WriteRune(r)
+		}
+	}
+	return strings.ToUpper(out.String())
 }
 
 func translateRepoErr(err error) error {

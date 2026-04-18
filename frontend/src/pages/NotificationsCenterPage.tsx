@@ -242,7 +242,6 @@ export function NotificationsCenterPage({ embedded = false }: NotificationsCente
 
   async function openInChat(n: InAppNotificationItem): Promise<void> {
     const chatContext = n.chat_context && typeof n.chat_context === 'object' ? n.chat_context : {};
-    const scope = getNotificationScope(n.chat_context);
     const insightScope = getNotificationInsightScope(n.chat_context);
     const routedAgent = getNotificationRoutedAgent(n.chat_context);
     const contentLanguage = getNotificationContentLanguage(n.chat_context);

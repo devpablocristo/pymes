@@ -13,7 +13,6 @@ import {
   hasReadableCrudValue,
   openCrudFormDialog,
   openCrudTextDialog,
-  renderCrudPrimaryCell,
 } from '../crud';
 import {
   INVOICE_STATUS_LABELS,
@@ -316,6 +315,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
   | 'searchText'
   | 'stateMachine'
   | 'kanban'
+  | 'editorModal'
   | 'toFormValues'
   | 'isValid'
 > {
@@ -369,7 +369,17 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       hardDelete: async (row) => removeDemoInvoice(row.id),
     },
     supportsArchived: true,
+    editorModal: {
+      eyebrow: 'Facturación',
+      sections: [{ id: 'default' }],
+    },
     kanban: {
+      card: {
+        title: (row: TRecord) => row.number || row.id,
+        subtitle: (row: TRecord) => row.customer || '—',
+        meta: (row: TRecord) => formatCrudLocalizedMoney(row.items?.reduce((s, i) => s + i.qty * i.unitPrice, 0) ?? 0),
+      },
+      createFooterLabel: 'Añadir factura',
       persistMove: async ({ row, nextValue }: { row: TRecord; field: string; nextValue: string }) => {
         const status = parseInvoiceStatus(nextValue);
         updateDemoInvoice(row.id, (r) => ({ ...r, status }));
@@ -460,18 +470,11 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
     createLabel: '+ Nuevo presupuesto',
     searchKeys: ['number', 'customer_name', 'status', 'notes'],
     columns: [
-      {
-        key: 'number',
-        header: 'Presupuesto',
-        className: 'cell-name',
-        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.customer_name || 'Sin cliente'} · ${row.status || 'draft'}`),
-      },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
-      },
-      { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '---' },
+      { key: 'number', header: 'Presupuesto', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
+      { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
+      { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
+      { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
+      { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '—' },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });
@@ -486,6 +489,16 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
+    },
+    kanban: {
+      card: {
+        title: (row: TRecord) => row.number || row.id,
+        subtitle: (row: TRecord) => row.customer_name || 'Sin cliente',
+        meta: (row: TRecord) => formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
+      },
+      createFooterLabel: 'Añadir presupuesto',
+      persistMove: async ({ row, nextValue }) =>
+        apiRequest<TRecord>(`/v1/quotes/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
@@ -563,18 +576,11 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
     createLabel: '+ Nueva venta',
     searchKeys: ['number', 'customer_name', 'status', 'payment_method', 'notes'],
     columns: [
-      {
-        key: 'number',
-        header: 'Venta',
-        className: 'cell-name',
-        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.customer_name || 'Sin cliente'} · ${row.status || 'draft'}`),
-      },
+      { key: 'number', header: 'Venta', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
+      { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
+      { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_method', header: 'Cobro' },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
-      },
+      { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });
@@ -591,6 +597,16 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
+    },
+    kanban: {
+      card: {
+        title: (row: TRecord) => row.number || row.id,
+        subtitle: (row: TRecord) => row.customer_name || 'Sin cliente',
+        meta: (row: TRecord) => formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
+      },
+      createFooterLabel: 'Añadir venta',
+      persistMove: async ({ row, nextValue }) =>
+        apiRequest<TRecord>(`/v1/sales/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
       { key: 'customer_id', label: 'Customer ID' },
@@ -754,13 +770,27 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',
     stateMachine,
+    editorModal: {
+      eyebrow: 'Notas de crédito',
+      sections: [{ id: 'default' }],
+    },
+    kanban: {
+      card: {
+        title: (row: TRecord) => row.number || row.id,
+        subtitle: (row: TRecord) => (row as unknown as { party_name?: string }).party_name || '—',
+        meta: (row: TRecord) => formatCrudLocalizedMoney(row.amount ?? 0),
+      },
+      createFooterLabel: 'Añadir nota de crédito',
+      persistMove: async ({ row, nextValue }) =>
+        apiRequest<TRecord>(`/v1/credit-notes/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
+    },
     columns: [
       {
         key: 'number',
         header: 'Documento',
         className: 'cell-name',
-        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number, row.status),
       },
+      { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || '—' },
       {
         key: 'balance',
         header: 'Saldo',
@@ -841,18 +871,11 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     createLabel: '+ Nueva compra',
     searchKeys: ['number', 'supplier_name', 'status', 'payment_status', 'notes'],
     columns: [
-      {
-        key: 'number',
-        header: 'Compra',
-        className: 'cell-name',
-        render: (_value, row: TRecord) => renderCrudPrimaryCell(row.number || row.id, `${row.supplier_name || 'Sin proveedor'} · ${row.status || 'draft'}`),
-      },
+      { key: 'number', header: 'Compra', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
+      { key: 'supplier_name', header: 'Proveedor', render: (_v, row: TRecord) => row.supplier_name || '—' },
+      { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_status', header: 'Pago' },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS'),
-      },
+      { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });

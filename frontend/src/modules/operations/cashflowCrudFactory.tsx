@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudPageConfig } from '../../components/CrudPage';
 import { asNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { formatOperationsMoney } from '../../crud/operationsCrudHelpers';
@@ -34,26 +33,12 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay movimientos en el rango consultado.',
     columns: [
-      {
-        key: 'type',
-        header: 'Movimiento',
-        className: 'cell-name',
-        render: (_value, row) => (
-          <>
-            <strong>{row.type}</strong>
-            <div className="text-secondary">
-              {row.category} · {row.payment_method}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'amount',
-        header: 'Importe',
-        render: (value, row) => formatOperationsMoney(value, row.currency),
-      },
+      { key: 'type', header: 'Movimiento', className: 'cell-name' },
+      { key: 'category', header: 'Categoría', render: (_v, row) => row.category || '—' },
+      { key: 'payment_method', header: 'Medio', render: (_v, row) => row.payment_method || '—' },
+      { key: 'amount', header: 'Importe', render: (value, row) => formatOperationsMoney(value, row.currency) },
       { key: 'description', header: 'Descripción', className: 'cell-notes' },
-      { key: 'reference_type', header: 'Origen', render: (_v, row) => row.reference_type || '---' },
+      { key: 'reference_type', header: 'Origen', render: (_v, row) => row.reference_type || '—' },
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [

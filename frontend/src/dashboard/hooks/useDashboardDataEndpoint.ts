@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
-import { useOptionalBranchSelection } from '../../lib/branchContext';
+import { useOptionalBranchSelection } from '../../lib/useBranchSelection';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 
 export function useDashboardDataEndpoint<T>(dataEndpoint: string, context: string) {

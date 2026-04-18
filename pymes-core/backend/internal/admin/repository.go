@@ -57,6 +57,9 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	} else {
 		applyString(&m.Currency, patch.Currency)
 		applyString(&m.SecondaryCurrency, patch.SecondaryCurrency)
+		// Currency canónica en mayúsculas; evita "ars" vs "ARS" en listados multi-tenant.
+		m.Currency = strings.ToUpper(strings.TrimSpace(m.Currency))
+		m.SecondaryCurrency = strings.ToUpper(strings.TrimSpace(m.SecondaryCurrency))
 		if patch.Currency != nil || patch.SecondaryCurrency != nil {
 			cur := defaultString(m.Currency, "ARS")
 			sec := strings.TrimSpace(m.SecondaryCurrency)

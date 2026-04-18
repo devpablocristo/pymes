@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudPageConfig } from '../../components/CrudPage';
 import {
   asBoolean,
@@ -34,30 +33,12 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
     labelPlural: 'gastos recurrentes',
     labelPluralCap: 'Gastos recurrentes',
     columns: [
-      {
-        key: 'description',
-        header: 'Concepto',
-        className: 'cell-name',
-        render: (_value, row) => (
-          <>
-            <strong>{row.description}</strong>
-            <div className="text-secondary">
-              {row.category || 'Sin categoria'} · {row.frequency || 'Sin frecuencia'}
-            </div>
-          </>
-        ),
-      },
-      {
-        key: 'amount',
-        header: 'Importe',
-        render: (value, row) => formatOperationsMoney(value, row.currency),
-      },
-      { key: 'next_due_date', header: 'Proximo venc.', render: (value) => String(value ?? '') || '---' },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => renderOperationsActiveBadge(Boolean(value)),
-      },
+      { key: 'description', header: 'Concepto', className: 'cell-name' },
+      { key: 'category', header: 'Categoría', render: (_v, row) => row.category || '—' },
+      { key: 'frequency', header: 'Frecuencia', render: (_v, row) => row.frequency || '—' },
+      { key: 'amount', header: 'Importe', render: (value, row) => formatOperationsMoney(value, row.currency) },
+      { key: 'next_due_date', header: 'Próximo venc.', render: (value) => String(value ?? '') || '—' },
+      { key: 'is_active', header: 'Estado', render: (value) => renderOperationsActiveBadge(Boolean(value)) },
     ],
     formFields: [
       { key: 'description', label: 'Descripcion', required: true, placeholder: 'Alquiler, internet, software' },

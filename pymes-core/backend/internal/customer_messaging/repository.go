@@ -68,7 +68,7 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 		}
 		return QuoteSnapshot{}, err
 	}
-	return QuoteSnapshot{ID: row.ID, Number: row.Number, PartyID: row.PartyID, CustomerName: row.CustomerName, Total: row.Total}, nil
+	return QuoteSnapshot(row), nil
 }
 
 func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (SaleSnapshot, error) {
@@ -80,7 +80,7 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUI
 		}
 		return SaleSnapshot{}, err
 	}
-	return SaleSnapshot{ID: row.ID, Number: row.Number, PartyID: row.PartyID, CustomerName: row.CustomerName, Total: row.Total}, nil
+	return SaleSnapshot(row), nil
 }
 
 func (r *Repository) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID) (string, string, error) {
@@ -120,7 +120,7 @@ func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templat
 		}
 		return Templates{}, err
 	}
-	return Templates{QuoteTemplate: row.QuoteTemplate, ReceiptTemplate: row.ReceiptTemplate, DefaultCountryCode: row.DefaultCountryCode}, nil
+	return Templates(row), nil
 }
 
 func (r *Repository) GetConnection(ctx context.Context, orgID uuid.UUID) (domain.Connection, error) {

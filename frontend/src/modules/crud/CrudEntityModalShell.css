@@ -20,10 +20,14 @@
 }
 
 .crud-entity-modal-shell__panel {
+  /* Tamaño base compartido por todos los modales CRUD. Overrides concretos usan
+     `--crud-modal-width` para variar solo ese eje sin tocar shell/padding/borde. */
+  --crud-modal-width: min(960px, 100%);
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
+  width: var(--crud-modal-width);
   min-width: 0;
   max-width: 100%;
   max-height: min(92vh, 920px);

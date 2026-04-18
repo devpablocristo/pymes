@@ -145,19 +145,9 @@ export function createProcurementRequestsCrudConfig(): CrudResourceConfigMap['pr
       },
     },
     columns: [
-      {
-        key: 'title',
-        header: 'Solicitud',
-        className: 'cell-name',
-        render: (_value, row: ProcurementRequest) => (
-          <>
-            <strong>{row.title || row.id}</strong>
-            <div className="text-secondary">
-              {row.requester_actor || '—'} · {row.status || 'draft'} · {formatCrudMoney(row.estimated_total, row.currency)}
-            </div>
-          </>
-        ),
-      },
+      { key: 'title', header: 'Solicitud', className: 'cell-name', render: (_v, row: ProcurementRequest) => row.title || row.id },
+      { key: 'requester_actor', header: 'Solicitante', render: (_v, row: ProcurementRequest) => row.requester_actor || '—' },
+      { key: 'estimated_total', header: 'Estimado', render: (_v, row: ProcurementRequest) => formatCrudMoney(row.estimated_total, row.currency) },
       { key: 'category', header: 'Rubro', render: (v) => String(v ?? '').trim() || '—' },
       { key: 'status', header: 'Estado' },
     ],
@@ -173,7 +163,7 @@ export function createProcurementRequestsCrudConfig(): CrudResourceConfigMap['pr
         type: 'textarea',
         required: true,
         fullWidth: true,
-        placeholder: '[{\"description\":\"Item\",\"quantity\":1,\"unit_price_estimate\":1000}]',
+        placeholder: '[{"description":"Item","quantity":1,"unit_price_estimate":1000}]',
       },
     ],
     rowActions: [
@@ -245,15 +235,11 @@ export function createProcurementPoliciesCrudConfig(): CrudResourceConfigMap['pr
         key: 'name',
         header: 'Política',
         className: 'cell-name',
-        render: (_value, row: ProcurementPolicy) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.effect} · prioridad {row.priority} · {row.mode} · {row.enabled ? 'activa' : 'inactiva'}
-            </div>
-          </>
-        ),
       },
+      { key: 'effect', header: 'Efecto', render: (_v, row: ProcurementPolicy) => row.effect || '—' },
+      { key: 'priority', header: 'Prioridad', render: (_v, row: ProcurementPolicy) => String(row.priority ?? '—') },
+      { key: 'mode', header: 'Modo', render: (_v, row: ProcurementPolicy) => row.mode || '—' },
+      { key: 'enabled', header: 'Activa', render: (_v, row: ProcurementPolicy) => (row.enabled ? 'Sí' : 'No') },
       { key: 'action_filter', header: 'Acción', className: 'cell-notes' },
     ],
     formFields: [
@@ -320,24 +306,13 @@ export function createNexusRolesCrudConfig(): CrudResourceConfigMap['roles'] {
       },
     },
     columns: [
-      {
-        key: 'name',
-        header: 'Rol',
-        className: 'cell-name',
-        render: (_value, row: Role) => (
-          <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.is_system ? 'Sistema' : 'Custom'} · {row.permissions.length} permisos
-            </div>
-          </>
-        ),
-      },
+      { key: 'name', header: 'Rol', className: 'cell-name' },
+      { key: 'is_system', header: 'Tipo', render: (_v, row: Role) => (row.is_system ? 'Sistema' : 'Custom') },
       {
         key: 'permissions',
         header: 'Permisos',
         render: (_value, row: Role) =>
-          row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ') || '---',
+          row.permissions.map((permission) => `${permission.resource}:${permission.action}`).join(', ') || '—',
       },
       { key: 'description', header: 'Descripcion', className: 'cell-notes' },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
@@ -351,7 +326,7 @@ export function createNexusRolesCrudConfig(): CrudResourceConfigMap['roles'] {
         type: 'textarea',
         required: true,
         fullWidth: true,
-        placeholder: '[{\"resource\":\"customers\",\"action\":\"read\"}]',
+        placeholder: '[{"resource":"customers","action":"read"}]',
       },
     ],
     searchText: (row: Role) =>

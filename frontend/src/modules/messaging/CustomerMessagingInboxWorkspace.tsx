@@ -18,11 +18,13 @@ import {
 } from './messagingHelpers';
 import { useCustomerMessagingConversations } from './useCustomerMessagingConversations';
 
+const EMPTY_CONVERSATIONS: CustomerMessagingConversation[] = [];
+
 export function CustomerMessagingInboxWorkspace() {
   const search = usePageSearch();
   const { conversationsQuery, assignMutation, markReadMutation, resolveMutation } = useCustomerMessagingConversations();
 
-  const conversations: CustomerMessagingConversation[] = conversationsQuery.data?.items ?? [];
+  const conversations: CustomerMessagingConversation[] = conversationsQuery.data?.items ?? EMPTY_CONVERSATIONS;
   const filtered = useSearch(
     conversations,
     (row) => [row.party_name, row.phone, row.assigned_to, row.last_message_preview, row.status].filter(Boolean).join(' '),

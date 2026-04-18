@@ -1,6 +1,5 @@
-.crud-entity-editor-modal {
-  width: min(920px, 100%);
-}
+/* El width viene de `--crud-modal-width` en `.crud-entity-modal-shell__panel`.
+   Para override por recurso: setear la var en un wrapper (no redefinir width aquí). */
 
 .crud-entity-editor-modal__header {
   display: flex;

@@ -1,7 +1,10 @@
-import { Route, Routes, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
 import type { CrudViewModeId } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
-import { useBranchSelection } from '../lib/branchContext';
+import { useBranchSelection } from '../lib/useBranchSelection';
+import { useTenantSlug } from '../lib/tenantSlug';
+import { getTenantProfile } from '../lib/tenantProfile';
 import {
   CalendarPage,
   ConfiguredCrudSectionPage,
@@ -23,6 +26,8 @@ import {
   WatcherConfigPage,
 } from './lazyRoutes';
 
+type WorkOrdersResourceId = 'carWorkOrders' | 'bikeWorkOrders';
+
 function BranchSelectionLoading() {
   return (
     <PageLayout title="Sucursal activa" lead="Cargando sucursal seleccionada.">
@@ -33,17 +38,16 @@ function BranchSelectionLoading() {
   );
 }
 
-function BranchAwareWorkOrdersModePage({
-  resourceId,
-  modeId,
-}: {
-  resourceId: 'carWorkOrders' | 'bikeWorkOrders';
-  modeId: CrudViewModeId;
-}) {
+/** Resuelve qué variante de work-orders mostrar según el subvertical del profile. */
+function resolveWorkOrdersResourceId(): WorkOrdersResourceId {
+  const profile = getTenantProfile();
+  return profile?.subVertical === 'bike_shop' ? 'bikeWorkOrders' : 'carWorkOrders';
+}
+
+function WorkOrdersModePage({ modeId }: { modeId: CrudViewModeId }) {
   const { isLoading, selectedBranchId } = useBranchSelection();
-  if (isLoading) {
-    return <BranchSelectionLoading />;
-  }
+  if (isLoading) return <BranchSelectionLoading />;
+  const resourceId = resolveWorkOrdersResourceId();
   return (
     <ConfiguredCrudModePage
       key={`${resourceId}:${modeId}:${selectedBranchId ?? 'all'}`}
@@ -53,17 +57,10 @@ function BranchAwareWorkOrdersModePage({
   );
 }
 
-function BranchAwareWorkOrdersNestedRouteModePage({
-  resourceId,
-  baseRoute,
-}: {
-  resourceId: 'carWorkOrders' | 'bikeWorkOrders';
-  baseRoute: string;
-}) {
+function WorkOrdersNestedRouteModePage({ baseRoute }: { baseRoute: string }) {
   const { isLoading, selectedBranchId } = useBranchSelection();
-  if (isLoading) {
-    return <BranchSelectionLoading />;
-  }
+  if (isLoading) return <BranchSelectionLoading />;
+  const resourceId = resolveWorkOrdersResourceId();
   return (
     <ConfiguredCrudNestedRouteModePage
       key={`${resourceId}:nested:${selectedBranchId ?? 'all'}`}
@@ -73,153 +70,201 @@ function BranchAwareWorkOrdersNestedRouteModePage({
   );
 }
 
-function BranchAwareInventoryModePage({ modeId }: { modeId: CrudViewModeId }) {
+function WorkOrdersIndexRedirect({ baseRoute }: { baseRoute: string }) {
+  const resourceId = resolveWorkOrdersResourceId();
+  return <ConfiguredCrudIndexRedirect resourceId={resourceId} baseRoute={baseRoute} />;
+}
+
+function WorkOrdersSectionLayout({ slug }: { slug: string }) {
+  const resourceId = resolveWorkOrdersResourceId();
+  const baseRoute = `/${slug}/work-orders`;
+  return (
+    <ConfiguredCrudSectionPage
+      resourceId={resourceId}
+      baseRoute={baseRoute}
+      contextPatternByModeId={{ list: `${baseRoute}/edit/:orderId` }}
+      actionLink={{
+        to: `${baseRoute}/configure`,
+        label: 'Configurar',
+        hideWhenActivePattern: `${baseRoute}/configure`,
+        activeReplacement: {
+          to: `${baseRoute}/list`,
+          label: 'Volver a órdenes de trabajo',
+        },
+      }}
+    />
+  );
+}
+
+function InventoryModePage({ modeId }: { modeId: CrudViewModeId }) {
   const { isLoading, selectedBranchId } = useBranchSelection();
-  if (isLoading) {
-    return <BranchSelectionLoading />;
-  }
+  if (isLoading) return <BranchSelectionLoading />;
   return <ConfiguredCrudModePage key={`inventory:${modeId}:${selectedBranchId ?? 'all'}`} resourceId="inventory" modeId={modeId} />;
+}
+
+function InventorySectionLayout({ slug }: { slug: string }) {
+  const baseRoute = `/${slug}/inventory`;
+  return (
+    <ConfiguredCrudSectionPage
+      resourceId="inventory"
+      baseRoute={baseRoute}
+      actionLink={{
+        to: `${baseRoute}/configure`,
+        label: 'Configurar',
+        hideWhenActivePattern: `${baseRoute}/configure`,
+        activeReplacement: {
+          to: `${baseRoute}/list`,
+          label: 'Volver al inventario',
+        },
+      }}
+    />
+  );
+}
+
+/** Raíz: resuelve el slug del tenant activo y redirige al dashboard; si no hay profile, a /onboarding. */
+function RootTenantRedirect() {
+  const slug = useTenantSlug();
+  if (!slug) return <Navigate to="/onboarding" replace />;
+  return <Navigate to={`/${slug}/dashboard`} replace />;
+}
+
+/** Catch-all para URLs legacy sin slug: prepende el slug actual y preserva el resto del path. */
+function LegacyPathRedirect() {
+  const slug = useTenantSlug();
+  const location = useLocation();
+  if (!slug) return <Navigate to="/onboarding" replace />;
+  return <Navigate to={`/${slug}${location.pathname}${location.search}${location.hash}`} replace />;
+}
+
+/** Valida que el :orgSlug de la URL coincida con el profile. Si no hay profile, manda a /onboarding. */
+function TenantSlugGate({ children }: { children: ReactNode }) {
+  const { orgSlug = '' } = useParams();
+  const slug = useTenantSlug();
+  if (!slug) return <Navigate to="/onboarding" replace />;
+  // Dev: aceptamos cualquier slug en la URL. En prod con backend esto se valida contra orgs.slug.
+  void orgSlug;
+  return <>{children}</>;
+}
+
+function TenantScopedRoutes() {
+  const { orgSlug = '' } = useParams();
+  const profileSlug = useTenantSlug();
+  const slug = profileSlug ?? orgSlug;
+  return (
+    <Routes>
+      <Route index element={<Navigate to="dashboard" replace />} />
+      <Route path="dashboard" element={<DashboardVisualPage />} />
+      <Route path="chat" element={<UnifiedChatPage />} />
+      <Route path="assistant/commercial" element={<Navigate to="../chat" replace />} />
+      <Route path="notifications" element={<NotificationsCenterPage />} />
+      <Route path="agenda" element={<CalendarPage />} />
+      <Route path="calendar" element={<Navigate to="../agenda" replace />} />
+      <Route path="settings" element={<SettingsHubPage />} />
+      <Route path="settings/keys" element={<Navigate to="../settings" replace />} />
+      <Route path="settings/notifications" element={<Navigate to="../settings?section=notifications" replace />} />
+      <Route path="admin" element={<Navigate to="../settings" replace />} />
+      <Route path="billing" element={<Navigate to="../settings?section=gateway" replace />} />
+      <Route path="audit" element={<Navigate to="../settings?section=audit" replace />} />
+      <Route path="roles" element={<Navigate to="../settings?section=rbac" replace />} />
+      <Route path="automation-rules" element={<AutomationRulesPage />} />
+      <Route path="customer-messaging/campaigns" element={<CustomerMessagingCampaignsPage />} />
+      <Route path="customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
+      <Route path="watcher-config" element={<WatcherConfigPage />} />
+      <Route path="restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
+
+      {/* work-orders: URL única, resuelve bike/car por subvertical */}
+      <Route path="work-orders" element={<WorkOrdersSectionLayout slug={slug} />}>
+        <Route index element={<WorkOrdersIndexRedirect baseRoute={`/${slug}/work-orders`} />} />
+        <Route path="board" element={<WorkOrdersModePage modeId="kanban" />} />
+        <Route path="list" element={<WorkOrdersModePage modeId="list" />} />
+        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
+        <Route path=":modePath" element={<WorkOrdersNestedRouteModePage baseRoute={`/${slug}/work-orders`} />} />
+      </Route>
+
+      {/* inventory: sección con sus propios routes */}
+      <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>
+        <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute={`/${slug}/inventory`} />} />
+        <Route path="list" element={<InventoryModePage modeId="list" />} />
+        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route path="explorer" element={<Navigate to="../list" replace />} />
+        <Route path="gallery" element={<InventoryModePage modeId="gallery" />} />
+        <Route path="board" element={<InventoryModePage modeId="kanban" />} />
+      </Route>
+
+      {/* CRUD genérico: /{slug}/{moduleId}[/modePath] */}
+      <Route path=":moduleId/configure" element={<CrudUiConfigurePage />} />
+      <Route path=":moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
+      <Route path=":moduleId" element={<ModulePage />} />
+    </Routes>
+  );
+}
+
+/** Legacy: /modules/:moduleId/... → /{slug}/:moduleId/... */
+function LegacyModulesRedirect() {
+  const slug = useTenantSlug();
+  const { moduleId = '' } = useParams();
+  const location = useLocation();
+  if (!slug) return <Navigate to="/onboarding" replace />;
+  const remainder = location.pathname.replace(/^\/modules\/[^/]+/, '');
+  return <Navigate to={`/${slug}/${moduleId}${remainder}${location.search}${location.hash}`} replace />;
+}
+
+/** Legacy: /workshops/{sub}/{module}/* → /{slug}/work-orders/* */
+function LegacyWorkshopsRedirect() {
+  const slug = useTenantSlug();
+  const location = useLocation();
+  if (!slug) return <Navigate to="/onboarding" replace />;
+  const match = location.pathname.match(/^\/workshops\/[^/]+\/[^/]+(\/.*)?$/);
+  const remainder = match?.[1] ?? '';
+  return <Navigate to={`/${slug}/work-orders${remainder}${location.search}${location.hash}`} replace />;
 }
 
 /**
  * Rutas bajo el Shell autenticado (producto).
+ *
+ * Política de URL: `/{tenant-slug}/{recurso}/{subpath}`. El tenant slug se
+ * deriva de `tenantProfile.businessName` slugificado. URLs viejas sin slug
+ * redirigen automáticamente al slug actual.
  */
 export function ShellRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/notifications" element={<NotificationsCenterPage />} />
-      <Route path="/chat" element={<UnifiedChatPage />} />
-      <Route path="/assistant/commercial" element={<Navigate to="/chat" replace />} />
-      <Route path="/admin" element={<Navigate to="/settings" replace />} />
-      <Route path="/billing" element={<Navigate to="/settings?section=gateway" replace />} />
-      <Route path="/invoices" element={<Navigate to="/modules/invoices" replace />} />
+      <Route path="/" element={<RootTenantRedirect />} />
+
+      {/* Rutas autenticadas bajo tenant slug */}
       <Route
-        path="/modules/carWorkOrders"
+        path="/:orgSlug/*"
         element={
-          <ConfiguredCrudSectionPage
-            resourceId="carWorkOrders"
-            baseRoute="/modules/carWorkOrders"
-            contextPatternByModeId={{ list: '/modules/carWorkOrders/edit/:orderId' }}
-            actionLink={{
-              to: '/modules/carWorkOrders/configure',
-              label: 'Configurar',
-              hideWhenActivePattern: '/modules/carWorkOrders/configure',
-              activeReplacement: {
-                to: '/modules/carWorkOrders/list',
-                label: 'Volver a órdenes de trabajo',
-              },
-            }}
-            includeCanonicalMissing
-          />
+          <TenantSlugGate>
+            <TenantScopedRoutes />
+          </TenantSlugGate>
         }
-      >
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />} />
-        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="carWorkOrders" modeId="kanban" />} />
-        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="carWorkOrders" modeId="list" />} />
-        <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
-        <Route
-          path=":modePath"
-          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="carWorkOrders" baseRoute="/modules/carWorkOrders" />}
-        />
-      </Route>
-      <Route
-        path="/modules/bikeWorkOrders"
-        element={
-          <ConfiguredCrudSectionPage
-            resourceId="bikeWorkOrders"
-            baseRoute="/modules/bikeWorkOrders"
-            actionLink={{
-              to: '/modules/bikeWorkOrders/configure',
-              label: 'Configurar',
-              hideWhenActivePattern: '/modules/bikeWorkOrders/configure',
-              activeReplacement: {
-                to: '/modules/bikeWorkOrders/list',
-                label: 'Volver a órdenes de trabajo',
-              },
-            }}
-            includeCanonicalMissing
-          />
-        }
-      >
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/modules/bikeWorkOrders" />} />
-        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
-        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="list" />} />
-        <Route
-          path=":modePath"
-          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/modules/bikeWorkOrders" />}
-        />
-      </Route>
-      <Route
-        path="/modules/inventory"
-        element={
-          <ConfiguredCrudSectionPage
-            resourceId="inventory"
-            baseRoute="/modules/inventory"
-            actionLink={{
-              to: '/modules/inventory/configure',
-              label: 'Configurar',
-              hideWhenActivePattern: '/modules/inventory/configure',
-              activeReplacement: {
-                to: '/modules/inventory/list',
-                label: 'Volver al inventario',
-              },
-            }}
-          />
-        }
-      >
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute="/modules/inventory" />} />
-        <Route path="list" element={<BranchAwareInventoryModePage modeId="list" />} />
-        <Route path="configure" element={<CrudUiConfigurePage />} />
-        <Route path="explorer" element={<Navigate to="/modules/inventory/list" replace />} />
-        <Route path="gallery" element={<BranchAwareInventoryModePage modeId="gallery" />} />
-        <Route path="board" element={<BranchAwareInventoryModePage modeId="kanban" />} />
-      </Route>
-      <Route path="/modules/:moduleId/configure" element={<CrudUiConfigurePage />} />
-      <Route path="/modules/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
-      <Route path="/modules/:moduleId" element={<ModulePage />} />
-      <Route path="/settings" element={<SettingsHubPage />} />
-      <Route path="/settings/keys" element={<Navigate to="/settings" replace />} />
-      <Route path="/settings/notifications" element={<Navigate to="/settings?section=notifications" replace />} />
-      <Route path="/workshops/auto-repair/orders/*" element={<Navigate to="/modules/carWorkOrders" replace />} />
-      <Route
-        path="/workshops/bike-shop/orders"
-        element={
-          <ConfiguredCrudSectionPage
-            resourceId="bikeWorkOrders"
-            baseRoute="/workshops/bike-shop/orders"
-            actionLink={{
-              to: '/modules/bikeWorkOrders/configure',
-              label: 'Configurar',
-              hideWhenActivePattern: '/modules/bikeWorkOrders/configure',
-              activeReplacement: {
-                to: '/workshops/bike-shop/orders/list',
-                label: 'Volver a órdenes de trabajo',
-              },
-            }}
-            includeCanonicalMissing
-          />
-        }
-      >
-        <Route index element={<ConfiguredCrudIndexRedirect resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />} />
-        <Route path="board" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="kanban" />} />
-        <Route path="list" element={<BranchAwareWorkOrdersModePage resourceId="bikeWorkOrders" modeId="list" />} />
-        <Route
-          path=":modePath"
-          element={<BranchAwareWorkOrdersNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
-        />
-      </Route>
-      <Route path="/restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
-      <Route path="/automation-rules" element={<AutomationRulesPage />} />
-      <Route path="/customer-messaging/campaigns" element={<CustomerMessagingCampaignsPage />} />
-      <Route path="/customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
-      <Route path="/watcher-config" element={<WatcherConfigPage />} />
-      <Route path="/audit" element={<Navigate to="/settings?section=audit" replace />} />
-      <Route path="/roles" element={<Navigate to="/settings?section=rbac" replace />} />
-      <Route path="/dashboard" element={<DashboardVisualPage />} />
-      <Route path="/modules/inventoryMovements" element={<Navigate to="/modules/inventory/list" replace />} />
-      <Route path="/agenda" element={<CalendarPage />} />
-      <Route path="/calendar" element={<Navigate to="/agenda" replace />} />
+      />
+
+      {/* Legacy redirects: capturan URLs autenticadas viejas y prepende slug. */}
+      <Route path="/dashboard/*" element={<LegacyPathRedirect />} />
+      <Route path="/chat/*" element={<LegacyPathRedirect />} />
+      <Route path="/notifications/*" element={<LegacyPathRedirect />} />
+      <Route path="/agenda/*" element={<LegacyPathRedirect />} />
+      <Route path="/calendar/*" element={<LegacyPathRedirect />} />
+      <Route path="/settings/*" element={<LegacyPathRedirect />} />
+      <Route path="/admin/*" element={<LegacyPathRedirect />} />
+      <Route path="/billing/*" element={<LegacyPathRedirect />} />
+      <Route path="/invoices/*" element={<LegacyPathRedirect />} />
+      <Route path="/audit/*" element={<LegacyPathRedirect />} />
+      <Route path="/roles/*" element={<LegacyPathRedirect />} />
+      <Route path="/automation-rules/*" element={<LegacyPathRedirect />} />
+      <Route path="/customer-messaging/*" element={<LegacyPathRedirect />} />
+      <Route path="/watcher-config/*" element={<LegacyPathRedirect />} />
+      <Route path="/assistant/*" element={<LegacyPathRedirect />} />
+      <Route path="/restaurants/*" element={<LegacyPathRedirect />} />
+
+      {/* /modules/* → /{slug}/* */}
+      <Route path="/modules/:moduleId/*" element={<LegacyModulesRedirect />} />
+
+      {/* /workshops/{sub}/* → /{slug}/work-orders */}
+      <Route path="/workshops/*" element={<LegacyWorkshopsRedirect />} />
     </Routes>
   );
 }

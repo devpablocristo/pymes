@@ -43,7 +43,7 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
       },
     },
     columns: [
-      { key: 'name', header: 'Nombre', className: 'cell-name', render: (v) => <strong>{String(v ?? '')}</strong> },
+      { key: 'name', header: 'Nombre', className: 'cell-name' },
       { key: 'sort_order', header: 'Orden', render: (v) => String(v ?? 0) },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },
     ],
@@ -90,22 +90,9 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
       },
     },
     columns: [
-      {
-        key: 'code',
-        header: 'Mesa',
-        className: 'cell-name',
-        render: (_v, row: RestaurantDiningTable) => (
-          <>
-            <strong>{row.code}</strong>
-            <div className="text-secondary">{row.label || '—'}</div>
-          </>
-        ),
-      },
-      {
-        key: 'area_id',
-        header: 'Área (ID)',
-        render: (v) => <span className="text-secondary">{String(v ?? '').slice(0, 8)}…</span>,
-      },
+      { key: 'code', header: 'Mesa', className: 'cell-name' },
+      { key: 'label', header: 'Etiqueta', render: (_v, row: RestaurantDiningTable) => row.label || '—' },
+      { key: 'area_id', header: 'Área', render: (v) => String(v ?? '').slice(0, 8) + '…' },
       { key: 'capacity', header: 'Cap.' },
       {
         key: 'status',

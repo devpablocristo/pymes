@@ -65,7 +65,9 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if in.Unit == "" {
 		in.Unit = "unit"
 	}
-	if strings.TrimSpace(in.Currency) == "" {
+	// Currency canónica en mayúsculas ("ARS", no "ars") para matching/display.
+	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
+	if in.Currency == "" {
 		in.Currency = "ARS"
 	}
 	out, err := u.repo.Create(ctx, in)
@@ -125,7 +127,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.Price = *in.Price
 	}
 	if in.Currency != nil {
-		current.Currency = strings.TrimSpace(*in.Currency)
+		current.Currency = strings.ToUpper(strings.TrimSpace(*in.Currency))
 	}
 	if in.CostPrice != nil {
 		current.CostPrice = *in.CostPrice

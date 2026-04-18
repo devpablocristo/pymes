@@ -3,7 +3,7 @@ import '@devpablocristo/modules-scheduling/styles.next.css';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';
 import { apiRequest } from '../../lib/api';
-import { useBranchSelection } from '../../lib/branchContext';
+import { useBranchSelection } from '../../lib/useBranchSelection';
 import { useI18n } from '../../lib/i18n';
 
 const schedulingClient = createSchedulingClient(apiRequest);

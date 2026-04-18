@@ -76,6 +76,16 @@
 
 .crud-table {
   width: 100%;
+  /* Distribuye las columnas uniformemente dentro de la caja contenedora.
+     `fixed` reparte el ancho proporcionalmente al valor calculado de la
+     primera fila, sin que el contenido largo reflote el layout. */
+  table-layout: fixed;
+}
+
+.crud-table th,
+.crud-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crud-table tbody tr.crud-table__row-clickable {
@@ -131,17 +141,39 @@
   color: var(--color-primary, #2563eb);
 }
 
-.crud-table td.cell-name {
-  font-weight: var(--font-weight-semibold);
+/* Tabla de consola: todo en una línea, misma fuente/tamaño/peso. Sin negrita,
+   sin color secundario ni apilado vertical dentro de la celda. Los column
+   renders heredados (title+subtítulo con <strong>+<div class="text-secondary">)
+   se aplanan aquí para uniformidad visual. */
+.crud-table td {
+  font-weight: var(--font-weight-regular, 400);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crud-table td strong,
+.crud-table td b {
+  font-weight: inherit;
+}
+
+.crud-table td .text-secondary {
+  color: inherit;
+}
+
+.crud-table td > div {
+  display: inline;
+}
+
+.crud-table td > div + div::before {
+  content: ' · ';
+  color: var(--color-text-muted);
 }
 
 .crud-table td.cell-notes {
   max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-text-secondary);
-  font-size: var(--text-base);
 }
 
 .crud-table .col-actions {

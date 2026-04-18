@@ -59,9 +59,7 @@ func (r *Repository) ListWidgets(ctx context.Context) ([]dashboarddomain.WidgetD
 	_ = ctx
 	catalog := fixedDashboardWidgets()
 	out := make([]dashboarddomain.WidgetDefinition, 0, len(catalog))
-	for _, widget := range catalog {
-		out = append(out, widget)
-	}
+	out = append(out, catalog...)
 	return out, nil
 }
 

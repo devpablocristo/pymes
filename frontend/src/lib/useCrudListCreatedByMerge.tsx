@@ -15,12 +15,14 @@ export function useCrudListCreatedByMerge(): {
   preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];
   listHeaderInlineSlot?: (ctx: ListCtx) => ReactNode;
 } {
-  if (!clerkEnabled) {
-    return useCrudListCreatedByMergeWithoutClerk();
-  }
-
-  return useCrudListCreatedByMergeWithClerk();
+  return useCrudListCreatedByMergeImpl();
 }
+
+// `clerkEnabled` se resuelve al cargar el módulo, así que el árbol de hooks queda
+// estable para toda la vida del bundle y evitamos invocar hooks condicionalmente.
+const useCrudListCreatedByMergeImpl = clerkEnabled
+  ? useCrudListCreatedByMergeWithClerk
+  : useCrudListCreatedByMergeWithoutClerk;
 
 function useCrudListCreatedByMergeWithoutClerk(): {
   preSearchFilter?: <T extends { id: string; created_by?: string }>(items: T[]) => T[];

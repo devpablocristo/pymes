@@ -45,17 +45,9 @@ export type StockRecord = {
 
 export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[] {
   return [
-    {
-      key: 'name',
-      header: 'Producto',
-      className: 'cell-name',
-      render: (_value, row) => (
-        <>
-          <strong>{row.name}</strong>
-          <div className="text-secondary">{row.sku || 'Sin SKU'} · {row.unit || 'unidad'}</div>
-        </>
-      ),
-    },
+    { key: 'name', header: 'Producto', className: 'cell-name' },
+    { key: 'sku', header: 'SKU', render: (_v, row) => row.sku || '—' },
+    { key: 'unit', header: 'Unidad', render: (_v, row) => row.unit || '—' },
     { key: 'price', header: 'Precio', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     {
@@ -210,7 +202,7 @@ export function createStockColumns<T extends StockRecord>(): CrudColumn<T>[] {
       key: 'product_name',
       header: 'Nombre',
       className: 'cell-name stock-col-product-name',
-      render: (_value, row) => <strong>{row.product_name}</strong>,
+      render: (_value, row) => row.product_name,
     },
     {
       key: 'sku',
@@ -247,7 +239,7 @@ export function createStockArchivedColumns<T extends StockRecord>(): CrudColumn<
       key: 'product_name',
       header: 'Nombre',
       className: 'cell-name stock-col-product-name',
-      render: (_value, row) => <strong>{row.product_name}</strong>,
+      render: (_value, row) => row.product_name,
     },
     {
       key: 'sku',

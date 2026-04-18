@@ -154,39 +154,13 @@ export function supplierFormToBody(values: CrudFormValues): Record<string, unkno
 
 export function createCustomerColumns<T extends CustomerRecord>(): CrudColumn<T>[] {
   return [
-    {
-      key: 'name',
-      header: 'Cliente',
-      className: 'cell-name',
-      render: (_value, row) => (
-        <>
-          <strong>{row.name}</strong>
-          <div className="text-secondary">
-            {row.type === 'company' ? 'Empresa' : 'Persona'} · {row.tax_id || 'Sin CUIT/CUIL'}
-          </div>
-        </>
-      ),
-    },
-    {
-      key: 'email',
-      header: 'Contacto',
-      render: (_value, row) => (
-        <>
-          <div>{row.email || '---'}</div>
-          <div className="text-secondary">{row.phone || '---'}</div>
-        </>
-      ),
-    },
-    {
-      key: 'tags',
-      header: 'Tags / Direccion',
-      render: (_value, row) => (
-        <>
-          <div>{formatPartyTagList(row.tags) || '---'}</div>
-          <div className="text-secondary">{formatPartyAddress(row.address)}</div>
-        </>
-      ),
-    },
+    { key: 'name', header: 'Nombre', className: 'cell-name' },
+    { key: 'type', header: 'Tipo', render: (_v, row) => (row.type === 'company' ? 'Empresa' : 'Persona') },
+    { key: 'tax_id', header: 'CUIT/CUIL', render: (_v, row) => row.tax_id || '—' },
+    { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
+    { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
+    { key: 'tags', header: 'Tags', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
+    { key: 'address', header: 'Dirección', render: (_v, row) => formatPartyAddress(row.address) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
 }
@@ -222,30 +196,12 @@ export function isValidCustomerForm(values: CrudFormValues): boolean {
 
 export function createSupplierColumns<T extends SupplierRecord>(): CrudColumn<T>[] {
   return [
-    {
-      key: 'name',
-      header: 'Proveedor',
-      className: 'cell-name',
-      render: (_value, row) => (
-        <>
-          <strong>{row.name}</strong>
-          <div className="text-secondary">
-            {row.contact_name || 'Sin contacto'} · {row.tax_id || 'Sin CUIT'}
-          </div>
-        </>
-      ),
-    },
-    {
-      key: 'email',
-      header: 'Contacto',
-      render: (_value, row) => (
-        <>
-          <div>{row.email || '---'}</div>
-          <div className="text-secondary">{row.phone || '---'}</div>
-        </>
-      ),
-    },
-    { key: 'tags', header: 'Tags', render: (value) => formatPartyTagList(value as string[]) || '---' },
+    { key: 'name', header: 'Nombre', className: 'cell-name' },
+    { key: 'contact_name', header: 'Contacto', render: (_v, row) => row.contact_name || '—' },
+    { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '—' },
+    { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
+    { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
+    { key: 'tags', header: 'Tags', render: (value) => formatPartyTagList(value as string[]) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
 }
@@ -354,30 +310,12 @@ export function createPartyColumns<T extends PartyRecord>(header = 'Entidad'): C
       key: 'display_name',
       header,
       className: 'cell-name',
-      render: (_value, row) => (
-        <>
-          <strong>{row.display_name}</strong>
-          <div className="text-secondary">
-            {row.party_type} · {row.tax_id || 'Sin identificacion fiscal'}
-          </div>
-        </>
-      ),
     },
-    {
-      key: 'email',
-      header: 'Contacto',
-      render: (_value, row) => (
-        <>
-          <div>{row.email || '---'}</div>
-          <div className="text-secondary">{row.phone || '---'}</div>
-        </>
-      ),
-    },
-    {
-      key: 'roles',
-      header: 'Roles',
-      render: (_value, row) => formatActivePartyRoles(row.roles),
-    },
+    { key: 'party_type', header: 'Tipo', render: (_v, row) => row.party_type || '—' },
+    { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '—' },
+    { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
+    { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
+    { key: 'roles', header: 'Roles', render: (_v, row) => formatActivePartyRoles(row.roles) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
 }
@@ -443,29 +381,11 @@ export function createAccountColumns<T extends AccountRecord & { updated_at?: st
   formatUpdatedAt: (value: unknown) => string = (value) => String(value ?? '') || '—',
 ): CrudColumn<T>[] {
   return [
-    {
-      key: 'entity_name',
-      header: 'Cuenta',
-      className: 'cell-name',
-      render: (_value, row) => (
-        <>
-          <strong>{row.entity_name}</strong>
-          <div className="text-secondary">
-            {row.type} · {row.entity_type}
-          </div>
-        </>
-      ),
-    },
-    {
-      key: 'balance',
-      header: 'Saldo',
-      render: (value, row) => formatPartyMoney(value, row.currency),
-    },
-    {
-      key: 'credit_limit',
-      header: 'Limite',
-      render: (value, row) => formatPartyMoney(value, row.currency),
-    },
+    { key: 'entity_name', header: 'Cuenta', className: 'cell-name' },
+    { key: 'type', header: 'Tipo', render: (_v, row) => row.type || '—' },
+    { key: 'entity_type', header: 'Entidad', render: (_v, row) => row.entity_type || '—' },
+    { key: 'balance', header: 'Saldo', render: (value, row) => formatPartyMoney(value, row.currency) },
+    { key: 'credit_limit', header: 'Limite', render: (value, row) => formatPartyMoney(value, row.currency) },
     { key: 'updated_at', header: 'Actualizada', render: (value) => formatUpdatedAt(value) },
   ];
 }

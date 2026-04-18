@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Branch } from '@devpablocristo/modules-scheduling/next';
 import type { SessionResponse } from './types';
-import { BranchProvider, useBranchSelection } from './branchContext';
+import { BranchProvider } from './branchContext';
+import { useBranchSelection } from './useBranchSelection';
 
 const apiMocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),

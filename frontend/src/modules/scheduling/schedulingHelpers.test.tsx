@@ -17,7 +17,7 @@ describe('schedulingHelpers', () => {
     const config = createProfessionalsCrudConfig();
     expect(config.label).toBe('teacher');
     expect(config.viewModes?.[0]?.id).toBe('list');
-    expect(config.columns).toHaveLength(4);
+    expect(config.columns).toHaveLength(6);
   });
 
   it('builds specialties, intakes and sessions configs', () => {

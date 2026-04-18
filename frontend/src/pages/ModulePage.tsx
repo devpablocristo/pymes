@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { fromCrudResourceSlug, toCrudResourceSlug } from '../crud/crudResourceSlug';
+import { tenantLink, useActiveTenantSlug } from '../lib/tenantSlug';
 import { PageLayout } from '../components/PageLayout';
 import { ReportsResultView } from '../components/ReportsResultView';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
-import { useOptionalBranchSelection } from '../lib/branchContext';
+import { useOptionalBranchSelection } from '../lib/useBranchSelection';
 import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { hasLazyCrudResource } from '../crud/lazyCrudPage';
 import { ConfiguredCrudStandalonePage } from '../crud/configuredCrudViews';
@@ -22,6 +24,8 @@ import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import { formatKpiValue, isReportDatasetPath } from '../lib/reportsResultPresentation';
 import { vocab } from '../lib/vocabulary';
+
+const EMPTY_DATASETS: ModuleDataset[] = [];
 
 function currentRuntimeContext(): ModuleRuntimeContext {
   const now = new Date();
@@ -474,7 +478,7 @@ function NotFoundState() {
         </div>
         <div className="module-link-grid">
           {moduleList.map((module) => (
-            <Link key={module.id} to={`/modules/${module.id}`} className="module-link-card">
+            <Link key={module.id} to={`/${toCrudResourceSlug(module.id)}`} relative="path" className="module-link-card">
               <div>
                 <strong>{localizeUiText(module.title)}</strong>
                 <p>{localizeText(module.summary)}</p>
@@ -679,7 +683,7 @@ function ReportsBusinessPage() {
   const [draftRange, setDraftRange] = useState(() => ({ from: runtime.monthStart, to: runtime.today }));
   const [range, setRange] = useState(() => ({ from: runtime.monthStart, to: runtime.today }));
 
-  const datasets = module.datasets ?? [];
+  const datasets = module.datasets ?? EMPTY_DATASETS;
   const queries = useQueries({
     queries: datasets.map((dataset) => ({
       queryKey: ['reports', dataset.id ?? dataset.path, range.from, range.to, selectedBranchId],
@@ -964,14 +968,17 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
 }
 
 export function ModulePage() {
-  const { moduleId = '' } = useParams();
+  const { moduleId: urlModuleId = '' } = useParams();
+  const moduleId = fromCrudResourceSlug(urlModuleId);
+  const urlSlug = toCrudResourceSlug(moduleId);
+  const tenantSlug = useActiveTenantSlug();
   const crudModuleQuery = useQuery({
     queryKey: queryKeys.modules.isCrud(moduleId),
     queryFn: () => hasLazyCrudResource(moduleId),
   });
 
   if (moduleId === 'workOrders') {
-    return <Navigate to="/modules/carWorkOrders" replace />;
+    return <Navigate to={tenantLink('/work-orders', tenantSlug)} replace />;
   }
   if (moduleId === 'reports') {
     return <ReportsBusinessPage />;
@@ -997,7 +1004,8 @@ export function ModulePage() {
     );
   }
   if (crudModuleQuery.data) {
-    return <ConfiguredCrudStandalonePage resourceId={moduleId} baseRoute={`/modules/${moduleId}`} />;
+    const baseRoute = tenantLink(`/${urlSlug}`, tenantSlug);
+    return <ConfiguredCrudStandalonePage resourceId={moduleId} baseRoute={baseRoute} />;
   }
   return <ModuleExplorerPage moduleId={moduleId} />;
 }

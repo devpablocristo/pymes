@@ -9,7 +9,6 @@ export type PageLayoutProps = {
   actions?: ReactNode;
   banner?: ReactNode;
   className?: string;
-  searchClearLabel?: string;
   children: ReactNode;
 };
 
@@ -17,7 +16,7 @@ function isPrimitiveLead(lead: ReactNode) {
   return typeof lead === 'string' || typeof lead === 'number';
 }
 
-export function PageLayout({ title, lead, actions, banner, className, searchClearLabel, children }: PageLayoutProps) {
+export function PageLayout({ title, lead, actions, banner, className, children }: PageLayoutProps) {
   const stackClass = ['page-stack', className].filter(Boolean).join(' ');
   const pageSearch = usePageSearchShellControl();
   const hasSearch = pageSearch.visible;

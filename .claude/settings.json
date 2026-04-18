@@ -38,7 +38,9 @@
       "Bash(grep -n \"export.*create.*CrudConfig\\\\|export function create\" /home/pablo/Projects/Pablo/pymes/frontend/src/modules/inventory/*.tsx)",
       "Bash(ls /home/pablo/Projects/Pablo/pymes/frontend/src/pages/CrudUiConfigurePage.*)",
       "Bash(ls /home/pablo/Projects/Pablo/modules/crud/ui/ts/tests/ /home/pablo/Projects/Pablo/modules/crud/ui/ts/src/*.test.*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git apply *)",
+      "Bash(grep -nA 8 \"toFormValues\" /home/pablo/Projects/Pablo/pymes/frontend/src/modules/audit-trail/auditTrailHelpers.tsx)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",

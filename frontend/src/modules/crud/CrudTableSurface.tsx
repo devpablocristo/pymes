@@ -41,6 +41,7 @@ export function CrudTableSurface<T>({
   onRowClick?: (row: T) => void;
   selectedId?: string | null;
 }) {
+  const hasRowActions = rowActions.length > 0;
   return (
     <div className="table-wrap">
       <table className="crud-table crud-explorer-table">
@@ -51,12 +52,14 @@ export function CrudTableSurface<T>({
                 {column.header}
               </th>
             ))}
+            {hasRowActions ? <th>Acciones</th> : null}
           </tr>
         </thead>
         <tbody>
           {items.map((row) => {
             const rowId =
               typeof row === 'object' && row !== null && 'id' in row ? String((row as { id: string }).id) : undefined;
+            const visibleRowActions = rowActions.filter((action) => action.isVisible?.(row) ?? true);
             return (
               <tr
                 key={rowId ?? JSON.stringify(row)}
@@ -68,6 +71,25 @@ export function CrudTableSurface<T>({
                     {column.render(row)}
                   </td>
                 ))}
+                {hasRowActions ? (
+                  <td className="cell-actions">
+                    <div className="crud-row-actions">
+                      {visibleRowActions.map((action) => (
+                        <button
+                          key={action.id}
+                          type="button"
+                          className={buttonClass(action.kind)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void action.onClick(row);
+                          }}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             );
           })}

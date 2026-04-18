@@ -1,0 +1,58 @@
+{
+  "hosting": {
+    "public": "frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/v1/chat",
+        "run": {
+          "serviceId": "pymes-ai",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/v1/chat/**",
+        "run": {
+          "serviceId": "pymes-ai",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/v1/notifications",
+        "run": {
+          "serviceId": "pymes-ai",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/v1/workshops/**",
+        "run": {
+          "serviceId": "pymes-ai",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/v1/professionals/**",
+        "run": {
+          "serviceId": "pymes-ai",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/v1/**",
+        "run": {
+          "serviceId": "pymes-core",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

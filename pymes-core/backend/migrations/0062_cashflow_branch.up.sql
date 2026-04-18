@@ -1,3 +1,31 @@
+-- Safety net for existing local databases where migration 0058 was already marked
+-- as applied before `sales.branch_id` was introduced into the file contents.
+ALTER TABLE sales
+    ADD COLUMN IF NOT EXISTS branch_id uuid;
+
+CREATE INDEX IF NOT EXISTS idx_sales_org_branch_date
+    ON sales(org_id, branch_id, created_at DESC);
+
+WITH one_branch AS (
+    SELECT org_id, id AS branch_id
+    FROM (
+        SELECT
+            org_id,
+            id,
+            COUNT(*) OVER (PARTITION BY org_id) AS branch_count,
+            ROW_NUMBER() OVER (PARTITION BY org_id ORDER BY created_at, id) AS rn
+        FROM scheduling_branches
+        WHERE active = true
+    ) ranked
+    WHERE branch_count = 1
+      AND rn = 1
+)
+UPDATE sales s
+SET branch_id = ob.branch_id
+FROM one_branch ob
+WHERE s.org_id = ob.org_id
+  AND s.branch_id IS NULL;
+
 ALTER TABLE cash_movements
     ADD COLUMN IF NOT EXISTS branch_id uuid REFERENCES scheduling_branches(id) ON DELETE CASCADE;
 

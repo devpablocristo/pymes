@@ -8,7 +8,7 @@ import {
   type DayAgendaItem,
   type SchedulingClient,
 } from '@devpablocristo/modules-scheduling';
-import { useBranchSelection } from '../../lib/branchContext';
+import { useBranchSelection } from '../../lib/useBranchSelection';
 
 const summaryKeys = {
   dashboard: (branchId: string | null, date: string) => ['scheduling-summary', 'dashboard', branchId ?? 'all', date] as const,

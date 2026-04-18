@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { buildRestCrudDataSource } from '../../crud/restCrudDataSource';
 import {

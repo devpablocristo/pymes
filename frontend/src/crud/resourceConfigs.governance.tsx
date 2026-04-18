@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import {
   createAccountCrudConfig,
   createPartyCrudConfig,

@@ -51,8 +51,11 @@ sucursal desde la entidad operativa que originan:
 
 ## Estado del repo
 
-- Ya branch-aware: `scheduling`, `work-orders`, `sales`, `quotes`, `purchases`.
-- `inventory` ya quedó abierto a `branch_id` en backend/frontend, con migración segura
-  para tenants con una sola sucursal activa.
-- Deuda operativa restante: `dashboard`, `reports`, `cashflow` y vistas derivadas
-  todavía deben consumir la sucursal desde los documentos origen.
+- Ya branch-aware: `scheduling`, `work-orders`, `sales`, `quotes`, `purchases`,
+  `inventory`.
+- Ya branch-derived efectivo: `dashboard`, `reports` y `cashflow` consumen
+  `branch_id` en backend/frontend y derivan la sucursal desde los documentos
+  operativos cuando aplica.
+- Deuda operativa restante: seguir cerrando consistencia en vistas derivadas
+  de `payments`, `returns` y superficies agregadas que todavía dependan de la
+  sucursal implícita del documento origen.

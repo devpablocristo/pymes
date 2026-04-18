@@ -32,6 +32,7 @@ yarn-error.log*
 pnpm-debug.log*
 .deps/
 frontend/.deps/
+.firebase/
 
 # Dumps de clientes y CSVs temporales de migración
 *.sql

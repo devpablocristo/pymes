@@ -1,14 +1,16 @@
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import type { ReactNode } from 'react';
 import {
-  CrudEntityFormModal,
-  type CrudEntityFormModalField,
-} from './CrudEntityFormModal';
-import type { CrudEntityEditorModalBlock, CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
+  CrudEntityEditorModal,
+  type CrudEntityEditorModalBlock,
+  type CrudEntityEditorModalField,
+  type CrudEntityEditorModalSection,
+  type CrudEntityEditorModalStat,
+} from './CrudEntityEditorModal';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
 import './CrudActionDialog.css';
 
-export type CrudActionDialogField = CrudEntityFormModalField;
+export type CrudActionDialogField = CrudEntityEditorModalField;
 
 type CrudActionDialogBaseProps = {
   title: string;
@@ -68,7 +70,7 @@ export type CrudActionDialogProps = CrudActionDialogFormProps | CrudActionDialog
 export function CrudActionDialog(props: CrudActionDialogProps) {
   if (props.mode === 'form') {
     return (
-      <CrudEntityFormModal
+      <CrudEntityEditorModal
         open
         title={props.title}
         subtitle={props.subtitle}

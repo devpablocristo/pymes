@@ -1,9 +1,9 @@
 import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
 import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-ui';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
-import { useOptionalBranchSelection } from '../lib/branchContext';
+import { useOptionalBranchSelection } from '../lib/useBranchSelection';
 import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { useI18n } from '../lib/i18n';
 import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
@@ -19,7 +19,6 @@ import {
   collectCrudImageUrls,
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
-  resolveCrudValueFilterOptions,
   buildFreeMovementStateMachine,
   useCrudArchivedSearchParam,
   useCrudConfiguredValueKanban,
@@ -32,11 +31,12 @@ import {
 } from '../modules/crud';
 import type {
   CrudColumn,
+  CrudHelpers,
   CrudEditorModalFieldConfig,
   CrudFormField,
   CrudFormValues,
   CrudPageConfig,
-  CrudValueFilterOption,
+  CrudRowAction,
   CrudViewModeId,
 } from '../components/CrudPage';
 
@@ -282,8 +282,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
       return String(searchText).toLowerCase().includes(query);
     },
   });
-  const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
-
   const kanbanReadyConfig = useMemo(() => {
     if (!crudConfig) return crudConfig;
     if (crudConfig.stateMachine) {
@@ -373,14 +371,45 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           return;
         }
       }
-      const fields = activeFields(crudConfig.formFields, editing);
+      // Si no hay formFields declarados (p. ej. inventory, audit, timeline,
+      // attachments, cashflow), generamos fields read-only desde columns para
+      // que todos los CRUDs abran el mismo Editor modal. En create no aplica.
+      const declaredFields = crudConfig.formFields ?? [];
+      const effectiveFields: CrudFormField[] =
+        declaredFields.length > 0
+          ? declaredFields
+          : crudConfig.columns.map<CrudFormField>((column) => ({
+              key: String(column.key),
+              label: String(column.header ?? column.key),
+              readOnly: true,
+            }));
+      const fields = activeFields(effectiveFields, editing);
       const blocks = buildEditorBlocks(crudConfig);
-      if (fields.length === 0 && !(blocks?.length)) return;
+      if (!editing && fields.length === 0 && !(blocks?.length)) return;
       const createInitialValues = {
         ...buildEmptyFormValues(fields),
         ...createDefaults,
       };
-      const currentValues = editing && editorRow ? crudConfig.toFormValues(editorRow) : createInitialValues;
+      // Fallback para CRUDs sin `toFormValues` útil (audit/attachments/timeline):
+      // mapear valores directos de `row[columnKey]`, pasados por el render de la columna cuando existe.
+      const fallbackFromRow = (r: T): CrudFormValues => {
+        const rec = r as unknown as Record<string, unknown>;
+        const out: CrudFormValues = {};
+        for (const column of crudConfig.columns) {
+          const raw = rec[String(column.key)];
+          if (column.render) {
+            const rendered = column.render(raw as CrudFieldValue, r);
+            out[String(column.key)] = typeof rendered === 'string' ? rendered : String(raw ?? '');
+          } else {
+            out[String(column.key)] = String(raw ?? '');
+          }
+        }
+        return out;
+      };
+      let currentValues = editing && editorRow ? crudConfig.toFormValues(editorRow) : createInitialValues;
+      if (editing && editorRow && Object.keys(currentValues).length === 0) {
+        currentValues = fallbackFromRow(editorRow);
+      }
       const dialogTitle =
         editing && editorRow
           ? pickStringValue(editorRow as Record<string, unknown>, ['number', 'name', 'title']) || `Detalle de ${crudConfig.label}`
@@ -489,13 +518,31 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
   const resolvedTableRowClick = useMemo(() => {
     if (onRowClick) return onRowClick;
-    if (archived || !canEdit) return undefined;
+    // Todo click abre el Editor modal. Si `allowEdit=false` o `formFields=[]`,
+    // `runCreateOrEdit` arma fields read-only desde `columns` automáticamente.
     return (row: T) => {
       void runCreateOrEdit(row);
     };
-  }, [archived, canEdit, onRowClick, runCreateOrEdit]);
+  }, [onRowClick, runCreateOrEdit]);
 
   const rowRecordValues = (row: T) => row as Record<string, unknown>;
+  const tableRowActions = useMemo(() => {
+    if (!crudConfig?.rowActions?.length) {
+      return [];
+    }
+    const helpers: CrudHelpers<T> = {
+      items,
+      reload,
+      setError: (message) => setError(message),
+    };
+    return crudConfig.rowActions.map((action: CrudRowAction<T>) => ({
+      id: action.id,
+      label: action.label,
+      kind: action.kind,
+      isVisible: (row: T) => action.isVisible?.(row, { archived }) ?? true,
+      onClick: (row: T) => action.onClick(row, helpers),
+    }));
+  }, [archived, crudConfig?.rowActions, items, reload, setError]);
   const kanbanCardConfig = crudConfig?.kanban?.card;
   const cardTitle = (row: T) =>
     (
@@ -569,11 +616,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             meta: (row) => cardMeta(row),
           }}
           onSelect={(row) => {
-            if (!archived && canEdit) {
-              void runCreateOrEdit(row);
-              return;
-            }
             selectItem(row.id);
+            void runCreateOrEdit(row);
           }}
         />
       ) : mode === 'kanban' ? (
@@ -584,11 +628,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           emptyLabel={archived ? crudConfig.archivedEmptyState ?? 'No hay archivados para mostrar.' : crudConfig.emptyState ?? 'No hay datos para mostrar.'}
           stateMachine={kanbanReadyConfig?.stateMachine}
           onCardOpen={(row) => {
-            if (!archived && canEdit) {
-              void runCreateOrEdit(row);
-              return;
-            }
             selectItem(row.id);
+            void runCreateOrEdit(row);
           }}
           getCardTitle={cardTitle}
           getCardSubtitle={cardSubtitle}
@@ -614,7 +655,9 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         <CrudTableSurface
           items={visibleItems}
           columns={columns}
+          rowActions={tableRowActions}
           onRowClick={resolvedTableRowClick}
+          selectedId={selectedId}
         />
       )}
 

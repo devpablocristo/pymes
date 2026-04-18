@@ -8,8 +8,10 @@ import { Navigate } from 'react-router-dom';
 import { loadLazyCrudPageConfig } from './lazyCrudPage';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import { crudModuleCatalog } from './crudModuleCatalog';
+import { fromCrudResourceSlug, toCrudResourceSlug } from './crudResourceSlug';
+import { getTenantSlug } from '../lib/tenantSlug';
 
-function fallbackViewModes(resourceId: string): CrudViewModeConfig[] {
+function fallbackViewModes(): CrudViewModeConfig[] {
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
 }
 
@@ -33,10 +35,10 @@ function resolveViewModes<T extends { id: string }>(
   const resolved = config ? applyCrudUiOverride(resourceId, config) : config;
   const modes =
     resolved == null
-      ? fallbackViewModes(resourceId)
+      ? fallbackViewModes()
       : resolved.viewModes
         ? resolved.viewModes
-        : fallbackViewModes(resourceId);
+        : fallbackViewModes();
   return [...modes].sort((a, b) => {
     const orderA = CANONICAL_VIEW_MODE_ORDER[a.id] ?? 99;
     const orderB = CANONICAL_VIEW_MODE_ORDER[b.id] ?? 99;
@@ -97,21 +99,17 @@ function useCrudConfig(resourceId: string) {
   return { config, error, loading };
 }
 
-function resolveCrudConfig<T extends { id: string }>(
-  resourceId: string,
-  config: CrudPageConfig<T> | null,
-): CrudPageConfig<T> | null {
-  return config ? applyCrudUiOverride(resourceId, config) : config;
-}
-
-function modeActionLink<T extends { id: string }>(resourceId: string, config: CrudPageConfig<T> | null) {
+function modeActionLink(resourceId: string) {
+  const tenant = getTenantSlug();
+  const urlSlug = toCrudResourceSlug(resourceId);
+  const base = tenant ? `/${tenant}/${urlSlug}` : `/${urlSlug}`;
   const title = crudModuleCatalog[resourceId]?.title?.trim() || resourceId;
   return {
-    to: `/modules/${resourceId}/configure`,
+    to: `${base}/configure`,
     label: 'Configurar',
-    hideWhenActivePattern: `/modules/${resourceId}/configure`,
+    hideWhenActivePattern: `${base}/configure`,
     activeReplacement: {
-      to: `/modules/${resourceId}`,
+      to: base,
       label: `Volver a ${title.toLowerCase()}`,
     },
   };
@@ -122,7 +120,7 @@ export function ConfiguredCrudSection({
   baseRoute,
   contextPatternByModeId,
   actionLink,
-  includeCanonicalMissing = false,
+  includeCanonicalMissing: _includeCanonicalMissing = false,
 }: {
   resourceId: string;
   baseRoute: string;
@@ -140,18 +138,17 @@ export function ConfiguredCrudSection({
 }) {
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
-  const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config),
-    [config, includeCanonicalMissing, resourceId, uiConfigVersion],
-  );
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(resourceId, config);
+  }, [config, resourceId, uiConfigVersion]);
 
   if (loading && config == null) {
     return (
       <CrudModuleSection
         modes={[{ path: `${baseRoute}/list`, label: '...' }]}
         groupAriaLabel="Cargando vistas"
-        actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
+        actionLink={actionLink ?? modeActionLink(resourceId)}
       />
     );
   }
@@ -168,7 +165,7 @@ export function ConfiguredCrudSection({
         contextPattern: contextPatternByModeId?.[mode.id],
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={actionLink ?? modeActionLink(resourceId, resolvedConfig)}
+      actionLink={actionLink ?? modeActionLink(resourceId)}
     />
   );
 }
@@ -176,20 +173,18 @@ export function ConfiguredCrudSection({
 export function ConfiguredCrudModePage({
   resourceId,
   modeId,
-  mergeConfig,
   allowGenericModeFallback = false,
 }: {
   resourceId: string;
   modeId: CrudViewModeId;
-  mergeConfig?: Record<string, unknown>;
   allowGenericModeFallback?: boolean;
 }) {
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config),
-    [allowGenericModeFallback, config, resourceId, uiConfigVersion],
-  );
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(resourceId, config);
+  }, [config, resourceId, uiConfigVersion]);
   const activeMode = viewModes.find((mode) => mode.id === modeId) ?? null;
 
   if (error) {
@@ -257,7 +252,10 @@ export function ConfiguredCrudIndexRedirect({
 }) {
   const { config, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const viewModes = useMemo(() => resolveViewModes(resourceId, config), [config, resourceId, uiConfigVersion]);
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(resourceId, config);
+  }, [config, resourceId, uiConfigVersion]);
   const defaultMode = viewModes.find((mode) => mode.isDefault) ?? viewModes[0];
   const target = defaultMode?.path || 'list';
 
@@ -287,11 +285,10 @@ export function ConfiguredCrudStandalonePage({
 }) {
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
-  const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config),
-    [config, resourceId, uiConfigVersion],
-  );
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(resourceId, config);
+  }, [config, resourceId, uiConfigVersion]);
   const activeMode = viewModes[0]?.id ?? 'list';
 
   if (error) {
@@ -323,7 +320,7 @@ export function ConfiguredCrudStandalonePage({
         label: mode.label,
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(resourceId, resolvedConfig)}
+      actionLink={modeActionLink(resourceId)}
     >
       <ConfiguredCrudModePage resourceId={resourceId} modeId={activeMode} allowGenericModeFallback />
     </CrudModuleSection>
@@ -331,14 +328,16 @@ export function ConfiguredCrudStandalonePage({
 }
 
 export function ConfiguredCrudRouteModePage() {
-  const { moduleId = '', modePath = '' } = useParams();
+  const { orgSlug = '', moduleId: urlModuleId = '', modePath = '' } = useParams();
+  const moduleId = fromCrudResourceSlug(urlModuleId);
+  const urlSlug = toCrudResourceSlug(moduleId);
+  const tenantPrefix = orgSlug ? `/${orgSlug}` : '';
   const { config, error, loading } = useCrudConfig(moduleId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const resolvedConfig = useMemo(() => resolveCrudConfig(moduleId, config), [config, moduleId, uiConfigVersion]);
-  const viewModes = useMemo(
-    () => resolveViewModes(moduleId, config),
-    [config, moduleId, uiConfigVersion],
-  );
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(moduleId, config);
+  }, [config, moduleId, uiConfigVersion]);
   const mode = viewModes.find((entry) => entry.path === modePath) ?? null;
 
   if (error) {
@@ -376,11 +375,11 @@ export function ConfiguredCrudRouteModePage() {
   return (
     <CrudModuleSection
       modes={viewModes.map((entry) => ({
-        path: `/modules/${moduleId}/${entry.path}`,
+        path: `${tenantPrefix}/${urlSlug}/${entry.path}`,
         label: entry.label,
       }))}
       groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(moduleId, resolvedConfig)}
+      actionLink={modeActionLink(moduleId)}
     >
       <ConfiguredCrudModePage resourceId={moduleId} modeId={mode.id} allowGenericModeFallback />
     </CrudModuleSection>
@@ -391,11 +390,10 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
   const { modePath = '' } = useParams();
   const { config, error, loading } = useCrudConfig(resourceId);
   const uiConfigVersion = useCrudUiConfigVersion();
-  const resolvedConfig = useMemo(() => resolveCrudConfig(resourceId, config), [config, resourceId, uiConfigVersion]);
-  const viewModes = useMemo(
-    () => resolveViewModes(resourceId, config),
-    [config, resourceId, uiConfigVersion],
-  );
+  const viewModes = useMemo(() => {
+    void uiConfigVersion;
+    return resolveViewModes(resourceId, config);
+  }, [config, resourceId, uiConfigVersion]);
   const mode = viewModes.find((entry) => entry.path === modePath) ?? null;
 
   if (error) {
@@ -430,16 +428,10 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
     );
   }
 
-  return (
-    <CrudModuleSection
-      modes={viewModes.map((entry) => ({
-        path: `${baseRoute}/${entry.path}`,
-        label: entry.label,
-      }))}
-      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(resourceId, resolvedConfig)}
-    >
-      <ConfiguredCrudModePage resourceId={resourceId} modeId={mode.id} allowGenericModeFallback />
-    </CrudModuleSection>
-  );
+  // Este componente siempre se usa dentro de `ConfiguredCrudSectionPage`, que ya
+  // envuelve los children con `CrudModuleSection` (las tabs Lista/Galería/Tablero
+  // + action link). No volvemos a renderizar `CrudModuleSection` acá para evitar
+  // que las tabs aparezcan dos veces apiladas.
+  void baseRoute;
+  return <ConfiguredCrudModePage resourceId={resourceId} modeId={mode.id} allowGenericModeFallback />;
 }

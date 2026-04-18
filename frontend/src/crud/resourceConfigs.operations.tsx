@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import type { CrudResourceConfigMap } from '../components/CrudPage';
 import { createStockCrudConfig, fetchStockLevels, type StockRecord, type StockLevelRow } from '../modules/inventory';
 import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';

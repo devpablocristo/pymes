@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudFieldValue, CrudPageConfig, CrudRowAction } from '../../components/CrudPage';
 import {
   archiveWorkOrder as archiveUnifiedWorkOrder,
@@ -380,27 +379,15 @@ export function createWorkOrdersCrudConfig({
       ...archiveMutations,
     },
     columns: [
+      { key: 'number', header: 'OT', className: 'cell-name', render: (_v, row) => row.number || row.id },
       {
-        key: 'number',
-        header: 'OT',
-        className: 'cell-name',
-        render: (_value, row) => (
-          <>
-            <strong>{row.number || row.id}</strong>
-            <div className="text-secondary">{fields.columnSubtitleLabel(row)}</div>
-          </>
-        ),
+        key: fields.targetLabelKey,
+        header: fields.targetLabelField,
+        render: (_v, row) => (row as unknown as Record<string, string>)[fields.targetLabelKey] || row[fields.targetIdKey] || '—',
       },
-      {
-        key: 'status',
-        header: 'Estado',
-        render: (value) => renderWorkshopWorkOrderStatusBadge(value),
-      },
-      {
-        key: 'total',
-        header: 'Total',
-        render: (value, row) => formatWorkshopMoney(value, row.currency),
-      },
+      { key: 'customer_name', header: 'Cliente', render: (_v, row) => row.customer_name || '—' },
+      { key: 'status', header: 'Estado', render: (value) => renderWorkshopWorkOrderStatusBadge(value) },
+      { key: 'total', header: 'Total', render: (value, row) => formatWorkshopMoney(value, row.currency) },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields,

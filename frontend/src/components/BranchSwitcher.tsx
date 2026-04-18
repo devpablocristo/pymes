@@ -1,5 +1,5 @@
 import { useI18n } from '../lib/i18n';
-import { useBranchSelection } from '../lib/branchContext';
+import { useBranchSelection } from '../lib/useBranchSelection';
 
 export function BranchSwitcher() {
   const { language } = useI18n();

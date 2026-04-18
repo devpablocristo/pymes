@@ -104,7 +104,7 @@ describe('partiesHelpers', () => {
   });
 
   it('parsea permisos y cuentas', () => {
-    expect(parsePartyPermissionInputs('[{\"resource\":\"customers\",\"action\":\"read\"}]')).toEqual([
+    expect(parsePartyPermissionInputs('[{"resource":"customers","action":"read"}]')).toEqual([
       { resource: 'customers', action: 'read' },
     ]);
 

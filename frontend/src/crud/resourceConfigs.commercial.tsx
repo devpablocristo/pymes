@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- archivo de configuración CRUD, no se hot-reloads */
 import { type CrudFormValues, type CrudResourceConfigMap } from '../components/CrudPage';
 import { defineCrudDomain } from './defineCrudDomain';
 import { buildRestCrudDataSource } from './restCrudDataSource';

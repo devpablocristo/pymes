@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
 import { asString, formatDate } from '../../crud/resourceConfigs.shared';
@@ -36,23 +35,12 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
     emptyState:
       'No hay devoluciones. Podés registrar una con «Nueva devolución» (venta, ítems en JSON) o desde la venta en la API.',
     columns: [
-      {
-        key: 'number',
-        header: 'Devolución',
-        className: 'cell-name',
-        render: (_value, row) => (
-          <>
-            <strong>{row.number}</strong>
-            <div className="text-secondary">
-              {row.status}
-              {row.sale_id ? ` · venta ${row.sale_id.slice(0, 8)}…` : ''}
-            </div>
-          </>
-        ),
-      },
-      { key: 'party_name', header: 'Cliente', render: (_value, row) => row.party_name || '---' },
+      { key: 'number', header: 'Devolución', className: 'cell-name' },
+      { key: 'status', header: 'Estado', render: (_v, row) => row.status || '—' },
+      { key: 'sale_id', header: 'Venta', render: (_v, row) => (row.sale_id ? `${row.sale_id.slice(0, 8)}…` : '—') },
+      { key: 'party_name', header: 'Cliente', render: (_value, row) => row.party_name || '—' },
       { key: 'total', header: 'Total', render: (value) => String(value ?? '') },
-      { key: 'refund_method', header: 'Medio', render: (_v, row) => row.refund_method || '---' },
+      { key: 'refund_method', header: 'Medio', render: (_v, row) => row.refund_method || '—' },
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [

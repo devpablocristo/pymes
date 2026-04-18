@@ -1,6 +1,4 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -14,23 +12,11 @@ import {
   writeActiveBranchId,
   writeStoredBranchId,
 } from './branchSelectionStorage';
+import { BranchContext, type BranchContextValue } from './branchSelectionContext';
 import { queryKeys } from './queryKeys';
 
 const schedulingClient = createSchedulingClient(apiRequest);
-
-type BranchContextValue = {
-  orgId: string | null;
-  branches: Branch[];
-  availableBranches: Branch[];
-  selectedBranchId: string | null;
-  selectedBranch: Branch | null;
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  setSelectedBranchId: (branchId: string | null) => void;
-};
-
-const BranchContext = createContext<BranchContextValue | null>(null);
+const EMPTY_BRANCHES: Branch[] = [];
 
 export function BranchProvider({ children }: PropsWithChildren) {
   const sessionQuery = useQuery({
@@ -50,7 +36,7 @@ export function BranchProvider({ children }: PropsWithChildren) {
     retry: 1,
   });
 
-  const branches = branchesQuery.data ?? [];
+  const branches = branchesQuery.data ?? EMPTY_BRANCHES;
   const availableBranches = useMemo(() => {
     const active = branches.filter((branch) => branch.active);
     return active.length > 0 ? active : branches;
@@ -134,16 +120,4 @@ export function BranchProvider({ children }: PropsWithChildren) {
   );
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;
-}
-
-export function useBranchSelection(): BranchContextValue {
-  const value = useContext(BranchContext);
-  if (!value) {
-    throw new Error('useBranchSelection must be used within BranchProvider');
-  }
-  return value;
-}
-
-export function useOptionalBranchSelection(): BranchContextValue | null {
-  return useContext(BranchContext);
 }

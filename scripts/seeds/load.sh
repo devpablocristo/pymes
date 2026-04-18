@@ -13,17 +13,15 @@ if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
   exit 1
 fi
 
+# Mínimo para levantar la app: usuarios/org Clerk + core business + RBAC.
 bash "$ROOT_DIR/scripts/seeds/core-01-clerk-prereqs.sh"
-
 bash "$ROOT_DIR/scripts/seeds/core-02-core-business.sh"
 bash "$ROOT_DIR/scripts/seeds/core-03-rbac.sh"
-bash "$ROOT_DIR/scripts/seeds/core-04-transversal-modules.sh"
-bash "$ROOT_DIR/scripts/seeds/core-05-in-app-notifications.sh"
-bash "$ROOT_DIR/scripts/seeds/core-06-scheduling.sh"
-bash "$ROOT_DIR/scripts/seeds/core-07-operations.sh"
-bash "$ROOT_DIR/scripts/seeds/core-08-governance-control.sh"
+
+# Verticales: cada uno es idempotente, se puede comentar el que no uses.
 bash "$ROOT_DIR/scripts/seeds/workshops-01-auto-repair.sh"
 bash "$ROOT_DIR/scripts/seeds/workshops-02-bike-shop.sh"
 bash "$ROOT_DIR/scripts/seeds/professionals-01-demo.sh"
 bash "$ROOT_DIR/scripts/seeds/restaurants-01-demo.sh"
+
 bash "$ROOT_DIR/scripts/seeds/load-review.sh"

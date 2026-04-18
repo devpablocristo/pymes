@@ -45,7 +45,8 @@ func (u *Usecases) Create(ctx context.Context, in servicedomain.Service, actor s
 	if len(in.Name) < 2 {
 		return servicedomain.Service{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if strings.TrimSpace(in.Currency) == "" {
+	in.Currency = strings.ToUpper(strings.TrimSpace(in.Currency))
+	if in.Currency == "" {
 		in.Currency = "ARS"
 	}
 	out, err := u.repo.Create(ctx, in)
@@ -107,7 +108,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.TaxRate = &v
 	}
 	if in.Currency != nil {
-		current.Currency = strings.TrimSpace(*in.Currency)
+		current.Currency = strings.ToUpper(strings.TrimSpace(*in.Currency))
 	}
 	if in.DefaultDurationMinutes != nil {
 		v := *in.DefaultDurationMinutes
@@ -126,7 +127,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if len(current.Name) < 2 {
 		return servicedomain.Service{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if strings.TrimSpace(current.Currency) == "" {
+	current.Currency = strings.ToUpper(strings.TrimSpace(current.Currency))
+	if current.Currency == "" {
 		current.Currency = "ARS"
 	}
 

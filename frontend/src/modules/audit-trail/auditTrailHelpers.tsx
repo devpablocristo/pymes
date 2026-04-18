@@ -116,17 +116,8 @@ export function createAttachmentsCrudConfig<TRecord extends AttachmentRow>(opts:
       },
     },
     columns: [
-      {
-        key: 'file_name',
-        header: 'Archivo',
-        className: 'cell-name',
-        render: (_v, row: TRecord) => (
-          <>
-            <strong>{row.file_name}</strong>
-            <div className="text-secondary">{row.content_type}</div>
-          </>
-        ),
-      },
+      { key: 'file_name', header: 'Archivo', className: 'cell-name' },
+      { key: 'content_type', header: 'Tipo', render: (_v, row: TRecord) => row.content_type || '—' },
       { key: 'size_bytes', header: 'Tamaño', render: (v) => String(v ?? '') },
       { key: 'uploaded_by', header: 'Subido por' },
       { key: 'created_at', header: 'Fecha', render: (v) => opts.formatDate(String(v ?? '')) },
@@ -193,13 +184,8 @@ export function createAuditCrudConfig<TRecord extends AuditEntryRow>(opts: {
         key: 'action',
         header: 'Acción',
         className: 'cell-name',
-        render: (_v, row: TRecord) => (
-          <>
-            <strong>{row.action}</strong>
-            <div className="text-secondary">{row.resource_type}</div>
-          </>
-        ),
       },
+      { key: 'resource_type', header: 'Tipo', render: (_v, row: TRecord) => row.resource_type || '—' },
       { key: 'resource_id', header: 'Recurso', render: (v) => String(v ?? '—') },
       { key: 'actor_label', header: 'Actor', render: (_v, row: TRecord) => row.actor_label || row.actor || '—' },
       { key: 'created_at', header: 'Fecha', render: (v) => opts.formatDate(String(v ?? '')) },
@@ -271,17 +257,8 @@ export function createTimelineCrudConfig<TRecord extends TimelineEntryRow>(opts:
       },
     },
     columns: [
-      {
-        key: 'title',
-        header: 'Evento',
-        className: 'cell-name',
-        render: (_v, row: TRecord) => (
-          <>
-            <strong>{row.title}</strong>
-            <div className="text-secondary">{row.event_type}</div>
-          </>
-        ),
-      },
+      { key: 'title', header: 'Evento', className: 'cell-name' },
+      { key: 'event_type', header: 'Tipo', render: (_v, row: TRecord) => row.event_type || '—' },
       { key: 'description', header: 'Detalle', className: 'cell-notes' },
       { key: 'actor', header: 'Actor' },
       { key: 'created_at', header: 'Fecha', render: (v) => opts.formatDate(String(v ?? '')) },
@@ -324,24 +301,11 @@ export function createWebhooksCrudConfig<TRecord extends WebhookEndpoint>(opts: 
     labelPlural: 'endpoints webhook',
     labelPluralCap: 'Webhooks',
     columns: [
-      {
-        key: 'url',
-        header: 'Endpoint',
-        className: 'cell-name',
-        render: (_value, row: TRecord) => (
-          <>
-            <strong>{row.url}</strong>
-            <div className="text-secondary">{formatAuditTrailTagList(row.events) || 'Sin eventos'}</div>
-          </>
-        ),
-      },
-      {
-        key: 'is_active',
-        header: 'Estado',
-        render: (value) => renderCrudActiveBadge(Boolean(value)),
-      },
+      { key: 'url', header: 'Endpoint', className: 'cell-name' },
+      { key: 'events', header: 'Eventos', render: (_v, row: TRecord) => formatAuditTrailTagList(row.events) || '—' },
+      { key: 'is_active', header: 'Estado', render: (value) => renderCrudActiveBadge(Boolean(value)) },
       { key: 'created_at', header: 'Creado', render: (value) => opts.formatDate(String(value ?? '')) },
-      { key: 'secret', header: 'Secret', render: (value) => (String(value ?? '').trim() ? 'Configurado' : '---') },
+      { key: 'secret', header: 'Secret', render: (value) => (String(value ?? '').trim() ? 'Configurado' : '—') },
     ],
     formFields: [
       { key: 'url', label: 'URL', required: true, placeholder: 'https://miapp.com/webhooks/pymes' },

@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- factory de config CRUD */
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import {
   createWorkshopVehicle,
@@ -67,17 +66,10 @@ export function createWorkshopVehiclesCrudConfig(): CrudPageConfig<WorkshopVehic
       hardDelete: workshopVehiclesArchivedCrud.hardDelete,
     },
     columns: [
-      {
-        key: 'license_plate',
-        header: 'Vehículo',
-        className: 'cell-name',
-        render: (_value, row) => (
-          <>
-            <strong>{row.license_plate}</strong>
-            <div className="text-secondary">{[row.make, row.model, row.year || 's/a'].filter(Boolean).join(' · ')}</div>
-          </>
-        ),
-      },
+      { key: 'license_plate', header: 'Patente', className: 'cell-name' },
+      { key: 'make', header: 'Marca', render: (_v, row) => row.make || '—' },
+      { key: 'model', header: 'Modelo', render: (_v, row) => row.model || '—' },
+      { key: 'year', header: 'Año', render: (_v, row) => (row.year ? String(row.year) : '—') },
       { key: 'customer_name', header: 'Dueño' },
       { key: 'kilometers', header: 'Km', render: (value) => Number(value ?? 0).toLocaleString('es-AR') },
       { key: 'updated_at', header: 'Actualizado', render: (value) => formatDate(String(value ?? '')) },

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Despliegue dev de pymes a GCP (Cloud Run + Cloud SQL + Artifact Registry).
+# Despliegue dev de pymes a GCP (Cloud Run + Cloud SQL + Artifact Registry + Firebase Hosting).
 # Idempotente: creaciones usan `|| true` cuando el recurso puede ya existir.
 #
 # Requisitos:
 #   - gcloud instalado y autenticado (`gcloud auth login`)
 #   - Billing account ID disponible
+#   - Node.js 20+ para build frontend y ejecutar firebase-tools vía npx
 #
 # Variables override por env:
 #   PROJECT_ID       (default: pymes-dev-XXX autogenerado si no existe)
@@ -30,6 +31,7 @@ AI_LLM_PROVIDER_VALUE="${AI_LLM_PROVIDER_VALUE:-${LLM_PROVIDER:-gemini}}"
 AI_GEMINI_MODEL_VALUE="${AI_GEMINI_MODEL_VALUE:-${GEMINI_MODEL:-gemini-2.0-flash-lite}}"
 AI_GEMINI_VERTEX_PROJECT_VALUE="${AI_GEMINI_VERTEX_PROJECT_VALUE:-${GEMINI_VERTEX_PROJECT:-}}"
 AI_GEMINI_VERTEX_LOCATION_VALUE="${AI_GEMINI_VERTEX_LOCATION_VALUE:-${GEMINI_VERTEX_LOCATION:-${REGION}}}"
+FIREBASE_TOOLS_VERSION="${FIREBASE_TOOLS_VERSION:-13}"
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 
@@ -65,6 +67,7 @@ gcloud services enable \
   run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com \
   secretmanager.googleapis.com cloudbuild.googleapis.com storage.googleapis.com \
   compute.googleapis.com servicenetworking.googleapis.com aiplatform.googleapis.com \
+  firebase.googleapis.com firebasehosting.googleapis.com \
   --project="$PROJECT_ID"
 
 # ── 2. Artifact Registry ──
@@ -117,7 +120,6 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 # ── 5. Build + push imágenes ──
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-core:dev"
-FRONT_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-frontend:dev"
 AI_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/pymes/pymes-ai:dev"
 
 # Backend: necesita parent dir con core/ hermano
@@ -157,7 +159,7 @@ gcloud run deploy pymes-core --image="$BACKEND_IMAGE" --region="$REGION" \
   --add-cloudsql-instances="$CONN" \
   --set-env-vars="$BACKEND_ENV_VARS" \
   --set-secrets="$BACKEND_SECRET_VARS" \
-  --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=60 \
+  --min-instances=0 --max-instances=3 --memory=512Mi --cpu=1 --timeout=300 \
   --project="$PROJECT_ID"
 
 BACKEND_URL=$(gcloud run services describe pymes-core --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
@@ -226,7 +228,7 @@ fi
 # AI
 log "staging ai context"
 AI_CTX="$(mktemp -d)"
-trap 'rm -rf "$BACKEND_CTX" "$FRONT_CTX" "$AI_CTX"' EXIT
+trap 'rm -rf "$BACKEND_CTX" "$AI_CTX"' EXIT
 rsync -a --exclude '.git/' --exclude '.venv/' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
       --exclude '__pycache__/' --exclude 'node_modules/' --exclude 'dist/' \
       "$REPO_ROOT/ai/" "$AI_CTX/ai/"
@@ -257,34 +259,33 @@ gcloud run deploy pymes-ai --image="$AI_IMAGE" --region="$REGION" \
   --add-cloudsql-instances="$CONN" \
   --set-env-vars="$AI_ENV_VARS" \
   --set-secrets="$AI_SECRET_VARS" \
-  --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=60 \
+  --min-instances=0 --max-instances=5 --memory=512Mi --cpu=1 --timeout=300 \
   --project="$PROJECT_ID"
 
 AI_URL=$(gcloud run services describe pymes-ai --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
 
-# Frontend
-log "staging frontend context"
-FRONT_CTX="$(mktemp -d)"
-rsync -a --exclude '.git/' --exclude 'node_modules/' --exclude 'dist/' \
-      --exclude 'frontend/node_modules/' --exclude 'frontend/dist/' \
-      --exclude 'ai/' --exclude 'pymes-core/' --exclude 'professionals/' \
-      --exclude 'beauty/' --exclude 'workshops/' --exclude 'restaurants/' \
-      --exclude 'tmp/' "$REPO_ROOT/" "$FRONT_CTX/"
+# Frontend en Firebase Hosting
+log "asegurando proyecto Firebase"
+npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" projects:addfirebase "$PROJECT_ID" --non-interactive >/dev/null 2>&1 || true
 
-log "building frontend image"
-( cd "$FRONT_CTX" && gcloud builds submit . \
-    --config frontend/cloudbuild.yaml \
-    --substitutions="_IMAGE=${FRONT_IMAGE},_VITE_API_URL=${BACKEND_URL},_VITE_AI_API_URL=${AI_URL},_VITE_CLERK_PUBLISHABLE_KEY=${FRONTEND_CLERK_PUBLISHABLE_KEY},_VITE_API_KEY=${FRONTEND_API_KEY}" \
-    --project="$PROJECT_ID" )
+log "building frontend static bundle"
+(
+  cd "$REPO_ROOT/frontend"
+  export VITE_API_URL="/"
+  export VITE_AI_API_URL="/"
+  export VITE_CLERK_PUBLISHABLE_KEY="$FRONTEND_CLERK_PUBLISHABLE_KEY"
+  export VITE_API_KEY="$FRONTEND_API_KEY"
+  npm ci
+  npm run build
+)
 
-# ── 7. Deploy Cloud Run frontend ──
-log "deploy frontend (Cloud Run)"
-gcloud run deploy pymes-frontend --image="$FRONT_IMAGE" --region="$REGION" \
-  --platform=managed --allow-unauthenticated \
-  --min-instances=0 --max-instances=2 --memory=256Mi --cpu=1 --timeout=60 \
-  --project="$PROJECT_ID"
+log "deploy frontend (Firebase Hosting)"
+npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+  --project "$PROJECT_ID" \
+  --only hosting \
+  --non-interactive
 
-FRONT_URL=$(gcloud run services describe pymes-frontend --region="$REGION" --project="$PROJECT_ID" --format="value(status.url)")
+FRONT_URL="https://${PROJECT_ID}.web.app"
 
 # Actualizar backend con FRONTEND_URL real (CORS)
 gcloud run services update pymes-core --region="$REGION" --project="$PROJECT_ID" \

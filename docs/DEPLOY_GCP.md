@@ -2,11 +2,12 @@
 
 Este stack se despliega completo en GCP con una cuenta personal (sin Workspace / sin org):
 
-- **Cloud Run** sirve backend (Go) + frontend (nginx static).
+- **Cloud Run** sirve backend (Go) + AI.
+- **Firebase Hosting** sirve el frontend estático (Vite).
 - **Cloud SQL Postgres `db-f1-micro`** (tier más chico, ~US$9/mes siempre prendido).
 - **Artifact Registry** guarda las imágenes Docker.
 - **Secret Manager** tiene `DATABASE_URL` y placeholders Clerk/JWT.
-- **Cloud Build** compila las imágenes (evita drama de arch local).
+- **Cloud Build** compila backend + AI.
 
 ## Deploy primera vez
 
@@ -67,7 +68,7 @@ gcloud secrets versions access latest --secret=DATABASE_URL --project=$PROJECT_I
 |---|---|
 | Cloud SQL `db-f1-micro` (HDD 10GB) | 9 |
 | Cloud Run backend (min 0, idle) | 0 |
-| Cloud Run frontend (min 0, idle) | 0 |
+| Firebase Hosting frontend (tráfico bajo) | ~0 |
 | Artifact Registry (<500MB) | <0.10 |
 | Cloud Build (primeros 120 min/día free) | 0 |
 | **Total estimado idle** | **~US$9** |
@@ -87,11 +88,13 @@ Eso borra todo (Cloud Run, Cloud SQL, buckets, secrets, imágenes). Irrevertible
 ```
 Internet
    │
-   ├─→ pymes-frontend.run.app   (nginx static, Vite build)
-   │        ↓ llama a VITE_API_URL
-   └─→ pymes-core.run.app       (Go, Gin)
-              ↓ unix socket /cloudsql/...
-        Cloud SQL Postgres 16 (db-f1-micro)
+   ├─→ pymes-dev-352318.web.app   (Firebase Hosting, Vite build)
+   │        ├─ /v1/**  → pymes-core (Cloud Run)
+   │        └─ /ai/**  → pymes-ai   (Cloud Run)
+   ├─→ pymes-core.run.app          (Go, Gin)
+   └─→ pymes-ai.run.app            (FastAPI)
+                 ↓ unix socket /cloudsql/...
+           Cloud SQL Postgres 16 (db-f1-micro)
 ```
 
 ## Estado actual del proyecto ya deployado
@@ -100,5 +103,5 @@ Si corriste el script, la info queda en:
 
 - **Project**: `pymes-dev-352318`
 - **Backend**: https://pymes-core-884236221349.us-central1.run.app
-- **Frontend**: https://pymes-frontend-884236221349.us-central1.run.app
+- **Frontend**: https://pymes-dev-352318.web.app
 - **Cloud SQL**: `pymes-dev-352318:us-central1:pymes-dev-db`

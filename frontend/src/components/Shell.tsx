@@ -7,6 +7,8 @@ import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
 import { getTenantProfile } from '../lib/tenantProfile';
 import { vocab } from '../lib/vocabulary';
+import { toCrudResourceSlug } from '../crud/crudResourceSlug';
+import { tenantLink, useTenantSlug } from '../lib/tenantSlug';
 
 type ModuleGroup = {
   id: string;
@@ -38,6 +40,8 @@ const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
 
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
+  const slug = useTenantSlug();
+  const link = (path: string) => tenantLink(path, slug);
   const [catalog, setCatalog] = useState<{ groups: ModuleGroup[]; modules: ModuleListItem[] }>({
     groups: [],
     modules: [],
@@ -73,75 +77,75 @@ export function Shell({ children }: { children: ReactNode }) {
   // - "Sistema" al final.
 
   const homeNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: '/dashboard', label: t('shell.nav.dashboard'), icon: dotIcon }],
-    [t],
+    () => [{ to: link('/dashboard'), label: t('shell.nav.dashboard'), icon: dotIcon }],
+    [t, slug],
   );
 
   const dailyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/agenda', label: t('shell.nav.calendar'), icon: dotIcon },
-      { to: '/chat', label: t('shell.nav.chat'), icon: dotIcon },
-      { to: '/notifications', label: t('shell.nav.notifications'), icon: dotIcon },
+      { to: link('/agenda'), label: t('shell.nav.calendar'), icon: dotIcon },
+      { to: link('/chat'), label: t('shell.nav.chat'), icon: dotIcon },
+      { to: link('/notifications'), label: t('shell.nav.notifications'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: '/modules/invoices', label: t('shell.nav.invoices'), icon: dotIcon }],
-    [t],
+    () => [{ to: link('/invoices'), label: t('shell.nav.invoices'), icon: dotIcon }],
+    [t, slug],
   );
 
   const whatsappNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/customer-messaging/inbox', label: t('shell.nav.whatsappInbox'), icon: dotIcon },
-      { to: '/customer-messaging/campaigns', label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
+      { to: link('/customer-messaging/inbox'), label: t('shell.nav.whatsappInbox'), icon: dotIcon },
+      { to: link('/customer-messaging/campaigns'), label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const systemNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: '/settings', label: t('shell.nav.settings'), icon: dotIcon }],
-    [t],
+    () => [{ to: link('/settings'), label: t('shell.nav.settings'), icon: dotIcon }],
+    [t, slug],
   );
 
   const professionalsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/teachers', label: t('shell.nav.teachers'), icon: dotIcon },
-      { to: '/modules/specialties', label: t('shell.nav.teachersSpecialties'), icon: dotIcon },
-      { to: '/modules/intakes', label: t('shell.nav.teachersIntakes'), icon: dotIcon },
-      { to: '/modules/sessions', label: t('shell.nav.teachersSessions'), icon: dotIcon },
+      { to: link('/teachers'), label: t('shell.nav.teachers'), icon: dotIcon },
+      { to: link('/specialties'), label: t('shell.nav.teachersSpecialties'), icon: dotIcon },
+      { to: link('/intakes'), label: t('shell.nav.teachersIntakes'), icon: dotIcon },
+      { to: link('/sessions'), label: t('shell.nav.teachersSessions'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/carWorkOrders', label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
+      { to: link('/work-orders/list'), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/workshops/bike-shop/orders', label: t('shell.nav.bikeOrders'), icon: dotIcon },
+      { to: link('/work-orders/list'), label: t('shell.nav.bikeOrders'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/employees', label: t('shell.nav.beautyStaff'), icon: dotIcon },
+      { to: link('/employees'), label: t('shell.nav.beautyStaff'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const restaurantsNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: '/modules/restaurantDiningAreas', label: t('shell.nav.restaurantAreas'), icon: dotIcon },
-      { to: '/modules/restaurantDiningTables', label: t('shell.nav.restaurantTables'), icon: dotIcon },
-      { to: '/restaurants/dining/sessions', label: t('shell.nav.restaurantSessions'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('restaurantDiningAreas')}`), label: t('shell.nav.restaurantAreas'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('restaurantDiningTables')}`), label: t('shell.nav.restaurantTables'), icon: dotIcon },
+      { to: link('/restaurants/dining/sessions'), label: t('shell.nav.restaurantSessions'), icon: dotIcon },
     ],
-    [t],
+    [t, slug],
   );
 
   const sections = useMemo(() => {
@@ -161,7 +165,7 @@ export function Shell({ children }: { children: ReactNode }) {
         localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
       )
       .map((module) => ({
-        to: module.customRoute ?? `/modules/${module.id}`,
+        to: module.customRoute ? link(module.customRoute) : link(`/${toCrudResourceSlug(module.id)}`),
         label: localizeUiText(vocab(module.navLabel)),
         icon: dotIcon,
       }));
@@ -181,7 +185,7 @@ export function Shell({ children }: { children: ReactNode }) {
             localizeUiText(vocab(left.navLabel)).localeCompare(localizeUiText(vocab(right.navLabel))),
           )
           .map((module) => ({
-            to: module.customRoute ?? `/modules/${module.id}`,
+            to: module.customRoute ? link(module.customRoute) : link(`/${toCrudResourceSlug(module.id)}`),
             label: localizeUiText(vocab(module.navLabel)),
             icon: dotIcon,
           })),

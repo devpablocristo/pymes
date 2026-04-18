@@ -42,6 +42,8 @@ vi.mock('./usePymesCrudHeaderFeatures', () => ({
 }));
 
 vi.mock('../modules/crud', () => ({
+  CrudEntityDetailModal: ({ open, title }: { open: boolean; title: string }) =>
+    open ? <div>detail-open:{title}</div> : null,
   useCrudArchivedSearchParam: () => ({ archived: false }),
   useCrudRemoteGalleryPage: () => ({
     items: [{ id: '1', name: 'Cliente Uno' }],

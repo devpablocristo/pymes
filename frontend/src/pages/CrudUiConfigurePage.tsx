@@ -10,6 +10,7 @@ import './CrudUiConfigurePage.css';
 const FEATURE_KEYS = [
   ['searchBar', 'Buscador'],
   ['creatorFilter', 'Filtro de responsable'],
+  ['valueFilter', 'Filtro de lista'],
   ['archivedToggle', 'Ver archivados'],
   ['createAction', 'Acción crear'],
   ['csvToolbar', 'Acciones CSV'],

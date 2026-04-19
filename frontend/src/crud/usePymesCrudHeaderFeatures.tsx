@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import type { CrudPageConfig } from '../components/CrudPage';
+import { TagPillsBar } from '../components/TagPillsBar';
 import { CrudValueFilterSelector, resolveCrudValueFilterOptions } from '../modules/crud';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
@@ -32,7 +33,22 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const setSearch = externalSetSearch ?? setInternalSearch;
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
-  const creatorFilterEnabled = enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false;
+  const hasCreatorSignals = useMemo(
+    () => items.some((row) => typeof row.created_by === 'string' && row.created_by.trim().length > 0),
+    [items],
+  );
+  const hasTagSignals = useMemo(
+    () =>
+      items.some((row) => {
+        const rec = row as Record<string, unknown>;
+        const tags = rec.tags;
+        return Array.isArray(tags) && tags.some((tag) => String(tag ?? '').trim().length > 0);
+      }),
+    [items],
+  );
+
+  const creatorFilterEnabled =
+    enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false && hasCreatorSignals;
   const headerQuickFilterStripEnabled = creatorFilterEnabled && listHeaderInlineSlot != null;
 
   const creatorFilteredItems = useMemo(
@@ -40,15 +56,54 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [creatorFilterEnabled, items, preSearchFilter],
   );
 
+  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals;
+
+  const tagFilterOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items.flatMap((row) => {
+            const rec = row as Record<string, unknown>;
+            const tags = Array.isArray(rec.tags) ? rec.tags : [];
+            return tags.map((raw) => String(raw ?? '').trim()).filter(Boolean);
+          }),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((tag) => ({
+          value: tag,
+          label: tag,
+          matches: (row: T) => {
+            const rec = row as Record<string, unknown>;
+            const tags = Array.isArray(rec.tags) ? rec.tags : [];
+            return tags.some((raw) => String(raw ?? '').trim() === tag);
+          },
+        })),
+    [items],
+  );
+  const tagValues = useMemo(() => tagFilterOptions.map((option) => option.value), [tagFilterOptions]);
+
+  const tagFilteredItems = useMemo(() => {
+    if (!tagFilterEnabled || valueFilter === 'all') return creatorFilteredItems;
+    return creatorFilteredItems.filter((row) => {
+      const rec = row as Record<string, unknown>;
+      const tags = Array.isArray(rec.tags) ? rec.tags : [];
+      return tags.some((raw) => String(raw ?? '').trim() === valueFilter);
+    });
+  }, [creatorFilteredItems, tagFilterEnabled, valueFilter]);
+
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
-  const valueFilterEnabled = creatorFilterEnabled;
+  const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
+  const valueFilterEnabled =
+    crudConfig?.featureFlags?.valueFilter !== false && (stateFilterEnabled || tagFilterEnabled);
+  const valueFilterOptions = stateFilterEnabled ? resolvedValueFilterOptions : tagFilterOptions;
 
   const valueFilteredItems = useMemo(() => {
-    if (!valueFilterEnabled || valueFilter === 'all') return creatorFilteredItems;
-    const selectedOption = resolvedValueFilterOptions.find((option) => option.value === valueFilter);
-    if (!selectedOption) return creatorFilteredItems;
-    return creatorFilteredItems.filter((row) => selectedOption.matches(row));
-  }, [creatorFilteredItems, resolvedValueFilterOptions, valueFilter, valueFilterEnabled]);
+    if (!valueFilterEnabled || valueFilter === 'all') return tagFilteredItems;
+    const selectedOption = valueFilterOptions.find((option) => option.value === valueFilter);
+    if (!selectedOption) return tagFilteredItems;
+    return tagFilteredItems.filter((row) => selectedOption.matches(row));
+  }, [tagFilteredItems, valueFilter, valueFilterEnabled, valueFilterOptions]);
 
   const visibleItems = useMemo(() => {
     if (!deferredSearch) return valueFilteredItems;
@@ -59,13 +114,18 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     <CrudValueFilterSelector<T>
       value={valueFilter}
       onChange={setValueFilter}
-      options={resolvedValueFilterOptions}
+      options={valueFilterOptions}
       className="crud-status-selector"
+      ariaLabel={stateFilterEnabled ? 'Filtrar por estado' : 'Filtrar por etiqueta'}
     />
   ) : null;
 
   const headerLeadSlot = headerQuickFilterStripEnabled ? (
     <div className="crud-list-header-lead">{listHeaderInlineSlot?.({ items })}</div>
+  ) : tagFilterEnabled ? (
+    <div className="crud-list-header-lead">
+      <TagPillsBar tags={tagValues} value={valueFilter} onChange={setValueFilter} />
+    </div>
   ) : undefined;
 
   return {

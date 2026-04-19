@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import {
   CrudPage as ModulesCrudPage,
+  type CrudFeatureFlags as ModulesCrudFeatureFlags,
   type CrudFieldValue as ModulesCrudFieldValue,
   type CrudFormValues as ModulesCrudFormValues,
   type CrudPageConfig as ModulesCrudPageConfig,
@@ -15,6 +16,11 @@ export type CrudViewModeId = ModulesCrudViewModeId;
 export type CrudViewModeConfig = ModulesCrudViewModeConfig & {
   /** Vista no-lista definida junto al recurso en `resourceConfigs.*`. */
   render?: () => ReactElement;
+};
+
+export type CrudFeatureFlags = ModulesCrudFeatureFlags & {
+  /** Selector junto al buscador para filtrar por estado/etiqueta cuando aplique. */
+  valueFilter?: boolean;
 };
 
 export type CrudExplorerMetricConfig<T> = {
@@ -174,7 +180,6 @@ export type CrudEditorModalConfig<T extends { id: string }> = {
 export type {
   CrudColumn,
   CrudDataSource,
-  CrudFeatureFlags,
   CrudFieldValue,
   CrudFormField,
   CrudFormValues,
@@ -185,7 +190,8 @@ export type {
   CrudToolbarAction,
 } from '@devpablocristo/modules-crud-ui';
 
-export type CrudPageConfig<T extends { id: string }> = ModulesCrudPageConfig<T> & {
+export type CrudPageConfig<T extends { id: string }> = Omit<ModulesCrudPageConfig<T>, 'featureFlags'> & {
+  featureFlags?: CrudFeatureFlags;
   viewModes?: CrudViewModeConfig[];
   explorerDetail?: CrudExplorerDetailConfig<T>;
   /** Extensión Pymes: render de celda tags cuando el módulo CRUD lo soporta vía CSV/flags. */

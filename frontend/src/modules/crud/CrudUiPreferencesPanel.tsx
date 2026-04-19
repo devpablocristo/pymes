@@ -9,6 +9,11 @@ import {
 export type CrudUiPreferencesResource = { resourceId: string; label: string };
 export type CrudUiPreferenceFeatureKey = readonly [keyof CrudFeatureFlags, string];
 
+const LOCAL_CRUD_UI_PREFERENCES_FEATURE_KEYS = [
+  ...CRUD_UI_PREFERENCES_FEATURE_KEYS,
+  ['valueFilter', 'Filtro de lista'],
+] as const satisfies readonly CrudUiPreferenceFeatureKey[];
+
 export type CrudUiPreferencesPanelCopy = {
   title?: string;
   hint?: string;
@@ -47,7 +52,7 @@ export function CrudUiPreferencesPanel({
   copy = {},
   hideResourceCardHeader = false,
   hideDefaultViewSelector = false,
-  featureKeys = CRUD_UI_PREFERENCES_FEATURE_KEYS,
+  featureKeys = LOCAL_CRUD_UI_PREFERENCES_FEATURE_KEYS,
   classes = {},
 }: CrudUiPreferencesPanelProps) {
   const api = useMemo(
@@ -110,7 +115,7 @@ export function CrudUiPreferencesPanel({
           const override = state[resource.resourceId] ?? {};
           const enabled = new Set(override.enabledViewModeIds ?? config?.viewModes.map((mode) => mode.id) ?? []);
           const defaultId = override.defaultViewModeId ?? config?.viewModes[0]?.id;
-          const featureFlags = override.featureFlags ?? {};
+          const featureFlags = (override.featureFlags ?? {}) as Partial<CrudFeatureFlags>;
           const rowExtra = classes.checkboxRow ? ` ${classes.checkboxRow}` : '';
 
           return (

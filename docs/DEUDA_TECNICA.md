@@ -272,8 +272,7 @@ Cambios en el módulo (no en pymes):
 
 Cambios en pymes (mínimos):
 
-- `go.mod`: `replace github.com/devpablocristo/modules/scheduling/go => ../modules/scheduling/go`
-  (temporal hasta publicar v0.2.0).
+- `go.mod`: se usó un `replace` temporal a `../modules/scheduling/go` durante la extracción inicial; quedó retirado una vez publicado el módulo.
 - `frontend/src/pages/CalendarPage.tsx`: **cero cambios** — el componente
   ahora soporta bloqueos out of the box.
 - Esta nota.

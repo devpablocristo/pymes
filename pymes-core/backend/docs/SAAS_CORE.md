@@ -57,6 +57,4 @@ En el repo monolito, `go.mod` fija:
 require github.com/devpablocristo/core/saas/go v0.1.0
 ```
 
-Si necesitás iterar localmente contra el checkout de `core`, el repo usa `replace` a `../core/saas/go` durante desarrollo local.
-
 Como `core/saas/go` se resuelve como módulo privado/versionado, los flujos de `go` del repo usan `GOPRIVATE=github.com/devpablocristo/*` y `GOPROXY=direct`.

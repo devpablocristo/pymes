@@ -53,7 +53,7 @@ Además:
 
 ## Integración externa librería `core`
 
-El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). El runtime reusable de AI también vive en `../../core/ai/python/src/runtime/`. Detalle de criterios y `replace` locales: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.
+El `go.mod` raíz importa módulos `github.com/devpablocristo/core/...` (authn, saas, governance, backend, etc.). El runtime reusable de AI se consume desde el paquete publicado `devpablocristo-core-ai`. Detalle de criterios de integración: **[CORE_INTEGRATION.md](./CORE_INTEGRATION.md)**.
 
 Enrutamiento SaaS compartido (orgs, usuarios, billing Clerk/Stripe): **`pymes-core/backend/docs/SAAS_CORE.md`**.
 

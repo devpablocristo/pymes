@@ -19,23 +19,11 @@ jobs:
         with:
           path: pymes
 
-      - name: Checkout core
-        uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-
       - name: Checkout nexus
         uses: actions/checkout@v4
         with:
           repository: devpablocristo/nexus
           path: nexus
-
-      - name: Checkout modules
-        uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
 
       - name: Create env file
         working-directory: pymes

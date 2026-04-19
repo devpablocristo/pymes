@@ -11,10 +11,6 @@ ENV GOPRIVATE=github.com/devpablocristo/* \
     GOPROXY=https://proxy.golang.org,direct
 
 COPY pymes/go.mod pymes/go.sum /workspace/pymes/
-COPY pymes/third_party/modules-scheduling-go /workspace/pymes/third_party/modules-scheduling-go
-COPY pymes/third_party/core-calendar-ics-go /workspace/pymes/third_party/core-calendar-ics-go
-COPY pymes/third_party/core-calendar-sync-google-go /workspace/pymes/third_party/core-calendar-sync-google-go
-COPY core/scheduling/go /workspace/core/scheduling/go
 
 WORKDIR /workspace/pymes/beauty/backend
 

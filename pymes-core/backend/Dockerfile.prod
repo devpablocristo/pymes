@@ -1,6 +1,5 @@
 # Build de producción para Cloud Run (stateless, binario estático).
-# Contexto esperado: directorio que contiene `pymes/` y `core/` como hermanos,
-# para resolver las replace directives en pymes/go.mod (core/scheduling/go).
+# Contexto esperado: directorio que contiene `pymes/`.
 #
 # Build:
 #   gcloud builds submit <ctx> \
@@ -18,7 +17,6 @@ ENV CGO_ENABLED=0 \
 WORKDIR /workspace
 
 COPY pymes /workspace/pymes
-COPY core/scheduling/go /workspace/core/scheduling/go
 
 WORKDIR /workspace/pymes/pymes-core/backend
 

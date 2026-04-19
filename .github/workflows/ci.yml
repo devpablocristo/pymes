@@ -13,19 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling core/modules for go.mod replace
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -39,19 +26,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling core/modules for go.mod replace
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -65,19 +39,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling core/modules for go.mod replace
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -91,19 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling core/modules for go.mod replace
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -117,19 +65,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling core/modules for go.mod replace
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/core" "$parent/core"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -148,10 +83,6 @@ jobs:
         working-directory: ai
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -160,8 +91,6 @@ jobs:
       - name: Install AI dependencies
         run: python -m pip install --upgrade pip && pip install -r requirements-dev.txt
       - name: Verify AI service
-        env:
-          PYTHONPATH: ${{ github.workspace }}/ai:${{ github.workspace }}/core/ai/python/src
         run: |
           python -m compileall -q src
           ruff check src
@@ -176,19 +105,6 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      # core anidado en workspace; `modules` solo como repo hermano (symlink para file:../../modules en package.json).
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
-      - uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/modules
-          path: modules
-      - name: Symlink sibling modules for npm file:../../modules
-        run: |
-          parent="$(dirname "$GITHUB_WORKSPACE")"
-          ln -sfn "$GITHUB_WORKSPACE/modules" "$parent/modules"
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
@@ -221,13 +137,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: pymes
-
-      - name: Checkout core
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/core
-          path: core
 
       - name: Checkout nexus
         if: github.event_name == 'workflow_dispatch'

@@ -18,8 +18,8 @@ Dependencias directas relevantes:
 Política actual recomendada:
 
 - Pymes debe consumir siempre módulos **publicados y versionados** de `core` y `modules`.
-- Los `replace` a `../core/...` o aliases a `../modules/...` solo se admiten como excepción temporal mientras se prepara una publicación.
-- Antes de cerrar una extracción reusable, el paso final es publicar la nueva versión y volver Pymes al artefacto publicado.
+- La build, Docker y CI de `pymes` no deben depender de `replace`, mounts ni symlinks a repos hermanos.
+- Antes de cerrar una extracción reusable, el paso final es publicar la nueva versión y migrar `pymes` al artefacto publicado.
 
 `GOPRIVATE=github.com/devpablocristo/*` y `GOPROXY=direct` se mantienen para consumo privado cuando corresponda (ver `Makefile`), pero no cambian esta regla de versionado.
 

@@ -5,13 +5,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../lib/i18n';
+import { BranchContext, type BranchContextValue } from '../lib/branchSelectionContext';
 
 const pageSearchMocks = vi.hoisted(() => ({
   usePageSearch: vi.fn(),
-}));
-
-const branchMocks = vi.hoisted(() => ({
-  useBranchSelection: vi.fn(),
 }));
 
 const schedulingMocks = vi.hoisted(() => {
@@ -37,10 +34,6 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../components/PageSearch', () => ({
   usePageSearch: () => pageSearchMocks.usePageSearch(),
-}));
-
-vi.mock('../lib/branchContext', () => ({
-  useBranchSelection: () => branchMocks.useBranchSelection(),
 }));
 
 vi.mock('../components/PageLayout', () => ({
@@ -85,16 +78,11 @@ vi.mock('@devpablocristo/modules-scheduling/next', () => ({
 
 describe('CalendarPage', () => {
   beforeEach(() => {
-    vi.resetModules();
     pageSearchMocks.usePageSearch.mockReset();
-    branchMocks.useBranchSelection.mockReset();
     schedulingMocks.createSchedulingClient.mockClear();
     schedulingMocks.capturedCalendarProps.length = 0;
     schedulingMocks.capturedQueueProps.length = 0;
     pageSearchMocks.usePageSearch.mockReturnValue('cliente demo');
-    branchMocks.useBranchSelection.mockReturnValue({
-      selectedBranchId: 'branch-central',
-    });
   });
 
   it('mounts scheduling calendar with the shared client, locale and page search query', async () => {
@@ -106,11 +94,25 @@ describe('CalendarPage', () => {
       },
     });
 
+    const branchContextValue: BranchContextValue = {
+      orgId: 'org-demo',
+      branches: [{ id: 'branch-central', name: 'Casa Central', active: true }],
+      availableBranches: [{ id: 'branch-central', name: 'Casa Central', active: true }],
+      selectedBranchId: 'branch-central',
+      selectedBranch: { id: 'branch-central', name: 'Casa Central', active: true },
+      isLoading: false,
+      isError: false,
+      error: null,
+      setSelectedBranchId: vi.fn(),
+    };
+
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <LanguageProvider initialLanguage="es">
-            <CalendarPage />
+            <BranchContext.Provider value={branchContextValue}>
+              <CalendarPage />
+            </BranchContext.Provider>
           </LanguageProvider>
         </MemoryRouter>
       </QueryClientProvider>,

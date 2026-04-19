@@ -43,10 +43,9 @@ e2e-review-notifications:
 cleanup-pablo:
 	DRY_RUN=$(DRY_RUN) bash scripts/cleanup-pablo-tree.sh "$(CURDIR)/.."
 
-# Módulo CRUD en el repo `modules`: typecheck + tests TS y go test (ruta vía MODULES_REPO_PATH en .env, default ../modules).
+# Verificación opcional del repo `modules` desde el workspace local del ecosistema.
 modules-check:
-	bash -c 'set -a && [[ -f "$(CURDIR)/.env" ]] && . "$(CURDIR)/.env" && set +a && \
-		M="$${MODULES_REPO_PATH:-../modules}" && \
+	bash -c 'M="${MODULES_REPO_PATH:-../modules}" && \
 		docker compose -f "$$M/docker-compose.yml" build crud-ts-check crud-go-check'
 
 # Stack local

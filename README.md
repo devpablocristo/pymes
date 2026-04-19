@@ -17,7 +17,7 @@ La topologia activa hoy es:
 Regla de consumo:
 
 - `pymes` debe consumir `core` y `modules` por **versiones publicadas**.
-- referencias locales a repos hermanos (`../core`, `../modules`) quedan solo como puente temporal durante una extracción o publicación pendiente, y deben retirarse antes de dar el cambio por cerrado.
+- la build, Docker y CI del repo no deben depender de mounts ni `replace` hacia checkouts locales de `core` o `modules`.
 
 No existen deployables `pymes-core/ai` ni `professionals/ai`. El único runtime AI del producto vive en `ai/`; el runtime reusable efectivo está en la librería `core`, y `pymes-core/shared/` no debe reintroducir un runtime AI paralelo.
 
@@ -40,7 +40,6 @@ Prerequisitos locales:
 
 Nota:
 
-- `.env.example` todavía expone `CORE_REPO_PATH` y `MODULES_REPO_PATH` para iteraciones puntuales, pero la política del repo es volver siempre a dependencias publicadas después de publicar el cambio reusable.
 - El servicio `ai/` debe consumir el runtime reusable Python desde el paquete publicado `devpablocristo-core-ai`; no debe montar `../../core/ai/python/src` como dependencia efectiva de runtime.
 
 Notas operativas del hardening:

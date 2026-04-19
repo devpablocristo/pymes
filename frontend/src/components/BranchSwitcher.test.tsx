@@ -1,34 +1,56 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Branch } from '@devpablocristo/modules-scheduling/next';
 import { LanguageProvider } from '../lib/i18n';
-
-const branchMocks = vi.hoisted(() => ({
-  useBranchSelection: vi.fn(),
-}));
-
-vi.mock('../lib/branchContext', () => ({
-  useBranchSelection: () => branchMocks.useBranchSelection(),
-}));
+import { BranchContext, type BranchContextValue } from '../lib/branchSelectionContext';
 
 import { BranchSwitcher } from './BranchSwitcher';
 
+function buildBranch(id: string, name: string): Branch {
+  return {
+    id,
+    org_id: 'org-demo',
+    code: id,
+    name,
+    timezone: 'America/Argentina/Tucuman',
+    address: `${name} 123`,
+    active: true,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+  };
+}
+
+function buildBranchContextValue(overrides: Partial<BranchContextValue> = {}): BranchContextValue {
+  return {
+    orgId: 'org-demo',
+    branches: [buildBranch('branch-a', 'Casa Central')],
+    availableBranches: [buildBranch('branch-a', 'Casa Central')],
+    selectedBranchId: 'branch-a',
+    selectedBranch: buildBranch('branch-a', 'Casa Central'),
+    isLoading: false,
+    isError: false,
+    error: null,
+    setSelectedBranchId: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe('BranchSwitcher', () => {
   beforeEach(() => {
-    branchMocks.useBranchSelection.mockReset();
+    vi.clearAllMocks();
   });
 
   it('stays hidden when there is zero or one available branch', () => {
-    branchMocks.useBranchSelection.mockReturnValue({
-      availableBranches: [{ id: 'branch-a', name: 'Casa Central' }],
-      selectedBranchId: 'branch-a',
-      setSelectedBranchId: vi.fn(),
-      isLoading: false,
-      isError: false,
-    });
-
     render(
       <LanguageProvider initialLanguage="es">
-        <BranchSwitcher />
+        <BranchContext.Provider
+          value={buildBranchContextValue({
+            branches: [buildBranch('branch-a', 'Casa Central')],
+            availableBranches: [buildBranch('branch-a', 'Casa Central')],
+          })}
+        >
+          <BranchSwitcher />
+        </BranchContext.Provider>
       </LanguageProvider>,
     );
 
@@ -37,20 +59,26 @@ describe('BranchSwitcher', () => {
 
   it('renders a global selector and forwards selection changes', () => {
     const setSelectedBranchId = vi.fn();
-    branchMocks.useBranchSelection.mockReturnValue({
-      availableBranches: [
-        { id: 'branch-a', name: 'Casa Central' },
-        { id: 'branch-b', name: 'Sucursal Norte' },
-      ],
-      selectedBranchId: 'branch-a',
-      setSelectedBranchId,
-      isLoading: false,
-      isError: false,
-    });
 
     render(
       <LanguageProvider initialLanguage="es">
-        <BranchSwitcher />
+        <BranchContext.Provider
+          value={buildBranchContextValue({
+            branches: [
+              buildBranch('branch-a', 'Casa Central'),
+              buildBranch('branch-b', 'Sucursal Norte'),
+            ],
+            availableBranches: [
+              buildBranch('branch-a', 'Casa Central'),
+              buildBranch('branch-b', 'Sucursal Norte'),
+            ],
+            selectedBranchId: 'branch-a',
+            selectedBranch: buildBranch('branch-a', 'Casa Central'),
+            setSelectedBranchId,
+          })}
+        >
+          <BranchSwitcher />
+        </BranchContext.Provider>
       </LanguageProvider>,
     );
 

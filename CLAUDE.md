@@ -61,8 +61,9 @@ Todo lo que es **código interno** debe estar en inglés sin excepciones:
 1. TLDR primero
 2. Ideal primero, luego práctico si difieren
 3. Esperar aprobación antes de implementar algo no trivial
-4. **Verificación obligatoria antes de decir “listo” / “ya está”:** desde la raíz del monorepo ejecutar **`make build`** y **`make test`** en este mismo turno cuando el cambio afecta entrega o varios paquetes; si el alcance es mínimo, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend). Si tocás **Dockerfile**, **entrypoint** o **compose**, además: **`docker compose build`** del servicio afectado, **`docker compose up -d`**, y comprobar **HTTP** (p. ej. `curl` a `/healthz` en el puerto publicado). Ver `.cursor/rules/verify-before-claim.mdc`.
-5. **Prohibido** afirmar “listo”, “ya está” o “funciona” sin evidencia de una ejecución exitosa en este turno (comandos + salida OK).
+4. **Verificación obligatoria antes de decir “listo” / “ya está”:** para **todo cambio de código, configuración, CI, Docker o infraestructura**, ejecutar la validación relevante **antes** de reportar cierre o empujar el cambio. Desde la raíz del monorepo: **`make build`** y **`make test`** cuando el cambio afecta entrega o varios paquetes; si el alcance es mínimo, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend).
+5. Si tocás **Dockerfile**, **entrypoint**, **compose** o wiring de runtime, además es obligatorio: **`docker compose build`** del servicio afectado, **`docker compose up -d`**, esperar readiness real y comprobar **HTTP** (p. ej. `curl` a `/healthz` en el puerto publicado). Si el smoke funcional depende de auth, seeds o secretos del entorno actual, hay que explicitarlo con precisión y dejar evidencia de la máxima validación posible en ese mismo turno. Ver `.cursor/rules/verify-before-claim.mdc`.
+6. **Prohibido** afirmar “listo”, “ya está” o “funciona” sin evidencia de una ejecución exitosa en este turno (comandos + salida OK). También queda prohibido dejar el testing “para después”.
 
 ---
 

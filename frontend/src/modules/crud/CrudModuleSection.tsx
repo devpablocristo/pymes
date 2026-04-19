@@ -41,7 +41,7 @@ export function CrudModuleSection(props: Props) {
   return (
     <HeaderMenuItemsProvider items={menuItems}>
       <div className="wo-mod-orders">
-        <CrudViewModeSwitch {...props} />
+        {!isActionHidden ? <CrudViewModeSwitch {...props} /> : null}
         {props.children}
         <Outlet />
       </div>

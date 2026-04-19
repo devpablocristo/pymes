@@ -86,9 +86,9 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   workshopVehicles: { title: 'Vehículos', navLabel: 'Vehículos', labelPlural: 'vehículos' },
   carWorkOrders: { title: 'Órdenes de trabajo (auto)', navLabel: 'OT auto', labelPlural: 'órdenes de trabajo' },
   bikeWorkOrders: {
-    title: 'Órdenes de bicicletería',
-    navLabel: 'Órdenes bici',
-    labelPlural: 'órdenes de bicicletería',
+    title: 'Órdenes de trabajo',
+    navLabel: 'Órdenes de trabajo',
+    labelPlural: 'órdenes de trabajo',
   },
   restaurantDiningAreas: {
     title: 'Zonas del salón',

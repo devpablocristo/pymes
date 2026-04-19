@@ -352,8 +352,7 @@ export function createWorkOrdersCrudConfig({
     viewModes: buildStandardCrudViewModes(
       () => <PymesSimpleCrudListModeContent resourceId={resourceId} />,
       {
-        defaultModeId: 'kanban',
-        renderKanban: () => <PymesSimpleCrudListModeContent resourceId={resourceId} mode="kanban" />,
+        defaultModeId: 'list',
         ariaLabel: 'Navegación tablero / lista / galería',
       },
     ),
@@ -362,13 +361,6 @@ export function createWorkOrdersCrudConfig({
     labelPluralCap,
     createLabel,
     searchPlaceholder: 'Buscar...',
-    stateMachine: WORK_ORDER_STATE_MACHINE,
-    kanban: {
-      persistMove: async ({ row, nextValue }) => {
-        await updateUnifiedWorkOrder(row.id, { status: nextValue });
-        return { ...row, status: nextValue } as WorkOrder;
-      },
-    },
     dataSource: {
       list: async ({ archived }) => {
         if (archived) {

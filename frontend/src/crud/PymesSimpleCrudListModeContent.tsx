@@ -745,6 +745,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           onRowClick={resolvedTableRowClick}
           selectedId={selectedId}
           sortable={crudConfig.featureFlags?.columnSort !== false}
+          tableClassName={resourceId === 'carWorkOrders' || resourceId === 'bikeWorkOrders' ? 'crud-table--auto-layout' : undefined}
         />
       )}
 

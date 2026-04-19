@@ -82,6 +82,10 @@
   table-layout: fixed;
 }
 
+.crud-table--auto-layout {
+  table-layout: auto;
+}
+
 .crud-table th,
 .crud-table td {
   overflow: hidden;

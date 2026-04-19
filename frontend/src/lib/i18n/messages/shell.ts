@@ -45,7 +45,7 @@ export const shellMessages: TranslationsByLanguage = {
     'shell.nav.settings': 'Ajustes',
     'shell.sections.bikeShop': 'Bicicletería',
     'shell.nav.bikeServices': 'Servicios',
-    'shell.nav.bikeOrders': 'Reparaciones',
+    'shell.nav.bikeOrders': 'Órdenes de trabajo',
     'shell.bikeWorkOrders.pageTitle': 'Órdenes de bicicletería',
     'shell.skipLink': 'Saltar al contenido principal',
     'shell.search.placeholder': 'Buscar...',

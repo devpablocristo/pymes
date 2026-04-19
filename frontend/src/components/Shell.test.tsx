@@ -96,7 +96,7 @@ describe('Shell bike shop navigation', () => {
     });
 
     expect(screen.getByText('Bicicletería')).toBeInTheDocument();
-    expect(screen.getByText('Reparaciones')).toBeInTheDocument();
+    expect(screen.getByText('Órdenes de trabajo')).toBeInTheDocument();
     expect(screen.queryByText('Bicis en taller')).not.toBeInTheDocument();
   });
 

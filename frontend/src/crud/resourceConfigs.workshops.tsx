@@ -18,7 +18,7 @@ const workshopsResourceConfigs: CrudResourceConfigMap = {
   bikeWorkOrders: createWorkOrdersCrudConfig({
     resourceId: 'bikeWorkOrders',
     targetType: 'bicycle',
-    labelPluralCap: 'Órdenes de trabajo (bicicletería)',
+    labelPluralCap: 'Órdenes de trabajo',
     createLabel: '+ Nueva orden',
     itemsPlaceholder:
       '[{"item_type":"service","description":"Parche de cámara","quantity":1,"unit_price":3500,"tax_rate":21},{"item_type":"part","description":"Cámara 29x2.1","quantity":1,"unit_price":8000,"tax_rate":21}]',
@@ -29,8 +29,8 @@ export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = define
   workshopsResourceConfigs,
   {
     csvOverrides: {
-      carWorkOrders: { mode: 'client', allowImport: false, allowExport: true },
-      bikeWorkOrders: { mode: 'client', allowImport: false, allowExport: true },
+      carWorkOrders: { mode: 'client', allowImport: true, allowExport: true },
+      bikeWorkOrders: { mode: 'client', allowImport: true, allowExport: true },
     },
   },
 );

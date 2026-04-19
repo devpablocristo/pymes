@@ -29,6 +29,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const { preSearchFilter, listHeaderInlineSlot } = useCrudListCreatedByMerge();
   const [internalSearch, setInternalSearch] = useState('');
   const [valueFilter, setValueFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('all');
   const search = externalSearch ?? internalSearch;
   const setSearch = externalSetSearch ?? setInternalSearch;
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
@@ -56,7 +57,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [creatorFilterEnabled, items, preSearchFilter],
   );
 
-  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals && resourceId !== 'suppliers';
+  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals;
 
   const tagFilterOptions = useMemo(
     () =>
@@ -112,13 +113,13 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   );
 
   const tagFilteredItems = useMemo(() => {
-    if (!tagFilterEnabled || valueFilter === 'all') return creatorFilteredItems;
+    if (!tagFilterEnabled || tagFilter === 'all') return creatorFilteredItems;
     return creatorFilteredItems.filter((row) => {
       const rec = row as Record<string, unknown>;
       const tags = Array.isArray(rec.tags) ? rec.tags : [];
-      return tags.some((raw) => String(raw ?? '').trim() === valueFilter);
+      return tags.some((raw) => String(raw ?? '').trim() === tagFilter);
     });
-  }, [creatorFilteredItems, tagFilterEnabled, valueFilter]);
+  }, [creatorFilteredItems, tagFilterEnabled, tagFilter]);
 
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
   const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
@@ -157,7 +158,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     <div className="crud-list-header-lead">{listHeaderInlineSlot?.({ items })}</div>
   ) : tagFilterEnabled ? (
     <div className="crud-list-header-lead">
-      <TagPillsBar tags={tagValues} value={valueFilter} onChange={setValueFilter} />
+      <TagPillsBar tags={tagValues} value={tagFilter} onChange={setTagFilter} />
     </div>
   ) : undefined;
 

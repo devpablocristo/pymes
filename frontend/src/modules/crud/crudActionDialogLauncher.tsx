@@ -8,6 +8,7 @@ type CrudFormDialogOptions = {
   title: string;
   subtitle?: string;
   eyebrow?: ReactNode;
+  allowEdit?: boolean;
   mediaUrls?: string[];
   mediaFieldId?: string;
   dialogMode?: 'create' | 'update';
@@ -42,6 +43,28 @@ type CrudFormDialogOptions = {
       cancelLabel?: string;
     };
     onArchive: () => Promise<void> | void;
+  };
+  restoreAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onRestore: () => Promise<void> | void;
+  };
+  deleteAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onDelete: () => Promise<void> | void;
   };
 };
 
@@ -78,6 +101,7 @@ export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Reco
       mediaUrls={options.mediaUrls}
       mediaFieldId={options.mediaFieldId}
       dialogMode={options.dialogMode}
+      allowEdit={options.allowEdit}
       fields={options.fields}
       blocks={options.blocks}
       sections={options.sections}
@@ -98,6 +122,28 @@ export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Reco
               ...options.archiveAction,
               onArchive: async () => {
                 await options.archiveAction?.onArchive();
+                finish(null);
+              },
+            }
+          : undefined
+      }
+      restoreAction={
+        options.restoreAction
+          ? {
+              ...options.restoreAction,
+              onRestore: async () => {
+                await options.restoreAction?.onRestore();
+                finish(null);
+              },
+            }
+          : undefined
+      }
+      deleteAction={
+        options.deleteAction
+          ? {
+              ...options.deleteAction,
+              onDelete: async () => {
+                await options.deleteAction?.onDelete();
                 finish(null);
               },
             }

@@ -22,6 +22,7 @@ type SupplierItem struct {
 	Metadata    map[string]any `json:"metadata"`
 	CreatedAt   string         `json:"created_at"`
 	UpdatedAt   string         `json:"updated_at"`
+	DeletedAt   string         `json:"deleted_at,omitempty"`
 }
 
 type ListSuppliersResponse struct {

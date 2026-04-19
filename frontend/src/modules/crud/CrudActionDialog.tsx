@@ -24,6 +24,7 @@ type CrudActionDialogBaseProps = {
 
 type CrudActionDialogFormProps = CrudActionDialogBaseProps & {
   mode: 'form';
+  allowEdit?: boolean;
   fields: CrudActionDialogField[];
   sections?: CrudEntityEditorModalSection[];
   stats?: CrudEntityEditorModalStat[];
@@ -52,6 +53,28 @@ type CrudActionDialogFormProps = CrudActionDialogBaseProps & {
     };
     onArchive: () => Promise<void> | void;
   };
+  restoreAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onRestore: () => Promise<void> | void;
+  };
+  deleteAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onDelete: () => Promise<void> | void;
+  };
   blocks?: CrudEntityEditorModalBlock[];
   submitLabel?: string;
   initialValues?: Record<string, CrudFieldValue>;
@@ -78,6 +101,7 @@ export function CrudActionDialog(props: CrudActionDialogProps) {
         mediaUrls={props.mediaUrls}
         mediaFieldId={props.mediaFieldId}
         mode={props.dialogMode}
+        allowEdit={props.allowEdit}
         editLabel={props.editLabel}
         cancelEditLabel={props.cancelEditLabel}
         closeLabel={props.closeLabel}
@@ -93,6 +117,8 @@ export function CrudActionDialog(props: CrudActionDialogProps) {
         disableSubmit={props.disableSubmit}
         confirmDiscard={props.confirmDiscard}
         archiveAction={props.archiveAction}
+        restoreAction={props.restoreAction}
+        deleteAction={props.deleteAction}
         submitLabel={props.submitLabel}
         cancelLabel={props.cancelLabel}
         onCancel={props.onCancel}

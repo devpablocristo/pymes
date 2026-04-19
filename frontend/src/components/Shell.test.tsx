@@ -96,7 +96,35 @@ describe('Shell bike shop navigation', () => {
     });
 
     expect(screen.getByText('Bicicletería')).toBeInTheDocument();
-    expect(screen.getByText('Órdenes de trabajo')).toBeInTheDocument();
+    expect(screen.getByText('Reparaciones')).toBeInTheDocument();
     expect(screen.queryByText('Bicis en taller')).not.toBeInTheDocument();
+  });
+
+  it('shows budgets in the commercial menu when the profile enables them', async () => {
+    shellMocks.loadModuleCatalog.mockResolvedValue({
+      moduleGroups: [{ id: 'commercial', label: 'Comercial' }],
+      moduleList: [
+        { id: 'quotes', group: 'commercial', navLabel: 'Presupuestos', icon: 'x' },
+        { id: 'sales', group: 'commercial', navLabel: 'Ventas', icon: 'x' },
+      ],
+    });
+    shellMocks.getVisibleModuleIds.mockReturnValue(new Set(['quotes', 'sales']));
+
+    render(
+      <MemoryRouter initialEntries={['/bicimax/dashboard']}>
+        <LanguageProvider initialLanguage="es">
+          <Shell>
+            <div>contenido</div>
+          </Shell>
+        </LanguageProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(shellMocks.loadModuleCatalog).toHaveBeenCalled();
+    });
+
+    expect(screen.getByText('Presupuestos')).toBeInTheDocument();
+    expect(screen.getByText('Ventas')).toBeInTheDocument();
   });
 });

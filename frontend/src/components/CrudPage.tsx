@@ -157,6 +157,7 @@ export type CrudEditorModalFieldConfig = {
 export type CrudEditorModalConfig<T extends { id: string }> = {
   eyebrow?: ReactNode;
   loadRecord?: (row: T) => Promise<T>;
+  canEdit?: (row: T) => boolean;
   mediaFieldKey?: string;
   blocks?: CrudEditorModalBlockConfig<T>[];
   sections?: CrudEditorModalSectionConfig[];

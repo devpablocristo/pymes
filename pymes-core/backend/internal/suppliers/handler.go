@@ -256,6 +256,10 @@ func (h *Handler) HardDelete(c *gin.Context) {
 }
 
 func toSupplierItem(in supplierdomain.Supplier) dto.SupplierItem {
+	deletedAt := ""
+	if in.DeletedAt != nil {
+		deletedAt = in.DeletedAt.UTC().Format(time.RFC3339)
+	}
 	return dto.SupplierItem{
 		ID:    in.ID.String(),
 		OrgID: in.OrgID.String(),
@@ -276,6 +280,7 @@ func toSupplierItem(in supplierdomain.Supplier) dto.SupplierItem {
 		Metadata:    in.Metadata,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
+		DeletedAt:   deletedAt,
 	}
 }
 

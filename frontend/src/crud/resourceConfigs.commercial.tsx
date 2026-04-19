@@ -57,6 +57,7 @@ type Supplier = {
   notes: string;
   tags?: string[];
   address?: CrudAddress;
+  deleted_at?: string | null;
 };
 
 type Product = {

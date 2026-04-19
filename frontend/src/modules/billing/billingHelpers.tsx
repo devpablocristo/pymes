@@ -619,6 +619,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
+      canEdit: () => false,
       fieldConfig: {
         customer_id: { hidden: true },
         quote_id: { hidden: true },
@@ -912,6 +913,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
+      canEdit: (row) => String(row.status ?? '').trim().toLowerCase() === 'draft',
       blocks: [
         {
           id: 'items',

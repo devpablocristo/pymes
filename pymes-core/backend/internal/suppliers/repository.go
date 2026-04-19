@@ -40,7 +40,7 @@ type supplierPartyRow struct {
 	Address     []byte `gorm:"column:address"`
 	TaxID       string `gorm:"column:tax_id"`
 	Notes       string
-	Tags        pq.StringArray `gorm:"column:tags"`
+	Tags        pq.StringArray `gorm:"type:text[];column:tags"`
 	Metadata    []byte         `gorm:"column:metadata"`
 	CreatedAt   time.Time      `gorm:"column:created_at"`
 	UpdatedAt   time.Time      `gorm:"column:updated_at"`
@@ -225,7 +225,22 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]suppl
 	var rows []supplierPartyRow
 	err := r.db.WithContext(ctx).
 		Table("parties p").
-		Select("p.*, COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name").
+		Select(`
+			p.id,
+			p.org_id,
+			p.display_name,
+			p.email,
+			p.phone,
+			p.address,
+			p.tax_id,
+			p.notes,
+			p.tags,
+			p.metadata,
+			p.created_at,
+			p.updated_at,
+			p.deleted_at,
+			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
+		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier'").
 		Where("p.org_id = ? AND p.deleted_at IS NOT NULL", orgID).
 		Order("p.updated_at DESC").
@@ -287,7 +302,22 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 	return r.db.WithContext(ctx).
 		Table("parties p").
-		Select("p.*, COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name").
+		Select(`
+			p.id,
+			p.org_id,
+			p.display_name,
+			p.email,
+			p.phone,
+			p.address,
+			p.tax_id,
+			p.notes,
+			p.tags,
+			p.metadata,
+			p.created_at,
+			p.updated_at,
+			p.deleted_at,
+			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
+		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
 		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
 }

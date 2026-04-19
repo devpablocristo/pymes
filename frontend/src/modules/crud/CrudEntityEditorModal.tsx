@@ -75,6 +75,7 @@ export type CrudEntityEditorModalProps = {
   eyebrow?: ReactNode;
   variant?: 'modal' | 'page';
   editBehavior?: 'read-edit' | 'edit-only';
+  allowEdit?: boolean;
   mediaUrls?: string[];
   mediaFieldId?: string;
   mode?: 'create' | 'update';
@@ -121,6 +122,28 @@ export type CrudEntityEditorModalProps = {
       cancelLabel?: string;
     };
     onArchive: () => Promise<void> | void;
+  };
+  restoreAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onRestore: () => Promise<void> | void;
+  };
+  deleteAction?: {
+    label?: string;
+    busyLabel?: string;
+    confirm?: {
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    };
+    onDelete: () => Promise<void> | void;
   };
   onCancel: () => void;
   onSubmit: (values: Record<string, CrudFieldValue>) => void;
@@ -203,13 +226,14 @@ export function CrudEntityEditorModal({
   eyebrow,
   variant = 'modal',
   editBehavior = 'read-edit',
+  allowEdit = true,
   mediaUrls,
   mediaFieldId,
   mode = 'create',
   cancelLabel = 'Cancelar',
   submitLabel = 'Guardar',
   editLabel = 'Editar',
-  cancelEditLabel = 'Cancelar edición',
+  cancelEditLabel = 'Cancelar',
   closeLabel = 'Cerrar',
   fields,
   blocks = [],
@@ -230,6 +254,8 @@ export function CrudEntityEditorModal({
   pageToolbarClassName,
   confirmDiscard,
   archiveAction,
+  restoreAction,
+  deleteAction,
   onCancel,
   onSubmit,
 }: CrudEntityEditorModalProps) {
@@ -245,6 +271,8 @@ export function CrudEntityEditorModal({
   const [values, setValues] = useState<Record<string, CrudFieldValue>>(initialValues);
   const [isEditing, setIsEditing] = useState(mode === 'create' || editBehavior === 'edit-only');
   const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setValues(initialValues);
@@ -349,8 +377,75 @@ export function CrudEntityEditorModal({
     }
   };
 
+  const handleRestore = async () => {
+    if (!restoreAction || restoring) return;
+    if (restoreAction.confirm) {
+      const confirmed = await confirmAction({
+        title: restoreAction.confirm.title,
+        description: restoreAction.confirm.description,
+        confirmLabel: restoreAction.confirm.confirmLabel ?? restoreAction.label ?? 'Restaurar',
+        cancelLabel: restoreAction.confirm.cancelLabel ?? 'Cancelar',
+      });
+      if (!confirmed) return;
+    }
+    setRestoring(true);
+    try {
+      await restoreAction.onRestore();
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteAction || deleting) return;
+    if (deleteAction.confirm) {
+      const confirmed = await confirmAction({
+        title: deleteAction.confirm.title,
+        description: deleteAction.confirm.description,
+        confirmLabel: deleteAction.confirm.confirmLabel ?? deleteAction.label ?? 'Eliminar',
+        cancelLabel: deleteAction.confirm.cancelLabel ?? 'Cancelar',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
+    }
+    setDeleting(true);
+    try {
+      await deleteAction.onDelete();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const startEditing = () => {
+    if (typeof window === 'undefined') {
+      setIsEditing(true);
+      return;
+    }
+    window.setTimeout(() => setIsEditing(true), 0);
+  };
+
   const footer =
-    mode === 'update' && editBehavior !== 'edit-only' && !isEditing ? (
+    mode === 'update' && editBehavior !== 'edit-only' && !isEditing && (restoreAction || deleteAction) ? (
+      <div className="crud-entity-editor-modal__footer-layout">
+        <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--start">
+          {deleteAction ? (
+            <button type="button" className="btn btn-danger" onClick={() => void handleDelete()} disabled={deleting || restoring}>
+              {deleting ? deleteAction.busyLabel ?? 'Eliminando…' : deleteAction.label ?? 'Eliminar'}
+            </button>
+          ) : null}
+        </div>
+        <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--end">
+          <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()} disabled={deleting || restoring}>
+            {closeLabel}
+          </button>
+          {restoreAction ? (
+            <button type="button" className="btn btn-primary" onClick={() => void handleRestore()} disabled={restoring || deleting}>
+              {restoring ? restoreAction.busyLabel ?? 'Restaurando…' : restoreAction.label ?? 'Restaurar'}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    ) : mode === 'update' && editBehavior !== 'edit-only' && !isEditing ? (
       <div className="crud-entity-editor-modal__footer-layout">
         <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--start">
           {archiveAction ? (
@@ -363,7 +458,13 @@ export function CrudEntityEditorModal({
           <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
             {closeLabel}
           </button>
-          <button type="button" className="btn btn-primary" onClick={() => setIsEditing(true)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={startEditing}
+            disabled={!allowEdit}
+            title={!allowEdit ? 'Este registro no admite edición' : undefined}
+          >
             {editLabel}
           </button>
         </div>

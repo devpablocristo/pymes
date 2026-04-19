@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
@@ -9,6 +9,7 @@ const { openCrudFormDialogMock, headerPropsSpy } = vi.hoisted(() => ({
   openCrudFormDialogMock: vi.fn(),
   headerPropsSpy: vi.fn(),
 }));
+let archivedState = false;
 
 vi.mock('../lib/i18n', () => ({
   useI18n: () => ({
@@ -44,7 +45,7 @@ vi.mock('./usePymesCrudHeaderFeatures', () => ({
 vi.mock('../modules/crud', () => ({
   CrudEntityDetailModal: ({ open, title }: { open: boolean; title: string }) =>
     open ? <div>detail-open:{title}</div> : null,
-  useCrudArchivedSearchParam: () => ({ archived: false }),
+  useCrudArchivedSearchParam: () => ({ archived: archivedState }),
   useCrudRemoteGalleryPage: () => ({
     items: [{ id: '1', name: 'Cliente Uno' }],
     setItems: vi.fn(),
@@ -74,9 +75,15 @@ vi.mock('../modules/crud', () => ({
       <div>rows:{items.length}</div>
       <div>cols:{columns.map((column) => `${column.id}:${column.header}`).join('|')}</div>
       <div>row-click:{String(Boolean(onRowClick))}</div>
+      {items[0] ? (
+        <button type="button" onClick={() => onRowClick?.(items[0])}>
+          open-row
+        </button>
+      ) : null}
     </div>
   ),
   CrudGallerySurface: () => <div>gallery-surface</div>,
+  collectCrudImageUrls: () => [],
   CrudPaginationBar: ({
     visibleCount,
     totalCount,
@@ -159,6 +166,7 @@ describe('PymesSimpleCrudListModeContent', () => {
   beforeEach(() => {
     openCrudFormDialogMock.mockReset();
     headerPropsSpy.mockReset();
+    archivedState = false;
   });
 
   it('preconfigura el estado al crear desde el pie de una columna kanban', async () => {
@@ -227,8 +235,8 @@ describe('PymesSimpleCrudListModeContent', () => {
       basePath: '/v1/customers',
       columns: [{ key: 'name', header: 'Nombre' }],
       formFields: [],
-      searchText: (row) => row.name,
-      toFormValues: (row) => ({ name: row.name ?? '' }),
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
       isValid: () => true,
     } as CrudPageConfig<{ id: string; name: string }>;
 
@@ -253,7 +261,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
 
     const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="services" />);
-    expect(screen.getByText('cols:name:Nombre|tags:Tags')).toBeInTheDocument();
+    expect(screen.getByText('cols:name:Nombre|tags:Etiquetas')).toBeInTheDocument();
 
     currentConfig = {
       ...currentConfig,
@@ -280,6 +288,33 @@ describe('PymesSimpleCrudListModeContent', () => {
 
     render(<PymesSimpleCrudListModeContent resourceId="purchases" />);
     expect(screen.getByText('row-click:true')).toBeInTheDocument();
+  });
+
+  it('abre proveedores con edición habilitada', async () => {
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    currentConfig = {
+      label: 'proveedor',
+      labelPlural: 'proveedores',
+      labelPluralCap: 'Proveedores',
+      basePath: '/v1/suppliers',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      allowEdit: true,
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+    vi.doMock('../modules/crud', () => ({}));
+
+    render(<PymesSimpleCrudListModeContent resourceId="suppliers" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    expect(openCrudFormDialogMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowEdit: true,
+        dialogMode: 'update',
+      }),
+    );
   });
 
   it('usa la surface reusable de kanban en vez del bloque inline viejo', () => {
@@ -368,5 +403,42 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('lead-slot:false')).toBeInTheDocument();
     expect(screen.getByText('extra-actions:false')).toBeInTheDocument();
     expect(screen.getByText('pagination:1:1:false:true')).toBeInTheDocument();
+  });
+
+  it('en archivados abre solo con restaurar y eliminar', async () => {
+    archivedState = true;
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    currentConfig = {
+      label: 'proveedor',
+      labelPlural: 'proveedores',
+      labelPluralCap: 'Proveedores',
+      basePath: '/v1/suppliers',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      supportsArchived: true,
+      dataSource: {
+        list: async () => [],
+        restore: async () => undefined,
+        hardDelete: async () => undefined,
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="suppliers" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() =>
+      expect(openCrudFormDialogMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowEdit: false,
+          closeLabel: 'Salir',
+          archiveAction: undefined,
+          restoreAction: expect.objectContaining({ label: 'Restaurar' }),
+          deleteAction: expect.objectContaining({ label: 'Eliminar' }),
+        }),
+      ),
+    );
   });
 });

@@ -25,8 +25,10 @@ type ModuleListItem = {
 
 const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
   'customers',
+  'suppliers',
   'products',
   'services',
+  'quotes',
   'sales',
   'purchases',
   'inventory',

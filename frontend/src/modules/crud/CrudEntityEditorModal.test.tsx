@@ -115,8 +115,10 @@ describe('CrudEntityEditorModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
 
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancelar edición' })).toBeInTheDocument();
+    return waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+    });
   });
 
   it('returns from edit mode to read mode when canceling edition', async () => {
@@ -139,8 +141,9 @@ describe('CrudEntityEditorModal', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByLabelText('Notas')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Notas'), { target: { value: 'Cambio temporal' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar edición' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument();
@@ -168,6 +171,7 @@ describe('CrudEntityEditorModal', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
     fireEvent.keyDown(window, { key: 'Escape' });
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
@@ -178,7 +182,7 @@ describe('CrudEntityEditorModal', () => {
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });
 
-  it('renders line item blocks only in edit mode', () => {
+  it('renders line item blocks only in edit mode', async () => {
     render(
       <CrudEntityEditorModal
         open
@@ -195,10 +199,10 @@ describe('CrudEntityEditorModal', () => {
 
     expect(screen.queryByText('Añadir renglón')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    expect(screen.getByText('Añadir renglón')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Añadir renglón')).toBeInTheDocument());
   });
 
-  it('keeps the modal open when switching an existing record with items into edit mode', () => {
+  it('keeps the modal open when switching an existing record with items into edit mode', async () => {
     render(
       <CrudEntityEditorModal
         open
@@ -215,8 +219,48 @@ describe('CrudEntityEditorModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
 
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
     expect(screen.getByDisplayValue('Producto')).toBeInTheDocument();
     expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
+  });
+
+  it('can render an existing record in read-only mode with disabled edit button', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="VTA-001"
+        mode="update"
+        allowEdit={false}
+        fields={[{ id: 'customer_name', label: 'Cliente', defaultValue: 'Cliente Demo', sectionId: 'summary' }]}
+        sections={[{ id: 'summary', title: 'Resumen' }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Cerrar' })).toHaveLength(2);
+  });
+
+  it('renders archived actions with restore and delete only', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Proveedor archivado"
+        mode="update"
+        closeLabel="Salir"
+        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo', sectionId: 'summary' }]}
+        sections={[{ id: 'summary', title: 'Resumen' }]}
+        restoreAction={{ onRestore: vi.fn() }}
+        deleteAction={{ onDelete: vi.fn() }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Restaurar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
   });
 });

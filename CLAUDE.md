@@ -64,6 +64,7 @@ Todo lo que es **código interno** debe estar en inglés sin excepciones:
 4. **Verificación obligatoria antes de decir “listo” / “ya está”:** para **todo cambio de código, configuración, CI, Docker o infraestructura**, ejecutar la validación relevante **antes** de reportar cierre o empujar el cambio. Desde la raíz del monorepo: **`make build`** y **`make test`** cuando el cambio afecta entrega o varios paquetes; si el alcance es mínimo, al menos el subset equivalente (p. ej. `go test` en el backend tocado + `npm run build` / `npm test` en frontend).
 5. Si tocás **Dockerfile**, **entrypoint**, **compose** o wiring de runtime, además es obligatorio: **`docker compose build`** del servicio afectado, **`docker compose up -d`**, esperar readiness real y comprobar **HTTP** (p. ej. `curl` a `/healthz` en el puerto publicado). Si el smoke funcional depende de auth, seeds o secretos del entorno actual, hay que explicitarlo con precisión y dejar evidencia de la máxima validación posible en ese mismo turno. Ver `.cursor/rules/verify-before-claim.mdc`.
 6. **Prohibido** afirmar “listo”, “ya está” o “funciona” sin evidencia de una ejecución exitosa en este turno (comandos + salida OK). También queda prohibido dejar el testing “para después”.
+7. **Si el cambio apunta a corregir un bug visible por usuario, no alcanza con compilar ni con asumir la causa:** hay que **reproducirlo, iterar, volver a probar e insistir hasta verificar que el bug quedó resuelto** en el flujo afectado; recién ahí se puede devolver como cerrado.
 
 ---
 

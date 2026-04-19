@@ -58,8 +58,10 @@ export type SupplierRecord = {
   tax_id?: string;
   email?: string;
   phone?: string;
+  address?: PartyAddress;
   notes?: string;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 };
 
 export type AccountRecord = {
@@ -144,7 +146,16 @@ export function customerFormToBody(values: CrudFormValues): Record<string, unkno
 }
 
 export function buildSupplierSearchText(row: SupplierRecord): string {
-  return [row.name, row.contact_name, row.email, row.phone, row.tax_id, row.notes, formatPartyTagList(row.tags)]
+  return [
+    row.name,
+    row.contact_name,
+    row.email,
+    row.phone,
+    row.tax_id,
+    formatPartyAddress(row.address),
+    row.notes,
+    formatPartyTagList(row.tags),
+  ]
     .filter(Boolean)
     .join(' ');
 }
@@ -156,6 +167,10 @@ export function buildSupplierFormValues(row: SupplierRecord) {
     tax_id: row.tax_id ?? '',
     email: row.email ?? '',
     phone: row.phone ?? '',
+    address_city: row.address?.city ?? '',
+    address_state: row.address?.state ?? '',
+    address_country: row.address?.country ?? '',
+    metadata_website: typeof row.metadata?.website === 'string' ? row.metadata.website : '',
     tags: formatPartyTagList(row.tags),
     notes: row.notes ?? '',
   };
@@ -168,6 +183,14 @@ export function supplierFormToBody(values: CrudFormValues): Record<string, unkno
     tax_id: asOptionalString(values.tax_id),
     email: asOptionalString(values.email),
     phone: normalizeArgentinaPhone(asString(values.phone)),
+    address: {
+      city: asString(values.address_city),
+      state: asString(values.address_state),
+      country: asString(values.address_country),
+    },
+    metadata: parseMetadataStringMap(undefined, {
+      website: asOptionalString(values.metadata_website),
+    }),
     tags: parsePartyTagCsv(values.tags),
     notes: asOptionalString(values.notes),
   };
@@ -226,10 +249,10 @@ export function createSupplierColumns<T extends SupplierRecord>(): CrudColumn<T>
     { key: 'name', header: 'Nombre', className: 'cell-name' },
     { key: 'contact_name', header: 'Contacto', render: (_v, row) => row.contact_name || '—' },
     { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '—' },
-    { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
-    { key: 'tags', header: 'Etiquetas', render: (value) => formatPartyTagList(value as string[]) || '—' },
-    { key: 'notes', header: 'Notas', className: 'cell-notes' },
+    { key: 'address', header: 'Ubicación', render: (_v, row) => formatPartyAddress(row.address) || '—' },
+    { key: 'metadata', header: 'Sitio web', render: (_v, row) => (typeof row.metadata?.website === 'string' ? row.metadata.website : '—') },
+    { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
   ];
 }
 
@@ -238,10 +261,14 @@ export function supplierFormFields(): CrudFormField[] {
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del proveedor' },
     { key: 'contact_name', label: 'Contacto', placeholder: 'Nombre de contacto' },
     { key: 'tax_id', label: 'CUIT', placeholder: '30-12345678-9' },
-    { key: 'email', label: 'Email', type: 'email', placeholder: 'compras@proveedor.com' },
     { key: 'phone', label: 'Teléfono', type: 'tel', placeholder: '3815551234' },
-    { key: 'tags', label: 'Etiquetas', placeholder: 'importado, insumos, logistico' },
-    { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+    { key: 'email', label: 'Email', type: 'email', placeholder: 'compras@proveedor.com' },
+    { key: 'metadata_website', label: 'Sitio web', type: 'text', placeholder: 'https://proveedor.com' },
+    { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad principal' },
+    { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
+    { key: 'address_country', label: 'País', type: 'select', options: countryOptions },
+    { key: 'tags', label: 'Etiquetas internas', placeholder: 'importado, insumos, logistico' },
+    { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
   ];
 }
 
@@ -469,6 +496,7 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
   | 'labelPluralCap'
   | 'createLabel'
   | 'searchPlaceholder'
+  | 'allowEdit'
   | 'columns'
   | 'formFields'
   | 'searchText'
@@ -479,6 +507,7 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
 > {
   return {
     supportsArchived: true,
+    allowEdit: true,
     viewModes: buildStandardCrudViewModes(options.render),
     label: options.label,
     labelPlural: options.labelPlural,
@@ -516,6 +545,7 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
   | 'label'
   | 'labelPlural'
   | 'labelPluralCap'
+  | 'allowEdit'
   | 'columns'
   | 'formFields'
   | 'searchText'
@@ -526,6 +556,7 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
 > {
   return {
     supportsArchived: true,
+    allowEdit: true,
     viewModes: buildStandardCrudViewModes(options.render),
     searchPlaceholder: 'Buscar...',
     label: 'proveedor',
@@ -539,10 +570,6 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
     isValid: isValidSupplierForm,
     editorModal: {
       fieldConfig: {
-        name: { helperText: 'Nombre comercial con el que identificás rápido al proveedor.' },
-        phone: { helperText: 'Se guarda normalizado para evitar teléfonos inútiles o mal cargados.' },
-        tags: { helperText: 'Etiquetas internas para clasificar rubro, origen o prioridad de compra.' },
-        notes: { helperText: 'Usalo para condiciones de compra, plazos o acuerdos relevantes.' },
       },
     },
   };

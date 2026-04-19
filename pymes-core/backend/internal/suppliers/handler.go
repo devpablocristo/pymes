@@ -280,6 +280,7 @@ func toSupplierItem(in supplierdomain.Supplier) dto.SupplierItem {
 		Metadata:    in.Metadata,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
+		Archived:    in.DeletedAt != nil,
 		DeletedAt:   deletedAt,
 	}
 }

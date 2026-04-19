@@ -238,12 +238,14 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         return { items: [], has_more: false, next_cursor: null };
       }
       const query = new URLSearchParams(crudConfig.listQuery ?? '');
+      const archivedBasePath =
+        pageArchived && crudConfig.supportsArchived ? `${crudConfig.basePath}/archived` : crudConfig.basePath;
       appendBranchIdToCrudListQuery(resourceId, query, selectedBranchId);
       query.set('limit', String(limit));
       if (search) query.set('search', search);
-      if (pageArchived) query.set('archived', 'true');
       if (after) query.set('after', after);
-      const data = await apiRequest<unknown>(`${crudConfig.basePath}?${query.toString()}`);
+      const queryString = query.toString();
+      const data = await apiRequest<unknown>(queryString ? `${archivedBasePath}?${queryString}` : archivedBasePath);
       const page = parsePaginatedResponse<T>(data);
       return { items: page.items, has_more: page.hasMore, next_cursor: page.nextCursor } satisfies CrudListResponse<T>;
     },
@@ -414,11 +416,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         editing && editorRow
           ? pickStringValue(editorRow as Record<string, unknown>, ['number', 'name', 'title']) || `Detalle de ${crudConfig.label}`
           : crudConfig.createLabel ?? `Nuevo ${crudConfig.label}`;
-      const rowRecord = (editorRow ?? null) as Record<string, unknown> | null;
-      const isArchivedRecord =
-        rowRecord != null &&
-        ((typeof rowRecord.archived_at === 'string' && rowRecord.archived_at.trim().length > 0) ||
-          (typeof rowRecord.deleted_at === 'string' && rowRecord.deleted_at.trim().length > 0));
       const allowEditRecord =
         !editing || !editorRow
           ? true
@@ -432,14 +429,14 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         title: editing ? '' : dialogTitle,
         subtitle: undefined,
         eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
-        allowEdit: archived && isArchivedRecord ? false : allowEditRecord,
+        allowEdit: archived ? false : allowEditRecord,
         mediaUrls: editing ? buildEditorMediaUrls(editorRow) : undefined,
         mediaFieldId: crudConfig.editorModal?.mediaFieldKey,
         dialogMode: editing ? 'update' : 'create',
         submitLabel: editing ? 'Guardar' : 'Crear',
         editLabel: 'Editar',
         cancelEditLabel: 'Cancelar',
-        closeLabel: archived && isArchivedRecord ? 'Salir' : 'Cerrar',
+        closeLabel: archived ? 'Salir' : 'Cerrar',
         initialValues: currentValues,
         fields: visibleFields.map((field) =>
           toDialogField(
@@ -467,11 +464,14 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                 },
                 onArchive: async () => {
                   try {
+                    setError(null);
                     if (crudConfig.dataSource?.deleteItem) {
                       await crudConfig.dataSource.deleteItem(editorRow);
                     } else if (crudConfig.basePath) {
                       await apiRequest(crudItemPath(crudConfig.basePath, editorRow.id), { method: 'DELETE' });
                     }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
                     await reload();
                   } catch (archiveError) {
                     setError(normalizeError(archiveError, `No se pudo archivar ${crudConfig.label}.`));
@@ -481,17 +481,20 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
               }
             : undefined,
         restoreAction:
-          editing && editorRow && archived && isArchivedRecord && crudConfig.supportsArchived
+          editing && editorRow && archived && crudConfig.supportsArchived
             ? {
                 label: 'Restaurar',
                 busyLabel: 'Restaurando…',
                 onRestore: async () => {
                   try {
+                    setError(null);
                     if (crudConfig.dataSource?.restore) {
                       await crudConfig.dataSource.restore(editorRow);
                     } else if (crudConfig.basePath) {
                       await apiRequest(`${crudItemPath(crudConfig.basePath, editorRow.id)}/restore`, { method: 'POST', body: {} });
                     }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
                     await reload();
                   } catch (restoreError) {
                     setError(normalizeError(restoreError, `No se pudo restaurar ${crudConfig.label}.`));
@@ -501,7 +504,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
               }
             : undefined,
         deleteAction:
-          editing && editorRow && archived && isArchivedRecord
+          editing && editorRow && archived
             ? {
                 label: 'Eliminar',
                 busyLabel: 'Eliminando…',
@@ -513,11 +516,14 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                 },
                 onDelete: async () => {
                   try {
+                    setError(null);
                     if (crudConfig.dataSource?.hardDelete) {
                       await crudConfig.dataSource.hardDelete(editorRow);
                     } else if (crudConfig.basePath) {
-                      await apiRequest(crudItemPath(crudConfig.basePath, editorRow.id), { method: 'DELETE' });
+                      await apiRequest(`${crudItemPath(crudConfig.basePath, editorRow.id)}/hard`, { method: 'DELETE' });
                     }
+                    setItems((current) => current.filter((item) => item.id !== editorRow!.id));
+                    selectItem(null);
                     await reload();
                   } catch (deleteError) {
                     setError(normalizeError(deleteError, `No se pudo eliminar ${crudConfig.label}.`));
@@ -557,7 +563,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         setError(normalizeError(submitError, `No se pudo guardar ${crudConfig.label}.`));
       }
     },
-    [crudConfig, reload, setError],
+    [archived, crudConfig, reload, setError],
   );
 
   const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);

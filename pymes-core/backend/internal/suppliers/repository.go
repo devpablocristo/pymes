@@ -284,6 +284,29 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 			return gorm.ErrRecordNotFound
 		}
 
+		// Soltar referencias anulables que guardan snapshot del nombre proveedor.
+		for _, table := range []string{
+			"purchases",
+			"quotes",
+			"sales",
+			"scheduling_bookings",
+			"scheduling_queue_tickets",
+			"scheduling_waitlist_entries",
+			"whatsapp_messages",
+			"payment_preferences",
+			"recurring_expenses",
+		} {
+			if err := tx.Exec("UPDATE "+table+" SET party_id = NULL WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
+				return err
+			}
+		}
+
+		// La cuenta corriente del proveedor es una dependencia dura del party:
+		// en hard delete también se elimina, junto con sus movimientos por cascade.
+		if err := tx.Exec("DELETE FROM accounts WHERE party_id = ? AND org_id = ? AND type = 'payable'", id, orgID).Error; err != nil {
+			return err
+		}
+
 		// Eliminar roles y extensiones del party.
 		if err := tx.Exec("DELETE FROM party_roles WHERE party_id = ? AND org_id = ?", id, orgID).Error; err != nil {
 			return err

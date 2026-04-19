@@ -7,7 +7,7 @@ type RestCrudDataSourceInput = {
   basePath: string;
   toBody: (values: CrudFormValues) => Record<string, unknown>;
   /**
-   * `archive` (default): DELETE soft vía `{basePath}/{id}/archive`, con `restore` y `hardDelete` explícitos.
+   * `archive` (default): DELETE soft vía `{basePath}/{id}`, con `restore` y `hardDelete` explícitos.
    * `hard-only`: DELETE duro vía `{basePath}/{id}`; sin archive/restore (para recursos que no los soportan en backend).
    */
   archiveMode?: ArchiveMode;
@@ -35,13 +35,13 @@ export function buildRestCrudDataSource<T extends { id: string }>({
     return {
       ...base,
       deleteItem: async (row) => {
-        await apiRequest(`${basePath}/${row.id}/archive`, { method: 'POST', body: {} });
+        await apiRequest(`${basePath}/${row.id}`, { method: 'DELETE' });
       },
       restore: async (row) => {
         await apiRequest(`${basePath}/${row.id}/restore`, { method: 'POST', body: {} });
       },
       hardDelete: async (row) => {
-        await apiRequest(`${basePath}/${row.id}`, { method: 'DELETE' });
+        await apiRequest(`${basePath}/${row.id}/hard`, { method: 'DELETE' });
       },
     };
   }

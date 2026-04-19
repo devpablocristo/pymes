@@ -154,6 +154,15 @@ type ResolvedSection = CrudEntityEditorModalSection & {
   blocks: CrudEntityEditorModalBlock[];
 };
 
+type PendingConfirmDialog = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone?: 'default' | 'danger';
+  onConfirm: () => Promise<void>;
+};
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -273,11 +282,20 @@ export function CrudEntityEditorModal({
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmDialog | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     setValues(initialValues);
     setIsEditing(mode === 'create' || editBehavior === 'edit-only');
   }, [editBehavior, initialValues, mode]);
+
+  useEffect(() => {
+    if (!open) {
+      setPendingConfirm(null);
+      setConfirming(false);
+    }
+  }, [open]);
 
   const dirty = useMemo(
     () => !areCrudFieldValuesEqual(values, initialValues),
@@ -360,14 +378,22 @@ export function CrudEntityEditorModal({
   const handleArchive = async () => {
     if (!archiveAction || archiving) return;
     if (archiveAction.confirm) {
-      const confirmed = await confirmAction({
+      setPendingConfirm({
         title: archiveAction.confirm.title,
         description: archiveAction.confirm.description,
         confirmLabel: archiveAction.confirm.confirmLabel ?? archiveAction.label ?? 'Archivar',
         cancelLabel: archiveAction.confirm.cancelLabel ?? 'Cancelar',
         tone: 'danger',
+        onConfirm: async () => {
+          setArchiving(true);
+          try {
+            await archiveAction.onArchive();
+          } finally {
+            setArchiving(false);
+          }
+        },
       });
-      if (!confirmed) return;
+      return;
     }
     setArchiving(true);
     try {
@@ -399,20 +425,39 @@ export function CrudEntityEditorModal({
   const handleDelete = async () => {
     if (!deleteAction || deleting) return;
     if (deleteAction.confirm) {
-      const confirmed = await confirmAction({
+      setPendingConfirm({
         title: deleteAction.confirm.title,
         description: deleteAction.confirm.description,
         confirmLabel: deleteAction.confirm.confirmLabel ?? deleteAction.label ?? 'Eliminar',
         cancelLabel: deleteAction.confirm.cancelLabel ?? 'Cancelar',
         tone: 'danger',
+        onConfirm: async () => {
+          setDeleting(true);
+          try {
+            await deleteAction.onDelete();
+          } finally {
+            setDeleting(false);
+          }
+        },
       });
-      if (!confirmed) return;
+      return;
     }
     setDeleting(true);
     try {
       await deleteAction.onDelete();
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handlePendingConfirm = async () => {
+    if (!pendingConfirm || confirming) return;
+    setConfirming(true);
+    try {
+      await pendingConfirm.onConfirm();
+      setPendingConfirm(null);
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -522,39 +567,40 @@ export function CrudEntityEditorModal({
   };
 
   return (
-    <CrudEntityModalShell
-      open={open}
-      variant={variant}
-      titleId={titleId}
-      ariaLabel={typeof title === 'string' && title.trim().length > 0 ? title : 'Detalle'}
-      onRequestClose={() => void requestCancel()}
-      rootClassName={cx('crud-entity-editor-modal-root', rootClassName)}
-      backdropClassName="crud-entity-editor-modal__backdrop"
-      panelClassName={cx('crud-entity-editor-modal', panelClassName)}
-      headerClassName="crud-entity-editor-modal__header"
-      bodyClassName="crud-entity-editor-modal__body"
-      footerClassName="crud-entity-editor-modal__footer"
-      pageToolbar={pageToolbar}
-      pageToolbarClassName={pageToolbarClassName}
-      header={
-        hasHeaderContent ? (
-          <div className="crud-entity-editor-modal__header-layout">
-            <div className="crud-entity-editor-modal__title-block">
-              {eyebrow ? <p className="crud-entity-editor-modal__eyebrow">{eyebrow}</p> : null}
-              <h2 className="crud-entity-editor-modal__title" id={titleId}>
-                {title}
-              </h2>
-              {subtitle ? <p className="crud-entity-editor-modal__subtitle">{subtitle}</p> : null}
+    <>
+      <CrudEntityModalShell
+        open={open}
+        variant={variant}
+        titleId={titleId}
+        ariaLabel={typeof title === 'string' && title.trim().length > 0 ? title : 'Detalle'}
+        onRequestClose={() => void requestCancel()}
+        rootClassName={cx('crud-entity-editor-modal-root', rootClassName)}
+        backdropClassName="crud-entity-editor-modal__backdrop"
+        panelClassName={cx('crud-entity-editor-modal', panelClassName)}
+        headerClassName="crud-entity-editor-modal__header"
+        bodyClassName="crud-entity-editor-modal__body"
+        footerClassName="crud-entity-editor-modal__footer"
+        pageToolbar={pageToolbar}
+        pageToolbarClassName={pageToolbarClassName}
+        header={
+          hasHeaderContent ? (
+            <div className="crud-entity-editor-modal__header-layout">
+              <div className="crud-entity-editor-modal__title-block">
+                {eyebrow ? <p className="crud-entity-editor-modal__eyebrow">{eyebrow}</p> : null}
+                <h2 className="crud-entity-editor-modal__title" id={titleId}>
+                  {title}
+                </h2>
+                {subtitle ? <p className="crud-entity-editor-modal__subtitle">{subtitle}</p> : null}
+              </div>
+              {resolvedHeaderActions ? (
+                <div className="crud-entity-editor-modal__header-actions">{resolvedHeaderActions}</div>
+              ) : null}
             </div>
-            {resolvedHeaderActions ? (
-              <div className="crud-entity-editor-modal__header-actions">{resolvedHeaderActions}</div>
-            ) : null}
-          </div>
-        ) : undefined
-      }
-      footer={footer}
-    >
-      <form id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
+          ) : undefined
+        }
+        footer={footer}
+      >
+        <form id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
         {loading ? <p className="crud-entity-editor-modal__loading">{loadingLabel}</p> : null}
         {error ? <p className="crud-entity-editor-modal__error">{error}</p> : null}
 
@@ -677,7 +723,53 @@ export function CrudEntityEditorModal({
               );
             })
           : null}
-      </form>
-    </CrudEntityModalShell>
+        </form>
+      </CrudEntityModalShell>
+      <CrudEntityModalShell
+        open={Boolean(pendingConfirm)}
+        variant="modal"
+        titleId={`${titleId}-confirm`}
+        ariaLabel="Confirmación"
+        onRequestClose={() => {
+          if (!confirming) setPendingConfirm(null);
+        }}
+        disableClose={confirming}
+        closeOnBackdrop={!confirming}
+        rootClassName="crud-entity-editor-modal__confirm-shell"
+        backdropClassName="crud-entity-editor-modal__confirm-backdrop"
+        panelClassName="crud-entity-editor-modal__confirm-panel"
+        headerClassName="crud-entity-editor-modal__confirm-header"
+        bodyClassName="crud-entity-editor-modal__confirm-body"
+        footerClassName="crud-entity-editor-modal__confirm-footer-shell"
+        header={
+          pendingConfirm ? (
+            <h3 className="crud-entity-editor-modal__confirm-title" id={`${titleId}-confirm`}>
+              {pendingConfirm.title}
+            </h3>
+          ) : undefined
+        }
+        footer={
+          pendingConfirm ? (
+            <div className="crud-entity-editor-modal__confirm-footer">
+              <button type="button" className="btn btn-secondary" disabled={confirming} onClick={() => setPendingConfirm(null)}>
+                {pendingConfirm.cancelLabel}
+              </button>
+              <button
+                type="button"
+                className={cx('btn', pendingConfirm.tone === 'danger' ? 'btn-danger' : 'btn-primary')}
+                disabled={confirming}
+                onClick={() => void handlePendingConfirm()}
+              >
+                {confirming ? 'Procesando…' : pendingConfirm.confirmLabel}
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
+        {pendingConfirm ? (
+          <p className="crud-entity-editor-modal__confirm-description">{pendingConfirm.description}</p>
+        ) : null}
+      </CrudEntityModalShell>
+    </>
   );
 }

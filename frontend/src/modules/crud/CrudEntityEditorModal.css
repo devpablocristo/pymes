@@ -288,6 +288,48 @@
   justify-content: flex-end;
 }
 
+.crud-entity-editor-modal__confirm-shell {
+  z-index: 1310;
+}
+
+.crud-entity-editor-modal__confirm-backdrop {
+  background: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.crud-entity-editor-modal__confirm-panel {
+  --crud-modal-width: min(420px, 100%);
+}
+
+.crud-entity-editor-modal__confirm-header {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.crud-entity-editor-modal__confirm-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.crud-entity-editor-modal__confirm-body {
+  padding: var(--space-3) var(--space-5) var(--space-2);
+}
+
+.crud-entity-editor-modal__confirm-description {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.crud-entity-editor-modal__confirm-footer-shell {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.crud-entity-editor-modal__confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 @media (max-width: 720px) {
   .crud-entity-editor-modal__stats,
   .crud-entity-editor-modal__fields {

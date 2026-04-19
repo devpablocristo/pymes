@@ -121,6 +121,71 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
+  it('opens archive confirmation above the detail modal without replacing it', async () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Proveedor Demo"
+        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo' }]}
+        archiveAction={{
+          label: 'Archivar',
+          confirm: {
+            title: 'Archivar proveedor',
+            description: 'Confirma archivado',
+            confirmLabel: 'Archivar',
+            cancelLabel: 'Cancelar',
+          },
+          onArchive: vi.fn(),
+        }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archivar' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Archivar proveedor' })).toBeInTheDocument();
+      expect(screen.getAllByText('Proveedor Demo').length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    });
+  });
+
+  it('opens delete confirmation above the archived detail modal without replacing it', async () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Proveedor archivado"
+        allowEdit={false}
+        closeLabel="Salir"
+        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor archivado' }]}
+        deleteAction={{
+          label: 'Eliminar',
+          confirm: {
+            title: 'Eliminar proveedor',
+            description: 'Confirma eliminación',
+            confirmLabel: 'Eliminar',
+            cancelLabel: 'Cancelar',
+          },
+          onDelete: vi.fn(),
+        }}
+        restoreAction={{ label: 'Restaurar', onRestore: vi.fn() }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Eliminar proveedor' })).toBeInTheDocument();
+      expect(screen.getAllByText('Proveedor archivado').length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    });
+  });
+
   it('returns from edit mode to read mode when canceling edition', async () => {
     render(
       <CrudEntityEditorModal

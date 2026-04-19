@@ -47,7 +47,9 @@ vi.mock('../modules/crud', () => ({
     open ? <div>detail-open:{title}</div> : null,
   useCrudArchivedSearchParam: () => ({ archived: archivedState }),
   useCrudRemoteGalleryPage: () => ({
-    items: [{ id: '1', name: 'Cliente Uno' }],
+    items: archivedState
+      ? [{ id: '1', name: 'Cliente Uno', deleted_at: '2026-04-19T11:00:00Z' }]
+      : [{ id: '1', name: 'Cliente Uno' }],
     setItems: vi.fn(),
     loading: false,
     error: null,
@@ -434,6 +436,93 @@ describe('PymesSimpleCrudListModeContent', () => {
         expect.objectContaining({
           allowEdit: false,
           closeLabel: 'Salir',
+          archiveAction: undefined,
+          restoreAction: expect.objectContaining({ label: 'Restaurar' }),
+          deleteAction: expect.objectContaining({ label: 'Eliminar' }),
+        }),
+      ),
+    );
+  });
+
+  it('en activos abre con edición y sin acciones de archivados', async () => {
+    archivedState = false;
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    currentConfig = {
+      label: 'proveedor',
+      labelPlural: 'proveedores',
+      labelPluralCap: 'Proveedores',
+      basePath: '/v1/suppliers',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      supportsArchived: true,
+      allowEdit: true,
+      dataSource: {
+        list: async () => [],
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="suppliers" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() =>
+      expect(openCrudFormDialogMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowEdit: true,
+          closeLabel: 'Cerrar',
+          archiveAction: expect.objectContaining({ label: 'Archivar' }),
+          restoreAction: undefined,
+          deleteAction: undefined,
+        }),
+      ),
+    );
+  });
+
+  it('actualiza el modal al cambiar entre activas y archivadas', async () => {
+    openCrudFormDialogMock.mockResolvedValue(null);
+    currentConfig = {
+      label: 'proveedor',
+      labelPlural: 'proveedores',
+      labelPluralCap: 'Proveedores',
+      basePath: '/v1/suppliers',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'name', label: 'Nombre' }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+      supportsArchived: true,
+      allowEdit: true,
+      dataSource: {
+        list: async () => [],
+        restore: async () => undefined,
+        hardDelete: async () => undefined,
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="suppliers" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() =>
+      expect(openCrudFormDialogMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          allowEdit: true,
+          archiveAction: expect.objectContaining({ label: 'Archivar' }),
+          restoreAction: undefined,
+          deleteAction: undefined,
+        }),
+      ),
+    );
+
+    archivedState = true;
+    rerender(<PymesSimpleCrudListModeContent resourceId="suppliers" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() =>
+      expect(openCrudFormDialogMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          allowEdit: false,
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
           deleteAction: expect.objectContaining({ label: 'Eliminar' }),

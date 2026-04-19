@@ -545,10 +545,10 @@ export function CrudEntityEditorModal({
     if (field.type === 'checkbox') return value ? 'Sí' : 'No';
     if (field.type === 'select') {
       const match = field.options?.find((option) => option.value === String(value ?? ''));
-      return match?.label ?? String(value ?? '—');
+      return match?.label ?? String(value ?? '');
     }
     const stringValue = String(value ?? '').trim();
-    return stringValue || '—';
+    return stringValue;
   };
 
   const renderBlock = (block: CrudEntityEditorModalBlock) => {

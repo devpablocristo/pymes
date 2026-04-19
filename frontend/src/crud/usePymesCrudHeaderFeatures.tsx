@@ -47,20 +47,25 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const search = externalSearch ?? internalSearch;
   const setSearch = externalSetSearch ?? setInternalSearch;
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
+  const normalizedTagValues = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          items.flatMap((row) => {
+            const rec = row as Record<string, unknown>;
+            const tags = Array.isArray(rec.tags) ? rec.tags : [];
+            return tags.map((raw) => String(raw ?? '').trim()).filter(Boolean);
+          }),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [items],
+  );
 
   const hasCreatorSignals = useMemo(
     () => items.some((row) => typeof row.created_by === 'string' && row.created_by.trim().length > 0),
     [items],
   );
-  const hasTagSignals = useMemo(
-    () =>
-      items.some((row) => {
-        const rec = row as Record<string, unknown>;
-        const tags = rec.tags;
-        return Array.isArray(tags) && tags.some((tag) => String(tag ?? '').trim().length > 0);
-      }),
-    [items],
-  );
+  const hasTagSignals = normalizedTagValues.length > 0;
 
   const creatorFilterEnabled =
     enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false && hasCreatorSignals;
@@ -75,17 +80,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
 
   const tagFilterOptions = useMemo(
     () =>
-      Array.from(
-        new Set(
-          items.flatMap((row) => {
-            const rec = row as Record<string, unknown>;
-            const tags = Array.isArray(rec.tags) ? rec.tags : [];
-            return tags.map((raw) => String(raw ?? '').trim()).filter(Boolean);
-          }),
-        ),
-      )
-        .sort((a, b) => a.localeCompare(b))
-        .map((tag) => ({
+      normalizedTagValues.map((tag) => ({
           value: tag,
           label: tag,
           matches: (row: T) => {
@@ -94,7 +89,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
             return tags.some((raw) => String(raw ?? '').trim() === tag);
           },
         })),
-    [items],
+    [normalizedTagValues],
   );
   const tagValues = useMemo(() => tagFilterOptions.map((option) => option.value), [tagFilterOptions]);
 

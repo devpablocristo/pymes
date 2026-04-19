@@ -363,13 +363,8 @@ export function ConfiguredCrudRouteModePage() {
   }
 
   if (!mode) {
-    return (
-      <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
-        <div className="empty-state">
-          <p>{moduleId} no expone la ruta {modePath}.</p>
-        </div>
-      </PageLayout>
-    );
+    const fallback = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
+    return <Navigate to={`${tenantPrefix}/${urlSlug}/${fallback?.path ?? 'list'}`} replace />;
   }
 
   return (
@@ -419,13 +414,8 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
   }
 
   if (!mode) {
-    return (
-      <PageLayout title="Módulo" lead="La vista pedida no está habilitada para este recurso.">
-        <div className="empty-state">
-          <p>{resourceId} no expone la ruta {modePath}.</p>
-        </div>
-      </PageLayout>
-    );
+    const fallback = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
+    return <Navigate to={`${baseRoute}/${fallback?.path ?? 'list'}`} replace />;
   }
 
   // Este componente siempre se usa dentro de `ConfiguredCrudSectionPage`, que ya

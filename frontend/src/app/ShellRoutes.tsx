@@ -17,12 +17,10 @@ import {
   RestaurantTableSessionsPage,
   SettingsHubPage,
   ConfiguredCrudModePage,
-  ConfiguredCrudNestedRouteModePage,
   ConfiguredCrudRouteModePage,
   UnifiedChatPage,
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
-  WorkOrdersEditorPage,
   AutomationRulesPage,
   WatcherConfigPage,
 } from './lazyRoutes';
@@ -45,54 +43,35 @@ function resolveWorkOrdersResourceId(): WorkOrdersResourceId {
   return profile?.subVertical === 'bike_shop' ? 'bikeWorkOrders' : 'carWorkOrders';
 }
 
-function WorkOrdersModePage({ modeId }: { modeId: CrudViewModeId }) {
-  const { isLoading, selectedBranchId } = useBranchSelection();
-  if (isLoading) return <BranchSelectionLoading />;
-  const resourceId = resolveWorkOrdersResourceId();
-  return (
-    <ConfiguredCrudModePage
-      key={`${resourceId}:${modeId}:${selectedBranchId ?? 'all'}`}
-      resourceId={resourceId}
-      modeId={modeId}
-    />
-  );
+function normalizeLegacyWorkOrdersRemainder(remainder: string): string {
+  if (!remainder || remainder === '/') {
+    return '/list';
+  }
+  if (remainder === '/board' || remainder.startsWith('/board/')) {
+    return '/list';
+  }
+  if (remainder.startsWith('/edit/')) {
+    return '/list';
+  }
+  return remainder;
 }
 
-function WorkOrdersNestedRouteModePage({ baseRoute }: { baseRoute: string }) {
-  const { isLoading, selectedBranchId } = useBranchSelection();
-  if (isLoading) return <BranchSelectionLoading />;
-  const resourceId = resolveWorkOrdersResourceId();
-  return (
-    <ConfiguredCrudNestedRouteModePage
-      key={`${resourceId}:nested:${selectedBranchId ?? 'all'}`}
-      resourceId={resourceId}
-      baseRoute={baseRoute}
-    />
-  );
-}
+function WorkOrdersLegacyAliasRedirect() {
+  const { orgSlug = '' } = useParams();
+  const profileSlug = useTenantSlug();
+  const slug = profileSlug ?? orgSlug;
+  const location = useLocation();
+  const resourceSlug = toCrudResourceSlug(resolveWorkOrdersResourceId());
+  const remainder = location.pathname.replace(/^\/[^/]+\/work-orders/, '');
 
-function WorkOrdersIndexRedirect({ baseRoute }: { baseRoute: string }) {
-  const resourceId = resolveWorkOrdersResourceId();
-  return <ConfiguredCrudIndexRedirect resourceId={resourceId} baseRoute={baseRoute} />;
-}
+  if (!slug) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
-function WorkOrdersSectionLayout({ slug }: { slug: string }) {
-  const resourceId = resolveWorkOrdersResourceId();
-  const baseRoute = `/${slug}/work-orders`;
   return (
-    <ConfiguredCrudSectionPage
-      resourceId={resourceId}
-      baseRoute={baseRoute}
-      contextPatternByModeId={{ list: `${baseRoute}/edit/:orderId` }}
-      actionLink={{
-        to: `${baseRoute}/configure`,
-        label: 'Configurar',
-        hideWhenActivePattern: `${baseRoute}/configure`,
-        activeReplacement: {
-          to: `${baseRoute}/list`,
-          label: 'Volver a órdenes de trabajo',
-        },
-      }}
+    <Navigate
+      to={`/${slug}/${resourceSlug}${normalizeLegacyWorkOrdersRemainder(remainder)}${location.search}${location.hash}`}
+      replace
     />
   );
 }
@@ -173,15 +152,8 @@ function TenantScopedRoutes() {
       <Route path="watcher-config" element={<WatcherConfigPage />} />
       <Route path="restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
 
-      {/* work-orders: URL única, resuelve bike/car por subvertical */}
-      <Route path="work-orders" element={<WorkOrdersSectionLayout slug={slug} />}>
-        <Route index element={<WorkOrdersIndexRedirect baseRoute={`/${slug}/work-orders`} />} />
-        <Route path="board" element={<WorkOrdersModePage modeId="kanban" />} />
-        <Route path="list" element={<WorkOrdersModePage modeId="list" />} />
-        <Route path="configure" element={<CrudUiConfigurePage />} />
-        <Route path="edit/:orderId" element={<WorkOrdersEditorPage />} />
-        <Route path=":modePath" element={<WorkOrdersNestedRouteModePage baseRoute={`/${slug}/work-orders`} />} />
-      </Route>
+      {/* alias legado: /work-orders/* -> recurso CRUD canónico según subvertical */}
+      <Route path="work-orders/*" element={<WorkOrdersLegacyAliasRedirect />} />
 
       {/* inventory: sección con sus propios routes */}
       <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>
@@ -221,7 +193,10 @@ export function resolveLegacyWorkshopDestination(slug: string, pathname: string)
   if (segment === 'auto-repair' && moduleId === 'vehicles') {
     return `/${slug}/${toCrudResourceSlug('workshopVehicles')}${remainder}`;
   }
-  return `/${slug}/work-orders${remainder}`;
+  if (segment === 'bike-shop') {
+    return `/${slug}/${toCrudResourceSlug('bikeWorkOrders')}${normalizeLegacyWorkOrdersRemainder(remainder)}`;
+  }
+  return `/${slug}/${toCrudResourceSlug('carWorkOrders')}${normalizeLegacyWorkOrdersRemainder(remainder)}`;
 }
 
 function LegacyWorkshopsRedirect() {
@@ -275,7 +250,9 @@ export function ShellRoutes() {
       {/* /modules/* → /{slug}/* */}
       <Route path="/modules/:moduleId/*" element={<LegacyModulesRedirect />} />
 
-      {/* /workshops/{sub}/* → /{slug}/work-orders */}
+      <Route path="/work-orders/*" element={<LegacyPathRedirect />} />
+
+      {/* /workshops/{sub}/* → recursos CRUD canónicos */}
       <Route path="/workshops/*" element={<LegacyWorkshopsRedirect />} />
     </Routes>
   );

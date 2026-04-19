@@ -5,6 +5,8 @@ import { loadLazyCrudPageConfig } from '../crud/lazyCrudPage';
 import { CrudUiPreferencesPanel } from '../modules/crud';
 import { CRUD_UI_CHANGE_EVENT, CRUD_UI_STORAGE_KEY } from '../lib/crudUiConfig';
 import { crudModuleCatalog } from '../crud/crudModuleCatalog';
+import { fromCrudResourceSlug } from '../crud/crudResourceSlug';
+import { tenantLink, useActiveTenantSlug } from '../lib/tenantSlug';
 import './CrudUiConfigurePage.css';
 
 const FEATURE_KEYS = [
@@ -18,11 +20,15 @@ const FEATURE_KEYS = [
 ] as const;
 
 export function CrudUiConfigurePage() {
-  const { moduleId = '' } = useParams();
+  const { moduleId: routeModuleId = '' } = useParams();
+  const tenantSlug = useActiveTenantSlug();
+  const moduleId = fromCrudResourceSlug(routeModuleId);
   const moduleDefinition = crudModuleCatalog[moduleId];
   const title = moduleDefinition?.title ?? moduleId;
   const resources = useMemo(() => [{ resourceId: moduleId, label: title }], [moduleId, title]);
-  const backHref = `/modules/${moduleId}`;
+  const backPath =
+    moduleId === 'carWorkOrders' || moduleId === 'bikeWorkOrders' ? `/${routeModuleId}/list` : `/${routeModuleId}`;
+  const backHref = tenantLink(backPath, tenantSlug);
 
   return (
     <div className="crud-configure-page">

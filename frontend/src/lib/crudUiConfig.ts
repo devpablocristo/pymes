@@ -53,6 +53,10 @@ export function applyCrudUiOverride<T extends { id: string }>(
 
   if (override && Array.isArray(override.enabledViewModeIds)) {
     const filteredEnabled = override.enabledViewModeIds.filter((id) => declaredIds.has(id));
+    const defaultModeId =
+      override.defaultViewModeId && filteredEnabled.includes(override.defaultViewModeId)
+        ? override.defaultViewModeId
+        : undefined;
     if (filteredEnabled.length === 0) {
       try {
         const raw = localStorage.getItem(CRUD_UI_STORAGE_KEY);
@@ -63,6 +67,23 @@ export function applyCrudUiOverride<T extends { id: string }>(
             delete entry.enabledViewModeIds;
             delete entry.defaultViewModeId;
             if (Object.keys(entry).length === 0) delete parsed[resourceId];
+            localStorage.setItem(CRUD_UI_STORAGE_KEY, JSON.stringify(parsed));
+          }
+        }
+      } catch { /* localStorage unavailable */ }
+    } else if (
+      filteredEnabled.length !== override.enabledViewModeIds.length ||
+      defaultModeId !== override.defaultViewModeId
+    ) {
+      try {
+        const raw = localStorage.getItem(CRUD_UI_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          const entry = parsed[resourceId] as Record<string, unknown> | undefined;
+          if (entry) {
+            entry.enabledViewModeIds = filteredEnabled;
+            if (defaultModeId) entry.defaultViewModeId = defaultModeId;
+            else delete entry.defaultViewModeId;
             localStorage.setItem(CRUD_UI_STORAGE_KEY, JSON.stringify(parsed));
           }
         }

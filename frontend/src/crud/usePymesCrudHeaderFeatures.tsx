@@ -15,6 +15,20 @@ type Options<T extends { id: string }> = {
   setSearch?: (value: string) => void;
 };
 
+const WORK_ORDER_STATUS_LABELS: Record<string, string> = {
+  received: 'Recibido',
+  diagnosing: 'Diagnóstico',
+  quote_pending: 'Presupuesto',
+  awaiting_parts: 'Repuestos',
+  in_progress: 'En taller',
+  quality_check: 'Control',
+  ready_for_pickup: 'Listo retiro',
+  delivered: 'Entregado',
+  invoiced: 'Facturado',
+  on_hold: 'En pausa',
+  cancelled: 'Cancelado',
+};
+
 export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: string }>({
   resourceId,
   items,
@@ -112,6 +126,32 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [items, resourceId],
   );
 
+  const workOrderStatusFilterOptions = useMemo(
+    () =>
+      resourceId !== 'carWorkOrders' && resourceId !== 'bikeWorkOrders'
+        ? []
+        : Array.from(
+            new Set(
+              items
+                .map((row) => {
+                  const rec = row as Record<string, unknown>;
+                  return typeof rec.status === 'string' ? rec.status.trim() : '';
+                })
+                .filter(Boolean),
+            ),
+          )
+            .sort((a, b) => a.localeCompare(b))
+            .map((status) => ({
+              value: status,
+              label: WORK_ORDER_STATUS_LABELS[status] ?? status,
+              matches: (row: T) => {
+                const rec = row as Record<string, unknown>;
+                return (typeof rec.status === 'string' ? rec.status.trim() : '') === status;
+              },
+            })),
+    [items, resourceId],
+  );
+
   const tagFilteredItems = useMemo(() => {
     if (!tagFilterEnabled || tagFilter === 'all') return creatorFilteredItems;
     return creatorFilteredItems.filter((row) => {
@@ -123,11 +163,15 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
 
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
   const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
+  const workOrderStateFilterEnabled = workOrderStatusFilterOptions.length > 0;
   const categoryFilterEnabled = supplierCategoryFilterOptions.length > 0;
   const valueFilterEnabled =
-    crudConfig?.featureFlags?.valueFilter !== false && (stateFilterEnabled || categoryFilterEnabled || tagFilterEnabled);
+    crudConfig?.featureFlags?.valueFilter !== false &&
+    (stateFilterEnabled || workOrderStateFilterEnabled || categoryFilterEnabled || tagFilterEnabled);
   const valueFilterOptions = stateFilterEnabled
     ? resolvedValueFilterOptions
+    : workOrderStateFilterEnabled
+      ? workOrderStatusFilterOptions
     : categoryFilterEnabled
       ? supplierCategoryFilterOptions
       : tagFilterOptions;
@@ -150,7 +194,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
       onChange={setValueFilter}
       options={valueFilterOptions}
       className="crud-status-selector"
-      ariaLabel={stateFilterEnabled ? 'Filtrar por estado' : categoryFilterEnabled ? 'Filtrar por categoría' : 'Filtrar por etiqueta'}
+      ariaLabel={stateFilterEnabled || workOrderStateFilterEnabled ? 'Filtrar por estado' : categoryFilterEnabled ? 'Filtrar por categoría' : 'Filtrar por etiqueta'}
     />
   ) : null;
 

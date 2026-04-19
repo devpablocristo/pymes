@@ -236,7 +236,7 @@ describe('configuredCrudViews', () => {
     expect(screen.queryByText('lazy:customers')).not.toBeInTheDocument();
   });
 
-  it('rejects non-declared standalone CRUD routes', async () => {
+  it('redirects standalone CRUD routes to the first active mode when the current path is disabled', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'customers') {
         return {
@@ -248,26 +248,34 @@ describe('configuredCrudViews', () => {
       }
       return null;
     });
+    writeCrudUiConfigState({
+      customers: { enabledViewModeIds: ['list'], defaultViewModeId: 'list' },
+    });
 
     render(
-      <MemoryRouter initialEntries={['/modules/customers/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/customers/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/modules/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
+          <Route path="/:moduleId/:modePath" element={<ConfiguredCrudRouteModePage />} />
+          <Route path="/customers/list" element={<div>customers-list-screen</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('customers no expone la ruta gallery.')).toBeInTheDocument();
+    expect(await screen.findByText('customers-list-screen')).toBeInTheDocument();
   });
 
-  it('shows only declared modes in dedicated sections', async () => {
+  it('shows all declared shared CRUD modes in dedicated sections', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'bikeWorkOrders') {
         return {
           label: 'orden',
           labelPlural: 'órdenes',
           labelPluralCap: 'Órdenes',
-          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+          viewModes: [
+            { id: 'list', label: 'Lista', path: 'list', isDefault: true },
+            { id: 'gallery', label: 'Galería', path: 'gallery' },
+            { id: 'kanban', label: 'Tablero', path: 'board' },
+          ],
         } as CrudPageConfig<{ id: string }>;
       }
       return null;
@@ -287,35 +295,43 @@ describe('configuredCrudViews', () => {
     );
 
     expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
   });
 
-  it('rejects non-declared dedicated nested CRUD routes', async () => {
+  it('redirects dedicated nested CRUD routes to the first active mode when the current path is disabled', async () => {
     loadLazyCrudPageConfigMock.mockImplementation(async (resourceId: string) => {
       if (resourceId === 'bikeWorkOrders') {
         return {
           label: 'orden',
           labelPlural: 'órdenes',
           labelPluralCap: 'Órdenes',
-          viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true }],
+          viewModes: [
+            { id: 'list', label: 'Lista', path: 'list', isDefault: true },
+            { id: 'gallery', label: 'Galería', path: 'gallery' },
+            { id: 'kanban', label: 'Tablero', path: 'board' },
+          ],
         } as CrudPageConfig<{ id: string }>;
       }
       return null;
     });
+    writeCrudUiConfigState({
+      bikeWorkOrders: { enabledViewModeIds: ['gallery', 'kanban'], defaultViewModeId: 'gallery' },
+    });
 
     render(
-      <MemoryRouter initialEntries={['/workshops/bike-shop/orders/gallery']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/workshops/bike-shop/orders/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route
             path="/workshops/bike-shop/orders/:modePath"
             element={<ConfiguredCrudNestedRouteModePage resourceId="bikeWorkOrders" baseRoute="/workshops/bike-shop/orders" />}
           />
+          <Route path="/workshops/bike-shop/orders/gallery" element={<div>bike-gallery-screen</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('bikeWorkOrders no expone la ruta gallery.')).toBeInTheDocument();
+    expect(await screen.findByText('bike-gallery-screen')).toBeInTheDocument();
   });
 
 });

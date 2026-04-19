@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CrudUiConfigurePage } from './CrudUiConfigurePage';
@@ -29,10 +29,10 @@ describe('CrudUiConfigurePage', () => {
 
   it('shows canonical CRUD views and the full reusable feature set', async () => {
     render(
-      <MemoryRouter initialEntries={['/modules/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/bicimax/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/modules/customers" element={<div>customers-home</div>} />
-          <Route path="/modules/:moduleId/configure" element={<CrudUiConfigurePage />} />
+          <Route path="/:orgSlug/customers" element={<div>customers-home</div>} />
+          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -50,6 +50,36 @@ describe('CrudUiConfigurePage', () => {
     expect(screen.queryByText('Configurar')).not.toBeInTheDocument();
     expect(screen.getByText('Paginación')).toBeInTheDocument();
     expect(screen.getByText('Acciones CSV')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Volver a clientes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    expect(await screen.findByRole('button', { name: 'Volver a clientes' })).toBeInTheDocument();
+  });
+
+  it('navigates with the header menu back action inside the tenant scope', async () => {
+    render(
+      <MemoryRouter initialEntries={['/bicimax/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/:orgSlug/customers" element={<div>customers-home</div>} />
+          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Volver a clientes' }));
+
+    expect(await screen.findByText('customers-home')).toBeInTheDocument();
+  });
+
+  it('uses the canonical list route for work orders', async () => {
+    render(
+      <MemoryRouter initialEntries={['/bicimax/bike-work-orders/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    expect(await screen.findByRole('button', { name: 'Volver a órdenes de trabajo' })).toBeInTheDocument();
   });
 });

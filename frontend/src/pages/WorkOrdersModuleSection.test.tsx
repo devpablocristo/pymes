@@ -17,9 +17,9 @@ function buildWorkOrdersConfig(): CrudPageConfig<{ id: string }> {
     labelPlural: 'órdenes',
     labelPluralCap: 'Órdenes de trabajo',
     viewModes: [
-      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de OT', isDefault: true, render: () => <div>board</div> },
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de OT', render: () => <div>list</div> },
-      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de OT', render: () => <div>gallery</div> },
+      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de OT', isDefault: true, render: () => <div>list</div> },
+      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de OT' },
+      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de OT' },
     ],
   } as CrudPageConfig<{ id: string }>;
 }
@@ -31,10 +31,10 @@ describe('work orders configured section shell', () => {
     loadLazyCrudPageConfigMock.mockResolvedValue(buildWorkOrdersConfig());
   });
 
-  it('keeps only the shared view tabs in the section band', async () => {
+  it('shows the shared CRUD view tabs in the section band', async () => {
     render(
       <MemoryRouter
-        initialEntries={['/modules/carWorkOrders/board']}
+        initialEntries={['/modules/carWorkOrders/list']}
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Routes>
@@ -56,18 +56,16 @@ describe('work orders configured section shell', () => {
               />
             }
           >
-            <Route path="board" element={<div>board-screen</div>} />
             <Route path="list" element={<div>list-screen</div>} />
-            <Route path="gallery" element={<div>gallery-screen</div>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('board-screen')).toBeInTheDocument();
+    expect(await screen.findByText('list-screen')).toBeInTheDocument();
     const tabs = screen.getByRole('navigation', { name: 'Vistas de OT' });
-    expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
     expect(within(tabs).getByRole('link', { name: 'Lista' })).toBeInTheDocument();
     expect(within(tabs).getByRole('link', { name: 'Galería' })).toBeInTheDocument();
+    expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
   });
 });

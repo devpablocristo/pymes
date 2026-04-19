@@ -7,9 +7,6 @@ export const Shell = lazy(() => import('../components/Shell').then((mod) => ({ d
 export const ConfiguredCrudSectionPage = lazy(() =>
   import('../pages/ConfiguredCrudSectionPage').then((mod) => ({ default: mod.ConfiguredCrudSectionPage })),
 );
-export const WorkOrdersEditorPage = lazy(() =>
-  import('../pages/WorkOrdersEditorPage').then((mod) => ({ default: mod.WorkOrdersEditorPage })),
-);
 export const ConfiguredCrudIndexRedirect = lazy(() =>
   import('../crud/configuredCrudViews').then((mod) => ({ default: mod.ConfiguredCrudIndexRedirect })),
 );

@@ -117,14 +117,14 @@ export function Shell({ children }: { children: ReactNode }) {
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: link(`/${toCrudResourceSlug('workshopVehicles')}`), label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
-      { to: link('/work-orders/list'), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('carWorkOrders')}/list`), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
     [t, slug],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
-      { to: link('/work-orders/list'), label: t('shell.nav.bikeOrders'), icon: dotIcon },
+      { to: link(`/${toCrudResourceSlug('bikeWorkOrders')}/list`), label: t('shell.nav.bikeOrders'), icon: dotIcon },
     ],
     [t, slug],
   );

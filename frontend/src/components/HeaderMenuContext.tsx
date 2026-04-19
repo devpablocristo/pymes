@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react';
 export type HeaderMenuItem = {
   label: string;
   href: string;
+  onSelect?: () => void;
 };
 
 const HeaderMenuItemsContext = createContext<HeaderMenuItem[]>([]);

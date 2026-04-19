@@ -25,59 +25,11 @@ import {
   toDateTimeInput,
   toRFC3339,
 } from '../../crud/resourceConfigs.shared';
-import { buildGroupedStatusStateMachine, buildStandardCrudViewModes, openCrudFormDialog } from '../crud';
+import { openCrudFormDialog } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
+import { buildStandardCrudViewModes } from '../crud/buildStandardCrudViewModes';
 
 type WorkOrderTargetKind = 'vehicle' | 'bicycle';
-
-const WORK_ORDER_STATE_MACHINE = buildGroupedStatusStateMachine<WorkOrder>('status', [
-  {
-    id: 'wo_intake',
-    label: 'Ingreso',
-    defaultState: 'received',
-    states: [
-      { value: 'received', label: 'Recibido', badgeVariant: 'info' },
-      { value: 'diagnosing', label: 'Diagnóstico', badgeVariant: 'warning' },
-    ],
-  },
-  {
-    id: 'wo_quote',
-    label: 'Presupuesto / repuestos',
-    defaultState: 'quote_pending',
-    states: [
-      { value: 'quote_pending', label: 'Presupuesto', badgeVariant: 'warning' },
-      { value: 'awaiting_parts', label: 'Repuestos', badgeVariant: 'warning' },
-    ],
-  },
-  {
-    id: 'wo_shop',
-    label: 'Taller',
-    defaultState: 'in_progress',
-    states: [
-      { value: 'in_progress', label: 'En taller', badgeVariant: 'info' },
-      { value: 'quality_check', label: 'Control', badgeVariant: 'info' },
-      { value: 'on_hold', label: 'En pausa', badgeVariant: 'warning' },
-    ],
-  },
-  {
-    id: 'wo_exit',
-    label: 'Salida',
-    defaultState: 'ready_for_pickup',
-    states: [
-      { value: 'ready_for_pickup', label: 'Listo retiro', badgeVariant: 'success' },
-      { value: 'delivered', label: 'Entregado', badgeVariant: 'success' },
-    ],
-  },
-  {
-    id: 'wo_closed',
-    label: 'Cerradas',
-    defaultState: 'invoiced',
-    states: [
-      { value: 'invoiced', label: 'Facturado', badgeVariant: 'success', terminal: true },
-      { value: 'cancelled', label: 'Cancelado', badgeVariant: 'danger', terminal: true },
-    ],
-  },
-]);
 
 const STATUS_OPTIONS = [
   { label: 'Recibido', value: 'received' },
@@ -351,10 +303,7 @@ export function createWorkOrdersCrudConfig({
     supportsArchived: true,
     viewModes: buildStandardCrudViewModes(
       () => <PymesSimpleCrudListModeContent resourceId={resourceId} />,
-      {
-        defaultModeId: 'list',
-        ariaLabel: 'Navegación tablero / lista / galería',
-      },
+      { ariaLabel: 'Vistas de órdenes de trabajo' },
     ),
     label: 'orden de trabajo',
     labelPlural: 'órdenes de trabajo',

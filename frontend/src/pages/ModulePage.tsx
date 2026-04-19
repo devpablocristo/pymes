@@ -3,6 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { fromCrudResourceSlug, toCrudResourceSlug } from '../crud/crudResourceSlug';
 import { tenantLink, useActiveTenantSlug } from '../lib/tenantSlug';
+import { getTenantProfile } from '../lib/tenantProfile';
 import { PageLayout } from '../components/PageLayout';
 import { ReportsResultView } from '../components/ReportsResultView';
 import { apiRequest, downloadAPIFile, getSession } from '../lib/api';
@@ -978,7 +979,9 @@ export function ModulePage() {
   });
 
   if (moduleId === 'workOrders') {
-    return <Navigate to={tenantLink('/work-orders', tenantSlug)} replace />;
+    const profile = getTenantProfile();
+    const workOrdersSlug = toCrudResourceSlug(profile?.subVertical === 'bike_shop' ? 'bikeWorkOrders' : 'carWorkOrders');
+    return <Navigate to={tenantLink(`/${workOrdersSlug}`, tenantSlug)} replace />;
   }
   if (moduleId === 'reports') {
     return <ReportsBusinessPage />;

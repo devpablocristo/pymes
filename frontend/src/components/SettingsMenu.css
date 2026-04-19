@@ -4,7 +4,6 @@
 }
 
 .settings-menu__trigger {
-  list-style: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15,10 +14,7 @@
   background: linear-gradient(180deg, #6d5cff 0%, #4b6dff 100%);
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(14, 24, 42, 0.26);
-}
-
-.settings-menu__trigger::-webkit-details-marker {
-  display: none;
+  appearance: none;
 }
 
 .settings-menu__avatar {
@@ -64,11 +60,16 @@
 
 .settings-menu__item {
   display: block;
+  width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
+  border: 0;
+  background: transparent;
   color: #dce8ff;
   text-decoration: none;
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
 .settings-menu__item:hover {

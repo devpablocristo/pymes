@@ -149,6 +149,7 @@ export function buildSupplierSearchText(row: SupplierRecord): string {
   return [
     row.name,
     row.contact_name,
+    typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     row.email,
     row.phone,
     row.tax_id,
@@ -164,6 +165,7 @@ export function buildSupplierFormValues(row: SupplierRecord) {
   return {
     name: row.name ?? '',
     contact_name: row.contact_name ?? '',
+    metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     tax_id: row.tax_id ?? '',
     email: row.email ?? '',
     phone: row.phone ?? '',
@@ -189,6 +191,7 @@ export function supplierFormToBody(values: CrudFormValues): Record<string, unkno
       country: asString(values.address_country),
     },
     metadata: parseMetadataStringMap(undefined, {
+      category: asOptionalString(values.metadata_category),
       website: asOptionalString(values.metadata_website),
     }),
     tags: parsePartyTagCsv(values.tags),
@@ -248,6 +251,7 @@ export function createSupplierColumns<T extends SupplierRecord>(): CrudColumn<T>
   return [
     { key: 'name', header: 'Nombre', className: 'cell-name' },
     { key: 'contact_name', header: 'Contacto', render: (_v, row) => row.contact_name || '—' },
+    { key: 'metadata', header: 'Categoría', render: (_v, row) => (typeof row.metadata?.category === 'string' ? row.metadata.category : '—') },
     { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
     { key: 'address', header: 'Ubicación', render: (_v, row) => formatPartyAddress(row.address) || '—' },
@@ -260,6 +264,7 @@ export function supplierFormFields(): CrudFormField[] {
   return [
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del proveedor' },
     { key: 'contact_name', label: 'Contacto', placeholder: 'Nombre de contacto' },
+    { key: 'metadata_category', label: 'Categoría', placeholder: 'Repuestos, insumos, logística' },
     { key: 'tax_id', label: 'CUIT', placeholder: '30-12345678-9' },
     { key: 'phone', label: 'Teléfono', type: 'tel', placeholder: '3815551234' },
     { key: 'email', label: 'Email', type: 'email', placeholder: 'compras@proveedor.com' },

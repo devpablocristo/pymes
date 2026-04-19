@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 export type CrudTableSurfaceColumn<T> = {
   id: string;
   header: string;
   className?: string;
   render: (row: T) => ReactNode;
+  sortValue?: (row: T) => string | number | boolean | null | undefined;
 };
 
 export type CrudTableSurfaceRowAction<T> = {
@@ -34,14 +35,39 @@ export function CrudTableSurface<T>({
   rowActions = [],
   onRowClick,
   selectedId,
+  sortable = true,
 }: {
   items: T[];
   columns: CrudTableSurfaceColumn<T>[];
   rowActions?: CrudTableSurfaceRowAction<T>[];
   onRowClick?: (row: T) => void;
   selectedId?: string | null;
+  sortable?: boolean;
 }) {
+  const [sortState, setSortState] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
   const hasRowActions = rowActions.length > 0;
+  const sortedItems = useMemo(() => {
+    if (!sortable || !sortState) return items;
+    const column = columns.find((entry) => entry.id === sortState.columnId);
+    if (!column?.sortValue) return items;
+    const normalize = (value: string | number | boolean | null | undefined) => {
+      if (typeof value === 'number') return { rank: 0, value };
+      if (typeof value === 'boolean') return { rank: 0, value: value ? 1 : 0 };
+      return { rank: 1, value: String(value ?? '').trim().toLocaleLowerCase() };
+    };
+    return [...items].sort((left, right) => {
+      const a = normalize(column.sortValue?.(left));
+      const b = normalize(column.sortValue?.(right));
+      const base =
+        a.rank !== b.rank
+          ? a.rank - b.rank
+          : typeof a.value === 'number' && typeof b.value === 'number'
+            ? a.value - b.value
+            : String(a.value).localeCompare(String(b.value), undefined, { numeric: true, sensitivity: 'base' });
+      return sortState.direction === 'asc' ? base : -base;
+    });
+  }, [columns, items, sortState, sortable]);
+
   return (
     <div className="table-wrap">
       <table className="crud-table crud-explorer-table">
@@ -49,14 +75,44 @@ export function CrudTableSurface<T>({
           <tr>
             {columns.map((column) => (
               <th key={column.id} className={column.className}>
-                {column.header}
+                {sortable && column.sortValue ? (
+                  <div className="crud-table__sort-btn">
+                    <span className="crud-table__sort-label">{column.header}</span>
+                    <span className="crud-table__sort-icons" aria-hidden>
+                      <button
+                        type="button"
+                        className={`crud-table__sort-icon${
+                          sortState?.columnId === column.id && sortState.direction === 'asc'
+                            ? ' crud-table__sort-icon--active'
+                            : ''
+                        }`}
+                        onClick={() => setSortState({ columnId: column.id, direction: 'asc' })}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className={`crud-table__sort-icon${
+                          sortState?.columnId === column.id && sortState.direction === 'desc'
+                            ? ' crud-table__sort-icon--active'
+                            : ''
+                        }`}
+                        onClick={() => setSortState({ columnId: column.id, direction: 'desc' })}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  </div>
+                ) : (
+                  column.header
+                )}
               </th>
             ))}
             {hasRowActions ? <th>Acciones</th> : null}
           </tr>
         </thead>
         <tbody>
-          {items.map((row) => {
+          {sortedItems.map((row) => {
             const rowId =
               typeof row === 'object' && row !== null && 'id' in row ? String((row as { id: string }).id) : undefined;
             const visibleRowActions = rowActions.filter((action) => action.isVisible?.(row) ?? true);

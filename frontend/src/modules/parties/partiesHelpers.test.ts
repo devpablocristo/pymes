@@ -56,6 +56,7 @@ describe('partiesHelpers', () => {
       supplierFormToBody({
         name: 'Proveedor',
         contact_name: 'Ana',
+        metadata_category: 'Repuestos',
         tax_id: '30-1',
         email: 'prove@test.local',
         phone: '456',
@@ -65,9 +66,10 @@ describe('partiesHelpers', () => {
     ).toMatchObject({
       name: 'Proveedor',
       contact_name: 'Ana',
+      metadata: { category: 'Repuestos' },
       tags: ['importado', 'logistica'],
     });
-    expect(buildSupplierSearchText({ name: 'Proveedor', contact_name: 'Ana' })).toContain('Ana');
+    expect(buildSupplierSearchText({ name: 'Proveedor', contact_name: 'Ana', metadata: { category: 'Repuestos' } })).toContain('Repuestos');
   });
 
   it('arma body de parties y employees', () => {

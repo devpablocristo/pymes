@@ -1,6 +1,6 @@
 import { parsePaginatedResponse } from '@devpablocristo/core-browser/crud';
 import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-ui';
-import { useCallback, useMemo } from 'react';
+import { isValidElement, useCallback, useMemo } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
 import { useOptionalBranchSelection } from '../lib/useBranchSelection';
@@ -179,6 +179,14 @@ function pickStringValue(row: Record<string, unknown>, candidates: string[]) {
   return '';
 }
 
+function toSortablePrimitive(value: unknown): string | number | boolean | null {
+  if (value == null) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map((entry) => String(entry ?? '').trim()).join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function buildEditorMediaUrls<T extends { id: string }>(row: T | undefined) {
   if (!row) return undefined;
   const record = row as Record<string, unknown>;
@@ -341,6 +349,21 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         render: (row: T) => {
           const value = row[column.key];
           return column.render ? column.render(value, row) : String(value ?? '—');
+        },
+        sortValue: (row: T) => {
+          const raw = row[column.key];
+          if (!column.render) {
+            return toSortablePrimitive(raw);
+          }
+          const rendered = column.render(raw, row);
+          if (typeof rendered === 'string' || typeof rendered === 'number' || typeof rendered === 'boolean') {
+            return rendered;
+          }
+          if (isValidElement(rendered)) {
+            const child = (rendered.props as { children?: unknown } | null)?.children;
+            return toSortablePrimitive(child);
+          }
+          return toSortablePrimitive(raw);
         },
       }));
 
@@ -721,6 +744,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           rowActions={tableRowActions}
           onRowClick={resolvedTableRowClick}
           selectedId={selectedId}
+          sortable={crudConfig.featureFlags?.columnSort !== false}
         />
       )}
 

@@ -71,7 +71,6 @@
 }
 
 .stock-inventory-list-crud .crud-table__sort-btn {
-  color: var(--color-text);
   font-size: inherit;
   font-weight: inherit;
   letter-spacing: inherit;
@@ -82,6 +81,7 @@
   font-weight: inherit;
   letter-spacing: inherit;
   text-transform: none;
+  color: var(--color-text);
 }
 
 .stock-inventory-list-crud .crud-table__sort-icons {

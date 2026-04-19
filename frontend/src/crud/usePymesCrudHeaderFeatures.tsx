@@ -56,7 +56,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [creatorFilterEnabled, items, preSearchFilter],
   );
 
-  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals;
+  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals && resourceId !== 'suppliers';
 
   const tagFilterOptions = useMemo(
     () =>
@@ -83,6 +83,34 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   );
   const tagValues = useMemo(() => tagFilterOptions.map((option) => option.value), [tagFilterOptions]);
 
+  const supplierCategoryFilterOptions = useMemo(
+    () =>
+      resourceId !== 'suppliers'
+        ? []
+        : Array.from(
+            new Set(
+              items
+                .map((row) => {
+                  const rec = row as Record<string, unknown>;
+                  const metadata = rec.metadata as Record<string, unknown> | undefined;
+                  return typeof metadata?.category === 'string' ? metadata.category.trim() : '';
+                })
+                .filter(Boolean),
+            ),
+          )
+            .sort((a, b) => a.localeCompare(b))
+            .map((category) => ({
+              value: category,
+              label: category,
+              matches: (row: T) => {
+                const rec = row as Record<string, unknown>;
+                const metadata = rec.metadata as Record<string, unknown> | undefined;
+                return (typeof metadata?.category === 'string' ? metadata.category.trim() : '') === category;
+              },
+            })),
+    [items, resourceId],
+  );
+
   const tagFilteredItems = useMemo(() => {
     if (!tagFilterEnabled || valueFilter === 'all') return creatorFilteredItems;
     return creatorFilteredItems.filter((row) => {
@@ -94,9 +122,14 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
 
   const resolvedValueFilterOptions = resolveCrudValueFilterOptions(crudConfig);
   const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
+  const categoryFilterEnabled = supplierCategoryFilterOptions.length > 0;
   const valueFilterEnabled =
-    crudConfig?.featureFlags?.valueFilter !== false && (stateFilterEnabled || tagFilterEnabled);
-  const valueFilterOptions = stateFilterEnabled ? resolvedValueFilterOptions : tagFilterOptions;
+    crudConfig?.featureFlags?.valueFilter !== false && (stateFilterEnabled || categoryFilterEnabled || tagFilterEnabled);
+  const valueFilterOptions = stateFilterEnabled
+    ? resolvedValueFilterOptions
+    : categoryFilterEnabled
+      ? supplierCategoryFilterOptions
+      : tagFilterOptions;
 
   const valueFilteredItems = useMemo(() => {
     if (!valueFilterEnabled || valueFilter === 'all') return tagFilteredItems;
@@ -116,7 +149,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
       onChange={setValueFilter}
       options={valueFilterOptions}
       className="crud-status-selector"
-      ariaLabel={stateFilterEnabled ? 'Filtrar por estado' : 'Filtrar por etiqueta'}
+      ariaLabel={stateFilterEnabled ? 'Filtrar por estado' : categoryFilterEnabled ? 'Filtrar por categoría' : 'Filtrar por etiqueta'}
     />
   ) : null;
 

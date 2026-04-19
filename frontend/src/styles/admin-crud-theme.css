@@ -88,6 +88,7 @@
 
 .crud-table th,
 .crud-table td {
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -102,9 +103,11 @@
 
 /* Ordenación por cabecera (CrudPage) */
 .crud-table__sort-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--space-1, 0.25rem);
+  width: 100%;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -162,6 +165,7 @@
   font-weight: var(--font-weight-regular, 400);
   font-size: var(--text-base);
   color: var(--color-text);
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

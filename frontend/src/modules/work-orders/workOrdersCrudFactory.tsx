@@ -330,9 +330,9 @@ export function createWorkOrdersCrudConfig({
       {
         key: fields.targetLabelKey,
         header: fields.targetLabelField,
-        render: (_v, row) => (row as unknown as Record<string, string>)[fields.targetLabelKey] || row[fields.targetIdKey] || '—',
+        render: (_v, row) => (row as unknown as Record<string, string>)[fields.targetLabelKey] || row[fields.targetIdKey] || '',
       },
-      { key: 'customer_name', header: 'Cliente', render: (_v, row) => row.customer_name || '—' },
+      { key: 'customer_name', header: 'Cliente', render: (_v, row) => row.customer_name || '' },
       { key: 'status', header: 'Estado', render: (value) => renderWorkshopWorkOrderStatusBadge(value) },
       { key: 'total', header: 'Total', render: (value, row) => formatWorkshopMoney(value, row.currency) },
       { key: 'opened_at', header: 'Ingreso', render: (value) => formatDate(String(value ?? '')) },

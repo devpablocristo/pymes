@@ -121,11 +121,11 @@ export function CrudResourceShellHeader<T extends { id: string }>({
       <CrudToolbarActionButtons
         actions={toolbarActions}
         items={items}
-              archived={showArchived}
-              reload={reload}
-              setError={setError}
-              formatLabel={formatFieldText}
-            />
+        archived={showArchived}
+        reload={reload}
+        setError={setError}
+        formatLabel={formatFieldText}
+      />
       {crudConfig?.supportsArchived && archivedToggleEnabled ? (
         <CrudArchivedSearchParamToggle
           className="btn-secondary btn-sm"

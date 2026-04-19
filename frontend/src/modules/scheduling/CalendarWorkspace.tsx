@@ -1,5 +1,6 @@
 import { SchedulingCalendar, createSchedulingClient } from '@devpablocristo/modules-scheduling/next';
 import '@devpablocristo/modules-scheduling/styles.next.css';
+import '../../styles/calendar-workspace.css';
 import { PageLayout } from '../../components/PageLayout';
 import { usePageSearch } from '../../components/PageSearch';
 import { apiRequest } from '../../lib/api';

@@ -1,11 +1,17 @@
 import { useI18n } from '../lib/i18n';
 import { useBranchSelection } from '../lib/useBranchSelection';
 
-export function BranchSwitcher() {
+export function BranchSwitcher({
+  hideWhenSingle = true,
+  variant = 'sidebar',
+}: {
+  hideWhenSingle?: boolean;
+  variant?: 'sidebar' | 'header';
+}) {
   const { language } = useI18n();
   const { availableBranches, selectedBranchId, setSelectedBranchId, isLoading, isError } = useBranchSelection();
 
-  if (isLoading || isError || availableBranches.length <= 1) {
+  if (isLoading || isError || (hideWhenSingle && availableBranches.length <= 1)) {
     return null;
   }
 
@@ -21,10 +27,12 @@ export function BranchSwitcher() {
         };
 
   return (
-    <div className="shell-branch-switcher">
-      <label className="shell-branch-switcher-label" htmlFor="shell-branch-switcher">
-        {copy.label}
-      </label>
+    <div className={`shell-branch-switcher shell-branch-switcher--${variant}`}>
+      {variant === 'sidebar' ? (
+        <label className="shell-branch-switcher-label" htmlFor="shell-branch-switcher">
+          {copy.label}
+        </label>
+      ) : null}
       <select
         id="shell-branch-switcher"
         className="shell-branch-switcher-input"

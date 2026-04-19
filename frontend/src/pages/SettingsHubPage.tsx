@@ -27,6 +27,7 @@ import {
   IconUsers,
 } from '@devpablocristo/modules-ui-data-display/icons';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
+import { BranchSwitcher } from '../components/BranchSwitcher';
 import { usePageSearch } from '../components/PageSearch';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { getSession } from '../lib/api';
@@ -34,11 +35,10 @@ import { themeHubColorSwatches } from '../lib/productPalette';
 import { queryKeys } from '../lib/queryKeys';
 import './SettingsHubPage.css';
 
-function SettingsDeepLink({ to, title, desc }: { to: string; title: string; desc: string }) {
+function SettingsDeepLink({ to, title }: { to: string; title: string; desc: string }) {
   return (
     <Link to={to} className="card stg__deep-link">
       <strong>{title}</strong>
-      <p className="text-secondary stg__deep-link-desc">{desc}</p>
     </Link>
   );
 }
@@ -236,7 +236,12 @@ function CompanyTab() {
 function BranchesTab() {
   return (
     <div className="card stg__card-mb">
-      <p className="text-secondary u-m-0 u-text-base">Hay 1 sucursal por defecto.</p>
+      <div className="form-group">
+        <label className="stg__toggle-label">Sucursal activa</label>
+        <div className="stg__form-group-mt">
+          <BranchSwitcher hideWhenSingle={false} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -642,7 +647,7 @@ export function SettingsHubPage() {
     <SectionHubPage
       className="stg"
       pageTitle="Ajustes"
-      pageLead="Elegí un área para configurar tu cuenta y tu espacio de trabajo."
+      pageLead=""
       sections={availableSections}
       visibleSections={filteredSections}
       emptyState={

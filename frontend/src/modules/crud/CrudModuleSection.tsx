@@ -1,5 +1,6 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, matchPath, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { HeaderMenuItemsProvider } from '../../components/HeaderMenuContext';
 import { CrudViewModeSwitch } from './CrudViewModeSwitch';
 import '../../pages/WorkOrdersModuleSection.css';
 
@@ -24,11 +25,26 @@ type Props = {
 };
 
 export function CrudModuleSection(props: Props) {
+  const { pathname } = useLocation();
+  const isActionHidden = Boolean(
+    props.actionLink?.hideWhenActivePattern &&
+      matchPath({ path: props.actionLink.hideWhenActivePattern, end: false }, pathname),
+  );
+  const resolvedActionLink =
+    isActionHidden && props.actionLink?.activeReplacement
+      ? props.actionLink.activeReplacement
+      : isActionHidden
+        ? null
+        : props.actionLink;
+  const menuItems = resolvedActionLink ? [{ label: resolvedActionLink.label, href: resolvedActionLink.to }] : [];
+
   return (
-    <div className="wo-mod-orders">
-      <CrudViewModeSwitch {...props} />
-      {props.children}
-      <Outlet />
-    </div>
+    <HeaderMenuItemsProvider items={menuItems}>
+      <div className="wo-mod-orders">
+        <CrudViewModeSwitch {...props} />
+        {props.children}
+        <Outlet />
+      </div>
+    </HeaderMenuItemsProvider>
   );
 }

@@ -1,0 +1,76 @@
+.settings-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.settings-menu__trigger {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(120, 144, 180, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6d5cff 0%, #4b6dff 100%);
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(14, 24, 42, 0.26);
+}
+
+.settings-menu__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.settings-menu__avatar {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+
+.settings-menu__avatar-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.settings-menu__avatar-body {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 18px;
+  height: 10px;
+  margin-left: -9px;
+  border-radius: 10px 10px 6px 6px;
+  background: #fff;
+}
+
+.settings-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 140px;
+  padding: 8px;
+  border: 1px solid rgba(120, 144, 180, 0.22);
+  border-radius: 14px;
+  background: #182235;
+  box-shadow: 0 16px 40px rgba(7, 13, 25, 0.38);
+  z-index: 40;
+}
+
+.settings-menu__item {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #dce8ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.settings-menu__item:hover {
+  background: rgba(91, 135, 255, 0.12);
+}

@@ -127,4 +127,22 @@ describe('Shell bike shop navigation', () => {
     expect(screen.getByText('Presupuestos')).toBeInTheDocument();
     expect(screen.getByText('Ventas')).toBeInTheDocument();
   });
+
+  it('does not render Ajustes in the sidebar sections anymore', async () => {
+    render(
+      <MemoryRouter initialEntries={['/bicimax/dashboard']}>
+        <LanguageProvider initialLanguage="es">
+          <Shell>
+            <div>contenido</div>
+          </Shell>
+        </LanguageProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(shellMocks.loadModuleCatalog).toHaveBeenCalled();
+    });
+
+    expect(screen.queryByText('Ajustes')).not.toBeInTheDocument();
+  });
 });

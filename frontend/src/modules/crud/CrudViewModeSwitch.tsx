@@ -1,4 +1,6 @@
 import { NavLink, matchPath, useLocation } from 'react-router-dom';
+import { HeaderMenu } from '../../components/HeaderMenu';
+import { useHeaderMenuItems } from '../../components/HeaderMenuContext';
 import '../../styles/viewModeSegmentedSwitch.css';
 import '../../pages/WorkOrdersModuleSection.css';
 
@@ -30,16 +32,7 @@ export function CrudViewModeSwitch({
   actionLink,
 }: Props) {
   const { pathname } = useLocation();
-  const isActionHidden = Boolean(
-    actionLink?.hideWhenActivePattern && matchPath({ path: actionLink.hideWhenActivePattern, end: false }, pathname),
-  );
-  const resolvedActionLink =
-    isActionHidden && actionLink?.activeReplacement
-      ? actionLink.activeReplacement
-      : isActionHidden
-        ? null
-        : actionLink;
-
+  const contextualMenuItems = useHeaderMenuItems();
   function isModeActive(mode: CrudViewModeLink): boolean {
     return Boolean(
       matchPath({ path: mode.path, end: true }, pathname) ||
@@ -63,11 +56,7 @@ export function CrudViewModeSwitch({
             </NavLink>
           ))}
         </nav>
-        {resolvedActionLink ? (
-          <NavLink className="wo-mod-orders__action" to={resolvedActionLink.to}>
-            {resolvedActionLink.label}
-          </NavLink>
-        ) : null}
+        <HeaderMenu items={contextualMenuItems} />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
@@ -31,7 +31,7 @@ describe('inventory configured section shell', () => {
     loadLazyCrudPageConfigMock.mockResolvedValue(buildInventoryConfig());
   });
 
-  it('uses the generic configured section shell and replaces configure with back-to-inventory on the configure route', async () => {
+  it('keeps only the view tabs in the section band even on configure route', async () => {
     render(
       <MemoryRouter
         initialEntries={['/modules/inventory/configure']}
@@ -66,10 +66,9 @@ describe('inventory configured section shell', () => {
     );
 
     expect(await screen.findByText('configure-screen')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Configurar' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Volver al inventario' })).toBeInTheDocument();
+    const tabs = screen.getByRole('navigation', { name: 'Vistas de inventario' });
+    expect(await within(tabs).findByRole('link', { name: 'Lista' })).toBeInTheDocument();
+    expect(within(tabs).getByRole('link', { name: 'Galería' })).toBeInTheDocument();
+    expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
   });
 });

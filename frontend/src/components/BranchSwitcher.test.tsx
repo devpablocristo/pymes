@@ -88,4 +88,29 @@ describe('BranchSwitcher', () => {
 
     expect(setSelectedBranchId).toHaveBeenCalledWith('branch-b');
   });
+
+  it('can stay visible with a single branch when explicitly requested', () => {
+    render(
+      <LanguageProvider initialLanguage="es">
+        <BranchContext.Provider value={buildBranchContextValue()}>
+          <BranchSwitcher hideWhenSingle={false} />
+        </BranchContext.Provider>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByLabelText('Sucursal activa')).toBeInTheDocument();
+  });
+
+  it('renders compact header variant without visible label text', () => {
+    render(
+      <LanguageProvider initialLanguage="es">
+        <BranchContext.Provider value={buildBranchContextValue()}>
+          <BranchSwitcher hideWhenSingle={false} variant="header" />
+        </BranchContext.Provider>
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByLabelText('Sucursal activa')).toBeInTheDocument();
+    expect(screen.queryByText('Sucursal')).toBeNull();
+  });
 });

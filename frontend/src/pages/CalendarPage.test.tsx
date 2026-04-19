@@ -40,15 +40,21 @@ vi.mock('../components/PageLayout', () => ({
   PageLayout: ({
     title,
     lead,
+    inlineActions,
+    actions,
     children,
   }: {
     title: React.ReactNode;
     lead?: React.ReactNode;
+    inlineActions?: React.ReactNode;
+    actions?: React.ReactNode;
     children: React.ReactNode;
   }) => (
     <div>
       <h1>{title}</h1>
       {lead ? <p>{lead}</p> : null}
+      {inlineActions}
+      {actions}
       {children}
     </div>
   ),

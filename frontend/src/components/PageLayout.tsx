@@ -2,27 +2,26 @@ import { CrudPageShell } from '@devpablocristo/core-browser/crud';
 import { CrudShellHeaderActionsColumn } from '@devpablocristo/modules-crud-ui';
 import type { ReactNode } from 'react';
 import { usePageSearchShellControl } from './PageSearch';
+import { HeaderMenu } from './HeaderMenu';
+import { useHeaderMenuItems } from './HeaderMenuContext';
 
 export type PageLayoutProps = {
   title: ReactNode;
   lead?: ReactNode;
   actions?: ReactNode;
+  inlineActions?: ReactNode;
+  menuItems?: Array<{ label: string; href: string }>;
   banner?: ReactNode;
   className?: string;
   children: ReactNode;
 };
 
-function isPrimitiveLead(lead: ReactNode) {
-  return typeof lead === 'string' || typeof lead === 'number';
-}
-
-export function PageLayout({ title, lead, actions, banner, className, children }: PageLayoutProps) {
+export function PageLayout({ title, lead, actions, inlineActions, menuItems, banner, className, children }: PageLayoutProps) {
+  const contextualMenuItems = useHeaderMenuItems();
   const stackClass = ['page-stack', className].filter(Boolean).join(' ');
   const pageSearch = usePageSearchShellControl();
   const hasSearch = pageSearch.visible;
-  const primitiveLead = lead != null && lead !== false && isPrimitiveLead(lead) ? lead : undefined;
-  const richLead =
-    lead != null && lead !== false && !isPrimitiveLead(lead) ? <div className="text-page-lead">{lead}</div> : undefined;
+  void lead;
 
   const headerActions = (
     <CrudShellHeaderActionsColumn
@@ -36,6 +35,7 @@ export function PageLayout({ title, lead, actions, banner, className, children }
             }
           : null
       }
+      searchInlineActions={inlineActions}
     >
       {actions}
     </CrudShellHeaderActionsColumn>
@@ -43,10 +43,11 @@ export function PageLayout({ title, lead, actions, banner, className, children }
 
   return (
     <div className={stackClass}>
+      <div className="page-layout__header-top-row">
+        <HeaderMenu items={[...contextualMenuItems, ...(menuItems ?? [])]} />
+      </div>
       <CrudPageShell
         title={title}
-        subtitle={primitiveLead}
-        headerLeadSlot={richLead}
         search={undefined}
         headerActions={headerActions}
       >

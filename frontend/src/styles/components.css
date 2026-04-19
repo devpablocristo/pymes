@@ -82,6 +82,13 @@
   min-width: min(100%, 36rem);
 }
 
+.page-layout__header-top-row {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: var(--space-1);
+}
+
 .page-header.crud-page-shell__header .crud-page-shell__header-actions .m-kanban__search,
 .page-header.crud-page-shell__header .crud-page-shell__header-actions input[type='search'] {
   width: 100%;

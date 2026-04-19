@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
-import { BranchSwitcher } from './BranchSwitcher';
 import { dotIcon } from './ShellIcons';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
@@ -102,11 +101,6 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link('/customer-messaging/inbox'), label: t('shell.nav.whatsappInbox'), icon: dotIcon },
       { to: link('/customer-messaging/campaigns'), label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
     ],
-    [t, slug],
-  );
-
-  const systemNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: link('/settings'), label: t('shell.nav.settings'), icon: dotIcon }],
     [t, slug],
   );
 
@@ -219,8 +213,6 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     result.push(...moduleNav);
-    // Sistema (Settings) al final, convención de Linear / Slack / Notion.
-    result.push({ label: sentenceCase(t('shell.sections.system')), items: systemNav });
     return result;
   }, [
     beautyNav,
@@ -234,7 +226,6 @@ export function Shell({ children }: { children: ReactNode }) {
     professionalsNav,
     restaurantsNav,
     sentenceCase,
-    systemNav,
     t,
     whatsappNav,
     workshopsNav,
@@ -245,11 +236,6 @@ export function Shell({ children }: { children: ReactNode }) {
       brandTitle="Pymes SaaS"
       brandSubtitle={sentenceCase(t('shell.brand.subtitle'))}
       sections={sections}
-      footerContent={
-        <div className="sidebar-footer-controls">
-          <BranchSwitcher />
-        </div>
-      }
       searchPlaceholder={t('shell.search.placeholder')}
       skipLinkLabel={t('shell.skipLink')}
     >

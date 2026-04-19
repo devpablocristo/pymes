@@ -2,14 +2,10 @@ package pymescore
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 func (c *Client) GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error) {
-	result, err := c.Get(ctx, fmt.Sprintf("/v1/internal/v1/parties/%s", url.PathEscape(partyID)), orgID)
-	if err != nil {
-		return nil, fmt.Errorf("get party: %w", err)
-	}
-	return result, nil
+	return pymescoreops.GetParty(ctx, c.Client, orgID, partyID)
 }

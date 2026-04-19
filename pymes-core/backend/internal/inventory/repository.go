@@ -54,6 +54,13 @@ func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
 	return branchID
 }
 
+func stockLevelSelectBranchExpr(branchID *uuid.UUID) string {
+	if normalizeBranchID(branchID) != nil {
+		return "sl.branch_id AS branch_id"
+	}
+	return "NULL AS branch_id"
+}
+
 func (r *Repository) EnsureStockLevel(ctx context.Context, orgID, productID uuid.UUID) error {
 	_ = ctx
 	_ = orgID
@@ -265,10 +272,11 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 	}
 
 	var rows []row
+	selectBranchID := stockLevelSelectBranchExpr(normalizedBranchID)
 	if err := q.Select(`
 			p.id AS product_id,
 			p.org_id AS org_id,
-			sl.branch_id AS branch_id,
+			` + selectBranchID + `,
 			p.name AS product_name,
 			p.sku AS sku,
 			p.track_stock AS track_stock,

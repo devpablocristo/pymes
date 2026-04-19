@@ -78,12 +78,12 @@ describe('WorkOrderEditor', () => {
 
     render(<WorkOrderEditor orderId="wo-1" variant="modal" onClose={onClose} onSaved={vi.fn()} />);
 
-    expect(await screen.findByLabelText('Cliente')).toBeInTheDocument();
+    const customerInput = await screen.findByLabelText('Cliente');
+    await waitFor(() => {
+      expect(customerInput).toHaveValue('Cliente original');
+    });
 
-    const closeButton = document.querySelector<HTMLButtonElement>('.wo-editor__close');
-
-    expect(closeButton).not.toBeNull();
-    fireEvent.click(closeButton!);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -111,5 +111,24 @@ describe('WorkOrderEditor', () => {
       );
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('usa labels de bicicleta cuando la orden es de bike_shop', async () => {
+    apiMocks.getWorkOrder.mockResolvedValue(
+      buildWorkOrder({
+        target_type: 'bicycle',
+        target_id: 'bike-1',
+        target_label: 'Trek Marlin 7',
+        vehicle_id: undefined,
+        vehicle_plate: undefined,
+        bicycle_id: 'bike-1',
+        bicycle_label: 'Trek Marlin 7',
+      }),
+    );
+
+    render(<WorkOrderEditor orderId="wo-1" variant="modal" targetType="bicycle" onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(await screen.findByLabelText('Bicicleta (UUID)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Vehículo (UUID)')).not.toBeInTheDocument();
   });
 });

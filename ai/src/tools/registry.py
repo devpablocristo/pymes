@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from src.agents.tool_access import is_legacy_internal_tool_allowed
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
 from src.core.dossier import add_learned_context, set_preference, update_business_field
@@ -28,114 +29,9 @@ from src.tools import (
 
 ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 
-ROLE_TOOL_ACCESS: dict[str, str | list[str]] = {
-    "admin": "*",
-    "seller": [
-        "search_customers",
-        "search_products",
-        "search_services",
-        "get_service",
-        "get_bookings",
-        "check_availability",
-        "book_scheduling",
-        "get_quotes",
-        "create_quote",
-        "create_sale",
-        "get_account_balances",
-        "get_low_stock",
-        "generate_payment_link",
-        "get_payment_status",
-        "send_payment_info",
-        "search_help",
-    ],
-    "cashier": [
-        "get_recent_sales",
-        "create_sale",
-        "get_cashflow_summary",
-        "create_cash_movement",
-        "search_customers",
-        "get_account_balances",
-        "get_bookings",
-        "generate_payment_link",
-        "get_payment_status",
-        "send_payment_info",
-        "search_help",
-    ],
-    "accountant": [
-        "get_sales_summary",
-        "get_cashflow_summary",
-        "get_account_balances",
-        "get_purchases",
-        "get_recurring_expenses",
-        "get_debtors",
-        "get_exchange_rates",
-        "get_payment_status",
-        "search_help",
-    ],
-    "warehouse": [
-        "search_products",
-        "get_low_stock",
-        "get_stock_level",
-        "get_purchases",
-        "search_help",
-    ],
-}
-
-TOOL_MODULES: dict[str, set[str]] = {
-    "get_sales_summary": {"sales"},
-    "get_recent_sales": {"sales"},
-    "get_top_customers": {"customers", "sales"},
-    "search_customers": {"customers"},
-    "search_products": {"products"},
-    "search_services": {"services"},
-    "get_service": {"services"},
-    "get_low_stock": {"inventory", "products"},
-    "get_stock_level": {"inventory", "products"},
-    "get_cashflow_summary": {"cashflow"},
-    "get_account_balances": {"accounts"},
-    "get_debtors": {"accounts"},
-    "get_bookings": {"scheduling"},
-    "check_availability": {"scheduling"},
-    "get_quotes": {"quotes"},
-    "get_purchases": {"purchases"},
-    "get_recurring_expenses": {"recurring"},
-    "get_exchange_rates": {"currency"},
-    "create_quote": {"quotes"},
-    "create_sale": {"sales"},
-    "book_scheduling": {"scheduling"},
-    "create_cash_movement": {"cashflow"},
-    "generate_payment_link": {"sales"},
-    "get_payment_status": {"sales"},
-    "send_payment_info": {"sales"},
-    "complete_onboarding_step": set(),
-    "skip_onboarding_step": set(),
-    "apply_business_profile": set(),
-    "update_business_info": set(),
-    "get_tenant_settings": set(),
-    "remember_fact": set(),
-    "search_help": set(),
-}
-
 
 def _tool(name: str, description: str, parameters: dict[str, Any]) -> ToolDeclaration:
     return ToolDeclaration(name=name, description=description, parameters=parameters)
-
-
-def _is_allowed_by_role(role: str, tool_name: str) -> bool:
-    allowed = ROLE_TOOL_ACCESS.get((role or "").strip().lower(), ["search_help"])
-    if allowed == "*":
-        return True
-    return tool_name in allowed
-
-
-def _is_allowed_by_modules(modules_active: list[str], tool_name: str) -> bool:
-    if not modules_active:
-        return True
-    required = TOOL_MODULES.get(tool_name)
-    if not required:
-        return True
-    active = {m.strip().lower() for m in modules_active if isinstance(m, str)}
-    return bool(required.intersection(active))
 
 
 def _maybe_add(
@@ -146,9 +42,7 @@ def _maybe_add(
     declaration: ToolDeclaration,
     handler: ToolHandler,
 ) -> None:
-    if not _is_allowed_by_role(role, declaration.name):
-        return
-    if not _is_allowed_by_modules(modules_active, declaration.name):
+    if not is_legacy_internal_tool_allowed(role, modules_active, declaration.name):
         return
     declarations.append(declaration)
     handlers[declaration.name] = handler

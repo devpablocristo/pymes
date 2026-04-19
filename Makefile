@@ -3,7 +3,7 @@
 .PHONY: \
 	up down ps logs llm-up llm-pull \
 	staticcheck ruff lint \
-	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
+	seed seeds seed-clear seeds-clear modules-check cleanup-pablo e2e-review-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
@@ -26,12 +26,19 @@ lint: staticcheck ruff
 # Seeds y utilidades
 
 # Carga seeds demo por el flujo único soportado (`scripts/seeds/load.sh`).
+# Debe dejar datos útiles en los CRUDs principales del producto.
 seed:
 	bash scripts/seeds/load.sh
 
-# Limpia seeds demo por el flujo único soportado (`scripts/seeds/clear.sh`).
+# Alias explícito en plural para evitar confusión operativa.
+seeds: seed
+
+# Limpia datos CRUD/demo preservando bootstrap del tenant (org, users, members, settings, API keys).
 seed-clear:
 	bash scripts/seeds/clear.sh
+
+# Alias explícito en plural para evitar confusión operativa.
+seeds-clear: seed-clear
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
 # Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`

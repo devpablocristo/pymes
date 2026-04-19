@@ -40,7 +40,9 @@
       "Bash(ls /home/pablo/Projects/Pablo/modules/crud/ui/ts/tests/ /home/pablo/Projects/Pablo/modules/crud/ui/ts/src/*.test.*)",
       "Bash(git stash:*)",
       "Bash(git apply *)",
-      "Bash(grep -nA 8 \"toFormValues\" /home/pablo/Projects/Pablo/pymes/frontend/src/modules/audit-trail/auditTrailHelpers.tsx)"
+      "Bash(grep -nA 8 \"toFormValues\" /home/pablo/Projects/Pablo/pymes/frontend/src/modules/audit-trail/auditTrailHelpers.tsx)",
+      "Bash(make seed-clear *)",
+      "Bash(make seed *)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",

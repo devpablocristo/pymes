@@ -2,14 +2,11 @@ package pymescore
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 // GetParty fetches a party by ID from the pymes-core.
 func (c *Client) GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error) {
-	result, err := c.Get(ctx, fmt.Sprintf("/v1/internal/v1/parties/%s", partyID), orgID)
-	if err != nil {
-		return nil, fmt.Errorf("get party: %w", err)
-	}
-	return result, nil
+	return pymescoreops.GetParty(ctx, c.Client, orgID, partyID)
 }

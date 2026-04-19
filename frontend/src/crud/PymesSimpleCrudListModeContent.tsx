@@ -349,7 +349,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     ) {
       mappedColumns.push({
         id: 'tags',
-        header: 'Tags',
+        header: 'Etiquetas',
         className: 'cell-tags',
         render: (row) => crudConfig.renderTagsCell?.(row) ?? '—',
       });
@@ -502,7 +502,6 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     [crudConfig, reload, setError],
   );
 
-  const canEdit = crudConfig?.allowEdit ?? Boolean(crudConfig?.formFields.length);
   const canCreate = crudConfig?.allowCreate ?? Boolean(crudConfig?.formFields.length);
   const paginationEnabled = crudConfig?.featureFlags?.pagination !== false;
   const kanbanCreateFooterLabel = crudConfig?.kanban?.createFooterLabel ?? `Añadir ${crudConfig?.label ?? 'registro'}`;

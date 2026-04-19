@@ -182,12 +182,6 @@ function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: 
   };
 }
 
-const archiveMutations = {
-  deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id),
-  restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id),
-  hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id),
-};
-
 type WorkOrdersCrudFactoryOptions = {
   resourceId: string;
   targetType: WorkOrderTargetKind;
@@ -204,75 +198,87 @@ export function createWorkOrdersCrudConfig({
   itemsPlaceholder,
 }: WorkOrdersCrudFactoryOptions): CrudPageConfig<WorkOrder> {
   const fields = targetType === 'vehicle' ? VEHICLE_FIELDS : BICYCLE_FIELDS;
-  const withBooking = targetType === 'vehicle';
-  const withNumber = targetType === 'vehicle';
+  const withBooking = true;
+  const withNumber = true;
+  const archiveMutations = {
+    deleteItem: async (row: { id: string }) => archiveUnifiedWorkOrder(row.id, targetType),
+    restore: async (row: { id: string }) => restoreUnifiedWorkOrder(row.id, targetType),
+    hardDelete: async (row: { id: string }) => hardDeleteUnifiedWorkOrder(row.id, targetType),
+  };
 
   const rowActions: CrudRowAction<WorkOrder>[] = [];
 
-  if (targetType === 'vehicle') {
-    rowActions.push({
-      id: 'schedule',
-      label: 'Agendar',
-      kind: 'secondary',
-      isVisible: (row) => !row.booking_id,
-      onClick: async (row, helpers) => {
-        const values = await openCrudFormDialog({
-          title: 'Agendar turno',
-          subtitle: row.number || row.id,
-          submitLabel: 'Agendar',
-          fields: [
-            {
-              id: 'title',
-              label: 'Título del turno',
-              required: true,
-              defaultValue: row.requested_work || `Servicio ${row.vehicle_plate || row.number}`,
-            },
-            {
-              id: 'start_at',
-              label: 'Inicio',
-              type: 'datetime-local',
-              required: true,
-              defaultValue: toDateTimeInput(new Date(Date.now() + 60 * 60 * 1000).toISOString()),
-            },
-            {
-              id: 'duration',
-              label: 'Duración en minutos',
-              type: 'number',
-              required: true,
-              defaultValue: '60',
-              min: 1,
-            },
-          ],
-        });
-        if (!values) return;
-        const title = String(values.title ?? '').trim();
-        if (!title) return;
-        const startAtInput = String(values.start_at ?? '').trim();
-        if (!startAtInput) return;
-        const duration = Number(values.duration || '60');
-        const booking = await createWorkshopBooking({
-          branch_id: row.branch_id,
-          customer_id: row.customer_id,
-          customer_name: row.customer_name || row.vehicle_plate || row.number,
-          title,
-          description: row.requested_work,
-          status: 'scheduled',
-          start_at: new Date(startAtInput).toISOString(),
-          duration: Number.isFinite(duration) ? duration : 60,
-          notes: row.notes,
-          metadata: {
-            work_order_id: row.id,
-            vehicle_id: row.vehicle_id,
-            vehicle_plate: row.vehicle_plate,
+  rowActions.push({
+    id: 'schedule',
+    label: 'Agendar',
+    kind: 'secondary',
+    isVisible: (row) => !row.booking_id,
+    onClick: async (row, helpers) => {
+      const assetLabel = targetType === 'vehicle' ? row.vehicle_plate : row.bicycle_label;
+      const values = await openCrudFormDialog({
+        title: 'Agendar turno',
+        subtitle: row.number || row.id,
+        submitLabel: 'Agendar',
+        fields: [
+          {
+            id: 'title',
+            label: 'Título del turno',
+            required: true,
+            defaultValue: row.requested_work || `Servicio ${assetLabel || row.number}`,
           },
-        });
-        if (booking.id) {
-          await updateUnifiedWorkOrder(row.id, { booking_id: booking.id });
-        }
-        await helpers.reload();
-      },
-    });
-  }
+          {
+            id: 'start_at',
+            label: 'Inicio',
+            type: 'datetime-local',
+            required: true,
+            defaultValue: toDateTimeInput(new Date(Date.now() + 60 * 60 * 1000).toISOString()),
+          },
+          {
+            id: 'duration',
+            label: 'Duración en minutos',
+            type: 'number',
+            required: true,
+            defaultValue: '60',
+            min: 1,
+          },
+        ],
+      });
+      if (!values) return;
+      const title = String(values.title ?? '').trim();
+      if (!title) return;
+      const startAtInput = String(values.start_at ?? '').trim();
+      if (!startAtInput) return;
+      const duration = Number(values.duration || '60');
+      const metadata =
+        targetType === 'vehicle'
+          ? {
+              work_order_id: row.id,
+              vehicle_id: row.vehicle_id,
+              vehicle_plate: row.vehicle_plate,
+            }
+          : {
+              work_order_id: row.id,
+              bicycle_id: row.bicycle_id,
+              bicycle_label: row.bicycle_label,
+            };
+      const booking = await createWorkshopBooking({
+        branch_id: row.branch_id,
+        customer_id: row.customer_id,
+        customer_name: row.customer_name || assetLabel || row.number,
+        title,
+        description: row.requested_work,
+        status: 'scheduled',
+        start_at: new Date(startAtInput).toISOString(),
+        duration: Number.isFinite(duration) ? duration : 60,
+        notes: row.notes,
+        metadata,
+      }, targetType);
+      if (booking.id) {
+        await updateUnifiedWorkOrder(row.id, { booking_id: booking.id }, targetType);
+      }
+      await helpers.reload();
+    },
+  });
 
   rowActions.push(
     {
@@ -281,7 +287,7 @@ export function createWorkOrdersCrudConfig({
       kind: 'secondary',
       isVisible: (row) => !row.quote_id && row.status !== 'cancelled',
       onClick: async (row, helpers) => {
-        await createWorkOrderQuote(row.id);
+        await createWorkOrderQuote(row.id, targetType);
         await helpers.reload();
       },
     },
@@ -291,7 +297,7 @@ export function createWorkOrdersCrudConfig({
       kind: 'success',
       isVisible: (row) => !row.sale_id && row.status !== 'cancelled',
       onClick: async (row, helpers) => {
-        await createWorkOrderSale(row.id);
+        await createWorkOrderSale(row.id, targetType);
         await helpers.reload();
       },
     },
@@ -301,7 +307,7 @@ export function createWorkOrdersCrudConfig({
       kind: 'success',
       isVisible: (row) => row.status !== 'cancelled',
       onClick: async (row, helpers) => {
-        const link = await createWorkOrderPaymentLink(row.id);
+        const link = await createWorkOrderPaymentLink(row.id, targetType);
         openExternalURL(link.payment_url as string | undefined);
         await helpers.reload();
       },

@@ -40,10 +40,6 @@ type IdentityResolver struct {
 	cfg      IdentityConfig
 }
 
-func NewIdentityResolver(verifier TokenVerifier, issuer string) *IdentityResolver {
-	return NewIdentityResolverWithConfig(verifier, IdentityConfig{Issuer: issuer})
-}
-
 func NewIdentityResolverWithConfig(verifier TokenVerifier, cfg IdentityConfig) *IdentityResolver {
 	return &IdentityResolver{verifier: verifier, cfg: cfg}
 }

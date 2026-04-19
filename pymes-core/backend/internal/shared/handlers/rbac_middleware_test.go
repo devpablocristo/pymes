@@ -66,3 +66,57 @@ func TestRBACMiddleware_RequirePermission(t *testing.T) {
 		})
 	}
 }
+
+func TestRBACMiddleware_RequirePermission_FailsClosedWhenCheckerMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	m := NewRBACMiddleware(nil)
+
+	r.Use(func(c *gin.Context) {
+		c.Set(types.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(types.CtxKeyActor, "local-admin")
+		c.Set(types.CtxKeyRole, "member")
+		c.Set(types.CtxKeyScopes, []string{})
+		c.Set(types.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
+	r.GET("/test", m.RequirePermission("sales", "create"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", resp.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestRBACMiddleware_RequirePermission_FailsClosedWhenMiddlewareIsNil(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	var m *RBACMiddleware
+
+	r.Use(func(c *gin.Context) {
+		c.Set(types.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(types.CtxKeyActor, "local-admin")
+		c.Set(types.CtxKeyRole, "member")
+		c.Set(types.CtxKeyScopes, []string{})
+		c.Set(types.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
+	r.GET("/test", m.RequirePermission("sales", "create"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", resp.Code, http.StatusInternalServerError)
+	}
+}

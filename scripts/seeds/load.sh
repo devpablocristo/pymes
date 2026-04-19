@@ -6,22 +6,26 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 ensure_seed_dbs_ready
+require_seed_org_external_id
 
-if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
-  echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required (Clerk org external_id, e.g. org_xxx)." >&2
-  echo "Definilo en $ROOT_DIR/.env (scripts/seeds/lib.sh lo carga al correr make seed)." >&2
-  exit 1
-fi
+TARGET_ORG_UUID="$(resolve_target_org_uuid)"
+SEED_ORG_EXTERNAL_ID="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID}"
+SEED_ORG_NAME="${PYMES_SEED_DEMO_ORG_NAME:-Pymes Demo Org}"
+SEED_ORG_SLUG="${PYMES_SEED_DEMO_ORG_SLUG:-$(derive_seed_org_slug "$SEED_ORG_EXTERNAL_ID")}"
+export TARGET_ORG_UUID SEED_ORG_EXTERNAL_ID SEED_ORG_NAME SEED_ORG_SLUG
 
-# Mínimo para levantar la app: usuarios/org Clerk + core business + RBAC.
-bash "$ROOT_DIR/scripts/seeds/core-01-clerk-prereqs.sh"
-bash "$ROOT_DIR/scripts/seeds/core-02-core-business.sh"
-bash "$ROOT_DIR/scripts/seeds/core-03-rbac.sh"
+for sql_file in \
+  "pymes-core/backend/seeds/01_clerk_prereqs.sql" \
+  "pymes-core/backend/seeds/02_core_business.sql" \
+  "pymes-core/backend/seeds/03_rbac.sql" \
+  "pymes-core/backend/seeds/04_full_demo.sql" \
+  "pymes-core/backend/seeds/05_scheduling_demo.sql" \
+  "workshops/backend/seeds/auto_repair_demo.sql" \
+  "workshops/backend/seeds/bike_shop_demo.sql" \
+  "professionals/backend/seeds/demo.sql" \
+  "restaurants/backend/seeds/demo.sql"
+do
+  run_pymes_sql_file "$sql_file"
+done
 
-# Verticales: cada uno es idempotente, se puede comentar el que no uses.
-bash "$ROOT_DIR/scripts/seeds/workshops-01-auto-repair.sh"
-bash "$ROOT_DIR/scripts/seeds/workshops-02-bike-shop.sh"
-bash "$ROOT_DIR/scripts/seeds/professionals-01-demo.sh"
-bash "$ROOT_DIR/scripts/seeds/restaurants-01-demo.sh"
-
-bash "$ROOT_DIR/scripts/seeds/load-review.sh"
+run_review_sql_file "scripts/seeds/review_demo.sql"

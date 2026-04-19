@@ -2,23 +2,14 @@ package pymescore
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 func (c *Client) CreateSale(ctx context.Context, payload map[string]any) (map[string]any, error) {
-	orgID, _ := payload["org_id"].(string)
-	result, err := c.Post(ctx, "/v1/internal/v1/sales", orgID, payload)
-	if err != nil {
-		return nil, fmt.Errorf("create sale: %w", err)
-	}
-	return result, nil
+	return pymescoreops.CreateSale(ctx, c.Client, payload)
 }
 
 func (c *Client) CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error) {
-	result, err := c.Post(ctx, fmt.Sprintf("/v1/internal/v1/sales/%s/payment-link", url.PathEscape(saleID)), orgID, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create sale payment link: %w", err)
-	}
-	return result, nil
+	return pymescoreops.CreateSalePaymentLink(ctx, c.Client, orgID, saleID)
 }

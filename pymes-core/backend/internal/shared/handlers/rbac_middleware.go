@@ -25,7 +25,7 @@ func (m *RBACMiddleware) RequirePermission(resource, action string) gin.HandlerF
 	action = strings.TrimSpace(action)
 	return func(c *gin.Context) {
 		if m == nil || m.checker == nil {
-			c.Next()
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "rbac_not_configured"})
 			return
 		}
 		authCtx := GetAuthContext(c)

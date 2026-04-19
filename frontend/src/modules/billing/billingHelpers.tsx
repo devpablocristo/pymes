@@ -14,6 +14,7 @@ import {
   openCrudFormDialog,
   openCrudTextDialog,
 } from '../crud';
+import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   INVOICE_STATUS_LABELS,
   archiveInvoice,
@@ -132,6 +133,21 @@ function buildCrudNameField(
   placeholder: string,
 ) {
   return { key, label, required: true, placeholder };
+}
+
+function buildPaymentMethodField() {
+  return {
+    key: 'payment_method',
+    label: 'Método de cobro',
+    type: 'select' as const,
+    required: true,
+    options: paymentMethodOptions,
+  };
+}
+
+function formatPaymentMethodLabel(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  return paymentMethodOptions.find((option) => option.value === raw)?.label ?? raw ?? '—';
 }
 
 function buildCommercialLineItemsBlock(sectionId = 'items') {
@@ -489,6 +505,12 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
+      fieldConfig: {
+        customer_id: { hidden: true },
+        customer_name: { helperText: 'Cliente al que le estás armando este presupuesto.' },
+        valid_until: { helperText: 'Fecha límite hasta la que mantenés este precio u oferta.' },
+        notes: { helperText: 'Agregá alcance, aclaraciones o condiciones comerciales.' },
+      },
     },
     kanban: {
       card: {
@@ -501,9 +523,9 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
         apiRequest<TRecord>(`/v1/quotes/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
-      { key: 'customer_id', label: 'Customer ID' },
+      { key: 'customer_id', label: 'Cliente' },
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
-      { key: 'valid_until', label: 'Valido hasta', type: 'date' },
+      { key: 'valid_until', label: 'Válido hasta', type: 'date' },
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -579,7 +601,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       { key: 'number', header: 'Venta', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
-      { key: 'payment_method', header: 'Cobro' },
+      { key: 'payment_method', header: 'Cobro', render: (value) => formatPaymentMethodLabel(value) },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
       { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
@@ -597,6 +619,13 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
+      fieldConfig: {
+        customer_id: { hidden: true },
+        quote_id: { hidden: true },
+        customer_name: { helperText: 'Cliente al que le cobrás esta operación.' },
+        payment_method: { helperText: 'Elegí cómo se cobró o se va a cobrar esta venta.' },
+        notes: { helperText: 'Usalo para observaciones rápidas de caja o entrega.' },
+      },
     },
     kanban: {
       card: {
@@ -609,15 +638,10 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         apiRequest<TRecord>(`/v1/sales/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
-      { key: 'customer_id', label: 'Customer ID' },
+      { key: 'customer_id', label: 'Cliente' },
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
-      { key: 'quote_id', label: 'Quote ID' },
-      {
-        key: 'payment_method',
-        label: 'Metodo de cobro',
-        required: true,
-        placeholder: 'efectivo, transferencia, tarjeta',
-      },
+      { key: 'quote_id', label: 'Presupuesto relacionado' },
+      buildPaymentMethodField(),
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -641,7 +665,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
               return;
             }
             const lines = items.map(
-              (p) => `${p.method} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`,
+              (p) => `${formatPaymentMethodLabel(p.method)} · ${p.amount} · ${p.received_at}${p.notes ? ` · ${p.notes}` : ''}`,
             );
             await openCrudTextDialog({
               title: 'Cobros registrados',
@@ -667,8 +691,9 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
                 id: 'method',
                 label: 'Método de cobro',
                 required: true,
-                defaultValue: 'efectivo',
-                placeholder: 'efectivo, transferencia, tarjeta',
+                defaultValue: 'cash',
+                type: 'select',
+                options: paymentMethodOptions,
               },
               {
                 id: 'amount',
@@ -726,7 +751,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
       quote_id: row.quote_id ?? '',
-      payment_method: row.payment_method ?? '',
+      payment_method: row.payment_method ?? 'cash',
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),

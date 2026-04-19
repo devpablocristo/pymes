@@ -15,6 +15,7 @@ import {
 import { formatPartyTagList, parsePartyTagCsv } from '../parties';
 import { buildStandardCrudViewModes } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
+import { currencyOptions, taxRateOptions } from '../../lib/formPresets';
 
 export type ServiceRecord = {
   id: string;
@@ -66,10 +67,10 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
         className: 'cell-name',
         render: (_value, row) => (
           <>
-            <strong>{row.name}</strong>
-            <div className="text-secondary">
-              {row.code || 'Sin codigo'} · {row.category_code || 'general'}
-            </div>
+              <strong>{row.name}</strong>
+              <div className="text-secondary">
+              {row.code || 'Sin código'} · {row.category_code || 'general'}
+              </div>
           </>
         ),
       },
@@ -88,13 +89,13 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
     ],
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del servicio' },
-      { key: 'code', label: 'Codigo', placeholder: 'SVC-001' },
-      { key: 'category_code', label: 'Categoria', placeholder: 'estetica, diagnostico, consultoria' },
+      { key: 'code', label: 'Código', placeholder: 'SVC-001' },
+      { key: 'category_code', label: 'Categoría', placeholder: 'estetica, diagnostico, consultoria' },
       { key: 'sale_price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
       { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
-      { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-      { key: 'default_duration_minutes', label: 'Duracion por defecto (min)', type: 'number', placeholder: '60' },
+      { key: 'tax_rate', label: 'IVA', type: 'select', options: taxRateOptions },
+      { key: 'currency', label: 'Moneda', type: 'select', options: currencyOptions },
+      { key: 'default_duration_minutes', label: 'Duración por defecto (min)', type: 'number', placeholder: '60' },
       {
         key: 'is_active',
         label: 'Estado comercial',
@@ -104,8 +105,8 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
           { label: 'Inactivo', value: 'false' },
         ],
       },
-      { key: 'tags', label: 'Tags', placeholder: 'premium, online, recurrente' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
+      { key: 'tags', label: 'Etiquetas', placeholder: 'premium, online, recurrente' },
+      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
       [row.name, row.code, row.category_code, row.description, row.currency, formatPartyTagList(row.tags)].filter(Boolean).join(' '),
@@ -124,5 +125,13 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
     }),
     toBody: serviceToBody,
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
+    editorModal: {
+      fieldConfig: {
+        code: { helperText: 'Código corto para buscar el servicio sin recordar el nombre completo.' },
+        category_code: { helperText: 'Agrupalo por rubro o familia para reportes y filtros.' },
+        tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
+        tags: { helperText: 'Etiquetas internas para campañas, filtros o automatizaciones.' },
+      },
+    },
   };
 }

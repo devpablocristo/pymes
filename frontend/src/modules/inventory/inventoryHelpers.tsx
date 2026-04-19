@@ -13,6 +13,15 @@ import {
 } from '../../crud/resourceConfigs.shared';
 import { renderCrudActiveBadge } from '../../modules/crud';
 import { formatPartyTagList, parsePartyTagCsv } from '../parties';
+import {
+  asCrudString,
+  currencyOptions,
+  parseMetadataStringMap,
+  productCategoryOptions,
+  productKindOptions,
+  productUnitOptions,
+  taxRateOptions,
+} from '../../lib/formPresets';
 
 export type ProductRecord = {
   id: string;
@@ -30,6 +39,7 @@ export type ProductRecord = {
   is_active: boolean;
   deleted_at?: string | null;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 };
 
 export type StockRecord = {
@@ -46,13 +56,18 @@ export type StockRecord = {
 export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[] {
   return [
     { key: 'name', header: 'Producto', className: 'cell-name' },
-    { key: 'sku', header: 'SKU', render: (_v, row) => row.sku || '—' },
+    {
+      key: 'sku',
+      header: 'Código',
+      render: (_v, row) =>
+        row.sku || (typeof row.metadata?.barcode === 'string' ? String(row.metadata.barcode) : '') || '—',
+    },
     { key: 'unit', header: 'Unidad', render: (_v, row) => row.unit || '—' },
     { key: 'price', header: 'Precio', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     {
       key: 'tags',
-      header: 'Tags',
+      header: 'Etiquetas',
       className: 'cell-tags',
       render: (_value, row) => renderTagBadges(row.tags),
     },
@@ -72,12 +87,26 @@ export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[]
 export function productFormFields(): CrudFormField[] {
   return [
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
-    { key: 'sku', label: 'SKU', placeholder: 'SKU-001' },
-    { key: 'unit', label: 'Unidad', placeholder: 'unidad, kg, hora' },
+    { key: 'sku', label: 'Código interno', placeholder: 'PROD-001' },
+    {
+      key: 'metadata_category',
+      label: 'Categoría',
+      type: 'select',
+      options: productCategoryOptions,
+    },
+    {
+      key: 'metadata_kind',
+      label: 'Tipo de producto',
+      type: 'select',
+      options: productKindOptions,
+    },
+    { key: 'metadata_barcode', label: 'Código de barras', placeholder: '7791234567890' },
+    { key: 'unit', label: 'Unidad', type: 'select', options: productUnitOptions },
     { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
-    { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
+    { key: 'currency', label: 'Moneda', type: 'select', options: currencyOptions },
     { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
-    { key: 'tax_rate', label: 'IVA %', type: 'number', placeholder: '21' },
+    { key: 'metadata_margin_percent', label: 'Margen (%)', type: 'number', placeholder: '35' },
+    { key: 'tax_rate', label: 'IVA', type: 'select', options: taxRateOptions },
     { key: 'track_stock', label: 'Controla stock', type: 'checkbox' },
     {
       key: 'is_active',
@@ -86,22 +115,33 @@ export function productFormFields(): CrudFormField[] {
       options: [
         { label: 'Activo', value: 'true' },
         { label: 'Inactivo', value: 'false' },
-      ],
+        ],
     },
-    { key: 'tags', label: 'Tags', placeholder: 'nuevo, combo, premium' },
+    { key: 'tags', label: 'Etiquetas', placeholder: 'nuevo, combo, premium' },
     {
       key: 'image_urls',
-      label: 'Imágenes (URLs)',
+      label: 'Imágenes',
       type: 'textarea',
       fullWidth: true,
-      placeholder: 'Una URL por línea (hasta 20). La primera es la principal.',
+      placeholder: 'Las imágenes cargadas se guardan acá. También podés pegarlas una por línea si ya las tenés.',
     },
     { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
   ];
 }
 
 export function buildProductSearchText(row: ProductRecord): string {
-  return [row.name, row.sku, row.description, row.unit, row.currency, formatPartyTagList(row.tags)].filter(Boolean).join(' ');
+  return [
+    row.name,
+    row.sku,
+    row.description,
+    row.unit,
+    row.currency,
+    formatPartyTagList(row.tags),
+    typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
+    typeof row.metadata?.category === 'string' ? row.metadata.category : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function buildProductFormValues(row: ProductRecord) {
@@ -118,23 +158,43 @@ export function buildProductFormValues(row: ProductRecord) {
     tags: formatPartyTagList(row.tags),
     image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
     description: row.description ?? '',
+    metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
+    metadata_kind: typeof row.metadata?.kind === 'string' ? row.metadata.kind : 'simple',
+    metadata_barcode: typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
+    metadata_margin_percent:
+      row.metadata?.margin_percent === undefined || row.metadata?.margin_percent === null ? '' : String(row.metadata.margin_percent),
   };
 }
 
 export function productFormToBody(values: CrudFormValues): Record<string, unknown> {
+  const price = asNumber(values.price);
+  const directCost = asOptionalNumber(values.cost_price);
+  const marginPercent = asOptionalNumber(values.metadata_margin_percent);
+  const derivedCost =
+    directCost !== undefined
+      ? directCost
+      : marginPercent !== undefined && Number.isFinite(marginPercent)
+        ? Math.max(0, price - price * (marginPercent / 100))
+        : 0;
   return {
     name: asString(values.name),
     sku: asOptionalString(values.sku),
     unit: asOptionalString(values.unit),
-    price: asNumber(values.price),
+    price,
     currency: asOptionalString(values.currency) ?? 'ARS',
-    cost_price: asNumber(values.cost_price),
+    cost_price: derivedCost,
     tax_rate: asOptionalNumber(values.tax_rate),
     track_stock: asBoolean(values.track_stock),
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
     tags: parsePartyTagCsv(values.tags),
     description: asOptionalString(values.description),
     image_urls: parseImageURLList(values.image_urls),
+    metadata: parseMetadataStringMap(undefined, {
+      category: asOptionalString(values.metadata_category),
+      kind: asOptionalString(values.metadata_kind),
+      barcode: asOptionalString(values.metadata_barcode),
+      margin_percent: asOptionalString(values.metadata_margin_percent),
+    }),
   };
 }
 
@@ -158,6 +218,7 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
   | 'toFormValues'
   | 'toBody'
   | 'isValid'
+  | 'editorModal'
 > {
   return {
     supportsArchived: true,
@@ -175,6 +236,59 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     toFormValues: buildProductFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: productFormToBody,
     isValid: isValidProductForm,
+    editorModal: {
+      fieldConfig: {
+        sku: { helperText: 'Código corto para buscar rápido en caja, stock o compras.' },
+        metadata_category: { helperText: 'Elegí una categoría predefinida para mantener el catálogo ordenado.' },
+        metadata_kind: { helperText: 'Simple para lo habitual; variable o agrupado para catálogos más complejos.' },
+        metadata_barcode: { helperText: 'Guardá acá el código de barras para búsquedas o lectores.' },
+        unit: { helperText: 'Definí cómo se vende o controla este producto.' },
+        price: { helperText: 'Precio de venta sugerido o actual.' },
+        cost_price: { helperText: 'Costo directo. Si preferís, podés completar margen y calcularlo en base al precio.' },
+        metadata_margin_percent: { helperText: 'Opcional: si no cargás costo, se calcula usando este porcentaje sobre el precio.' },
+        tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
+        tags: { helperText: 'Etiquetas internas para campañas, filtros o agrupaciones rápidas.' },
+        image_urls: {
+          helperText: 'Podés subir imágenes desde tu dispositivo o pegar enlaces si ya los tenés.',
+          editControl: ({ value, setValue }) => {
+            return (
+              <div className="crud-inline-upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={async (event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (!files.length) return;
+                    try {
+                      const encoded = await Promise.all(
+                        files.map(
+                          (file) =>
+                            new Promise<string>((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(String(reader.result ?? ''));
+                              reader.onerror = () => reject(reader.error ?? new Error('upload_failed'));
+                              reader.readAsDataURL(file);
+                            }),
+                        ),
+                      );
+                      const current = asCrudString(value)
+                        .split('\n')
+                        .map((entry) => entry.trim())
+                        .filter(Boolean);
+                      setValue([...current, ...encoded].join('\n'));
+                    } finally {
+                      event.currentTarget.value = '';
+                    }
+                  }}
+                />
+                <small>Subí una o varias fotos desde el dispositivo.</small>
+              </div>
+            );
+          },
+        },
+      },
+    },
   };
 }
 

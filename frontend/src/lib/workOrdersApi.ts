@@ -1,9 +1,10 @@
 /**
- * Cliente unificado de work orders del backend de workshops.
+ * Cliente de work orders de workshops.
  *
- * Apunta al endpoint /v1/work-orders con polimorfismo target_type ('vehicle' | 'bicycle' | …).
- * Es la única vía para CRUD/orquestación de OT; auto_repair/bike_shop solo conservan recursos
- * propios (vehículos, etc.) en sus respectivos clientes.
+ * La vertical mantiene un endpoint unificado legado (`/v1/work-orders`) por
+ * compatibilidad, pero el ownership real vive en los módulos por subvertical:
+ * `auto_repair` y `bike_shop`. Este cliente resuelve el prefijo correcto según
+ * `target_type` y cae al endpoint legado solo cuando no puede inferirlo.
  */
 import { createVerticalRequest } from './verticalApi';
 import { readActiveBranchId } from './branchSelectionStorage';
@@ -32,7 +33,27 @@ const workOrdersRequest = createVerticalRequest({
     'El backend de talleres no respondió a tiempo. Levantá work-backend (puerto 8282), revisá VITE_WORKSHOPS_API_URL y que las migraciones estén aplicadas.',
 });
 
-const WORK_ORDERS_PREFIX = '/v1/work-orders';
+const WORK_ORDERS_COMPAT_PREFIX = '/v1/work-orders';
+const WORK_ORDERS_PREFIX_BY_TARGET_TYPE: Record<string, string> = {
+  vehicle: '/v1/auto-repair/work-orders',
+  bicycle: '/v1/bike-shop/work-orders',
+};
+const WORKSHOP_BOOKINGS_PREFIX_BY_TARGET_TYPE: Record<string, string> = {
+  vehicle: '/v1/auto-repair/workshop-bookings',
+  bicycle: '/v1/bike-shop/workshop-bookings',
+};
+
+function normalizeTargetType(targetType?: WorkOrderTargetType | null): string {
+  return typeof targetType === 'string' ? targetType.trim().toLowerCase() : '';
+}
+
+function resolveWorkOrdersPrefix(targetType?: WorkOrderTargetType | null): string {
+  return WORK_ORDERS_PREFIX_BY_TARGET_TYPE[normalizeTargetType(targetType)] ?? WORK_ORDERS_COMPAT_PREFIX;
+}
+
+function resolveWorkshopBookingsPrefix(targetType?: WorkOrderTargetType | null): string {
+  return WORKSHOP_BOOKINGS_PREFIX_BY_TARGET_TYPE[normalizeTargetType(targetType)] ?? '/v1/workshop-bookings';
+}
 
 function resolveBranchId(branchId?: string | null): string | undefined {
   const explicit = branchId?.trim();
@@ -129,6 +150,7 @@ export type ListWorkOrdersParams = {
 // ── Listar / paginar ───────────────────────────────────────────────────────
 
 export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<ListResponse> {
+  const prefix = resolveWorkOrdersPrefix(params?.target_type);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
   if (branchId) q.set('branch_id', branchId);
@@ -138,7 +160,7 @@ export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<List
   if (params?.status) q.set('status', params.status);
   if (params?.after) q.set('after', params.after);
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}${suffix}`);
+  return workOrdersRequest(`${prefix}${suffix}`);
 }
 
 export async function getAllWorkOrders(params?: {
@@ -162,21 +184,22 @@ export async function getWorkOrdersArchived(params?: {
   branch_id?: string;
   target_type?: WorkOrderTargetType;
 }): Promise<WorkOrder[]> {
+  const prefix = resolveWorkOrdersPrefix(params?.target_type);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
   if (branchId) q.set('branch_id', branchId);
   if (params?.target_type) q.set('target_type', params.target_type);
   const suffix = q.toString() ? `?${q.toString()}` : '';
   const data = await workOrdersRequest<{ items?: WorkOrder[] }>(
-    `${WORK_ORDERS_PREFIX}/archived${suffix}`,
+    `${prefix}/archived${suffix}`,
   );
   return data.items ?? [];
 }
 
 // ── Detalle ────────────────────────────────────────────────────────────────
 
-export async function getWorkOrder(id: string): Promise<WorkOrder> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}`);
+export async function getWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`);
 }
 
 // ── Crear ──────────────────────────────────────────────────────────────────
@@ -204,7 +227,7 @@ export type CreateWorkOrderInput = {
 
 export async function createWorkOrder(data: CreateWorkOrderInput): Promise<WorkOrder> {
   const branchId = resolveBranchId(data.branch_id);
-  return workOrdersRequest(WORK_ORDERS_PREFIX, {
+  return workOrdersRequest(resolveWorkOrdersPrefix(data.target_type), {
     method: 'POST',
     body: branchId ? { ...data, branch_id: branchId } : data,
   });
@@ -236,26 +259,26 @@ export type UpdateWorkOrderInput = Partial<{
   items: WorkOrderLineItem[];
 }>;
 
-export async function updateWorkOrder(id: string, data: UpdateWorkOrderInput): Promise<WorkOrder> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}`, { method: 'PUT', body: data });
+export async function updateWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PUT', body: data });
 }
 
-export async function patchWorkOrder(id: string, data: UpdateWorkOrderInput): Promise<WorkOrder> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}`, { method: 'PATCH', body: data });
+export async function patchWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PATCH', body: data });
 }
 
 // ── Archive / Restore / Hard delete ────────────────────────────────────────
 
-export async function archiveWorkOrder(id: string): Promise<void> {
-  await workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}`, { method: 'DELETE' });
+export async function archiveWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'DELETE' });
 }
 
-export async function restoreWorkOrder(id: string): Promise<void> {
-  await workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}/restore`, { method: 'POST', body: {} });
+export async function restoreWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}/restore`, { method: 'POST', body: {} });
 }
 
-export async function hardDeleteWorkOrder(id: string): Promise<void> {
-  await workOrdersRequest(`${WORK_ORDERS_PREFIX}/${id}/hard`, { method: 'DELETE' });
+export async function hardDeleteWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}/hard`, { method: 'DELETE' });
 }
 
 // ── Fragmento CRUD genérico (paridad con el patrón verticalApi) ────────────
@@ -276,27 +299,28 @@ export type WorkOrderPaymentLink = {
 
 export async function createWorkshopBooking(
   data: Record<string, unknown>,
+  targetType: WorkOrderTargetType = 'vehicle',
 ): Promise<{ id: string; [key: string]: unknown }> {
   const branchId =
     typeof data.branch_id === 'string' && data.branch_id.trim()
       ? data.branch_id.trim()
       : resolveBranchId();
-  return workOrdersRequest('/v1/workshop-bookings', {
+  return workOrdersRequest(resolveWorkshopBookingsPrefix(targetType), {
     method: 'POST',
     body: branchId ? { ...data, branch_id: branchId } : data,
   });
 }
 
-export async function createWorkOrderQuote(workOrderId: string): Promise<{ id: string }> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/quote`, { method: 'POST', body: {} });
+export async function createWorkOrderQuote(workOrderId: string, targetType?: WorkOrderTargetType): Promise<{ id: string }> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/quote`, { method: 'POST', body: {} });
 }
 
-export async function createWorkOrderSale(workOrderId: string): Promise<{ id: string }> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/sale`, { method: 'POST', body: {} });
+export async function createWorkOrderSale(workOrderId: string, targetType?: WorkOrderTargetType): Promise<{ id: string }> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/sale`, { method: 'POST', body: {} });
 }
 
-export async function createWorkOrderPaymentLink(workOrderId: string): Promise<WorkOrderPaymentLink> {
-  return workOrdersRequest(`${WORK_ORDERS_PREFIX}/${workOrderId}/payment-link`, {
+export async function createWorkOrderPaymentLink(workOrderId: string, targetType?: WorkOrderTargetType): Promise<WorkOrderPaymentLink> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/payment-link`, {
     method: 'POST',
     body: {},
   });
@@ -312,8 +336,8 @@ export function workOrdersArchivedCrud(targetType: WorkOrderTargetType) {
       const data = await getWorkOrders({ target_type: targetType, limit: 250 });
       return (data.items ?? []) as unknown as T[];
     },
-    deleteItem: async (row: { id: string }) => archiveWorkOrder(row.id),
-    restore: async (row: { id: string }) => restoreWorkOrder(row.id),
-    hardDelete: async (row: { id: string }) => hardDeleteWorkOrder(row.id),
+    deleteItem: async (row: { id: string }) => archiveWorkOrder(row.id, targetType),
+    restore: async (row: { id: string }) => restoreWorkOrder(row.id, targetType),
+    hardDelete: async (row: { id: string }) => hardDeleteWorkOrder(row.id, targetType),
   };
 }

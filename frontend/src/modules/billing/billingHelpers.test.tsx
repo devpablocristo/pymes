@@ -76,7 +76,7 @@ describe('billingHelpers', () => {
         { id: 'rejected', label: 'Rechazado', defaultState: 'rejected' },
       ],
     });
-    expect(config.editorModal).toEqual({
+    expect(config.editorModal).toMatchObject({
       blocks: [
         {
           id: 'items',
@@ -213,7 +213,7 @@ describe('billingHelpers', () => {
         { id: 'cancelled', label: 'Cancelada', defaultState: 'cancelled' },
       ],
     });
-    expect(config.editorModal).toEqual({
+    expect(config.editorModal).toMatchObject({
       blocks: [
         {
           id: 'items',
@@ -231,7 +231,7 @@ describe('billingHelpers', () => {
         customer_id: 'c1',
         customer_name: 'Cliente',
         quote_id: 'q1',
-        payment_method: 'efectivo',
+        payment_method: 'cash',
         items: '[{"description":"Producto","quantity":1,"unit_price":1000}]',
         notes: 'ok',
       }),
@@ -240,7 +240,7 @@ describe('billingHelpers', () => {
       customer_id: 'c1',
       customer_name: 'Cliente',
       quote_id: 'q1',
-      payment_method: 'efectivo',
+      payment_method: 'cash',
       items: [
         {
           description: 'Producto',

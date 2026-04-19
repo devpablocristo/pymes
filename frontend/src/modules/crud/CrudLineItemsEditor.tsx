@@ -6,25 +6,32 @@ import './CrudLineItemsEditor.css';
 type CrudLineItemDraft = {
   description: string;
   quantity: number;
-  unit_cost: number;
+  unit_amount: number;
   product_id?: string;
   service_id?: string;
   tax_rate?: number;
 };
 
-function normalizeItems(value: CrudFieldValue | undefined): CrudLineItemDraft[] {
+function normalizeLineItemSource(value: CrudFieldValue | undefined): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null);
+  }
   try {
-    return parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON').map((item) => ({
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 1),
-      unit_cost: Number(item.unit_cost ?? 0),
-      product_id: typeof item.product_id === 'string' ? item.product_id : undefined,
-      service_id: typeof item.service_id === 'string' ? item.service_id : undefined,
-      tax_rate: typeof item.tax_rate === 'number' ? item.tax_rate : undefined,
-    }));
+    return parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON');
   } catch {
     return [];
   }
+}
+
+function normalizeItems(value: CrudFieldValue | undefined): CrudLineItemDraft[] {
+  return normalizeLineItemSource(value).map((item) => ({
+    description: String(item.description ?? '').trim(),
+    quantity: Number(item.quantity ?? item.qty ?? 1),
+    unit_amount: Number(item.unit_price ?? item.unit_cost ?? item.unitPrice ?? 0),
+    product_id: typeof item.product_id === 'string' ? item.product_id : undefined,
+    service_id: typeof item.service_id === 'string' ? item.service_id : undefined,
+    tax_rate: typeof item.tax_rate === 'number' ? item.tax_rate : undefined,
+  }));
 }
 
 function toStoredValue(items: CrudLineItemDraft[]) {
@@ -33,7 +40,8 @@ function toStoredValue(items: CrudLineItemDraft[]) {
       .map((item) => ({
         description: item.description.trim(),
         quantity: Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1,
-        unit_cost: Number.isFinite(item.unit_cost) && item.unit_cost >= 0 ? item.unit_cost : 0,
+        unit_cost: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
+        unit_price: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
         product_id: item.product_id || undefined,
         service_id: item.service_id || undefined,
         tax_rate: item.tax_rate,
@@ -51,7 +59,7 @@ export function CrudLineItemsEditor({
 }) {
   const items = useMemo(() => {
     const parsed = normalizeItems(value);
-    return parsed.length > 0 ? parsed : [{ description: '', quantity: 1, unit_cost: 0 }];
+    return parsed.length > 0 ? parsed : [{ description: '', quantity: 1, unit_amount: 0 }];
   }, [value]);
 
   const updateItems = (nextItems: CrudLineItemDraft[]) => {
@@ -86,13 +94,13 @@ export function CrudLineItemsEditor({
             />
           </div>
           <div className="crud-line-items-editor__field">
-            <span>Costo unitario</span>
+            <span>Importe unitario</span>
             <input
               type="number"
               min="0"
               step="any"
-              value={Number.isFinite(item.unit_cost) ? item.unit_cost : 0}
-              onChange={(event) => setItem(index, { unit_cost: Number(asString(event.target.value)) || 0 })}
+              value={Number.isFinite(item.unit_amount) ? item.unit_amount : 0}
+              onChange={(event) => setItem(index, { unit_amount: Number(asString(event.target.value)) || 0 })}
             />
           </div>
           <div className="crud-line-items-editor__actions">
@@ -100,7 +108,7 @@ export function CrudLineItemsEditor({
               type="button"
               className="btn btn-secondary"
               onClick={() =>
-                updateItems(items.length === 1 ? [{ description: '', quantity: 1, unit_cost: 0 }] : items.filter((_, i) => i !== index))
+                updateItems(items.length === 1 ? [{ description: '', quantity: 1, unit_amount: 0 }] : items.filter((_, i) => i !== index))
               }
             >
               Quitar
@@ -112,7 +120,7 @@ export function CrudLineItemsEditor({
         <button
           type="button"
           className="btn btn-secondary"
-          onClick={() => updateItems([...items, { description: '', quantity: 1, unit_cost: 0 }])}
+          onClick={() => updateItems([...items, { description: '', quantity: 1, unit_amount: 0 }])}
         >
           Añadir renglón
         </button>

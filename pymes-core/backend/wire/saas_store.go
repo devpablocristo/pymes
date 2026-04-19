@@ -68,37 +68,60 @@ func (s *pymesSaaSStore) FindOrgIDByExternalID(ctx context.Context, externalID s
 	if externalID == "" {
 		return "", false, nil
 	}
-	// Token con UUID interno (p. ej. entornos que emiten tenant como id de fila).
-	if id, err := uuid.Parse(externalID); err == nil {
-		var row pymesOrgRow
-		err := s.db.WithContext(ctx).Where("id = ?", id).Take(&row).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", false, nil
-		}
-		if err != nil {
-			return "", false, err
-		}
-		return row.ID.String(), true, nil
+	if orgID, ok, err := s.findOrgIDByUUID(ctx, externalID); ok || err != nil {
+		return orgID, ok, err
+	}
+	if orgID, ok, err := s.findOrgIDByExternalRef(ctx, externalID); ok || err != nil {
+		return orgID, ok, err
+	}
+	if !shouldAutoProvisionOrg(externalID) {
+		return "", false, nil
+	}
+	orgID, err := s.autoProvisionOrgForVerifiedExternalID(ctx, externalID)
+	if err != nil {
+		return "", false, err
+	}
+	return orgID, true, nil
+}
+
+func (s *pymesSaaSStore) findOrgIDByUUID(ctx context.Context, externalID string) (string, bool, error) {
+	id, err := uuid.Parse(strings.TrimSpace(externalID))
+	if err != nil {
+		return "", false, nil
 	}
 	var row pymesOrgRow
-	err := s.db.WithContext(ctx).
-		Where("external_id = ?", externalID).
-		Take(&row).Error
+	err = s.db.WithContext(ctx).Where("id = ?", id).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// Clerk emite org_id tipo org_...; sin webhook aún no hay fila. Creamos org mínima (JWT ya verificado).
-		if strings.HasPrefix(externalID, "org_") {
-			orgID, upErr := s.UpsertOrg(ctx, externalID, "Organization")
-			if upErr != nil {
-				return "", false, upErr
-			}
-			return orgID, true, nil
-		}
 		return "", false, nil
 	}
 	if err != nil {
 		return "", false, err
 	}
 	return row.ID.String(), true, nil
+}
+
+func (s *pymesSaaSStore) findOrgIDByExternalRef(ctx context.Context, externalID string) (string, bool, error) {
+	var row pymesOrgRow
+	err := s.db.WithContext(ctx).
+		Where("external_id = ?", strings.TrimSpace(externalID)).
+		Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return row.ID.String(), true, nil
+}
+
+func shouldAutoProvisionOrg(externalID string) bool {
+	return strings.HasPrefix(strings.TrimSpace(externalID), "org_")
+}
+
+func (s *pymesSaaSStore) autoProvisionOrgForVerifiedExternalID(ctx context.Context, externalID string) (string, error) {
+	// Clerk emite org_id tipo org_...; si el webhook aún no materializó la fila local,
+	// provisionamos una org mínima porque el JWT/API key ya fue verificado aguas arriba.
+	return s.UpsertOrg(ctx, strings.TrimSpace(externalID), "Organization")
 }
 
 func (s *pymesSaaSStore) FindPrincipalByAPIKeyHash(ctx context.Context, apiKeyHash string) (saasorgdomain.Principal, string, error) {

@@ -8,6 +8,13 @@ import {
   asString,
   parseJSONArray,
 } from '../../crud/resourceConfigs.shared';
+import {
+  argentinaProvinceOptions,
+  countryOptions,
+  customerGenderOptions,
+  normalizeArgentinaPhone,
+  parseMetadataStringMap,
+} from '../../lib/formPresets';
 
 export type PartyAddress = {
   street?: string;
@@ -42,6 +49,7 @@ export type CustomerRecord = {
   notes?: string;
   tags?: string[];
   address?: PartyAddress;
+  metadata?: Record<string, unknown>;
 };
 
 export type SupplierRecord = {
@@ -83,7 +91,16 @@ export { formatCrudMoney as formatPartyMoney };
 const formatPartyMoney = formatCrudMoney;
 
 export function buildCustomerSearchText(row: CustomerRecord): string {
-  return [row.name, row.email, row.phone, row.tax_id, row.notes, formatPartyTagList(row.tags), formatPartyAddress(row.address)]
+  return [
+    row.name,
+    row.email,
+    row.phone,
+    row.tax_id,
+    row.notes,
+    formatPartyTagList(row.tags),
+    formatPartyAddress(row.address),
+    typeof row.metadata?.gender === 'string' ? row.metadata.gender : '',
+  ]
     .filter(Boolean)
     .join(' ');
 }
@@ -100,6 +117,7 @@ export function buildCustomerFormValues(row: CustomerRecord) {
     address_city: row.address?.city ?? '',
     address_state: row.address?.state ?? '',
     address_country: row.address?.country ?? '',
+    metadata_gender: typeof row.metadata?.gender === 'string' ? row.metadata.gender : '',
     notes: row.notes ?? '',
   };
 }
@@ -110,7 +128,7 @@ export function customerFormToBody(values: CrudFormValues): Record<string, unkno
     name: asString(values.name),
     tax_id: asOptionalString(values.tax_id),
     email: asOptionalString(values.email),
-    phone: asOptionalString(values.phone),
+    phone: normalizeArgentinaPhone(asString(values.phone)),
     notes: asOptionalString(values.notes),
     tags: parsePartyTagCsv(values.tags),
     address: {
@@ -119,6 +137,9 @@ export function customerFormToBody(values: CrudFormValues): Record<string, unkno
       state: asString(values.address_state),
       country: asString(values.address_country),
     },
+    metadata: parseMetadataStringMap(undefined, {
+      gender: asOptionalString(values.metadata_gender),
+    }),
   };
 }
 
@@ -146,7 +167,7 @@ export function supplierFormToBody(values: CrudFormValues): Record<string, unkno
     contact_name: asOptionalString(values.contact_name),
     tax_id: asOptionalString(values.tax_id),
     email: asOptionalString(values.email),
-    phone: asOptionalString(values.phone),
+    phone: normalizeArgentinaPhone(asString(values.phone)),
     tags: parsePartyTagCsv(values.tags),
     notes: asOptionalString(values.notes),
   };
@@ -159,7 +180,7 @@ export function createCustomerColumns<T extends CustomerRecord>(): CrudColumn<T>
     { key: 'tax_id', header: 'CUIT/CUIL', render: (_v, row) => row.tax_id || '—' },
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
-    { key: 'tags', header: 'Tags', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
+    { key: 'tags', header: 'Etiquetas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
     { key: 'address', header: 'Dirección', render: (_v, row) => formatPartyAddress(row.address) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
@@ -180,12 +201,18 @@ export function customerFormFields(label = 'cliente'): CrudFormField[] {
     { key: 'name', label: 'Nombre', required: true, placeholder: `Nombre del ${label}` },
     { key: 'tax_id', label: 'CUIT / CUIL', placeholder: '20-12345678-9' },
     { key: 'email', label: 'Email', type: 'email', placeholder: 'email@ejemplo.com' },
-    { key: 'phone', label: 'Telefono', type: 'tel', placeholder: '+54 11 1234-5678' },
-    { key: 'tags', label: 'Tags', placeholder: 'vip, mayorista, mora' },
+    { key: 'phone', label: 'Teléfono', type: 'tel', placeholder: '3815551234' },
+    {
+      key: 'metadata_gender',
+      label: 'Sexo / género',
+      type: 'select',
+      options: customerGenderOptions,
+    },
+    { key: 'tags', label: 'Etiquetas', placeholder: 'vip, mayorista, mora' },
     { key: 'address_street', label: 'Calle', fullWidth: true, placeholder: 'Direccion principal' },
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad' },
-    { key: 'address_state', label: 'Provincia', placeholder: 'Provincia' },
-    { key: 'address_country', label: 'Pais', placeholder: 'Pais' },
+    { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
+    { key: 'address_country', label: 'País', type: 'select', options: countryOptions },
     { key: 'notes', label: 'Notas', type: 'textarea', placeholder: 'Notas internas...', fullWidth: true },
   ];
 }
@@ -201,7 +228,7 @@ export function createSupplierColumns<T extends SupplierRecord>(): CrudColumn<T>
     { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '—' },
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
-    { key: 'tags', header: 'Tags', render: (value) => formatPartyTagList(value as string[]) || '—' },
+    { key: 'tags', header: 'Etiquetas', render: (value) => formatPartyTagList(value as string[]) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
 }
@@ -212,8 +239,8 @@ export function supplierFormFields(): CrudFormField[] {
     { key: 'contact_name', label: 'Contacto', placeholder: 'Nombre de contacto' },
     { key: 'tax_id', label: 'CUIT', placeholder: '30-12345678-9' },
     { key: 'email', label: 'Email', type: 'email', placeholder: 'compras@proveedor.com' },
-    { key: 'phone', label: 'Telefono', type: 'tel', placeholder: '+54 11 1234-5678' },
-    { key: 'tags', label: 'Tags', placeholder: 'importado, insumos, logistico' },
+    { key: 'phone', label: 'Teléfono', type: 'tel', placeholder: '3815551234' },
+    { key: 'tags', label: 'Etiquetas', placeholder: 'importado, insumos, logistico' },
     { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
   ];
 }
@@ -334,9 +361,9 @@ export const partyFormFields: CrudFormField[] = [
   },
   { key: 'display_name', label: 'Nombre visible', required: true, placeholder: 'Nombre principal' },
   { key: 'email', label: 'Email', type: 'email' as const },
-  { key: 'phone', label: 'Telefono', type: 'tel' as const },
+  { key: 'phone', label: 'Teléfono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Tags', placeholder: 'cliente, proveedor' },
+  { key: 'tags', label: 'Etiquetas', placeholder: 'cliente, proveedor' },
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
@@ -351,13 +378,13 @@ export function employeePartyFormFields(): CrudFormField[] {
 
 export const accountFormFields = [
   { key: 'type', label: 'Tipo', required: true, placeholder: 'receivable, payable' },
-  { key: 'entity_type', label: 'Entity type', required: true, placeholder: 'customer, supplier' },
-  { key: 'entity_id', label: 'Entity ID', required: true, placeholder: 'UUID de la entidad' },
+  { key: 'entity_type', label: 'Tipo de entidad', required: true, placeholder: 'customer, supplier' },
+  { key: 'entity_id', label: 'ID de entidad', required: true, placeholder: 'UUID de la entidad' },
   { key: 'entity_name', label: 'Nombre', required: true, placeholder: 'Nombre visible' },
   { key: 'amount', label: 'Ajuste inicial', type: 'number' as const, required: true, placeholder: '0.00' },
   { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
-  { key: 'credit_limit', label: 'Limite de credito', type: 'number' as const, placeholder: '0.00' },
-  { key: 'description', label: 'Descripcion', type: 'textarea' as const, fullWidth: true },
+  { key: 'credit_limit', label: 'Límite de crédito', type: 'number' as const, placeholder: '0.00' },
+  { key: 'description', label: 'Descripción', type: 'textarea' as const, fullWidth: true },
 ];
 
 export function buildAccountSearchText(row: AccountRecord): string {
@@ -448,6 +475,7 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
   | 'toFormValues'
   | 'toBody'
   | 'isValid'
+  | 'editorModal'
 > {
   return {
     supportsArchived: true,
@@ -463,6 +491,18 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
     toFormValues: buildCustomerFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: customerFormToBody,
     isValid: isValidCustomerForm,
+    editorModal: {
+      fieldConfig: {
+        name: { helperText: 'Usá el nombre con el que atendés o buscás a la persona.' },
+        phone: { helperText: 'Se normaliza automáticamente con formato argentino para usarlo luego en WhatsApp.' },
+        metadata_gender: { helperText: 'Dato útil para segmentar campañas o búsquedas sin volver a pedirlo.' },
+        address_city: { helperText: 'Elegí la ciudad para mantener la base ordenada y reutilizable.' },
+        address_state: { helperText: 'Elegí la provincia desde la lista para evitar variantes cargadas a mano.' },
+        address_country: { helperText: 'Definí el país para futuras búsquedas, filtros e integraciones.' },
+        tags: { helperText: 'Etiquetas internas cortas para agrupar clientes sin tocar su ficha principal.' },
+        notes: { helperText: 'Anotá contexto comercial o recordatorios que sirvan al equipo.' },
+      },
+    },
   };
 }
 
@@ -482,6 +522,7 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
   | 'toFormValues'
   | 'toBody'
   | 'isValid'
+  | 'editorModal'
 > {
   return {
     supportsArchived: true,
@@ -496,6 +537,14 @@ export function createSupplierCrudConfig<T extends SupplierRecord>(options: {
     toFormValues: buildSupplierFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: supplierFormToBody,
     isValid: isValidSupplierForm,
+    editorModal: {
+      fieldConfig: {
+        name: { helperText: 'Nombre comercial con el que identificás rápido al proveedor.' },
+        phone: { helperText: 'Se guarda normalizado para evitar teléfonos inútiles o mal cargados.' },
+        tags: { helperText: 'Etiquetas internas para clasificar rubro, origen o prioridad de compra.' },
+        notes: { helperText: 'Usalo para condiciones de compra, plazos o acuerdos relevantes.' },
+      },
+    },
   };
 }
 

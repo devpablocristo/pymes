@@ -66,7 +66,7 @@ describe('inventory configured section shell', () => {
     );
 
     expect(await screen.findByText('configure-screen')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Lista' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Configurar' })).not.toBeInTheDocument();

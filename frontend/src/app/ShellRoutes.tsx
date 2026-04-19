@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
 import type { CrudViewModeId } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
+import { toCrudResourceSlug } from '../crud/crudResourceSlug';
 import { useBranchSelection } from '../lib/useBranchSelection';
 import { useTenantSlug } from '../lib/tenantSlug';
 import { getTenantProfile } from '../lib/tenantProfile';
@@ -210,14 +211,25 @@ function LegacyModulesRedirect() {
   return <Navigate to={`/${slug}/${moduleId}${remainder}${location.search}${location.hash}`} replace />;
 }
 
-/** Legacy: /workshops/{sub}/{module}/* → /{slug}/work-orders/* */
+/** Legacy: /workshops/{sub}/{module}/* → recursos canónicos bajo /{slug}/... */
+export function resolveLegacyWorkshopDestination(slug: string, pathname: string): string {
+  const match = pathname.match(/^\/workshops\/([^/]+)\/([^/]+)(\/.*)?$/);
+  const segment = match?.[1] ?? '';
+  const moduleId = match?.[2] ?? '';
+  const remainder = match?.[3] ?? '';
+
+  if (segment === 'auto-repair' && moduleId === 'vehicles') {
+    return `/${slug}/${toCrudResourceSlug('workshopVehicles')}${remainder}`;
+  }
+  return `/${slug}/work-orders${remainder}`;
+}
+
 function LegacyWorkshopsRedirect() {
   const slug = useTenantSlug();
   const location = useLocation();
   if (!slug) return <Navigate to="/onboarding" replace />;
-  const match = location.pathname.match(/^\/workshops\/[^/]+\/[^/]+(\/.*)?$/);
-  const remainder = match?.[1] ?? '';
-  return <Navigate to={`/${slug}/work-orders${remainder}${location.search}${location.hash}`} replace />;
+  const destination = resolveLegacyWorkshopDestination(slug, location.pathname);
+  return <Navigate to={`${destination}${location.search}${location.hash}`} replace />;
 }
 
 /**

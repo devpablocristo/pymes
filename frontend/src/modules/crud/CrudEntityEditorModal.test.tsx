@@ -197,4 +197,26 @@ describe('CrudEntityEditorModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     expect(screen.getByText('Añadir renglón')).toBeInTheDocument();
   });
+
+  it('keeps the modal open when switching an existing record with items into edit mode', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="VTA-001"
+        mode="update"
+        initialValues={{ items: [{ description: 'Producto', quantity: 1, unit_price: 1000 }] as unknown as string }}
+        fields={[{ id: 'customer_name', label: 'Cliente', defaultValue: 'Cliente Demo', sectionId: 'summary' }]}
+        sections={[{ id: 'summary', title: 'Resumen' }, { id: 'items' }]}
+        blocks={[{ id: 'items', kind: 'lineItems', field: 'items', sectionId: 'items', visible: ({ editing }) => editing }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Producto')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
+  });
 });

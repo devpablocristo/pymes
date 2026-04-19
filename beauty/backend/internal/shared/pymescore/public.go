@@ -2,14 +2,14 @@ package pymescore
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 func (c *Client) GetBusinessInfo(ctx context.Context, orgRef string) (map[string]any, error) {
-	return c.Get(ctx, fmt.Sprintf("/v1/public/%s/info", url.PathEscape(orgRef)), "")
+	return pymescoreops.GetBusinessInfo(ctx, c.Client, orgRef)
 }
 
 func (c *Client) BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error) {
-	return c.Post(ctx, fmt.Sprintf("/v1/public/%s/book", url.PathEscape(orgRef)), "", payload)
+	return pymescoreops.BookScheduling(ctx, c.Client, orgRef, payload)
 }

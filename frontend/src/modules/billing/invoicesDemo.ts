@@ -30,7 +30,7 @@ export type InvoiceRecord = {
   archived_at?: string | null;
 };
 
-const STORAGE_KEY = 'pymes.billing.demo.invoices.v1';
+const STORAGE_KEY = 'pymes.billing.demo.invoices.v2';
 
 let nextLineId = 200;
 let nextInvoiceId = 20;
@@ -91,89 +91,7 @@ export const INVOICE_STATUS_BADGE_CLASS: Record<InvoiceStatus, string> = {
   overdue: 'badge-danger',
 };
 
-export const INITIAL_INVOICES: InvoiceRecord[] = [
-  {
-    id: '1',
-    number: 'INV-3492',
-    customer: 'María García',
-    initials: 'MG',
-    issuedDate: '2026-03-10',
-    dueDate: '2026-04-10',
-    status: 'paid',
-    items: [
-      { id: '1', description: 'Diseño de logo', qty: 1, unit: 'unidad', unitPrice: 15000 },
-      { id: '2', description: 'Tarjetas de presentación', qty: 500, unit: 'unidades', unitPrice: 12 },
-    ],
-    discount: 0,
-    tax: 21,
-  },
-  {
-    id: '2',
-    number: 'INV-3493',
-    customer: 'Juan Pérez',
-    initials: 'JP',
-    issuedDate: '2026-03-12',
-    dueDate: '2026-04-12',
-    status: 'pending',
-    items: [{ id: '3', description: 'Desarrollo web', qty: 40, unit: 'horas', unitPrice: 5000 }],
-    discount: 5,
-    tax: 21,
-  },
-  {
-    id: '3',
-    number: 'INV-3494',
-    customer: 'Ana López',
-    initials: 'AL',
-    issuedDate: '2026-03-05',
-    dueDate: '2026-03-20',
-    status: 'overdue',
-    items: [
-      { id: '4', description: 'Consultoría SEO', qty: 10, unit: 'horas', unitPrice: 3500 },
-      { id: '5', description: 'Auditoría técnica', qty: 1, unit: 'unidad', unitPrice: 25000 },
-    ],
-    discount: 10,
-    tax: 21,
-  },
-  {
-    id: '4',
-    number: 'INV-3495',
-    customer: 'Carlos Ruiz',
-    initials: 'CR',
-    issuedDate: '2026-03-15',
-    dueDate: '2026-04-15',
-    status: 'paid',
-    items: [{ id: '6', description: 'Hosting anual', qty: 1, unit: 'año', unitPrice: 48000 }],
-    discount: 0,
-    tax: 21,
-  },
-  {
-    id: '5',
-    number: 'INV-3496',
-    customer: 'Laura Díaz',
-    initials: 'LD',
-    issuedDate: '2026-03-18',
-    dueDate: '2026-04-18',
-    status: 'pending',
-    items: [
-      { id: '7', description: 'Mantenimiento mensual', qty: 3, unit: 'meses', unitPrice: 15000 },
-      { id: '8', description: 'Soporte premium', qty: 3, unit: 'meses', unitPrice: 8000 },
-    ],
-    discount: 0,
-    tax: 21,
-  },
-  {
-    id: '6',
-    number: 'INV-3497',
-    customer: 'Pedro Sánchez',
-    initials: 'PS',
-    issuedDate: '2026-03-20',
-    dueDate: '2026-04-20',
-    status: 'paid',
-    items: [{ id: '9', description: 'App mobile MVP', qty: 1, unit: 'proyecto', unitPrice: 350000 }],
-    discount: 15,
-    tax: 21,
-  },
-];
+export const INITIAL_INVOICES: InvoiceRecord[] = [];
 
 function isInvoiceStatus(value: unknown): value is InvoiceStatus {
   return value === 'paid' || value === 'pending' || value === 'overdue';

@@ -6,12 +6,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
 func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	auth := GetAuthContext(c)
-	orgID, err := uuid.Parse(strings.TrimSpace(auth.OrgID))
-	if err != nil {
+	orgID, ok := sharedauth.ParseAuthOrgID(c)
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
 		return uuid.Nil, false
 	}

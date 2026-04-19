@@ -7,6 +7,7 @@ import {
   restoreWorkOrder,
   updateWorkOrder,
   type WorkOrder as UnifiedWorkOrder,
+  type WorkOrderTargetType,
 } from '../lib/workOrdersApi';
 import {
   CrudEntityEditorModal,
@@ -34,8 +35,8 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 type Draft = {
   status: string;
-  vehicle_id: string;
-  vehicle_plate: string;
+  target_id: string;
+  target_label: string;
   customer_id: string;
   customer_name: string;
   booking_id: string;
@@ -50,8 +51,25 @@ type Draft = {
   items: string;
 };
 
+type EditorTargetConfig = {
+  targetIdLabel: string;
+  targetLabel: string;
+};
+
+const TARGET_CONFIG: Record<'vehicle' | 'bicycle', EditorTargetConfig> = {
+  vehicle: {
+    targetIdLabel: 'Vehículo (UUID)',
+    targetLabel: 'Patente',
+  },
+  bicycle: {
+    targetIdLabel: 'Bicicleta (UUID)',
+    targetLabel: 'Etiqueta bicicleta',
+  },
+};
+
 export type WorkOrderEditorProps = {
   orderId: string;
+  targetType?: WorkOrderTargetType;
   variant: 'modal' | 'page';
   onClose: () => void;
   onSaved: (wo: AutoRepairWorkOrder) => void;
@@ -81,8 +99,8 @@ function textValue(value: CrudFieldValue | undefined): string {
 function valuesToDraft(values: Record<string, CrudFieldValue>): Draft {
   return {
     status: textValue(values.status),
-    vehicle_id: textValue(values.vehicle_id),
-    vehicle_plate: textValue(values.vehicle_plate),
+    target_id: textValue(values.target_id),
+    target_label: textValue(values.target_label),
     customer_id: textValue(values.customer_id),
     customer_name: textValue(values.customer_name),
     booking_id: textValue(values.booking_id),
@@ -101,8 +119,8 @@ function valuesToDraft(values: Record<string, CrudFieldValue>): Draft {
 function woToDraft(wo: AutoRepairWorkOrder): Draft {
   return {
     status: wo.status,
-    vehicle_id: wo.vehicle_id ?? '',
-    vehicle_plate: wo.vehicle_plate ?? '',
+    target_id: wo.target_id ?? wo.vehicle_id ?? wo.bicycle_id ?? '',
+    target_label: wo.target_label ?? wo.vehicle_plate ?? wo.bicycle_label ?? '',
     customer_id: wo.customer_id ?? '',
     customer_name: wo.customer_name ?? '',
     booking_id: wo.booking_id ?? '',
@@ -118,7 +136,13 @@ function woToDraft(wo: AutoRepairWorkOrder): Draft {
   };
 }
 
-function buildFields(): CrudEntityEditorModalField[] {
+function resolveEditorTargetType(targetType?: WorkOrderTargetType, wo?: AutoRepairWorkOrder | null): 'vehicle' | 'bicycle' {
+  const resolved = String(targetType ?? wo?.target_type ?? 'vehicle').trim().toLowerCase();
+  return resolved === 'bicycle' ? 'bicycle' : 'vehicle';
+}
+
+function buildFields(targetType: 'vehicle' | 'bicycle'): CrudEntityEditorModalField[] {
+  const targetConfig = TARGET_CONFIG[targetType];
   return [
     {
       id: 'status',
@@ -131,13 +155,13 @@ function buildFields(): CrudEntityEditorModalField[] {
       label: 'Moneda',
     },
     {
-      id: 'vehicle_id',
-      label: 'Vehículo (UUID)',
+      id: 'target_id',
+      label: targetConfig.targetIdLabel,
       fullWidth: true,
     },
     {
-      id: 'vehicle_plate',
-      label: 'Patente',
+      id: 'target_label',
+      label: targetConfig.targetLabel,
     },
     {
       id: 'customer_name',
@@ -241,8 +265,7 @@ function buildStats(wo: AutoRepairWorkOrder | null): CrudEntityEditorModalStat[]
   ];
 }
 
-export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRemoved }: WorkOrderEditorProps) {
-  const fields = useMemo(() => buildFields(), []);
+export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved, onRecordRemoved }: WorkOrderEditorProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [wo, setWo] = useState<AutoRepairWorkOrder | null>(null);
@@ -254,7 +277,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setLoading(true);
     setError(null);
     try {
-      const data = await getWorkOrder(id);
+      const data = await getWorkOrder(id, targetType);
       setWo(data);
     } catch (e) {
       setWo(null);
@@ -262,7 +285,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [targetType]);
 
   useEffect(() => {
     void load(orderId);
@@ -271,6 +294,8 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
   const isArchived = Boolean(wo?.archived_at);
   const closeDisabled = saving || archiveBusy || restoreBusy;
   const stats = useMemo(() => buildStats(wo), [wo]);
+  const editorTargetType = resolveEditorTargetType(targetType, wo);
+  const fields = useMemo(() => buildFields(editorTargetType), [editorTargetType]);
 
   const handleArchive = useCallback(
     async (dirty: boolean) => {
@@ -296,7 +321,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
       setArchiveBusy(true);
       setError(null);
       try {
-        await archiveWorkOrder(wo.id);
+        await archiveWorkOrder(wo.id, targetType ?? wo.target_type);
         onRecordRemoved?.(wo.id);
         onClose();
       } catch (e) {
@@ -320,8 +345,8 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
     setRestoreBusy(true);
     setError(null);
     try {
-      await restoreWorkOrder(wo.id);
-      const restored = await getWorkOrder(wo.id);
+      await restoreWorkOrder(wo.id, targetType ?? wo.target_type);
+      const restored = await getWorkOrder(wo.id, targetType ?? wo.target_type);
       setWo(restored);
       onSaved(restored);
     } catch (e) {
@@ -340,10 +365,10 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
       try {
         const body: Parameters<typeof updateWorkOrder>[1] = {};
         if (draft.status !== wo.status) body.status = draft.status;
-        if (draft.vehicle_id.trim() !== (wo.vehicle_id ?? '').trim()) {
-          body.vehicle_id = draft.vehicle_id.trim();
+        if (draft.target_id.trim() !== (wo.target_id ?? '').trim()) {
+          body.target_id = draft.target_id.trim();
         }
-        if (draft.vehicle_plate !== (wo.vehicle_plate ?? '')) body.vehicle_plate = draft.vehicle_plate;
+        if (draft.target_label !== (wo.target_label ?? '')) body.target_label = draft.target_label;
         if (draft.customer_id.trim() !== (wo.customer_id ?? '').trim()) {
           const customerId = draft.customer_id.trim();
           body.customer_id = customerId.length > 0 ? customerId : undefined;
@@ -384,7 +409,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
           return;
         }
 
-        const updated = await updateWorkOrder(orderId, body);
+        const updated = await updateWorkOrder(orderId, body, targetType ?? wo.target_type);
         setWo(updated);
         onSaved(updated);
         onClose();
@@ -394,7 +419,7 @@ export function WorkOrderEditor({ orderId, variant, onClose, onSaved, onRecordRe
         setSaving(false);
       }
     },
-    [onClose, onSaved, orderId, wo],
+    [onClose, onSaved, orderId, targetType, wo],
   );
 
   return (

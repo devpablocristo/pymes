@@ -45,12 +45,25 @@ ensure_seed_dbs_ready() {
   wait_for_pg review-postgres "$REVIEW_DB_NAME" "$REVIEW_DB_USER"
 }
 
-resolve_target_org_uuid() {
-  local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
-  if [[ -z "$external_id" ]]; then
+require_seed_org_external_id() {
+  if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
     echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required" >&2
     exit 1
   fi
+}
+
+derive_seed_org_slug() {
+  local external_id="$1"
+  local cleaned="${external_id#org_}"
+  cleaned="$(printf '%s' "$cleaned" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//;s/-*$//')"
+  cleaned="${cleaned:-demo}"
+  printf 'demo-%s\n' "$(printf '%s' "$cleaned" | cut -c1-40)"
+}
+
+resolve_target_org_uuid() {
+  require_seed_org_external_id
+
+  local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
 
   # psql no sustituye :'var' en -c de modo no interactivo; por stdin sí (PG 16 en imagen oficial).
   local org_uuid
@@ -60,8 +73,19 @@ resolve_target_org_uuid() {
         psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
+  if [[ -n "$org_uuid" ]]; then
+    printf '%s\n' "$org_uuid"
+    return 0
+  fi
+
+  org_uuid="$(
+    printf '%s\n' "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/org/' || :'external_id') as text);" \
+      | dc exec -T postgres \
+        psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
+  )"
+  org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -z "$org_uuid" ]]; then
-    echo "No existe org con external_id=$external_id para aplicar seeds demo" >&2
+    echo "No se pudo resolver org uuid para external_id=$external_id" >&2
     exit 1
   fi
   printf '%s\n' "$org_uuid"
@@ -76,13 +100,25 @@ render_seed_sql() {
     fullpath="$ROOT_DIR/$file"
   fi
   python3 - "$fullpath" "$TARGET_ORG_UUID" <<'PY'
+import os
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
 target_org_uuid = sys.argv[2]
 body = path.read_text()
-body = body.replace("__SEED_ORG_ID__", target_org_uuid)
+
+def sql_escape(value: str) -> str:
+    return value.replace("'", "''")
+
+replacements = {
+    "__SEED_ORG_ID__": target_org_uuid,
+    "__SEED_ORG_EXTERNAL_ID__": sql_escape(os.environ.get("SEED_ORG_EXTERNAL_ID", "")),
+    "__SEED_ORG_NAME__": sql_escape(os.environ.get("SEED_ORG_NAME", "")),
+    "__SEED_ORG_SLUG__": sql_escape(os.environ.get("SEED_ORG_SLUG", "")),
+}
+for placeholder, value in replacements.items():
+    body = body.replace(placeholder, value)
 sys.stdout.write(body)
 PY
 }
@@ -100,6 +136,17 @@ run_pymes_sql_inline() {
 run_review_sql_inline() {
   local sql="$1"
   printf '%s\n' "$sql" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
+}
+
+run_review_sql_file() {
+  local file="$1"
+  local fullpath
+  if [[ "$file" == /* ]]; then
+    fullpath="$file"
+  else
+    fullpath="$ROOT_DIR/$file"
+  fi
+  cat "$fullpath" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
 }
 
 export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER

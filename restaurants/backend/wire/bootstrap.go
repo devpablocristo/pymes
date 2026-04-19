@@ -3,17 +3,16 @@ package wire
 import (
 	"context"
 	"os"
-	"slices"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalaudit"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/areas"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/sessions"
@@ -36,7 +35,7 @@ func InitializeApp() *app.App {
 
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, nil)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-	auditLog := &logAudit{logger: logger}
+	auditLog := verticalaudit.NewLogger(logger)
 
 	areasRepo := areas.NewRepository(db)
 	tablesRepo := tables.NewRepository(db)
@@ -52,19 +51,8 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(newCORSMiddleware(cfg.FrontendURL))
-	router.GET("/healthz", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-	router.GET("/readyz", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-		defer cancel()
-		if err := store.Ping(ctx, db); err != nil {
-			c.JSON(503, gin.H{"status": "not_ready", "error": "database unreachable"})
-			return
-		}
-		c.JSON(200, gin.H{"status": "ready"})
-	})
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")
 	authGroup := v1.Group("")
@@ -82,55 +70,4 @@ func setupLogger() zerolog.Logger {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 	return logger.With().Timestamp().Logger()
-}
-
-type logAudit struct {
-	logger zerolog.Logger
-}
-
-func (a *logAudit) Log(_ context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
-	a.logger.Info().
-		Str("org_id", orgID).
-		Str("actor", actor).
-		Str("action", action).
-		Str("resource_type", resourceType).
-		Str("resource_id", resourceID).
-		Any("payload", payload).
-		Msg("audit")
-}
-
-func newCORSMiddleware(frontendURL string) gin.HandlerFunc {
-	origins := []string{
-		"http://localhost:5173",
-		"http://localhost:5180",
-	}
-	if frontendURL != "" {
-		trimmed := strings.TrimSuffix(frontendURL, "/")
-		if !slices.Contains(origins, trimmed) {
-			origins = append(origins, trimmed)
-		}
-	}
-
-	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		allowed := false
-		for _, item := range origins {
-			if item == origin {
-				allowed = true
-				break
-			}
-		}
-		if allowed {
-			c.Header("Access-Control-Allow-Origin", origin)
-			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-API-KEY, X-Org-ID")
-			c.Header("Access-Control-Allow-Credentials", "true")
-			c.Header("Access-Control-Max-Age", "86400")
-		}
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	}
 }

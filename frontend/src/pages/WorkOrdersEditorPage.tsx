@@ -3,6 +3,7 @@ import { PageLayout } from '../components/PageLayout';
 import { WorkOrderEditor } from '../components/WorkOrderEditor';
 import { useI18n } from '../lib/i18n';
 import { useActiveTenantSlug } from '../lib/tenantSlug';
+import { getTenantProfile } from '../lib/tenantProfile';
 
 /**
  * Misma UI que el modal del Kanban: un solo editor de OT por ruta.
@@ -12,6 +13,8 @@ export function WorkOrdersEditorPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const slug = useActiveTenantSlug();
+  const targetType = getTenantProfile()?.subVertical === 'bike_shop' ? 'bicycle' : 'vehicle';
+  const pageTitle = targetType === 'bicycle' ? t('shell.bikeWorkOrders.pageTitle') : t('shell.carWorkOrders.pageTitle');
   const listPath = slug ? `/${slug}/work-orders/list` : '/work-orders/list';
 
   const content = !orderId ? (
@@ -25,6 +28,7 @@ export function WorkOrdersEditorPage() {
     <WorkOrderEditor
       variant="page"
       orderId={orderId}
+      targetType={targetType}
       onClose={() => navigate(listPath)}
       onSaved={() => {
         /* lista se refresca al volver */
@@ -35,7 +39,7 @@ export function WorkOrdersEditorPage() {
   return (
     <PageLayout
       className="wo-mod-orders"
-      title={t('shell.carWorkOrders.pageTitle')}
+      title={pageTitle}
     >
       {content}
     </PageLayout>

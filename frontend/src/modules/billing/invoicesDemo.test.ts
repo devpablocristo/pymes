@@ -4,6 +4,7 @@ import {
   calcInvoiceSubtotal,
   calcInvoiceTotal,
   formatInvoiceMoney,
+  INITIAL_INVOICES,
   readDemoInvoices,
   restoreInvoice,
   writeDemoInvoices,
@@ -53,6 +54,11 @@ describe('invoicesDemo', () => {
 
     writeDemoInvoices(invoices);
     expect(readDemoInvoices()).toEqual(invoices);
+  });
+
+  it('starts empty when localStorage has no persisted invoices', () => {
+    expect(INITIAL_INVOICES).toEqual([]);
+    expect(readDemoInvoices()).toEqual([]);
   });
 
   it('archives and restores invoices', () => {

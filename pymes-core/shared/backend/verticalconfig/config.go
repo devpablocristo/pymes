@@ -55,11 +55,6 @@ func Load(opts Options) Config {
 	return cfg
 }
 
-// IsLocalEnvironment indica ambiente de desarrollo local. Delega a core.
-func IsLocalEnvironment(environment string) bool {
-	return envconfig.IsLocal(environment)
-}
-
 func validateInternalServiceToken(environment, token string) error {
 	normalizedToken := strings.TrimSpace(token)
 	if envconfig.IsLocal(environment) {

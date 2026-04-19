@@ -120,6 +120,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
     () => [
+      { to: link(`/${toCrudResourceSlug('workshopVehicles')}`), label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
       { to: link('/work-orders/list'), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
     [t, slug],

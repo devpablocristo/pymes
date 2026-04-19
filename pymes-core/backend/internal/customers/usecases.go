@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -38,6 +39,29 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 	return &Usecases{repo: repo, audit: audit}
 }
 
+var nonDigitPhoneChars = regexp.MustCompile(`\D+`)
+
+func normalizeArgentinaPhone(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	digits := nonDigitPhoneChars.ReplaceAllString(trimmed, "")
+	if digits == "" {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(digits, "549"):
+		return "+" + digits
+	case strings.HasPrefix(digits, "54"):
+		return "+" + digits
+	case strings.HasPrefix(digits, "0"):
+		return "+54" + digits[1:]
+	default:
+		return "+54" + digits
+	}
+}
+
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
 }
@@ -53,6 +77,7 @@ func (u *Usecases) Create(ctx context.Context, in customerdomain.Customer, actor
 	if in.Type != "person" && in.Type != "company" {
 		return customerdomain.Customer{}, fmt.Errorf("invalid type: %w", httperrors.ErrBadInput)
 	}
+	in.Phone = normalizeArgentinaPhone(in.Phone)
 	out, err := u.repo.Create(ctx, in)
 	if err != nil {
 		return customerdomain.Customer{}, err
@@ -96,7 +121,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		current.Email = strings.TrimSpace(*in.Email)
 	}
 	if in.Phone != nil {
-		current.Phone = strings.TrimSpace(*in.Phone)
+		current.Phone = normalizeArgentinaPhone(*in.Phone)
 	}
 	if in.Address != nil {
 		current.Address = *in.Address

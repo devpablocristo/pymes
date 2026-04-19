@@ -113,12 +113,14 @@ BEGIN
        AND type = 'service'
        AND sku IN ('DEMO-SVC-001', 'DEMO-SVC-002');
 
+    -- El índice único es parcial (WHERE branch_id IS NULL), por eso ON CONFLICT
+    -- necesita el mismo predicado. Sembramos el nivel legacy (sin branch).
     INSERT INTO stock_levels (org_id, product_id, quantity, min_quantity)
     VALUES
         (v_org, p1, 50, 10),
         (v_org, p2, 30, 8),
         (v_org, p3, 20, 5)
-    ON CONFLICT (org_id, product_id) DO UPDATE
+    ON CONFLICT (org_id, product_id) WHERE branch_id IS NULL DO UPDATE
         SET quantity = EXCLUDED.quantity,
             min_quantity = EXCLUDED.min_quantity,
             updated_at = now();

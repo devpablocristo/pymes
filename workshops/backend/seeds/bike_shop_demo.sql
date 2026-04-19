@@ -21,6 +21,16 @@ BEGIN
     woi_bike1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/bike/1');
     woi_bike2 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/bike/2');
 
+    INSERT INTO workshops.bicycles (
+        id, org_id, customer_id, customer_name, frame_number, brand, model, bike_type, size,
+        wheel_size_inches, color, notes
+    )
+    VALUES (
+        bike1, v_org, c1, 'Cliente Demo Uno', 'BIKE-DEMO-001', 'Trek', 'Marlin 7', 'mountain', 'M',
+        29, 'Negro', 'Bicicleta demo para bike_shop'
+    )
+    ON CONFLICT (id) DO NOTHING;
+
     INSERT INTO workshops.work_orders (
         id, org_id, number, target_type, target_id, target_label, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency, metadata,

@@ -3,16 +3,13 @@ package pymescore
 import (
 	"context"
 	"fmt"
+
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
 // CreateBooking creates a booking in the pymes-core scheduling module.
 func (c *Client) CreateBooking(ctx context.Context, payload map[string]any) (map[string]any, error) {
-	orgID, _ := payload["org_id"].(string)
-	result, err := c.Post(ctx, "/v1/internal/v1/scheduling/bookings", orgID, payload)
-	if err != nil {
-		return nil, fmt.Errorf("create booking: %w", err)
-	}
-	return result, nil
+	return pymescoreops.CreateBooking(ctx, c.Client, payload)
 }
 
 // GetBooking fetches a booking by ID from the pymes-core scheduling module.

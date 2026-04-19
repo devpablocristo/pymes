@@ -57,8 +57,3 @@ func ParseNullableRFC3339Ptr(raw *string) (**time.Time, error) {
 	}
 	return &t, nil
 }
-
-// ParseOptionalInt64Query parsea un int64 opcional de un query parameter. Delega a core.
-func ParseOptionalInt64Query(c *gin.Context, param string) (*int64, error) {
-	return ginmw.ParseOptionalInt64Query(c, param)
-}

@@ -3,16 +3,16 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 
-	ginmw "github.com/devpablocristo/core/http/gin/go"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
-// AuthMiddleware re-exporta el tipo de core.
-type AuthMiddleware = ginmw.AuthMiddleware
+// AuthMiddleware re-exports the shared auth middleware type.
+type AuthMiddleware = sharedauth.AuthMiddleware
 
-// AuthContext re-exporta el tipo de core.
-type AuthContext = ginmw.AuthContext
+// AuthContext re-exports the shared auth context type.
+type AuthContext = sharedauth.AuthContext
 
-// GetAuthContext delega a core.
+// GetAuthContext delegates to the shared auth package.
 func GetAuthContext(c *gin.Context) AuthContext {
-	return ginmw.GetAuthContext(c)
+	return sharedauth.GetAuthContext(c)
 }

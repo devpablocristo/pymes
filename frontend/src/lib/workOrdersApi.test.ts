@@ -31,13 +31,13 @@ describe('workOrdersApi branch scoping', () => {
   it('scopes active work orders to the globally selected branch by default', async () => {
     await getWorkOrders({ target_type: 'vehicle', search: 'ford' });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/work-orders?branch_id=branch-active&target_type=vehicle&search=ford');
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders?branch_id=branch-active&target_type=vehicle&search=ford');
   });
 
   it('uses the explicit branch filter when the caller provides one', async () => {
     await getWorkOrdersArchived({ target_type: 'vehicle', branch_id: 'branch-north' });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/work-orders/archived?branch_id=branch-north&target_type=vehicle');
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders/archived?branch_id=branch-north&target_type=vehicle');
   });
 
   it('injects the active branch into work order creation when the form omits it', async () => {
@@ -47,7 +47,7 @@ describe('workOrdersApi branch scoping', () => {
       items: [],
     });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/work-orders', {
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders', {
       method: 'POST',
       body: {
         target_type: 'vehicle',
@@ -63,14 +63,36 @@ describe('workOrdersApi branch scoping', () => {
       branch_id: 'branch-from-row',
       customer_name: 'Juan',
       start_at: '2026-04-16T13:00:00Z',
-    });
+    }, 'vehicle');
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/workshop-bookings', {
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/workshop-bookings', {
       method: 'POST',
       body: {
         branch_id: 'branch-from-row',
         customer_name: 'Juan',
         start_at: '2026-04-16T13:00:00Z',
+      },
+    });
+  });
+
+  it('routes bicycle work orders to the bike shop module', async () => {
+    await getWorkOrders({ target_type: 'bicycle' });
+
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/bike-shop/work-orders?branch_id=branch-active&target_type=bicycle');
+  });
+
+  it('routes bicycle bookings to the bike shop module', async () => {
+    await createWorkshopBooking({
+      customer_name: 'Ana',
+      start_at: '2026-04-16T13:00:00Z',
+    }, 'bicycle');
+
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/bike-shop/workshop-bookings', {
+      method: 'POST',
+      body: {
+        customer_name: 'Ana',
+        start_at: '2026-04-16T13:00:00Z',
+        branch_id: 'branch-active',
       },
     });
   });

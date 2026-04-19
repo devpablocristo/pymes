@@ -358,14 +358,3 @@ func parseWebhookPayload(payload []byte) ([]InboundMessage, []domain.StatusUpdat
 	}
 	return messages, statusUpdates, nil
 }
-
-// ParseInboundMessages expone el parser para wrappers de compatibilidad y tests legacy.
-func ParseInboundMessages(payload []byte) ([]InboundMessage, error) {
-	messages, _, err := parseWebhookPayload(payload)
-	return messages, err
-}
-
-// ParseWebhookPayload expone el parser completo para tests y compatibilidad.
-func ParseWebhookPayload(payload []byte) ([]InboundMessage, []domain.StatusUpdate, error) {
-	return parseWebhookPayload(payload)
-}

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	googleoauth "github.com/devpablocristo/core/calendar/sync/google/go"
-	coreworker "github.com/devpablocristo/core/concurrency/go/worker"
 	schedulingmodule "github.com/devpablocristo/modules/scheduling/go"
 	schedulinghttp "github.com/devpablocristo/modules/scheduling/go/httpgin"
 	schedulingpublichttp "github.com/devpablocristo/modules/scheduling/go/publichttpgin"
@@ -297,90 +296,74 @@ func InitializeApp() *app.App {
 	})
 
 	v1 := router.Group("/v1")
-	// Orgs, Clerk, billing, users — served by core/saas/go via AttachSaaSUnmatchedRoutes (NoRoute).
-	paymentGatewayHandler.RegisterPublicRoutes(v1)
-	customerMessagingHandler.RegisterPublicRoutes(v1)
-	schedulerHandler.RegisterRoutes(v1)
-	// Feed iCalendar público: el cliente (Apple Calendar / Google Calendar / Outlook /
-	// Thunderbird) suscribe vía URL conociendo sólo el plaintext del token.
-	calendarExportHandler.RegisterPublicRoutes(v1)
-	// Callback OAuth de Google: el browser del usuario llega acá tras el flow
-	// de consent. Sin auth Clerk porque el redirect viene desde Google, no
-	// desde la app. La autenticación es el `state` validado contra DB.
-	calendarSyncHandler.RegisterPublicRoutes(v1)
-
-	internalGroup := v1.Group("/internal/v1")
-	internalGroup.Use(ginmw.NewInternalServiceAuth(cfg.InternalServiceToken))
-	internalAPIHandler.RegisterRoutes(internalGroup)
-	schedulingHandler.RegisterRoutes(internalGroup, rbacMiddleware.RequirePermission)
-	if strings.TrimSpace(cfg.ReviewCallbackToken) != "" {
-		reviewCallbackGroup := v1.Group("/internal/v1")
-		reviewCallbackGroup.Use(ginmw.NewInternalServiceAuth(cfg.ReviewCallbackToken))
-		internalAPIHandler.RegisterReviewCallbackRoutes(reviewCallbackGroup)
-	}
-
-	public := v1.Group("/public/:org_id")
-	public.Use(ginmw.NewRateLimit(30))
-	public.Use(ginmw.NewBodySizeLimit(64 << 10))
-	publicAPIHandler.RegisterRoutes(public)
-	publicSchedulingHandler.RegisterRoutes(public)
-	paymentGatewayHandler.RegisterExternalRoutes(public)
-
-	authGroup := v1.Group("")
-	authGroup.Use(GinSaaSAuthMiddleware(saasSvc))
-	adminHandler.RegisterRoutes(authGroup)
-	attachmentsHandler.RegisterRoutes(authGroup)
-	rbacHandler.RegisterRoutes(authGroup)
-	auditHandler.RegisterRoutes(authGroup)
-	partyHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	pdfgenHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	timelineHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	customerMessagingHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	notificationHandler.RegisterRoutes(authGroup)
-	inAppNotifHandler.RegisterRoutes(authGroup)
-	outwebhooksHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	accountsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	customersHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	currencyHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	dashboardHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	dataioHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	paymentsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	priceListsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	suppliersHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	productsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	servicesHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	inventoryHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	purchasesHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	procurementHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	cashflowHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	recurringHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	returnsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	salesHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	quotesHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	reportsHandler.RegisterRoutes(authGroup, rbacMiddleware)
-	schedulingHandler.RegisterRoutes(authGroup, rbacMiddleware.RequirePermission)
-	calendarExportHandler.RegisterAuthRoutes(authGroup)
-	calendarSyncHandler.RegisterAuthRoutes(authGroup)
-	paymentGatewayHandler.RegisterAuthRoutes(authGroup, rbacMiddleware)
-
-	// Review proxy — opcional, se activa si REVIEW_URL está configurado
-	if reviewClient != nil {
-		reviewHandler := reviewproxy.NewHandler(reviewClient)
-		reviewHandler.RegisterRoutes(authGroup)
-		log.Info().Str("review_url", reviewURL).Msg("review proxy enabled")
-		if cfg.ReviewSyncInterval > 0 {
-			go coreworker.RunOnceAndPeriodic(context.Background(), cfg.ReviewSyncInterval, "pymes-review-approval-sync", func(ctx context.Context) {
-				synced, err := inAppNotifUC.SyncAllPendingApprovals(ctx)
-				if err != nil {
-					logger.Error().Err(err).Msg("review approval sync failed")
-					return
-				}
-				if synced > 0 {
-					logger.Debug().Int("recipient_count", synced).Msg("review approval sync completed")
-				}
-			})
-		}
-	}
+	// Orgs, Clerk, billing y users quedan montados por el runtime SaaS en NoRoute.
+	registerPublicV1Routes(v1, publicV1Registrars{
+		public: []publicRoutesRegistrar{
+			paymentGatewayHandler,
+			customerMessagingHandler,
+			// Feed iCalendar público: el cliente (Apple Calendar / Google Calendar /
+			// Outlook / Thunderbird) suscribe vía URL conociendo sólo el plaintext del token.
+			calendarExportHandler,
+			// Callback OAuth de Google: el browser del usuario llega acá tras el flow
+			// de consent. Sin auth Clerk porque el redirect viene desde Google; la
+			// autenticación es el `state` validado contra DB.
+			calendarSyncHandler,
+		},
+		scheduler: schedulerHandler,
+	})
+	registerInternalV1Routes(v1, cfg.InternalServiceToken, strings.TrimSpace(cfg.ReviewCallbackToken), internalV1Registrars{
+		api:             internalAPIHandler,
+		scheduling:      schedulingHandler,
+		reviewCallbacks: internalAPIHandler,
+	}, rbacMiddleware.RequirePermission)
+	registerTenantPublicRoutes(v1, tenantPublicRegistrars{
+		api:            publicAPIHandler,
+		scheduling:     publicSchedulingHandler,
+		paymentGateway: paymentGatewayHandler,
+	})
+	authGroup := registerAuthenticatedV1Routes(v1, saasSvc, rbacMiddleware, authenticatedV1Registrars{
+		plain: []groupRoutesRegistrar{
+			adminHandler,
+			attachmentsHandler,
+			rbacHandler,
+			auditHandler,
+			notificationHandler,
+			inAppNotifHandler,
+		},
+		rbac: []rbacRoutesRegistrar{
+			partyHandler,
+			pdfgenHandler,
+			timelineHandler,
+			customerMessagingHandler,
+			outwebhooksHandler,
+			accountsHandler,
+			customersHandler,
+			currencyHandler,
+			dashboardHandler,
+			dataioHandler,
+			paymentsHandler,
+			priceListsHandler,
+			suppliersHandler,
+			productsHandler,
+			servicesHandler,
+			inventoryHandler,
+			purchasesHandler,
+			procurementHandler,
+			cashflowHandler,
+			recurringHandler,
+			returnsHandler,
+			salesHandler,
+			quotesHandler,
+			reportsHandler,
+		},
+		scheduling: schedulingHandler,
+		authOnly: []authRoutesRegistrar{
+			calendarExportHandler,
+			calendarSyncHandler,
+		},
+		paymentGateway: paymentGatewayHandler,
+	})
+	registerReviewRuntime(authGroup, reviewClient, reviewURL, cfg.ReviewSyncInterval, inAppNotifUC, logger)
 
 	AttachSaaSUnmatchedRoutes(router, saasSvc)
 

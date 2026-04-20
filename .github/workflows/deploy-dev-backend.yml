@@ -120,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           frontend_url="https://${FIREBASE_HOSTING_SITE_ID}.web.app"
-          env_vars="ENVIRONMENT=dev,PORT=8080,AUTH_ENABLE_JWT=${AUTH_ENABLE_JWT},AUTH_ALLOW_API_KEY=${AUTH_ALLOW_API_KEY},NOTIFICATION_BACKEND=${NOTIFICATION_BACKEND},FRONTEND_URL=${frontend_url}"
+          env_vars="ENVIRONMENT=dev,AUTH_ENABLE_JWT=${AUTH_ENABLE_JWT},AUTH_ALLOW_API_KEY=${AUTH_ALLOW_API_KEY},NOTIFICATION_BACKEND=${NOTIFICATION_BACKEND},FRONTEND_URL=${frontend_url}"
           if [[ -n "${JWKS_URL}" ]]; then
             env_vars="${env_vars},JWKS_URL=${JWKS_URL}"
           fi

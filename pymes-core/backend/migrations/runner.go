@@ -15,7 +15,7 @@ const postSchedulingMigrationsTable = "pymes_core_post_scheduling_schema_migrati
 //go:embed *.sql
 var sqlFiles embed.FS
 
-//go:embed post_scheduling/*.sql
+//go:embed all:post_scheduling
 var postSchedulingSQLFiles embed.FS
 
 func Run(db *gorm.DB, logger zerolog.Logger) error {

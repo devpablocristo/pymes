@@ -38,6 +38,7 @@ jobs:
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
       SECRET_REVIEW_API_KEY_NAME: REVIEW_API_KEY
+      SECRET_JWT_ISSUER_NAME: CLERK_JWT_ISSUER
       AUTH_ENABLE_JWT: "true"
       AUTH_ALLOW_API_KEY: "true"
       NOTIFICATION_BACKEND: noop
@@ -103,10 +104,16 @@ jobs:
           if gcloud secrets describe "$SECRET_CLERK_SECRET_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
             secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           fi
+          jwt_issuer_mode="literal"
           if gcloud secrets describe "$SECRET_REVIEW_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
             secret_flags="${secret_flags},REVIEW_API_KEY=${SECRET_REVIEW_API_KEY_NAME}:latest"
           fi
+          if gcloud secrets describe "$SECRET_JWT_ISSUER_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            secret_flags="${secret_flags},JWT_ISSUER=${SECRET_JWT_ISSUER_NAME}:latest"
+            jwt_issuer_mode="secret"
+          fi
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
+          echo "JWT_ISSUER_MODE=$jwt_issuer_mode" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)
         run: |
@@ -116,7 +123,7 @@ jobs:
           if [[ -n "${JWKS_URL}" ]]; then
             env_vars="${env_vars},JWKS_URL=${JWKS_URL}"
           fi
-          if [[ -n "${JWT_ISSUER}" ]]; then
+          if [[ "${JWT_ISSUER_MODE:-literal}" != "secret" && -n "${JWT_ISSUER}" ]]; then
             env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
           fi
           if [[ -n "${REVIEW_URL}" ]]; then

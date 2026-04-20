@@ -167,5 +167,11 @@ jobs:
       - name: Smoke checks
         run: |
           set -euo pipefail
-          curl -fsS "${SERVICE_URL}/healthz" >/dev/null
-          curl -fsS "${SERVICE_URL}/readyz" >/dev/null
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS "${SERVICE_URL}/readyz" | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::AI readyz no respondió ready."
+          exit 1

@@ -74,6 +74,10 @@ jobs:
             --exclude 'frontend/node_modules/' \
             --exclude 'ai/.venv/' \
             ./ "$build_root/pymes/"
+          if [[ -d "../core/scheduling" ]]; then
+            mkdir -p "$build_root/core"
+            rsync -a --exclude '.git/' ../core/scheduling/ "$build_root/core/scheduling/"
+          fi
           echo "BUILD_ROOT=$build_root" >> "$GITHUB_ENV"
 
       - name: Build y push imagen
@@ -82,8 +86,10 @@ jobs:
         run: |
           set -euo pipefail
           image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -f "${BUILD_ROOT}/pymes/pymes-core/backend/Dockerfile.prod" -t "$image_uri" "$BUILD_ROOT"
-          docker push "$image_uri"
+          gcloud builds submit "$BUILD_ROOT" \
+            --config "${BUILD_ROOT}/pymes/pymes-core/backend/cloudbuild.yaml" \
+            --substitutions "_IMAGE=${image_uri}" \
+            --project "$GCP_PROJECT_ID"
           echo "IMAGE_URI=$image_uri" >> "$GITHUB_ENV"
 
       - name: Resolve existing AI URL
@@ -192,5 +198,11 @@ jobs:
       - name: Smoke checks
         run: |
           set -euo pipefail
-          curl -fsS "${SERVICE_URL}/healthz" >/dev/null
-          curl -fsS "${SERVICE_URL}/readyz" >/dev/null
+          for _ in 1 2 3 4 5 6; do
+            if curl -fsS "${SERVICE_URL}/readyz" | grep -q '"status":"ready"'; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Backend readyz no respondió ready."
+          exit 1

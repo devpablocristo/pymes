@@ -2,10 +2,10 @@ export function renderCrudBooleanBadge(
   value: boolean,
   trueLabel = 'Sí',
   falseLabel = 'No',
-  trueClassName = 'badge-success',
-  falseClassName = 'badge-neutral',
+  _trueClassName = 'badge-success',
+  _falseClassName = 'badge-neutral',
 ) {
-  return <span className={`badge ${value ? trueClassName : falseClassName}`}>{value ? trueLabel : falseLabel}</span>;
+  return <span>{value ? trueLabel : falseLabel}</span>;
 }
 
 export function renderCrudActiveBadge(

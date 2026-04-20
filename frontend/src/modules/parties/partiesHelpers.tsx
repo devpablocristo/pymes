@@ -206,7 +206,7 @@ export function createCustomerColumns<T extends CustomerRecord>(): CrudColumn<T>
     { key: 'tax_id', header: 'CUIT/CUIL', render: (_v, row) => row.tax_id || '—' },
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
-    { key: 'tags', header: 'Etiquetas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
+    { key: 'tags', header: 'Etiquetas internas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
     { key: 'address', header: 'Dirección', render: (_v, row) => formatPartyAddress(row.address) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
@@ -234,7 +234,7 @@ export function customerFormFields(label = 'cliente'): CrudFormField[] {
       type: 'select',
       options: customerGenderOptions,
     },
-    { key: 'tags', label: 'Etiquetas', placeholder: 'vip, mayorista, mora' },
+    { key: 'tags', label: 'Etiquetas internas', placeholder: 'vip, mayorista, mora' },
     { key: 'address_street', label: 'Calle', fullWidth: true, placeholder: 'Direccion principal' },
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad' },
     { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
@@ -395,7 +395,7 @@ export const partyFormFields: CrudFormField[] = [
   { key: 'email', label: 'Email', type: 'email' as const },
   { key: 'phone', label: 'Teléfono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Etiquetas', placeholder: 'cliente, proveedor' },
+  { key: 'tags', label: 'Etiquetas internas', placeholder: 'cliente, proveedor' },
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
@@ -525,18 +525,6 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
     toFormValues: buildCustomerFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: customerFormToBody,
     isValid: isValidCustomerForm,
-    editorModal: {
-      fieldConfig: {
-        name: { helperText: 'Usá el nombre con el que atendés o buscás a la persona.' },
-        phone: { helperText: 'Se normaliza automáticamente con formato argentino para usarlo luego en WhatsApp.' },
-        metadata_gender: { helperText: 'Dato útil para segmentar campañas o búsquedas sin volver a pedirlo.' },
-        address_city: { helperText: 'Elegí la ciudad para mantener la base ordenada y reutilizable.' },
-        address_state: { helperText: 'Elegí la provincia desde la lista para evitar variantes cargadas a mano.' },
-        address_country: { helperText: 'Definí el país para futuras búsquedas, filtros e integraciones.' },
-        tags: { helperText: 'Etiquetas internas cortas para agrupar clientes sin tocar su ficha principal.' },
-        notes: { helperText: 'Anotá contexto comercial o recordatorios que sirvan al equipo.' },
-      },
-    },
   };
 }
 

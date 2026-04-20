@@ -247,6 +247,26 @@ describe('CrudEntityEditorModal', () => {
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });
 
+  it('renders dash-only read values as blank', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Proveedor Demo"
+        fields={[
+          { id: 'website', label: 'Sitio web', defaultValue: '—' },
+          { id: 'city', label: 'Ciudad', defaultValue: '---' },
+        ]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const readValues = document.querySelectorAll('.crud-entity-editor-modal__read-value');
+    expect(readValues).toHaveLength(2);
+    expect(Array.from(readValues).every((node) => node.textContent === '')).toBe(true);
+  });
+
   it('renders line item blocks only in edit mode', async () => {
     render(
       <CrudEntityEditorModal

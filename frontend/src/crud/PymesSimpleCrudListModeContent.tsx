@@ -61,6 +61,9 @@ function resolveEditorFieldConfig(
     fullWidth: overrides?.fullWidth ?? field.fullWidth,
     hidden: overrides?.hidden,
     readOnly: overrides?.readOnly,
+    editControl: overrides?.editControl,
+    visible: overrides?.visible,
+    readValue: overrides?.readValue,
   };
 }
 
@@ -453,8 +456,9 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         subtitle: undefined,
         eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
         allowEdit: archived ? false : allowEditRecord,
-        mediaUrls: editing ? buildEditorMediaUrls(editorRow) : undefined,
-        mediaFieldId: crudConfig.editorModal?.mediaFieldKey,
+        mediaUrls:
+          editing && !crudConfig.editorModal?.disableBuiltInMedia ? buildEditorMediaUrls(editorRow) : undefined,
+        mediaFieldId: crudConfig.editorModal?.disableBuiltInMedia ? undefined : crudConfig.editorModal?.mediaFieldKey,
         dialogMode: editing ? 'update' : 'create',
         submitLabel: editing ? 'Guardar' : 'Crear',
         editLabel: 'Editar',

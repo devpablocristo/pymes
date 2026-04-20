@@ -79,3 +79,26 @@ func TestCreateSyncsPrimaryFromImageURLs(t *testing.T) {
 		t.Fatalf("unexpected image_urls in repo: %#v", repo.created.ImageURLs)
 	}
 }
+
+func TestCreateAcceptsLargeDataURLImages(t *testing.T) {
+	t.Parallel()
+
+	repo := &captureProductRepo{}
+	uc := NewUsecases(repo, nil, nil)
+	dataURL := "data:image/png;base64," + string(make([]byte, 20_000))
+
+	out, err := uc.Create(context.Background(), productdomain.Product{
+		OrgID:     uuid.New(),
+		Name:      "Foto local",
+		ImageURLs: []string{dataURL},
+	}, "tester")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.ImageURL != dataURL {
+		t.Fatalf("expected primary image_url from data url, got %q", out.ImageURL)
+	}
+	if len(repo.created.ImageURLs) != 1 || repo.created.ImageURLs[0] != dataURL {
+		t.Fatalf("unexpected image_urls in repo: %#v", repo.created.ImageURLs)
+	}
+}

@@ -1,26 +1,18 @@
-import { type CrudColumn, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
+import { useEffect, useMemo, useState } from 'react';
+import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
-import { renderTagBadges } from '../../crud/crudTagBadges';
 import { buildStandardCrudViewModes } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
-  asOptionalNumber,
   asOptionalString,
   asString,
-  formatProductImageURLsToForm,
-  parseImageURLList,
 } from '../../crud/resourceConfigs.shared';
-import { renderCrudActiveBadge } from '../../modules/crud';
 import { formatPartyTagList, parsePartyTagCsv } from '../parties';
 import {
   asCrudString,
-  currencyOptions,
   parseMetadataStringMap,
   productCategoryOptions,
-  productKindOptions,
-  productUnitOptions,
-  taxRateOptions,
 } from '../../lib/formPresets';
 
 export type ProductRecord = {
@@ -53,6 +45,197 @@ export type StockRecord = {
   updated_at: string;
 };
 
+function normalizeProductImageEntries(values: string[] | undefined, legacySingle?: string): string[] {
+  const source = values?.length ? values : legacySingle?.trim() ? [legacySingle.trim()] : [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  let lastDataPrefix = '';
+  for (let index = 0; index < source.length; index += 1) {
+    let current = String(source[index] ?? '').trim();
+    if (!current) continue;
+    if (current.startsWith('data:image/') && !current.includes(',')) {
+      const next = String(source[index + 1] ?? '').trim();
+      if (next) {
+        current = `${current},${next}`;
+        index += 1;
+      }
+    }
+    if (current.startsWith('data:image/')) {
+      const commaIndex = current.indexOf(',');
+      if (commaIndex > 0) {
+        lastDataPrefix = current.slice(0, commaIndex + 1);
+      }
+    } else if (looksLikeProductImageBase64(current)) {
+      const prefix = lastDataPrefix || inferProductImageDataPrefix(current);
+      if (prefix) current = `${prefix}${current}`;
+    }
+    if (seen.has(current)) continue;
+    seen.add(current);
+    out.push(current);
+  }
+  return out;
+}
+
+function inferProductImageDataPrefix(raw: string): string {
+  const trimmed = String(raw ?? '').trim();
+  if (trimmed.startsWith('/9j/')) return 'data:image/jpeg;base64,';
+  if (trimmed.startsWith('iVBOR')) return 'data:image/png;base64,';
+  if (trimmed.startsWith('R0lGOD')) return 'data:image/gif;base64,';
+  if (trimmed.startsWith('UklGR')) return 'data:image/webp;base64,';
+  return '';
+}
+
+function looksLikeProductImageBase64(raw: string): boolean {
+  const trimmed = String(raw ?? '').trim();
+  if (trimmed.length < 8 || inferProductImageDataPrefix(trimmed) === '') return false;
+  return /^[A-Za-z0-9+/=]+$/.test(trimmed);
+}
+
+function formatProductImagesForEditor(values: string[] | undefined, legacySingle?: string): string {
+  return normalizeProductImageEntries(values, legacySingle).join('\n');
+}
+
+function parseProductImagesFromEditor(value: CrudFieldValue | undefined): string[] {
+  return asCrudString(value)
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function ProductImagesField({
+  value,
+  setValue,
+  readOnly = false,
+}: {
+  value: CrudFieldValue | undefined;
+  setValue: (nextValue: string) => void;
+  readOnly?: boolean;
+}) {
+  const images = useMemo(
+    () =>
+      asCrudString(value)
+        .split('\n')
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    [value],
+  );
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!images.length) {
+      setSelectedIndex(0);
+      return;
+    }
+    if (selectedIndex > images.length - 1) {
+      setSelectedIndex(images.length - 1);
+    }
+  }, [images, selectedIndex]);
+
+  const selectedImage = images[selectedIndex] ?? '';
+  const removeImage = (indexToRemove: number) => {
+    const nextImages = images.filter((_, index) => index !== indexToRemove);
+    setValue(nextImages.join('\n'));
+    setSelectedIndex((current) => {
+      if (!nextImages.length) return 0;
+      if (current > indexToRemove) return current - 1;
+      return Math.min(current, nextImages.length - 1);
+    });
+  };
+
+  return (
+    <div className="crud-inline-upload">
+      <input
+        id="product-images-upload-input"
+        className="crud-inline-upload__input"
+        type="file"
+        accept="image/*"
+        multiple
+        disabled={readOnly}
+        onChange={async (event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (!files.length) return;
+          try {
+            const encoded = await Promise.all(
+              files.map(
+                (file) =>
+                  new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result ?? ''));
+                    reader.onerror = () => reject(reader.error ?? new Error('upload_failed'));
+                    reader.readAsDataURL(file);
+                  }),
+              ),
+            );
+            const nextImages = [...images, ...encoded];
+            setValue(nextImages.join('\n'));
+            setSelectedIndex(images.length);
+          } finally {
+            event.currentTarget.value = '';
+          }
+        }}
+      />
+      {!readOnly ? (
+        <label htmlFor="product-images-upload-input" className="crud-inline-upload__button">
+          Subir imágenes desde la computadora
+        </label>
+      ) : null}
+      {selectedImage ? (
+        <div className="crud-inline-upload__preview">
+          <div className="crud-inline-upload__hero">
+            {images.length > 1 ? (
+              <button
+                type="button"
+                className="crud-inline-upload__nav crud-inline-upload__nav--prev"
+                onClick={() => setSelectedIndex((current) => (current - 1 + images.length) % images.length)}
+                aria-label="Imagen anterior"
+              >
+                ←
+              </button>
+            ) : null}
+            <img src={selectedImage} alt={`Imagen ${selectedIndex + 1}`} />
+            {images.length > 1 ? (
+              <button
+                type="button"
+                className="crud-inline-upload__nav crud-inline-upload__nav--next"
+                onClick={() => setSelectedIndex((current) => (current + 1) % images.length)}
+                aria-label="Imagen siguiente"
+              >
+                →
+              </button>
+            ) : null}
+          </div>
+          <div className="crud-inline-upload__thumbs">
+            {images.map((image, index) => (
+              <div
+                key={`${image}-${index}`}
+                className={`crud-inline-upload__thumb-wrap${index === selectedIndex ? ' crud-inline-upload__thumb-wrap--active' : ''}`}
+              >
+                <button
+                  type="button"
+                  className={`crud-inline-upload__thumb${index === selectedIndex ? ' crud-inline-upload__thumb--active' : ''}`}
+                  onClick={() => setSelectedIndex(index)}
+                >
+                  <img src={image} alt={`Miniatura ${index + 1}`} />
+                </button>
+                {!readOnly ? (
+                  <button
+                    type="button"
+                    className="crud-inline-upload__remove"
+                    onClick={() => removeImage(index)}
+                    aria-label={`Eliminar imagen ${index + 1}`}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[] {
   return [
     { key: 'name', header: 'Producto', className: 'cell-name' },
@@ -65,27 +248,12 @@ export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[]
     { key: 'unit', header: 'Unidad', render: (_v, row) => row.unit || '—' },
     { key: 'price', header: 'Precio', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
-    {
-      key: 'tags',
-      header: 'Etiquetas',
-      className: 'cell-tags',
-      render: (_value, row) => renderTagBadges(row.tags),
-    },
-    {
-      key: 'track_stock',
-      header: 'Stock',
-      render: (value) => renderCrudActiveBadge(Boolean(value), 'Controlado', 'Sin control'),
-    },
-    {
-      key: 'is_active',
-      header: 'Estado',
-      render: (value) => renderCrudActiveBadge(Boolean(value)),
-    },
   ];
 }
 
 export function productFormFields(): CrudFormField[] {
   return [
+    { key: 'image_urls', label: 'Imágenes', type: 'textarea', rows: 3, fullWidth: true },
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
     { key: 'sku', label: 'Código interno', placeholder: 'PROD-001' },
     {
@@ -94,20 +262,17 @@ export function productFormFields(): CrudFormField[] {
       type: 'select',
       options: productCategoryOptions,
     },
-    {
-      key: 'metadata_kind',
-      label: 'Tipo de producto',
-      type: 'select',
-      options: productKindOptions,
-    },
     { key: 'metadata_barcode', label: 'Código de barras', placeholder: '7791234567890' },
-    { key: 'unit', label: 'Unidad', type: 'select', options: productUnitOptions },
     { key: 'price', label: 'Precio', type: 'number', required: true, placeholder: '0.00' },
-    { key: 'currency', label: 'Moneda', type: 'select', options: currencyOptions },
-    { key: 'cost_price', label: 'Costo', type: 'number', placeholder: '0.00' },
-    { key: 'metadata_margin_percent', label: 'Margen (%)', type: 'number', placeholder: '35' },
-    { key: 'tax_rate', label: 'IVA', type: 'select', options: taxRateOptions },
-    { key: 'track_stock', label: 'Controla stock', type: 'checkbox' },
+    {
+      key: 'track_stock',
+      label: 'Controla stock',
+      type: 'select',
+      options: [
+        { label: 'Sí', value: 'true' },
+        { label: 'No', value: 'false' },
+      ],
+    },
     {
       key: 'is_active',
       label: 'Estado comercial',
@@ -115,17 +280,10 @@ export function productFormFields(): CrudFormField[] {
       options: [
         { label: 'Activo', value: 'true' },
         { label: 'Inactivo', value: 'false' },
-        ],
+      ],
     },
-    { key: 'tags', label: 'Etiquetas', placeholder: 'nuevo, combo, premium' },
-    {
-      key: 'image_urls',
-      label: 'Imágenes',
-      type: 'textarea',
-      fullWidth: true,
-      placeholder: 'Las imágenes cargadas se guardan acá. También podés pegarlas una por línea si ya las tenés.',
-    },
-    { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
+    { key: 'tags', label: 'Etiquetas internas', placeholder: 'nuevo, combo, premium' },
+    { key: 'description', label: 'Descripcion', type: 'textarea', rows: 3, fullWidth: true },
   ];
 }
 
@@ -156,7 +314,7 @@ export function buildProductFormValues(row: ProductRecord) {
     track_stock: row.track_stock ?? true,
     is_active: row.is_active ? 'true' : 'false',
     tags: formatPartyTagList(row.tags),
-    image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
+    image_urls: formatProductImagesForEditor(row.image_urls, row.image_url),
     description: row.description ?? '',
     metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     metadata_kind: typeof row.metadata?.kind === 'string' ? row.metadata.kind : 'simple',
@@ -168,32 +326,21 @@ export function buildProductFormValues(row: ProductRecord) {
 
 export function productFormToBody(values: CrudFormValues): Record<string, unknown> {
   const price = asNumber(values.price);
-  const directCost = asOptionalNumber(values.cost_price);
-  const marginPercent = asOptionalNumber(values.metadata_margin_percent);
-  const derivedCost =
-    directCost !== undefined
-      ? directCost
-      : marginPercent !== undefined && Number.isFinite(marginPercent)
-        ? Math.max(0, price - price * (marginPercent / 100))
-        : 0;
   return {
     name: asString(values.name),
     sku: asOptionalString(values.sku),
-    unit: asOptionalString(values.unit),
+    unit: 'unit',
     price,
-    currency: asOptionalString(values.currency) ?? 'ARS',
-    cost_price: derivedCost,
-    tax_rate: asOptionalNumber(values.tax_rate),
+    currency: 'ARS',
+    cost_price: 0,
     track_stock: asBoolean(values.track_stock),
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
     tags: parsePartyTagCsv(values.tags),
+    image_urls: parseProductImagesFromEditor(values.image_urls),
     description: asOptionalString(values.description),
-    image_urls: parseImageURLList(values.image_urls),
     metadata: parseMetadataStringMap(undefined, {
       category: asOptionalString(values.metadata_category),
-      kind: asOptionalString(values.metadata_kind),
       barcode: asOptionalString(values.metadata_barcode),
-      margin_percent: asOptionalString(values.metadata_margin_percent),
     }),
   };
 }
@@ -212,6 +359,7 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
   | 'label'
   | 'labelPlural'
   | 'labelPluralCap'
+  | 'allowEdit'
   | 'columns'
   | 'formFields'
   | 'searchText'
@@ -230,6 +378,7 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     label: 'producto',
     labelPlural: 'productos',
     labelPluralCap: 'Productos',
+    allowEdit: true,
     columns: createProductColumns<T & { id: string }>(),
     formFields: productFormFields(),
     searchText: buildProductSearchText as CrudPageConfig<T & { id: string }>['searchText'],
@@ -237,55 +386,32 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     toBody: productFormToBody,
     isValid: isValidProductForm,
     editorModal: {
+      disableBuiltInMedia: true,
       fieldConfig: {
-        sku: { helperText: 'Código corto para buscar rápido en caja, stock o compras.' },
-        metadata_category: { helperText: 'Elegí una categoría predefinida para mantener el catálogo ordenado.' },
-        metadata_kind: { helperText: 'Simple para lo habitual; variable o agrupado para catálogos más complejos.' },
-        metadata_barcode: { helperText: 'Guardá acá el código de barras para búsquedas o lectores.' },
-        unit: { helperText: 'Definí cómo se vende o controla este producto.' },
-        price: { helperText: 'Precio de venta sugerido o actual.' },
-        cost_price: { helperText: 'Costo directo. Si preferís, podés completar margen y calcularlo en base al precio.' },
-        metadata_margin_percent: { helperText: 'Opcional: si no cargás costo, se calcula usando este porcentaje sobre el precio.' },
-        tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
-        tags: { helperText: 'Etiquetas internas para campañas, filtros o agrupaciones rápidas.' },
         image_urls: {
-          helperText: 'Podés subir imágenes desde tu dispositivo o pegar enlaces si ya los tenés.',
-          editControl: ({ value, setValue }) => {
-            return (
-              <div className="crud-inline-upload">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={async (event) => {
-                    const files = Array.from(event.target.files ?? []);
-                    if (!files.length) return;
-                    try {
-                      const encoded = await Promise.all(
-                        files.map(
-                          (file) =>
-                            new Promise<string>((resolve, reject) => {
-                              const reader = new FileReader();
-                              reader.onload = () => resolve(String(reader.result ?? ''));
-                              reader.onerror = () => reject(reader.error ?? new Error('upload_failed'));
-                              reader.readAsDataURL(file);
-                            }),
-                        ),
-                      );
-                      const current = asCrudString(value)
-                        .split('\n')
-                        .map((entry) => entry.trim())
-                        .filter(Boolean);
-                      setValue([...current, ...encoded].join('\n'));
-                    } finally {
-                      event.currentTarget.value = '';
-                    }
-                  }}
-                />
-                <small>Subí una o varias fotos desde el dispositivo.</small>
-              </div>
-            );
-          },
+          readValue: ({ value }) => (
+            <ProductImagesField
+              value={normalizeProductImageEntries(
+                asCrudString(value)
+                  .split('\n')
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+              ).join('\n')}
+              setValue={() => {}}
+              readOnly
+            />
+          ),
+          editControl: ({ value, setValue }) => (
+            <ProductImagesField
+              value={normalizeProductImageEntries(
+                asCrudString(value)
+                  .split('\n')
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+              ).join('\n')}
+              setValue={(next) => setValue(next)}
+            />
+          ),
         },
       },
     },

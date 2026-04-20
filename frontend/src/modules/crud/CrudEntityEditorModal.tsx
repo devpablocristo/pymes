@@ -228,6 +228,13 @@ function renderStatValue(
   return typeof stat.value === 'function' ? stat.value(values) : stat.value;
 }
 
+function normalizeReadString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^[-\u2010-\u2015\s]+$/.test(trimmed)) return '';
+  return trimmed;
+}
+
 export function CrudEntityEditorModal({
   open,
   title,
@@ -545,10 +552,9 @@ export function CrudEntityEditorModal({
     if (field.type === 'checkbox') return value ? 'Sí' : 'No';
     if (field.type === 'select') {
       const match = field.options?.find((option) => option.value === String(value ?? ''));
-      return match?.label ?? String(value ?? '');
+      return normalizeReadString(String(match?.label ?? value ?? ''));
     }
-    const stringValue = String(value ?? '').trim();
-    return stringValue;
+    return normalizeReadString(String(value ?? ''));
   };
 
   const renderBlock = (block: CrudEntityEditorModalBlock) => {
@@ -679,7 +685,7 @@ export function CrudEntityEditorModal({
                                 }
                                 placeholder={field.placeholder}
                                 required={field.required}
-                                rows={field.rows ?? (field.id === 'notes' ? 2 : 4)}
+                                rows={field.rows ?? 2}
                                 readOnly={field.readOnly}
                               />
                             ) : field.type === 'select' ? (

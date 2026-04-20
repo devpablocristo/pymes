@@ -507,9 +507,6 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       ],
       fieldConfig: {
         customer_id: { hidden: true },
-        customer_name: { helperText: 'Cliente al que le estás armando este presupuesto.' },
-        valid_until: { helperText: 'Fecha límite hasta la que mantenés este precio u oferta.' },
-        notes: { helperText: 'Agregá alcance, aclaraciones o condiciones comerciales.' },
       },
     },
     kanban: {
@@ -623,9 +620,6 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       fieldConfig: {
         customer_id: { hidden: true },
         quote_id: { hidden: true },
-        customer_name: { helperText: 'Cliente al que le cobrás esta operación.' },
-        payment_method: { helperText: 'Elegí cómo se cobró o se va a cobrar esta venta.' },
-        notes: { helperText: 'Usalo para observaciones rápidas de caja o entrega.' },
       },
     },
     kanban: {

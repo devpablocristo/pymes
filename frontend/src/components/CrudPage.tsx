@@ -165,6 +165,7 @@ export type CrudEditorModalConfig<T extends { id: string }> = {
   loadRecord?: (row: T) => Promise<T>;
   canEdit?: (row: T) => boolean;
   mediaFieldKey?: string;
+  disableBuiltInMedia?: boolean;
   blocks?: CrudEditorModalBlockConfig<T>[];
   sections?: CrudEditorModalSectionConfig[];
   fieldConfig?: Record<string, CrudEditorModalFieldConfig>;

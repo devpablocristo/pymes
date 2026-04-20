@@ -238,6 +238,179 @@
   align-self: center;
 }
 
+.crud-inline-upload {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-inline-upload__input {
+  display: none;
+}
+
+.crud-inline-upload__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.crud-inline-upload__button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.crud-inline-upload__preview {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-inline-upload__hero {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.crud-inline-upload__hero img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+}
+
+.crud-inline-upload__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  color: color-mix(in srgb, var(--color-text) 88%, white);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 1;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.crud-inline-upload__nav--prev {
+  left: 12px;
+}
+
+.crud-inline-upload__nav--next {
+  right: 12px;
+}
+
+.crud-inline-upload__nav:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-bg) 90%, transparent);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.crud-inline-upload__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.crud-inline-upload__thumb-wrap {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  flex: 0 0 auto;
+}
+
+.crud-inline-upload__thumb-wrap--active::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 75%, white);
+  border-radius: calc(var(--radius-sm) + 2px);
+  pointer-events: none;
+}
+
+.crud-inline-upload__thumb {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.crud-inline-upload__thumb--active {
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.crud-inline-upload__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.crud-inline-upload__thumb:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 70%, var(--color-border));
+  transform: translateY(-1px);
+}
+
+.crud-inline-upload__remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  color: color-mix(in srgb, var(--color-text) 82%, white);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.crud-inline-upload__remove:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-bg) 96%, transparent);
+  transform: scale(1.05);
+}
+
 .crud-entity-editor-modal__checkbox-row {
   display: inline-flex;
   align-items: center;

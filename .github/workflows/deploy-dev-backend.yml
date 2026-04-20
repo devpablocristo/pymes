@@ -108,6 +108,14 @@ jobs:
           fi
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
+      - name: Drop legacy JWT_ISSUER secret binding
+        run: |
+          set -euo pipefail
+          gcloud run services update "$SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --remove-secrets="JWT_ISSUER" || true
+
       - name: Deploy to Cloud Run (DEV)
         run: |
           set -euo pipefail
@@ -136,7 +144,6 @@ jobs:
             --memory=512Mi \
             --cpu=1 \
             --timeout=300 \
-            --remove-secrets="JWT_ISSUER" \
             --set-env-vars="${env_vars}" \
             --set-secrets="${SECRET_FLAGS}"
 

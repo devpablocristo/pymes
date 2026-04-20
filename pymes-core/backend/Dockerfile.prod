@@ -17,8 +17,6 @@ ENV CGO_ENABLED=0 \
 WORKDIR /workspace
 
 COPY pymes /workspace/pymes
-COPY pymes/pymes-core/backend/migrations/post_scheduling /workspace/pymes/pymes-core/backend/migrations/post_scheduling
-
 WORKDIR /workspace/pymes/pymes-core/backend
 
 RUN go mod download

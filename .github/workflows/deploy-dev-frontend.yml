@@ -1,0 +1,126 @@
+name: Deploy Frontend DEV (Firebase Hosting)
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama o ref a desplegar (default: develop)"
+        required: false
+        default: "develop"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pymes-deploy-dev-frontend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GCP_REGION: us-central1
+      GCP_PROJECT_ID: pymes-dev-352318
+      WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+      WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
+      BACKEND_SERVICE_NAME: pymes-core
+      AI_SERVICE_NAME: pymes-ai
+      FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
+      FRONTEND_CLERK_PUBLISHABLE_KEY: pk_test_c2VsZWN0ZWQtdGljay00OC5jbGVyay5hY2NvdW50cy5kZXYk
+      FIREBASE_TOOLS_VERSION: "13"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          VITE_API_URL="/" \
+          VITE_AI_API_URL="/" \
+          VITE_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY}" \
+          npm run build
+
+      - name: Write Firebase target config
+        run: |
+          cat > .firebaserc <<EOF
+          {
+            "projects": {
+              "default": "${GCP_PROJECT_ID}"
+            },
+            "targets": {
+              "${GCP_PROJECT_ID}": {
+                "hosting": {
+                  "default": [
+                    "${FIREBASE_HOSTING_SITE_ID}"
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy to Firebase Hosting
+        run: |
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+            --project "${GCP_PROJECT_ID}" \
+            --only hosting \
+            --non-interactive
+
+      - name: Resolve service URLs
+        run: |
+          set -euo pipefail
+          echo "FRONTEND_URL=https://${FIREBASE_HOSTING_SITE_ID}.web.app" >> "$GITHUB_ENV"
+          backend_url="$(gcloud run services describe "$BACKEND_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          echo "BACKEND_URL=$backend_url" >> "$GITHUB_ENV"
+          ai_url="$(gcloud run services describe "$AI_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)' 2>/dev/null || true)"
+          echo "AI_URL=$ai_url" >> "$GITHUB_ENV"
+
+      - name: Update backend public URLs
+        run: |
+          set -euo pipefail
+          update_vars="FRONTEND_URL=${FRONTEND_URL}"
+          if [[ -n "${AI_URL:-}" ]]; then
+            update_vars="${update_vars},AI_SERVICE_URL=${AI_URL}"
+          fi
+          gcloud run services update "$BACKEND_SERVICE_NAME" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --update-env-vars="${update_vars}"
+
+      - name: Smoke checks
+        run: |
+          set -euo pipefail
+          curl -fsS "${FRONTEND_URL}" >/dev/null
+          curl -fsS "${BACKEND_URL}/healthz" >/dev/null

@@ -19,6 +19,7 @@ type Service struct {
 	Currency               string
 	DefaultDurationMinutes *int
 	IsActive               bool
+	IsFavorite             bool
 	Tags                   []string
 	Metadata               map[string]any
 	CreatedAt              time.Time

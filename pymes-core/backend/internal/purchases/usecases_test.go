@@ -12,10 +12,14 @@ import (
 type mockPurchasesRepo struct {
 	createFn       func(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	getByIDFn      func(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
+	updateFn       func(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	updateStatusFn func(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
 }
 
 func (m *mockPurchasesRepo) List(context.Context, uuid.UUID, *uuid.UUID, string, int) ([]purchasesdomain.Purchase, error) {
+	return nil, nil
+}
+func (m *mockPurchasesRepo) ListArchived(context.Context, uuid.UUID, *uuid.UUID, string, int) ([]purchasesdomain.Purchase, error) {
 	return nil, nil
 }
 func (m *mockPurchasesRepo) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -27,12 +31,18 @@ func (m *mockPurchasesRepo) Create(ctx context.Context, in CreateInput) (purchas
 func (m *mockPurchasesRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 	return m.getByIDFn(ctx, orgID, id)
 }
-func (m *mockPurchasesRepo) Update(context.Context, UpdateInput) (purchasesdomain.Purchase, error) {
-	return purchasesdomain.Purchase{}, nil
+func (m *mockPurchasesRepo) Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error) {
+	if m.updateFn == nil {
+		return purchasesdomain.Purchase{}, nil
+	}
+	return m.updateFn(ctx, in)
 }
 func (m *mockPurchasesRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error) {
 	return m.updateStatusFn(ctx, in)
 }
+func (m *mockPurchasesRepo) SoftDelete(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (m *mockPurchasesRepo) Restore(context.Context, uuid.UUID, uuid.UUID) error    { return nil }
+func (m *mockPurchasesRepo) HardDelete(context.Context, uuid.UUID, uuid.UUID) error { return nil }
 func (m *mockPurchasesRepo) GetSupplierName(context.Context, uuid.UUID, uuid.UUID) (string, error) {
 	return "", nil
 }
@@ -155,5 +165,54 @@ func TestCreate_PreservesSelectedBranch(t *testing.T) {
 	}
 	if out.BranchID == nil || *out.BranchID != branchID {
 		t.Fatalf("expected output branch_id %s, got %#v", branchID, out.BranchID)
+	}
+}
+
+func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
+	orgID := uuid.New()
+	purchaseID := uuid.New()
+	repo := &mockPurchasesRepo{
+		getByIDFn: func(ctx context.Context, gotOrgID, gotID uuid.UUID) (purchasesdomain.Purchase, error) {
+			return purchasesdomain.Purchase{
+				ID:            gotID,
+				OrgID:         gotOrgID,
+				Number:        "CPA-00004",
+				Status:        "received",
+				PaymentStatus: "pending",
+				SupplierName:  "Proveedor",
+				CreatedBy:     "creator",
+			}, nil
+		},
+		updateFn: func(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error) {
+			if in.Status != "received" {
+				t.Fatalf("expected update status received, got %q", in.Status)
+			}
+			return purchasesdomain.Purchase{
+				ID:            in.ID,
+				OrgID:         in.OrgID,
+				Number:        "CPA-00004",
+				Status:        in.Status,
+				PaymentStatus: in.PaymentStatus,
+				SupplierName:  in.SupplierName,
+			}, nil
+		},
+	}
+	uc := NewUsecases(repo, nil)
+
+	out, err := uc.Update(context.Background(), UpdateInput{
+		ID:            purchaseID,
+		OrgID:         orgID,
+		SupplierName:  "Proveedor actualizado",
+		Status:        "received",
+		PaymentStatus: "paid",
+		Items: []purchasesdomain.PurchaseItem{
+			{Description: "Insumo", Quantity: 1, UnitCost: 100},
+		},
+	}, "tester")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if out.Status != "received" {
+		t.Fatalf("expected received status, got %q", out.Status)
 	}
 }

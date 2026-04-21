@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -17,10 +18,14 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -29,10 +34,14 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
 	auth.GET("/purchases", rbac.RequirePermission("purchases", "read"), h.List)
+	auth.GET("/purchases/"+crudpaths.SegmentArchived, rbac.RequirePermission("purchases", "read"), h.ListArchived)
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
 	auth.PUT("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
 	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
+	auth.DELETE("/purchases/:id", rbac.RequirePermission("purchases", "delete"), h.Delete)
+	auth.POST("/purchases/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("purchases", "delete"), h.Restore)
+	auth.DELETE("/purchases/:id/"+crudpaths.SegmentHard, rbac.RequirePermission("purchases", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -51,6 +60,29 @@ func (h *Handler) List(c *gin.Context) {
 		branchID = &id
 	}
 	items, err := h.uc.List(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	orgID, ok := parseOrg(c)
+	if !ok {
+		return
+	}
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	var branchID *uuid.UUID
+	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &id
+	}
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -112,7 +144,7 @@ func (h *Handler) Update(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, IsFavorite: payload.IsFavorite, Tags: payload.Tags, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -141,6 +173,45 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) Delete(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor string) (CreateInput, error) {
@@ -184,7 +255,8 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 		}
 		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
-	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
+	isFavorite := req.IsFavorite != nil && *req.IsFavorite
+	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), IsFavorite: isFavorite, Tags: req.Tags, Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {

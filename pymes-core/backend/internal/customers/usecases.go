@@ -96,6 +96,7 @@ type UpdateInput struct {
 	Phone    *string
 	Address  *customerdomain.Address
 	Notes    *string
+	IsFavorite *bool
 	Tags     *[]string
 	Metadata *map[string]any
 }
@@ -128,6 +129,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
 	}
 	if in.Tags != nil {
 		current.Tags = append([]string(nil), (*in.Tags)...)

@@ -15,10 +15,14 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error)
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 	GetTaxRate(ctx context.Context, orgID uuid.UUID) float64
@@ -63,6 +67,8 @@ type CreateInput struct {
 	SupplierName  string
 	Status        string
 	PaymentStatus string
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	CreatedBy     string
 	Items         []purchasesdomain.PurchaseItem
@@ -76,6 +82,8 @@ type UpdateInput struct {
 	SupplierName  string
 	Status        string
 	PaymentStatus string
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	Items         []purchasesdomain.PurchaseItem
 }
@@ -88,6 +96,10 @@ type UpdateStatusInput struct {
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	return u.repo.List(ctx, orgID, branchID, strings.TrimSpace(status), limit)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID, strings.TrimSpace(status), limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -130,14 +142,14 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 		}
 		return purchasesdomain.Purchase{}, err
 	}
-	if current.Status != "draft" {
-		return purchasesdomain.Purchase{}, domainerr.BusinessRule("only draft purchases can be updated")
+	if current.DeletedAt != nil {
+		return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
 	}
 	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, BranchID: in.BranchID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, Notes: prepared.Notes, Items: prepared.Items})
+	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, IsFavorite: prepared.IsFavorite, Tags: prepared.Tags, Notes: prepared.Notes, Items: prepared.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
@@ -160,6 +172,9 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
 		}
 		return purchasesdomain.Purchase{}, err
+	}
+	if current.DeletedAt != nil {
+		return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
 	}
 	nextStatus, err := normalizePurchaseStatus(in.Status, "")
 	if err != nil {
@@ -186,6 +201,45 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
 	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.archived", "purchase", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.restored", "purchase", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("purchase", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.deleted", "purchase", id.String(), map[string]any{})
+	}
+	return nil
 }
 
 func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInput, error) {

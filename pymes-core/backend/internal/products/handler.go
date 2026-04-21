@@ -48,6 +48,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.DELETE(productsItemPath, rbac.RequirePermission("products", "delete"), h.Delete)
 	auth.POST(productsItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("products", "update"), h.Archive)
 	auth.POST(productsItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("products", "update"), h.Restore)
+	auth.DELETE(productsItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("products", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -137,6 +138,12 @@ func (h *Handler) Create(c *gin.Context) {
 		ImageURLs:   append([]string(nil), req.ImageURLs...),
 		TrackStock:  trackStock,
 		IsActive:    isActive,
+		IsFavorite: func() bool {
+			if req.IsFavorite == nil {
+				return false
+			}
+			return *req.IsFavorite
+		}(),
 		Tags:        req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
@@ -205,6 +212,7 @@ func (h *Handler) Update(c *gin.Context) {
 		ImageURLs:   req.ImageURLs,
 		TrackStock:  req.TrackStock,
 		IsActive:    req.IsActive,
+		IsFavorite:  req.IsFavorite,
 		Tags:        req.Tags,
 		Metadata:    req.Metadata,
 	}, a.Actor)
@@ -216,6 +224,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	h.Archive(c)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
@@ -288,6 +300,7 @@ func toProductItem(in productdomain.Product) dto.ProductItem {
 		ImageURL:    "",
 		TrackStock:  in.TrackStock,
 		IsActive:    in.IsActive,
+		IsFavorite:  in.IsFavorite,
 		Tags:        in.Tags,
 		Metadata:    in.Metadata,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),

@@ -1,6 +1,7 @@
 export * from './CrudArchivedSearchParamToggle';
 export * from './CrudActionDialog';
 export * from './CrudEntityEditorModal';
+export * from './CrudEntityImageField';
 export * from './CrudKanbanColumnCreateButton';
 export * from './CrudEntityMediaCarousel';
 export * from './CrudEntityModalShell';
@@ -17,6 +18,7 @@ export * from './CrudTableSurface';
 export * from './CrudToolbarActionButtons';
 export * from './CrudViewModeSwitch';
 export * from './CrudValueFilterSelector';
+export * from './crudStandardEntityFields';
 export * from './buildStandardCrudViewModes';
 export * from './crudLinkedEntityImageUrls';
 export * from './crudContextEntityParams';

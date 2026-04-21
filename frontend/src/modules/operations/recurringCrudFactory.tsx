@@ -51,7 +51,7 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
       { key: 'supplier_id', label: 'Supplier ID' },
       { key: 'next_due_date', label: 'Proximo vencimiento', type: 'date' },
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
       [row.description, row.category, row.payment_method, row.frequency, row.notes].filter(Boolean).join(' '),

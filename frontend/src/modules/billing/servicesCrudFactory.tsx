@@ -12,8 +12,7 @@ import {
   asOptionalString,
   asString,
 } from '../../crud/resourceConfigs.shared';
-import { formatPartyTagList, parsePartyTagCsv } from '../parties';
-import { buildStandardCrudViewModes } from '../crud';
+import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { currencyOptions, taxRateOptions } from '../../lib/formPresets';
 
@@ -29,6 +28,7 @@ export type ServiceRecord = {
   currency?: string;
   default_duration_minutes?: number | null;
   is_active: boolean;
+  is_favorite?: boolean;
   deleted_at?: string | null;
   tags?: string[];
 };
@@ -44,8 +44,9 @@ function serviceToBody(values: CrudFormValues): Record<string, unknown> {
     currency: asOptionalString(values.currency) ?? 'ARS',
     default_duration_minutes: asOptionalNumber(values.default_duration_minutes),
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-    tags: parsePartyTagCsv(values.tags),
-    description: asOptionalString(values.description),
+    is_favorite: asBoolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
+    description: asOptionalString(values.notes),
   };
 }
 
@@ -105,11 +106,10 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
           { label: 'Inactivo', value: 'false' },
         ],
       },
-      { key: 'tags', label: 'Etiquetas internas', placeholder: 'premium, online, recurrente' },
-      { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'premium, online, recurrente' }),
     ],
     searchText: (row) =>
-      [row.name, row.code, row.category_code, row.description, row.currency, formatPartyTagList(row.tags)].filter(Boolean).join(' '),
+      [row.name, row.code, row.category_code, row.description, row.currency, formatTagCsv(row.tags)].filter(Boolean).join(' '),
     toFormValues: (row) => ({
       name: row.name ?? '',
       code: row.code ?? '',
@@ -120,8 +120,9 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
       currency: row.currency ?? 'ARS',
       default_duration_minutes: row.default_duration_minutes?.toString() ?? '',
       is_active: row.is_active ? 'true' : 'false',
-      tags: formatPartyTagList(row.tags),
-      description: row.description ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
+      notes: row.description ?? '',
     }),
     toBody: serviceToBody,
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,

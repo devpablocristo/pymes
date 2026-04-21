@@ -15,6 +15,7 @@ import {
   normalizeArgentinaPhone,
   parseMetadataStringMap,
 } from '../../lib/formPresets';
+import { buildInternalNotesField, buildStandardInternalFields, parseTagCsv, formatTagCsv } from '../crud';
 
 export type PartyAddress = {
   street?: string;
@@ -32,6 +33,7 @@ export type PartyRecord = {
   email?: string;
   phone?: string;
   tax_id?: string;
+  is_favorite?: boolean;
   notes?: string;
   tags?: string[];
   address?: PartyAddress;
@@ -46,6 +48,7 @@ export type CustomerRecord = {
   tax_id?: string;
   email?: string;
   phone?: string;
+  is_favorite?: boolean;
   notes?: string;
   tags?: string[];
   address?: PartyAddress;
@@ -59,6 +62,7 @@ export type SupplierRecord = {
   email?: string;
   phone?: string;
   address?: PartyAddress;
+  is_favorite?: boolean;
   notes?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -72,17 +76,16 @@ export type AccountRecord = {
   balance?: number;
   currency?: string;
   credit_limit?: number;
+  notes?: string;
+  description?: string;
 };
 
 export function parsePartyTagCsv(value: CrudFieldValue | undefined): string[] {
-  return asString(value)
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+  return parseTagCsv(value);
 }
 
 export function formatPartyTagList(tags?: string[]): string {
-  return (tags ?? []).join(', ');
+  return formatTagCsv(tags);
 }
 
 export function formatPartyAddress(address?: PartyAddress): string {
@@ -114,6 +117,7 @@ export function buildCustomerFormValues(row: CustomerRecord) {
     tax_id: row.tax_id ?? '',
     email: row.email ?? '',
     phone: row.phone ?? '',
+    is_favorite: row.is_favorite ?? false,
     tags: formatPartyTagList(row.tags),
     address_street: row.address?.street ?? '',
     address_city: row.address?.city ?? '',
@@ -131,6 +135,7 @@ export function customerFormToBody(values: CrudFormValues): Record<string, unkno
     tax_id: asOptionalString(values.tax_id),
     email: asOptionalString(values.email),
     phone: normalizeArgentinaPhone(asString(values.phone)),
+    is_favorite: asBoolean(values.is_favorite),
     notes: asOptionalString(values.notes),
     tags: parsePartyTagCsv(values.tags),
     address: {
@@ -169,6 +174,7 @@ export function buildSupplierFormValues(row: SupplierRecord) {
     tax_id: row.tax_id ?? '',
     email: row.email ?? '',
     phone: row.phone ?? '',
+    is_favorite: row.is_favorite ?? false,
     address_city: row.address?.city ?? '',
     address_state: row.address?.state ?? '',
     address_country: row.address?.country ?? '',
@@ -185,6 +191,7 @@ export function supplierFormToBody(values: CrudFormValues): Record<string, unkno
     tax_id: asOptionalString(values.tax_id),
     email: asOptionalString(values.email),
     phone: normalizeArgentinaPhone(asString(values.phone)),
+    is_favorite: asBoolean(values.is_favorite),
     address: {
       city: asString(values.address_city),
       state: asString(values.address_state),
@@ -208,7 +215,7 @@ export function createCustomerColumns<T extends CustomerRecord>(): CrudColumn<T>
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
     { key: 'tags', header: 'Etiquetas internas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
     { key: 'address', header: 'Dirección', render: (_v, row) => formatPartyAddress(row.address) || '—' },
-    { key: 'notes', header: 'Notas', className: 'cell-notes' },
+    { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
   ];
 }
 
@@ -234,12 +241,12 @@ export function customerFormFields(label = 'cliente'): CrudFormField[] {
       type: 'select',
       options: customerGenderOptions,
     },
-    { key: 'tags', label: 'Etiquetas internas', placeholder: 'vip, mayorista, mora' },
+    ...buildStandardInternalFields({ tagsPlaceholder: 'vip, mayorista, mora', includeNotes: false }),
     { key: 'address_street', label: 'Calle', fullWidth: true, placeholder: 'Direccion principal' },
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad' },
     { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
     { key: 'address_country', label: 'País', type: 'select', options: countryOptions },
-    { key: 'notes', label: 'Notas', type: 'textarea', placeholder: 'Notas internas...', fullWidth: true },
+    buildInternalNotesField(),
   ];
 }
 
@@ -272,8 +279,7 @@ export function supplierFormFields(): CrudFormField[] {
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad principal' },
     { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
     { key: 'address_country', label: 'País', type: 'select', options: countryOptions },
-    { key: 'tags', label: 'Etiquetas internas', placeholder: 'importado, insumos, logistico' },
-    { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
+    ...buildStandardInternalFields({ tagsPlaceholder: 'importado, insumos, logistico' }),
   ];
 }
 
@@ -298,6 +304,7 @@ export function partyFormToBody(values: CrudFormValues): Record<string, unknown>
     email: asOptionalString(values.email),
     phone: asOptionalString(values.phone),
     tax_id: asOptionalString(values.tax_id),
+    is_favorite: asBoolean(values.is_favorite),
     notes: asOptionalString(values.notes),
     tags: parsePartyTagCsv(values.tags),
     address: {},
@@ -353,6 +360,7 @@ export function buildPartyFormValues(row: PartyRecord) {
     email: row.email ?? '',
     phone: row.phone ?? '',
     tax_id: row.tax_id ?? '',
+    is_favorite: row.is_favorite ?? false,
     tags: formatPartyTagList(row.tags),
     person_first_name: row.person?.first_name ?? '',
     person_last_name: row.person?.last_name ?? '',
@@ -375,7 +383,7 @@ export function createPartyColumns<T extends PartyRecord>(header = 'Entidad'): C
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
     { key: 'roles', header: 'Roles', render: (_v, row) => formatActivePartyRoles(row.roles) || '—' },
-    { key: 'notes', header: 'Notas', className: 'cell-notes' },
+    { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
   ];
 }
 
@@ -395,13 +403,13 @@ export const partyFormFields: CrudFormField[] = [
   { key: 'email', label: 'Email', type: 'email' as const },
   { key: 'phone', label: 'Teléfono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Etiquetas internas', placeholder: 'cliente, proveedor' },
+  ...buildStandardInternalFields({ tagsPlaceholder: 'cliente, proveedor', includeNotes: false }),
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
   { key: 'org_trade_name', label: 'Nombre comercial' },
   { key: 'org_tax_condition', label: 'Condicion fiscal' },
-  { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true },
+  buildInternalNotesField(),
 ];
 
 export function employeePartyFormFields(): CrudFormField[] {
@@ -416,7 +424,7 @@ export const accountFormFields = [
   { key: 'amount', label: 'Ajuste inicial', type: 'number' as const, required: true, placeholder: '0.00' },
   { key: 'currency', label: 'Moneda', placeholder: 'ARS' },
   { key: 'credit_limit', label: 'Límite de crédito', type: 'number' as const, placeholder: '0.00' },
-  { key: 'description', label: 'Descripción', type: 'textarea' as const, fullWidth: true },
+  buildInternalNotesField(),
 ];
 
 export function buildAccountSearchText(row: AccountRecord): string {
@@ -432,7 +440,7 @@ export function buildAccountFormValues(row: AccountRecord) {
     amount: '0',
     currency: row.currency ?? 'ARS',
     credit_limit: row.credit_limit?.toString() ?? '0',
-    description: '',
+    notes: row.notes ?? row.description ?? '',
   };
 }
 
@@ -458,7 +466,7 @@ export function accountFormToBody(values: CrudFormValues): Record<string, unknow
     amount: asNumber(values.amount),
     currency: asOptionalString(values.currency) ?? 'ARS',
     credit_limit: asOptionalNumber(values.credit_limit),
-    description: asOptionalString(values.description),
+    description: asOptionalString(values.notes),
   };
 }
 

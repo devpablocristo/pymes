@@ -24,6 +24,7 @@ type Supplier struct {
 	Address     Address
 	ContactName string
 	Notes       string
+	IsFavorite  bool
 	Tags        []string
 	Metadata    map[string]any
 	CreatedAt   time.Time

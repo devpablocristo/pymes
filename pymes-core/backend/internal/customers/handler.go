@@ -107,6 +107,12 @@ func (h *Handler) Create(c *gin.Context) {
 		Phone:   req.Phone,
 		Address: toDomainAddress(req.Address),
 		Notes:   req.Notes,
+		IsFavorite: func() bool {
+			if req.IsFavorite == nil {
+				return false
+			}
+			return *req.IsFavorite
+		}(),
 		Tags:    req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
@@ -172,6 +178,7 @@ func (h *Handler) Update(c *gin.Context) {
 		Phone:    req.Phone,
 		Address:  addr,
 		Notes:    req.Notes,
+		IsFavorite: req.IsFavorite,
 		Tags:     req.Tags,
 		Metadata: req.Metadata,
 	}, a.Actor)
@@ -307,6 +314,7 @@ func toCustomerItem(in customerdomain.Customer) dto.CustomerItem {
 			Country: in.Address.Country,
 		},
 		Notes:     in.Notes,
+		IsFavorite: in.IsFavorite,
 		Tags:      in.Tags,
 		Metadata:  in.Metadata,
 		CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339),

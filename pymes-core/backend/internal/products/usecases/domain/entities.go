@@ -21,6 +21,7 @@ type Product struct {
 	ImageURLs   []string
 	TrackStock  bool
 	IsActive    bool
+	IsFavorite  bool
 	Tags        []string
 	Metadata    map[string]any
 	CreatedAt   time.Time

@@ -23,6 +23,7 @@ type ProductModel struct {
 	ImageURLs   pq.StringArray `gorm:"type:text[];column:image_urls;not null;default:'{}'"`
 	TrackStock  bool
 	IsActive    bool           `gorm:"column:is_active;not null"`
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
 	Tags        pq.StringArray `gorm:"type:text[]"`
 	Metadata    []byte         `gorm:"type:jsonb"`
 	CreatedAt   time.Time

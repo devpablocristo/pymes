@@ -62,5 +62,5 @@ export function formatCrudLinkedEntityImageUrlsToForm(
   legacySingle?: string,
 ): string {
   const list = urls?.length ? urls : legacySingle?.trim() ? [legacySingle.trim()] : [];
-  return list.join('\n');
+  return normalizeCrudImageUrlParts(list).join('\n');
 }

@@ -122,7 +122,7 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           { label: 'Limpieza', value: 'cleaning' },
         ],
       },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: RestaurantDiningTable) => [row.code, row.label, row.notes].filter(Boolean).join(' '),
     toFormValues: (row: RestaurantDiningTable) => ({

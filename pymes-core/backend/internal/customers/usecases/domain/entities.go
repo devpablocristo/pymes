@@ -24,6 +24,7 @@ type Customer struct {
 	Phone     string
 	Address   Address
 	Notes     string
+	IsFavorite bool
 	Tags      []string
 	Metadata  map[string]any
 	CreatedAt time.Time

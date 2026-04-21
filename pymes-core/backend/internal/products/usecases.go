@@ -99,6 +99,7 @@ type UpdateInput struct {
 	ImageURLs   *[]string
 	TrackStock  *bool
 	IsActive    *bool
+	IsFavorite  *bool
 	Tags        *[]string
 	Metadata    *map[string]any
 }
@@ -157,6 +158,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
 	}
 	if in.Tags != nil {
 		current.Tags = append([]string(nil), (*in.Tags)...)

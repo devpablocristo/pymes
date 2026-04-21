@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/repository/models"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
 )
@@ -36,7 +38,27 @@ func normalizeBranchID(branchID *uuid.UUID) *uuid.UUID {
 
 func (r *Repository) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ?", orgID)
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NULL", orgID)
+	if branchID != nil && *branchID != uuid.Nil {
+		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
+	}
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
+	var rows []models.PurchaseModel
+	if err := q.Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]purchasesdomain.Purchase, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomain(row, nil))
+	}
+	return out, nil
+}
+
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	q := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND deleted_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -63,7 +85,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 		}
 		number := fmt.Sprintf("%s-%05d", tenant.PurchasePrefix, tenant.NextPurchaseNumber)
 		subtotal, taxTotal, total := totals(in.Items)
-		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 		if err := tx.Create(&purchaseRow).Error; err != nil {
 			return err
 		}
@@ -114,6 +136,45 @@ func (r *Repository) getByIDWithDB(ctx context.Context, db *gorm.DB, orgID, id u
 	return toDomain(row, items), nil
 }
 
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Delete(&models.PurchaseModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error) {
 	var out purchasesdomain.Purchase
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -128,7 +189,7 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 			}
 		}
 		subtotal, taxTotal, total := totals(in.Items)
-		updates := map[string]any{"party_id": in.SupplierID, "party_name": in.SupplierName, "branch_id": in.BranchID, "status": in.Status, "payment_status": in.PaymentStatus, "subtotal": subtotal, "tax_total": taxTotal, "total": total, "notes": in.Notes, "updated_at": time.Now().UTC()}
+		updates := map[string]any{"party_id": in.SupplierID, "party_name": in.SupplierName, "branch_id": in.BranchID, "status": in.Status, "payment_status": in.PaymentStatus, "subtotal": subtotal, "tax_total": taxTotal, "total": total, "is_favorite": in.IsFavorite, "tags": pq.StringArray(utils.NormalizeTags(in.Tags)), "notes": in.Notes, "updated_at": time.Now().UTC()}
 		if in.Status == "received" && current.ReceivedAt == nil {
 			updates["received_at"] = time.Now().UTC()
 		}
@@ -403,7 +464,7 @@ func totals(items []purchasesdomain.PurchaseItem) (float64, float64, float64) {
 }
 
 func toDomain(row models.PurchaseModel, items []models.PurchaseItemModel) purchasesdomain.Purchase {
-	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, DeletedAt: row.DeletedAt}
 	for _, item := range items {
 		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 	}

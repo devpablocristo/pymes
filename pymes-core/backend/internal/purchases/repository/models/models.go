@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type PurchaseModel struct {
@@ -19,11 +20,14 @@ type PurchaseModel struct {
 	TaxTotal      float64
 	Total         float64
 	Currency      string
+	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
+	Tags          pq.StringArray `gorm:"type:text[]"`
 	Notes         string
 	ReceivedAt    *time.Time
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	DeletedAt     *time.Time
 }
 
 func (PurchaseModel) TableName() string { return "purchases" }

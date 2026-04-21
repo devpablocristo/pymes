@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
 import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
-import { buildStandardCrudViewModes } from '../../modules/crud';
+import { CrudEntityImageField, buildStandardCrudViewModes, formatCrudLinkedEntityImageUrlsToForm, parseCrudLinkedEntityImageUrlList } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
   asOptionalString,
   asString,
 } from '../../crud/resourceConfigs.shared';
-import { formatPartyTagList, parsePartyTagCsv } from '../parties';
+import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import {
   asCrudString,
   parseMetadataStringMap,
@@ -29,6 +28,7 @@ export type ProductRecord = {
   image_urls?: string[];
   track_stock: boolean;
   is_active: boolean;
+  is_favorite?: boolean;
   deleted_at?: string | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -45,195 +45,12 @@ export type StockRecord = {
   updated_at: string;
 };
 
-function normalizeProductImageEntries(values: string[] | undefined, legacySingle?: string): string[] {
-  const source = values?.length ? values : legacySingle?.trim() ? [legacySingle.trim()] : [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  let lastDataPrefix = '';
-  for (let index = 0; index < source.length; index += 1) {
-    let current = String(source[index] ?? '').trim();
-    if (!current) continue;
-    if (current.startsWith('data:image/') && !current.includes(',')) {
-      const next = String(source[index + 1] ?? '').trim();
-      if (next) {
-        current = `${current},${next}`;
-        index += 1;
-      }
-    }
-    if (current.startsWith('data:image/')) {
-      const commaIndex = current.indexOf(',');
-      if (commaIndex > 0) {
-        lastDataPrefix = current.slice(0, commaIndex + 1);
-      }
-    } else if (looksLikeProductImageBase64(current)) {
-      const prefix = lastDataPrefix || inferProductImageDataPrefix(current);
-      if (prefix) current = `${prefix}${current}`;
-    }
-    if (seen.has(current)) continue;
-    seen.add(current);
-    out.push(current);
-  }
-  return out;
-}
-
-function inferProductImageDataPrefix(raw: string): string {
-  const trimmed = String(raw ?? '').trim();
-  if (trimmed.startsWith('/9j/')) return 'data:image/jpeg;base64,';
-  if (trimmed.startsWith('iVBOR')) return 'data:image/png;base64,';
-  if (trimmed.startsWith('R0lGOD')) return 'data:image/gif;base64,';
-  if (trimmed.startsWith('UklGR')) return 'data:image/webp;base64,';
-  return '';
-}
-
-function looksLikeProductImageBase64(raw: string): boolean {
-  const trimmed = String(raw ?? '').trim();
-  if (trimmed.length < 8 || inferProductImageDataPrefix(trimmed) === '') return false;
-  return /^[A-Za-z0-9+/=]+$/.test(trimmed);
-}
-
 function formatProductImagesForEditor(values: string[] | undefined, legacySingle?: string): string {
-  return normalizeProductImageEntries(values, legacySingle).join('\n');
+  return formatCrudLinkedEntityImageUrlsToForm(values, legacySingle);
 }
 
 function parseProductImagesFromEditor(value: CrudFieldValue | undefined): string[] {
-  return asCrudString(value)
-    .split('\n')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function ProductImagesField({
-  value,
-  setValue,
-  readOnly = false,
-}: {
-  value: CrudFieldValue | undefined;
-  setValue: (nextValue: string) => void;
-  readOnly?: boolean;
-}) {
-  const images = useMemo(
-    () =>
-      asCrudString(value)
-        .split('\n')
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    [value],
-  );
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  useEffect(() => {
-    if (!images.length) {
-      setSelectedIndex(0);
-      return;
-    }
-    if (selectedIndex > images.length - 1) {
-      setSelectedIndex(images.length - 1);
-    }
-  }, [images, selectedIndex]);
-
-  const selectedImage = images[selectedIndex] ?? '';
-  const removeImage = (indexToRemove: number) => {
-    const nextImages = images.filter((_, index) => index !== indexToRemove);
-    setValue(nextImages.join('\n'));
-    setSelectedIndex((current) => {
-      if (!nextImages.length) return 0;
-      if (current > indexToRemove) return current - 1;
-      return Math.min(current, nextImages.length - 1);
-    });
-  };
-
-  return (
-    <div className="crud-inline-upload">
-      <input
-        id="product-images-upload-input"
-        className="crud-inline-upload__input"
-        type="file"
-        accept="image/*"
-        multiple
-        disabled={readOnly}
-        onChange={async (event) => {
-          const files = Array.from(event.target.files ?? []);
-          if (!files.length) return;
-          try {
-            const encoded = await Promise.all(
-              files.map(
-                (file) =>
-                  new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(String(reader.result ?? ''));
-                    reader.onerror = () => reject(reader.error ?? new Error('upload_failed'));
-                    reader.readAsDataURL(file);
-                  }),
-              ),
-            );
-            const nextImages = [...images, ...encoded];
-            setValue(nextImages.join('\n'));
-            setSelectedIndex(images.length);
-          } finally {
-            event.currentTarget.value = '';
-          }
-        }}
-      />
-      {!readOnly ? (
-        <label htmlFor="product-images-upload-input" className="crud-inline-upload__button">
-          Subir imágenes desde la computadora
-        </label>
-      ) : null}
-      {selectedImage ? (
-        <div className="crud-inline-upload__preview">
-          <div className="crud-inline-upload__hero">
-            {images.length > 1 ? (
-              <button
-                type="button"
-                className="crud-inline-upload__nav crud-inline-upload__nav--prev"
-                onClick={() => setSelectedIndex((current) => (current - 1 + images.length) % images.length)}
-                aria-label="Imagen anterior"
-              >
-                ←
-              </button>
-            ) : null}
-            <img src={selectedImage} alt={`Imagen ${selectedIndex + 1}`} />
-            {images.length > 1 ? (
-              <button
-                type="button"
-                className="crud-inline-upload__nav crud-inline-upload__nav--next"
-                onClick={() => setSelectedIndex((current) => (current + 1) % images.length)}
-                aria-label="Imagen siguiente"
-              >
-                →
-              </button>
-            ) : null}
-          </div>
-          <div className="crud-inline-upload__thumbs">
-            {images.map((image, index) => (
-              <div
-                key={`${image}-${index}`}
-                className={`crud-inline-upload__thumb-wrap${index === selectedIndex ? ' crud-inline-upload__thumb-wrap--active' : ''}`}
-              >
-                <button
-                  type="button"
-                  className={`crud-inline-upload__thumb${index === selectedIndex ? ' crud-inline-upload__thumb--active' : ''}`}
-                  onClick={() => setSelectedIndex(index)}
-                >
-                  <img src={image} alt={`Miniatura ${index + 1}`} />
-                </button>
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    className="crud-inline-upload__remove"
-                    onClick={() => removeImage(index)}
-                    aria-label={`Eliminar imagen ${index + 1}`}
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+  return parseCrudLinkedEntityImageUrlList(asCrudString(value));
 }
 
 export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[] {
@@ -282,8 +99,7 @@ export function productFormFields(): CrudFormField[] {
         { label: 'Inactivo', value: 'false' },
       ],
     },
-    { key: 'tags', label: 'Etiquetas internas', placeholder: 'nuevo, combo, premium' },
-    { key: 'description', label: 'Descripcion', type: 'textarea', rows: 3, fullWidth: true },
+    ...buildStandardInternalFields({ tagsPlaceholder: 'nuevo, combo, premium' }),
   ];
 }
 
@@ -294,7 +110,7 @@ export function buildProductSearchText(row: ProductRecord): string {
     row.description,
     row.unit,
     row.currency,
-    formatPartyTagList(row.tags),
+    formatTagCsv(row.tags),
     typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
     typeof row.metadata?.category === 'string' ? row.metadata.category : '',
   ]
@@ -313,9 +129,10 @@ export function buildProductFormValues(row: ProductRecord) {
     tax_rate: row.tax_rate?.toString() ?? '',
     track_stock: row.track_stock ?? true,
     is_active: row.is_active ? 'true' : 'false',
-    tags: formatPartyTagList(row.tags),
+    is_favorite: row.is_favorite ?? false,
+    tags: formatTagCsv(row.tags),
     image_urls: formatProductImagesForEditor(row.image_urls, row.image_url),
-    description: row.description ?? '',
+    notes: row.description ?? '',
     metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     metadata_kind: typeof row.metadata?.kind === 'string' ? row.metadata.kind : 'simple',
     metadata_barcode: typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
@@ -335,9 +152,10 @@ export function productFormToBody(values: CrudFormValues): Record<string, unknow
     cost_price: 0,
     track_stock: asBoolean(values.track_stock),
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-    tags: parsePartyTagCsv(values.tags),
+    is_favorite: asBoolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
     image_urls: parseProductImagesFromEditor(values.image_urls),
-    description: asOptionalString(values.description),
+    description: asOptionalString(values.notes),
     metadata: parseMetadataStringMap(undefined, {
       category: asOptionalString(values.metadata_category),
       barcode: asOptionalString(values.metadata_barcode),
@@ -390,27 +208,10 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
       fieldConfig: {
         image_urls: {
           readValue: ({ value }) => (
-            <ProductImagesField
-              value={normalizeProductImageEntries(
-                asCrudString(value)
-                  .split('\n')
-                  .map((entry) => entry.trim())
-                  .filter(Boolean),
-              ).join('\n')}
-              setValue={() => {}}
-              readOnly
-            />
+            <CrudEntityImageField value={value} setValue={() => {}} readOnly />
           ),
           editControl: ({ value, setValue }) => (
-            <ProductImagesField
-              value={normalizeProductImageEntries(
-                asCrudString(value)
-                  .split('\n')
-                  .map((entry) => entry.trim())
-                  .filter(Boolean),
-              ).join('\n')}
-              setValue={(next) => setValue(next)}
-            />
+            <CrudEntityImageField value={value} setValue={(next) => setValue(next)} />
           ),
         },
       },

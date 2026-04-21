@@ -7,13 +7,17 @@ import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
+  buildStandardInternalFields,
   buildFullyConnectedStatusStateMachine,
   buildStandardCrudViewModes,
+  formatTagCsv,
   formatCrudLocalizedMoney,
   hasReadableCrudValue,
   openCrudFormDialog,
   openCrudTextDialog,
+  parseTagCsv,
 } from '../crud';
+import { renderTagBadges } from '../../crud/crudTagBadges';
 import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   INVOICE_STATUS_LABELS,
@@ -120,11 +124,13 @@ export type PurchaseRecord = {
   currency?: string;
   notes?: string;
   received_at?: string;
+  is_favorite?: boolean;
+  tags?: string[];
   items?: CommercialCostLineItem[];
 };
 
 function buildCrudNotesField() {
-  return { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true };
+  return { key: 'notes', label: 'Notas internas', type: 'textarea' as const, fullWidth: true };
 }
 
 function buildCrudNameField(
@@ -491,7 +497,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
       { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '—' },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
   });
   return {
@@ -600,7 +606,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_method', header: 'Cobro', render: (value) => formatPaymentMethodLabel(value) },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
   });
 
@@ -616,7 +622,6 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         { id: 'default' },
         { id: 'items' },
       ],
-      canEdit: () => false,
       fieldConfig: {
         customer_id: { hidden: true },
         quote_id: { hidden: true },
@@ -700,7 +705,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
               },
               {
                 id: 'notes',
-                label: 'Notas',
+                label: 'Notas internas',
                 type: 'textarea',
                 rows: 3,
                 placeholder: 'Opcional',
@@ -896,18 +901,38 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_status', header: 'Pago' },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
   });
   return {
     basePath: '/v1/purchases',
+    allowEdit: true,
     allowDelete: false,
     ...base.config,
+    renderTagsCell: (row) => renderTagBadges(row.tags),
+    dataSource: {
+      ...(base.config.dataSource ?? {}),
+      update: async (row, values) => {
+        await apiRequest<TRecord>(`/v1/purchases/${row.id}`, {
+          method: 'PUT',
+          body: {
+            branch_id: readActiveBranchId() ?? undefined,
+            supplier_id: asOptionalString(values.supplier_id),
+            supplier_name: asString(values.supplier_name),
+            status: asOptionalString(values.status),
+            payment_status: asOptionalString(values.payment_status),
+            is_favorite: Boolean(values.is_favorite),
+            tags: parseTagCsv(values.tags),
+            items: parseCommercialCostLineItems(values.items),
+            notes: asOptionalString(values.notes),
+          },
+        });
+      },
+    },
     stateMachine,
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
-      canEdit: (row) => String(row.status ?? '').trim().toLowerCase() === 'draft',
       blocks: [
         {
           id: 'items',
@@ -985,6 +1010,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       },
       { key: 'total', label: 'Total' },
       { key: 'received_at', label: 'Fecha de recepción' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'insumos, urgente, importado', includeNotes: false }),
       buildCrudNotesField(),
     ],
     toFormValues: (row: TRecord) => ({
@@ -994,6 +1020,8 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       payment_status: row.payment_status ?? '',
       total: formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
       received_at: row.received_at ? formatDate(row.received_at) : '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),
@@ -1003,6 +1031,8 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),
       payment_status: asOptionalString(values.payment_status),
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       items: parseCommercialCostLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),

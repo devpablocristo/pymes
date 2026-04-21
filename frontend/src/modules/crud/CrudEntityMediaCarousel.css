@@ -83,6 +83,11 @@
   background: var(--color-surface);
 }
 
+.crud-entity-media-carousel__thumb-item {
+  position: relative;
+  flex: 0 0 auto;
+}
+
 .crud-entity-media-carousel__thumb--active {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 42%, transparent);
@@ -93,4 +98,23 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.crud-entity-media-carousel__thumb-remove {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 85%, transparent);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.crud-entity-media-carousel__thumb-remove:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }

@@ -18,6 +18,7 @@ type SupplierItem struct {
 	Address     Address        `json:"address"`
 	ContactName string         `json:"contact_name"`
 	Notes       string         `json:"notes"`
+	IsFavorite  bool           `json:"is_favorite"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 	CreatedAt   string         `json:"created_at"`
@@ -41,6 +42,7 @@ type CreateSupplierRequest struct {
 	Address     Address        `json:"address"`
 	ContactName string         `json:"contact_name"`
 	Notes       string         `json:"notes"`
+	IsFavorite  *bool          `json:"is_favorite"`
 	Tags        []string       `json:"tags"`
 	Metadata    map[string]any `json:"metadata"`
 }
@@ -53,6 +55,7 @@ type UpdateSupplierRequest struct {
 	Address     *Address        `json:"address"`
 	ContactName *string         `json:"contact_name"`
 	Notes       *string         `json:"notes"`
+	IsFavorite  *bool           `json:"is_favorite"`
 	Tags        *[]string       `json:"tags"`
 	Metadata    *map[string]any `json:"metadata"`
 }

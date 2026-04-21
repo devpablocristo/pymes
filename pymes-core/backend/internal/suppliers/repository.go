@@ -40,6 +40,7 @@ type supplierPartyRow struct {
 	Address     []byte `gorm:"column:address"`
 	TaxID       string `gorm:"column:tax_id"`
 	Notes       string
+	IsFavorite  bool           `gorm:"column:is_favorite"`
 	Tags        pq.StringArray `gorm:"type:text[];column:tags"`
 	Metadata    []byte         `gorm:"column:metadata"`
 	CreatedAt   time.Time      `gorm:"column:created_at"`
@@ -113,6 +114,7 @@ func (r *Repository) Create(ctx context.Context, in supplierdomain.Supplier) (su
 			"address":      addr,
 			"tax_id":       strings.TrimSpace(in.TaxID),
 			"notes":        strings.TrimSpace(in.Notes),
+			"is_favorite":  in.IsFavorite,
 			"tags":         pq.StringArray(utils.NormalizeTags(in.Tags)),
 			"metadata":     meta,
 			"created_at":   time.Now().UTC(),
@@ -173,6 +175,7 @@ func (r *Repository) Update(ctx context.Context, in supplierdomain.Supplier) (su
 				"address":      addr,
 				"tax_id":       strings.TrimSpace(in.TaxID),
 				"notes":        strings.TrimSpace(in.Notes),
+				"is_favorite":  in.IsFavorite,
 				"tags":         pq.StringArray(utils.NormalizeTags(in.Tags)),
 				"metadata":     meta,
 				"updated_at":   time.Now().UTC(),
@@ -234,6 +237,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]suppl
 			p.address,
 			p.tax_id,
 			p.notes,
+			p.is_favorite,
 			p.tags,
 			p.metadata,
 			p.created_at,
@@ -334,6 +338,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			p.address,
 			p.tax_id,
 			p.notes,
+			p.is_favorite,
 			p.tags,
 			p.metadata,
 			p.created_at,
@@ -365,6 +370,7 @@ func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {
 		Address:     addr,
 		ContactName: row.ContactName,
 		Notes:       row.Notes,
+		IsFavorite:  row.IsFavorite,
 		Tags:        append([]string(nil), row.Tags...),
 		Metadata:    meta,
 		CreatedAt:   row.CreatedAt,

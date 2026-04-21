@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { CrudActionDialog, type CrudActionDialogField } from './CrudActionDialog';
 import type { CrudEntityEditorModalBlock, CrudEntityEditorModalSection, CrudEntityEditorModalStat } from './CrudEntityEditorModal';
@@ -66,6 +66,7 @@ type CrudFormDialogOptions = {
     };
     onDelete: () => Promise<void> | void;
   };
+  onSubmit?: (values: Record<string, CrudFieldValue>) => Promise<void> | void;
 };
 
 type CrudTextDialogOptions = {
@@ -92,69 +93,93 @@ function withCrudActionDialog<T>(render: (finish: (result: T) => void) => import
 }
 
 export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Record<string, CrudFieldValue> | null> {
-  return withCrudActionDialog<Record<string, CrudFieldValue> | null>((finish) => (
-    <CrudActionDialog
-      mode="form"
-      title={options.title}
-      subtitle={options.subtitle}
-      eyebrow={options.eyebrow}
-      mediaUrls={options.mediaUrls}
-      mediaFieldId={options.mediaFieldId}
-      dialogMode={options.dialogMode}
-      allowEdit={options.allowEdit}
-      fields={options.fields}
-      blocks={options.blocks}
-      sections={options.sections}
-      stats={options.stats}
-      initialValues={options.initialValues}
-      row={options.row}
-      error={options.error}
-      loading={options.loading}
-      loadingLabel={options.loadingLabel}
-      disableSubmit={options.disableSubmit}
-      editLabel={options.editLabel}
-      cancelEditLabel={options.cancelEditLabel}
-      closeLabel={options.closeLabel}
-      confirmDiscard={options.confirmDiscard}
-      archiveAction={
-        options.archiveAction
-          ? {
-              ...options.archiveAction,
-              onArchive: async () => {
-                await options.archiveAction?.onArchive();
-                finish(null);
-              },
-            }
-          : undefined
-      }
-      restoreAction={
-        options.restoreAction
-          ? {
-              ...options.restoreAction,
-              onRestore: async () => {
-                await options.restoreAction?.onRestore();
-                finish(null);
-              },
-            }
-          : undefined
-      }
-      deleteAction={
-        options.deleteAction
-          ? {
-              ...options.deleteAction,
-              onDelete: async () => {
-                await options.deleteAction?.onDelete();
-                finish(null);
-              },
-            }
-          : undefined
-      }
-      submitLabel={options.submitLabel}
-      cancelLabel={options.cancelLabel}
-      onCancel={() => finish(null)}
-      onSubmit={(values) => finish(values)}
-    />
-  ));
+  function CrudFormDialogController({ finish }: { finish: (result: Record<string, CrudFieldValue> | null) => void }) {
+    const [initialValues, setInitialValues] = useState<Record<string, CrudFieldValue> | undefined>(options.initialValues);
+    const [loading, setLoading] = useState(Boolean(options.loading));
+    const [error, setError] = useState<string | undefined>(options.error);
+
+    return (
+      <CrudActionDialog
+        mode="form"
+        title={options.title}
+        subtitle={options.subtitle}
+        eyebrow={options.eyebrow}
+        mediaUrls={options.mediaUrls}
+        mediaFieldId={options.mediaFieldId}
+        dialogMode={options.dialogMode}
+        allowEdit={options.allowEdit}
+        fields={options.fields}
+        blocks={options.blocks}
+        sections={options.sections}
+        stats={options.stats}
+        initialValues={initialValues}
+        row={options.row}
+        error={error}
+        loading={loading}
+        loadingLabel={options.loadingLabel}
+        disableSubmit={options.disableSubmit}
+        editLabel={options.editLabel}
+        cancelEditLabel={options.cancelEditLabel}
+        closeLabel={options.closeLabel}
+        confirmDiscard={options.confirmDiscard}
+        archiveAction={
+          options.archiveAction
+            ? {
+                ...options.archiveAction,
+                onArchive: async () => {
+                  await options.archiveAction?.onArchive();
+                  finish(null);
+                },
+              }
+            : undefined
+        }
+        restoreAction={
+          options.restoreAction
+            ? {
+                ...options.restoreAction,
+                onRestore: async () => {
+                  await options.restoreAction?.onRestore();
+                  finish(null);
+                },
+              }
+            : undefined
+        }
+        deleteAction={
+          options.deleteAction
+            ? {
+                ...options.deleteAction,
+                onDelete: async () => {
+                  await options.deleteAction?.onDelete();
+                  finish(null);
+                },
+              }
+            : undefined
+        }
+        submitLabel={options.submitLabel}
+        cancelLabel={options.cancelLabel}
+        onCancel={() => finish(null)}
+        onSubmit={async (values) => {
+          if (!options.onSubmit) {
+            finish(values);
+            return;
+          }
+          setLoading(true);
+          setError(undefined);
+          try {
+            await options.onSubmit(values);
+            setInitialValues(values);
+          } catch (submitError) {
+            setError(submitError instanceof Error ? submitError.message : 'No se pudo guardar.');
+            throw submitError;
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return withCrudActionDialog<Record<string, CrudFieldValue> | null>((finish) => <CrudFormDialogController finish={finish} />);
 }
 
 export function openCrudTextDialog(options: CrudTextDialogOptions): Promise<void> {

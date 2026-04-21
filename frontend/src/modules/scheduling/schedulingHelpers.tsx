@@ -16,7 +16,7 @@ import {
   updateTeacherSpecialty,
 } from '../../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../../lib/teachersTypes';
-import { openCrudFormDialog } from '../crud';
+import { buildInternalNotesField, openCrudFormDialog } from '../crud';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from '../../crud/resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
@@ -152,7 +152,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
         await createTeacherSpecialty({
           code: asString(values.code),
           name: asString(values.name),
-          description: asString(values.description),
+          description: asString(values.notes),
           is_active: asBoolean(values.is_active),
         });
       },
@@ -160,7 +160,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
         await updateTeacherSpecialty(row.id, {
           code: asOptionalString(values.code),
           name: asOptionalString(values.name),
-          description: asOptionalString(values.description),
+          description: asOptionalString(values.notes),
           is_active: asBoolean(values.is_active),
         });
       },
@@ -178,7 +178,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
     formFields: [
       { key: 'code', label: 'Codigo', required: true, placeholder: 'PSY' },
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Psicologia' },
-      { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
+      buildInternalNotesField(),
       { key: 'is_active', label: 'Activa', type: 'checkbox' },
     ],
     rowActions: [
@@ -195,7 +195,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
     toFormValues: (row: TeacherSpecialty) => ({
       code: row.code ?? '',
       name: row.name ?? '',
-      description: row.description ?? '',
+      notes: row.description ?? '',
       is_active: row.is_active ?? true,
     }),
     isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
@@ -228,11 +228,11 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
         render: (value) => renderSchedulingStatusBadge(value),
       },
       { key: 'created_at', header: 'Creado', render: (value) => formatDate(String(value ?? '')) },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
     formFields: [
       { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
       {

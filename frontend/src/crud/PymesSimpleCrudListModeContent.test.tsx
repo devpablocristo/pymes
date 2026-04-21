@@ -10,6 +10,7 @@ const { openCrudFormDialogMock, headerPropsSpy } = vi.hoisted(() => ({
   headerPropsSpy: vi.fn(),
 }));
 let archivedState = false;
+let mockGalleryItem: Record<string, unknown> = { id: '1', name: 'Cliente Uno' };
 
 vi.mock('../lib/i18n', () => ({
   useI18n: () => ({
@@ -49,7 +50,7 @@ vi.mock('../modules/crud', () => ({
   useCrudRemoteGalleryPage: () => ({
     items: archivedState
       ? [{ id: '1', name: 'Cliente Uno', deleted_at: '2026-04-19T11:00:00Z' }]
-      : [{ id: '1', name: 'Cliente Uno' }],
+      : [mockGalleryItem],
     setItems: vi.fn(),
     loading: false,
     error: null,
@@ -84,8 +85,15 @@ vi.mock('../modules/crud', () => ({
       ) : null}
     </div>
   ),
-  CrudGallerySurface: () => <div>gallery-surface</div>,
-  collectCrudImageUrls: () => [],
+  CrudGallerySurface: ({ items, card }: { items: Array<{ id: string }> ; card: { imageSrc?: (row: Record<string, unknown>) => string | undefined }}) => (
+    <div>
+      gallery
+      <span data-testid="gallery-image">
+        {items.map((item) => card.imageSrc?.(item) ?? 'none').join('|')}
+      </span>
+    </div>
+  ),
+  collectCrudImageUrls: ({ imageUrls }: { imageUrls?: Array<string> }) => imageUrls ?? [],
   CrudPaginationBar: ({
     visibleCount,
     totalCount,
@@ -169,6 +177,30 @@ describe('PymesSimpleCrudListModeContent', () => {
     openCrudFormDialogMock.mockReset();
     headerPropsSpy.mockReset();
     archivedState = false;
+    mockGalleryItem = { id: '1', name: 'Cliente Uno', image_urls: ['https://img.example.com/one.jpg', 'https://img.example.com/two.jpg'] };
+  });
+
+  it('muestra en galería la primera imagen válida para cualquier entidad', () => {
+    mockGalleryItem = {
+      id: '1',
+      name: 'Producto Uno',
+      images: ['https://img.example.com/first.jpg', 'https://img.example.com/second.jpg'],
+    };
+    currentConfig = {
+      label: 'producto',
+      labelPlural: 'productos',
+      labelPluralCap: 'Productos',
+      basePath: '/v1/products',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
+      isValid: () => true,
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="products" mode="gallery" />);
+
+    expect(screen.getByTestId('gallery-image')).toHaveTextContent('https://img.example.com/first.jpg');
   });
 
   it('preconfigura el estado al crear desde el pie de una columna kanban', async () => {

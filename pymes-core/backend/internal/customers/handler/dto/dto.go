@@ -18,6 +18,7 @@ type CustomerItem struct {
 	Phone     string         `json:"phone,omitempty"`
 	Address   Address        `json:"address"`
 	Notes     string         `json:"notes"`
+	IsFavorite bool          `json:"is_favorite"`
 	Tags      []string       `json:"tags"`
 	Metadata  map[string]any `json:"metadata"`
 	CreatedAt string         `json:"created_at"`
@@ -39,6 +40,7 @@ type CreateCustomerRequest struct {
 	Phone    string         `json:"phone"`
 	Address  Address        `json:"address"`
 	Notes    string         `json:"notes"`
+	IsFavorite *bool        `json:"is_favorite"`
 	Tags     []string       `json:"tags"`
 	Metadata map[string]any `json:"metadata"`
 }
@@ -51,6 +53,7 @@ type UpdateCustomerRequest struct {
 	Phone    *string         `json:"phone"`
 	Address  *Address        `json:"address"`
 	Notes    *string         `json:"notes"`
+	IsFavorite *bool         `json:"is_favorite"`
 	Tags     *[]string       `json:"tags"`
 	Metadata *map[string]any `json:"metadata"`
 }

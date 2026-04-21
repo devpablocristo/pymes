@@ -17,6 +17,7 @@ type PartyModel struct {
 	Address     []byte `gorm:"type:jsonb"`
 	TaxID       string `gorm:"column:tax_id"`
 	Notes       string
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
 	Tags        pq.StringArray `gorm:"type:text[]"`
 	Metadata    []byte         `gorm:"type:jsonb"`
 	CreatedAt   time.Time

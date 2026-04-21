@@ -84,7 +84,7 @@ export function createWorkshopVehiclesCrudConfig(): CrudPageConfig<WorkshopVehic
       { key: 'year', label: 'Año', type: 'number', placeholder: '2021' },
       { key: 'kilometers', label: 'Kilómetros', type: 'number', placeholder: '68000' },
       { key: 'color', label: 'Color' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
       [row.license_plate, row.vin, row.make, row.model, row.customer_name, row.notes].filter(Boolean).join(' '),

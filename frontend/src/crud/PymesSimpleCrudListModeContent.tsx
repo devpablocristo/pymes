@@ -16,6 +16,7 @@ import {
   CrudPaginationBar,
   CrudTableSurface,
   CrudValueKanbanSurface,
+  parseCrudLinkedEntityImageUrlList,
   collectCrudImageUrls,
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
@@ -190,22 +191,44 @@ function toSortablePrimitive(value: unknown): string | number | boolean | null {
   return String(value);
 }
 
+function readCrudImageUrlCandidates(record: Record<string, unknown>): Array<string | string[] | undefined> {
+  const read = (key: string) => (record[key] as string | string[] | undefined);
+  return [
+    read('image_urls'),
+    read('imageUrls'),
+    read('images'),
+    read('photo_urls'),
+    read('photoUrls'),
+    read('photos'),
+    read('media'),
+    read('image'),
+    read('image_url'),
+    read('imageUrl'),
+    read('logo_url'),
+    read('logoUrl'),
+    read('avatar_url'),
+    read('avatarUrl'),
+    read('banner_image'),
+    read('bannerImage'),
+  ];
+}
+
+function parseCrudImageCandidate(candidate: string | string[] | undefined): string[] {
+  if (!candidate) return [];
+  if (Array.isArray(candidate)) return candidate.filter((value): value is string => typeof value === 'string');
+  return parseCrudLinkedEntityImageUrlList(candidate);
+}
+
 function buildEditorMediaUrls<T extends { id: string }>(row: T | undefined) {
   if (!row) return undefined;
   const record = row as Record<string, unknown>;
-  return collectCrudImageUrls({
-    imageUrls: Array.isArray(record.image_urls)
-      ? record.image_urls.filter((value): value is string => typeof value === 'string')
-      : Array.isArray(record.imageUrls)
-        ? record.imageUrls.filter((value): value is string => typeof value === 'string')
-        : undefined,
-    legacyImageUrl:
-      typeof record.image_url === 'string'
-        ? record.image_url
-        : typeof record.imageUrl === 'string'
-          ? record.imageUrl
-          : undefined,
-  });
+  const collected = readCrudImageUrlCandidates(record).flatMap((candidate) => parseCrudImageCandidate(candidate as string | string[] | undefined));
+  return collectCrudImageUrls({ imageUrls: collected });
+}
+
+function getFirstCrudImageUrl<T extends { id: string }>(row: T | undefined): string | undefined {
+  const urls = buildEditorMediaUrls(row);
+  return urls?.[0];
 }
 
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
@@ -462,7 +485,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         dialogMode: editing ? 'update' : 'create',
         submitLabel: editing ? 'Guardar' : 'Crear',
         editLabel: 'Editar',
-        cancelEditLabel: 'Cancelar',
+        cancelEditLabel: 'Cerrar',
         closeLabel: archived ? 'Salir' : 'Cerrar',
         initialValues: currentValues,
         fields: visibleFields.map((field) =>
@@ -559,36 +582,34 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                 },
               }
             : undefined,
-      });
-      if (!values) return;
-      const submittedValues = editing ? { ...currentValues, ...values } : { ...createInitialValues, ...values };
-      if (!crudConfig.isValid(submittedValues)) {
-        setError(`Revisá los campos de ${crudConfig.label}.`);
-        return;
-      }
+        onSubmit: async (submittedValues) => {
+          const nextValues = editing ? { ...currentValues, ...submittedValues } : { ...createInitialValues, ...submittedValues };
+          if (!crudConfig.isValid(nextValues)) {
+            throw new Error(`Revisá los campos de ${crudConfig.label}.`);
+          }
 
-      try {
-        if (editing && row) {
-          if (crudConfig.dataSource?.update) {
-            await crudConfig.dataSource.update(row, submittedValues);
+          setError(null);
+          if (editing && row) {
+            if (crudConfig.dataSource?.update) {
+              await crudConfig.dataSource.update(row, nextValues);
+            } else if (crudConfig.basePath) {
+              await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
+                method: 'PATCH',
+                body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
+              });
+            }
+          } else if (crudConfig.dataSource?.create) {
+            await crudConfig.dataSource.create(nextValues);
           } else if (crudConfig.basePath) {
-            await apiRequest(crudItemPath(crudConfig.basePath, row.id), {
-              method: 'PUT',
-              body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
+            await apiRequest(crudConfig.basePath, {
+              method: 'POST',
+              body: crudConfig.toBody ? crudConfig.toBody(nextValues) : (nextValues as Record<string, unknown>),
             });
           }
-        } else if (crudConfig.dataSource?.create) {
-          await crudConfig.dataSource.create(submittedValues);
-        } else if (crudConfig.basePath) {
-          await apiRequest(crudConfig.basePath, {
-            method: 'POST',
-            body: crudConfig.toBody ? crudConfig.toBody(submittedValues) : (submittedValues as Record<string, unknown>),
-          });
-        }
-        await reload();
-      } catch (submitError) {
-        setError(normalizeError(submitError, `No se pudo guardar ${crudConfig.label}.`));
-      }
+          await reload();
+        },
+      });
+      if (!values) return;
     },
     [archived, crudConfig, reload, setError],
   );
@@ -704,6 +725,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             title: cardTitle,
             subtitle: (row) => cardSubtitle(row),
             meta: (row) => cardMeta(row),
+            imageSrc: (row) => getFirstCrudImageUrl(row),
           }}
           onSelect={(row) => {
             selectItem(row.id);

@@ -186,5 +186,5 @@ export const partyCrudFormFields = [
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },
   { key: 'org_trade_name', label: 'Nombre comercial' },
   { key: 'org_tax_condition', label: 'Condicion fiscal' },
-  { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true },
+  { key: 'notes', label: 'Notas internas', type: 'textarea' as const, fullWidth: true },
 ];

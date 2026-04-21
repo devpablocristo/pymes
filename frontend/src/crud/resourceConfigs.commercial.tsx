@@ -1,4 +1,4 @@
-import { type CrudFormValues, type CrudResourceConfigMap } from '../components/CrudPage';
+import { type CrudResourceConfigMap } from '../components/CrudPage';
 import { defineCrudDomain } from './defineCrudDomain';
 import { buildRestCrudDataSource } from './restCrudDataSource';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
@@ -8,16 +8,15 @@ import {
   asOptionalNumber,
   asOptionalString,
   asString,
-  parseImageURLList,
 } from './resourceConfigs.shared';
 import {
   createProductCrudConfig,
+  productFormToBody,
   type ProductRecord,
 } from '../modules/inventory';
 import {
   createCustomerCrudConfig,
   createSupplierCrudConfig,
-  parsePartyTagCsv,
   type PartyAddress as CrudAddress,
 } from '../modules/parties';
 import {
@@ -74,26 +73,10 @@ type Product = {
   image_urls?: string[];
   track_stock: boolean;
   is_active: boolean;
+  is_favorite?: boolean;
   deleted_at?: string | null;
   tags?: string[];
 };
-
-function productToBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    name: asString(values.name),
-    sku: asOptionalString(values.sku),
-    unit: asOptionalString(values.unit),
-    price: asNumber(values.price),
-    currency: asOptionalString(values.currency) ?? 'ARS',
-    cost_price: asNumber(values.cost_price),
-    tax_rate: asOptionalNumber(values.tax_rate),
-    track_stock: asBoolean(values.track_stock),
-    is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
-    tags: parsePartyTagCsv(values.tags),
-    description: asOptionalString(values.description),
-    image_urls: parseImageURLList(values.image_urls),
-  };
-}
 
 const customerLabel = vocab('cliente');
 const customerPlural = vocab('clientes');
@@ -127,7 +110,7 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       renderGallery: () => <PymesSimpleCrudListModeContent resourceId="products" mode="gallery" />,
       renderList: () => <PymesSimpleCrudListModeContent resourceId="products" />,
     }),
-    dataSource: buildRestCrudDataSource<Product>({ basePath: '/v1/products', toBody: productToBody }),
+    dataSource: buildRestCrudDataSource<Product>({ basePath: '/v1/products', toBody: productFormToBody }),
   },
   services: createServicesCrudConfig(),
   priceLists: createPriceListsCrudConfig(),

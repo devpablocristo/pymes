@@ -15,6 +15,8 @@ type CreatePurchaseRequest struct {
 	SupplierName  string                `json:"supplier_name"`
 	Status        string                `json:"status,omitempty"`
 	PaymentStatus string                `json:"payment_status,omitempty"`
+	IsFavorite    *bool                 `json:"is_favorite,omitempty"`
+	Tags          []string              `json:"tags,omitempty"`
 	Notes         string                `json:"notes,omitempty"`
 	Items         []PurchaseItemPayload `json:"items" binding:"required"`
 }

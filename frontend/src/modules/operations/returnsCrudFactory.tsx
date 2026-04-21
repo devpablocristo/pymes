@@ -67,7 +67,7 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
           { label: 'Otro', value: 'other' },
         ],
       },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
       {
         key: 'items',
         label: 'Ítems',

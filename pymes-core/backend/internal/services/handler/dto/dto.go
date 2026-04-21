@@ -13,6 +13,7 @@ type ServiceItem struct {
 	Currency               string         `json:"currency"`
 	DefaultDurationMinutes *int           `json:"default_duration_minutes,omitempty"`
 	IsActive               bool           `json:"is_active"`
+	IsFavorite             bool           `json:"is_favorite"`
 	Tags                   []string       `json:"tags"`
 	Metadata               map[string]any `json:"metadata"`
 	CreatedAt              string         `json:"created_at"`
@@ -38,6 +39,7 @@ type CreateServiceRequest struct {
 	Currency               string         `json:"currency"`
 	DefaultDurationMinutes *int           `json:"default_duration_minutes"`
 	IsActive               *bool          `json:"is_active"`
+	IsFavorite             *bool          `json:"is_favorite"`
 	Tags                   []string       `json:"tags"`
 	Metadata               map[string]any `json:"metadata"`
 }
@@ -53,6 +55,7 @@ type UpdateServiceRequest struct {
 	Currency               *string         `json:"currency"`
 	DefaultDurationMinutes *int            `json:"default_duration_minutes"`
 	IsActive               *bool           `json:"is_active"`
+	IsFavorite             *bool           `json:"is_favorite"`
 	Tags                   *[]string       `json:"tags"`
 	Metadata               *map[string]any `json:"metadata"`
 }

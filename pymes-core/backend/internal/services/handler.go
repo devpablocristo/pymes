@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.DELETE(servicesItemPath, rbac.RequirePermission("services", "delete"), h.Delete)
 	auth.POST(servicesItemPath+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("services", "update"), h.Archive)
 	auth.POST(servicesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("services", "update"), h.Restore)
+	auth.DELETE(servicesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("services", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -121,6 +122,12 @@ func (h *Handler) Create(c *gin.Context) {
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
 		IsActive:               isActive,
+		IsFavorite: func() bool {
+			if req.IsFavorite == nil {
+				return false
+			}
+			return *req.IsFavorite
+		}(),
 		Tags:                   req.Tags,
 		Metadata: func() map[string]any {
 			if req.Metadata == nil {
@@ -184,6 +191,7 @@ func (h *Handler) Update(c *gin.Context) {
 		Currency:               req.Currency,
 		DefaultDurationMinutes: req.DefaultDurationMinutes,
 		IsActive:               req.IsActive,
+		IsFavorite:             req.IsFavorite,
 		Tags:                   req.Tags,
 		Metadata:               req.Metadata,
 	}, a.Actor)
@@ -195,6 +203,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	h.Archive(c)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
@@ -265,6 +277,7 @@ func toServiceItem(in servicedomain.Service) dto.ServiceItem {
 		Currency:               in.Currency,
 		DefaultDurationMinutes: in.DefaultDurationMinutes,
 		IsActive:               in.IsActive,
+		IsFavorite:             in.IsFavorite,
 		Tags:                   in.Tags,
 		Metadata:               in.Metadata,
 		CreatedAt:              in.CreatedAt.UTC().Format(time.RFC3339),

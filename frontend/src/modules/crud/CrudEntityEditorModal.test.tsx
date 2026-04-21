@@ -1,10 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CrudEntityEditorModal } from './CrudEntityEditorModal';
 
 vi.mock('@devpablocristo/core-browser', () => ({
   confirmAction: vi.fn(async () => true),
 }));
+
+function getMainCloseButton() {
+  return screen
+    .getAllByRole('button', { name: 'Cerrar' })
+    .find((button) => button.getAttribute('aria-label') !== 'Cerrar');
+}
+
+function getConfirmDialog() {
+  return screen.getAllByRole('dialog')[1];
+}
 
 describe('CrudEntityEditorModal', () => {
   it('renders stats and submits values', () => {
@@ -56,26 +66,57 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
-  it('confirms discard when there are unsaved changes', async () => {
+  it('asks to save when closing with unsaved changes and saves before closing', async () => {
+    const onCancel = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Editar compra"
+        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo' }]}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByLabelText('Proveedor')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
+    fireEvent.click(getMainCloseButton()!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
+      expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    });
+
+    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ supplier_name: 'Otro proveedor' });
+      expect(onCancel).toHaveBeenCalled();
+    });
+  });
+
+  it('closes directly when cancelling a create form', () => {
     const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
         open
-        title="Editar compra"
-        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo' }]}
-        confirmDiscard={{
-          title: 'Descartar cambios',
-          description: 'Hay cambios pendientes.',
-        }}
+        mode="create"
+        title="Nueva compra"
+        cancelLabel="Cancelar"
+        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: '' }]}
         onCancel={onCancel}
         onSubmit={vi.fn()}
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Proveedor Demo' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    await waitFor(() => expect(onCancel).toHaveBeenCalled());
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('heading', { name: 'Desea guardar los cambios?' })).not.toBeInTheDocument();
   });
 
   it('opens existing records in read mode with media and edit/archive actions', () => {
@@ -117,7 +158,7 @@ describe('CrudEntityEditorModal', () => {
 
     return waitFor(() => {
       expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+      expect(getMainCloseButton()).toBeInTheDocument();
     });
   });
 
@@ -208,11 +249,120 @@ describe('CrudEntityEditorModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await waitFor(() => expect(screen.getByLabelText('Notas')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Notas'), { target: { value: 'Cambio temporal' } });
+    fireEvent.click(getMainCloseButton()!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument();
-    expect(screen.getByText('Compra inicial')).toBeInTheDocument();
+    expect(screen.getByLabelText('Notas')).toBeInTheDocument();
+  });
+
+  it('stays in editor mode after initial values are refreshed by a save', async () => {
+    const { rerender } = render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Proveedor Demo"
+        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo' }]}
+        initialValues={{ name: 'Proveedor Demo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn(async () => {})}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Proveedor Nuevo' } });
+
+    rerender(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Proveedor Demo"
+        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo' }]}
+        initialValues={{ name: 'Proveedor Nuevo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn(async () => {})}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre')).toHaveValue('Proveedor Nuevo');
+  });
+
+  it('places internal fields below the media block when media exists', async () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Producto Demo"
+        mediaUrls={['https://example.com/item.png']}
+        fields={[
+          { id: 'tags', label: 'Etiquetas internas', defaultValue: 'a, b', sectionId: 'info' },
+          { id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', sectionId: 'info' },
+          { id: 'name', label: 'Nombre', defaultValue: 'Producto Demo', sectionId: 'info' },
+          { id: 'description', label: 'Descripción', defaultValue: 'Detalle', sectionId: 'info', type: 'textarea' },
+        ]}
+        sections={[{ id: 'info', title: 'Información' }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const fieldRows = Array.from(dialog.querySelectorAll('label'))
+      .filter((node) => node.classList.contains('crud-entity-editor-modal__field'))
+      .map((node) => node.textContent?.trim() ?? '');
+    const tagsIndex = fieldRows.findIndex((labelText) => labelText.includes('Etiquetas internas'));
+    const favoriteIndex = fieldRows.findIndex((labelText) => labelText.includes('Agregar a favoritos'));
+    const nameIndex = fieldRows.findIndex((labelText) => labelText.includes('Nombre'));
+    const descriptionIndex = fieldRows.findIndex((labelText) => labelText.includes('Descripción'));
+
+    expect(tagsIndex).toBeGreaterThan(-1);
+    expect(favoriteIndex).toBeGreaterThan(-1);
+    expect(nameIndex).toBeGreaterThan(-1);
+    expect(descriptionIndex).toBeGreaterThan(-1);
+    expect(tagsIndex).toBeLessThan(nameIndex);
+    expect(favoriteIndex).toBeLessThan(nameIndex);
+    expect(tagsIndex).toBeLessThan(descriptionIndex);
+    expect(favoriteIndex).toBeLessThan(descriptionIndex);
+  });
+
+  it('places internal fields at the top when media is not provided', async () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Producto Demo"
+        fields={[
+          { id: 'name', label: 'Nombre', defaultValue: 'Producto Demo', sectionId: 'info' },
+          { id: 'tags', label: 'Etiquetas internas', defaultValue: 'a, b', sectionId: 'info' },
+          { id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', sectionId: 'info' },
+          { id: 'description', label: 'Descripción', defaultValue: 'Detalle', sectionId: 'info', type: 'textarea' },
+        ]}
+        sections={[{ id: 'info', title: 'Información' }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const fieldRows = Array.from(dialog.querySelectorAll('label'))
+      .filter((node) => node.classList.contains('crud-entity-editor-modal__field'))
+      .map((node) => node.textContent?.trim() ?? '');
+    const tagsIndex = fieldRows.findIndex((labelText) => labelText.includes('Etiquetas internas'));
+    const favoriteIndex = fieldRows.findIndex((labelText) => labelText.includes('Agregar a favoritos'));
+    const nameIndex = fieldRows.findIndex((labelText) => labelText.includes('Nombre'));
+    const descriptionIndex = fieldRows.findIndex((labelText) => labelText.includes('Descripción'));
+
+    expect(tagsIndex).toBeGreaterThan(-1);
+    expect(favoriteIndex).toBeGreaterThan(-1);
+    expect(nameIndex).toBeGreaterThan(-1);
+    expect(descriptionIndex).toBeGreaterThan(-1);
+    expect(tagsIndex).toBeLessThan(nameIndex);
+    expect(favoriteIndex).toBeLessThan(nameIndex);
+    expect(tagsIndex).toBeLessThan(descriptionIndex);
+    expect(favoriteIndex).toBeLessThan(descriptionIndex);
   });
 
   it('returns to read mode on escape while editing and closes on escape while reading', async () => {
@@ -265,6 +415,23 @@ describe('CrudEntityEditorModal', () => {
     const readValues = document.querySelectorAll('.crud-entity-editor-modal__read-value');
     expect(readValues).toHaveLength(2);
     expect(Array.from(readValues).every((node) => node.textContent === '')).toBe(true);
+  });
+
+  it('renders checkbox fields in read mode as a circular check with label instead of yes-no text', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Producto Demo"
+        fields={[{ id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', defaultValue: true }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('checkbox', { name: 'Agregar a favoritos' })).toBeChecked();
+    expect(screen.queryByText('Sí')).not.toBeInTheDocument();
+    expect(screen.queryByText('No')).not.toBeInTheDocument();
   });
 
   it('renders line item blocks only in edit mode', async () => {

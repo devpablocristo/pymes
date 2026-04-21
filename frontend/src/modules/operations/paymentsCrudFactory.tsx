@@ -59,7 +59,7 @@ export function createPaymentsCrudConfig(): CrudPageConfig<SalePaymentRow> {
       { key: 'method', header: 'Método', className: 'cell-name' },
       { key: 'amount', header: 'Importe', render: (v) => formatOperationsMoney(v) },
       { key: 'received_at', header: 'Recibido', render: (v) => formatDate(String(v ?? '')) },
-      { key: 'notes', header: 'Notas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
     formFields: [
       {
@@ -71,7 +71,7 @@ export function createPaymentsCrudConfig(): CrudPageConfig<SalePaymentRow> {
       { key: 'method', label: 'Método', required: true, placeholder: 'efectivo, transferencia, tarjeta' },
       { key: 'amount', label: 'Importe', type: 'number', required: true },
       { key: 'received_at', label: 'Recibido', type: 'datetime-local' },
-      { key: 'notes', label: 'Notas', type: 'textarea', fullWidth: true },
+      { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
       [row.method, row.notes, String(row.amount), row.received_at, row.id].filter(Boolean).join(' '),

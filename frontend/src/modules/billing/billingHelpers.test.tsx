@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCreditNotesCrudConfig,
   createInvoicesCrudConfig,
@@ -15,9 +15,21 @@ import {
 } from './billingHelpers';
 import type { InvoiceRecord } from './invoicesDemo';
 
+const { apiRequestMock } = vi.hoisted(() => ({
+  apiRequestMock: vi.fn(),
+}));
+
+vi.mock('../../lib/api', () => ({
+  apiRequest: apiRequestMock,
+  createSalePayment: vi.fn(),
+  downloadAPIFile: vi.fn(),
+  listSalePayments: vi.fn(),
+}));
+
 describe('billingHelpers', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    apiRequestMock.mockReset();
   });
 
   it('parses priced commercial line items', () => {
@@ -304,6 +316,7 @@ describe('billingHelpers', () => {
 
     expect(config.basePath).toBe('/v1/purchases');
     expect(config.labelPluralCap).toBe('Compras');
+    expect(config.allowEdit).toBe(true);
     expect(config.viewModes?.map((mode) => mode.id)).toEqual(['list', 'gallery', 'kanban']);
     expect(config.viewModes?.map((mode) => mode.path)).toEqual(['list', 'gallery', 'board']);
     expect(config.stateMachine).toMatchObject({
@@ -393,6 +406,16 @@ describe('billingHelpers', () => {
       key: 'total',
       label: 'Total',
     });
+    expect(config.formFields.find((field) => field.key === 'is_favorite')).toEqual({
+      key: 'is_favorite',
+      label: 'Agregar a favoritos',
+      type: 'checkbox',
+    });
+    expect(config.formFields.find((field) => field.key === 'tags')).toEqual({
+      key: 'tags',
+      label: 'Etiquetas internas',
+      placeholder: 'insumos, urgente, importado',
+    });
     expect(config.formFields.find((field) => field.key === 'received_at')).toEqual({
       key: 'received_at',
       label: 'Fecha de recepción',
@@ -403,6 +426,8 @@ describe('billingHelpers', () => {
         supplier_name: 'Proveedor',
         status: 'draft',
         payment_status: 'pending',
+        is_favorite: true,
+        tags: 'insumos, urgente',
         items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]',
         notes: 'ok',
       }),
@@ -412,6 +437,8 @@ describe('billingHelpers', () => {
       supplier_name: 'Proveedor',
       status: 'draft',
       payment_status: 'pending',
+      is_favorite: true,
+      tags: ['insumos', 'urgente'],
       items: [
         {
           description: 'Insumo',
@@ -423,6 +450,72 @@ describe('billingHelpers', () => {
         },
       ],
       notes: 'ok',
+    });
+    expect(config.toFormValues?.({
+      id: '1',
+      number: 'COMP-1',
+      supplier_name: 'Proveedor',
+      status: 'draft',
+      payment_status: 'pending',
+      total: 1000,
+      currency: 'ARS',
+      is_favorite: true,
+      tags: ['insumos', 'urgente'],
+      notes: 'ok',
+    } as PurchaseRecord)).toMatchObject({
+      is_favorite: true,
+      tags: 'insumos, urgente',
+    });
+  });
+
+  it('updates purchases with PUT against the purchase endpoint', async () => {
+    window.localStorage.setItem('pymes-ui:branch-selection:active', 'branch-active');
+    apiRequestMock.mockResolvedValueOnce({});
+    const config = createPurchasesCrudConfig<PurchaseRecord>({ renderList: () => <></> });
+
+    await config.dataSource?.update?.(
+      {
+        id: 'purchase-1',
+        number: 'OC-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'pending',
+        total: 1000,
+      } as PurchaseRecord,
+      {
+        supplier_id: 'supplier-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'paid',
+        is_favorite: true,
+        tags: 'insumos, urgente',
+        items: '[{"description":"Insumo","quantity":2,"unit_cost":500}]',
+        notes: 'ok',
+      },
+    );
+
+    expect(apiRequestMock).toHaveBeenCalledWith('/v1/purchases/purchase-1', {
+      method: 'PUT',
+      body: {
+        branch_id: 'branch-active',
+        supplier_id: 'supplier-1',
+        supplier_name: 'Proveedor',
+        status: 'received',
+        payment_status: 'paid',
+        is_favorite: true,
+        tags: ['insumos', 'urgente'],
+        items: [
+          {
+            description: 'Insumo',
+            product_id: undefined,
+            quantity: 2,
+            service_id: undefined,
+            tax_rate: undefined,
+            unit_cost: 500,
+          },
+        ],
+        notes: 'ok',
+      },
     });
   });
 });

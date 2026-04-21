@@ -24,6 +24,7 @@ type Party struct {
 	Address      Address            `json:"address"`
 	TaxID        string             `json:"tax_id,omitempty"`
 	Notes        string             `json:"notes,omitempty"`
+	IsFavorite   bool               `json:"is_favorite"`
 	Tags         []string           `json:"tags,omitempty"`
 	Metadata     map[string]any     `json:"metadata,omitempty"`
 	CreatedAt    time.Time          `json:"created_at"`

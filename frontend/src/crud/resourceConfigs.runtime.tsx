@@ -5,6 +5,33 @@ import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
 type ResourceConfigMap = CrudResourceConfigMap;
 
+function applyCrudConfigContractDefaults<T extends { id: string }>(config: CrudPageConfig<T>): CrudPageConfig<T> {
+  const supportsArchived = config.supportsArchived ?? false;
+  const hasFormFields = (config.formFields?.length ?? 0) > 0;
+
+  return {
+    ...config,
+    supportsArchived,
+    allowRestore: config.allowRestore ?? supportsArchived,
+    allowHardDelete: config.allowHardDelete ?? supportsArchived,
+    allowCreate: config.allowCreate ?? hasFormFields,
+    allowEdit: config.allowEdit ?? hasFormFields,
+    allowDelete: config.allowDelete ?? false,
+    featureFlags: {
+      searchBar: true,
+      creatorFilter: true,
+      valueFilter: true,
+      archivedToggle: true,
+      createAction: true,
+      pagination: true,
+      csvToolbar: true,
+      columnSort: true,
+      tagsColumn: true,
+      ...(config.featureFlags ?? {}),
+    },
+  };
+}
+
 export function hasCrudResourceInMap(resourceConfigs: ResourceConfigMap, resourceId: string): boolean {
   return resourceId in resourceConfigs;
 }
@@ -29,7 +56,9 @@ export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: 
   }
   const merged = applyCrudUiOverride(
     resourceId,
-    mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>),
+    applyCrudConfigContractDefaults(
+      mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>),
+    ),
   );
   return withoutCsvToolbarActions(merged);
 }

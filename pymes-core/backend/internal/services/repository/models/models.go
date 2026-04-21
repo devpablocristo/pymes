@@ -20,6 +20,7 @@ type ServiceModel struct {
 	Currency               string         `gorm:"not null"`
 	DefaultDurationMinutes *int           `gorm:"column:default_duration_minutes"`
 	IsActive               bool           `gorm:"column:is_active;not null"`
+	IsFavorite             bool           `gorm:"column:is_favorite;not null"`
 	Tags                   pq.StringArray `gorm:"type:text[]"`
 	Metadata               []byte         `gorm:"type:jsonb"`
 	CreatedAt              time.Time

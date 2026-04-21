@@ -146,7 +146,7 @@ export type CrudEntityEditorModalProps = {
     onDelete: () => Promise<void> | void;
   };
   onCancel: () => void;
-  onSubmit: (values: Record<string, CrudFieldValue>) => void;
+  onSubmit: (values: Record<string, CrudFieldValue>) => Promise<void> | void;
 };
 
 type ResolvedSection = CrudEntityEditorModalSection & {
@@ -162,6 +162,54 @@ type PendingConfirmDialog = {
   tone?: 'default' | 'danger';
   onConfirm: () => Promise<void>;
 };
+
+const PRIORITY_FIELDS_IN_EDITOR_MODAL = new Set(['tags', 'is_favorite']);
+
+function prioritizeEditorFieldsInFirstSection(sections: ResolvedSection[]): ResolvedSection[] {
+  if (!sections.length) {
+    return sections;
+  }
+
+  const promoted: CrudEntityEditorModalField[] = [];
+  const nextSections = sections.map((section) => {
+    const remainingFields = section.fields.filter((field) => {
+      if (PRIORITY_FIELDS_IN_EDITOR_MODAL.has(field.id)) {
+        promoted.push(field);
+        return false;
+      }
+      return true;
+    });
+
+    return {
+      ...section,
+      fields: remainingFields,
+    };
+  });
+
+  if (promoted.length === 0) {
+    return nextSections.filter((section) => section.fields.length > 0 || section.blocks.length > 0);
+  }
+
+  const normalizedSections = nextSections.filter((section) => section.fields.length > 0 || section.blocks.length > 0);
+  const firstSection = normalizedSections[0];
+  if (!firstSection) {
+    return [
+      {
+        id: 'general',
+        fields: promoted,
+        blocks: [],
+      },
+    ];
+  }
+
+  return [
+    {
+      ...firstSection,
+      fields: [...promoted, ...firstSection.fields],
+    },
+    ...normalizedSections.slice(1),
+  ];
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -246,10 +294,10 @@ export function CrudEntityEditorModal({
   mediaUrls,
   mediaFieldId,
   mode = 'create',
-  cancelLabel = 'Cancelar',
+  cancelLabel = 'Cerrar',
   submitLabel = 'Guardar',
   editLabel = 'Editar',
-  cancelEditLabel = 'Cancelar',
+  cancelEditLabel = 'Cerrar',
   closeLabel = 'Cerrar',
   fields,
   blocks = [],
@@ -277,6 +325,7 @@ export function CrudEntityEditorModal({
 }: CrudEntityEditorModalProps) {
   const titleId = 'crud-entity-editor-modal-title';
   const formId = 'crud-entity-editor-modal-form';
+  const resolvedEditCloseLabel = cancelEditLabel || closeLabel;
   const initialValues = useMemo(
     () => ({
       ...Object.fromEntries(fields.map((field) => [field.id, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])),
@@ -293,8 +342,9 @@ export function CrudEntityEditorModal({
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
+    const shouldStartEditing = mode === 'create' || editBehavior === 'edit-only';
     setValues(initialValues);
-    setIsEditing(mode === 'create' || editBehavior === 'edit-only');
+    setIsEditing((current) => (shouldStartEditing ? true : current));
   }, [editBehavior, initialValues, mode]);
 
   useEffect(() => {
@@ -309,7 +359,10 @@ export function CrudEntityEditorModal({
     [initialValues, values],
   );
 
-  const resolvedSections = useMemo(() => resolveSections(fields, blocks, sections), [blocks, fields, sections]);
+  const resolvedSections = useMemo(() => {
+    const resolved = resolveSections(fields, blocks, sections);
+    return prioritizeEditorFieldsInFirstSection(resolved);
+  }, [blocks, fields, sections]);
   const hasHeaderContent = Boolean(eyebrow || title || subtitle);
   const resolvedMediaUrls = useMemo(() => {
     if (mediaFieldId) {
@@ -331,36 +384,32 @@ export function CrudEntityEditorModal({
         setIsEditing(false);
         return;
       }
-      if (!confirmDiscard) {
-        setValues(initialValues);
-        setIsEditing(false);
-        return;
-      }
-      const confirmed = await confirmAction({
-        title: confirmDiscard.title,
-        description: confirmDiscard.description,
-        confirmLabel: confirmDiscard.confirmLabel ?? 'Descartar cambios',
-        cancelLabel: confirmDiscard.cancelLabel ?? 'Seguir editando',
-        tone: 'danger',
+      setPendingConfirm({
+        title: confirmDiscard?.title ?? 'Desea guardar los cambios?',
+        description: confirmDiscard?.description ?? 'Hay cambios sin guardar.',
+        confirmLabel: 'Guardar',
+        cancelLabel: 'Cancelar',
+        onConfirm: async () => {
+          await onSubmit(values);
+          onCancel();
+        },
       });
-      if (confirmed) {
-        setValues(initialValues);
-        setIsEditing(false);
-      }
       return;
     }
-    if (!dirty || !confirmDiscard) {
+    if (!dirty) {
       onCancel();
       return;
     }
-    const confirmed = await confirmAction({
-      title: confirmDiscard.title,
-      description: confirmDiscard.description,
-      confirmLabel: confirmDiscard.confirmLabel ?? 'Descartar cambios',
-      cancelLabel: confirmDiscard.cancelLabel ?? 'Seguir editando',
-      tone: 'danger',
+    setPendingConfirm({
+      title: confirmDiscard?.title ?? 'Desea guardar los cambios?',
+      description: confirmDiscard?.description ?? 'Hay cambios sin guardar.',
+      confirmLabel: 'Guardar',
+      cancelLabel: 'Cancelar',
+      onConfirm: async () => {
+        await onSubmit(values);
+        onCancel();
+      },
     });
-    if (confirmed) onCancel();
   };
 
   const resolvedEditingStartActions =
@@ -375,11 +424,11 @@ export function CrudEntityEditorModal({
         })
       : headerActions;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    onSubmit(values);
+    await onSubmit(values);
   };
 
   const handleArchive = async () => {
@@ -476,6 +525,14 @@ export function CrudEntityEditorModal({
     window.setTimeout(() => setIsEditing(true), 0);
   };
 
+  const handleSecondaryClose = () => {
+    if (mode === 'create') {
+      onCancel();
+      return;
+    }
+    void requestCancel();
+  };
+
   const footer =
     mode === 'update' && editBehavior !== 'edit-only' && !isEditing && (restoreAction || deleteAction) ? (
       <div className="crud-entity-editor-modal__footer-layout">
@@ -527,8 +584,8 @@ export function CrudEntityEditorModal({
           {resolvedEditingStartActions}
         </div>
         <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--end">
-          <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
-            {mode === 'update' && editBehavior !== 'edit-only' ? cancelEditLabel : cancelLabel}
+          <button type="button" className="btn btn-secondary" onClick={handleSecondaryClose}>
+            {mode === 'update' && editBehavior !== 'edit-only' ? resolvedEditCloseLabel : cancelLabel}
           </button>
           <button
             type="submit"
@@ -653,8 +710,17 @@ export function CrudEntityEditorModal({
                       >
                         {!isEditing ? (
                           <>
-                            <span>{field.label}</span>
-                            <div className="crud-entity-editor-modal__read-value">{renderFieldValue(field)}</div>
+                            {field.type === 'checkbox' ? (
+                              <div className="crud-entity-editor-modal__checkbox-row crud-entity-editor-modal__checkbox-row--read">
+                                <input type="checkbox" checked={Boolean(values[field.id])} readOnly disabled />
+                                <span>{field.label}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <span>{field.label}</span>
+                                <div className="crud-entity-editor-modal__read-value">{renderFieldValue(field)}</div>
+                              </>
+                            )}
                           </>
                         ) : field.type === 'checkbox' ? (
                           <div className="crud-entity-editor-modal__checkbox-row">

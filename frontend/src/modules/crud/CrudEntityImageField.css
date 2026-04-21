@@ -1,0 +1,28 @@
+.crud-entity-image-field {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crud-entity-image-field__input {
+  display: none;
+}
+
+.crud-entity-image-field__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.crud-entity-image-field__button:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}

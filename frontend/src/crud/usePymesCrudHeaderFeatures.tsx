@@ -121,6 +121,18 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
     [items, resourceId],
   );
 
+  const favoriteFilterOption = useMemo(
+    () => ({
+      value: 'favorites',
+      label: 'Favoritos',
+      matches: (row: T) => {
+        const rec = row as Record<string, unknown>;
+        return rec.is_favorite === true;
+      },
+    }),
+    [],
+  );
+
   const workOrderStatusFilterOptions = useMemo(
     () =>
       resourceId !== 'carWorkOrders' && resourceId !== 'bikeWorkOrders'
@@ -163,13 +175,25 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const valueFilterEnabled =
     crudConfig?.featureFlags?.valueFilter !== false &&
     (stateFilterEnabled || workOrderStateFilterEnabled || categoryFilterEnabled || tagFilterEnabled);
-  const valueFilterOptions = stateFilterEnabled
-    ? resolvedValueFilterOptions
-    : workOrderStateFilterEnabled
-      ? workOrderStatusFilterOptions
-    : categoryFilterEnabled
-      ? supplierCategoryFilterOptions
-      : tagFilterOptions;
+  const valueFilterOptions = useMemo(() => {
+    const baseOptions = stateFilterEnabled
+      ? resolvedValueFilterOptions
+      : workOrderStateFilterEnabled
+        ? workOrderStatusFilterOptions
+      : categoryFilterEnabled
+        ? supplierCategoryFilterOptions
+        : tagFilterOptions;
+    return [favoriteFilterOption, ...baseOptions];
+  }, [
+    categoryFilterEnabled,
+    favoriteFilterOption,
+    resolvedValueFilterOptions,
+    stateFilterEnabled,
+    supplierCategoryFilterOptions,
+    tagFilterOptions,
+    workOrderStateFilterEnabled,
+    workOrderStatusFilterOptions,
+  ]);
 
   const valueFilteredItems = useMemo(() => {
     if (!valueFilterEnabled || valueFilter === 'all') return tagFilteredItems;

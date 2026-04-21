@@ -178,8 +178,10 @@
 }
 
 .crud-entity-editor-modal__field span {
+  font-family: var(--font-body);
   font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text-secondary);
 }
 
@@ -189,7 +191,10 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 40px;
-  font: inherit;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 1.4;
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);

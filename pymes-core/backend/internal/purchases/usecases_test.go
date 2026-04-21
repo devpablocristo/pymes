@@ -187,12 +187,20 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 			if in.Status != "received" {
 				t.Fatalf("expected update status received, got %q", in.Status)
 			}
+			if !in.IsFavorite {
+				t.Fatalf("expected is_favorite to be preserved")
+			}
+			if len(in.Tags) != 2 || in.Tags[0] != "insumos" || in.Tags[1] != "urgente" {
+				t.Fatalf("expected tags to be preserved, got %#v", in.Tags)
+			}
 			return purchasesdomain.Purchase{
 				ID:            in.ID,
 				OrgID:         in.OrgID,
 				Number:        "CPA-00004",
 				Status:        in.Status,
 				PaymentStatus: in.PaymentStatus,
+				IsFavorite:    in.IsFavorite,
+				Tags:          in.Tags,
 				SupplierName:  in.SupplierName,
 			}, nil
 		},
@@ -205,6 +213,8 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 		SupplierName:  "Proveedor actualizado",
 		Status:        "received",
 		PaymentStatus: "paid",
+		IsFavorite:    true,
+		Tags:          []string{"insumos", "urgente"},
 		Items: []purchasesdomain.PurchaseItem{
 			{Description: "Insumo", Quantity: 1, UnitCost: 100},
 		},
@@ -214,5 +224,8 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 	}
 	if out.Status != "received" {
 		t.Fatalf("expected received status, got %q", out.Status)
+	}
+	if !out.IsFavorite {
+		t.Fatalf("expected favorite to remain true")
 	}
 }

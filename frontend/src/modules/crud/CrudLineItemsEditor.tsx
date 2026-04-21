@@ -36,17 +36,15 @@ function normalizeItems(value: CrudFieldValue | undefined): CrudLineItemDraft[] 
 
 function toStoredValue(items: CrudLineItemDraft[]) {
   return JSON.stringify(
-    items
-      .map((item) => ({
-        description: item.description.trim(),
-        quantity: Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1,
-        unit_cost: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
-        unit_price: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
-        product_id: item.product_id || undefined,
-        service_id: item.service_id || undefined,
-        tax_rate: item.tax_rate,
-      }))
-      .filter((item) => item.description.length > 0),
+    items.map((item) => ({
+      description: item.description.trim(),
+      quantity: Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1,
+      unit_cost: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
+      unit_price: Number.isFinite(item.unit_amount) && item.unit_amount >= 0 ? item.unit_amount : 0,
+      product_id: item.product_id || undefined,
+      service_id: item.service_id || undefined,
+      tax_rate: item.tax_rate,
+    })),
   );
 }
 
@@ -74,7 +72,7 @@ export function CrudLineItemsEditor({
     <div className="crud-line-items-editor">
       {items.map((item, index) => (
         <div key={index} className="crud-line-items-editor__row">
-          <div className="crud-line-items-editor__field crud-line-items-editor__field--full">
+          <div className="crud-line-items-editor__field crud-entity-editor-modal__field crud-line-items-editor__field--full crud-entity-editor-modal__field--full">
             <span>Concepto</span>
             <input
               type="text"
@@ -83,7 +81,7 @@ export function CrudLineItemsEditor({
               placeholder="Qué se compró"
             />
           </div>
-          <div className="crud-line-items-editor__field">
+          <div className="crud-line-items-editor__field crud-entity-editor-modal__field">
             <span>Cantidad</span>
             <input
               type="number"
@@ -93,7 +91,7 @@ export function CrudLineItemsEditor({
               onChange={(event) => setItem(index, { quantity: Number(asString(event.target.value)) || 1 })}
             />
           </div>
-          <div className="crud-line-items-editor__field">
+          <div className="crud-line-items-editor__field crud-entity-editor-modal__field">
             <span>Importe unitario</span>
             <input
               type="number"

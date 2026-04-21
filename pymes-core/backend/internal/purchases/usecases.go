@@ -145,7 +145,19 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	if current.DeletedAt != nil {
 		return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
 	}
-	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, BranchID: in.BranchID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
+	prepared, err := u.prepareCreate(ctx, CreateInput{
+		OrgID:         in.OrgID,
+		BranchID:      in.BranchID,
+		SupplierID:    in.SupplierID,
+		SupplierName:  in.SupplierName,
+		Status:        in.Status,
+		PaymentStatus: in.PaymentStatus,
+		IsFavorite:    in.IsFavorite,
+		Tags:          in.Tags,
+		Notes:         in.Notes,
+		CreatedBy:     current.CreatedBy,
+		Items:         in.Items,
+	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}

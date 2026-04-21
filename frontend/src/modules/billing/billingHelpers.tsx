@@ -907,7 +907,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
   return {
     basePath: '/v1/purchases',
     allowEdit: true,
-    allowDelete: false,
+    allowDelete: true,
     ...base.config,
     renderTagsCell: (row) => renderTagBadges(row.tags),
     dataSource: {

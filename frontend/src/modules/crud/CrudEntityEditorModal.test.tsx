@@ -66,7 +66,7 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
-  it('asks to save when closing with unsaved changes and saves before closing', async () => {
+  it('asks before closing with unsaved changes and closes when confirming close', async () => {
     const onCancel = vi.fn();
     const onSubmit = vi.fn(async () => {});
     render(
@@ -87,25 +87,49 @@ describe('CrudEntityEditorModal', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
-      expect(screen.getAllByRole('dialog')).toHaveLength(2);
     });
+    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 
+  it('saves pending changes when confirming save from the small modal', async () => {
+    const onCancel = vi.fn();
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Editar compra"
+        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo' }]}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByLabelText('Proveedor')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
+    fireEvent.click(getMainCloseButton()!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
+    });
     fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({ supplier_name: 'Otro proveedor' });
-      expect(onCancel).toHaveBeenCalled();
+      expect(onCancel).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('closes directly when cancelling a create form', () => {
+  it('asks before closing a dirty create form and closes when confirming close', async () => {
     const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
         open
         mode="create"
         title="Nueva compra"
-        cancelLabel="Cancelar"
         fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: '' }]}
         onCancel={onCancel}
         onSubmit={vi.fn()}
@@ -113,10 +137,13 @@ describe('CrudEntityEditorModal', () => {
     );
 
     fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Proveedor Demo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(getMainCloseButton()!);
 
-    expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('heading', { name: 'Desea guardar los cambios?' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
+    });
+    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });
 
   it('opens existing records in read mode with media and edit/archive actions', () => {
@@ -227,7 +254,8 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
-  it('returns from edit mode to read mode when canceling edition', async () => {
+  it('asks before closing edition and closes when confirming close', async () => {
+    const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
         open
@@ -241,7 +269,7 @@ describe('CrudEntityEditorModal', () => {
           { id: 'summary', title: 'Resumen de la compra' },
           { id: 'notes', title: 'Notas' },
         ]}
-        onCancel={vi.fn()}
+        onCancel={onCancel}
         onSubmit={vi.fn()}
       />,
     );
@@ -254,9 +282,8 @@ describe('CrudEntityEditorModal', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-
-    expect(screen.getByLabelText('Notas')).toBeInTheDocument();
+    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
   });
 
   it('stays in editor mode after initial values are refreshed by a save', async () => {
@@ -365,7 +392,7 @@ describe('CrudEntityEditorModal', () => {
     expect(favoriteIndex).toBeLessThan(descriptionIndex);
   });
 
-  it('returns to read mode on escape while editing and closes on escape while reading', async () => {
+  it('closes on escape while editing and while reading', async () => {
     const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
@@ -387,11 +414,6 @@ describe('CrudEntityEditorModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
-    fireEvent.keyDown(window, { key: 'Escape' });
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
-    expect(onCancel).not.toHaveBeenCalled();
-
     fireEvent.keyDown(window, { key: 'Escape' });
 
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
@@ -452,6 +474,28 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.queryByText('Añadir renglón')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await waitFor(() => expect(screen.getByText('Añadir renglón')).toBeInTheDocument());
+  });
+
+  it('keeps a newly added empty line item row visible while editing', async () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="CPA-001"
+        mode="update"
+        initialValues={{ items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]' }}
+        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo', sectionId: 'summary' }]}
+        sections={[{ id: 'summary' }, { id: 'items' }]}
+        blocks={[{ id: 'items', kind: 'lineItems', field: 'items', sectionId: 'items', visible: ({ editing }) => editing }]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByText('Añadir renglón')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Añadir renglón'));
+
+    await waitFor(() => expect(screen.getAllByText('Concepto')).toHaveLength(2));
   });
 
   it('keeps the modal open when switching an existing record with items into edit mode', async () => {

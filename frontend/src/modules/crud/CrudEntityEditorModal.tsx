@@ -1,5 +1,5 @@
 import { confirmAction } from '@devpablocristo/core-browser';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
@@ -161,6 +161,7 @@ type PendingConfirmDialog = {
   cancelLabel: string;
   tone?: 'default' | 'danger';
   onConfirm: () => Promise<void>;
+  onCancel?: () => void;
 };
 
 const PRIORITY_FIELDS_IN_EDITOR_MODAL = new Set(['tags', 'is_favorite']);
@@ -325,6 +326,7 @@ export function CrudEntityEditorModal({
 }: CrudEntityEditorModalProps) {
   const titleId = 'crud-entity-editor-modal-title';
   const formId = 'crud-entity-editor-modal-form';
+  const formRef = useRef<HTMLFormElement | null>(null);
   const resolvedEditCloseLabel = cancelEditLabel || closeLabel;
   const initialValues = useMemo(
     () => ({
@@ -378,24 +380,6 @@ export function CrudEntityEditorModal({
   }, [mediaFieldId, mediaUrls, values]);
 
   const requestCancel = async () => {
-    if (mode === 'update' && editBehavior !== 'edit-only' && isEditing) {
-      if (!dirty) {
-        setValues(initialValues);
-        setIsEditing(false);
-        return;
-      }
-      setPendingConfirm({
-        title: confirmDiscard?.title ?? 'Desea guardar los cambios?',
-        description: confirmDiscard?.description ?? 'Hay cambios sin guardar.',
-        confirmLabel: 'Guardar',
-        cancelLabel: 'Cancelar',
-        onConfirm: async () => {
-          await onSubmit(values);
-          onCancel();
-        },
-      });
-      return;
-    }
     if (!dirty) {
       onCancel();
       return;
@@ -404,9 +388,19 @@ export function CrudEntityEditorModal({
       title: confirmDiscard?.title ?? 'Desea guardar los cambios?',
       description: confirmDiscard?.description ?? 'Hay cambios sin guardar.',
       confirmLabel: 'Guardar',
-      cancelLabel: 'Cancelar',
+      cancelLabel: 'Cerrar',
       onConfirm: async () => {
-        await onSubmit(values);
+        const saved = await submitCurrentValues(formRef.current);
+        if (!saved) return;
+        onCancel();
+      },
+      onCancel: () => {
+        setPendingConfirm(null);
+        setConfirming(false);
+        setValues(initialValues);
+        if (mode === 'update' && editBehavior !== 'edit-only') {
+          setIsEditing(false);
+        }
         onCancel();
       },
     });
@@ -424,11 +418,15 @@ export function CrudEntityEditorModal({
         })
       : headerActions;
 
+  const submitCurrentValues = async (form: HTMLFormElement | null) => {
+    if (!form?.reportValidity()) return false;
+    await onSubmit(values);
+    return true;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    await onSubmit(values);
+    await submitCurrentValues(event.currentTarget);
   };
 
   const handleArchive = async () => {
@@ -526,10 +524,6 @@ export function CrudEntityEditorModal({
   };
 
   const handleSecondaryClose = () => {
-    if (mode === 'create') {
-      onCancel();
-      return;
-    }
     void requestCancel();
   };
 
@@ -663,7 +657,7 @@ export function CrudEntityEditorModal({
         }
         footer={footer}
       >
-        <form id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
+        <form ref={formRef} id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
         {loading ? <p className="crud-entity-editor-modal__loading">{loadingLabel}</p> : null}
         {error ? <p className="crud-entity-editor-modal__error">{error}</p> : null}
 
@@ -823,7 +817,18 @@ export function CrudEntityEditorModal({
         footer={
           pendingConfirm ? (
             <div className="crud-entity-editor-modal__confirm-footer">
-              <button type="button" className="btn btn-secondary" disabled={confirming} onClick={() => setPendingConfirm(null)}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={confirming}
+                onClick={() => {
+                  if (pendingConfirm.onCancel) {
+                    pendingConfirm.onCancel();
+                    return;
+                  }
+                  setPendingConfirm(null);
+                }}
+              >
                 {pendingConfirm.cancelLabel}
               </button>
               <button

@@ -168,6 +168,8 @@ describe('billingHelpers', () => {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+      { key: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox' },
+      { key: 'tags', label: 'Etiquetas internas', placeholder: 'factura, urgente, prioritario' },
     ]);
     expect(config.editorModal?.blocks).toEqual([
       {
@@ -198,6 +200,8 @@ describe('billingHelpers', () => {
       discount: '0',
       tax: '21',
       items: '[{"id":"1","description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+      is_favorite: false,
+      tags: '',
     });
     expect(config.isValid?.({ customer: 'Cliente Demo', items: '[{"description":"Servicio"}]' })).toBe(true);
     expect(config.isValid?.({ customer: '', items: '' })).toBe(false);

@@ -235,6 +235,8 @@ export async function createDemoInvoiceFromCrudValues(values: Record<string, Cru
       discount: asOptionalNumber(values.discount) ?? 0,
       tax: asOptionalNumber(values.tax) ?? 21,
       items: createInvoiceCrudLineItems(values.items),
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       archived_at: null,
     },
     ...invoices,
@@ -398,6 +400,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
           tax: asOptionalNumber(values.tax) ?? r.tax,
           issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
           dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
+          is_favorite: values.is_favorite === undefined ? r.is_favorite : Boolean(values.is_favorite),
+          tags: values.tags === undefined ? r.tags : parseTagCsv(values.tags),
         }));
       },
       deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
@@ -440,6 +444,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'factura, urgente, prioritario', includeNotes: false }),
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -450,6 +455,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       discount: String(row.discount ?? 0),
       tax: String(row.tax ?? 21),
       items: JSON.stringify(row.items ?? []),
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => {
       if (asString(values.customer).trim().length < 2) return false;

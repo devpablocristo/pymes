@@ -48,6 +48,8 @@ describe('invoicesDemo', () => {
         items: [],
         discount: 0,
         tax: 21,
+        is_favorite: false,
+        tags: [],
         archived_at: null,
       },
     ];

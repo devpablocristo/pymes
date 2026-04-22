@@ -27,6 +27,8 @@ export type InvoiceRecord = {
   items: InvoiceLineItem[];
   discount: number;
   tax: number;
+  is_favorite?: boolean;
+  tags?: string[];
   archived_at?: string | null;
 };
 
@@ -114,6 +116,7 @@ function sanitizeInvoice(raw: unknown): InvoiceRecord | null {
   const source = raw as Record<string, unknown>;
   const status = isInvoiceStatus(source.status) ? source.status : 'pending';
   const items = Array.isArray(source.items) ? source.items.map(sanitizeInvoiceLine).filter(Boolean) as InvoiceLineItem[] : [];
+  const tagsSource = Array.isArray(source.tags) ? source.tags : [];
   return {
     id: String(source.id ?? nextInvoiceUid()),
     number: String(source.number ?? `INV-${3500 + Math.floor(Math.random() * 100)}`),
@@ -125,6 +128,8 @@ function sanitizeInvoice(raw: unknown): InvoiceRecord | null {
     items,
     discount: Number(source.discount ?? 0),
     tax: Number(source.tax ?? 21),
+    is_favorite: Boolean(source.is_favorite),
+    tags: tagsSource.map((tag) => String(tag)).filter((tag) => tag.length > 0),
     archived_at: source.archived_at == null ? null : String(source.archived_at),
   };
 }

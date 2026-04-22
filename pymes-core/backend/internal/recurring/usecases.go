@@ -10,15 +10,20 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error)
 	Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (recurringdomain.RecurringExpense, error)
 	Update(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error)
 	Deactivate(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 }
 
@@ -37,6 +42,10 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
 	return u.repo.List(ctx, orgID, activeOnly, limit)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error) {
@@ -76,6 +85,9 @@ func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpen
 		}
 		return recurringdomain.RecurringExpense{}, err
 	}
+	if err := archive.IfArchived(current.ArchivedAt, "recurring_expense"); err != nil {
+		return recurringdomain.RecurringExpense{}, err
+	}
 	mergeRecurring(&current, in)
 	current, err = prepareRecurring(current, false, u.repo.GetCurrency(ctx, current.OrgID))
 	if err != nil {
@@ -100,6 +112,45 @@ func (u *Usecases) Deactivate(ctx context.Context, orgID, id uuid.UUID, actor st
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.deactivated", "recurring_expense", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("recurring_expense", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.archived", "recurring_expense", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("recurring_expense", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.restored", "recurring_expense", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("recurring_expense", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.hard_deleted", "recurring_expense", id.String(), nil)
 	}
 	return nil
 }

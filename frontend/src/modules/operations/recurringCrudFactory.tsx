@@ -34,6 +34,7 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
     label: 'gasto recurrente',
     labelPlural: 'gastos recurrentes',
     labelPluralCap: 'Gastos recurrentes',
+    supportsArchived: true,
     columns: [
       { key: 'description', header: 'Concepto', className: 'cell-name' },
       { key: 'category', header: 'Categoría', render: (_v, row) => row.category || '—' },

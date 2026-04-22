@@ -55,6 +55,7 @@ export function createPriceListsCrudConfig(): CrudPageConfig<PriceListRecord> {
     label: 'lista de precios',
     labelPlural: 'listas de precios',
     labelPluralCap: 'Listas de precios',
+    supportsArchived: true,
     columns: [
       {
         key: 'name',

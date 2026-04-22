@@ -16,6 +16,7 @@ type PriceList struct {
 	IsActive    bool            `json:"is_active"`
 	IsFavorite  bool            `json:"is_favorite"`
 	Tags        []string        `json:"tags"`
+	ArchivedAt  *time.Time      `json:"archived_at,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	Items       []PriceListItem `json:"items,omitempty"`

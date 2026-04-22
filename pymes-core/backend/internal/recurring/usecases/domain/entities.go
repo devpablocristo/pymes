@@ -23,6 +23,7 @@ type RecurringExpense struct {
 	NextDueDate   time.Time  `json:"next_due_date"`
 	LastPaidDate  *time.Time `json:"last_paid_date,omitempty"`
 	Notes         string     `json:"notes"`
+	ArchivedAt    *time.Time `json:"archived_at,omitempty"`
 	CreatedBy     string     `json:"created_by,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`

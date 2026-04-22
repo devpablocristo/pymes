@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -17,10 +18,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]pricelistdomain.PriceList, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]pricelistdomain.PriceList, error)
 	Create(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (pricelistdomain.PriceList, error)
 	Update(ctx context.Context, in pricelistdomain.PriceList) (pricelistdomain.PriceList, error)
-	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -28,11 +32,18 @@ type Handler struct{ uc usecasesPort }
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddleware) {
-	auth.GET("/price-lists", rbac.RequirePermission("price_lists", "read"), h.List)
-	auth.POST("/price-lists", rbac.RequirePermission("price_lists", "create"), h.Create)
-	auth.GET("/price-lists/:id", rbac.RequirePermission("price_lists", "read"), h.Get)
-	auth.PATCH("/price-lists/:id", rbac.RequirePermission("price_lists", "update"), h.Update)
-	auth.DELETE("/price-lists/:id", rbac.RequirePermission("price_lists", "delete"), h.Delete)
+	const base = "/price-lists"
+	const item = base + "/:id"
+
+	auth.GET(base, rbac.RequirePermission("price_lists", "read"), h.List)
+	auth.GET(base+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("price_lists", "read"), h.ListArchived)
+	auth.POST(base, rbac.RequirePermission("price_lists", "create"), h.Create)
+	auth.GET(item, rbac.RequirePermission("price_lists", "read"), h.Get)
+	auth.PATCH(item, rbac.RequirePermission("price_lists", "update"), h.Update)
+	auth.DELETE(item, rbac.RequirePermission("price_lists", "delete"), h.Delete)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("price_lists", "update"), h.Delete)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("price_lists", "update"), h.RestoreAction)
+	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("price_lists", "delete"), h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -42,7 +53,31 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	activeOnly := strings.ToLower(c.DefaultQuery("active", "true")) != "false"
+	archived := strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
+	if archived {
+		items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+		if err != nil {
+			httperrors.Respond(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"items": items})
+		return
+	}
 	items, err := h.uc.List(c.Request.Context(), orgID, activeOnly, limit)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	orgID, ok := parseOrg(c)
+	if !ok {
+		return
+	}
+	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -101,12 +136,37 @@ func (h *Handler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
+// Delete realiza soft delete (archiva). Es la semántica canónica CRUD.
 func (h *Handler) Delete(c *gin.Context) {
 	orgID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), orgID, id); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) RestoreAction(c *gin.Context) {
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

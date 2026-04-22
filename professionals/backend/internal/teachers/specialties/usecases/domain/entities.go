@@ -13,6 +13,8 @@ type Specialty struct {
 	Name        string
 	Description string
 	IsActive    bool
+	IsFavorite  bool
+	Tags        []string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

@@ -93,6 +93,8 @@ github.com/devpablocristo/core/security/go v0.1.0 h1:cG1y35bN2RFF2NAnCtDho0kTF8z
 github.com/devpablocristo/core/security/go v0.1.0/go.mod h1:iwFHt1JZ4bRwnqysUasQBGCnHsMTJowvMJBgbnqrDAE=
 github.com/devpablocristo/core/validate/go v0.1.1 h1:FMA8qJ36WGJ1U6JEY8dguu+8lT5JtYdAJdLo5vMXWY4=
 github.com/devpablocristo/core/validate/go v0.1.1/go.mod h1:kOsWOU6vZJN71ZXYvrXrtvUpH+G6178+vKbfc04R+BU=
+github.com/devpablocristo/modules/crud/archive/go v0.1.0 h1:aTpEP6JPerhS7vslLBaWWelL/w9FwwAI1suqAt8WAds=
+github.com/devpablocristo/modules/crud/archive/go v0.1.0/go.mod h1:UnBY14BUW7WDKHFB0nnw2xFGZ0CPNQc9Eb7SO5r7T7U=
 github.com/devpablocristo/modules/crud/paths/go v0.1.0 h1:+CFlsHDfL3R9Gf+0DDwBRNL8K7JHuQz45vh9WTaZ/Eg=
 github.com/devpablocristo/modules/crud/paths/go v0.1.0/go.mod h1:GgI8/7t94PXoaxEmKdixNNGujSjo9cf6JSFog+QJ3MU=
 github.com/devpablocristo/modules/scheduling/go v0.4.0 h1:egvd2GIQ61D3bp7lpd1uhTS7CMxIPpzkJXmVYQJBX4o=

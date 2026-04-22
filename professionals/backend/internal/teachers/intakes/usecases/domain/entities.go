@@ -14,6 +14,8 @@ type Intake struct {
 	CustomerPartyID *uuid.UUID
 	ServiceID       *uuid.UUID
 	Status          string
+	IsFavorite      bool
+	Tags            []string
 	Payload         map[string]any
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

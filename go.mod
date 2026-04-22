@@ -19,6 +19,7 @@ require (
 	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
+	github.com/devpablocristo/modules/crud/archive/go v0.1.0
 	github.com/devpablocristo/modules/crud/paths/go v0.1.0
 	github.com/devpablocristo/modules/scheduling/go v0.4.0
 	github.com/gin-gonic/gin v1.12.0
@@ -46,7 +47,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/driver/sqlite v1.6.0 // indirect
+	gorm.io/driver/sqlite v1.6.0
 )
 
 require (

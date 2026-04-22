@@ -172,9 +172,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   const stateFilterEnabled = resolvedValueFilterOptions.length > 0;
   const workOrderStateFilterEnabled = workOrderStatusFilterOptions.length > 0;
   const categoryFilterEnabled = supplierCategoryFilterOptions.length > 0;
-  const valueFilterEnabled =
-    crudConfig?.featureFlags?.valueFilter !== false &&
-    (stateFilterEnabled || workOrderStateFilterEnabled || categoryFilterEnabled || tagFilterEnabled);
+  const valueFilterEnabled = crudConfig?.featureFlags?.valueFilter !== false;
   const valueFilterOptions = useMemo(() => {
     const baseOptions = stateFilterEnabled
       ? resolvedValueFilterOptions

@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/pricelists/repository/models"
 	pricelistdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/pricelists/usecases/domain"
 )
@@ -41,7 +43,7 @@ func (r *Repository) Create(ctx context.Context, in pricelistdomain.PriceList) (
 				return err
 			}
 		}
-		row := models.PriceListModel{ID: in.ID, OrgID: in.OrgID, Name: in.Name, Description: in.Description, IsDefault: in.IsDefault, Markup: in.Markup, IsActive: in.IsActive, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		row := models.PriceListModel{ID: in.ID, OrgID: in.OrgID, Name: in.Name, Description: in.Description, IsDefault: in.IsDefault, Markup: in.Markup, IsActive: in.IsActive, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 		if err := tx.Create(&row).Error; err != nil {
 			return err
 		}
@@ -89,7 +91,7 @@ func (r *Repository) Update(ctx context.Context, in pricelistdomain.PriceList) (
 				return err
 			}
 		}
-		if err := tx.Model(&models.PriceListModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(map[string]any{"name": in.Name, "description": in.Description, "is_default": in.IsDefault, "markup": in.Markup, "is_active": in.IsActive, "updated_at": time.Now().UTC()}).Error; err != nil {
+		if err := tx.Model(&models.PriceListModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(map[string]any{"name": in.Name, "description": in.Description, "is_default": in.IsDefault, "markup": in.Markup, "is_active": in.IsActive, "is_favorite": in.IsFavorite, "tags": pq.StringArray(utils.NormalizeTags(in.Tags)), "updated_at": time.Now().UTC()}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("price_list_id = ?", in.ID).Delete(&models.PriceListItemModel{}).Error; err != nil {
@@ -148,7 +150,7 @@ func toItemModels(priceListID uuid.UUID, items []pricelistdomain.PriceListItem) 
 }
 
 func modelToDomain(row models.PriceListModel, items []models.PriceListItemModel, serviceItems []models.ServicePriceListItemModel) pricelistdomain.PriceList {
-	out := pricelistdomain.PriceList{ID: row.ID, OrgID: row.OrgID, Name: row.Name, Description: row.Description, IsDefault: row.IsDefault, Markup: row.Markup, IsActive: row.IsActive, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := pricelistdomain.PriceList{ID: row.ID, OrgID: row.OrgID, Name: row.Name, Description: row.Description, IsDefault: row.IsDefault, Markup: row.Markup, IsActive: row.IsActive, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range items {
 		productID := item.ProductID
 		out.Items = append(out.Items, pricelistdomain.PriceListItem{ProductID: &productID, Price: item.Price})

@@ -173,6 +173,10 @@ func mergeRecurring(dst *recurringdomain.RecurringExpense, patch recurringdomain
 		dst.Notes = strings.TrimSpace(patch.Notes)
 	}
 	dst.IsActive = patch.IsActive || dst.IsActive
+	dst.IsFavorite = patch.IsFavorite || dst.IsFavorite
+	if patch.Tags != nil {
+		dst.Tags = patch.Tags
+	}
 }
 
 func nextRecurringDate(base time.Time, frequency string, dayOfMonth int) time.Time {

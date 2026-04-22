@@ -28,6 +28,9 @@ func (m *mockRepo) Create(ctx context.Context, in CreateInput) (saledomain.Sale,
 func (m *mockRepo) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.getByIDFn(ctx, orgID, saleID)
 }
+func (m *mockRepo) Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error) {
+	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID}, nil
+}
 func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.voidFn(ctx, orgID, saleID)
 }

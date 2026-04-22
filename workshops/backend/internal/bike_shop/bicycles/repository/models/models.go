@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type BicycleModel struct {
@@ -20,6 +21,8 @@ type BicycleModel struct {
 	Color           string     `gorm:"not null;default:''"`
 	EbikeNotes      string     `gorm:"not null;default:''"`
 	Notes           string     `gorm:"not null;default:''"`
+	IsFavorite      bool           `gorm:"column:is_favorite;not null"`
+	Tags            pq.StringArray `gorm:"type:text[]"`
 	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

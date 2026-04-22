@@ -36,7 +36,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/intakes", h.List)
 	authGroup.GET("/intakes/:id", h.Get)
 	authGroup.POST("/intakes", h.Create)
-	authGroup.PUT("/intakes/:id", h.Update)
+	authGroup.PATCH("/intakes/:id", h.Update)
 	authGroup.POST("/intakes/:id/submit", h.Submit)
 }
 
@@ -86,11 +86,17 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid profile_id"})
 		return
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	intake := domain.Intake{
-		OrgID:     orgID,
-		ProfileID: profileID,
-		Status:    domain.IntakeStatusDraft,
-		Payload:   req.Payload,
+		OrgID:      orgID,
+		ProfileID:  profileID,
+		Status:     domain.IntakeStatusDraft,
+		IsFavorite: isFavorite,
+		Tags:       req.Tags,
+		Payload:    req.Payload,
 	}
 	if req.BookingID != nil && strings.TrimSpace(*req.BookingID) != "" {
 		intake.BookingID = vertvalues.ParseOptionalUUID(*req.BookingID)
@@ -132,7 +138,11 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
-	input := UpdateInput{Payload: req.Payload}
+	input := UpdateInput{
+		Payload:    req.Payload,
+		IsFavorite: req.IsFavorite,
+		Tags:       req.Tags,
+	}
 	if req.BookingID != nil && strings.TrimSpace(*req.BookingID) != "" {
 		input.BookingID = vertvalues.ParseOptionalUUID(*req.BookingID)
 		if input.BookingID == nil {
@@ -177,14 +187,20 @@ func (h *Handler) Submit(c *gin.Context) {
 }
 
 func toIntakeItem(in domain.Intake) dto.IntakeItem {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	item := dto.IntakeItem{
-		ID:        in.ID.String(),
-		OrgID:     in.OrgID.String(),
-		ProfileID: in.ProfileID.String(),
-		Status:    in.Status,
-		Payload:   in.Payload,
-		CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt: in.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:         in.ID.String(),
+		OrgID:      in.OrgID.String(),
+		ProfileID:  in.ProfileID.String(),
+		Status:     in.Status,
+		IsFavorite: in.IsFavorite,
+		Tags:       tags,
+		Payload:    in.Payload,
+		CreatedAt:  in.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:  in.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	if in.BookingID != nil {
 		s := in.BookingID.String()

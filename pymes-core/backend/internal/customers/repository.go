@@ -52,7 +52,7 @@ type customerPartyRow struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.baseQuery(ctx, p.OrgID)
+	q := r.baseQuery(ctx, p.OrgID).Where("p.deleted_at IS NULL")
 	if t := strings.TrimSpace(p.Type); t != "" {
 		q = q.Where("p.party_type = ?", mapCustomerType(t))
 	}
@@ -331,7 +331,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			p.deleted_at
 		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'customer' AND pr.is_active = true").
-		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
+		Where("p.org_id = ?", orgID)
 }
 
 func upsertCustomerExtension(ctx context.Context, tx *gorm.DB, partyID uuid.UUID, partyType, name string, metadata map[string]any) error {

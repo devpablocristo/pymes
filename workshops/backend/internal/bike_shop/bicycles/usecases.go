@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
@@ -33,6 +34,8 @@ type UpdateInput struct {
 	Color           *string
 	EbikeNotes      *string
 	Notes           *string
+	IsFavorite      *bool
+	Tags            *[]string
 }
 
 type RepositoryPort interface {
@@ -109,8 +112,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.Bicycle{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.Bicycle{}, fmt.Errorf("bicycle is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "bicycle"); err != nil {
+		return domain.Bicycle{}, err
 	}
 	if in.CustomerID != nil {
 		current.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -144,6 +147,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 	if err := u.enrichCustomer(ctx, &current); err != nil {
 		return domain.Bicycle{}, err

@@ -332,7 +332,6 @@ func rejectLegacyProductTypeField(c *gin.Context) bool {
 			return false
 		}
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
 	return true
 }
 

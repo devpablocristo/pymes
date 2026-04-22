@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 )
@@ -84,6 +86,8 @@ func (r *Repository) Create(ctx context.Context, in domain.ProfessionalProfile) 
 		IsPublic:          in.IsPublic,
 		IsBookable:        in.IsBookable,
 		AcceptsNewClients: in.AcceptsNewClients,
+		IsFavorite:        in.IsFavorite,
+		Tags:              pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Metadata:          meta,
 		CreatedAt:         time.Now().UTC(),
 		UpdatedAt:         time.Now().UTC(),
@@ -143,6 +147,8 @@ func (r *Repository) Update(ctx context.Context, in domain.ProfessionalProfile) 
 		"is_public":           in.IsPublic,
 		"is_bookable":         in.IsBookable,
 		"accepts_new_clients": in.AcceptsNewClients,
+		"is_favorite":         in.IsFavorite,
+		"tags":                pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"metadata":            meta,
 		"updated_at":          time.Now().UTC(),
 	}
@@ -237,6 +243,8 @@ func toDomain(row models.ProfessionalProfileModel) domain.ProfessionalProfile {
 		IsPublic:          row.IsPublic,
 		IsBookable:        row.IsBookable,
 		AcceptsNewClients: row.AcceptsNewClients,
+		IsFavorite:        row.IsFavorite,
+		Tags:              append([]string(nil), row.Tags...),
 		Metadata:          meta,
 		CreatedAt:         row.CreatedAt,
 		UpdatedAt:         row.UpdatedAt,

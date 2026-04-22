@@ -17,6 +17,7 @@ import (
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateInput) (saledomain.Sale, error)
+	Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
@@ -94,8 +95,19 @@ type CreateSaleInput struct {
 	QuoteID       *uuid.UUID
 	PaymentMethod string
 	Items         []CreateSaleItemInput
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	CreatedBy     string
+}
+
+type UpdateSaleInput struct {
+	OrgID      uuid.UUID
+	ID         uuid.UUID
+	IsFavorite *bool
+	Tags       *[]string
+	Notes      *string
+	Actor      string
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -222,6 +234,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		TaxTotal:      taxTotal,
 		Total:         total,
 		Currency:      currency,
+		IsFavorite:    in.IsFavorite,
+		Tags:          in.Tags,
 		Notes:         strings.TrimSpace(in.Notes),
 		CreatedBy:     strings.TrimSpace(in.CreatedBy),
 		Items:         createItems,
@@ -254,6 +268,26 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	}
 	if u.notifier != nil {
 		_ = u.notifier.NotifySaleCreated(ctx, out)
+	}
+	return out, nil
+}
+
+func (u *Usecases) Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error) {
+	out, err := u.repo.Update(ctx, UpdateInput{
+		OrgID:      in.OrgID,
+		ID:         in.ID,
+		IsFavorite: in.IsFavorite,
+		Tags:       in.Tags,
+		Notes:      in.Notes,
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "sale.updated", "sale", in.ID.String(), map[string]any{})
 	}
 	return out, nil
 }

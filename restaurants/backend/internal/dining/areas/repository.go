@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/areas/repository/models"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/areas/usecases/domain"
 )
@@ -70,12 +72,14 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.DiningAre
 
 func (r *Repository) Create(ctx context.Context, in domain.DiningArea) (domain.DiningArea, error) {
 	row := models.DiningAreaModel{
-		ID:        uuid.New(),
-		OrgID:     in.OrgID,
-		Name:      in.Name,
-		SortOrder: in.SortOrder,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		ID:         uuid.New(),
+		OrgID:      in.OrgID,
+		Name:       in.Name,
+		SortOrder:  in.SortOrder,
+		IsFavorite: in.IsFavorite,
+		Tags:       pq.StringArray(utils.NormalizeTags(in.Tags)),
+		CreatedAt:  time.Now().UTC(),
+		UpdatedAt:  time.Now().UTC(),
 	}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.DiningArea{}, err
@@ -96,9 +100,11 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.D
 
 func (r *Repository) Update(ctx context.Context, in domain.DiningArea) (domain.DiningArea, error) {
 	updates := map[string]any{
-		"name":       in.Name,
-		"sort_order": in.SortOrder,
-		"updated_at": time.Now().UTC(),
+		"name":        in.Name,
+		"sort_order":  in.SortOrder,
+		"is_favorite": in.IsFavorite,
+		"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningAreaModel{}).
 		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
@@ -114,11 +120,13 @@ func (r *Repository) Update(ctx context.Context, in domain.DiningArea) (domain.D
 
 func toDomain(row models.DiningAreaModel) domain.DiningArea {
 	return domain.DiningArea{
-		ID:        row.ID,
-		OrgID:     row.OrgID,
-		Name:      row.Name,
-		SortOrder: row.SortOrder,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:         row.ID,
+		OrgID:      row.OrgID,
+		Name:       row.Name,
+		SortOrder:  row.SortOrder,
+		IsFavorite: row.IsFavorite,
+		Tags:       append([]string(nil), row.Tags...),
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
 	}
 }

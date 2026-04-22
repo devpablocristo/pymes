@@ -10,7 +10,9 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -111,6 +113,8 @@ type CreateInput struct {
 	TaxTotal     float64
 	Total        float64
 	Currency     string
+	IsFavorite   bool
+	Tags         []string
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
@@ -138,6 +142,8 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 			TaxTotal:     in.TaxTotal,
 			Total:        in.Total,
 			Currency:     coalesce(in.Currency, tenant.Currency),
+			IsFavorite:   in.IsFavorite,
+			Tags:         pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Notes:        strings.TrimSpace(in.Notes),
 			ValidUntil:   in.ValidUntil,
 			CreatedBy:    strings.TrimSpace(in.CreatedBy),
@@ -294,6 +300,8 @@ type UpdateInput struct {
 	TaxTotal     float64
 	Total        float64
 	Currency     string
+	IsFavorite   bool
+	Tags         []string
 	Notes        string
 	ValidUntil   *time.Time
 	Items        []CreateItemInput
@@ -317,6 +325,8 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 			"tax_total":   in.TaxTotal,
 			"total":       in.Total,
 			"currency":    strings.TrimSpace(in.Currency),
+			"is_favorite": in.IsFavorite,
+			"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
 			"notes":       strings.TrimSpace(in.Notes),
 			"valid_until": in.ValidUntil,
 			"updated_at":  gorm.Expr("now()"),
@@ -563,6 +573,8 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 		TaxTotal:     quoteRow.TaxTotal,
 		Total:        quoteRow.Total,
 		Currency:     quoteRow.Currency,
+		IsFavorite:   quoteRow.IsFavorite,
+		Tags:         append([]string(nil), quoteRow.Tags...),
 		Notes:        quoteRow.Notes,
 		ValidUntil:   quoteRow.ValidUntil,
 		CreatedBy:    quoteRow.CreatedBy,

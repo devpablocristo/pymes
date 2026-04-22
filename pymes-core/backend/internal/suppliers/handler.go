@@ -42,7 +42,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(suppliersBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("suppliers", "read"), h.ListArchived)
 	auth.POST(suppliersBasePath, rbac.RequirePermission("suppliers", "create"), h.Create)
 	auth.GET(suppliersItemPath, rbac.RequirePermission("suppliers", "read"), h.Get)
-	auth.PUT(suppliersItemPath, rbac.RequirePermission("suppliers", "update"), h.Update)
+	auth.PATCH(suppliersItemPath, rbac.RequirePermission("suppliers", "update"), h.Update)
 	auth.DELETE(suppliersItemPath, rbac.RequirePermission("suppliers", "delete"), h.Delete)
 	auth.POST(suppliersItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("suppliers", "delete"), h.Restore)
 	auth.DELETE(suppliersItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("suppliers", "delete"), h.HardDelete)

@@ -73,6 +73,9 @@ type WorkOrderItem struct {
 
 	Metadata map[string]any `json:"metadata"`
 
+	IsFavorite bool     `json:"is_favorite"`
+	Tags       []string `json:"tags"`
+
 	CreatedBy  string  `json:"created_by"`
 	ArchivedAt *string `json:"archived_at,omitempty"`
 	CreatedAt  string  `json:"created_at"`
@@ -117,6 +120,8 @@ type CreateWorkOrderRequest struct {
 	OpenedAt      string               `json:"opened_at"`
 	PromisedAt    string               `json:"promised_at"`
 	Metadata      map[string]any       `json:"metadata"`
+	IsFavorite    *bool                `json:"is_favorite,omitempty"`
+	Tags          []string             `json:"tags,omitempty"`
 	Items         []WorkOrderLineInput `json:"items" binding:"required"`
 }
 
@@ -144,5 +149,7 @@ type UpdateWorkOrderRequest struct {
 	PromisedAt    *string               `json:"promised_at"`
 	ReadyAt       *string               `json:"ready_at"`
 	DeliveredAt   *string               `json:"delivered_at"`
+	IsFavorite    *bool                 `json:"is_favorite,omitempty"`
+	Tags          *[]string             `json:"tags,omitempty"`
 	Items         *[]WorkOrderLineInput `json:"items"`
 }

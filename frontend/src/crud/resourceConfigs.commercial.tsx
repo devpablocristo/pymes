@@ -17,6 +17,8 @@ import {
 import {
   createCustomerCrudConfig,
   createSupplierCrudConfig,
+  customerFormToBody,
+  supplierFormToBody,
   type PartyAddress as CrudAddress,
 } from '../modules/parties';
 import {
@@ -97,12 +99,14 @@ export const commercialResourceConfigs: CrudResourceConfigMap = {
       createLabel: `+ Nuevo ${customerLabel}`,
       render: () => <PymesSimpleCrudListModeContent resourceId="customers" />,
     }),
+    dataSource: buildRestCrudDataSource<Customer>({ basePath: '/v1/customers', toBody: customerFormToBody }),
   },
   suppliers: {
     basePath: '/v1/suppliers',
     ...createSupplierCrudConfig<Supplier>({
       render: () => <PymesSimpleCrudListModeContent resourceId="suppliers" />,
     }),
+    dataSource: buildRestCrudDataSource<Supplier>({ basePath: '/v1/suppliers', toBody: supplierFormToBody }),
   },
   products: {
     basePath: '/v1/products',

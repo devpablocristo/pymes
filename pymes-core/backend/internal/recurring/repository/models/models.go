@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type RecurringExpenseModel struct {
@@ -18,6 +19,8 @@ type RecurringExpenseModel struct {
 	DayOfMonth    int
 	SupplierID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
 	IsActive      bool
+	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
+	Tags          pq.StringArray `gorm:"type:text[]"`
 	NextDueDate   time.Time
 	LastPaidDate  *time.Time
 	Notes         string

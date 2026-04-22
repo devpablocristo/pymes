@@ -19,6 +19,8 @@ type Vehicle struct {
 	Kilometers   int
 	Color        string
 	Notes        string
+	IsFavorite   bool
+	Tags         []string
 	ArchivedAt   *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

@@ -33,6 +33,8 @@ function mapIntake(item: {
   customer_party_id?: string;
   service_id?: string;
   status: 'draft' | 'submitted' | 'reviewed';
+  is_favorite?: boolean;
+  tags?: string[];
   payload?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -46,6 +48,8 @@ function mapIntake(item: {
     service_id: item.service_id,
     status: item.status,
     notes: typeof item.payload?.notes === 'string' ? item.payload.notes : '',
+    is_favorite: item.is_favorite,
+    tags: item.tags,
     payload: item.payload,
     created_at: item.created_at,
     updated_at: item.updated_at,
@@ -72,6 +76,8 @@ export async function createTeacher(data: {
   is_public?: boolean;
   is_bookable?: boolean;
   accepts_new_clients?: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
 }): Promise<TeacherProfile> {
   return teachersRequest('/v1/teachers/professionals', { method: 'POST', body: data });
 }
@@ -89,9 +95,11 @@ export async function updateTeacher(
     is_public: boolean;
     is_bookable: boolean;
     accepts_new_clients: boolean;
+    is_favorite: boolean;
+    tags: string[];
   }>,
 ): Promise<TeacherProfile> {
-  return teachersRequest(`/v1/teachers/professionals/${id}`, { method: 'PUT', body: data });
+  return teachersRequest(`/v1/teachers/professionals/${id}`, { method: 'PATCH', body: data });
 }
 
 // ── Specialties ──
@@ -105,15 +113,17 @@ export async function createTeacherSpecialty(data: {
   name: string;
   description: string;
   is_active?: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
 }): Promise<TeacherSpecialty> {
   return teachersRequest('/v1/teachers/specialties', { method: 'POST', body: data });
 }
 
 export async function updateTeacherSpecialty(
   id: string,
-  data: Partial<{ code: string; name: string; description: string; is_active: boolean }>,
+  data: Partial<{ code: string; name: string; description: string; is_active: boolean; is_favorite: boolean; tags: string[] }>,
 ): Promise<TeacherSpecialty> {
-  return teachersRequest(`/v1/teachers/specialties/${id}`, { method: 'PUT', body: data });
+  return teachersRequest(`/v1/teachers/specialties/${id}`, { method: 'PATCH', body: data });
 }
 
 // ── Profile Services ──
@@ -162,7 +172,12 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
   return mapIntake(response);
 }
 
-export async function createTeacherIntake(data: { profile_id: string; notes: string }): Promise<TeacherIntake> {
+export async function createTeacherIntake(data: {
+  profile_id: string;
+  notes: string;
+  is_favorite?: boolean;
+  tags?: string[];
+}): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
@@ -171,17 +186,27 @@ export async function createTeacherIntake(data: { profile_id: string; notes: str
     customer_party_id?: string;
     service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
+    is_favorite?: boolean;
+    tags?: string[];
     payload?: Record<string, unknown>;
     created_at: string;
     updated_at: string;
   }>('/v1/teachers/intakes', {
     method: 'POST',
-    body: { profile_id: data.profile_id, payload: { notes: data.notes } },
+    body: {
+      profile_id: data.profile_id,
+      payload: { notes: data.notes },
+      is_favorite: data.is_favorite,
+      tags: data.tags,
+    },
   });
   return mapIntake(response);
 }
 
-export async function updateTeacherIntake(id: string, data: Partial<{ notes: string }>): Promise<TeacherIntake> {
+export async function updateTeacherIntake(
+  id: string,
+  data: Partial<{ notes: string; is_favorite: boolean; tags: string[] }>,
+): Promise<TeacherIntake> {
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
@@ -190,12 +215,18 @@ export async function updateTeacherIntake(id: string, data: Partial<{ notes: str
     customer_party_id?: string;
     service_id?: string;
     status: 'draft' | 'submitted' | 'reviewed';
+    is_favorite?: boolean;
+    tags?: string[];
     payload?: Record<string, unknown>;
     created_at: string;
     updated_at: string;
   }>(`/v1/teachers/intakes/${id}`, {
-    method: 'PUT',
-    body: { payload: { notes: data.notes ?? '' } },
+    method: 'PATCH',
+    body: {
+      payload: { notes: data.notes ?? '' },
+      is_favorite: data.is_favorite,
+      tags: data.tags,
+    },
   });
   return mapIntake(response);
 }

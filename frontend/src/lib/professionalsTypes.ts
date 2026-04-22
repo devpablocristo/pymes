@@ -7,6 +7,8 @@ export type ProfessionalProfile = {
   is_public: boolean;
   is_bookable: boolean;
   accepts_new_clients: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
   specialties: Array<string | { id: string; code: string; name: string }>;
   created_at: string;
   updated_at: string;
@@ -25,6 +27,8 @@ export type Specialty = {
   name: string;
   description: string;
   is_active: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 };
@@ -51,6 +55,8 @@ export type Intake = {
   service_id?: string;
   status: 'draft' | 'submitted' | 'reviewed';
   notes: string;
+  is_favorite?: boolean;
+  tags?: string[];
   payload?: Record<string, unknown>;
   created_at: string;
   updated_at: string;

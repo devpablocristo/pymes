@@ -32,7 +32,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         await apiRequest(`/v1/products/${row.product_id}/restore`, { method: 'POST', body: {} });
       },
       hardDelete: async (row: StockLevelRow) => {
-        await apiRequest(`/v1/products/${row.product_id}`, { method: 'DELETE' });
+        await apiRequest(`/v1/products/${row.product_id}/hard`, { method: 'DELETE' });
       },
     },
     formFields: [],

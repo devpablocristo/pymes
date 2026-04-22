@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	servicedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/services/usecases/domain"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -81,9 +81,12 @@ type UpdateInput struct {
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (servicedomain.Service, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return servicedomain.Service{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
 		}
+		return servicedomain.Service{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "service"); err != nil {
 		return servicedomain.Service{}, err
 	}
 	if in.Code != nil {

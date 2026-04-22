@@ -33,7 +33,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/dining-tables", h.List)
 	authGroup.POST("/dining-tables", h.Create)
 	authGroup.GET("/dining-tables/:id", h.Get)
-	authGroup.PUT("/dining-tables/:id", h.Update)
+	authGroup.PATCH("/dining-tables/:id", h.Update)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -102,14 +102,20 @@ func (h *Handler) Create(c *gin.Context) {
 	if status == "" {
 		status = "available"
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.DiningTable{
-		OrgID:    orgID,
-		AreaID:   areaUUID,
-		Code:     req.Code,
-		Label:    req.Label,
-		Capacity: capacity,
-		Status:   status,
-		Notes:    req.Notes,
+		OrgID:      orgID,
+		AreaID:     areaUUID,
+		Code:       req.Code,
+		Label:      req.Label,
+		Capacity:   capacity,
+		Status:     status,
+		Notes:      req.Notes,
+		IsFavorite: isFavorite,
+		Tags:       req.Tags,
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -142,11 +148,13 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	in := UpdateInput{
-		Code:     req.Code,
-		Label:    req.Label,
-		Capacity: req.Capacity,
-		Status:   req.Status,
-		Notes:    req.Notes,
+		Code:       req.Code,
+		Label:      req.Label,
+		Capacity:   req.Capacity,
+		Status:     req.Status,
+		Notes:      req.Notes,
+		IsFavorite: req.IsFavorite,
+		Tags:       req.Tags,
 	}
 	if req.AreaID != nil {
 		parsed, err := uuid.Parse(*req.AreaID)
@@ -173,16 +181,22 @@ func toTableItems(items []domain.DiningTable) []dto.DiningTableItem {
 }
 
 func toTableItem(item domain.DiningTable) dto.DiningTableItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return dto.DiningTableItem{
-		ID:        item.ID.String(),
-		OrgID:     item.OrgID.String(),
-		AreaID:    item.AreaID.String(),
-		Code:      item.Code,
-		Label:     item.Label,
-		Capacity:  item.Capacity,
-		Status:    item.Status,
-		Notes:     item.Notes,
-		CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt: item.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:         item.ID.String(),
+		OrgID:      item.OrgID.String(),
+		AreaID:     item.AreaID.String(),
+		Code:       item.Code,
+		Label:      item.Label,
+		Capacity:   item.Capacity,
+		Status:     item.Status,
+		Notes:      item.Notes,
+		IsFavorite: item.IsFavorite,
+		Tags:       tags,
+		CreatedAt:  item.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:  item.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }

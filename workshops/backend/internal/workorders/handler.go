@@ -46,7 +46,6 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(workOrdersBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
 	authGroup.POST(workOrdersBasePath, h.Create)
 	authGroup.GET(workOrdersItemPath, h.Get)
-	authGroup.PUT(workOrdersItemPath, h.Update)
 	authGroup.PATCH(workOrdersItemPath, h.Update)
 	authGroup.DELETE(workOrdersItemPath, h.Delete)
 	authGroup.POST(workOrdersItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
@@ -156,6 +155,10 @@ func (h *Handler) Create(c *gin.Context) {
 		metadata = map[string]any{}
 	}
 
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.WorkOrder{
 		OrgID:         orgID,
 		BranchID:      branchID,
@@ -175,6 +178,8 @@ func (h *Handler) Create(c *gin.Context) {
 		OpenedAt:      openedAt,
 		PromisedAt:    promisedAt,
 		Metadata:      metadata,
+		IsFavorite:    isFavorite,
+		Tags:          req.Tags,
 		CreatedBy:     authCtx.Actor,
 		Items:         toItems(req.Items),
 	}, authCtx.Actor)
@@ -252,6 +257,8 @@ func (h *Handler) Update(c *gin.Context) {
 		PromisedAt:    promisedAt,
 		ReadyAt:       readyAt,
 		DeliveredAt:   deliveredAt,
+		IsFavorite:    req.IsFavorite,
+		Tags:          req.Tags,
 		Items:         items,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
@@ -351,6 +358,10 @@ func toWorkOrderItems(items []domain.WorkOrder) []dto.WorkOrderItem {
 }
 
 func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	result := dto.WorkOrderItem{
 		ID:               item.ID.String(),
 		OrgID:            item.OrgID.String(),
@@ -371,6 +382,8 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		Total:            item.Total,
 		OpenedAt:         item.OpenedAt.UTC().Format(time.RFC3339),
 		Metadata:         item.Metadata,
+		IsFavorite:       item.IsFavorite,
+		Tags:             tags,
 		CreatedBy:        item.CreatedBy,
 		CreatedAt:        item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:        item.UpdatedAt.UTC().Format(time.RFC3339),

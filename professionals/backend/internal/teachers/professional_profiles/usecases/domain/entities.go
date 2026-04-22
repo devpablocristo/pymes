@@ -16,6 +16,8 @@ type ProfessionalProfile struct {
 	IsPublic          bool
 	IsBookable        bool
 	AcceptsNewClients bool
+	IsFavorite        bool
+	Tags              []string
 	Metadata          map[string]any
 	Specialties       []Specialty
 	CreatedAt         time.Time

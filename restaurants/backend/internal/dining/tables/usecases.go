@@ -22,12 +22,14 @@ type ListParams struct {
 }
 
 type UpdateInput struct {
-	AreaID   *uuid.UUID
-	Code     *string
-	Label    *string
-	Capacity *int
-	Status   *string
-	Notes    *string
+	AreaID     *uuid.UUID
+	Code       *string
+	Label      *string
+	Capacity   *int
+	Status     *string
+	Notes      *string
+	IsFavorite *bool
+	Tags       *[]string
 }
 
 type RepositoryPort interface {
@@ -119,6 +121,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Notes != nil {
 		current.Notes = strings.TrimSpace(*in.Notes)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 	if err := u.normalizeAndValidate(&current); err != nil {
 		return domain.DiningTable{}, err

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	supplierdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/suppliers/usecases/domain"
 )
@@ -75,6 +76,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return supplierdomain.Supplier{}, fmt.Errorf("supplier not found: %w", httperrors.ErrNotFound)
 		}
+		return supplierdomain.Supplier{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "supplier"); err != nil {
 		return supplierdomain.Supplier{}, err
 	}
 	if in.Name != nil {

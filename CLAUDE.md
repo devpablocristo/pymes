@@ -234,21 +234,27 @@ Los **mappers** viven en el adapter que los necesita:
 
 ---
 
-## 7. CRUD canónico (7 operaciones)
+## 7. CRUD canónico
 
-| Operación | Método | Path | Status |
-|-----------|--------|------|--------|
-| Create | `POST` | `/v1/{entities}` | 201 |
-| Read | `GET` | `/v1/{entities}/{id}` | 200 |
-| List | `GET` | `/v1/{entities}` | 200 |
-| Update | `PATCH` | `/v1/{entities}/{id}` | 200 |
-| Delete | `DELETE` | `/v1/{entities}/{id}` | 204 |
-| Archive | `POST` | `/v1/{entities}/{id}/archive` | 204 |
-| Restore | `POST` | `/v1/{entities}/{id}/restore` | 204 |
+Contrato HTTP compartido entre backend y frontend. Los segmentos de ruta vienen de la librería común **`modules/crud/paths`** (Go: `crudpaths.SegmentArchived`, `SegmentArchive`, `SegmentRestore`, `SegmentHard`; TS espejo: `modules/crud/ui/ts/src/restPaths.ts`) y son consumidos por el frontend vía `buildRestCrudDataSource` (`frontend/src/crud/restCrudDataSource.ts`). No redefinir estos literales en cada módulo.
 
-- DELETE = **hard delete** siempre. Archive = **soft delete**. Restore = limpia `archived_at`.
-- Archive/Restore son idempotentes.
-- List excluye archivados por default; `?archived=true` para incluirlos.
+| Operación | Método | Path | Status | Semántica |
+|-----------|--------|------|--------|-----------|
+| Create | `POST` | `/v1/{entities}` | 201 | — |
+| Read | `GET` | `/v1/{entities}/{id}` | 200 | — |
+| List | `GET` | `/v1/{entities}` | 200 | excluye archivados por default |
+| List archivados | `GET` | `/v1/{entities}/archived` | 200 | equivalente a `List?archived=true` |
+| Update | `PATCH` | `/v1/{entities}/{id}` | 200 | — |
+| Delete (soft) | `DELETE` | `/v1/{entities}/{id}` | 204 | **soft delete** — marca archivado |
+| Archive (alias soft) | `POST` | `/v1/{entities}/{id}/archive` | 204 | mismo efecto que `DELETE /:id`, idempotente |
+| Restore | `POST` | `/v1/{entities}/{id}/restore` | 204 | limpia la marca de archivado, idempotente |
+| Hard delete | `DELETE` | `/v1/{entities}/{id}/hard` | 204 | borrado físico irreversible |
+
+- `DELETE /:id` = **soft delete**. El hard delete siempre es explícito en `/:id/hard`.
+- `Archive` y `DELETE /:id` producen el mismo efecto; `Archive` existe como verbo explícito para el frontend.
+- `Archive` / `Restore` / `Delete (soft)` son idempotentes.
+- List admite `?archived=true` para incluir archivados; la sub-ruta `/archived` es un atajo canónico del frontend (misma semántica).
+- La columna de archivado puede llamarse `deleted_at` o `archived_at` según el módulo; conceptualmente es la marca de soft delete.
 
 ---
 

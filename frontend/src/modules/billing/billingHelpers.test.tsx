@@ -125,6 +125,8 @@ describe('billingHelpers', () => {
           unit_price: 1000,
         },
       ],
+      is_favorite: false,
+      tags: [],
       notes: 'ok',
     });
   });
@@ -264,6 +266,8 @@ describe('billingHelpers', () => {
           unit_price: 1000,
         },
       ],
+      is_favorite: false,
+      tags: [],
       notes: 'ok',
     });
   });
@@ -495,7 +499,7 @@ describe('billingHelpers', () => {
     );
 
     expect(apiRequestMock).toHaveBeenCalledWith('/v1/purchases/purchase-1', {
-      method: 'PUT',
+      method: 'PATCH',
       body: {
         branch_id: 'branch-active',
         supplier_id: 'supplier-1',

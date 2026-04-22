@@ -48,6 +48,9 @@ type WorkOrder struct {
 	// Metadata vertical-specific (segment, custom fields, etc.).
 	Metadata map[string]any
 
+	IsFavorite bool
+	Tags       []string
+
 	CreatedBy  string
 	ArchivedAt *time.Time
 	CreatedAt  time.Time

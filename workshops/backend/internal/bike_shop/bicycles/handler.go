@@ -43,7 +43,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(bicyclesBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
 	authGroup.POST(bicyclesBasePath, h.Create)
 	authGroup.GET(bicyclesItemPath, h.Get)
-	authGroup.PUT(bicyclesItemPath, h.Update)
+	authGroup.PATCH(bicyclesItemPath, h.Update)
 	authGroup.DELETE(bicyclesItemPath, h.Delete)
 	authGroup.POST(bicyclesItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
 	authGroup.DELETE(bicyclesItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
@@ -106,6 +106,10 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Bicycle{
 		OrgID:           orgID,
 		CustomerID:      vertvalues.ParseOptionalUUID(req.CustomerID),
@@ -119,6 +123,8 @@ func (h *Handler) Create(c *gin.Context) {
 		Color:           req.Color,
 		EbikeNotes:      req.EbikeNotes,
 		Notes:           req.Notes,
+		IsFavorite:      isFavorite,
+		Tags:            req.Tags,
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -162,6 +168,8 @@ func (h *Handler) Update(c *gin.Context) {
 		Color:           req.Color,
 		EbikeNotes:      req.EbikeNotes,
 		Notes:           req.Notes,
+		IsFavorite:      req.IsFavorite,
+		Tags:            req.Tags,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -215,6 +223,10 @@ func toBicycleItems(items []domain.Bicycle) []dto.BicycleItem {
 }
 
 func toBicycleItem(item domain.Bicycle) dto.BicycleItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	result := dto.BicycleItem{
 		ID:              item.ID.String(),
 		OrgID:           item.OrgID.String(),
@@ -228,6 +240,8 @@ func toBicycleItem(item domain.Bicycle) dto.BicycleItem {
 		Color:           item.Color,
 		EbikeNotes:      item.EbikeNotes,
 		Notes:           item.Notes,
+		IsFavorite:      item.IsFavorite,
+		Tags:            tags,
 		CreatedAt:       item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:       item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

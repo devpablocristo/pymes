@@ -15,6 +15,8 @@ type CreateQuoteRequest struct {
 	CustomerID   *string            `json:"customer_id"`
 	CustomerName string             `json:"customer_name"`
 	Items        []QuoteItemPayload `json:"items" binding:"required"`
+	IsFavorite   *bool              `json:"is_favorite"`
+	Tags         []string           `json:"tags"`
 	Notes        string             `json:"notes"`
 	ValidUntil   *string            `json:"valid_until"`
 }
@@ -23,6 +25,8 @@ type UpdateQuoteRequest struct {
 	CustomerID   *string             `json:"customer_id"`
 	CustomerName *string             `json:"customer_name"`
 	Items        *[]QuoteItemPayload `json:"items"`
+	IsFavorite   *bool               `json:"is_favorite"`
+	Tags         *[]string           `json:"tags"`
 	Notes        *string             `json:"notes"`
 	ValidUntil   *string             `json:"valid_until"`
 }
@@ -58,6 +62,8 @@ type QuoteResponse struct {
 	TaxTotal     float64             `json:"tax_total"`
 	Total        float64             `json:"total"`
 	Currency     string              `json:"currency"`
+	IsFavorite   bool                `json:"is_favorite"`
+	Tags         []string            `json:"tags"`
 	Notes        string              `json:"notes"`
 	ValidUntil   string              `json:"valid_until,omitempty"`
 	CreatedBy    string              `json:"created_by"`

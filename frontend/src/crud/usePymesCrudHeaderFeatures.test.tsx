@@ -54,4 +54,22 @@ describe('usePymesCrudHeaderFeatures', () => {
 
     expect(screen.getByRole('option', { name: 'Favoritos' })).toBeInTheDocument();
   });
+
+  it('muestra selector con Todas + Favoritos aunque no haya otros filtros derivados', () => {
+    const { result } = renderHook(() =>
+      usePymesCrudHeaderFeatures({
+        resourceId: 'quotes',
+        items: [
+          { id: '1', is_favorite: false },
+          { id: '2', is_favorite: true },
+        ],
+        matchesSearch: () => true,
+      }),
+    );
+
+    render(<>{result.current.searchInlineActions}</>);
+
+    expect(screen.getByRole('option', { name: 'Todas' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Favoritos' })).toBeInTheDocument();
+  });
 });

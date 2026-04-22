@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type PriceListModel struct {
@@ -14,6 +15,8 @@ type PriceListModel struct {
 	IsDefault   bool
 	Markup      float64
 	IsActive    bool
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
+	Tags        pq.StringArray `gorm:"type:text[]"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

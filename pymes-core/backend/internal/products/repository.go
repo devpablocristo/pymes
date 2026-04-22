@@ -27,7 +27,6 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 var (
 	ErrNotFound      = errors.New("product not found")
 	ErrAlreadyExists = errors.New("product already exists")
-	ErrArchived      = errors.New("product archived")
 )
 
 type ListParams struct {
@@ -44,7 +43,9 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND type = 'product'", p.OrgID)
-	if !p.Archived {
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
 		q = q.Where("deleted_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
@@ -127,9 +128,11 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 	return toDomain(row), nil
 }
 
+// GetByID devuelve el producto independientemente de su estado de archivado.
+// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
 	var row models.ProductModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return productdomain.Product{}, ErrNotFound

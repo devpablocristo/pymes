@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	profmodels "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/repository/models"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
@@ -78,6 +80,8 @@ func (r *Repository) Create(ctx context.Context, in domain.Specialty) (domain.Sp
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
 		IsActive:    in.IsActive,
+		IsFavorite:  in.IsFavorite,
+		Tags:        pq.StringArray(utils.NormalizeTags(in.Tags)),
 		CreatedAt:   time.Now().UTC(),
 		UpdatedAt:   time.Now().UTC(),
 	}
@@ -105,6 +109,8 @@ func (r *Repository) Update(ctx context.Context, in domain.Specialty) (domain.Sp
 		"name":        strings.TrimSpace(in.Name),
 		"description": strings.TrimSpace(in.Description),
 		"is_active":   in.IsActive,
+		"is_favorite": in.IsFavorite,
+		"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).
@@ -161,6 +167,8 @@ func toDomain(row models.SpecialtyModel) domain.Specialty {
 		Name:        row.Name,
 		Description: row.Description,
 		IsActive:    row.IsActive,
+		IsFavorite:  row.IsFavorite,
+		Tags:        append([]string(nil), row.Tags...),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}

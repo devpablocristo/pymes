@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/workorders/repository/models"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
@@ -131,6 +133,8 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			ReadyAt:          in.ReadyAt,
 			DeliveredAt:      in.DeliveredAt,
 			Metadata:         metadata,
+			IsFavorite:       in.IsFavorite,
+			Tags:             pq.StringArray(utils.NormalizeTags(in.Tags)),
 			CreatedBy:        in.CreatedBy,
 			CreatedAt:        time.Now().UTC(),
 			UpdatedAt:        time.Now().UTC(),
@@ -189,6 +193,8 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			"ready_at":          in.ReadyAt,
 			"delivered_at":      in.DeliveredAt,
 			"metadata":          metadata,
+			"is_favorite":       in.IsFavorite,
+			"tags":              pq.StringArray(utils.NormalizeTags(in.Tags)),
 			"updated_at":        time.Now().UTC(),
 		}
 		res := tx.Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).Updates(updates)
@@ -385,6 +391,8 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 		ReadyAt:          row.ReadyAt,
 		DeliveredAt:      row.DeliveredAt,
 		Metadata:         metadata,
+		IsFavorite:       row.IsFavorite,
+		Tags:             append([]string(nil), row.Tags...),
 		CreatedBy:        row.CreatedBy,
 		ArchivedAt:       row.ArchivedAt,
 		CreatedAt:        row.CreatedAt,

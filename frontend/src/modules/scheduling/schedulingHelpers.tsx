@@ -16,7 +16,13 @@ import {
   updateTeacherSpecialty,
 } from '../../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../../lib/teachersTypes';
-import { buildInternalNotesField, openCrudFormDialog } from '../crud';
+import {
+  buildInternalNotesField,
+  buildStandardInternalFields,
+  formatTagCsv,
+  openCrudFormDialog,
+  parseTagCsv,
+} from '../crud';
 import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from '../../crud/resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
@@ -63,6 +69,8 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
           is_public: asBoolean(values.is_public),
           is_bookable: asBoolean(values.is_bookable),
           accepts_new_clients: asBoolean(values.accepts_new_clients),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: TeacherProfile, values) => {
@@ -73,6 +81,8 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
           is_public: asBoolean(values.is_public),
           is_bookable: asBoolean(values.is_bookable),
           accepts_new_clients: asBoolean(values.accepts_new_clients),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
     },
@@ -103,6 +113,7 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
       { key: 'is_public', label: 'Visible al publico', type: 'checkbox' },
       { key: 'is_bookable', label: 'Reservable', type: 'checkbox' },
       { key: 'accepts_new_clients', label: 'Acepta nuevos alumnos', type: 'checkbox' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'senior, presencial, online', includeNotes: false }),
       { key: 'bio', label: 'Bio', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
@@ -135,6 +146,8 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
       is_public: row.is_public ?? false,
       is_bookable: row.is_bookable ?? false,
       accepts_new_clients: row.accepts_new_clients ?? true,
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.party_id).trim().length > 0,
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="professionals" /> }],
@@ -154,6 +167,8 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
           name: asString(values.name),
           description: asString(values.notes),
           is_active: asBoolean(values.is_active),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: TeacherSpecialty, values) => {
@@ -162,6 +177,8 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
           name: asOptionalString(values.name),
           description: asOptionalString(values.notes),
           is_active: asBoolean(values.is_active),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
     },
@@ -180,6 +197,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Psicologia' },
       buildInternalNotesField(),
       { key: 'is_active', label: 'Activa', type: 'checkbox' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'clinica, infantil, urgente', includeNotes: false }),
     ],
     rowActions: [
       {
@@ -197,6 +215,8 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
       name: row.name ?? '',
       notes: row.description ?? '',
       is_active: row.is_active ?? true,
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="specialties" /> }],
@@ -214,10 +234,16 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
         await createTeacherIntake({
           profile_id: asString(values.profile_id),
           notes: asString(values.notes),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: TeacherIntake, values) => {
-        await updateTeacherIntake(row.id, { notes: asString(values.notes) });
+        await updateTeacherIntake(row.id, {
+          notes: asString(values.notes),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
+        });
       },
     },
     columns: [
@@ -232,6 +258,7 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
     ],
     formFields: [
       { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'seguimiento, prioridad, derivado', includeNotes: false }),
       { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     rowActions: [
@@ -249,6 +276,8 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
     toFormValues: (row: TeacherIntake) => ({
       profile_id: row.profile_id ?? '',
       notes: row.notes ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.profile_id).trim().length > 0,
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="intakes" /> }],

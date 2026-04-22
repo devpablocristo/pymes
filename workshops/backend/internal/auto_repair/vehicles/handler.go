@@ -43,7 +43,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(vehiclesBasePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
 	authGroup.POST(vehiclesBasePath, h.Create)
 	authGroup.GET(vehiclesItemPath, h.Get)
-	authGroup.PUT(vehiclesItemPath, h.Update)
+	authGroup.PATCH(vehiclesItemPath, h.Update)
 	authGroup.DELETE(vehiclesItemPath, h.Delete)
 	authGroup.POST(vehiclesItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
 	authGroup.DELETE(vehiclesItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
@@ -106,6 +106,10 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Vehicle{
 		OrgID:        orgID,
 		CustomerID:   vertvalues.ParseOptionalUUID(req.CustomerID),
@@ -118,6 +122,8 @@ func (h *Handler) Create(c *gin.Context) {
 		Kilometers:   req.Kilometers,
 		Color:        req.Color,
 		Notes:        req.Notes,
+		IsFavorite:   isFavorite,
+		Tags:         req.Tags,
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -160,6 +166,8 @@ func (h *Handler) Update(c *gin.Context) {
 		Kilometers:   req.Kilometers,
 		Color:        req.Color,
 		Notes:        req.Notes,
+		IsFavorite:   req.IsFavorite,
+		Tags:         req.Tags,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -213,6 +221,10 @@ func toVehicleItems(items []domain.Vehicle) []dto.VehicleItem {
 }
 
 func toVehicleItem(item domain.Vehicle) dto.VehicleItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	result := dto.VehicleItem{
 		ID:           item.ID.String(),
 		OrgID:        item.OrgID.String(),
@@ -225,6 +237,8 @@ func toVehicleItem(item domain.Vehicle) dto.VehicleItem {
 		Kilometers:   item.Kilometers,
 		Color:        item.Color,
 		Notes:        item.Notes,
+		IsFavorite:   item.IsFavorite,
+		Tags:         tags,
 		CreatedAt:    item.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:    item.UpdatedAt.UTC().Format(time.RFC3339),
 	}

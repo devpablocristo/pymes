@@ -34,7 +34,7 @@ func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/specialties", h.List)
 	authGroup.POST("/specialties", h.Create)
-	authGroup.PUT("/specialties/:id", h.Update)
+	authGroup.PATCH("/specialties/:id", h.Update)
 	authGroup.POST("/specialties/:id/assign-professionals", h.AssignProfessionals)
 }
 
@@ -88,12 +88,18 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Specialty{
 		OrgID:       orgID,
 		Code:        req.Code,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    isActive,
+		IsFavorite:  isFavorite,
+		Tags:        req.Tags,
 	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -118,6 +124,8 @@ func (h *Handler) Update(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    req.IsActive,
+		IsFavorite:  req.IsFavorite,
+		Tags:        req.Tags,
 	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -154,6 +162,10 @@ func (h *Handler) AssignProfessionals(c *gin.Context) {
 }
 
 func toSpecialtyItem(in domain.Specialty) dto.SpecialtyItem {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return dto.SpecialtyItem{
 		ID:          in.ID.String(),
 		OrgID:       in.OrgID.String(),
@@ -161,6 +173,8 @@ func toSpecialtyItem(in domain.Specialty) dto.SpecialtyItem {
 		Name:        in.Name,
 		Description: in.Description,
 		IsActive:    in.IsActive,
+		IsFavorite:  in.IsFavorite,
+		Tags:        tags,
 		CreatedAt:   in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   in.UpdatedAt.UTC().Format(time.RFC3339),
 	}

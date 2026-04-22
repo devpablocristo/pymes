@@ -12,7 +12,7 @@ import {
   asString,
   formatDate,
 } from '../../crud/resourceConfigs.shared';
-import { buildStandardCrudViewModes } from '../crud';
+import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 function buildCreatePayload(values: Record<string, CrudFieldValue | undefined>) {
@@ -27,6 +27,8 @@ function buildCreatePayload(values: Record<string, CrudFieldValue | undefined>) 
     kilometers: asNumber(values.kilometers),
     color: asOptionalString(values.color),
     notes: asOptionalString(values.notes),
+    is_favorite: Boolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
   };
 }
 
@@ -42,6 +44,8 @@ function buildUpdatePayload(values: Record<string, CrudFieldValue | undefined>) 
     kilometers: asOptionalNumber(values.kilometers),
     color: asOptionalString(values.color),
     notes: asOptionalString(values.notes),
+    is_favorite: Boolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
   };
 }
 
@@ -84,6 +88,7 @@ export function createWorkshopVehiclesCrudConfig(): CrudPageConfig<WorkshopVehic
       { key: 'year', label: 'Año', type: 'number', placeholder: '2021' },
       { key: 'kilometers', label: 'Kilómetros', type: 'number', placeholder: '68000' },
       { key: 'color', label: 'Color' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'particular, flota, antiguo', includeNotes: false }),
       { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
@@ -99,6 +104,8 @@ export function createWorkshopVehiclesCrudConfig(): CrudPageConfig<WorkshopVehic
       kilometers: String(row.kilometers ?? ''),
       color: row.color ?? '',
       notes: row.notes ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) =>
       asString(values.license_plate).trim().length >= 5 &&

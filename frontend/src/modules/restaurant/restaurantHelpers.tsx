@@ -9,6 +9,7 @@ import {
 } from '../../lib/restaurantsApi';
 import type { RestaurantDiningArea, RestaurantDiningTable } from '../../lib/restaurantTypes';
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
+import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export function renderRestaurantTableStatusBadge(value: unknown) {
@@ -33,12 +34,16 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
         await createRestaurantDiningArea({
           name: asString(values.name),
           sort_order: asNumber(values.sort_order),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: RestaurantDiningArea, values) => {
         await updateRestaurantDiningArea(row.id, {
           name: asOptionalString(values.name),
           sort_order: asOptionalNumber(values.sort_order),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
     },
@@ -50,11 +55,14 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
     formFields: [
       { key: 'name', label: 'Nombre', required: true, placeholder: 'Salón principal, Terraza, Barra...' },
       { key: 'sort_order', label: 'Orden', type: 'number', placeholder: '0' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'terraza, vip, fumadores', includeNotes: false }),
     ],
     searchText: (row: RestaurantDiningArea) => row.name,
     toFormValues: (row: RestaurantDiningArea) => ({
       name: row.name ?? '',
       sort_order: String(row.sort_order ?? 0),
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningAreas" /> }],
@@ -76,6 +84,8 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           capacity: asNumber(values.capacity) || 4,
           status: asOptionalString(values.status) || 'available',
           notes: asOptionalString(values.notes),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: RestaurantDiningTable, values) => {
@@ -86,6 +96,8 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           capacity: asOptionalNumber(values.capacity),
           status: asOptionalString(values.status),
           notes: asOptionalString(values.notes),
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
         });
       },
     },
@@ -122,6 +134,7 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           { label: 'Limpieza', value: 'cleaning' },
         ],
       },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'vip, ventana, reservada', includeNotes: false }),
       { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row: RestaurantDiningTable) => [row.code, row.label, row.notes].filter(Boolean).join(' '),
@@ -132,6 +145,8 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
       capacity: String(row.capacity ?? 4),
       status: row.status ?? 'available',
       notes: row.notes ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.area_id).trim().length > 0 && asString(values.code).trim().length >= 1,
     viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningTables" /> }],

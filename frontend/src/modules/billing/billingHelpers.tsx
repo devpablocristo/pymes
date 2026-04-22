@@ -80,6 +80,8 @@ export type QuoteRecord = {
   total: number;
   currency?: string;
   valid_until?: string;
+  is_favorite?: boolean;
+  tags?: string[];
   notes?: string;
   items?: CommercialPricedLineItem[];
 };
@@ -95,6 +97,8 @@ export type SaleRecord = {
   payment_method?: string;
   total: number;
   currency?: string;
+  is_favorite?: boolean;
+  tags?: string[];
   notes?: string;
   items?: CommercialPricedLineItem[];
 };
@@ -529,6 +533,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       { key: 'customer_id', label: 'Cliente' },
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'valid_until', label: 'Válido hasta', type: 'date' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'cotización, prioritario', includeNotes: false }),
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -566,6 +571,8 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_name: row.customer_name ?? '',
       valid_until: row.valid_until ? String(row.valid_until).slice(0, 10) : '',
       items: JSON.stringify(row.items ?? []),
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -574,6 +581,8 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
       items: parseCommercialPricedLineItems(values.items),
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -642,6 +651,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'quote_id', label: 'Presupuesto relacionado' },
       buildPaymentMethodField(),
+      ...buildStandardInternalFields({ tagsPlaceholder: 'venta, frecuente, prioridad', includeNotes: false }),
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -753,6 +763,8 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       quote_id: row.quote_id ?? '',
       payment_method: row.payment_method ?? 'cash',
       items: JSON.stringify(row.items ?? []),
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -762,6 +774,8 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       quote_id: asOptionalString(values.quote_id),
       payment_method: asString(values.payment_method),
       items: parseCommercialPricedLineItems(values.items),
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -914,7 +928,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       ...(base.config.dataSource ?? {}),
       update: async (row, values) => {
         await apiRequest<TRecord>(`/v1/purchases/${row.id}`, {
-          method: 'PUT',
+          method: 'PATCH',
           body: {
             branch_id: readActiveBranchId() ?? undefined,
             supplier_id: asOptionalString(values.supplier_id),

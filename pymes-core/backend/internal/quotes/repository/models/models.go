@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type QuoteModel struct {
@@ -19,6 +20,8 @@ type QuoteModel struct {
 	TaxTotal     float64    `gorm:"type:numeric(15,2)"`
 	Total        float64    `gorm:"type:numeric(15,2)"`
 	Currency     string
+	IsFavorite   bool           `gorm:"column:is_favorite;not null"`
+	Tags         pq.StringArray `gorm:"type:text[]"`
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string

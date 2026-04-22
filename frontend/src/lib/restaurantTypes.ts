@@ -3,6 +3,8 @@ export type RestaurantDiningArea = {
   org_id: string;
   name: string;
   sort_order: number;
+  is_favorite?: boolean;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 };
@@ -16,6 +18,8 @@ export type RestaurantDiningTable = {
   capacity: number;
   status: string;
   notes: string;
+  is_favorite?: boolean;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 };

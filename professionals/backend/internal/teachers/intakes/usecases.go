@@ -73,9 +73,11 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Int
 }
 
 type UpdateInput struct {
-	BookingID   *uuid.UUID
+	BookingID       *uuid.UUID
 	CustomerPartyID *uuid.UUID
 	ServiceID       *uuid.UUID
+	IsFavorite      *bool
+	Tags            *[]string
 	Payload         *map[string]any
 }
 
@@ -100,6 +102,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.ServiceID != nil {
 		current.ServiceID = normalizeServiceID(in.ServiceID)
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 	if in.Payload != nil {
 		current.Payload = *in.Payload

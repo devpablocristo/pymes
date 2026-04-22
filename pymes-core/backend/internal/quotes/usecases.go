@@ -13,6 +13,7 @@ import (
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -66,6 +67,8 @@ type CreateQuoteInput struct {
 	CustomerID   *uuid.UUID
 	CustomerName string
 	Items        []QuoteItemInput
+	IsFavorite   bool
+	Tags         []string
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
@@ -100,6 +103,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 		TaxTotal:     taxTotal,
 		Total:        subtotal + taxTotal,
 		Currency:     currency,
+		IsFavorite:   in.IsFavorite,
+		Tags:         in.Tags,
 		Notes:        in.Notes,
 		ValidUntil:   in.ValidUntil,
 		CreatedBy:    in.CreatedBy,
@@ -123,6 +128,8 @@ type UpdateQuoteInput struct {
 	CustomerID   **uuid.UUID
 	CustomerName *string
 	Items        *[]QuoteItemInput
+	IsFavorite   *bool
+	Tags         *[]string
 	Notes        *string
 	ValidUntil   **time.Time
 	Actor        string
@@ -134,6 +141,9 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
+		return quotedomain.Quote{}, err
+	}
+	if err := archive.IfArchived(current.ArchivedAt, "quote"); err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if current.Status != "draft" {
@@ -155,6 +165,14 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 	validUntil := current.ValidUntil
 	if in.ValidUntil != nil {
 		validUntil = *in.ValidUntil
+	}
+	isFavorite := current.IsFavorite
+	if in.IsFavorite != nil {
+		isFavorite = *in.IsFavorite
+	}
+	tags := current.Tags
+	if in.Tags != nil {
+		tags = *in.Tags
 	}
 
 	itemInputs := make([]QuoteItemInput, 0, len(current.Items))
@@ -193,6 +211,8 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		TaxTotal:     taxTotal,
 		Total:        subtotal + taxTotal,
 		Currency:     current.Currency,
+		IsFavorite:   isFavorite,
+		Tags:         tags,
 		Notes:        notes,
 		ValidUntil:   validUntil,
 		Items:        items,

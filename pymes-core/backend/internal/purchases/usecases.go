@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
 )
 
@@ -142,8 +143,8 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 		}
 		return purchasesdomain.Purchase{}, err
 	}
-	if current.DeletedAt != nil {
-		return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
+	if err := archive.IfArchived(current.DeletedAt, "purchase"); err != nil {
+		return purchasesdomain.Purchase{}, err
 	}
 	prepared, err := u.prepareCreate(ctx, CreateInput{
 		OrgID:         in.OrgID,
@@ -185,8 +186,8 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 		}
 		return purchasesdomain.Purchase{}, err
 	}
-	if current.DeletedAt != nil {
-		return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
+	if err := archive.IfArchived(current.DeletedAt, "purchase"); err != nil {
+		return purchasesdomain.Purchase{}, err
 	}
 	nextStatus, err := normalizePurchaseStatus(in.Status, "")
 	if err != nil {

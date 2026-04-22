@@ -11,6 +11,8 @@ export type AutoRepairVehicle = {
   kilometers: number;
   color: string;
   notes: string;
+  is_favorite?: boolean;
+  tags?: string[];
   archived_at?: string | null;
   created_at: string;
   updated_at: string;

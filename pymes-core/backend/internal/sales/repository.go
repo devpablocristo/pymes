@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -112,9 +114,19 @@ type CreateInput struct {
 	TaxTotal      float64
 	Total         float64
 	Currency      string
+	IsFavorite    bool
+	Tags          []string
 	Notes         string
 	CreatedBy     string
 	Items         []CreateItemInput
+}
+
+type UpdateInput struct {
+	OrgID      uuid.UUID
+	ID         uuid.UUID
+	IsFavorite *bool
+	Tags       *[]string
+	Notes      *string
 }
 
 func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
@@ -141,6 +153,8 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 			TaxTotal:      in.TaxTotal,
 			Total:         in.Total,
 			Currency:      coalesce(in.Currency, tenant.Currency),
+			IsFavorite:    in.IsFavorite,
+			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Notes:         strings.TrimSpace(in.Notes),
 			CreatedBy:     strings.TrimSpace(in.CreatedBy),
 			CreatedAt:     time.Now().UTC(),
@@ -264,6 +278,32 @@ func (r *Repository) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (sale
 		return saledomain.Sale{}, err
 	}
 	return saleToDomain(saleRow, itemRows), nil
+}
+
+func (r *Repository) Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error) {
+	updates := map[string]any{}
+	if in.IsFavorite != nil {
+		updates["is_favorite"] = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		updates["tags"] = pq.StringArray(utils.NormalizeTags(*in.Tags))
+	}
+	if in.Notes != nil {
+		updates["notes"] = strings.TrimSpace(*in.Notes)
+	}
+	if len(updates) == 0 {
+		return r.GetByID(ctx, in.OrgID, in.ID)
+	}
+	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Updates(updates)
+	if res.Error != nil {
+		return saledomain.Sale{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return saledomain.Sale{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
 func (r *Repository) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
@@ -398,6 +438,8 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 		TaxTotal:      saleRow.TaxTotal,
 		Total:         saleRow.Total,
 		Currency:      saleRow.Currency,
+		IsFavorite:    saleRow.IsFavorite,
+		Tags:          append([]string(nil), saleRow.Tags...),
 		Notes:         saleRow.Notes,
 		CreatedBy:     saleRow.CreatedBy,
 		CreatedAt:     saleRow.CreatedAt,

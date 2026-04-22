@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type VehicleModel struct {
@@ -19,6 +20,8 @@ type VehicleModel struct {
 	Kilometers   int        `gorm:"not null;default:0"`
 	Color        string     `gorm:"not null;default:''"`
 	Notes        string     `gorm:"not null;default:''"`
+	IsFavorite   bool           `gorm:"column:is_favorite;not null"`
+	Tags         pq.StringArray `gorm:"type:text[]"`
 	ArchivedAt   *time.Time `gorm:"column:archived_at"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

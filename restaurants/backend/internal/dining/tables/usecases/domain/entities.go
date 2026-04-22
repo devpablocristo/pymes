@@ -7,14 +7,16 @@ import (
 )
 
 type DiningTable struct {
-	ID        uuid.UUID
-	OrgID     uuid.UUID
-	AreaID    uuid.UUID
-	Code      string
-	Label     string
-	Capacity  int
-	Status    string
-	Notes     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	AreaID     uuid.UUID
+	Code       string
+	Label      string
+	Capacity   int
+	Status     string
+	Notes      string
+	IsFavorite bool
+	Tags       []string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }

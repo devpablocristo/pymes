@@ -66,7 +66,7 @@ export async function updateAutoRepairVehicle(
     notes: string;
   }>,
 ): Promise<AutoRepairVehicle> {
-  return workshopsRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/${id}`, { method: 'PUT', body: data });
+  return workshopsRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/${id}`, { method: 'PATCH', body: data });
 }
 
 // Aliases neutros mantenidos por compatibilidad con resourceConfigs.workshops.tsx.

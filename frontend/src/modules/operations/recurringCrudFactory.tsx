@@ -7,7 +7,7 @@ import {
   asString,
 } from '../../crud/resourceConfigs.shared';
 import { formatOperationsMoney, renderOperationsActiveBadge } from '../../crud/operationsCrudHelpers';
-import { buildStandardCrudViewModes } from '../crud';
+import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 type RecurringExpense = {
@@ -23,6 +23,8 @@ type RecurringExpense = {
   next_due_date?: string;
   notes?: string;
   is_active: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
 };
 
 export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExpense> {
@@ -51,6 +53,7 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
       { key: 'supplier_id', label: 'Supplier ID' },
       { key: 'next_due_date', label: 'Proximo vencimiento', type: 'date' },
       { key: 'is_active', label: 'Activo', type: 'checkbox' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'servicio, fijo, admin', includeNotes: false }),
       { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>
@@ -66,6 +69,8 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
       supplier_id: row.supplier_id ?? '',
       next_due_date: row.next_due_date ? String(row.next_due_date).slice(0, 10) : '',
       is_active: row.is_active ?? true,
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -79,6 +84,8 @@ export function createRecurringExpensesCrudConfig(): CrudPageConfig<RecurringExp
       supplier_id: asOptionalString(values.supplier_id),
       next_due_date: asOptionalString(values.next_due_date),
       is_active: asBoolean(values.is_active),
+      is_favorite: asBoolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) => asString(values.description).trim().length >= 2 && asNumber(values.amount) > 0,

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/repository/models"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
 )
@@ -93,6 +95,8 @@ func (r *Repository) Create(ctx context.Context, in domain.Bicycle) (domain.Bicy
 		Color:           in.Color,
 		EbikeNotes:      in.EbikeNotes,
 		Notes:           in.Notes,
+		IsFavorite:      in.IsFavorite,
+		Tags:            pq.StringArray(utils.NormalizeTags(in.Tags)),
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -126,6 +130,8 @@ func (r *Repository) Update(ctx context.Context, in domain.Bicycle) (domain.Bicy
 		"color":             in.Color,
 		"ebike_notes":       in.EbikeNotes,
 		"notes":             in.Notes,
+		"is_favorite":       in.IsFavorite,
+		"tags":              pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.BicycleModel{}).
@@ -213,6 +219,8 @@ func toDomain(row models.BicycleModel) domain.Bicycle {
 		Color:           row.Color,
 		EbikeNotes:      row.EbikeNotes,
 		Notes:           row.Notes,
+		IsFavorite:      row.IsFavorite,
+		Tags:            append([]string(nil), row.Tags...),
 		ArchivedAt:      row.ArchivedAt,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,

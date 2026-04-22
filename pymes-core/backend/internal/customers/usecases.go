@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -107,6 +108,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return customerdomain.Customer{}, fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
 		}
+		return customerdomain.Customer{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "customer"); err != nil {
 		return customerdomain.Customer{}, err
 	}
 	if in.Type != nil {

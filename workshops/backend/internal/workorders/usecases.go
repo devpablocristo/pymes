@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/vertvalues"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/workshops"
@@ -46,6 +47,8 @@ type UpdateInput struct {
 	PromisedAt    *time.Time
 	ReadyAt       **time.Time
 	DeliveredAt   **time.Time
+	IsFavorite    *bool
+	Tags          *[]string
 	Items         *[]domain.WorkOrderItem
 }
 
@@ -175,8 +178,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.WorkOrder{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "work order"); err != nil {
+		return domain.WorkOrder{}, err
 	}
 
 	prevCanon := normalizeWorkOrderStatus(current.Status)
@@ -238,6 +241,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.Items != nil {
 		next.Items = *in.Items
 	}
+	if in.IsFavorite != nil {
+		next.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		next.Tags = *in.Tags
+	}
 
 	hook := u.hooks.lookup(next.TargetType)
 	if err := hook.BeforeUpdate(ctx, &current, &next); err != nil {
@@ -291,8 +300,8 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 		}
 		return domain.WorkOrder{}, err
 	}
-	if current.ArchivedAt != nil {
-		return domain.WorkOrder{}, fmt.Errorf("work order is archived: %w", httperrors.ErrBadInput)
+	if err := archive.IfArchived(current.ArchivedAt, "work order"); err != nil {
+		return domain.WorkOrder{}, err
 	}
 	out, err := u.repo.SaveIntegrations(ctx, orgID, id, quoteID, saleID, status)
 	if err != nil {

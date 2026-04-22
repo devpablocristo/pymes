@@ -21,6 +21,8 @@ type Bicycle struct {
 	Color           string
 	EbikeNotes      string
 	Notes           string
+	IsFavorite      bool
+	Tags            []string
 	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

@@ -31,15 +31,17 @@ export async function getRestaurantDiningAreas(): Promise<{ items: RestaurantDin
 export async function createRestaurantDiningArea(data: {
   name: string;
   sort_order?: number;
+  is_favorite?: boolean;
+  tags?: string[];
 }): Promise<RestaurantDiningArea> {
   return restaurantsRequest('/v1/restaurants/dining-areas', { method: 'POST', body: data });
 }
 
 export async function updateRestaurantDiningArea(
   id: string,
-  data: Partial<{ name: string; sort_order: number }>,
+  data: Partial<{ name: string; sort_order: number; is_favorite: boolean; tags: string[] }>,
 ): Promise<RestaurantDiningArea> {
-  return restaurantsRequest(`/v1/restaurants/dining-areas/${id}`, { method: 'PUT', body: data });
+  return restaurantsRequest(`/v1/restaurants/dining-areas/${id}`, { method: 'PATCH', body: data });
 }
 
 export async function getRestaurantDiningTables(areaId?: string): Promise<{ items: RestaurantDiningTable[] }> {
@@ -57,6 +59,8 @@ export async function createRestaurantDiningTable(data: {
   capacity?: number;
   status?: string;
   notes?: string;
+  is_favorite?: boolean;
+  tags?: string[];
 }): Promise<RestaurantDiningTable> {
   return restaurantsRequest('/v1/restaurants/dining-tables', { method: 'POST', body: data });
 }
@@ -70,9 +74,11 @@ export async function updateRestaurantDiningTable(
     capacity: number;
     status: string;
     notes: string;
+    is_favorite: boolean;
+    tags: string[];
   }>,
 ): Promise<RestaurantDiningTable> {
-  return restaurantsRequest(`/v1/restaurants/dining-tables/${id}`, { method: 'PUT', body: data });
+  return restaurantsRequest(`/v1/restaurants/dining-tables/${id}`, { method: 'PATCH', body: data });
 }
 
 export async function getRestaurantTableSessions(openOnly = true): Promise<{ items: RestaurantTableSession[] }> {

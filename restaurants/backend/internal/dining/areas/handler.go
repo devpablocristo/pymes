@@ -33,7 +33,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/dining-areas", h.List)
 	authGroup.POST("/dining-areas", h.Create)
 	authGroup.GET("/dining-areas/:id", h.Get)
-	authGroup.PUT("/dining-areas/:id", h.Update)
+	authGroup.PATCH("/dining-areas/:id", h.Update)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -79,10 +79,16 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), domain.DiningArea{
-		OrgID:     orgID,
-		Name:      req.Name,
-		SortOrder: req.SortOrder,
+		OrgID:      orgID,
+		Name:       req.Name,
+		SortOrder:  req.SortOrder,
+		IsFavorite: isFavorite,
+		Tags:       req.Tags,
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -115,8 +121,10 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
-		Name:      req.Name,
-		SortOrder: req.SortOrder,
+		Name:       req.Name,
+		SortOrder:  req.SortOrder,
+		IsFavorite: req.IsFavorite,
+		Tags:       req.Tags,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -134,12 +142,18 @@ func toAreaItems(items []domain.DiningArea) []dto.DiningAreaItem {
 }
 
 func toAreaItem(item domain.DiningArea) dto.DiningAreaItem {
+	tags := item.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return dto.DiningAreaItem{
-		ID:        item.ID.String(),
-		OrgID:     item.OrgID.String(),
-		Name:      item.Name,
-		SortOrder: item.SortOrder,
-		CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt: item.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:         item.ID.String(),
+		OrgID:      item.OrgID.String(),
+		Name:       item.Name,
+		SortOrder:  item.SortOrder,
+		IsFavorite: item.IsFavorite,
+		Tags:       tags,
+		CreatedAt:  item.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:  item.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }

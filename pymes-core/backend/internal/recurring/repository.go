@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/repository/models"
 	recurringdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring/usecases/domain"
 )
@@ -34,7 +36,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, activeOnly bool,
 }
 
 func (r *Repository) Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error) {
-	row := models.RecurringExpenseModel{ID: in.ID, OrgID: in.OrgID, Description: in.Description, Amount: in.Amount, Currency: in.Currency, Category: in.Category, PaymentMethod: in.PaymentMethod, Frequency: in.Frequency, DayOfMonth: in.DayOfMonth, SupplierID: in.SupplierID, IsActive: true, NextDueDate: in.NextDueDate, LastPaidDate: in.LastPaidDate, Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	row := models.RecurringExpenseModel{ID: in.ID, OrgID: in.OrgID, Description: in.Description, Amount: in.Amount, Currency: in.Currency, Category: in.Category, PaymentMethod: in.PaymentMethod, Frequency: in.Frequency, DayOfMonth: in.DayOfMonth, SupplierID: in.SupplierID, IsActive: true, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), NextDueDate: in.NextDueDate, LastPaidDate: in.LastPaidDate, Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -50,7 +52,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (recurrin
 }
 
 func (r *Repository) Update(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error) {
-	row := models.RecurringExpenseModel{ID: in.ID, OrgID: in.OrgID, Description: in.Description, Amount: in.Amount, Currency: in.Currency, Category: in.Category, PaymentMethod: in.PaymentMethod, Frequency: in.Frequency, DayOfMonth: in.DayOfMonth, SupplierID: in.SupplierID, IsActive: in.IsActive, NextDueDate: in.NextDueDate, LastPaidDate: in.LastPaidDate, Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: time.Now().UTC()}
+	row := models.RecurringExpenseModel{ID: in.ID, OrgID: in.OrgID, Description: in.Description, Amount: in.Amount, Currency: in.Currency, Category: in.Category, PaymentMethod: in.PaymentMethod, Frequency: in.Frequency, DayOfMonth: in.DayOfMonth, SupplierID: in.SupplierID, IsActive: in.IsActive, IsFavorite: in.IsFavorite, Tags: pq.StringArray(utils.NormalizeTags(in.Tags)), NextDueDate: in.NextDueDate, LastPaidDate: in.LastPaidDate, Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: time.Now().UTC()}
 	if err := r.db.WithContext(ctx).Save(&row).Error; err != nil {
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -77,5 +79,5 @@ func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
 }
 
 func toDomain(row models.RecurringExpenseModel) recurringdomain.RecurringExpense {
-	return recurringdomain.RecurringExpense{ID: row.ID, OrgID: row.OrgID, Description: row.Description, Amount: row.Amount, Currency: row.Currency, Category: row.Category, PaymentMethod: row.PaymentMethod, Frequency: row.Frequency, DayOfMonth: row.DayOfMonth, SupplierID: row.SupplierID, IsActive: row.IsActive, NextDueDate: row.NextDueDate, LastPaidDate: row.LastPaidDate, Notes: row.Notes, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return recurringdomain.RecurringExpense{ID: row.ID, OrgID: row.OrgID, Description: row.Description, Amount: row.Amount, Currency: row.Currency, Category: row.Category, PaymentMethod: row.PaymentMethod, Frequency: row.Frequency, DayOfMonth: row.DayOfMonth, SupplierID: row.SupplierID, IsActive: row.IsActive, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), NextDueDate: row.NextDueDate, LastPaidDate: row.LastPaidDate, Notes: row.Notes, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

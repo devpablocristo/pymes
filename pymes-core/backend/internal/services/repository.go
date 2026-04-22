@@ -27,7 +27,6 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 var (
 	ErrNotFound      = errors.New("service not found")
 	ErrAlreadyExists = errors.New("service already exists")
-	ErrArchived      = errors.New("service archived")
 )
 
 type ListParams struct {
@@ -44,7 +43,9 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]servicedomain.Service, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ?", p.OrgID)
-	if !p.Archived {
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
 		q = q.Where("deleted_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
@@ -124,9 +125,11 @@ func (r *Repository) Create(ctx context.Context, in servicedomain.Service) (serv
 	return toDomain(row), nil
 }
 
+// GetByID devuelve el servicio independientemente de su estado de archivado.
+// El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error) {
 	var row models.ServiceModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return servicedomain.Service{}, ErrNotFound

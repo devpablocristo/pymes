@@ -17,7 +17,15 @@ type CreateSaleRequest struct {
 	QuoteID       *string           `json:"quote_id"`
 	PaymentMethod string            `json:"payment_method"`
 	Items         []SaleItemPayload `json:"items" binding:"required"`
+	IsFavorite    *bool             `json:"is_favorite"`
+	Tags          []string          `json:"tags"`
 	Notes         string            `json:"notes"`
+}
+
+type UpdateSaleRequest struct {
+	IsFavorite *bool     `json:"is_favorite"`
+	Tags       *[]string `json:"tags"`
+	Notes      *string   `json:"notes"`
 }
 
 type SaleItemResponse struct {
@@ -49,6 +57,8 @@ type SaleResponse struct {
 	TaxTotal      float64            `json:"tax_total"`
 	Total         float64            `json:"total"`
 	Currency      string             `json:"currency"`
+	IsFavorite    bool               `json:"is_favorite"`
+	Tags          []string           `json:"tags"`
 	Notes         string             `json:"notes"`
 	CreatedBy     string             `json:"created_by"`
 	CreatedAt     string             `json:"created_at"`

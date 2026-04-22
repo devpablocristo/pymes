@@ -50,7 +50,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(quotesBasePath+"/"+crudpaths.SegmentArchived, rbac.RequirePermission("quotes", "read"), h.ListArchived)
 	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
 	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
-	auth.PUT(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
+	auth.PATCH(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
 	auth.DELETE(quotesItemPath, rbac.RequirePermission("quotes", "delete"), h.Delete)
 	auth.POST(quotesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("quotes", "delete"), h.Restore)
 	auth.DELETE(quotesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("quotes", "delete"), h.HardDelete)
@@ -200,12 +200,18 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), CreateQuoteInput{
 		OrgID:        orgID,
 		BranchID:     branchID,
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
 		Items:        items,
+		IsFavorite:   isFavorite,
+		Tags:         req.Tags,
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
 		CreatedBy:    a.Actor,
@@ -290,6 +296,8 @@ func (h *Handler) Update(c *gin.Context) {
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
 		Items:        items,
+		IsFavorite:   req.IsFavorite,
+		Tags:         req.Tags,
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
 		Actor:        a.Actor,
@@ -431,6 +439,10 @@ func (h *Handler) ToSale(c *gin.Context) {
 }
 
 func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	resp := dto.QuoteResponse{
 		ID:           in.ID.String(),
 		OrgID:        in.OrgID.String(),
@@ -442,6 +454,8 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 		TaxTotal:     in.TaxTotal,
 		Total:        in.Total,
 		Currency:     in.Currency,
+		IsFavorite:   in.IsFavorite,
+		Tags:         tags,
 		Notes:        in.Notes,
 		CreatedBy:    in.CreatedBy,
 		CreatedAt:    in.CreatedAt.UTC().Format(time.RFC3339),

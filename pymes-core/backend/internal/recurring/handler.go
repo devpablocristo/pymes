@@ -32,7 +32,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/recurring-expenses", rbac.RequirePermission("recurring", "read"), h.List)
 	auth.POST("/recurring-expenses", rbac.RequirePermission("recurring", "create"), h.Create)
 	auth.GET("/recurring-expenses/:id", rbac.RequirePermission("recurring", "read"), h.Get)
-	auth.PUT("/recurring-expenses/:id", rbac.RequirePermission("recurring", "update"), h.Update)
+	auth.PATCH("/recurring-expenses/:id", rbac.RequirePermission("recurring", "update"), h.Update)
 	auth.DELETE("/recurring-expenses/:id", rbac.RequirePermission("recurring", "delete"), h.Delete)
 }
 
@@ -143,7 +143,11 @@ func createRecurringPayload(orgID uuid.UUID, req dto.CreateRecurringExpenseReque
 		}
 		nextDueDate = parsed.UTC()
 	}
-	return recurringdomain.RecurringExpense{OrgID: orgID, Description: req.Description, Amount: req.Amount, Currency: req.Currency, Category: req.Category, PaymentMethod: req.PaymentMethod, Frequency: req.Frequency, DayOfMonth: req.DayOfMonth, SupplierID: supplierID, NextDueDate: nextDueDate, Notes: req.Notes, IsActive: true, CreatedBy: actor}, nil
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
+	return recurringdomain.RecurringExpense{OrgID: orgID, Description: req.Description, Amount: req.Amount, Currency: req.Currency, Category: req.Category, PaymentMethod: req.PaymentMethod, Frequency: req.Frequency, DayOfMonth: req.DayOfMonth, SupplierID: supplierID, NextDueDate: nextDueDate, Notes: req.Notes, IsActive: true, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: actor}, nil
 }
 
 func updateRecurringPayload(orgID, id uuid.UUID, req dto.UpdateRecurringExpenseRequest) (recurringdomain.RecurringExpense, error) {
@@ -178,6 +182,12 @@ func updateRecurringPayload(orgID, id uuid.UUID, req dto.UpdateRecurringExpenseR
 	}
 	if req.IsActive != nil {
 		payload.IsActive = *req.IsActive
+	}
+	if req.IsFavorite != nil {
+		payload.IsFavorite = *req.IsFavorite
+	}
+	if req.Tags != nil {
+		payload.Tags = *req.Tags
 	}
 	if req.NextDueDate != nil && strings.TrimSpace(*req.NextDueDate) != "" {
 		parsed, err := time.Parse("2006-01-02", strings.TrimSpace(*req.NextDueDate))

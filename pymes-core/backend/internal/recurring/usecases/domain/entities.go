@@ -18,6 +18,8 @@ type RecurringExpense struct {
 	DayOfMonth    int        `json:"day_of_month"`
 	SupplierID    *uuid.UUID `json:"supplier_id,omitempty"`
 	IsActive      bool       `json:"is_active"`
+	IsFavorite    bool       `json:"is_favorite"`
+	Tags          []string   `json:"tags"`
 	NextDueDate   time.Time  `json:"next_due_date"`
 	LastPaidDate  *time.Time `json:"last_paid_date,omitempty"`
 	Notes         string     `json:"notes"`

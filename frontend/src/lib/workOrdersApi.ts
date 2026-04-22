@@ -123,6 +123,9 @@ export type WorkOrder = {
 
   metadata: Record<string, unknown>;
 
+  is_favorite?: boolean;
+  tags?: string[];
+
   created_by: string;
   archived_at?: string | null;
   created_at: string;
@@ -260,7 +263,7 @@ export type UpdateWorkOrderInput = Partial<{
 }>;
 
 export async function updateWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PUT', body: data });
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PATCH', body: data });
 }
 
 export async function patchWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {

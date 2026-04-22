@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/repository/models"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/usecases/domain"
@@ -62,16 +64,18 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.DiningTab
 
 func (r *Repository) Create(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error) {
 	row := models.DiningTableModel{
-		ID:        uuid.New(),
-		OrgID:     in.OrgID,
-		AreaID:    in.AreaID,
-		Code:      in.Code,
-		Label:     in.Label,
-		Capacity:  in.Capacity,
-		Status:    in.Status,
-		Notes:     in.Notes,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		ID:         uuid.New(),
+		OrgID:      in.OrgID,
+		AreaID:     in.AreaID,
+		Code:       in.Code,
+		Label:      in.Label,
+		Capacity:   in.Capacity,
+		Status:     in.Status,
+		Notes:      in.Notes,
+		IsFavorite: in.IsFavorite,
+		Tags:       pq.StringArray(utils.NormalizeTags(in.Tags)),
+		CreatedAt:  time.Now().UTC(),
+		UpdatedAt:  time.Now().UTC(),
 	}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		if httperrors.IsUniqueViolation(err) {
@@ -95,13 +99,15 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.D
 
 func (r *Repository) Update(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error) {
 	updates := map[string]any{
-		"area_id":    in.AreaID,
-		"code":       in.Code,
-		"label":      in.Label,
-		"capacity":   in.Capacity,
-		"status":     in.Status,
-		"notes":      in.Notes,
-		"updated_at": time.Now().UTC(),
+		"area_id":     in.AreaID,
+		"code":        in.Code,
+		"label":       in.Label,
+		"capacity":    in.Capacity,
+		"status":      in.Status,
+		"notes":       in.Notes,
+		"is_favorite": in.IsFavorite,
+		"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningTableModel{}).
 		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
@@ -136,15 +142,17 @@ var ErrDuplicateTableCode = errors.New("duplicate table code")
 
 func toDomain(row models.DiningTableModel) domain.DiningTable {
 	return domain.DiningTable{
-		ID:        row.ID,
-		OrgID:     row.OrgID,
-		AreaID:    row.AreaID,
-		Code:      row.Code,
-		Label:     row.Label,
-		Capacity:  row.Capacity,
-		Status:    row.Status,
-		Notes:     row.Notes,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:         row.ID,
+		OrgID:      row.OrgID,
+		AreaID:     row.AreaID,
+		Code:       row.Code,
+		Label:      row.Label,
+		Capacity:   row.Capacity,
+		Status:     row.Status,
+		Notes:      row.Notes,
+		IsFavorite: row.IsFavorite,
+		Tags:       append([]string(nil), row.Tags...),
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
 	}
 }

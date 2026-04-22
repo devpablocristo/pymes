@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET("/professionals", h.List)
 	authGroup.POST("/professionals", h.Create)
 	authGroup.GET("/professionals/:id", h.Get)
-	authGroup.PUT("/professionals/:id", h.Update)
+	authGroup.PATCH("/professionals/:id", h.Update)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -106,6 +106,10 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.AcceptsNewClients != nil {
 		profile.AcceptsNewClients = *req.AcceptsNewClients
 	}
+	if req.IsFavorite != nil {
+		profile.IsFavorite = *req.IsFavorite
+	}
+	profile.Tags = req.Tags
 	out, err := h.uc.Create(c.Request.Context(), profile, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -145,6 +149,8 @@ func (h *Handler) Update(c *gin.Context) {
 		IsPublic:          req.IsPublic,
 		IsBookable:        req.IsBookable,
 		AcceptsNewClients: req.AcceptsNewClients,
+		IsFavorite:        req.IsFavorite,
+		Tags:              req.Tags,
 		Metadata:          req.Metadata,
 	}, a.Actor)
 	if err != nil {
@@ -155,6 +161,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func toProfileItem(in domain.ProfessionalProfile) dto.ProfileItem {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	item := dto.ProfileItem{
 		ID:                in.ID.String(),
 		OrgID:             in.OrgID.String(),
@@ -165,6 +175,8 @@ func toProfileItem(in domain.ProfessionalProfile) dto.ProfileItem {
 		IsPublic:          in.IsPublic,
 		IsBookable:        in.IsBookable,
 		AcceptsNewClients: in.AcceptsNewClients,
+		IsFavorite:        in.IsFavorite,
+		Tags:              tags,
 		Metadata:          in.Metadata,
 		CreatedAt:         in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:         in.UpdatedAt.UTC().Format(time.RFC3339),

@@ -25,7 +25,7 @@ import {
   toDateTimeInput,
   toRFC3339,
 } from '../../crud/resourceConfigs.shared';
-import { openCrudFormDialog } from '../crud';
+import { buildStandardInternalFields, formatTagCsv, openCrudFormDialog, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { buildStandardCrudViewModes } from '../crud/buildStandardCrudViewModes';
 
@@ -112,6 +112,8 @@ function buildCreatePayload(fields: FieldMapping, targetType: WorkOrderTargetKin
     currency: asOptionalString(values.currency) ?? 'ARS',
     opened_at: toRFC3339(values.opened_at) ?? new Date().toISOString(),
     promised_at: toRFC3339(values.promised_at),
+    is_favorite: Boolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
     items: parseWorkOrderItems(values.items),
   };
 }
@@ -130,6 +132,8 @@ function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: 
     internal_notes: asOptionalString(values.internal_notes),
     currency: asOptionalString(values.currency),
     promised_at: toRFC3339(values.promised_at),
+    is_favorite: Boolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
     items: parseWorkOrderItems(values.items),
   };
 }
@@ -288,6 +292,7 @@ export function createWorkOrdersCrudConfig({
     { key: 'diagnosis', label: 'Diagnóstico', type: 'textarea', fullWidth: true, createOnly: true },
     { key: 'notes', label: 'Notas para cliente', type: 'textarea', fullWidth: true, createOnly: true },
     { key: 'internal_notes', label: 'Notas internas', type: 'textarea', fullWidth: true, createOnly: true },
+    ...buildStandardInternalFields({ tagsPlaceholder: 'urgente, garantía, recurrente', includeNotes: false }),
     {
       key: 'items',
       label: 'Items',
@@ -367,6 +372,8 @@ export function createWorkOrdersCrudConfig({
       diagnosis: row.diagnosis ?? '',
       notes: row.notes ?? '',
       internal_notes: row.internal_notes ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
       items: stringifyJSON(row.items ?? []),
     }),
     isValid: (values) =>

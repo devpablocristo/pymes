@@ -84,6 +84,8 @@ type UpdateInput struct {
 	Name        *string
 	Description *string
 	IsActive    *bool
+	IsFavorite  *bool
+	Tags        *[]string
 }
 
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error) {
@@ -116,6 +118,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 
 	if len(current.Code) < 2 {

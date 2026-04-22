@@ -37,7 +37,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/purchases/"+crudpaths.SegmentArchived, rbac.RequirePermission("purchases", "read"), h.ListArchived)
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
-	auth.PUT("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
+	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
 	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
 	auth.DELETE("/purchases/:id", rbac.RequirePermission("purchases", "delete"), h.Delete)
 	auth.POST("/purchases/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("purchases", "delete"), h.Restore)

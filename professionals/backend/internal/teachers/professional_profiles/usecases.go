@@ -121,6 +121,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.AcceptsNewClients != nil {
 		current.AcceptsNewClients = *in.AcceptsNewClients
 	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
+	}
 	if in.Metadata != nil {
 		current.Metadata = *in.Metadata
 	}
@@ -164,6 +170,8 @@ type UpdateInput struct {
 	IsPublic          *bool
 	IsBookable        *bool
 	AcceptsNewClients *bool
+	IsFavorite        *bool
+	Tags              *[]string
 	Metadata          *map[string]any
 }
 

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type SpecialtyModel struct {
@@ -12,7 +13,9 @@ type SpecialtyModel struct {
 	Code        string    `gorm:"not null"`
 	Name        string    `gorm:"not null"`
 	Description string
-	IsActive    bool `gorm:"not null;default:true"`
+	IsActive    bool           `gorm:"not null;default:true"`
+	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
+	Tags        pq.StringArray `gorm:"type:text[]"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

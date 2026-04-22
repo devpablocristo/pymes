@@ -52,7 +52,7 @@ type supplierPartyRow struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]supplierdomain.Supplier, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.baseQuery(ctx, p.OrgID)
+	q := r.baseQuery(ctx, p.OrgID).Where("p.deleted_at IS NULL")
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
 		q = q.Where("? = ANY(p.tags)", tag)
 	}
@@ -347,7 +347,7 @@ func (r *Repository) baseQuery(ctx context.Context, orgID uuid.UUID) *gorm.DB {
 			COALESCE(pr.metadata->>'contact_name', p.metadata->>'contact_name', '') AS contact_name
 		`).
 		Joins("JOIN party_roles pr ON pr.party_id = p.id AND pr.org_id = p.org_id AND pr.role = 'supplier' AND pr.is_active = true").
-		Where("p.org_id = ? AND p.deleted_at IS NULL", orgID)
+		Where("p.org_id = ?", orgID)
 }
 
 func supplierFromPartyRow(row supplierPartyRow) supplierdomain.Supplier {

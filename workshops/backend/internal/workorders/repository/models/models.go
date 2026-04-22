@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
@@ -41,6 +42,9 @@ type WorkOrderModel struct {
 	DeliveredAt *time.Time
 
 	Metadata []byte `gorm:"type:jsonb;not null;default:'{}'"`
+
+	IsFavorite bool           `gorm:"column:is_favorite;not null"`
+	Tags       pq.StringArray `gorm:"type:text[]"`
 
 	CreatedBy  string     `gorm:"not null;default:''"`
 	ArchivedAt *time.Time `gorm:"column:archived_at"`

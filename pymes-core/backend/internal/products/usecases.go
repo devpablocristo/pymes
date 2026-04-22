@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	productdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/products/usecases/domain"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
@@ -107,9 +107,12 @@ type UpdateInput struct {
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (productdomain.Product, error) {
 	current, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			return productdomain.Product{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
 		}
+		return productdomain.Product{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "product"); err != nil {
 		return productdomain.Product{}, err
 	}
 	if in.SKU != nil {
@@ -149,9 +152,10 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 			current.ImageURL = ""
 		}
 	}
+	// Si el cliente manda sólo image_url (sin image_urls), actualiza el thumbnail
+	// sin borrar la galería existente. Para vaciar la galería hay que enviar image_urls=[].
 	if in.ImageURL != nil && in.ImageURLs == nil {
 		current.ImageURL = strings.TrimSpace(*in.ImageURL)
-		current.ImageURLs = nil
 	}
 	if in.TrackStock != nil {
 		current.TrackStock = *in.TrackStock

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/repository/models"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/intakes/usecases/domain"
 )
@@ -39,11 +41,13 @@ func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intak
 	row := models.IntakeModel{
 		ID:              uuid.New(),
 		OrgID:           in.OrgID,
-		BookingID:   in.BookingID,
+		BookingID:       in.BookingID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
 		ServiceID:       in.ServiceID,
 		Status:          in.Status,
+		IsFavorite:      in.IsFavorite,
+		Tags:            pq.StringArray(utils.NormalizeTags(in.Tags)),
 		Payload:         payload,
 		CreatedAt:       time.Now().UTC(),
 		UpdatedAt:       time.Now().UTC(),
@@ -69,10 +73,12 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.I
 func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intake, error) {
 	payload, _ := json.Marshal(in.Payload)
 	updates := map[string]any{
-		"booking_id":    in.BookingID,
+		"booking_id":        in.BookingID,
 		"customer_party_id": in.CustomerPartyID,
 		"service_id":        in.ServiceID,
 		"status":            in.Status,
+		"is_favorite":       in.IsFavorite,
+		"tags":              pq.StringArray(utils.NormalizeTags(in.Tags)),
 		"payload":           payload,
 		"updated_at":        time.Now().UTC(),
 	}
@@ -99,11 +105,13 @@ func toDomain(row models.IntakeModel) domain.Intake {
 	return domain.Intake{
 		ID:              row.ID,
 		OrgID:           row.OrgID,
-		BookingID:   row.BookingID,
+		BookingID:       row.BookingID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,
 		ServiceID:       coalesceServiceReference(row.ServiceID),
 		Status:          row.Status,
+		IsFavorite:      row.IsFavorite,
+		Tags:            append([]string(nil), row.Tags...),
 		Payload:         payload,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,

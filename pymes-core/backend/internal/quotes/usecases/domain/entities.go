@@ -19,6 +19,8 @@ type Quote struct {
 	TaxTotal     float64     `json:"tax_total"`
 	Total        float64     `json:"total"`
 	Currency     string      `json:"currency"`
+	IsFavorite   bool        `json:"is_favorite"`
+	Tags         []string    `json:"tags"`
 	Notes        string      `json:"notes"`
 	ValidUntil   *time.Time  `json:"valid_until,omitempty"`
 	CreatedBy    string      `json:"created_by"`

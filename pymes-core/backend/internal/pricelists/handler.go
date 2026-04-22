@@ -31,7 +31,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/price-lists", rbac.RequirePermission("price_lists", "read"), h.List)
 	auth.POST("/price-lists", rbac.RequirePermission("price_lists", "create"), h.Create)
 	auth.GET("/price-lists/:id", rbac.RequirePermission("price_lists", "read"), h.Get)
-	auth.PUT("/price-lists/:id", rbac.RequirePermission("price_lists", "update"), h.Update)
+	auth.PATCH("/price-lists/:id", rbac.RequirePermission("price_lists", "update"), h.Update)
 	auth.DELETE("/price-lists/:id", rbac.RequirePermission("price_lists", "delete"), h.Delete)
 }
 
@@ -118,6 +118,10 @@ func requestToDomain(orgID uuid.UUID, req dto.CreatePriceListRequest) pricelistd
 	if req.IsActive != nil {
 		active = *req.IsActive
 	}
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	items := make([]pricelistdomain.PriceListItem, 0, len(req.Items))
 	for _, item := range req.Items {
 		if item.ProductID != nil {
@@ -131,7 +135,7 @@ func requestToDomain(orgID uuid.UUID, req dto.CreatePriceListRequest) pricelistd
 			}
 		}
 	}
-	return pricelistdomain.PriceList{OrgID: orgID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, Items: items}
+	return pricelistdomain.PriceList{OrgID: orgID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, IsFavorite: isFavorite, Tags: req.Tags, Items: items}
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {

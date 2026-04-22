@@ -21,8 +21,10 @@ type ListParams struct {
 }
 
 type UpdateInput struct {
-	Name      *string
-	SortOrder *int
+	Name       *string
+	SortOrder  *int
+	IsFavorite *bool
+	Tags       *[]string
 }
 
 type RepositoryPort interface {
@@ -88,6 +90,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.SortOrder != nil {
 		current.SortOrder = *in.SortOrder
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = *in.Tags
 	}
 	if len(current.Name) < 2 {
 		return domain.DiningArea{}, fmt.Errorf("name too short: %w", httperrors.ErrBadInput)

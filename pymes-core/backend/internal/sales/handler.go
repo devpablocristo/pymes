@@ -19,6 +19,7 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateSaleInput) (saledomain.Sale, error)
+	Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
 }
@@ -33,6 +34,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/sales", rbac.RequirePermission("sales", "read"), h.List)
 	auth.POST("/sales", rbac.RequirePermission("sales", "create"), h.Create)
 	auth.GET("/sales/:id", rbac.RequirePermission("sales", "read"), h.Get)
+	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Update)
 	auth.POST("/sales/:id/void", rbac.RequirePermission("sales", "void"), h.Void)
 }
 
@@ -181,6 +183,10 @@ func (h *Handler) Create(c *gin.Context) {
 		})
 	}
 
+	isFavorite := false
+	if req.IsFavorite != nil {
+		isFavorite = *req.IsFavorite
+	}
 	out, err := h.uc.Create(c.Request.Context(), CreateSaleInput{
 		OrgID:         orgID,
 		BranchID:      branchID,
@@ -189,6 +195,8 @@ func (h *Handler) Create(c *gin.Context) {
 		QuoteID:       quoteID,
 		PaymentMethod: req.PaymentMethod,
 		Items:         items,
+		IsFavorite:    isFavorite,
+		Tags:          req.Tags,
 		Notes:         req.Notes,
 		CreatedBy:     a.Actor,
 	})
@@ -219,6 +227,38 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, toSaleResponse(out))
 }
 
+func (h *Handler) Update(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var req dto.UpdateSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	out, err := h.uc.Update(c.Request.Context(), UpdateSaleInput{
+		OrgID:      orgID,
+		ID:         id,
+		IsFavorite: req.IsFavorite,
+		Tags:       req.Tags,
+		Notes:      req.Notes,
+		Actor:      a.Actor,
+	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toSaleResponse(out))
+}
+
 func (h *Handler) Void(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
@@ -241,6 +281,10 @@ func (h *Handler) Void(c *gin.Context) {
 }
 
 func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
+	tags := in.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	resp := dto.SaleResponse{
 		ID:            in.ID.String(),
 		OrgID:         in.OrgID.String(),
@@ -253,6 +297,8 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 		TaxTotal:      in.TaxTotal,
 		Total:         in.Total,
 		Currency:      in.Currency,
+		IsFavorite:    in.IsFavorite,
+		Tags:          tags,
 		Notes:         in.Notes,
 		CreatedBy:     in.CreatedBy,
 		CreatedAt:     in.CreatedAt.UTC().Format(time.RFC3339),

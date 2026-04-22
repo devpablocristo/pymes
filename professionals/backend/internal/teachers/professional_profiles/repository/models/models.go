@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type ProfessionalProfileModel struct {
@@ -13,10 +14,12 @@ type ProfessionalProfileModel struct {
 	PublicSlug        string    `gorm:"not null"`
 	Bio               string
 	Headline          string
-	IsPublic          bool   `gorm:"not null;default:false"`
-	IsBookable        bool   `gorm:"not null;default:false"`
-	AcceptsNewClients bool   `gorm:"not null;default:true"`
-	Metadata          []byte `gorm:"type:jsonb"`
+	IsPublic          bool           `gorm:"not null;default:false"`
+	IsBookable        bool           `gorm:"not null;default:false"`
+	AcceptsNewClients bool           `gorm:"not null;default:true"`
+	IsFavorite        bool           `gorm:"column:is_favorite;not null"`
+	Tags              pq.StringArray `gorm:"type:text[]"`
+	Metadata          []byte         `gorm:"type:jsonb"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

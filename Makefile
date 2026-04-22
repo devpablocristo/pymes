@@ -8,7 +8,7 @@
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-LOCAL_INFRA_DIR = /home/pablo/Projects/Pablo/local-infra
+LOCAL_INFRA_DIR ?= /home/pablo/Projects/Pablo/local-infra
 DC = docker compose --project-directory $(CURDIR) -f $(LOCAL_INFRA_DIR)/docker-compose.yml -f $(CURDIR)/docker-compose.yml
 
 # Calidad

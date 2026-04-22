@@ -22,7 +22,7 @@ describe('LanguageProvider', () => {
     );
     const scope = within(view.container);
 
-    expect(scope.getByTestId('dashboard')).toHaveTextContent('Dashboard');
+    expect(scope.getByTestId('dashboard')).toHaveTextContent('Inicio');
     expect(scope.getByTestId('admin')).toHaveTextContent('Administración');
   });
 

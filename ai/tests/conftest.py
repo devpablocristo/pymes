@@ -84,6 +84,19 @@ def _ensure_runtime_package_stub() -> None:
     if "httpserver.errors" not in sys.modules:
         errors_mod = _t.ModuleType("httpserver.errors")
 
+        from dataclasses import dataclass, field
+        from typing import Any
+
+        @dataclass(slots=True)
+        class AppError(Exception):
+            code: str
+            message: str
+            status_code: int = 400
+            details: dict[str, Any] = field(default_factory=dict)
+
+            def __str__(self) -> str:
+                return self.message
+
         def error_payload(
             code: str = "",
             message: str = "",
@@ -99,6 +112,7 @@ def _ensure_runtime_package_stub() -> None:
                 }
             }
 
+        errors_mod.AppError = AppError  # type: ignore[attr-defined]
         errors_mod.error_payload = error_payload  # type: ignore[attr-defined]
         sys.modules["httpserver.errors"] = errors_mod
 

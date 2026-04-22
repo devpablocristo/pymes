@@ -991,7 +991,8 @@ export function ModulePage() {
     return (
       <PageLayout title="Módulo" lead="No se pudo resolver la configuración del módulo.">
         <div className="alert alert-error">
-          {crudModuleQuery.error instanceof Error ? crudModuleQuery.error.message : 'Error al cargar el módulo.'}
+          <p>No se pudo resolver la configuración del módulo.</p>
+          <p>{crudModuleQuery.error instanceof Error ? crudModuleQuery.error.message : 'Error al cargar el módulo.'}</p>
         </div>
       </PageLayout>
     );

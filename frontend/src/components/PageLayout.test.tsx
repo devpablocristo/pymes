@@ -1,11 +1,18 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { PageLayout } from './PageLayout';
 import { PageSearchProvider, usePageSearch } from './PageSearch';
 
+// PageLayout usa HeaderMenu, que a su vez llama useNavigate(). Necesita un Router.
+function renderWithRouter(ui: ReactNode) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe('PageLayout', () => {
   it('renderiza título sin subtítulo visible', () => {
-    render(
+    renderWithRouter(
       <PageLayout title="Título" lead="Subtítulo">
         <p>Contenido</p>
       </PageLayout>,
@@ -16,7 +23,7 @@ describe('PageLayout', () => {
   });
 
   it('usa cabecera split cuando hay acciones', () => {
-    render(
+    renderWithRouter(
       <PageLayout title="Panel" lead="Resumen" actions={<button type="button">Acción</button>}>
         <div>Cuerpo</div>
       </PageLayout>,
@@ -27,7 +34,7 @@ describe('PageLayout', () => {
   });
 
   it('renderiza acciones inline en la fila superior del header', () => {
-    render(
+    renderWithRouter(
       <PageLayout title="Panel" lead="Resumen" inlineActions={<button type="button">Sucursal</button>}>
         <div>Cuerpo</div>
       </PageLayout>,
@@ -49,7 +56,7 @@ describe('PageLayout', () => {
       );
     }
 
-    render(
+    renderWithRouter(
       <PageSearchProvider placeholder="Buscar...">
         <Fixture />
       </PageSearchProvider>,

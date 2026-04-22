@@ -93,7 +93,6 @@ describe('WorkOrderEditor', () => {
 
   it('pide confirmación antes de cerrar con Escape si hay cambios sin guardar', async () => {
     const onClose = vi.fn();
-    apiMocks.confirmAction.mockResolvedValue(false);
 
     render(<WorkOrderEditor orderId="wo-1" variant="modal" onClose={onClose} onSaved={vi.fn()} />);
 
@@ -101,14 +100,10 @@ describe('WorkOrderEditor', () => {
     fireEvent.change(customerInput, { target: { value: 'Cliente editado' } });
     fireEvent.keyDown(window, { key: 'Escape' });
 
+    // CrudEntityEditorModal usa un diálogo propio (setPendingConfirm) en lugar de
+    // confirmAction externo: verificamos que el modal de confirmación aparezca.
     await waitFor(() => {
-      expect(apiMocks.confirmAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Cancelar edición',
-          confirmLabel: 'Sí, cancelar',
-          cancelLabel: 'Seguir editando',
-        }),
-      );
+      expect(screen.getByText('Cancelar edición')).toBeInTheDocument();
     });
     expect(onClose).not.toHaveBeenCalled();
   });

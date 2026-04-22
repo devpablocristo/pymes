@@ -158,6 +158,13 @@ jobs:
           repository: devpablocristo/nexus
           path: nexus
 
+      - name: Checkout local-infra
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          repository: devpablocristo/local-infra
+          path: local-infra
+
       - name: Create env file
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
@@ -173,11 +180,20 @@ jobs:
       - name: Build and start governance stack
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
-        run: docker compose up -d --build review cp-backend
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+        run: |
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            up -d --build review cp-backend
 
       - name: Wait for review and cp-backend
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
         run: |
           for attempt in $(seq 1 60); do
             review_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
@@ -188,13 +204,18 @@ jobs:
             sleep 5
           done
           echo "review/cp-backend did not become ready in time" >&2
-          docker compose ps
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            ps
           exit 1
 
       - name: Run review notifications E2E
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
           # Runners compartidos: el callback review → cp-backend + persistencia en Postgres suele superar 20s.
           CALLBACK_TIMEOUT_SECONDS: "90"
         run: make e2e-review-notifications
@@ -202,9 +223,23 @@ jobs:
       - name: Print container logs on failure
         if: failure() && github.event_name == 'workflow_dispatch'
         working-directory: pymes
-        run: docker compose logs --no-color
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+        run: |
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            logs --no-color
 
       - name: Stop stack
         if: always() && github.event_name == 'workflow_dispatch'
         working-directory: pymes
-        run: docker compose down -v
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+        run: |
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            down -v

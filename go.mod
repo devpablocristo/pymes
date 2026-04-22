@@ -21,7 +21,7 @@ require (
 	github.com/devpablocristo/core/validate/go v0.1.1
 	github.com/devpablocristo/modules/crud/archive/go v0.1.0
 	github.com/devpablocristo/modules/crud/paths/go v0.1.0
-	github.com/devpablocristo/modules/scheduling/go v0.4.0
+	github.com/devpablocristo/modules/scheduling/go v0.5.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

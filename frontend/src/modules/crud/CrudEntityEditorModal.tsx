@@ -561,15 +561,15 @@ export function CrudEntityEditorModal({
           <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
             {closeLabel}
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={startEditing}
-            disabled={!allowEdit}
-            title={!allowEdit ? 'Este registro no admite edición' : undefined}
-          >
-            {editLabel}
-          </button>
+          {allowEdit ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={startEditing}
+            >
+              {editLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     ) : (

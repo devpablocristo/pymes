@@ -457,7 +457,16 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         }
         return out;
       };
-      let currentValues = editing && editorRow ? crudConfig.toFormValues(editorRow) : createInitialValues;
+      // Cuando el CRUD no declara formFields (inventory, audit, timeline), los
+      // campos se generan read-only desde columns. En ese caso preferimos
+      // fallbackFromRow para que los valores mostrados pasen por column.render
+      // (ej. "is_low_stock=false" → "Normal") en vez de exponer el bool crudo.
+      const useColumnFallback = declaredFields.length === 0;
+      let currentValues = editing && editorRow
+        ? useColumnFallback
+          ? fallbackFromRow(editorRow)
+          : crudConfig.toFormValues(editorRow)
+        : createInitialValues;
       if (editing && editorRow && Object.keys(currentValues).length === 0) {
         currentValues = fallbackFromRow(editorRow);
       }

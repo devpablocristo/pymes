@@ -198,16 +198,26 @@ export function parseInvoiceStatus(value: CrudFieldValue | undefined): InvoiceSt
 }
 
 export function createInvoiceCrudLineItems(value: CrudFieldValue | undefined): InvoiceLineItem[] {
-  return parseJSONArray<{ id?: string; description?: string; qty?: number; unit?: string; unitPrice?: number }>(
-    value,
-    'Los items deben ser un arreglo JSON',
-  ).map((item, index) => ({
-    id: String(item.id ?? index + 1),
-    description: String(item.description ?? ''),
-    qty: Number(item.qty ?? 1),
-    unit: String(item.unit ?? 'unidad'),
-    unitPrice: Number(item.unitPrice ?? 0),
-  }));
+  // Acepta tanto el formato legacy (qty, unitPrice) como el del editor visual
+  // compartido (quantity, unit_price/unit_cost). Ver CrudLineItemsEditor.
+  return parseJSONArray<{
+    id?: string;
+    description?: string;
+    qty?: number;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+    unit_price?: number;
+    unit_cost?: number;
+  }>(value, 'Los items deben ser un arreglo JSON')
+    .map((item, index) => ({
+      id: String(item.id ?? index + 1),
+      description: String(item.description ?? ''),
+      qty: Number(item.qty ?? item.quantity ?? 1),
+      unit: String(item.unit ?? 'unidad'),
+      unitPrice: Number(item.unitPrice ?? item.unit_price ?? item.unit_cost ?? 0),
+    }))
+    .filter((item) => item.description.trim().length > 0);
 }
 
 export async function createDemoInvoiceFromCrudValues(values: Record<string, CrudFieldValue | undefined>): Promise<void> {
@@ -397,7 +407,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     supportsArchived: true,
     editorModal: {
       eyebrow: 'Facturación',
-      sections: [{ id: 'default' }],
+      sections: [{ id: 'default' }, { id: 'items' }],
+      blocks: [buildCommercialLineItemsBlock()],
     },
     kanban: {
       card: {
@@ -429,14 +440,6 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
-      {
-        key: 'items',
-        label: 'Detalle',
-        type: 'textarea',
-        fullWidth: true,
-        required: true,
-        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
-      },
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -448,8 +451,11 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       tax: String(row.tax ?? 21),
       items: JSON.stringify(row.items ?? []),
     }),
-    isValid: (values) =>
-      asString(values.customer).trim().length >= 2 && asString(values.items).trim().length > 0,
+    isValid: (values) => {
+      if (asString(values.customer).trim().length < 2) return false;
+      const lines = createInvoiceCrudLineItems(values.items);
+      return lines.length > 0;
+    },
   };
 }
 
@@ -621,7 +627,8 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
 
   return {
     basePath: '/v1/sales',
-    allowEdit: false,
+    // El PATCH del backend solo acepta favorito/tags/notes (el resto es inmutable post-creación).
+    allowEdit: true,
     allowDelete: false,
     ...base.config,
     stateMachine,
@@ -647,10 +654,10 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         apiRequest<TRecord>(`/v1/sales/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
-      { key: 'customer_id', label: 'Cliente' },
-      buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
-      { key: 'quote_id', label: 'Presupuesto relacionado' },
-      buildPaymentMethodField(),
+      { key: 'customer_id', label: 'Cliente', createOnly: true },
+      { ...buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'), createOnly: true },
+      { key: 'quote_id', label: 'Presupuesto relacionado', createOnly: true },
+      { ...buildPaymentMethodField(), createOnly: true },
       ...buildStandardInternalFields({ tagsPlaceholder: 'venta, frecuente, prioridad', includeNotes: false }),
       buildCrudNotesField(),
     ],

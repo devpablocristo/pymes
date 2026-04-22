@@ -168,13 +168,14 @@ describe('billingHelpers', () => {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
+    ]);
+    expect(config.editorModal?.blocks).toEqual([
       {
-        key: 'items',
-        label: 'Detalle',
-        type: 'textarea',
-        fullWidth: true,
-        required: true,
-        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+        id: 'items',
+        kind: 'lineItems',
+        field: 'items',
+        sectionId: 'items',
+        visible: expect.any(Function),
       },
     ]);
     expect(config.toFormValues?.({

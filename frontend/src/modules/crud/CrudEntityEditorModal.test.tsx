@@ -520,7 +520,7 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
   });
 
-  it('can render an existing record in read-only mode with disabled edit button', () => {
+  it('can render an existing record in read-only mode without the edit button', () => {
     render(
       <CrudEntityEditorModal
         open
@@ -534,7 +534,7 @@ describe('CrudEntityEditorModal', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Editar' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Cerrar' })).toHaveLength(2);
   });
 

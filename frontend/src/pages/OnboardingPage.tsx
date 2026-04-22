@@ -127,6 +127,7 @@ const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
   workshops: 'onboarding.vertical.workshops',
   beauty: 'onboarding.vertical.beauty',
   restaurants: 'onboarding.vertical.restaurants',
+  medical: 'onboarding.vertical.medical',
 };
 
 type Step = 1 | 2 | 3 | 4;

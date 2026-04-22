@@ -43,7 +43,7 @@ describe('resourceConfigs.runtime', () => {
     expect(config).not.toBeNull();
     if (!config || !config.toBody) return;
 
-    expect(config.toFormValues({ id: '1', category: 'herramientas' })).toEqual({
+    expect(config.toFormValues({ id: '1', category: 'herramientas' } as { id: string })).toEqual({
       category: 'herramientas',
     });
     expect(config.toBody({ category: 'insumos' })).toEqual({

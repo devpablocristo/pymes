@@ -74,6 +74,19 @@ jobs:
           go test ./restaurants/backend/...
           go build ./restaurants/backend/...
 
+  medical-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify medical backend
+        run: |
+          go vet ./medical/backend/...
+          go test ./medical/backend/...
+          go build ./medical/backend/...
+
   ai:
     runs-on: ubuntu-latest
     permissions:

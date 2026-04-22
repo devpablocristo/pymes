@@ -1,6 +1,6 @@
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
-import { asOptionalNumber, asOptionalString, asString, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
+import { asOptionalString, asString, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
@@ -21,7 +21,6 @@ import { renderTagBadges } from '../../crud/crudTagBadges';
 import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   INVOICE_STATUS_LABELS,
-  invoiceInitials,
   type InvoiceLineItem,
   type InvoiceRecord,
   type InvoiceStatus,
@@ -365,7 +364,6 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     allowCreate: true,
     allowEdit: true,
     stateMachine,
-    basePath: '/v1/invoices',
     // REST contra pymes-core `/v1/invoices` con las 7 operaciones canónicas.
     dataSource: {
       ...existingDataSource,

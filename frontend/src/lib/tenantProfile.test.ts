@@ -195,6 +195,18 @@ describe('tenantProfileFromSettings', () => {
     expect(result!.usesScheduling).toBe(true);
   });
 
+  it('infers subVertical=bike_shop when backend sends vertical=bike_shop even without previous profile', () => {
+    mockStorage.getJSON.mockReturnValue(null);
+
+    const result = tenantProfileFromSettings(makeSettings({ vertical: 'bike_shop' }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        vertical: 'workshops',
+        subVertical: 'bike_shop',
+      }),
+    );
+  });
+
   it('preserves a compatible local sub-vertical when syncing from backend settings', () => {
     mockStorage.getJSON.mockReturnValue({
       ...FULL_PROFILE,

@@ -100,12 +100,17 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
 
   const previousProfile = getTenantProfile();
   const normalizedVertical = (vertical === 'bike_shop' ? 'workshops' : vertical) as VerticalType;
+  // Si el backend devuelve `vertical='bike_shop'` (alias directo del sub-vertical),
+  // lo promovemos a subVertical aunque no haya profile previo. Sin este fallback,
+  // el primer sync pierde la marca y el routing de work-orders cae en autoreparación.
+  const inferredSubVertical: SubVerticalType | undefined = vertical === 'bike_shop' ? 'bike_shop' : undefined;
   const preservedSubVertical =
-    previousProfile?.vertical === normalizedVertical &&
+    inferredSubVertical ??
+    (previousProfile?.vertical === normalizedVertical &&
     previousProfile.subVertical &&
     SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(previousProfile.subVertical)
       ? previousProfile.subVertical
-      : undefined;
+      : undefined);
 
   return {
     businessName: settings.business_name?.trim() || '',

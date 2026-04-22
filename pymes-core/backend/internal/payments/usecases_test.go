@@ -20,11 +20,35 @@ func (f *fakePaymentsRepo) ListSalePayments(context.Context, uuid.UUID, uuid.UUI
 	return nil, nil
 }
 
+func (f *fakePaymentsRepo) ListArchived(context.Context, uuid.UUID, int) ([]paymentsdomain.Payment, error) {
+	return nil, nil
+}
+
 func (f *fakePaymentsRepo) CreateSalePayment(context.Context, uuid.UUID, uuid.UUID, paymentsdomain.Payment) (paymentsdomain.Payment, error) {
 	if f.err != nil {
 		return paymentsdomain.Payment{}, f.err
 	}
 	return f.out, nil
+}
+
+func (f *fakePaymentsRepo) GetByID(context.Context, uuid.UUID, uuid.UUID) (paymentsdomain.Payment, error) {
+	return f.out, f.err
+}
+
+func (f *fakePaymentsRepo) Update(context.Context, paymentsdomain.Payment) (paymentsdomain.Payment, error) {
+	return f.out, f.err
+}
+
+func (f *fakePaymentsRepo) SoftDelete(context.Context, uuid.UUID, uuid.UUID) error {
+	return f.err
+}
+
+func (f *fakePaymentsRepo) Restore(context.Context, uuid.UUID, uuid.UUID) error {
+	return f.err
+}
+
+func (f *fakePaymentsRepo) HardDelete(context.Context, uuid.UUID, uuid.UUID) error {
+	return f.err
 }
 
 type fakeAudit struct {

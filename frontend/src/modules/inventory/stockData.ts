@@ -10,6 +10,9 @@ export type StockLevelRow = {
   min_quantity: number;
   track_stock?: boolean;
   is_low_stock: boolean;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
   updated_at: string;
   created_by?: string;
 };

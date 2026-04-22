@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	returnmodels "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/repository/models"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )
@@ -180,7 +182,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ?", orgID).
+		Where("r.org_id = ? AND r.deleted_at IS NULL", orgID).
 		Order("r.created_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -192,6 +194,94 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 		out = append(out, toReturnDomain(row.ReturnModel, nil, row.PartyID, row.PartyName))
 	}
 	return out, nil
+}
+
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
+	if err != nil {
+		return nil, err
+	}
+	salePartyNameExpr, err := r.salesPartyNameSelectExpr(ctx, "s")
+	if err != nil {
+		return nil, err
+	}
+	var rows []returnWithPartyRow
+	err = r.db.WithContext(ctx).Table("returns r").
+		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
+		Joins("JOIN sales s ON s.id = r.sale_id").
+		Where("r.org_id = ? AND r.deleted_at IS NOT NULL", orgID).
+		Order("r.deleted_at DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]returndomain.Return, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toReturnDomain(row.ReturnModel, nil, row.PartyID, row.PartyName))
+	}
+	return out, nil
+}
+
+func (r *Repository) Update(ctx context.Context, in returndomain.Return) (returndomain.Return, error) {
+	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Updates(map[string]any{
+			"notes":       strings.TrimSpace(in.Notes),
+			"is_favorite": in.IsFavorite,
+			"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+		})
+	if res.Error != nil {
+		return returndomain.Return{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return returndomain.Return{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Update("deleted_at", time.Now().UTC())
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) RestoreArchived(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Update("deleted_at", nil)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("return_id = ?", id).Delete(&returnmodels.ReturnItemModel{}).Error; err != nil {
+			return err
+		}
+		res := tx.Where("org_id = ? AND id = ?", orgID, id).Delete(&returnmodels.ReturnModel{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	return err
 }
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error) {
@@ -207,7 +297,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndo
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.id = ?", orgID, id).
+		Where("r.org_id = ? AND r.id = ? AND r.deleted_at IS NULL", orgID, id).
 		Take(&row).Error
 	if err != nil {
 		return returndomain.Return{}, err
@@ -477,7 +567,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 }
 
 func toReturnDomain(row returnmodels.ReturnModel, items []returnmodels.ReturnItemModel, partyID *uuid.UUID, partyName string) returndomain.Return {
-	out := returndomain.Return{ID: row.ID, OrgID: row.OrgID, Number: row.Number, SaleID: row.SaleID, PartyID: partyID, PartyName: partyName, Reason: row.Reason, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, RefundMethod: row.RefundMethod, Status: row.Status, Notes: row.Notes, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
+	out := returndomain.Return{ID: row.ID, OrgID: row.OrgID, Number: row.Number, SaleID: row.SaleID, PartyID: partyID, PartyName: partyName, Reason: row.Reason, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, RefundMethod: row.RefundMethod, Status: row.Status, Notes: row.Notes, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), ArchivedAt: row.DeletedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
 	for _, item := range items {
 		out.Items = append(out.Items, returndomain.ReturnItem{ID: item.ID, ReturnID: item.ReturnID, SaleItemID: item.SaleItemID, ProductID: item.ProductID, Description: item.Description, Quantity: item.Quantity, UnitPrice: item.UnitPrice, TaxRate: item.TaxRate, Subtotal: item.Subtotal})
 	}

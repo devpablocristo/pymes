@@ -1,8 +1,8 @@
 import type { CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
-import { asString, formatDate } from '../../crud/resourceConfigs.shared';
+import { asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { parseReturnSaleItemsJson, validateReturnForm } from '../../crud/operationsCrudHelpers';
-import { buildStandardCrudViewModes } from '../crud';
+import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 type ReturnRow = {
@@ -14,6 +14,10 @@ type ReturnRow = {
   total: number;
   refund_method: string;
   status: string;
+  notes?: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
   created_at: string;
 };
 
@@ -24,13 +28,11 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
     label: 'devolución',
     labelPlural: 'devoluciones',
     labelPluralCap: 'Devoluciones',
-    supportsArchived: false,
-    allowRestore: false,
-    allowHardDelete: false,
+    supportsArchived: true,
     allowCreate: true,
     createLabel: '+ Nueva devolución',
-    allowEdit: false,
-    allowDelete: false,
+    allowEdit: true,
+    allowDelete: true,
     searchPlaceholder: 'Buscar...',
     emptyState:
       'No hay devoluciones. Podés registrar una con «Nueva devolución» (venta, ítems en JSON) o desde la venta en la API.',
@@ -44,12 +46,13 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
       { key: 'created_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
-      { key: 'sale_id', label: 'ID de venta (UUID)', required: true, placeholder: 'UUID de la venta' },
+      { key: 'sale_id', label: 'ID de venta (UUID)', required: true, placeholder: 'UUID de la venta', createOnly: true },
       {
         key: 'refund_method',
         label: 'Medio de reembolso',
         type: 'select',
         required: true,
+        createOnly: true,
         options: [
           { label: 'Efectivo / similar', value: 'cash' },
           { label: 'Nota de crédito', value: 'credit_note' },
@@ -60,6 +63,7 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
         key: 'reason',
         label: 'Motivo',
         type: 'select',
+        createOnly: true,
         options: [
           { label: 'Defectuoso', value: 'defective' },
           { label: 'Artículo incorrecto', value: 'wrong_item' },
@@ -74,8 +78,10 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
         type: 'textarea',
         fullWidth: true,
         required: true,
+        createOnly: true,
         placeholder: '[{"sale_item_id":"<uuid>","quantity":1}]',
       },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'devolución, prioridad, defecto', includeNotes: false }),
     ],
     dataSource: {
       create: async (values) => {
@@ -98,14 +104,21 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
     },
     searchText: (row) =>
       [row.number, row.sale_id, row.party_name, row.reason, row.status, row.refund_method].filter(Boolean).join(' '),
-    toFormValues: () =>
+    toFormValues: (row?: ReturnRow) =>
       ({
-        sale_id: '',
-        refund_method: 'cash',
-        reason: 'other',
-        notes: '',
+        sale_id: row?.sale_id ?? '',
+        refund_method: row?.refund_method ?? 'cash',
+        reason: row?.reason ?? 'other',
+        notes: row?.notes ?? '',
         items: '[{"sale_item_id":"","quantity":1}]',
+        is_favorite: row?.is_favorite ?? false,
+        tags: formatTagCsv(row?.tags),
       }) as CrudFormValues,
+    toBody: (values) => ({
+      notes: asOptionalString(values.notes) ?? undefined,
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
+    }),
     isValid: validateReturnForm,
     rowActions: [
       {

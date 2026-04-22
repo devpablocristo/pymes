@@ -4,22 +4,26 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type ReturnModel struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID        uuid.UUID `gorm:"type:uuid;index;not null"`
-	Number       string    `gorm:"not null"`
-	SaleID       uuid.UUID `gorm:"type:uuid;not null"`
-	Reason       string    `gorm:"not null"`
-	Subtotal     float64   `gorm:"type:numeric(15,2);not null"`
-	TaxTotal     float64   `gorm:"type:numeric(15,2);not null"`
-	Total        float64   `gorm:"type:numeric(15,2);not null"`
-	RefundMethod string    `gorm:"not null"`
-	Status       string    `gorm:"not null"`
-	Notes        string    `gorm:"not null;default:''"`
-	CreatedBy    string    `gorm:"default:''"`
-	CreatedAt    time.Time `gorm:"not null"`
+	ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OrgID        uuid.UUID      `gorm:"type:uuid;index;not null"`
+	Number       string         `gorm:"not null"`
+	SaleID       uuid.UUID      `gorm:"type:uuid;not null"`
+	Reason       string         `gorm:"not null"`
+	Subtotal     float64        `gorm:"type:numeric(15,2);not null"`
+	TaxTotal     float64        `gorm:"type:numeric(15,2);not null"`
+	Total        float64        `gorm:"type:numeric(15,2);not null"`
+	RefundMethod string         `gorm:"not null"`
+	Status       string         `gorm:"not null"`
+	Notes        string         `gorm:"not null;default:''"`
+	IsFavorite   bool           `gorm:"column:is_favorite;not null"`
+	Tags         pq.StringArray `gorm:"type:text[]"`
+	DeletedAt    *time.Time     `gorm:"column:deleted_at;index"`
+	CreatedBy    string         `gorm:"default:''"`
+	CreatedAt    time.Time      `gorm:"not null"`
 }
 
 func (ReturnModel) TableName() string { return "returns" }

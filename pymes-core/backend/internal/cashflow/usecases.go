@@ -2,19 +2,29 @@ package cashflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
+	"github.com/devpablocristo/core/errors/go/domainerr"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	cashdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error)
 	Create(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error)
+	Update(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 	Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
 	DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
@@ -35,6 +45,91 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error) {
 	return u.repo.List(ctx, p)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
+}
+
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return cashdomain.CashMovement{}, domainerr.NotFoundf("cash_movement", id.String())
+		}
+		return cashdomain.CashMovement{}, err
+	}
+	return out, nil
+}
+
+func (u *Usecases) Update(ctx context.Context, in cashdomain.CashMovement, actor string) (cashdomain.CashMovement, error) {
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return cashdomain.CashMovement{}, domainerr.NotFoundf("cash_movement", in.ID.String())
+		}
+		return cashdomain.CashMovement{}, err
+	}
+	if err := archive.IfArchived(current.ArchivedAt, "cash_movement"); err != nil {
+		return cashdomain.CashMovement{}, err
+	}
+	// El tipo e importe son inmutables: solo editamos metadatos (favoritos, tags,
+	// categoría, descripción, medio de pago) para mantener la integridad del log.
+	current.Category = strings.TrimSpace(in.Category)
+	current.Description = strings.TrimSpace(in.Description)
+	current.PaymentMethod = strings.TrimSpace(in.PaymentMethod)
+	current.IsFavorite = in.IsFavorite
+	current.Tags = in.Tags
+	out, err := u.repo.Update(ctx, current)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return cashdomain.CashMovement{}, domainerr.NotFoundf("cash_movement", in.ID.String())
+		}
+		return cashdomain.CashMovement{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, out.OrgID.String(), actor, "cashflow.updated", "cash_movement", out.ID.String(), nil)
+	}
+	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("cash_movement", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.archived", "cash_movement", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("cash_movement", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.restored", "cash_movement", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domainerr.NotFoundf("cash_movement", id.String())
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "cashflow.hard_deleted", "cash_movement", id.String(), nil)
+	}
+	return nil
 }
 
 func (u *Usecases) CreateManual(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error) {

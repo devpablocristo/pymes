@@ -10,13 +10,19 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	returndomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/returns/usecases/domain"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error)
 	Create(ctx context.Context, in CreateReturnInput) (returndomain.Return, *returndomain.CreditNote, error)
+	Update(ctx context.Context, in returndomain.Return) (returndomain.Return, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	RestoreArchived(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
 	Void(ctx context.Context, orgID, id uuid.UUID, actor string) (returndomain.Return, error)
 	ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error)
 	GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (returndomain.CreditNote, error)
@@ -49,6 +55,61 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, timeline TimelinePort, we
 
 func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	return u.repo.List(ctx, orgID, limit)
+}
+
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
+}
+
+func (u *Usecases) Update(ctx context.Context, in returndomain.Return, actor string) (returndomain.Return, error) {
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	if err != nil {
+		return returndomain.Return{}, translate(err, "return", in.ID.String())
+	}
+	if err := archive.IfArchived(current.ArchivedAt, "return"); err != nil {
+		return returndomain.Return{}, err
+	}
+	current.Notes = strings.TrimSpace(in.Notes)
+	current.IsFavorite = in.IsFavorite
+	current.Tags = in.Tags
+	out, err := u.repo.Update(ctx, current)
+	if err != nil {
+		return returndomain.Return{}, translate(err, "return", in.ID.String())
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, out.OrgID.String(), actor, "return.updated", "return", out.ID.String(), nil)
+	}
+	return out, nil
+}
+
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+		return translate(err, "return", id.String())
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "return.archived", "return", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) RestoreArchived(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.RestoreArchived(ctx, orgID, id); err != nil {
+		return translate(err, "return", id.String())
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "return.restored", "return", id.String(), nil)
+	}
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+		return translate(err, "return", id.String())
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "return.hard_deleted", "return", id.String(), nil)
+	}
+	return nil
 }
 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error) {

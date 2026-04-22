@@ -1,19 +1,30 @@
 package dto
 
 type CashMovementItem struct {
-	ID            string  `json:"id"`
-	OrgID         string  `json:"org_id"`
-	BranchID      string  `json:"branch_id,omitempty"`
-	Type          string  `json:"type"`
-	Amount        float64 `json:"amount"`
-	Currency      string  `json:"currency"`
-	Category      string  `json:"category"`
-	Description   string  `json:"description"`
-	PaymentMethod string  `json:"payment_method"`
-	ReferenceType string  `json:"reference_type"`
-	ReferenceID   string  `json:"reference_id,omitempty"`
-	CreatedBy     string  `json:"created_by"`
-	CreatedAt     string  `json:"created_at"`
+	ID            string   `json:"id"`
+	OrgID         string   `json:"org_id"`
+	BranchID      string   `json:"branch_id,omitempty"`
+	Type          string   `json:"type"`
+	Amount        float64  `json:"amount"`
+	Currency      string   `json:"currency"`
+	Category      string   `json:"category"`
+	Description   string   `json:"description"`
+	PaymentMethod string   `json:"payment_method"`
+	ReferenceType string   `json:"reference_type"`
+	ReferenceID   string   `json:"reference_id,omitempty"`
+	IsFavorite    bool     `json:"is_favorite"`
+	Tags          []string `json:"tags"`
+	ArchivedAt    string   `json:"archived_at,omitempty"`
+	CreatedBy     string   `json:"created_by"`
+	CreatedAt     string   `json:"created_at"`
+}
+
+type UpdateCashMovementRequest struct {
+	Category      *string   `json:"category"`
+	Description   *string   `json:"description"`
+	PaymentMethod *string   `json:"payment_method"`
+	IsFavorite    *bool     `json:"is_favorite"`
+	Tags          *[]string `json:"tags"`
 }
 
 type ListCashMovementsResponse struct {
@@ -24,15 +35,17 @@ type ListCashMovementsResponse struct {
 }
 
 type CreateCashMovementRequest struct {
-	Type          string  `json:"type" binding:"required"`
-	Amount        float64 `json:"amount" binding:"required"`
-	BranchID      *string `json:"branch_id"`
-	Category      string  `json:"category"`
-	Description   string  `json:"description"`
-	PaymentMethod string  `json:"payment_method"`
-	ReferenceType string  `json:"reference_type"`
-	ReferenceID   *string `json:"reference_id"`
-	Currency      *string `json:"currency"`
+	Type          string   `json:"type" binding:"required"`
+	Amount        float64  `json:"amount" binding:"required"`
+	BranchID      *string  `json:"branch_id"`
+	Category      string   `json:"category"`
+	Description   string   `json:"description"`
+	PaymentMethod string   `json:"payment_method"`
+	ReferenceType string   `json:"reference_type"`
+	ReferenceID   *string  `json:"reference_id"`
+	Currency      *string  `json:"currency"`
+	IsFavorite    *bool    `json:"is_favorite"`
+	Tags          []string `json:"tags"`
 }
 
 type CashSummaryResponse struct {

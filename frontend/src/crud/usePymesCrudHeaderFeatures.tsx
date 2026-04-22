@@ -67,16 +67,23 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
   );
   const hasTagSignals = normalizedTagValues.length > 0;
 
+  // Las etiquetas internas (tags) son la franja canónica de filtro rápido en el header.
+  // Siempre aparecen cuando hay al menos un tag en los datos — se priorizan sobre el
+  // filtro por creador, que queda como fallback solo si no hay tags. Esto evita que
+  // aparezcan chips tipo "Asignado a mí", "Seeds" o actor ids en lugar de tags.
+  const tagFilterEnabled = hasTagSignals;
+
   const creatorFilterEnabled =
-    enableCreatorFilter && crudConfig?.featureFlags?.creatorFilter !== false && hasCreatorSignals;
+    enableCreatorFilter &&
+    crudConfig?.featureFlags?.creatorFilter !== false &&
+    hasCreatorSignals &&
+    !tagFilterEnabled;
   const headerQuickFilterStripEnabled = creatorFilterEnabled && listHeaderInlineSlot != null;
 
   const creatorFilteredItems = useMemo(
     () => (creatorFilterEnabled && preSearchFilter ? preSearchFilter(items) : items),
     [creatorFilterEnabled, items, preSearchFilter],
   );
-
-  const tagFilterEnabled = !creatorFilterEnabled && hasTagSignals;
 
   const tagFilterOptions = useMemo(
     () =>

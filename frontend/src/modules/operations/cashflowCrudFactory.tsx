@@ -1,7 +1,7 @@
 import type { CrudPageConfig } from '../../components/CrudPage';
 import { asNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { formatOperationsMoney } from '../../crud/operationsCrudHelpers';
-import { buildStandardCrudViewModes } from '../crud';
+import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 
@@ -16,6 +16,9 @@ type CashMovementRow = {
   payment_method: string;
   reference_type: string;
   reference_id?: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
   created_by: string;
   created_at: string;
 };
@@ -27,8 +30,10 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
     label: 'movimiento',
     labelPlural: 'movimientos',
     labelPluralCap: 'Movimientos de caja',
-    allowEdit: false,
+    // Tipo/importe/fecha son inmutables (log contable), pero favorito/tags/categoría/descripción/medio sí son editables.
+    allowEdit: true,
     allowDelete: false,
+    supportsArchived: true,
     createLabel: '+ Registrar movimiento',
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay movimientos en el rango consultado.',
@@ -47,18 +52,20 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
         label: 'Tipo',
         type: 'select',
         required: true,
+        createOnly: true,
         options: [
           { label: 'Ingreso', value: 'income' },
           { label: 'Egreso', value: 'expense' },
         ],
       },
-      { key: 'amount', label: 'Importe', type: 'number', required: true, placeholder: '0.00' },
+      { key: 'amount', label: 'Importe', type: 'number', required: true, placeholder: '0.00', createOnly: true },
       { key: 'category', label: 'Categoría', placeholder: 'other, payroll, supplier…' },
       { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
       { key: 'payment_method', label: 'Medio de pago', placeholder: 'cash, transfer, card…' },
-      { key: 'reference_type', label: 'Tipo referencia', placeholder: 'manual (default)' },
-      { key: 'reference_id', label: 'ID referencia (UUID)', placeholder: 'opcional' },
-      { key: 'currency', label: 'Moneda', placeholder: 'ARS (default org)' },
+      { key: 'reference_type', label: 'Tipo referencia', placeholder: 'manual (default)', createOnly: true },
+      { key: 'reference_id', label: 'ID referencia (UUID)', placeholder: 'opcional', createOnly: true },
+      { key: 'currency', label: 'Moneda', placeholder: 'ARS (default org)', createOnly: true },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'caja, urgente, conciliado', includeNotes: false }),
     ],
     searchText: (row) =>
       [
@@ -81,6 +88,8 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
       reference_type: row.reference_type ?? '',
       reference_id: row.reference_id ?? '',
       currency: row.currency ?? '',
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
     }),
     toBody: (values) => ({
       branch_id: readActiveBranchId() ?? undefined,
@@ -92,6 +101,8 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
       reference_type: asOptionalString(values.reference_type) || undefined,
       reference_id: asOptionalString(values.reference_id) || undefined,
       currency: asOptionalString(values.currency) || undefined,
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
     }),
     isValid: (values) => {
       const ty = asString(values.type);

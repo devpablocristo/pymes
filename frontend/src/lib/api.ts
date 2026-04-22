@@ -172,6 +172,9 @@ export type SalePaymentRow = {
   amount: number;
   notes?: string;
   received_at: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  archived_at?: string | null;
   created_by?: string;
   created_at?: string;
 };

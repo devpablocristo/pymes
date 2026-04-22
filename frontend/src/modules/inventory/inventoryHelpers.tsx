@@ -330,8 +330,9 @@ export function createStockCrudConfig<T extends StockRecord>(options: {
     labelPlural: 'productos en el inventario',
     labelPluralCap: 'Inventario',
     allowCreate: false,
-    allowEdit: false,
-    allowDelete: false,
+    // Inventario edita el producto subyacente (favoritos/tags/stock min) vía /v1/products/:id.
+    allowEdit: true,
+    allowDelete: true,
     supportsArchived: true,
     archivedEmptyState: 'No hay productos archivados en inventario.',
     searchPlaceholder: 'Buscar...',

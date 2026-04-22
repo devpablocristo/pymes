@@ -18,6 +18,9 @@ type CashMovement struct {
 	PaymentMethod string     `json:"payment_method"`
 	ReferenceType string     `json:"reference_type"`
 	ReferenceID   *uuid.UUID `json:"reference_id,omitempty"`
+	IsFavorite    bool       `json:"is_favorite"`
+	Tags          []string   `json:"tags"`
+	ArchivedAt    *time.Time `json:"archived_at,omitempty"`
 	CreatedBy     string     `json:"created_by"`
 	CreatedAt     time.Time  `json:"created_at"`
 }

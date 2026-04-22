@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/cashflow/repository/models"
@@ -69,7 +71,7 @@ func applyBranchFilter(db *gorm.DB, alias string, branchID *uuid.UUID) *gorm.DB 
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Table("cash_movements cm").Where("cm.org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Table("cash_movements cm").Where("cm.org_id = ? AND cm.deleted_at IS NULL", p.OrgID)
 	q = applyBranchFilter(q, "cm", p.BranchID)
 	if t := strings.TrimSpace(p.Type); t != "" {
 		q = q.Where("cm.type = ?", t)
@@ -123,6 +125,8 @@ func (r *Repository) Create(ctx context.Context, in cashdomain.CashMovement) (ca
 		PaymentMethod: in.PaymentMethod,
 		ReferenceType: in.ReferenceType,
 		ReferenceID:   in.ReferenceID,
+		IsFavorite:    in.IsFavorite,
+		Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
 		CreatedBy:     in.CreatedBy,
 		CreatedAt:     time.Now().UTC(),
 	}
@@ -130,6 +134,90 @@ func (r *Repository) Create(ctx context.Context, in cashdomain.CashMovement) (ca
 		return cashdomain.CashMovement{}, err
 	}
 	return toDomain(row), nil
+}
+
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error) {
+	var row models.CashMovementModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Take(&row).Error; err != nil {
+		return cashdomain.CashMovement{}, err
+	}
+	return toDomain(row), nil
+}
+
+func (r *Repository) Update(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error) {
+	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Updates(map[string]any{
+			"category":       in.Category,
+			"description":    in.Description,
+			"payment_method": in.PaymentMethod,
+			"is_favorite":    in.IsFavorite,
+			"tags":           pq.StringArray(utils.NormalizeTags(in.Tags)),
+		})
+	if res.Error != nil {
+		return cashdomain.CashMovement{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return cashdomain.CashMovement{}, gorm.ErrRecordNotFound
+	}
+	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error) {
+	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	var rows []models.CashMovementModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND deleted_at IS NOT NULL", orgID).
+		Order("deleted_at DESC").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]cashdomain.CashMovement, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDomain(row))
+	}
+	return out, nil
+}
+
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	now := time.Now().UTC()
+	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Update("deleted_at", now)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Model(&models.CashMovementModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Update("deleted_at", nil)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.CashMovementModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *Repository) GetCurrency(ctx context.Context, orgID uuid.UUID) string {
@@ -150,7 +238,7 @@ func (r *Repository) Summary(ctx context.Context, orgID uuid.UUID, branchID *uui
 	q = applyBranchFilter(q, "cm", branchID)
 	if err := q.
 		Select("COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("cm.org_id = ? AND cm.created_at >= ? AND cm.created_at <= ?", orgID, from, to).
+		Where("cm.org_id = ? AND cm.deleted_at IS NULL AND cm.created_at >= ? AND cm.created_at <= ?", orgID, from, to).
 		Take(&agg).Error; err != nil {
 		return cashdomain.CashSummary{}, err
 	}
@@ -175,7 +263,7 @@ func (r *Repository) DailySummary(ctx context.Context, orgID uuid.UUID, branchID
 	q = applyBranchFilter(q, "cm", branchID)
 	if err := q.
 		Select("date_trunc('day', created_at) as day, COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),0) as expense").
-		Where("cm.org_id = ? AND cm.created_at >= ?", orgID, start).
+		Where("cm.org_id = ? AND cm.deleted_at IS NULL AND cm.created_at >= ?", orgID, start).
 		Group("day").
 		Order("day ASC").
 		Find(&rows).Error; err != nil {
@@ -218,6 +306,9 @@ func toDomain(row models.CashMovementModel) cashdomain.CashMovement {
 		PaymentMethod: row.PaymentMethod,
 		ReferenceType: row.ReferenceType,
 		ReferenceID:   row.ReferenceID,
+		IsFavorite:    row.IsFavorite,
+		Tags:          append([]string(nil), row.Tags...),
+		ArchivedAt:    row.DeletedAt,
 		CreatedBy:     row.CreatedBy,
 		CreatedAt:     row.CreatedAt,
 	}

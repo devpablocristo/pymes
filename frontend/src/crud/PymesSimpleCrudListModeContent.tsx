@@ -511,7 +511,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         row: editorRow,
         confirmDiscard: crudConfig.editorModal?.confirmDiscard,
         archiveAction:
-          editing && editorRow && !archived && crudConfig.supportsArchived
+          editing && editorRow && !archived && crudConfig.supportsArchived && crudConfig.allowDelete !== false
             ? {
                 label: 'Archivar',
                 busyLabel: 'Archivando…',

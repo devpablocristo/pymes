@@ -20,6 +20,9 @@ type Return struct {
 	RefundMethod string       `json:"refund_method"`
 	Status       string       `json:"status"`
 	Notes        string       `json:"notes"`
+	IsFavorite   bool         `json:"is_favorite"`
+	Tags         []string     `json:"tags"`
+	ArchivedAt   *time.Time   `json:"archived_at,omitempty"`
 	CreatedBy    string       `json:"created_by"`
 	CreatedAt    time.Time    `json:"created_at"`
 	Items        []ReturnItem `json:"items,omitempty"`

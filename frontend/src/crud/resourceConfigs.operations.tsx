@@ -8,6 +8,8 @@ import {
   createReturnsCrudConfig,
 } from '../modules/operations';
 import { apiRequest } from '../lib/api';
+import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../modules/crud';
+import { asOptionalString } from './resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from './PymesSimpleCrudListModeContent';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import { defineCrudDomain } from './defineCrudDomain';
@@ -28,6 +30,19 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
     }),
     dataSource: {
       list: async ({ archived }) => fetchStockLevels({ archived: Boolean(archived) }),
+      // Update, deleteItem y restore van contra products: el inventario es una vista derivada.
+      update: async (row: StockLevelRow, values) => {
+        await apiRequest(`/v1/products/${row.product_id}`, {
+          method: 'PATCH',
+          body: {
+            is_favorite: Boolean(values.is_favorite),
+            tags: parseTagCsv(values.tags),
+          },
+        });
+      },
+      deleteItem: async (row: StockLevelRow) => {
+        await apiRequest(`/v1/products/${row.product_id}`, { method: 'DELETE' });
+      },
       restore: async (row: StockLevelRow) => {
         await apiRequest(`/v1/products/${row.product_id}/restore`, { method: 'POST', body: {} });
       },
@@ -35,7 +50,13 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
         await apiRequest(`/v1/products/${row.product_id}/hard`, { method: 'DELETE' });
       },
     },
-    formFields: [],
+    formFields: [
+      { key: 'product_name', label: 'Nombre', createOnly: false, required: false },
+      { key: 'sku', label: 'SKU' },
+      { key: 'quantity', label: 'Stock actual', type: 'number' },
+      { key: 'min_quantity', label: 'Stock mínimo', type: 'number' },
+      ...buildStandardInternalFields({ tagsPlaceholder: 'inventario, urgente, reponer', includeNotes: false }),
+    ],
     searchText: (row: StockLevelRow) =>
       [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
     toFormValues: (row: StockLevelRow) => ({
@@ -44,8 +65,13 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       sku: row.sku ?? '',
       quantity: String(row.quantity ?? ''),
       min_quantity: String(row.min_quantity ?? ''),
-      is_low_stock: row.is_low_stock ? 'true' : 'false',
-      updated_at: String(row.updated_at ?? ''),
+      is_favorite: row.is_favorite ?? false,
+      tags: formatTagCsv(row.tags),
+    }),
+    toBody: (values) => ({
+      is_favorite: Boolean(values.is_favorite),
+      tags: parseTagCsv(values.tags),
+      notes: asOptionalString(values.notes),
     }),
     isValid: () => true,
   },

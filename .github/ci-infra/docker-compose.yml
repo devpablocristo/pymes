@@ -1,0 +1,32 @@
+# Overlay compose usado por el CI para proveer `postgres` y `review-postgres`
+# sin depender del repo externo `local-infra` (su layout difiere entre local y
+# remoto, lo que rompía el smoke test del E2E).
+#
+# Se combina con `docker-compose.yml` del proyecto:
+#   docker compose -f .github/ci-compose.yml -f docker-compose.yml up ...
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pymes
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  review-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus_review
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_review"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

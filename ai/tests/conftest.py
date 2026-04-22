@@ -116,5 +116,25 @@ def _ensure_runtime_package_stub() -> None:
         errors_mod.error_payload = error_payload  # type: ignore[attr-defined]
         sys.modules["httpserver.errors"] = errors_mod
 
+    if "httpserver.fastapi_bootstrap" not in sys.modules:
+        fastapi_bootstrap_mod = _t.ModuleType("httpserver.fastapi_bootstrap")
+
+        def apply_permissive_cors(*args, **kwargs):
+            _ = (args, kwargs)
+            return None
+
+        def install_request_context_middleware(*args, **kwargs):
+            _ = (args, kwargs)
+            return None
+
+        def register_common_exception_handlers(*args, **kwargs):
+            _ = (args, kwargs)
+            return None
+
+        fastapi_bootstrap_mod.apply_permissive_cors = apply_permissive_cors  # type: ignore[attr-defined]
+        fastapi_bootstrap_mod.install_request_context_middleware = install_request_context_middleware  # type: ignore[attr-defined]
+        fastapi_bootstrap_mod.register_common_exception_handlers = register_common_exception_handlers  # type: ignore[attr-defined]
+        sys.modules["httpserver.fastapi_bootstrap"] = fastapi_bootstrap_mod
+
 
 _ensure_runtime_package_stub()

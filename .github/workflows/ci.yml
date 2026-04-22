@@ -158,13 +158,6 @@ jobs:
           repository: devpablocristo/nexus
           path: nexus
 
-      - name: Checkout local-infra
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
-        with:
-          repository: devpablocristo/local-infra
-          path: local-infra
-
       - name: Create env file
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
@@ -181,7 +174,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           docker compose \
             --project-directory "$(pwd)" \
@@ -193,7 +186,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           for attempt in $(seq 1 60); do
             review_status=$(curl -fsS http://127.0.0.1:18084/readyz >/dev/null && echo ok || true)
@@ -215,7 +208,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
           # Runners compartidos: el callback review → cp-backend + persistencia en Postgres suele superar 20s.
           CALLBACK_TIMEOUT_SECONDS: "90"
         run: make e2e-review-notifications
@@ -224,7 +217,7 @@ jobs:
         if: failure() && github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           docker compose \
             --project-directory "$(pwd)" \
@@ -236,7 +229,7 @@ jobs:
         if: always() && github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
-          LOCAL_INFRA_DIR: ${{ github.workspace }}/local-infra
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
         run: |
           docker compose \
             --project-directory "$(pwd)" \

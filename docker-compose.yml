@@ -92,6 +92,7 @@ services:
       VITE_WORKSHOPS_API_URL: http://localhost:8282
       VITE_BEAUTY_API_URL: http://localhost:8383
       VITE_RESTAURANTS_API_URL: http://localhost:8484
+      VITE_MEDICAL_API_URL: http://localhost:8585
       VITE_AI_API_URL: ${VITE_AI_API_URL:-http://localhost:8200}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
@@ -255,6 +256,35 @@ services:
       cp-backend:
         condition: service_healthy
 
+  # ── Medical / Medicina laboral Vertical ──
+
+  medical-backend:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: pymes/medical/backend/Dockerfile.dev
+    ports:
+      - "8585:8085"
+    volumes:
+      - ./medical/backend:/workspace/pymes/medical/backend
+      - ./pymes-core/shared/backend:/workspace/pymes/pymes-core/shared/backend
+      - medical_backend_go_mod:/go/pkg/mod
+      - medical_backend_go_build:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      PORT: 8085
+      ENVIRONMENT: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
+      PYMES_CORE_URL: http://cp-backend:8080
+      FRONTEND_URL: http://localhost:5180
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cp-backend:
+        condition: service_healthy
+
 volumes:
   cp_backend_go_mod:
   cp_backend_go_build:
@@ -266,3 +296,5 @@ volumes:
   beauty_backend_go_build:
   restaurants_backend_go_mod:
   restaurants_backend_go_build:
+  medical_backend_go_mod:
+  medical_backend_go_build:

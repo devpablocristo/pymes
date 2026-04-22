@@ -4,7 +4,7 @@ import type { TenantSettings } from './types';
 export type TeamSize = 'solo' | 'small' | 'medium' | 'large';
 export type SellsType = 'products' | 'services' | 'both' | 'unsure';
 export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'mixed';
-export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+export type VerticalType = 'none' | 'professionals' | 'workshops' | 'beauty' | 'restaurants' | 'medical';
 export type SubVerticalType =
   | 'teachers'
   | 'consulting'
@@ -15,7 +15,8 @@ export type SubVerticalType =
   | 'aesthetics'
   | 'restaurant'
   | 'bar'
-  | 'cafe';
+  | 'cafe'
+  | 'occupational_health';
 
 export type TenantProfile = {
   businessName: string;
@@ -36,6 +37,7 @@ const SUB_VERTICAL_BY_VERTICAL: Partial<Record<VerticalType, readonly SubVertica
   workshops: ['auto_repair', 'bike_shop'],
   beauty: ['salon', 'barbershop', 'aesthetics'],
   restaurants: ['restaurant', 'bar', 'cafe'],
+  medical: ['occupational_health'],
 };
 
 const STORAGE_KEY = 'pymes:tenant_profile';

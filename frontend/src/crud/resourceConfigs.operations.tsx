@@ -3,6 +3,7 @@ import { createStockCrudConfig, fetchStockLevels, type StockRecord, type StockLe
 import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';
 import {
   createCashflowCrudConfig,
+  createEmployeesCrudConfig,
   createPaymentsCrudConfig,
   createRecurringExpensesCrudConfig,
   createReturnsCrudConfig,
@@ -77,6 +78,7 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
   },
   payments: createPaymentsCrudConfig(),
   recurring: createRecurringExpensesCrudConfig(),
+  employees: createEmployeesCrudConfig(),
 };
 
 export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain(

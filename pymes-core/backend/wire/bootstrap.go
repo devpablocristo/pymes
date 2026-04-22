@@ -30,10 +30,12 @@ import (
 	customerwhatsapp "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/channels/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/employees"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/invoices"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/notifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/outwebhooks"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/party"
@@ -114,6 +116,8 @@ func InitializeApp() *app.App {
 	inventoryRepo := inventory.NewRepository(db)
 	cashflowRepo := cashflow.NewRepository(db)
 	salesRepo := sales.NewRepository(db)
+	invoicesRepo := invoices.NewRepository(db)
+	employeesRepo := employees.NewRepository(db)
 	quotesRepo := quotes.NewRepository(db)
 	reportsRepo := reports.NewRepository(db)
 	returnsRepo := returns.NewRepository(db)
@@ -240,6 +244,8 @@ func InitializeApp() *app.App {
 	)
 	paymentsUC := payments.NewUsecases(paymentsRepo, auditUC, businessInsightsUC)
 	quotesUC := quotes.NewUsecases(quotesRepo, salesUC, auditUC)
+	invoicesUC := invoices.NewUsecases(invoicesRepo, auditUC)
+	employeesUC := employees.NewUsecases(employeesRepo, auditUC)
 
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
@@ -254,6 +260,8 @@ func InitializeApp() *app.App {
 	inventoryHandler := inventory.NewHandler(inventoryUC)
 	cashflowHandler := cashflow.NewHandler(cashflowUC)
 	salesHandler := sales.NewHandler(salesUC)
+	invoicesHandler := invoices.NewHandler(invoicesUC)
+	employeesHandler := employees.NewHandler(employeesUC)
 	accountsHandler := accounts.NewHandler(accountsUC)
 	currencyHandler := currency.NewHandler(currencyUC)
 	dashboardHandler := dashboard.NewHandler(dashboardUC)
@@ -353,6 +361,8 @@ func InitializeApp() *app.App {
 			recurringHandler,
 			returnsHandler,
 			salesHandler,
+			invoicesHandler,
+			employeesHandler,
 			quotesHandler,
 			reportsHandler,
 		},

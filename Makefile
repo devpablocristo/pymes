@@ -69,7 +69,7 @@ llm-pull:
 up:
 	@$(MAKE) llm-up
 	@$(MAKE) llm-pull
-	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
+	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto

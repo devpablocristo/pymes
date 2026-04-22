@@ -1,27 +1,21 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  archiveInvoice,
+  INVOICE_STATUS_BADGE_CLASS,
+  INVOICE_STATUS_LABELS,
   calcInvoiceSubtotal,
   calcInvoiceTotal,
   formatInvoiceMoney,
-  INITIAL_INVOICES,
-  readDemoInvoices,
-  restoreInvoice,
-  writeDemoInvoices,
+  invoiceInitials,
   type InvoiceRecord,
-} from './invoicesDemo';
+} from './invoiceMath';
 
-describe('invoicesDemo', () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
+describe('invoiceMath', () => {
   it('calculates subtotal and total correctly', () => {
     const invoice: InvoiceRecord = {
       id: '1',
       number: 'INV-1',
       customer: 'Cliente Demo',
-      initials: 'CD',
+      initials: invoiceInitials('Cliente Demo'),
       issuedDate: '2026-01-01',
       dueDate: '2026-01-10',
       status: 'pending',
@@ -35,51 +29,14 @@ describe('invoicesDemo', () => {
     expect(formatInvoiceMoney(2178)).toContain('$');
   });
 
-  it('persists demo invoices to localStorage', () => {
-    const invoices: InvoiceRecord[] = [
-      {
-        id: 'x',
-        number: 'INV-9999',
-        customer: 'Persistido',
-        initials: 'PE',
-        issuedDate: '2026-01-01',
-        dueDate: '2026-01-10',
-        status: 'paid',
-        items: [],
-        discount: 0,
-        tax: 21,
-        is_favorite: false,
-        tags: [],
-        archived_at: null,
-      },
-    ];
-
-    writeDemoInvoices(invoices);
-    expect(readDemoInvoices()).toEqual(invoices);
+  it('computes initials from customer name', () => {
+    expect(invoiceInitials('Distribuidora Norte')).toBe('DN');
+    expect(invoiceInitials('Café Central')).toBe('CC');
+    expect(invoiceInitials('Ferretería Sur')).toBe('FS');
   });
 
-  it('starts empty when localStorage has no persisted invoices', () => {
-    expect(INITIAL_INVOICES).toEqual([]);
-    expect(readDemoInvoices()).toEqual([]);
-  });
-
-  it('archives and restores invoices', () => {
-    const invoice: InvoiceRecord = {
-      id: '1',
-      number: 'INV-1',
-      customer: 'Cliente Demo',
-      initials: 'CD',
-      issuedDate: '2026-01-01',
-      dueDate: '2026-01-10',
-      status: 'pending',
-      items: [],
-      discount: 0,
-      tax: 21,
-      archived_at: null,
-    };
-
-    const archived = archiveInvoice(invoice);
-    expect(archived.archived_at).toBeTruthy();
-    expect(restoreInvoice(archived).archived_at).toBeNull();
+  it('exposes status labels and badge classes for the 3 canonical states', () => {
+    expect(Object.keys(INVOICE_STATUS_LABELS).sort()).toEqual(['overdue', 'paid', 'pending']);
+    expect(Object.keys(INVOICE_STATUS_BADGE_CLASS).sort()).toEqual(['overdue', 'paid', 'pending']);
   });
 });

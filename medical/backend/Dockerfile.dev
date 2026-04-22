@@ -1,0 +1,24 @@
+FROM golang:1.26-alpine
+
+RUN apk add --no-cache git curl && \
+    curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b /usr/local/bin
+
+WORKDIR /workspace
+
+ENV GOPRIVATE=github.com/devpablocristo/* \
+    GONOSUMDB=github.com/devpablocristo/* \
+    GONOPROXY=github.com/devpablocristo/* \
+    GOPROXY=https://proxy.golang.org,direct
+
+COPY pymes/go.mod pymes/go.sum /workspace/pymes/
+
+WORKDIR /workspace/pymes/medical/backend
+
+RUN go mod download
+
+COPY pymes/medical/backend /workspace/pymes/medical/backend
+COPY pymes/pymes-core/shared/backend /workspace/pymes/pymes-core/shared/backend
+
+EXPOSE 8085
+
+CMD ["air", "-c", ".air.toml"]

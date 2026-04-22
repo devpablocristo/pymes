@@ -92,7 +92,10 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
-    () => [{ to: link('/invoices'), label: t('shell.nav.invoices'), icon: dotIcon }],
+    () => [
+      { to: link('/invoices'), label: t('shell.nav.invoices'), icon: dotIcon },
+      { to: link('/employees'), label: 'Empleados', icon: dotIcon },
+    ],
     [t, slug],
   );
 
@@ -211,6 +214,9 @@ export function Shell({ children }: { children: ReactNode }) {
     }
     if (vertical === 'restaurants') {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
+    }
+    if (vertical === 'medical') {
+      result.push({ label: 'Medicina laboral', items: [] });
     }
     result.push(...moduleNav);
     return result;

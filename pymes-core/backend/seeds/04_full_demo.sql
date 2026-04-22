@@ -36,6 +36,14 @@ DECLARE
     pay3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/payment/purchase/1');
     notif1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
     notif2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/review-approval');
+    inv1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1');
+    inv2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2');
+    inv3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/3');
+    inv4 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4');
+    inv5 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/5');
+    emp1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1');
+    emp2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2');
+    emp3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3');
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
         RETURN;
@@ -413,4 +421,60 @@ BEGIN
             entity_id = EXCLUDED.entity_id,
             chat_context = EXCLUDED.chat_context,
             created_at = EXCLUDED.created_at;
+
+    -- Invoices demo (F1): 5 facturas con line items, cubren los 3 estados (paid/pending/overdue).
+    INSERT INTO invoices (
+        id, org_id, number, customer_name, issued_date, due_date, status,
+        subtotal, discount_percent, tax_percent, total, notes, is_favorite, tags, created_by
+    ) VALUES
+        (inv1, v_org, 'INV-4001', 'Distribuidora Norte',   DATE '2026-04-05', DATE '2026-04-15', 'paid',    107500, 5,  21, 123661.125, '', true,  ARRAY['mayorista','recurrente']::text[], 'seed'),
+        (inv2, v_org, 'INV-4002', 'Café Central',          DATE '2026-04-15', DATE '2026-04-25', 'pending',  90800, 0,  21, 109868,     '', false, ARRAY['gastronomia']::text[],            'seed'),
+        (inv3, v_org, 'INV-4003', 'Ferretería Sur',        DATE '2026-03-10', DATE '2026-03-20', 'overdue',  57000, 0,  21, 68970,      '', false, ARRAY['urgente','cobrar']::text[],       'seed'),
+        (inv4, v_org, 'INV-4004', 'Taller Mecánica Beta',  DATE '2026-04-20', DATE '2026-05-05', 'pending',  81000, 10, 21, 88209,      '', false, ARRAY['soporte']::text[],                'seed'),
+        (inv5, v_org, 'INV-4005', 'Panadería La Esquina',  DATE '2026-04-12', DATE '2026-04-22', 'paid',     92000, 0,  21, 111320,     '', true,  ARRAY['gastronomia','mayorista']::text[], 'seed')
+    ON CONFLICT (id) DO UPDATE
+        SET number = EXCLUDED.number,
+            customer_name = EXCLUDED.customer_name,
+            issued_date = EXCLUDED.issued_date,
+            due_date = EXCLUDED.due_date,
+            status = EXCLUDED.status,
+            subtotal = EXCLUDED.subtotal,
+            discount_percent = EXCLUDED.discount_percent,
+            tax_percent = EXCLUDED.tax_percent,
+            total = EXCLUDED.total,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            updated_at = now();
+
+    -- Line items asociados (limpiamos y recreamos idempotente).
+    DELETE FROM invoice_line_items WHERE invoice_id IN (inv1, inv2, inv3, inv4, inv5);
+    INSERT INTO invoice_line_items (id, invoice_id, description, qty, unit, unit_price, line_total, sort_order) VALUES
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1/line/1'), inv1, 'Instalación de red',         1,  'servicio', 85000, 85000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1/line/2'), inv1, 'Cable UTP cat 6',            50, 'metro',      450, 22500, 2),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2/line/1'), inv2, 'Café en grano premium',      10, 'kg',        7800, 78000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2/line/2'), inv2, 'Vajilla descartable',         4, 'caja',      3200, 12800, 2),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/3/line/1'), inv3, 'Asesoría técnica',            6, 'hora',      9500, 57000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4/line/1'), inv4, 'Mantenimiento de software',   1, 'servicio', 45000, 45000, 1),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4/line/2'), inv4, 'Capacitación de equipo',      3, 'hora',     12000, 36000, 2),
+        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/5/line/1'), inv5, 'Harina 000 bolsa 25 kg',      8, 'bolsa',    11500, 92000, 1);
+
+    -- Employees demo (F1): 3 empleados cubriendo estados active / inactive.
+    INSERT INTO employees (
+        id, org_id, first_name, last_name, email, phone, position, status,
+        hire_date, notes, is_favorite, tags, created_by
+    ) VALUES
+        (emp1, v_org, 'María',    'Gómez',    'maria.gomez@demo.pymes',    '+54 9 11 2345 6789', 'Administración',     'active',   DATE '2024-03-01', '',  true,  ARRAY['administracion']::text[], 'seed'),
+        (emp2, v_org, 'Carlos',   'Ramírez',  'carlos.ramirez@demo.pymes', '+54 9 11 4567 8901', 'Operario',           'active',   DATE '2023-11-15', '',  false, ARRAY['operaciones']::text[],    'seed'),
+        (emp3, v_org, 'Lucía',    'Fernández','lucia.fernandez@demo.pymes','+54 9 11 6789 0123', 'Atención al cliente','inactive', DATE '2022-07-20', '',  false, ARRAY['comercial']::text[],      'seed')
+    ON CONFLICT (id) DO UPDATE
+        SET first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            email = EXCLUDED.email,
+            phone = EXCLUDED.phone,
+            position = EXCLUDED.position,
+            status = EXCLUDED.status,
+            hire_date = EXCLUDED.hire_date,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            updated_at = now();
 END $$;

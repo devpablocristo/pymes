@@ -21,18 +21,17 @@ import { renderTagBadges } from '../../crud/crudTagBadges';
 import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   INVOICE_STATUS_LABELS,
-  archiveInvoice,
   invoiceInitials,
-  nextInvoiceUid,
-  readDemoInvoices,
-  removeDemoInvoice,
-  restoreInvoice,
-  updateDemoInvoice,
-  writeDemoInvoices,
   type InvoiceLineItem,
   type InvoiceRecord,
   type InvoiceStatus,
-} from './invoicesDemo';
+} from './invoiceMath';
+import {
+  createInvoiceFromCrudValues,
+  fetchInvoices,
+  invoiceUpdateBodyFromCrud,
+  updateInvoiceStatus,
+} from '../../lib/invoicesApi';
 
 export type CommercialDocumentStatusOption<TStatus extends string> = {
   value: TStatus;
@@ -220,27 +219,9 @@ export function createInvoiceCrudLineItems(value: CrudFieldValue | undefined): I
     .filter((item) => item.description.trim().length > 0);
 }
 
+// Shim de compatibilidad: delega al cliente REST centralizado en `lib/invoicesApi`.
 export async function createDemoInvoiceFromCrudValues(values: Record<string, CrudFieldValue | undefined>): Promise<void> {
-  const customer = asString(values.customer);
-  const invoices = readDemoInvoices();
-  writeDemoInvoices([
-    {
-      id: nextInvoiceUid(),
-      number: asOptionalString(values.number) ?? `INV-${3500 + Math.floor(Math.random() * 100)}`,
-      customer,
-      initials: invoiceInitials(customer),
-      issuedDate: asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
-      dueDate: asOptionalString(values.dueDate) ?? asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
-      status: parseInvoiceStatus(values.status),
-      discount: asOptionalNumber(values.discount) ?? 0,
-      tax: asOptionalNumber(values.tax) ?? 21,
-      items: createInvoiceCrudLineItems(values.items),
-      is_favorite: Boolean(values.is_favorite),
-      tags: parseTagCsv(values.tags),
-      archived_at: null,
-    },
-    ...invoices,
-  ]);
+  await createInvoiceFromCrudValues(values);
 }
 
 export function parseCommercialPricedLineItems(value: CrudFieldValue | undefined): CommercialPricedLineItem[] {
@@ -384,29 +365,29 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     allowCreate: true,
     allowEdit: true,
     stateMachine,
-    // Demo localStorage: expone list/update/archive/restore/delete contra el store.
+    basePath: '/v1/invoices',
+    // REST contra pymes-core `/v1/invoices` con las 7 operaciones canónicas.
     dataSource: {
       ...existingDataSource,
       list: async ({ archived }) => {
-        const rows = readDemoInvoices();
-        const matchesArchived = (r: InvoiceRecord) => (archived ? r.archived_at != null : r.archived_at == null);
-        return rows.filter(matchesArchived) as TRecord[];
+        const rows = await fetchInvoices({ archived: Boolean(archived) });
+        return rows as TRecord[];
+      },
+      create: async (values) => {
+        await createInvoiceFromCrudValues(values);
       },
       update: async (row, values) => {
-        updateDemoInvoice(row.id, (r) => ({
-          ...r,
-          status: parseInvoiceStatus(values.status),
-          discount: asOptionalNumber(values.discount) ?? r.discount,
-          tax: asOptionalNumber(values.tax) ?? r.tax,
-          issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
-          dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
-          is_favorite: values.is_favorite === undefined ? r.is_favorite : Boolean(values.is_favorite),
-          tags: values.tags === undefined ? r.tags : parseTagCsv(values.tags),
-        }));
+        await apiRequest(`/v1/invoices/${row.id}`, { method: 'PATCH', body: invoiceUpdateBodyFromCrud(values) });
       },
-      deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
-      restore: async (row) => updateDemoInvoice(row.id, restoreInvoice),
-      hardDelete: async (row) => removeDemoInvoice(row.id),
+      deleteItem: async (row) => {
+        await apiRequest(`/v1/invoices/${row.id}`, { method: 'DELETE' });
+      },
+      restore: async (row) => {
+        await apiRequest(`/v1/invoices/${row.id}/restore`, { method: 'POST', body: {} });
+      },
+      hardDelete: async (row) => {
+        await apiRequest(`/v1/invoices/${row.id}/hard`, { method: 'DELETE' });
+      },
     },
     supportsArchived: true,
     editorModal: {
@@ -423,7 +404,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       createFooterLabel: 'Añadir factura',
       persistMove: async ({ row, nextValue }: { row: TRecord; field: string; nextValue: string }) => {
         const status = parseInvoiceStatus(nextValue);
-        updateDemoInvoice(row.id, (r) => ({ ...r, status }));
+        await updateInvoiceStatus(row.id, status);
         return { ...(row as InvoiceRecord), status } as TRecord;
       },
     },

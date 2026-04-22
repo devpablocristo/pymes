@@ -113,6 +113,7 @@ var validVerticals = map[string]struct{}{
 	"workshops":     {},
 	"beauty":        {},
 	"restaurants":   {},
+	"medical":       {},
 }
 
 var validTeamSizes = map[string]struct{}{

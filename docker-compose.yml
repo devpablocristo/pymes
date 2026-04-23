@@ -54,6 +54,9 @@ services:
       # Vacío: cp-backend no recibe org de seed explícita (útil si solo usás org local embebida en seeds).
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}
       REVIEW_URL: http://review:8080
+      # Debe coincidir con REVIEW_CALLBACK_TOKEN del servicio review: sin esto
+      # cp-backend no registra `/v1/internal/v1/review-callback` y el E2E falla.
+      REVIEW_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 5s

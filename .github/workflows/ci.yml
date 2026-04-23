@@ -251,6 +251,40 @@ jobs:
           fi
           echo "ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
 
+      - name: Debug — review env + callback connectivity
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          set +e
+          echo "--- review env (callback vars) ---"
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            exec -T review \
+            printenv REVIEW_CALLBACK_TOKEN REVIEW_APPROVAL_PENDING_CALLBACK_URLS REVIEW_APPROVAL_RESOLVED_CALLBACK_URLS || true
+          echo "--- review → cp-backend connectivity (expect 401 without token) ---"
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            exec -T review \
+            wget -qSO- http://cp-backend:8080/v1/internal/v1/review-callback --post-data='{}' --header='Content-Type: application/json' 2>&1 | head -20 || true
+          echo "--- review → cp-backend with token ---"
+          docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            exec -T review \
+            wget -qSO- http://cp-backend:8080/v1/internal/v1/review-callback \
+              --post-data='{"event":"approval_pending","request_id":"debug"}' \
+              --header='Content-Type: application/json' \
+              --header='Authorization: Bearer local-review-callback-token' \
+              2>&1 | head -20 || true
+          exit 0
+
       - name: Run review notifications E2E
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes

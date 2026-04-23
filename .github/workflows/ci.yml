@@ -204,14 +204,33 @@ jobs:
             ps
           exit 1
 
-      - name: Load seeds (needed to have an ORG_ID for the E2E)
+      - name: Load core seeds (needed to have an ORG_ID for the E2E)
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes
         env:
           LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
           PYMES_SEED_DEMO_ORG_EXTERNAL_ID: org_e2e_test
           PYMES_SEED_DEMO_ORG_NAME: "E2E Test Org"
-        run: bash scripts/seeds/load.sh
+        run: |
+          # El E2E sólo necesita la org semilla. Los seeds de verticales requieren
+          # que esos backends hayan aplicado sus propias migraciones, cosa que no
+          # pasa acá porque la stack de E2E sólo levanta review + cp-backend.
+          # Cargamos únicamente los seeds que dependen de pymes-core.
+          source scripts/seeds/lib.sh
+          ensure_seed_dbs_ready
+          require_seed_org_external_id
+          TARGET_ORG_UUID="$(resolve_target_org_uuid)"
+          SEED_ORG_EXTERNAL_ID="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID}"
+          SEED_ORG_NAME="${PYMES_SEED_DEMO_ORG_NAME:-Pymes Demo Org}"
+          SEED_ORG_SLUG="${PYMES_SEED_DEMO_ORG_SLUG:-$(derive_seed_org_slug "$SEED_ORG_EXTERNAL_ID")}"
+          export TARGET_ORG_UUID SEED_ORG_EXTERNAL_ID SEED_ORG_NAME SEED_ORG_SLUG
+
+          for sql_file in \
+            "pymes-core/backend/seeds/01_clerk_prereqs.sql" \
+            "pymes-core/backend/seeds/03_rbac.sql"
+          do
+            run_pymes_sql_file "$sql_file"
+          done
 
       - name: Resolve ORG_ID for E2E
         if: github.event_name == 'workflow_dispatch'

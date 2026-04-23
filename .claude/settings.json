@@ -63,7 +63,10 @@
       "Bash(awk '/Wait for review/{flag=1} /Print container logs on failure/{flag=0} flag {print}')",
       "Bash(awk '/Load seeds/{flag=1} /Resolve ORG_ID/{flag=0} flag')",
       "Bash(unzip -o -qq /tmp/ci2.zip -d /tmp/ci2)",
-      "Bash(awk '/Run review notifications E2E/{flag=1} /Print container logs/{flag=0} flag' /tmp/ci2/0_review-notifications-e2e.txt)"
+      "Bash(awk '/Run review notifications E2E/{flag=1} /Print container logs/{flag=0} flag' /tmp/ci2/0_review-notifications-e2e.txt)",
+      "Bash(unzip -o -qq /tmp/ci3.zip -d /tmp/ci3)",
+      "Bash(awk '/Run review notifications E2E/{flag=1} /Print container logs/{flag=0} flag' /tmp/ci3/0_review-notifications-e2e.txt)",
+      "Bash(grep -B 1 -A 15 'inbox\\\\s*$\\\\|inbox \\\\+' /home/pablo/Projects/Pablo/pymes/pymes-core/backend/internal/inappnotifications/usecases.go)"
     ],
     "additionalDirectories": [
       "/home/pablo/Projects/Pablo/saas-core/users",

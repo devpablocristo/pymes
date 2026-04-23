@@ -34,17 +34,17 @@ const (
 )
 
 func Run(db *gorm.DB, logger zerolog.Logger) error {
+	// No cerramos los migradores: el driver postgres comparte el mismo *sql.DB
+	// que usa GORM; cerrarlo (m.Close()) tira la connection pool y cualquier
+	// consumidor posterior falla con "database is closed".
 	coreMig, err := newMigrator(db, iofsCoreSource, "")
 	if err != nil {
 		return fmt.Errorf("core migrator: %w", err)
 	}
-	defer coreMig.Close()
-
 	schedMig, err := newMigrator(db, iofsSchedulingSource, schedulingmigrations.DefaultMigrationsTable)
 	if err != nil {
 		return fmt.Errorf("scheduling migrator: %w", err)
 	}
-	defer schedMig.Close()
 
 	// 1) pymes-core 0001..0040 (orgs, users, parties).
 	if err := migrateUpTo(coreMig, preSchedulingSplit); err != nil {

@@ -29,7 +29,7 @@ var sqlFiles embed.FS
 // avanzamos hacia versiones mayores que la actual.
 const (
 	preSchedulingSplit        uint = 40 // pymes-core hasta acá antes de usar scheduling_branches
-	postServicesSplit         uint = 42 // pymes-core hasta acá antes que scheduling/0003 necesite services
+	postServicesSplit         uint = 43 // pymes-core hasta acá: 0041 usa scheduling_branches, 0042 crea catalog_services, 0043 lo renombra a `services`
 	schedulingBranchesVersion uint = 2  // scheduling hasta acá antes de necesitar services
 )
 

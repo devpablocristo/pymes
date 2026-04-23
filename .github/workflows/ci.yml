@@ -204,6 +204,34 @@ jobs:
             ps
           exit 1
 
+      - name: Load seeds (needed to have an ORG_ID for the E2E)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+          PYMES_SEED_DEMO_ORG_EXTERNAL_ID: org_e2e_test
+          PYMES_SEED_DEMO_ORG_NAME: "E2E Test Org"
+        run: bash scripts/seeds/load.sh
+
+      - name: Resolve ORG_ID for E2E
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: pymes
+        env:
+          LOCAL_INFRA_DIR: ${{ github.workspace }}/pymes/.github/ci-infra
+        run: |
+          ORG_ID="$(docker compose \
+            --project-directory "$(pwd)" \
+            -f "$LOCAL_INFRA_DIR/docker-compose.yml" \
+            -f docker-compose.yml \
+            exec -T postgres \
+            psql -U postgres -d pymes -Atq -c "SELECT id FROM orgs WHERE external_id='org_e2e_test'")"
+          ORG_ID="$(printf '%s' "$ORG_ID" | tr -d '[:space:]')"
+          if [[ -z "$ORG_ID" ]]; then
+            echo "Could not resolve ORG_ID from seeded orgs table" >&2
+            exit 1
+          fi
+          echo "ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
+
       - name: Run review notifications E2E
         if: github.event_name == 'workflow_dispatch'
         working-directory: pymes

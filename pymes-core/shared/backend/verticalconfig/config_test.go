@@ -13,28 +13,14 @@ func TestLoadAllowsLocalDefaultInternalToken(t *testing.T) {
 	}
 }
 
-func TestLoadPanicsWithoutInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", "")
-
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for missing production internal token")
-		}
-	}()
-
-	_ = Load(Options{DefaultPort: "8081"})
+func TestValidateInternalServiceTokenRejectsMissingTokenOutsideLocal(t *testing.T) {
+	if err := validateInternalServiceToken("production", ""); err == nil {
+		t.Fatal("expected error for missing production internal token")
+	}
 }
 
-func TestLoadPanicsWithDefaultInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)
-
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for default production internal token")
-		}
-	}()
-
-	_ = Load(Options{DefaultPort: "8081"})
+func TestValidateInternalServiceTokenRejectsDefaultTokenOutsideLocal(t *testing.T) {
+	if err := validateInternalServiceToken("production", localInternalServiceToken); err == nil {
+		t.Fatal("expected error for default production internal token")
+	}
 }

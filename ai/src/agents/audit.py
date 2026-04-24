@@ -19,6 +19,11 @@ async def record_agent_event(
     entity_type: str = "",
     entity_id: str = "",
     request_id: str | None = None,
+    capability_id: str | None = None,
+    confirmation_id: str | None = None,
+    review_request_id: str | None = None,
+    idempotency_key: str | None = None,
+    payload_hash: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> None:
     handler = getattr(repo, "record_agent_event", None)
@@ -38,6 +43,11 @@ async def record_agent_event(
         entity_type=entity_type,
         entity_id=entity_id,
         external_request_id=request_id,
+        capability_id=capability_id,
+        confirmation_id=confirmation_id,
+        review_request_id=review_request_id,
+        idempotency_key=idempotency_key,
+        payload_hash=payload_hash,
         metadata=metadata or {},
     )
 

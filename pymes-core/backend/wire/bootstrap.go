@@ -19,6 +19,7 @@ import (
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/accounts"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/admin"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/agent"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/attachments"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/businessinsights"
@@ -30,8 +31,8 @@ import (
 	customerwhatsapp "github.com/devpablocristo/pymes/pymes-core/backend/internal/customer_messaging/channels/whatsapp"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/customers"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/employees"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/employees"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
@@ -102,6 +103,7 @@ func InitializeApp() *app.App {
 	}
 
 	auditRepo := audit.NewRepository(db)
+	agentRepo := agent.NewRepository(db)
 	adminRepo := admin.NewRepository(db)
 	attachmentsRepo := attachments.NewRepository(db)
 	businessInsightsRepo := businessinsights.NewRepository(db)
@@ -225,6 +227,7 @@ func InitializeApp() *app.App {
 			inappnotifications.WithApprovalSource(reviewproxy.NewPendingApprovalSource(reviewClient)),
 		)
 	}
+	agentUC := agent.NewUsecases(agentRepo, reviewClient, auditUC)
 	businessInsightsUC := businessinsights.NewService(businessInsightsRepo, inAppNotifUC, businessinsights.Config{
 		FeaturedSaleThreshold:    cfg.InsightsFeaturedSaleThreshold,
 		FeaturedPaymentThreshold: cfg.InsightsFeaturedPaymentThreshold,
@@ -250,6 +253,7 @@ func InitializeApp() *app.App {
 	partyUC := party.NewUsecases(partyRepo, auditUC, party.WithTimeline(timelineUC), party.WithWebhooks(outwebhooksUC))
 	pdfgenUC := pdfgen.NewUsecases(quotesUC, salesUC, adminUC)
 
+	agentHandler := agent.NewHandler(agentUC, rbacUC)
 	auditHandler := audit.NewHandler(auditUC)
 	adminHandler := admin.NewHandler(adminUC)
 	attachmentsHandler := attachments.NewHandler(attachmentsUC)
@@ -334,6 +338,7 @@ func InitializeApp() *app.App {
 			adminHandler,
 			attachmentsHandler,
 			rbacHandler,
+			agentHandler,
 			auditHandler,
 			notificationHandler,
 			inAppNotifHandler,

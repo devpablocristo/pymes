@@ -3,11 +3,11 @@ package audit
 import (
 	"context"
 	"encoding/json"
-	"strings"
-	"testing"
 	"github.com/devpablocristo/core/security/go/hashutil"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/audit/usecases/domain"
 	"github.com/google/uuid"
+	"strings"
+	"testing"
 )
 
 type mockAuditRepo struct {
@@ -55,6 +55,10 @@ func (m *mockAuditRepo) List(orgID uuid.UUID, limit int) []domain.Entry {
 
 func (m *mockAuditRepo) ExportCSV(orgID uuid.UUID) (string, error) {
 	return "id,action\n", nil
+}
+
+func (m *mockAuditRepo) Verify(orgID uuid.UUID) domain.VerifyResult {
+	return domain.VerifyResult{OrgID: orgID, Verified: true, CheckedRows: len(m.entries), Message: "ok"}
 }
 
 func TestAuditLog(t *testing.T) {

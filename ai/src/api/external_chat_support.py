@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from src.agents.review_gate import evaluate_action
+from src.agents.review_gate import GOVERNED_ACTIONS, evaluate_action
 from src.backend_client.client import BackendClient
 from src.config import get_settings
 from src.core.dossier import summarize_dossier_for_context
@@ -205,15 +205,22 @@ def _wrap_handlers_with_review_gate(
 
     wrapped: dict[str, Any] = {}
     for tool_name, handler_fn in handlers.items():
-        async def _gated(args: dict[str, Any], *, _name: str = tool_name, _fn: Any = handler_fn) -> Any:
+        async def _gated(*args: Any, _name: str = tool_name, _fn: Any = handler_fn, **kwargs: Any) -> Any:
+            tool_args: dict[str, Any]
+            if kwargs:
+                tool_args = dict(kwargs)
+            elif len(args) == 1 and isinstance(args[0], dict):
+                tool_args = dict(args[0])
+            else:
+                tool_args = {}
             decision = await evaluate_action(
                 review_client=review_client,
                 tool_name=_name,
-                tool_args=args,
+                tool_args=tool_args,
                 org_id=org_id,
             )
             if decision.allowed:
-                return await _fn(args)
+                return await _fn(**tool_args)
             if decision.decision == "deny":
                 return {"error": "Esta acción no está disponible por este canal."}
             # require_approval — informar que se envió para revisión
@@ -222,6 +229,9 @@ def _wrap_handlers_with_review_gate(
                 "message": "Tu solicitud fue enviada al equipo para aprobación.",
                 "review_request_id": decision.request_id,
                 "approval_id": decision.approval_id,
+                "type": GOVERNED_ACTIONS.get(_name, _name),
+                "tool_name": _name,
+                "tool_args": tool_args,
             }
         wrapped[tool_name] = _gated
     return wrapped
@@ -316,6 +326,9 @@ async def run_external_chat(
         pending_action = {
             "review_request_id": review_request_id,
             "approval_id": pending_review.get("approval_id"),
+            "type": pending_review.get("type"),
+            "tool_name": pending_review.get("tool_name"),
+            "tool_args": pending_review.get("tool_args") or {},
             "tool_calls": sorted(set(tool_calls)),
             "awaiting": "review",
         }
@@ -333,8 +346,7 @@ async def run_external_chat(
     # Persistir estado de review pendiente si aplica
     if pending_action:
         try:
-            await repo.update_review_state(
-                org_id=org_id,
+            await repo.set_pending_review(
                 conversation_id=conversation.id,
                 pending_action=pending_action,
                 review_request_id=review_request_id,

@@ -70,6 +70,12 @@ class AIAgentEvent(Base):
         index=True,
     )
     external_request_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    capability_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    confirmation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_request_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent_mode: Mapped[str] = mapped_column(String(40), nullable=False)
     channel: Mapped[str] = mapped_column(String(40), nullable=False)
     actor_id: Mapped[str] = mapped_column(Text, nullable=False)

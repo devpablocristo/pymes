@@ -11,3 +11,13 @@
 ## Arquitectura
 
 - `architecture/` — diagramas o notas adicionales (vacío hasta que se agregue contenido).
+
+## Agentes, API y gobernanza
+
+| Documento | Descripción |
+|-----------|-------------|
+| [Operación de agentes](AGENTS.md) | Modelo de capabilities, riesgos y regla de no bypass para agentes. |
+| [Autenticación y firmas](AUTH.md) | Clerk/JWT, API keys, scopes y firma HMAC para agentes externos. |
+| [Contratos API](API_CONTRACTS.md) | Idempotencia, payload hashes, errores y superficie `/v1/agent/*`. |
+| [Gobernanza](GOVERNANCE.md) | Integración con Nexus Review, aprobaciones y auditoría hash v2. |
+| [UX humano-agente](HUMAN_AGENT_UX.md) | Supervisión humana, confirmaciones, approvals y filtros de auditoría. |

@@ -19,6 +19,8 @@ type AuditLogModel struct {
 	Payload      []byte `gorm:"type:jsonb"`
 	PrevHash     string
 	Hash         string
+	HashVersion  int    `gorm:"not null;default:1"`
+	PayloadHash  string `gorm:"not null;default:''"`
 	CreatedAt    time.Time
 }
 

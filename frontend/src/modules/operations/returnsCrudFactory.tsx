@@ -29,7 +29,7 @@ export function createReturnsCrudConfig(): CrudPageConfig<ReturnRow> {
     allowHardDelete: false,
     allowCreate: true,
     createLabel: '+ Nueva devolución',
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState:

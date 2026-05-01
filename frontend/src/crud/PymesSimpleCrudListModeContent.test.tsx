@@ -407,7 +407,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('pagination:1:1:false:true')).toBeInTheDocument();
   });
 
-  it('en archivados abre solo con restaurar y eliminar', async () => {
+  it('en archivados abre con Editar habilitado además de restaurar y eliminar', async () => {
     archivedState = true;
     openCrudFormDialogMock.mockResolvedValueOnce(null);
     currentConfig = {
@@ -434,7 +434,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     await waitFor(() =>
       expect(openCrudFormDialogMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          allowEdit: false,
+          allowEdit: true,
           closeLabel: 'Salir',
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
@@ -522,7 +522,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     await waitFor(() =>
       expect(openCrudFormDialogMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          allowEdit: false,
+          allowEdit: true,
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
           deleteAction: expect.objectContaining({ label: 'Eliminar' }),

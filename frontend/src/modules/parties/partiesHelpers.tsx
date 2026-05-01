@@ -646,7 +646,7 @@ export function createAccountCrudConfig<T extends AccountRecord & { updated_at?:
 > {
   return {
     allowCreate: true,
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     label: 'cuenta corriente',
     labelPlural: 'cuentas corrientes',

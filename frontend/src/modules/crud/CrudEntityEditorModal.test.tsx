@@ -121,6 +121,38 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
+  it('stays in edit mode when initialValues object identity changes after Edit', async () => {
+    const fields = [{ id: 'name', label: 'Nombre', defaultValue: 'Demo' }];
+    const { rerender } = render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Detalle"
+        fields={fields}
+        initialValues={{ name: 'Demo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
+
+    rerender(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Detalle"
+        fields={fields}
+        initialValues={{ name: 'Demo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+  });
+
   it('opens archive confirmation above the detail modal without replacing it', async () => {
     render(
       <CrudEntityEditorModal
@@ -289,7 +321,8 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
   });
 
-  it('can render an existing record in read-only mode with disabled edit button', () => {
+  it('can render an existing record in read-only mode with blocked edit button (no click-through to backdrop)', async () => {
+    const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
         open
@@ -298,13 +331,17 @@ describe('CrudEntityEditorModal', () => {
         allowEdit={false}
         fields={[{ id: 'customer_name', label: 'Cliente', defaultValue: 'Cliente Demo', sectionId: 'summary' }]}
         sections={[{ id: 'summary', title: 'Resumen' }]}
-        onCancel={vi.fn()}
+        onCancel={onCancel}
         onSubmit={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Editar' })).toBeDisabled();
-    expect(screen.getAllByRole('button', { name: 'Cerrar' })).toHaveLength(2);
+    const editBtn = screen.getByRole('button', { name: 'Editar' });
+    expect(editBtn).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(editBtn);
+    await waitFor(() => expect(onCancel).not.toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
   });
 
   it('renders archived actions with restore and delete only', () => {

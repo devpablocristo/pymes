@@ -288,6 +288,13 @@
   justify-content: flex-end;
 }
 
+/* Sin `disabled`: los clics en botones disabled atraviesan al backdrop y cerraban el modal. */
+.crud-entity-editor-modal__edit-btn--blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .crud-entity-editor-modal__confirm-shell {
   z-index: 1310;
 }

@@ -403,7 +403,7 @@ export function createStockCrudConfig<T extends StockRecord>(options: {
     labelPlural: 'productos en el inventario',
     labelPluralCap: 'Inventario',
     allowCreate: false,
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     supportsArchived: true,
     archivedEmptyState: 'No hay productos archivados en inventario.',

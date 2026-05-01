@@ -23,7 +23,7 @@ export function createPaymentsCrudConfig(): CrudPageConfig<SalePaymentRow> {
     label: 'pago',
     labelPlural: 'pagos',
     labelPluralCap: 'Pagos',
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     allowCreate: true,
     createLabel: '+ Registrar pago',

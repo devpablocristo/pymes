@@ -14,7 +14,10 @@ export type CrudEntityModalShellProps = {
   header?: ReactNode;
   footer?: ReactNode;
   variant?: 'modal' | 'page';
+  /** Escape y otros cierres “directos” del shell (no backdrop). */
   onRequestClose?: () => void;
+  /** Si se define, solo el backdrop lo usa; así se puede suprimir el cierre por clic sin bloquear Escape. */
+  onBackdropRequestClose?: () => void;
   disableClose?: boolean;
   closeOnEscape?: boolean;
   closeOnBackdrop?: boolean;
@@ -37,6 +40,7 @@ export function CrudEntityModalShell({
   footer,
   variant = 'modal',
   onRequestClose,
+  onBackdropRequestClose,
   disableClose = false,
   closeOnEscape = variant === 'modal',
   closeOnBackdrop = variant === 'modal',
@@ -90,14 +94,16 @@ export function CrudEntityModalShell({
 
   return createPortal(
     <div className={cx('crud-entity-modal-shell', rootClassName)} role="presentation">
-      <button
-        type="button"
+      {/* div (no button): menos rarezas de foco/hit-testing; el cierre por teclado sigue en Escape */}
+      <div
+        role="presentation"
+        aria-hidden="true"
         className={cx('crud-entity-modal-shell__backdrop', backdropClassName)}
-        aria-label="Cerrar"
-        onClick={() => {
-          if (!disableClose && closeOnBackdrop) {
-            onRequestClose?.();
-          }
+        onClick={(event) => {
+          if (disableClose || !closeOnBackdrop) return;
+          if (event.target !== event.currentTarget) return;
+          const handler = onBackdropRequestClose ?? onRequestClose;
+          handler?.();
         }}
       />
       {panel}

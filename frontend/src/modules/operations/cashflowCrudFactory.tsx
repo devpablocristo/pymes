@@ -27,7 +27,7 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
     label: 'movimiento',
     labelPlural: 'movimientos',
     labelPluralCap: 'Movimientos de caja',
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     createLabel: '+ Registrar movimiento',
     searchPlaceholder: 'Buscar...',

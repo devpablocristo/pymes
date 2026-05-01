@@ -444,7 +444,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           ? true
           : crudConfig.editorModal?.canEdit
             ? crudConfig.editorModal.canEdit(editorRow)
-            : (crudConfig.allowEdit ?? false);
+            : (crudConfig.allowEdit ?? true);
       const visibleFields = fields.filter(
         (field) => !crudConfig.editorModal?.fieldConfig?.[field.key]?.hidden,
       );
@@ -452,7 +452,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         title: editing ? '' : dialogTitle,
         subtitle: undefined,
         eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
-        allowEdit: archived ? false : allowEditRecord,
+        allowEdit: allowEditRecord,
         mediaUrls: editing ? buildEditorMediaUrls(editorRow) : undefined,
         mediaFieldId: crudConfig.editorModal?.mediaFieldKey,
         dialogMode: editing ? 'update' : 'create',
@@ -604,7 +604,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
 
   const resolvedTableRowClick = useMemo(() => {
     if (onRowClick) return onRowClick;
-    // Todo click abre el Editor modal. Si `allowEdit=false` o `formFields=[]`,
+    // Todo click abre el Editor modal. Si `allowEdit=false` (explícito) o `formFields=[]`,
     // `runCreateOrEdit` arma fields read-only desde `columns` automáticamente.
     return (row: T) => {
       void runCreateOrEdit(row);

@@ -225,6 +225,7 @@ describe('billingHelpers', () => {
       ],
       sections: [{ id: 'default' }, { id: 'items' }],
     });
+    expect(config.allowEdit).toBe(true);
     expect(config.rowActions?.map((action) => action.id)).toEqual(['receipt-pdf', 'payments', 'add-payment', 'void']);
     expect(
       config.toBody?.({
@@ -261,7 +262,7 @@ describe('billingHelpers', () => {
 
     expect(config.labelPluralCap).toBe('Notas de crédito');
     expect(config.emptyState).toBe('No hay notas de crédito emitidas.');
-    expect(config.allowEdit).toBe(false);
+    expect(config.allowEdit).toBe(true);
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [

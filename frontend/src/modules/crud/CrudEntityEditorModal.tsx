@@ -1,5 +1,6 @@
 import { confirmAction } from '@devpablocristo/core-browser';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
@@ -284,16 +285,33 @@ export function CrudEntityEditorModal({
   const [deleting, setDeleting] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmDialog | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /** Evita cierre por backdrop justo después de activar edición (race con pointer). */
+  const suppressBackdropCloseRef = useRef(false);
+  /** Ratón/táctil: la activación se hace en pointerup tras capture; el click siguiente se ignora. */
+  const pointerActivatedEditRef = useRef(false);
+  /** Libera suppressBackdrop tras una ventana fija (el click fantasma puede ir después del microtask). */
+  const suppressBackdropTimerRef = useRef<number | null>(null);
+
+  // Sincronizar valores cuando cambian datos de formulario; no reiniciar modo lectura/edición
+  // aquí: `initialValues` suele ser un objeto nuevo en cada render del padre y eso devolvía
+  // al usuario al visor justo después de pulsar "Editar".
+  useLayoutEffect(() => {
+    setValues(initialValues);
+  }, [initialValues]);
 
   useEffect(() => {
-    setValues(initialValues);
     setIsEditing(mode === 'create' || editBehavior === 'edit-only');
-  }, [editBehavior, initialValues, mode]);
+  }, [editBehavior, mode]);
 
   useEffect(() => {
     if (!open) {
       setPendingConfirm(null);
       setConfirming(false);
+      if (suppressBackdropTimerRef.current !== null) {
+        window.clearTimeout(suppressBackdropTimerRef.current);
+        suppressBackdropTimerRef.current = null;
+      }
+      suppressBackdropCloseRef.current = false;
     }
   }, [open]);
 
@@ -461,8 +479,23 @@ export function CrudEntityEditorModal({
     }
   };
 
-  const startEditing = () => {
-    setIsEditing(true);
+  const scheduleActivateEditing = () => {
+    if (!allowEdit || isEditing) return;
+    suppressBackdropCloseRef.current = true;
+    if (suppressBackdropTimerRef.current !== null) {
+      window.clearTimeout(suppressBackdropTimerRef.current);
+    }
+    suppressBackdropTimerRef.current = window.setTimeout(() => {
+      suppressBackdropCloseRef.current = false;
+      suppressBackdropTimerRef.current = null;
+    }, 450);
+    // Macrotask: el «click» del mismo gesto ocurre antes que setTimeout(0); así el botón sigue en el DOM
+    // durante el click y no “cae” en Cerrar/backdrop al desmontarse en flushSync.
+    window.setTimeout(() => {
+      flushSync(() => {
+        setIsEditing(true);
+      });
+    }, 0);
   };
 
   const footer =
@@ -501,9 +534,48 @@ export function CrudEntityEditorModal({
           </button>
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={startEditing}
-            disabled={!allowEdit}
+            className={cx('btn btn-primary', !allowEdit && 'crud-entity-editor-modal__edit-btn--blocked')}
+            onPointerDown={(event) => {
+              if (!allowEdit || isEditing) return;
+              if (event.pointerType === 'mouse' && event.button !== 0) return;
+              try {
+                (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId);
+              } catch {
+                /* capture opcional según plataforma */
+              }
+            }}
+            onPointerCancel={(event) => {
+              const el = event.currentTarget as HTMLButtonElement;
+              try {
+                if (typeof el.hasPointerCapture === 'function' && el.hasPointerCapture(event.pointerId)) {
+                  el.releasePointerCapture(event.pointerId);
+                }
+              } catch {
+                /* noop */
+              }
+            }}
+            onPointerUp={(event) => {
+              if (!allowEdit || isEditing) return;
+              if (event.pointerType === 'mouse' && event.button !== 0) return;
+              const el = event.currentTarget as HTMLButtonElement;
+              try {
+                if (typeof el.hasPointerCapture === 'function' && el.hasPointerCapture(event.pointerId)) {
+                  el.releasePointerCapture(event.pointerId);
+                }
+              } catch {
+                /* noop */
+              }
+              pointerActivatedEditRef.current = true;
+              scheduleActivateEditing();
+            }}
+            onClick={() => {
+              if (pointerActivatedEditRef.current) {
+                pointerActivatedEditRef.current = false;
+                return;
+              }
+              scheduleActivateEditing();
+            }}
+            aria-disabled={!allowEdit}
             title={!allowEdit ? 'Este registro no admite edición' : undefined}
           >
             {editLabel}
@@ -570,6 +642,10 @@ export function CrudEntityEditorModal({
         titleId={titleId}
         ariaLabel={typeof title === 'string' && title.trim().length > 0 ? title : 'Detalle'}
         onRequestClose={() => void requestCancel()}
+        onBackdropRequestClose={() => {
+          if (suppressBackdropCloseRef.current) return;
+          void requestCancel();
+        }}
         rootClassName={cx('crud-entity-editor-modal-root', rootClassName)}
         backdropClassName="crud-entity-editor-modal__backdrop"
         panelClassName={cx('crud-entity-editor-modal', panelClassName)}

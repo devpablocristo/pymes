@@ -7,7 +7,7 @@ import { getTenantProfile, saveTenantProfile } from '../lib/tenantProfile';
 import type { TenantSettings } from '../lib/types';
 
 const apiMocks = vi.hoisted(() => ({
-  getTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
+  getTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
   getSession: vi.fn(),
   apiRequest: vi.fn(),
 }));

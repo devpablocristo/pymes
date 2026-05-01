@@ -4,7 +4,7 @@ import type { WorkOrder as AutoRepairWorkOrder } from '../lib/workOrdersApi';
 import { WorkOrderEditor } from '../modules/work-orders';
 
 const apiMocks = vi.hoisted(() => ({
-  getWorkOrder: vi.fn<[], Promise<AutoRepairWorkOrder>>(),
+  getWorkOrder: vi.fn<() => Promise<AutoRepairWorkOrder>>(),
   updateWorkOrder: vi.fn(),
   archiveWorkOrder: vi.fn(),
   restoreWorkOrder: vi.fn(),

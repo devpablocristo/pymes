@@ -124,7 +124,7 @@ describe('Shell bike shop navigation', () => {
       expect(shellMocks.loadModuleCatalog).toHaveBeenCalled();
     });
 
-    expect(screen.getByText('Presupuestos')).toBeInTheDocument();
+    expect(await screen.findByText('Presupuestos')).toBeInTheDocument();
     expect(screen.getByText('Ventas')).toBeInTheDocument();
   });
 

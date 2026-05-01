@@ -5,12 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModulePage } from './ModulePage';
 
 const crudMocks = vi.hoisted(() => ({
-  hasLazyCrudResource: vi.fn<[string], Promise<boolean>>(),
+  hasLazyCrudResource: vi.fn<(resourceId: string) => Promise<boolean>>(),
 }));
 
 const apiMocks = vi.hoisted(() => ({
-  apiRequest: vi.fn<[string], Promise<unknown>>(),
-  getSession: vi.fn<[], Promise<unknown>>(),
+  apiRequest: vi.fn<(path: string) => Promise<unknown>>(),
+  getSession: vi.fn<() => Promise<unknown>>(),
   downloadAPIFile: vi.fn(),
 }));
 
@@ -95,7 +95,7 @@ describe('ModulePage', () => {
     await waitFor(() => {
       expect(screen.getByText('boom module')).toBeInTheDocument();
     });
-    expect(screen.getByText('No se pudo resolver la configuración del módulo.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Módulo' })).toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   archiveCommercialDocument,
   readCommercialDocumentDemoRecords,
@@ -9,6 +9,10 @@ import {
 describe('commercialDocumentDemoStore', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
     vi.useRealTimers();
   });
 

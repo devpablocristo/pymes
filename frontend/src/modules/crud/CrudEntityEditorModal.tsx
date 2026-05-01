@@ -462,11 +462,7 @@ export function CrudEntityEditorModal({
   };
 
   const startEditing = () => {
-    if (typeof window === 'undefined') {
-      setIsEditing(true);
-      return;
-    }
-    window.setTimeout(() => setIsEditing(true), 0);
+    setIsEditing(true);
   };
 
   const footer =

@@ -10,7 +10,7 @@ import {
   parseJSONArray,
   stringifyJSON,
 } from '../../crud/resourceConfigs.shared';
-import { formatCrudMoney } from '../crud';
+import { buildStandardCrudViewModes, formatCrudMoney } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export type ProcurementRequest = {
@@ -209,7 +209,7 @@ export function createProcurementRequestsCrudConfig(): CrudResourceConfigMap['pr
       lines_json: stringifyJSON(row.lines ?? []),
     }),
     isValid: (values) => asString(values.title).trim().length >= 2 && asString(values.lines_json).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="procurementRequests" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="procurementRequests" />),
   }, {});
 }
 
@@ -268,7 +268,7 @@ export function createProcurementPoliciesCrudConfig(): CrudResourceConfigMap['pr
       asString(values.name).trim().length >= 2 &&
       asString(values.expression).trim().length > 0 &&
       asString(values.effect).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="procurementPolicies" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="procurementPolicies" />),
   }, {});
 }
 
@@ -339,7 +339,7 @@ export function createNexusRolesCrudConfig(): CrudResourceConfigMap['roles'] {
       permissions_json: stringifyJSON(row.permissions ?? []),
     }),
     isValid: (values) => asString(values.name).trim().length > 0 && asString(values.permissions_json).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="roles" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="roles" />),
   }, {});
 }
 

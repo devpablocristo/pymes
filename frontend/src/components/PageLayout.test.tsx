@@ -1,11 +1,21 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { PageLayout } from './PageLayout';
 import { PageSearchProvider, usePageSearch } from './PageSearch';
 
+function renderInRouter(children: ReactNode) {
+  return render(
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {children}
+    </MemoryRouter>,
+  );
+}
+
 describe('PageLayout', () => {
   it('renderiza título sin subtítulo visible', () => {
-    render(
+    renderInRouter(
       <PageLayout title="Título" lead="Subtítulo">
         <p>Contenido</p>
       </PageLayout>,
@@ -16,7 +26,7 @@ describe('PageLayout', () => {
   });
 
   it('usa cabecera split cuando hay acciones', () => {
-    render(
+    renderInRouter(
       <PageLayout title="Panel" lead="Resumen" actions={<button type="button">Acción</button>}>
         <div>Cuerpo</div>
       </PageLayout>,
@@ -27,7 +37,7 @@ describe('PageLayout', () => {
   });
 
   it('renderiza acciones inline en la fila superior del header', () => {
-    render(
+    renderInRouter(
       <PageLayout title="Panel" lead="Resumen" inlineActions={<button type="button">Sucursal</button>}>
         <div>Cuerpo</div>
       </PageLayout>,
@@ -49,7 +59,7 @@ describe('PageLayout', () => {
       );
     }
 
-    render(
+    renderInRouter(
       <PageSearchProvider placeholder="Buscar...">
         <Fixture />
       </PageSearchProvider>,

@@ -409,11 +409,11 @@ export function createStockCrudConfig<T extends StockRecord>(options: {
     archivedEmptyState: 'No hay productos archivados en inventario.',
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay productos en el inventario.',
-    viewModes: [
-      { id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vistas de inventario', isDefault: true, render: options.renderList },
-      { id: 'gallery', label: 'Galería', path: 'gallery', ariaLabel: 'Vistas de inventario', render: options.renderGallery },
-      { id: 'kanban', label: 'Tablero', path: 'board', ariaLabel: 'Vistas de inventario', render: options.renderBoard },
-    ],
+    viewModes: buildStandardCrudViewModes(options.renderList, {
+      renderGallery: options.renderGallery,
+      renderKanban: options.renderBoard,
+      ariaLabel: 'Vistas de inventario',
+    }),
     rowActions: [],
     toolbarActions: [createStockNewProductAction() as CrudToolbarAction<T>],
     columns: createStockColumns<T>(),

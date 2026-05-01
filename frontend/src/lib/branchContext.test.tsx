@@ -8,7 +8,7 @@ import { useBranchSelection } from './useBranchSelection';
 
 const apiMocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
-  getSession: vi.fn<[], Promise<SessionResponse>>(),
+  getSession: vi.fn<() => Promise<SessionResponse>>(),
 }));
 
 vi.mock('./api', () => ({

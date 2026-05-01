@@ -1,7 +1,7 @@
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import type { CrudFieldValue, CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
-import { renderCrudActiveBadge } from '../crud';
+import { buildStandardCrudViewModes, renderCrudActiveBadge } from '../crud';
 
 export type AttachmentRow = {
   id: string;
@@ -95,7 +95,7 @@ export function createAttachmentsCrudConfig<TRecord extends AttachmentRow>(opts:
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista adjuntos', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista adjuntos' }),
     label: 'adjunto',
     labelPlural: 'adjuntos',
     labelPluralCap: 'Adjuntos',
@@ -164,7 +164,7 @@ export function createAuditCrudConfig<TRecord extends AuditEntryRow>(opts: {
   'viewModes' | 'label' | 'labelPlural' | 'labelPluralCap' | 'allowCreate' | 'allowEdit' | 'allowDelete' | 'searchPlaceholder' | 'emptyState' | 'dataSource' | 'columns' | 'formFields' | 'searchText' | 'toFormValues' | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista auditoría', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista auditoría' }),
     label: 'evento',
     labelPlural: 'eventos',
     labelPluralCap: 'Auditoría',
@@ -224,7 +224,7 @@ export function createTimelineCrudConfig<TRecord extends TimelineEntryRow>(opts:
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista historial', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista historial' }),
     label: 'entrada',
     labelPlural: 'entradas',
     labelPluralCap: 'Historial',
@@ -295,7 +295,7 @@ export function createWebhooksCrudConfig<TRecord extends WebhookEndpoint>(opts: 
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista webhooks', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista webhooks' }),
     basePath: '/v1/webhook-endpoints',
     label: 'endpoint webhook',
     labelPlural: 'endpoints webhook',

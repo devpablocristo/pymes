@@ -1,6 +1,10 @@
 package verticalconfig
 
-import "testing"
+import (
+	"os"
+	"os/exec"
+	"testing"
+)
 
 func TestLoadAllowsLocalDefaultInternalToken(t *testing.T) {
 	t.Setenv("ENVIRONMENT", "development")
@@ -13,28 +17,39 @@ func TestLoadAllowsLocalDefaultInternalToken(t *testing.T) {
 	}
 }
 
-func TestLoadPanicsWithoutInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", "")
+func TestLoadExitsWithoutInternalTokenOutsideLocal(t *testing.T) {
+	assertLoadExits(t, "production", "")
+}
 
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for missing production internal token")
-		}
-	}()
+func TestLoadExitsWithDefaultInternalTokenOutsideLocal(t *testing.T) {
+	assertLoadExits(t, "production", localInternalServiceToken)
+}
 
+func TestLoadFatalExit(t *testing.T) {
+	if os.Getenv("VERTICALCONFIG_FATAL_CHILD") != "1" {
+		return
+	}
+
+	t.Setenv("ENVIRONMENT", os.Getenv("VERTICALCONFIG_FATAL_ENVIRONMENT"))
+	t.Setenv("INTERNAL_SERVICE_TOKEN", os.Getenv("VERTICALCONFIG_FATAL_INTERNAL_SERVICE_TOKEN"))
 	_ = Load(Options{DefaultPort: "8081"})
 }
 
-func TestLoadPanicsWithDefaultInternalTokenOutsideLocal(t *testing.T) {
-	t.Setenv("ENVIRONMENT", "production")
-	t.Setenv("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)
+func assertLoadExits(t *testing.T, environment, token string) {
+	t.Helper()
 
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for default production internal token")
-		}
-	}()
+	cmd := exec.Command(os.Args[0], "-test.run=TestLoadFatalExit")
+	cmd.Env = append(os.Environ(),
+		"VERTICALCONFIG_FATAL_CHILD=1",
+		"VERTICALCONFIG_FATAL_ENVIRONMENT="+environment,
+		"VERTICALCONFIG_FATAL_INTERNAL_SERVICE_TOKEN="+token,
+	)
 
-	_ = Load(Options{DefaultPort: "8081"})
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected Load to exit")
+	}
+	if _, ok := err.(*exec.ExitError); !ok {
+		t.Fatalf("expected exit error, got %T: %v", err, err)
+	}
 }

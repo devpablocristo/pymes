@@ -17,16 +17,18 @@ from src.config import Settings
 
 
 def build_llm_provider(settings: Settings) -> Any:
-    provider = settings.llm_provider.strip().lower() or "echo"
+    provider = settings.llm_provider.strip().lower() or "gemini"
+    if provider != "gemini":
+        raise ValueError("LLM_PROVIDER must be gemini")
     if provider == "gemini" and settings.gemini_vertex_project.strip():
         gemini = GeminiProvider(
             api_key="vertex-ai",
-            model=settings.gemini_model.strip() or "gemini-2.0-flash",
+            model=settings.gemini_model.strip() or "gemini-2.5-flash",
         )
         gemini.client = genai.Client(
             vertexai=True,
             project=settings.gemini_vertex_project.strip(),
-            location=settings.gemini_vertex_location.strip() or "us-central1",
+            location=settings.gemini_vertex_location.strip() or "global",
         )
         return gemini
     return create_runtime_provider(settings)

@@ -26,9 +26,9 @@ def test_build_llm_provider_uses_vertex_when_project_is_configured(monkeypatch) 
     provider = runtime_bootstrap.build_llm_provider(
         SimpleNamespace(
             llm_provider="gemini",
-            gemini_model="gemini-2.0-flash-lite",
+            gemini_model="gemini-2.5-flash",
             gemini_vertex_project="pymes-dev-352318",
-            gemini_vertex_location="us-central1",
+            gemini_vertex_location="global",
             gemini_api_key="",
         )
     )
@@ -36,10 +36,10 @@ def test_build_llm_provider_uses_vertex_when_project_is_configured(monkeypatch) 
     assert isinstance(provider, StubGeminiProvider)
     assert calls == {
         "api_key": "vertex-ai",
-        "model": "gemini-2.0-flash-lite",
+        "model": "gemini-2.5-flash",
         "vertexai": "true",
         "vertex_project": "pymes-dev-352318",
-        "vertex_location": "us-central1",
+        "vertex_location": "global",
     }
 
 

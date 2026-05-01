@@ -8,19 +8,19 @@ require (
 	github.com/devpablocristo/core/authz/go v0.1.0
 	github.com/devpablocristo/core/calendar/ics/go v0.1.0
 	github.com/devpablocristo/core/calendar/sync/google/go v0.1.0
-	github.com/devpablocristo/core/concurrency/go v0.1.1
-	github.com/devpablocristo/core/config/go v0.0.0-20260328151810-084828e80b26
+	github.com/devpablocristo/core/concurrency/go v0.2.0
+	github.com/devpablocristo/core/config/go v0.1.0
 	github.com/devpablocristo/core/databases/postgres/go v0.1.1
 	github.com/devpablocristo/core/errors/go v0.1.0
-	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
+	github.com/devpablocristo/core/governance/go v0.1.0
 	github.com/devpablocristo/core/http/gin/go v0.1.1
 	github.com/devpablocristo/core/http/go v0.1.1
 	github.com/devpablocristo/core/notifications/go v0.3.0
-	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
+	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
 	github.com/devpablocristo/modules/crud/paths/go v0.1.0
-	github.com/devpablocristo/modules/scheduling/go v0.4.0
+	github.com/devpablocristo/modules/scheduling/go v0.5.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -46,7 +46,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
-	gorm.io/driver/sqlite v1.6.0 // indirect
+	gorm.io/driver/sqlite v1.6.0
 )
 
 require (

@@ -1,15 +1,14 @@
 # Pymes — flujo local habitual: todo en contenedores (`make up`).
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
-	up down ps logs llm-up llm-pull \
+	up down ps logs \
 	staticcheck ruff lint \
-	seed seeds seed-clear seeds-clear modules-check cleanup-pablo e2e-review-notifications \
+	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-LOCAL_INFRA_DIR = /home/pablo/Projects/Pablo/local-infra
-DC = docker compose --project-directory $(CURDIR) -f $(LOCAL_INFRA_DIR)/docker-compose.yml -f $(CURDIR)/docker-compose.yml
+DC = docker compose --project-directory $(CURDIR) -f $(CURDIR)/docker-compose.yml
 
 # Calidad
 
@@ -30,15 +29,9 @@ lint: staticcheck ruff
 seed:
 	bash scripts/seeds/load.sh
 
-# Alias explícito en plural para evitar confusión operativa.
-seeds: seed
-
 # Limpia datos CRUD/demo preservando bootstrap del tenant (org, users, members, settings, API keys).
 seed-clear:
 	bash scripts/seeds/clear.sh
-
-# Alias explícito en plural para evitar confusión operativa.
-seeds-clear: seed-clear
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
 # Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
@@ -57,18 +50,8 @@ modules-check:
 
 # Stack local
 
-# Levanta Ollama compartido del ecosistema local
-llm-up:
-	docker compose --project-directory $(LOCAL_INFRA_DIR) -f $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml up -d
-
-# Asegura el modelo LLM local por defecto en el Ollama compartido
-llm-pull:
-	$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh gemma4:e4b
-
 # Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
 up:
-	@$(MAKE) llm-up
-	@$(MAKE) llm-pull
 	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend frontend ai
 	$(DC) up -d --no-build
 

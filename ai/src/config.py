@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LOCAL_INTERNAL_SERVICE_TOKEN = "local-internal-token"
@@ -22,12 +22,9 @@ class Settings(BaseSettings):
 
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
     gemini_vertex_project: str = ""
-    gemini_vertex_location: str = "us-central1"
-    ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "gemma4:e4b"
-    ollama_timeout_seconds: float = 240.0
+    gemini_vertex_location: str = "global"
     assistant_max_tool_calls: int = 5
     assistant_tool_timeout_seconds: float = 20.0
     assistant_total_timeout_seconds: float = 180.0
@@ -63,19 +60,29 @@ class Settings(BaseSettings):
     def review_enabled(self) -> bool:
         return bool(self.review_url.strip())
 
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_llm_provider(cls, value: str) -> str:
+        provider = value.strip().lower() or "gemini"
+        if provider != "gemini":
+            raise ValueError("LLM_PROVIDER must be gemini")
+        return provider
+
     @model_validator(mode="after")
-    def validate_internal_service_token(self) -> "Settings":
+    def validate_runtime_settings(self) -> "Settings":
         token = self.internal_service_token.strip()
         if self.is_local_environment:
             self.ai_environment = self.normalized_environment
             self.internal_service_token = token or LOCAL_INTERNAL_SERVICE_TOKEN
-            return self
+        else:
+            if not token or token == LOCAL_INTERNAL_SERVICE_TOKEN:
+                raise ValueError("INTERNAL_SERVICE_TOKEN must be configured with a non-default value outside local environments")
 
-        if not token or token == LOCAL_INTERNAL_SERVICE_TOKEN:
-            raise ValueError("INTERNAL_SERVICE_TOKEN must be configured with a non-default value outside local environments")
+            self.ai_environment = self.normalized_environment
+            self.internal_service_token = token
 
-        self.ai_environment = self.normalized_environment
-        self.internal_service_token = token
+        if not self.gemini_api_key.strip() and not self.gemini_vertex_project.strip():
+            raise ValueError("GEMINI_API_KEY or GEMINI_VERTEX_PROJECT must be configured for Gemini")
         return self
 
 

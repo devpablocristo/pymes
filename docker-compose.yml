@@ -1,4 +1,45 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pymes
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pymes"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  review-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nexus_review
+    volumes:
+      - review_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus_review"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   review:
     restart: unless-stopped
     build:
@@ -7,16 +48,16 @@ services:
     ports:
       - "18084:8080"
     volumes:
-      - ../nexus/v3/review:/workspace/nexus/v3/review
+      - ../nexus/governance:/workspace/nexus/governance
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@review-postgres:5432/nexus_review?sslmode=disable
-      NEXUS_API_KEYS: admin=${REVIEW_API_KEY:-nexus-review-admin-dev-key}
+      GOVERNANCE_API_KEYS: admin=${REVIEW_API_KEY:-nexus-review-admin-dev-key}
       APPROVAL_DEFAULT_TTL: "3600"
-      NEXUS_SIGNING_KEY: nexus-dev-signing-key-change-in-production
-      REVIEW_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
-      REVIEW_APPROVAL_PENDING_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback
-      REVIEW_APPROVAL_RESOLVED_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback,http://ai:8000/v1/internal/review-callback
+      GOVERNANCE_SIGNING_KEY: nexus-dev-signing-key-change-in-production
+      GOVERNANCE_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
+      GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback
+      GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback,http://ai:8000/v1/internal/review-callback
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null 2>&1 || exit 1"]
       interval: 5s
@@ -39,7 +80,8 @@ services:
       - cp_backend_go_mod:/go/pkg/mod
       - cp_backend_go_build:/root/.cache/go-build
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       # Debe coincidir con el mapeo host 8100:8080, healthcheck y URLs internas (review → cp-backend:8080).
       PORT: "8080"
@@ -85,7 +127,8 @@ services:
       - ./frontend/eslint.config.js:/workspace/pymes/frontend/eslint.config.js
       - ./frontend/vendor:/workspace/pymes/frontend/vendor
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       VITE_API_URL: http://localhost:8100
       VITE_PROFESSIONALS_API_URL: http://localhost:8181
@@ -95,6 +138,10 @@ services:
       VITE_AI_API_URL: ${VITE_AI_API_URL:-http://localhost:8200}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+      VITE_API_KEY: ${VITE_API_KEY:-psk_local_admin}
+      VITE_API_ACTOR: ${VITE_API_ACTOR:-local-admin}
+      VITE_API_ROLE: ${VITE_API_ROLE:-admin}
+      VITE_API_SCOPES: ${VITE_API_SCOPES:-admin:console:read,admin:console:write}
     depends_on:
       - cp-backend
 
@@ -109,11 +156,14 @@ services:
       - ./ai/src:/workspace/pymes/ai/src
       - ./ai/tests:/workspace/pymes/ai/tests
       - ./ai/pyproject.toml:/workspace/pymes/ai/pyproject.toml
+      # ADC local para Vertex AI. No se versionan credenciales; se monta read-only desde el host.
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       AI_ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/pymes
@@ -123,12 +173,13 @@ services:
       BEAUTY_BACKEND_URL: http://host.docker.internal:8383
       RESTAURANTS_BACKEND_URL: http://host.docker.internal:8484
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-local-internal-token}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
+      LLM_PROVIDER: gemini
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_VERTEX_PROJECT: ${GEMINI_VERTEX_PROJECT:-}
+      GEMINI_VERTEX_LOCATION: ${GEMINI_VERTEX_LOCATION:-global}
       REVIEW_URL: http://review:8080
       PYTHONPATH: /workspace/pymes/ai
-      # Cuando el runtime use proveedor Ollama (misma app, config por env): API desde el contenedor `ai`.
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     depends_on:
       cp-backend:
         condition: service_started
@@ -152,7 +203,8 @@ services:
       - prof_backend_go_mod:/go/pkg/mod
       - prof_backend_go_build:/root/.cache/go-build
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       PORT: 8081
       ENVIRONMENT: development
@@ -181,7 +233,8 @@ services:
       - work_backend_go_mod:/go/pkg/mod
       - work_backend_go_build:/root/.cache/go-build
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       PORT: 8082
       ENVIRONMENT: development
@@ -212,7 +265,8 @@ services:
       - beauty_backend_go_mod:/go/pkg/mod
       - beauty_backend_go_build:/root/.cache/go-build
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       PORT: 8083
       ENVIRONMENT: development
@@ -241,7 +295,8 @@ services:
       - restaurants_backend_go_mod:/go/pkg/mod
       - restaurants_backend_go_build:/root/.cache/go-build
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       PORT: 8084
       ENVIRONMENT: development
@@ -256,6 +311,8 @@ services:
         condition: service_healthy
 
 volumes:
+  postgres_data:
+  review_postgres_data:
   cp_backend_go_mod:
   cp_backend_go_build:
   prof_backend_go_mod:

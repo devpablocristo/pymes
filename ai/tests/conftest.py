@@ -76,13 +76,30 @@ def _ensure_runtime_package_stub() -> None:
         logging_mod.get_request_id = _get_request_id  # type: ignore[attr-defined]
         sys.modules["runtime.logging"] = logging_mod
 
-    if "httpserver" not in sys.modules:
-        httpserver_mod = _t.ModuleType("httpserver")
-        httpserver_mod.__path__ = []  # type: ignore[attr-defined]
-        sys.modules["httpserver"] = httpserver_mod
+    try:
+        importlib.import_module("httpserver.errors")
+        importlib.import_module("httpserver.fastapi_bootstrap")
+    except ModuleNotFoundError:
+        if "httpserver" not in sys.modules:
+            httpserver_mod = _t.ModuleType("httpserver")
+            httpserver_mod.__path__ = []  # type: ignore[attr-defined]
+            sys.modules["httpserver"] = httpserver_mod
 
-    if "httpserver.errors" not in sys.modules:
         errors_mod = _t.ModuleType("httpserver.errors")
+
+        class AppError(Exception):
+            def __init__(
+                self,
+                code: str = "INTERNAL",
+                message: str = "internal error",
+                status_code: int = 500,
+                details: dict | None = None,
+            ):
+                super().__init__(message)
+                self.code = code
+                self.message = message
+                self.status_code = status_code
+                self.details = details or {}
 
         def error_payload(
             code: str = "",
@@ -99,8 +116,19 @@ def _ensure_runtime_package_stub() -> None:
                 }
             }
 
+        errors_mod.AppError = AppError  # type: ignore[attr-defined]
         errors_mod.error_payload = error_payload  # type: ignore[attr-defined]
         sys.modules["httpserver.errors"] = errors_mod
+
+        bootstrap_mod = _t.ModuleType("httpserver.fastapi_bootstrap")
+
+        def _noop(*args, **kwargs):
+            return None
+
+        bootstrap_mod.apply_permissive_cors = _noop  # type: ignore[attr-defined]
+        bootstrap_mod.install_request_context_middleware = _noop  # type: ignore[attr-defined]
+        bootstrap_mod.register_common_exception_handlers = _noop  # type: ignore[attr-defined]
+        sys.modules["httpserver.fastapi_bootstrap"] = bootstrap_mod
 
 
 _ensure_runtime_package_stub()

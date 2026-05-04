@@ -16,7 +16,6 @@ const loadLazyCrudPageConfigMock = vi.fn<(resourceId: string) => Promise<CrudPag
 
 vi.mock('./lazyCrudPage', () => ({
   loadLazyCrudPageConfig: (resourceId: string) => loadLazyCrudPageConfigMock(resourceId),
-  LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
 vi.mock('./PymesSimpleCrudListModeContent', () => ({

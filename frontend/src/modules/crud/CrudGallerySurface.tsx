@@ -31,7 +31,7 @@ const PLACEHOLDER_IMAGE =
 const gridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-  gap: 16,
+  gap: 'var(--space-4)',
   width: '100%',
 };
 
@@ -40,12 +40,11 @@ const cardStyle: CSSProperties = {
   flexDirection: 'column',
   background: 'var(--color-surface)',
   border: '1px solid var(--color-border)',
-  borderRadius: 8,
+  borderRadius: 'var(--radius-sm)',
   overflow: 'hidden',
   cursor: 'pointer',
   textAlign: 'left',
   padding: 0,
-  font: 'inherit',
   fontFamily: 'var(--crud-ui-font-family)',
   fontSize: 'var(--crud-ui-font-size)',
   color: 'inherit',
@@ -66,10 +65,10 @@ const imageStyle: CSSProperties = {
 };
 
 const bodyStyle: CSSProperties = {
-  padding: 8,
+  padding: 'var(--space-2)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 2,
+  gap: 'var(--space-1)',
   color: 'var(--color-text)',
 };
 

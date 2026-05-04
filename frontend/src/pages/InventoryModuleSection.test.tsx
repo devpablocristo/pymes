@@ -8,7 +8,6 @@ const loadLazyCrudPageConfigMock = vi.fn<(resourceId: string) => Promise<CrudPag
 
 vi.mock('../crud/lazyCrudPage', () => ({
   loadLazyCrudPageConfig: (resourceId: string) => loadLazyCrudPageConfigMock(resourceId),
-  LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
 function buildInventoryConfig(): CrudPageConfig<{ id: string }> {

@@ -1,7 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- infraestructura de lazy loading CRUD */
-import { useEffect, useState, type ComponentType } from 'react';
 import type { CrudPageConfig } from '../components/CrudPage';
-import { PageLayout } from '../components/PageLayout';
 import { hasCrudModule } from './crudModuleCatalog';
 
 type CrudModule =
@@ -12,61 +10,78 @@ type CrudModule =
   | typeof import('./resourceConfigs.control')
   | typeof import('./resourceConfigs.professionals')
   | typeof import('./resourceConfigs.workshops')
-  | typeof import('./resourceConfigs.beauty')
   | typeof import('./resourceConfigs.restaurants');
 
-const crudModulePromises = new Map<string, Promise<CrudModule>>();
+/** Clave del bundle lazy (`resourceConfigs.*`). Debe cubrir todo recurso con entrada en `defineCrudDomain`. */
+type CrudLazyChunk =
+  | 'commercial'
+  | 'operations'
+  | 'governance'
+  | 'control'
+  | 'professionals'
+  | 'workshops'
+  | 'restaurants'
+  | 'common';
 
-function resolveCrudModuleGroup(resourceId: string): string {
-  if (['invoices', 'customers', 'suppliers', 'products', 'services', 'priceLists', 'quotes', 'sales', 'purchases'].includes(resourceId)) {
-    return 'commercial';
-  }
-  if (
-    [
-      'inventory',
-      'returns',
-      'creditNotes',
-      'cashflow',
-      'payments',
-      'recurring',
-    ].includes(resourceId)
-  ) {
-    return 'operations';
-  }
-  if (
-    ['procurementRequests', 'procurementPolicies', 'accounts', 'roles', 'parties', 'employees'].includes(resourceId)
-  ) {
-    return 'governance';
-  }
-  if (['attachments', 'audit', 'timeline', 'webhooks'].includes(resourceId)) {
-    return 'control';
-  }
-  if (['professionals', 'teachers', 'specialties', 'intakes', 'sessions'].includes(resourceId)) {
-    return 'professionals';
-  }
-  if (
-    [
-      'workshopVehicles',
-      'carWorkOrders',
-      'bikeWorkOrders',
-    ].includes(resourceId)
-  ) {
-    return 'workshops';
-  }
-  if (['restaurantDiningAreas', 'restaurantDiningTables'].includes(resourceId)) {
-    return 'restaurants';
-  }
+const COMMERCIAL_CRUD_IDS = new Set<string>([
+  'invoices',
+  'customers',
+  'suppliers',
+  'products',
+  'services',
+  'priceLists',
+  'quotes',
+  'sales',
+  'purchases',
+]);
+
+const OPERATIONS_CRUD_IDS = new Set<string>([
+  'inventory',
+  'returns',
+  'creditNotes',
+  'cashflow',
+  'payments',
+  'recurring',
+]);
+
+const GOVERNANCE_CRUD_IDS = new Set<string>([
+  'procurementRequests',
+  'procurementPolicies',
+  'accounts',
+  'roles',
+  'parties',
+  'employees',
+]);
+
+const CONTROL_CRUD_IDS = new Set<string>(['attachments', 'audit', 'timeline', 'webhooks']);
+
+const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'teachers', 'specialties', 'intakes', 'sessions']);
+
+const WORKSHOPS_CRUD_IDS = new Set<string>(['workshopVehicles', 'carWorkOrders', 'bikeWorkOrders']);
+
+const RESTAURANTS_CRUD_IDS = new Set<string>(['restaurantDiningAreas', 'restaurantDiningTables']);
+
+function resolveCrudLazyChunk(resourceId: string): CrudLazyChunk {
+  if (COMMERCIAL_CRUD_IDS.has(resourceId)) return 'commercial';
+  if (OPERATIONS_CRUD_IDS.has(resourceId)) return 'operations';
+  if (GOVERNANCE_CRUD_IDS.has(resourceId)) return 'governance';
+  if (CONTROL_CRUD_IDS.has(resourceId)) return 'control';
+  if (PROFESSIONALS_CRUD_IDS.has(resourceId)) return 'professionals';
+  if (WORKSHOPS_CRUD_IDS.has(resourceId)) return 'workshops';
+  if (RESTAURANTS_CRUD_IDS.has(resourceId)) return 'restaurants';
   return 'common';
 }
 
+const crudModulePromises = new Map<CrudLazyChunk, Promise<CrudModule>>();
+
 function loadCrudModule(resourceId: string): Promise<CrudModule> {
-  const group = resolveCrudModuleGroup(resourceId);
-  const cached = crudModulePromises.get(group);
+  const chunk = resolveCrudLazyChunk(resourceId);
+  const cached = crudModulePromises.get(chunk);
   if (cached) {
     return cached;
   }
   let promise: Promise<CrudModule>;
-  switch (group) {
+  switch (chunk) {
     case 'commercial':
       promise = import('./resourceConfigs.commercial');
       break;
@@ -85,9 +100,6 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
     case 'workshops':
       promise = import('./resourceConfigs.workshops');
       break;
-    case 'beauty':
-      promise = import('./resourceConfigs.beauty');
-      break;
     case 'restaurants':
       promise = import('./resourceConfigs.restaurants');
       break;
@@ -96,19 +108,11 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
       break;
   }
   promise = promise.catch((err: unknown) => {
-    crudModulePromises.delete(group);
+    crudModulePromises.delete(chunk);
     throw err;
   });
-  crudModulePromises.set(group, promise);
+  crudModulePromises.set(chunk, promise);
   return promise;
-}
-
-export async function loadCrudResourceConfig(resourceId: string) {
-  const mod = await loadCrudModule(resourceId);
-  if (!mod.hasCrudResource(resourceId)) {
-    return null;
-  }
-  return { ConfiguredCrudPage: mod.ConfiguredCrudPage };
 }
 
 export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { id: string }>(
@@ -116,69 +120,6 @@ export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { 
 ): Promise<CrudPageConfig<TRecord> | null> {
   const mod = await loadCrudModule(resourceId);
   return mod.getCrudPageConfig<TRecord>(resourceId);
-}
-
-export function LazyConfiguredCrudPage({
-  resourceId,
-  mergeConfig,
-}: {
-  resourceId: string;
-  mergeConfig?: Record<string, unknown>;
-}) {
-  const [ConfiguredCrudPage, setConfiguredCrudPage] = useState<ComponentType<{
-    resourceId: string;
-    mergeConfig?: Record<string, unknown>;
-  }> | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoadError(null);
-    void loadCrudModule(resourceId)
-      .then((mod) => {
-        if (cancelled) return;
-        const C = mod.ConfiguredCrudPage;
-        if (C == null) {
-          setLoadError('El bundle del módulo no exporta ConfiguredCrudPage.');
-          return;
-        }
-        setConfiguredCrudPage(() => C);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : String(err));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [resourceId]);
-
-  if (loadError != null) {
-    return (
-      <PageLayout title="Módulo" lead="No se pudo cargar la superficie CRUD.">
-        <div className="alert alert-error">
-          <p>{loadError}</p>
-          <p className="text-secondary text-sm">
-            Revisá la instalación del frontend: <code>@devpablocristo/modules-crud-ui</code> debe estar resuelto
-            desde <code>node_modules</code>. Si corrés Docker, reconstruí la imagen para refrescar dependencias y
-            lockfile.
-          </p>
-        </div>
-      </PageLayout>
-    );
-  }
-
-  if (ConfiguredCrudPage == null) {
-    return (
-      <PageLayout title="Módulo" lead="Cargando superficie del módulo.">
-        <div className="card">
-          <p>Cargando módulo…</p>
-        </div>
-      </PageLayout>
-    );
-  }
-  return <ConfiguredCrudPage resourceId={resourceId} mergeConfig={mergeConfig} />;
 }
 
 export async function hasLazyCrudResource(resourceId: string): Promise<boolean> {

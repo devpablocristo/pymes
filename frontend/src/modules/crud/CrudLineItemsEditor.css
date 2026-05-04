@@ -1,12 +1,19 @@
+/* Columnas compartidas entre cabecera de columna y filas de datos */
 .crud-line-items-editor {
+  --crud-line-items-cols: minmax(0, 1.8fr) minmax(120px, 0.6fr) minmax(160px, 0.8fr) auto;
+
   display: grid;
   gap: var(--space-3);
 }
 
-.crud-line-items-editor__labels-row {
+.crud-line-items-editor__labels-row,
+.crud-line-items-editor__row {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(120px, 0.6fr) minmax(160px, 0.8fr) auto;
+  grid-template-columns: var(--crud-line-items-cols);
   gap: var(--space-3);
+}
+
+.crud-line-items-editor__labels-row {
   align-items: end;
 }
 
@@ -17,14 +24,7 @@
 }
 
 .crud-line-items-editor__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(120px, 0.6fr) minmax(160px, 0.8fr) auto;
-  gap: var(--space-3);
   align-items: center;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
 }
 
 .crud-line-items-editor__field {
@@ -59,11 +59,7 @@
 }
 
 @media (max-width: 820px) {
-  .crud-line-items-editor__row {
-    grid-template-columns: 1fr;
-  }
-
-  .crud-line-items-editor__labels-row {
-    grid-template-columns: 1fr;
+  .crud-line-items-editor {
+    --crud-line-items-cols: 1fr;
   }
 }

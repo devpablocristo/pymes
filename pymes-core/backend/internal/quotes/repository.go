@@ -3,6 +3,7 @@ package quotes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -114,6 +117,8 @@ type CreateInput struct {
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
+	Tags         []string
+	Metadata     map[string]any
 	Items        []CreateItemInput
 }
 
@@ -143,6 +148,8 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 			CreatedBy:    strings.TrimSpace(in.CreatedBy),
 			CreatedAt:    time.Now().UTC(),
 			UpdatedAt:    time.Now().UTC(),
+			Tags:         pq.StringArray(utils.NormalizeTags(in.Tags)),
+			Metadata:     metadataToJSONBytesQuotes(in.Metadata),
 		}
 		if err := tx.Create(&quoteRow).Error; err != nil {
 			return err
@@ -296,6 +303,8 @@ type UpdateInput struct {
 	Currency     string
 	Notes        string
 	ValidUntil   *time.Time
+	Tags         []string
+	Metadata     map[string]any
 	Items        []CreateItemInput
 }
 
@@ -319,6 +328,8 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 			"currency":    strings.TrimSpace(in.Currency),
 			"notes":       strings.TrimSpace(in.Notes),
 			"valid_until": in.ValidUntil,
+			"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+			"metadata":    metadataToJSONBytesQuotes(in.Metadata),
 			"updated_at":  gorm.Expr("now()"),
 		}
 		if err := tx.Model(&models.QuoteModel{}).
@@ -569,7 +580,91 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 		CreatedAt:    quoteRow.CreatedAt,
 		UpdatedAt:    quoteRow.UpdatedAt,
 		ArchivedAt:   quoteRow.ArchivedAt,
+		Tags:         append([]string(nil), quoteRow.Tags...),
+		Metadata:     metadataFromJSONBytesQuotes(quoteRow.Metadata),
 	}
+}
+
+func metadataFromJSONBytesQuotes(b []byte) map[string]any {
+	if len(b) == 0 {
+		return map[string]any{}
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil || m == nil {
+		return map[string]any{}
+	}
+	return m
+}
+
+func metadataToJSONBytesQuotes(m map[string]any) []byte {
+	if m == nil || len(m) == 0 {
+		return []byte("{}")
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
+}
+
+func mergeMetadataJSONQuotes(current []byte, patch map[string]any) ([]byte, error) {
+	base := metadataFromJSONBytesQuotes(current)
+	for k, v := range patch {
+		if k == "favorite" && !truthyMetadataQuotes(v) {
+			delete(base, "favorite")
+			continue
+		}
+		base[k] = v
+	}
+	return json.Marshal(base)
+}
+
+func truthyMetadataQuotes(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		s := strings.TrimSpace(strings.ToLower(t))
+		return s == "true" || s == "1"
+	case float64:
+		return t != 0
+	case int:
+		return t != 0
+	default:
+		return v != nil
+	}
+}
+
+// PatchAnnotations actualiza etiquetas, metadata y campos de texto permitidos fuera del borrador.
+func (r *Repository) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error) {
+	var row models.QuoteModel
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+		return quotedomain.Quote{}, err
+	}
+	updates := map[string]any{"updated_at": gorm.Expr("now()")}
+	if patch.Tags != nil {
+		updates["tags"] = pq.StringArray(utils.NormalizeTags(*patch.Tags))
+	}
+	if patch.Metadata != nil {
+		merged, err := mergeMetadataJSONQuotes(row.Metadata, *patch.Metadata)
+		if err != nil {
+			return quotedomain.Quote{}, err
+		}
+		updates["metadata"] = merged
+	}
+	if patch.Notes != nil {
+		updates["notes"] = strings.TrimSpace(*patch.Notes)
+	}
+	if patch.CustomerName != nil {
+		updates["party_name"] = strings.TrimSpace(*patch.CustomerName)
+	}
+	if len(updates) == 1 {
+		return r.GetByID(ctx, orgID, id)
+	}
+	if err := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ? AND id = ?", orgID, id).Updates(updates).Error; err != nil {
+		return quotedomain.Quote{}, err
+	}
+	return r.GetByID(ctx, orgID, id)
 }
 
 func coalesce(v, def string) string {

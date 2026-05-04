@@ -135,13 +135,14 @@
   border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
 }
 
+/* Un solo cuerpo continuo: sin “cajas” por sección (campos + bloques comparten el mismo lienzo). */
 .crud-entity-editor-modal__section {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  gap: var(--space-3);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .crud-entity-editor-modal__section-head {

@@ -19,8 +19,12 @@ export type CrudViewModeConfig = ModulesCrudViewModeConfig & {
 };
 
 export type CrudFeatureFlags = ModulesCrudFeatureFlags & {
-  /** Selector junto al buscador para filtrar por estado/etiqueta cuando aplique. */
+  /** Selector junto al buscador para filtrar por estado/categoría cuando aplique (no incluye `tags`; esos van en chips). */
   valueFilter?: boolean;
+  /** Si es `false`, no se muestran chips de filtro por `tags`. Por defecto se muestran cuando hay etiquetas en los ítems. */
+  tagPills?: boolean;
+  /** Si es `false`, no se inyectan campos estándar `tags` + favorito (`metadata.favorite`). Por defecto activo salvo opt-out por recurso. */
+  standardAnnotations?: boolean;
 };
 
 export type CrudExplorerMetricConfig<T> = {

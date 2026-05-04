@@ -3,6 +3,7 @@ import { crudItemPath, type CrudFieldValue } from '@devpablocristo/modules-crud-
 import { isValidElement, useCallback, useMemo } from 'react';
 import './PymesSimpleCrudListModeContent.css';
 import { apiRequest } from '../lib/api';
+import { REST_ARCHIVE_VIA_POST_BASE_PATHS } from './restCrudDataSource';
 import { useOptionalBranchSelection } from '../lib/useBranchSelection';
 import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { useI18n } from '../lib/i18n';
@@ -374,7 +375,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     ) {
       mappedColumns.push({
         id: 'tags',
-        header: 'Etiquetas',
+        header: 'Etiquetas Internas',
         className: 'cell-tags',
         render: (row) => crudConfig.renderTagsCell?.(row) ?? '—',
       });
@@ -491,7 +492,12 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                     if (crudConfig.dataSource?.deleteItem) {
                       await crudConfig.dataSource.deleteItem(editorRow);
                     } else if (crudConfig.basePath) {
-                      await apiRequest(crudItemPath(crudConfig.basePath, editorRow.id), { method: 'DELETE' });
+                      const itemPath = crudItemPath(crudConfig.basePath, editorRow.id);
+                      if (REST_ARCHIVE_VIA_POST_BASE_PATHS.has(crudConfig.basePath)) {
+                        await apiRequest(`${itemPath}/archive`, { method: 'POST', body: {} });
+                      } else {
+                        await apiRequest(itemPath, { method: 'DELETE' });
+                      }
                     }
                     setItems((current) => current.filter((item) => item.id !== editorRow!.id));
                     selectItem(null);
@@ -543,7 +549,12 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
                     if (crudConfig.dataSource?.hardDelete) {
                       await crudConfig.dataSource.hardDelete(editorRow);
                     } else if (crudConfig.basePath) {
-                      await apiRequest(`${crudItemPath(crudConfig.basePath, editorRow.id)}/hard`, { method: 'DELETE' });
+                      const itemPath = crudItemPath(crudConfig.basePath, editorRow.id);
+                      if (REST_ARCHIVE_VIA_POST_BASE_PATHS.has(crudConfig.basePath)) {
+                        await apiRequest(itemPath, { method: 'DELETE' });
+                      } else {
+                        await apiRequest(`${itemPath}/hard`, { method: 'DELETE' });
+                      }
                     }
                     setItems((current) => current.filter((item) => item.id !== editorRow!.id));
                     selectItem(null);

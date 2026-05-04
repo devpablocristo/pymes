@@ -19,9 +19,20 @@ type RepositoryPort interface {
 	Create(ctx context.Context, in CreateInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error)
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
 	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+}
+
+// SalePatchFields actualización parcial permitida desde el CRUD unificado.
+type SalePatchFields struct {
+	Tags          *[]string
+	Metadata      *map[string]any
+	Notes         *string
+	PaymentMethod *string
+	CustomerName  *string
+	BranchID      *uuid.UUID
 }
 
 type InventoryPort interface {
@@ -95,6 +106,8 @@ type CreateSaleInput struct {
 	PaymentMethod string
 	Items         []CreateSaleItemInput
 	Notes         string
+	Tags          []string
+	Metadata      map[string]any
 	CreatedBy     string
 }
 
@@ -223,6 +236,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		Total:         total,
 		Currency:      currency,
 		Notes:         strings.TrimSpace(in.Notes),
+		Tags:          in.Tags,
+		Metadata:      in.Metadata,
 		CreatedBy:     strings.TrimSpace(in.CreatedBy),
 		Items:         createItems,
 	})
@@ -265,6 +280,42 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledo
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
 		}
 		return saledomain.Sale{}, err
+	}
+	return out, nil
+}
+
+func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields, actor string) (saledomain.Sale, error) {
+	current, err := u.repo.GetByID(ctx, orgID, saleID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
+	}
+	if current.Status == "voided" {
+		return saledomain.Sale{}, fmt.Errorf("cannot update voided sale: %w", httperrors.ErrConflict)
+	}
+	if in.PaymentMethod != nil {
+		pm := strings.TrimSpace(*in.PaymentMethod)
+		if pm == "" || !isValidPaymentMethod(pm) {
+			return saledomain.Sale{}, fmt.Errorf("invalid payment_method: %w", httperrors.ErrBadInput)
+		}
+	}
+
+	hasPatch := in.Tags != nil || in.Metadata != nil || in.Notes != nil || in.PaymentMethod != nil || in.CustomerName != nil || in.BranchID != nil
+	if !hasPatch {
+		return saledomain.Sale{}, fmt.Errorf("no fields to patch: %w", httperrors.ErrBadInput)
+	}
+
+	out, err := u.repo.PatchSale(ctx, orgID, saleID, in)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
+		}
+		return saledomain.Sale{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "sale.patched", "sale", saleID.String(), map[string]any{})
 	}
 	return out, nil
 }

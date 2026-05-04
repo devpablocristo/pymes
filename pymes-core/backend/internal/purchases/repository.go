@@ -2,16 +2,19 @@ package purchases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/repository/models"
 	purchasesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/purchases/usecases/domain"
 )
@@ -63,7 +66,27 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (purchasesdomai
 		}
 		number := fmt.Sprintf("%s-%05d", tenant.PurchasePrefix, tenant.NextPurchaseNumber)
 		subtotal, taxTotal, total := totals(in.Items)
-		purchaseRow := models.PurchaseModel{ID: uuid.New(), OrgID: in.OrgID, BranchID: in.BranchID, Number: number, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, Currency: tenant.Currency, Notes: in.Notes, ReceivedAt: markReceivedAt(in.Status), CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+		purchaseRow := models.PurchaseModel{
+			ID:            uuid.New(),
+			OrgID:         in.OrgID,
+			BranchID:      in.BranchID,
+			Number:        number,
+			SupplierID:    in.SupplierID,
+			SupplierName:  in.SupplierName,
+			Status:        in.Status,
+			PaymentStatus: in.PaymentStatus,
+			Subtotal:      subtotal,
+			TaxTotal:      taxTotal,
+			Total:         total,
+			Currency:      tenant.Currency,
+			Notes:         in.Notes,
+			ReceivedAt:    markReceivedAt(in.Status),
+			CreatedBy:     in.CreatedBy,
+			CreatedAt:     time.Now().UTC(),
+			UpdatedAt:     time.Now().UTC(),
+			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
+			Metadata:      metadataToJSONBytes(in.Metadata),
+		}
 		if err := tx.Create(&purchaseRow).Error; err != nil {
 			return err
 		}
@@ -128,7 +151,20 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (purchasesdomai
 			}
 		}
 		subtotal, taxTotal, total := totals(in.Items)
-		updates := map[string]any{"party_id": in.SupplierID, "party_name": in.SupplierName, "branch_id": in.BranchID, "status": in.Status, "payment_status": in.PaymentStatus, "subtotal": subtotal, "tax_total": taxTotal, "total": total, "notes": in.Notes, "updated_at": time.Now().UTC()}
+		updates := map[string]any{
+			"party_id":        in.SupplierID,
+			"party_name":      in.SupplierName,
+			"branch_id":       in.BranchID,
+			"status":          in.Status,
+			"payment_status":  in.PaymentStatus,
+			"subtotal":        subtotal,
+			"tax_total":       taxTotal,
+			"total":           total,
+			"notes":           in.Notes,
+			"tags":            pq.StringArray(utils.NormalizeTags(in.Tags)),
+			"metadata":        metadataToJSONBytes(in.Metadata),
+			"updated_at":      time.Now().UTC(),
+		}
 		if in.Status == "received" && current.ReceivedAt == nil {
 			updates["received_at"] = time.Now().UTC()
 		}
@@ -234,6 +270,41 @@ func (r *Repository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (pu
 		return purchasesdomain.Purchase{}, err
 	}
 	return out, nil
+}
+
+// PatchAnnotations actualiza etiquetas, metadata y campos de texto permitidos fuera del borrador.
+func (r *Repository) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields) (purchasesdomain.Purchase, error) {
+	var row models.PurchaseModel
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+		return purchasesdomain.Purchase{}, err
+	}
+	updates := map[string]any{"updated_at": time.Now().UTC()}
+	if patch.Tags != nil {
+		updates["tags"] = pq.StringArray(utils.NormalizeTags(*patch.Tags))
+	}
+	if patch.Metadata != nil {
+		merged, err := mergeMetadataJSON(row.Metadata, *patch.Metadata)
+		if err != nil {
+			return purchasesdomain.Purchase{}, err
+		}
+		updates["metadata"] = merged
+	}
+	if patch.Notes != nil {
+		updates["notes"] = strings.TrimSpace(*patch.Notes)
+	}
+	if patch.PaymentStatus != nil {
+		updates["payment_status"] = strings.TrimSpace(strings.ToLower(*patch.PaymentStatus))
+	}
+	if patch.SupplierName != nil {
+		updates["party_name"] = strings.TrimSpace(*patch.SupplierName)
+	}
+	if len(updates) == 1 {
+		return r.GetByID(ctx, orgID, id)
+	}
+	if err := r.db.WithContext(ctx).Model(&models.PurchaseModel{}).Where("org_id = ? AND id = ?", orgID, id).Updates(updates).Error; err != nil {
+		return purchasesdomain.Purchase{}, err
+	}
+	return r.GetByID(ctx, orgID, id)
 }
 
 func (r *Repository) reverseStock(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, purchaseID uuid.UUID, items []models.PurchaseItemModel, actor string) error {
@@ -403,9 +474,79 @@ func totals(items []purchasesdomain.PurchaseItem) (float64, float64, float64) {
 }
 
 func toDomain(row models.PurchaseModel, items []models.PurchaseItemModel) purchasesdomain.Purchase {
-	out := purchasesdomain.Purchase{ID: row.ID, OrgID: row.OrgID, BranchID: row.BranchID, Number: row.Number, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Status: row.Status, PaymentStatus: row.PaymentStatus, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, Currency: row.Currency, Notes: row.Notes, ReceivedAt: row.ReceivedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := purchasesdomain.Purchase{
+		ID:            row.ID,
+		OrgID:         row.OrgID,
+		BranchID:      row.BranchID,
+		Number:        row.Number,
+		SupplierID:    row.SupplierID,
+		SupplierName:  row.SupplierName,
+		Status:        row.Status,
+		PaymentStatus: row.PaymentStatus,
+		Subtotal:      row.Subtotal,
+		TaxTotal:      row.TaxTotal,
+		Total:         row.Total,
+		Currency:      row.Currency,
+		Notes:         row.Notes,
+		ReceivedAt:    row.ReceivedAt,
+		CreatedBy:     row.CreatedBy,
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+		Tags:          append([]string(nil), row.Tags...),
+		Metadata:      metadataFromJSONBytes(row.Metadata),
+	}
 	for _, item := range items {
 		out.Items = append(out.Items, purchasesdomain.PurchaseItem{ID: item.ID, PurchaseID: item.PurchaseID, ProductID: item.ProductID, ServiceID: item.ServiceID, Description: item.Description, Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: item.TaxRate, Subtotal: item.Subtotal, SortOrder: item.SortOrder})
 	}
 	return out
+}
+
+func metadataFromJSONBytes(b []byte) map[string]any {
+	if len(b) == 0 {
+		return map[string]any{}
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil || m == nil {
+		return map[string]any{}
+	}
+	return m
+}
+
+func metadataToJSONBytes(m map[string]any) []byte {
+	if m == nil || len(m) == 0 {
+		return []byte("{}")
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
+}
+
+func mergeMetadataJSON(current []byte, patch map[string]any) ([]byte, error) {
+	base := metadataFromJSONBytes(current)
+	for k, v := range patch {
+		if k == "favorite" && !truthyMetadata(v) {
+			delete(base, "favorite")
+			continue
+		}
+		base[k] = v
+	}
+	return json.Marshal(base)
+}
+
+func truthyMetadata(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		s := strings.TrimSpace(strings.ToLower(t))
+		return s == "true" || s == "1"
+	case float64:
+		return t != 0
+	case int:
+		return t != 0
+	default:
+		return v != nil
+	}
 }

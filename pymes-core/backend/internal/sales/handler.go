@@ -20,6 +20,7 @@ type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateSaleInput) (saledomain.Sale, error)
 	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields, actor string) (saledomain.Sale, error)
 	Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
 }
 
@@ -33,6 +34,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET("/sales", rbac.RequirePermission("sales", "read"), h.List)
 	auth.POST("/sales", rbac.RequirePermission("sales", "create"), h.Create)
 	auth.GET("/sales/:id", rbac.RequirePermission("sales", "read"), h.Get)
+	auth.PATCH("/sales/:id", rbac.RequirePermission("sales", "update"), h.Patch)
 	auth.POST("/sales/:id/void", rbac.RequirePermission("sales", "void"), h.Void)
 }
 
@@ -190,6 +192,8 @@ func (h *Handler) Create(c *gin.Context) {
 		PaymentMethod: req.PaymentMethod,
 		Items:         items,
 		Notes:         req.Notes,
+		Tags:          req.Tags,
+		Metadata:      req.Metadata,
 		CreatedBy:     a.Actor,
 	})
 	if err != nil {
@@ -212,6 +216,59 @@ func (h *Handler) Get(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toSaleResponse(out))
+}
+
+func (h *Handler) Patch(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var req dto.PatchSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	if req.Tags == nil && req.Metadata == nil && req.Notes == nil && req.PaymentMethod == nil && req.CustomerName == nil && req.BranchID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
+		return
+	}
+
+	var branchID *uuid.UUID
+	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
+		bid, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			return
+		}
+		branchID = &bid
+	}
+
+	var pm *string
+	if req.PaymentMethod != nil {
+		t := strings.TrimSpace(*req.PaymentMethod)
+		pm = &t
+	}
+
+	out, err := h.uc.PatchSale(c.Request.Context(), orgID, id, SalePatchFields{
+		Tags:          req.Tags,
+		Metadata:      req.Metadata,
+		Notes:         req.Notes,
+		PaymentMethod: pm,
+		CustomerName:  req.CustomerName,
+		BranchID:      branchID,
+	}, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -256,6 +313,8 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 		Notes:         in.Notes,
 		CreatedBy:     in.CreatedBy,
 		CreatedAt:     in.CreatedAt.UTC().Format(time.RFC3339),
+		Tags:          in.Tags,
+		Metadata:      in.Metadata,
 	}
 	if in.BranchID != nil {
 		resp.BranchID = in.BranchID.String()

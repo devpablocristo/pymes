@@ -30,6 +30,10 @@ func (m *mockPurchasesRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (p
 func (m *mockPurchasesRepo) Update(context.Context, UpdateInput) (purchasesdomain.Purchase, error) {
 	return purchasesdomain.Purchase{}, nil
 }
+
+func (m *mockPurchasesRepo) PatchAnnotations(context.Context, uuid.UUID, uuid.UUID, PurchasePatchFields) (purchasesdomain.Purchase, error) {
+	return purchasesdomain.Purchase{}, nil
+}
 func (m *mockPurchasesRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error) {
 	return m.updateStatusFn(ctx, in)
 }

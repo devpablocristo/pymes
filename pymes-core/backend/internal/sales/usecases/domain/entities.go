@@ -23,8 +23,10 @@ type Sale struct {
 	Currency      string     `json:"currency"`
 	Notes         string     `json:"notes"`
 	CreatedBy     string     `json:"created_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	VoidedAt      *time.Time `json:"voided_at,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+	VoidedAt      *time.Time     `json:"voided_at,omitempty"`
+	Tags          []string       `json:"tags,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 
 type SaleItem struct {

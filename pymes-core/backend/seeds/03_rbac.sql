@@ -43,6 +43,7 @@ BEGIN
         (gen_random_uuid(), r_seller, 'products', 'read'),
         (gen_random_uuid(), r_seller, 'sales', 'read'),
         (gen_random_uuid(), r_seller, 'sales', 'create'),
+        (gen_random_uuid(), r_seller, 'sales', 'update'),
         (gen_random_uuid(), r_seller, 'quotes', 'read'),
         (gen_random_uuid(), r_seller, 'quotes', 'create'),
         (gen_random_uuid(), r_seller, 'quotes', 'update'),
@@ -57,6 +58,7 @@ BEGIN
 
         (gen_random_uuid(), r_cashier, 'sales', 'read'),
         (gen_random_uuid(), r_cashier, 'sales', 'create'),
+        (gen_random_uuid(), r_cashier, 'sales', 'update'),
         (gen_random_uuid(), r_cashier, 'cashflow', 'read'),
         (gen_random_uuid(), r_cashier, 'cashflow', 'create'),
         (gen_random_uuid(), r_cashier, 'customers', 'read'),

@@ -26,12 +26,14 @@ export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = define
         buildCrudContextEntityPath,
         getCrudContextEntityParams,
       }),
+      featureFlags: { tagPills: false },
     },
     audit: {
       ...createAuditCrudConfig<AuditEntryRow>({
         renderList: () => <AuditListModeContent />,
         formatDate,
       }),
+      featureFlags: { tagPills: false },
     },
     timeline: {
       ...createTimelineCrudConfig<TimelineEntryRow>({
@@ -42,6 +44,7 @@ export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = define
         asString,
         asOptionalString,
       }),
+      featureFlags: { tagPills: false },
     },
     webhooks: {
       ...createWebhooksCrudConfig<WebhookEndpoint>({
@@ -51,6 +54,7 @@ export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = define
         asOptionalString,
         asBoolean,
       }),
+      featureFlags: { tagPills: false },
     },
   },
   {

@@ -1,6 +1,7 @@
 import { mergeCanonicalCrudDefaults } from '@devpablocristo/modules-crud-ui/surface';
 import { CrudPage, type CrudPageConfig, type CrudResourceConfigMap } from '../components/CrudPage';
 import { applyCrudUiOverride } from '../lib/crudUiConfig';
+import { applyStandardCrudAnnotations } from './standardCrudAnnotations';
 import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
 type ResourceConfigMap = CrudResourceConfigMap;
@@ -27,9 +28,9 @@ export function getCrudPageConfigFromMap<TRecord extends { id: string } = { id: 
   if (!config) {
     return null;
   }
-  const merged = applyCrudUiOverride(
+  const merged = applyStandardCrudAnnotations(
     resourceId,
-    mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>),
+    applyCrudUiOverride(resourceId, mergeCanonicalCrudDefaults(resourceId, config as CrudPageConfig<TRecord>)),
   );
   return withoutCsvToolbarActions(merged);
 }

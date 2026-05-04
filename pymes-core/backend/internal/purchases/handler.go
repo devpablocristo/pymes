@@ -21,6 +21,7 @@ type usecasesPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error)
+	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields, actor string) (purchasesdomain.Purchase, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -32,6 +33,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST("/purchases", rbac.RequirePermission("purchases", "create"), h.Create)
 	auth.GET("/purchases/:id", rbac.RequirePermission("purchases", "read"), h.Get)
 	auth.PUT("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
+	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Patch)
 	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
 }
 
@@ -112,7 +114,49 @@ func (h *Handler) Update(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
+		ID:            id,
+		OrgID:         orgID,
+		BranchID:      payload.BranchID,
+		SupplierID:    payload.SupplierID,
+		SupplierName:  payload.SupplierName,
+		Status:        payload.Status,
+		PaymentStatus: payload.PaymentStatus,
+		Notes:         payload.Notes,
+		Tags:          payload.Tags,
+		Metadata:      payload.Metadata,
+		Items:         payload.Items,
+	}, authCtx.Actor)
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) Patch(c *gin.Context) {
+	authCtx := handlers.GetAuthContext(c)
+	orgID, id, ok := parseOrgID(c)
+	if !ok {
+		return
+	}
+	var req dto.PatchPurchaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	patch := PurchasePatchFields{
+		Tags:          req.Tags,
+		Metadata:      req.Metadata,
+		Notes:         req.Notes,
+		PaymentStatus: req.PaymentStatus,
+		SupplierName:  req.SupplierName,
+	}
+	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.PaymentStatus == nil && patch.SupplierName == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
+		return
+	}
+	out, err := h.uc.PatchAnnotations(c.Request.Context(), orgID, id, patch, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -184,7 +228,19 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 		}
 		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
-	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
+	return CreateInput{
+		OrgID:         orgID,
+		BranchID:      branchID,
+		SupplierID:    supplierID,
+		SupplierName:  strings.TrimSpace(req.SupplierName),
+		Status:        strings.TrimSpace(req.Status),
+		PaymentStatus: strings.TrimSpace(req.PaymentStatus),
+		Notes:         strings.TrimSpace(req.Notes),
+		CreatedBy:     actor,
+		Tags:          req.Tags,
+		Metadata:      req.Metadata,
+		Items:         items,
+	}, nil
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {

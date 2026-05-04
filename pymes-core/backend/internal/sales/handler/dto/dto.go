@@ -18,6 +18,18 @@ type CreateSaleRequest struct {
 	PaymentMethod string            `json:"payment_method"`
 	Items         []SaleItemPayload `json:"items" binding:"required"`
 	Notes         string            `json:"notes"`
+	Tags          []string          `json:"tags,omitempty"`
+	Metadata      map[string]any    `json:"metadata,omitempty"`
+}
+
+// PatchSaleRequest actualización parcial desde el CRUD (etiquetas, metadata, notas, cobro, cliente).
+type PatchSaleRequest struct {
+	Tags          *[]string       `json:"tags"`
+	Metadata      *map[string]any `json:"metadata"`
+	Notes         *string         `json:"notes"`
+	PaymentMethod *string         `json:"payment_method"`
+	CustomerName  *string         `json:"customer_name"`
+	BranchID      *string         `json:"branch_id"`
 }
 
 type SaleItemResponse struct {
@@ -52,6 +64,8 @@ type SaleResponse struct {
 	Notes         string             `json:"notes"`
 	CreatedBy     string             `json:"created_by"`
 	CreatedAt     string             `json:"created_at"`
+	Tags          []string           `json:"tags,omitempty"`
+	Metadata      map[string]any     `json:"metadata,omitempty"`
 }
 
 type ListSalesResponse struct {

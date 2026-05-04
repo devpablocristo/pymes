@@ -155,6 +155,64 @@ type ResolvedSection = CrudEntityEditorModalSection & {
   blocks: CrudEntityEditorModalBlock[];
 };
 
+/** Orden global del modal: favorito, etiquetas, primer campo de imágenes conocido, resto en orden declarado. */
+const CRUD_MODAL_PINNED_FIELD_IDS = ['metadata_favorite', 'tags'] as const;
+const CRUD_MODAL_IMAGE_FIELD_IDS = ['image_urls', 'image_url', 'images'] as const;
+
+function dedupeModalFieldsById(fields: CrudEntityEditorModalField[]): CrudEntityEditorModalField[] {
+  const seen = new Set<string>();
+  const out: CrudEntityEditorModalField[] = [];
+  for (const f of fields) {
+    if (seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
+}
+
+function dedupeModalBlocksById(blocks: CrudEntityEditorModalBlock[]): CrudEntityEditorModalBlock[] {
+  const seen = new Set<string>();
+  const out: CrudEntityEditorModalBlock[] = [];
+  for (const b of blocks) {
+    if (seen.has(b.id)) continue;
+    seen.add(b.id);
+    out.push(b);
+  }
+  return out;
+}
+
+function reorderPinnedModalFields(fields: CrudEntityEditorModalField[]): CrudEntityEditorModalField[] {
+  const byId = new Map(fields.map((f) => [f.id, f]));
+  const head: CrudEntityEditorModalField[] = [];
+  for (const id of CRUD_MODAL_PINNED_FIELD_IDS) {
+    const f = byId.get(id);
+    if (f) head.push(f);
+  }
+  const imageId = CRUD_MODAL_IMAGE_FIELD_IDS.find((id) => byId.has(id));
+  if (imageId) head.push(byId.get(imageId)!);
+  const headIds = new Set(head.map((f) => f.id));
+  const tail = fields.filter((f) => !headIds.has(f.id));
+  return [...head, ...tail];
+}
+
+/** Un solo panel de formulario: sin fraccionar por secciones con marcos (convención Pymes). */
+function mergeResolvedSectionsToSingleBody(sections: ResolvedSection[]): ResolvedSection[] {
+  if (sections.length === 0) return sections;
+  if (sections.length === 1) {
+    const only = sections[0];
+    return [
+      {
+        ...only,
+        fields: reorderPinnedModalFields(dedupeModalFieldsById(only.fields)),
+        blocks: dedupeModalBlocksById(only.blocks),
+      },
+    ];
+  }
+  const mergedFields = reorderPinnedModalFields(dedupeModalFieldsById(sections.flatMap((s) => s.fields)));
+  const mergedBlocks = dedupeModalBlocksById(sections.flatMap((s) => s.blocks));
+  return [{ id: 'crud-form-unified', fields: mergedFields, blocks: mergedBlocks }];
+}
+
 type PendingConfirmDialog = {
   title: string;
   description: string;
@@ -210,16 +268,16 @@ function resolveSections(
         blocks: restBlocks,
       });
     }
-    return resolved;
+    return mergeResolvedSectionsToSingleBody(resolved);
   }
 
-  return [
+  return mergeResolvedSectionsToSingleBody([
     {
       id: 'general',
       fields,
       blocks,
     },
-  ];
+  ]);
 }
 
 function renderStatValue(

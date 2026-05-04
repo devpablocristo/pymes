@@ -19,9 +19,19 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
+	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields) (purchasesdomain.Purchase, error)
 	GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error)
 	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 	GetTaxRate(ctx context.Context, orgID uuid.UUID) float64
+}
+
+// PurchasePatchFields campos parciales permitidos fuera del borrador (CRUD unificado).
+type PurchasePatchFields struct {
+	Tags          *[]string
+	Metadata      *map[string]any
+	Notes         *string
+	PaymentStatus *string
+	SupplierName  *string
 }
 
 type AuditPort interface {
@@ -65,6 +75,8 @@ type CreateInput struct {
 	PaymentStatus string
 	Notes         string
 	CreatedBy     string
+	Tags          []string
+	Metadata      map[string]any
 	Items         []purchasesdomain.PurchaseItem
 }
 
@@ -77,6 +89,8 @@ type UpdateInput struct {
 	Status        string
 	PaymentStatus string
 	Notes         string
+	Tags          []string
+	Metadata      map[string]any
 	Items         []purchasesdomain.PurchaseItem
 }
 
@@ -133,11 +147,36 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	if current.Status != "draft" {
 		return purchasesdomain.Purchase{}, domainerr.BusinessRule("only draft purchases can be updated")
 	}
-	prepared, err := u.prepareCreate(ctx, CreateInput{OrgID: in.OrgID, BranchID: in.BranchID, SupplierID: in.SupplierID, SupplierName: in.SupplierName, Status: in.Status, PaymentStatus: in.PaymentStatus, Notes: in.Notes, CreatedBy: current.CreatedBy, Items: in.Items})
+	prepareInput := CreateInput{
+		OrgID:         in.OrgID,
+		BranchID:      in.BranchID,
+		SupplierID:    in.SupplierID,
+		SupplierName:  in.SupplierName,
+		Status:        in.Status,
+		PaymentStatus: in.PaymentStatus,
+		Notes:         in.Notes,
+		CreatedBy:     current.CreatedBy,
+		Items:         in.Items,
+		Tags:          in.Tags,
+		Metadata:      in.Metadata,
+	}
+	prepared, err := u.prepareCreate(ctx, prepareInput)
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, Notes: prepared.Notes, Items: prepared.Items})
+	out, err := u.repo.Update(ctx, UpdateInput{
+		ID:            in.ID,
+		OrgID:         in.OrgID,
+		BranchID:      prepared.BranchID,
+		SupplierID:    prepared.SupplierID,
+		SupplierName:  prepared.SupplierName,
+		Status:        prepared.Status,
+		PaymentStatus: prepared.PaymentStatus,
+		Notes:         prepared.Notes,
+		Tags:          prepared.Tags,
+		Metadata:      prepared.Metadata,
+		Items:         prepared.Items,
+	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
@@ -149,6 +188,37 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	}
 	if u.webhooks != nil {
 		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
+	}
+	return out, nil
+}
+
+func (u *Usecases) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch PurchasePatchFields, actor string) (purchasesdomain.Purchase, error) {
+	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.PaymentStatus == nil && patch.SupplierName == nil {
+		return purchasesdomain.Purchase{}, domainerr.Validation("no patch fields")
+	}
+	normalized := patch
+	if patch.PaymentStatus != nil {
+		ps := strings.TrimSpace(strings.ToLower(*patch.PaymentStatus))
+		if ps == "" || (ps != "pending" && ps != "partial" && ps != "paid") {
+			return purchasesdomain.Purchase{}, domainerr.Validation("invalid payment_status")
+		}
+		normalized.PaymentStatus = &ps
+	}
+	if _, err := u.repo.GetByID(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
+		}
+		return purchasesdomain.Purchase{}, err
+	}
+	out, err := u.repo.PatchAnnotations(ctx, orgID, id, normalized)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
+		}
+		return purchasesdomain.Purchase{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "purchase.annotations_updated", "purchase", out.ID.String(), map[string]any{})
 	}
 	return out, nil
 }

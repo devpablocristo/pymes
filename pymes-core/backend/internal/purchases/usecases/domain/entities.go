@@ -24,6 +24,8 @@ type Purchase struct {
 	CreatedBy     string         `json:"created_by,omitempty"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
+	Tags          []string       `json:"tags,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
 	Items         []PurchaseItem `json:"items,omitempty"`
 }
 

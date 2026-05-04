@@ -180,7 +180,7 @@ export const partyCrudFormFields = [
   { key: 'email', label: 'Email', type: 'email' as const },
   { key: 'phone', label: 'Telefono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Tags', placeholder: 'cliente, proveedor' },
+  { key: 'tags', label: 'Etiquetas Internas', placeholder: 'cliente, proveedor' },
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },

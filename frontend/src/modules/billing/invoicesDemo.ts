@@ -27,6 +27,8 @@ export type InvoiceRecord = {
   items: InvoiceLineItem[];
   discount: number;
   tax: number;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   archived_at?: string | null;
 };
 
@@ -114,6 +116,12 @@ function sanitizeInvoice(raw: unknown): InvoiceRecord | null {
   const source = raw as Record<string, unknown>;
   const status = isInvoiceStatus(source.status) ? source.status : 'pending';
   const items = Array.isArray(source.items) ? source.items.map(sanitizeInvoiceLine).filter(Boolean) as InvoiceLineItem[] : [];
+  const tagsFromStore = Array.isArray(source.tags)
+    ? (source.tags as unknown[]).map(String).map((s) => s.trim()).filter(Boolean)
+    : [];
+  const metaRaw = source.metadata;
+  const metadata =
+    metaRaw && typeof metaRaw === 'object' ? ({ ...(metaRaw as Record<string, unknown>) } as Record<string, unknown>) : undefined;
   return {
     id: String(source.id ?? nextInvoiceUid()),
     number: String(source.number ?? `INV-${3500 + Math.floor(Math.random() * 100)}`),
@@ -126,6 +134,8 @@ function sanitizeInvoice(raw: unknown): InvoiceRecord | null {
     discount: Number(source.discount ?? 0),
     tax: Number(source.tax ?? 21),
     archived_at: source.archived_at == null ? null : String(source.archived_at),
+    tags: tagsFromStore.length > 0 ? tagsFromStore : undefined,
+    metadata,
   };
 }
 

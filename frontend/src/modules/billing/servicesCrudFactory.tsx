@@ -59,7 +59,12 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
     label: 'servicio',
     labelPlural: 'servicios',
     labelPluralCap: 'Servicios',
-    dataSource: buildRestCrudDataSource<ServiceRecord>({ basePath: '/v1/services', toBody: serviceToBody }),
+    dataSource: buildRestCrudDataSource<ServiceRecord>({
+      basePath: '/v1/services',
+      toBody: serviceToBody,
+      softArchiveHttp: 'post_archive',
+      hardDeleteHttp: 'delete_item',
+    }),
     columns: [
       {
         key: 'name',
@@ -105,7 +110,7 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
           { label: 'Inactivo', value: 'false' },
         ],
       },
-      { key: 'tags', label: 'Etiquetas', placeholder: 'premium, online, recurrente' },
+      { key: 'tags', label: 'Etiquetas Internas', placeholder: 'premium, online, recurrente' },
       { key: 'description', label: 'Descripción', type: 'textarea', fullWidth: true },
     ],
     searchText: (row) =>

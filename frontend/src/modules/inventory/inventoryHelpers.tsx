@@ -62,12 +62,23 @@ export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[]
       render: (_v, row) =>
         row.sku || (typeof row.metadata?.barcode === 'string' ? String(row.metadata.barcode) : '') || '—',
     },
+    {
+      key: 'metadata',
+      header: '★',
+      className: 'cell-narrow',
+      render: (_v, row) =>
+        row.metadata?.favorite === true || String(row.metadata?.favorite).toLowerCase() === 'true' ? (
+          <span title="Favorito">★</span>
+        ) : (
+          '—'
+        ),
+    },
     { key: 'unit', header: 'Unidad', render: (_v, row) => row.unit || '—' },
     { key: 'price', header: 'Precio', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     { key: 'cost_price', header: 'Costo', render: (value, row) => `${row.currency ?? 'ARS'} ${Number(value ?? 0).toFixed(2)}` },
     {
       key: 'tags',
-      header: 'Etiquetas',
+      header: 'Etiquetas Internas',
       className: 'cell-tags',
       render: (_value, row) => renderTagBadges(row.tags),
     },
@@ -86,6 +97,15 @@ export function createProductColumns<T extends ProductRecord>(): CrudColumn<T>[]
 
 export function productFormFields(): CrudFormField[] {
   return [
+    { key: 'metadata_favorite', label: 'Favorito', type: 'checkbox' },
+    { key: 'tags', label: 'Etiquetas Internas', placeholder: 'nuevo, combo, premium' },
+    {
+      key: 'image_urls',
+      label: 'Imágenes',
+      type: 'textarea',
+      fullWidth: true,
+      placeholder: 'Las imágenes cargadas se guardan acá. También podés pegarlas una por línea si ya las tenés.',
+    },
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
     { key: 'sku', label: 'Código interno', placeholder: 'PROD-001' },
     {
@@ -115,15 +135,7 @@ export function productFormFields(): CrudFormField[] {
       options: [
         { label: 'Activo', value: 'true' },
         { label: 'Inactivo', value: 'false' },
-        ],
-    },
-    { key: 'tags', label: 'Etiquetas', placeholder: 'nuevo, combo, premium' },
-    {
-      key: 'image_urls',
-      label: 'Imágenes',
-      type: 'textarea',
-      fullWidth: true,
-      placeholder: 'Las imágenes cargadas se guardan acá. También podés pegarlas una por línea si ya las tenés.',
+      ],
     },
     { key: 'description', label: 'Descripcion', type: 'textarea', fullWidth: true },
   ];
@@ -163,6 +175,10 @@ export function buildProductFormValues(row: ProductRecord) {
     metadata_barcode: typeof row.metadata?.barcode === 'string' ? row.metadata.barcode : '',
     metadata_margin_percent:
       row.metadata?.margin_percent === undefined || row.metadata?.margin_percent === null ? '' : String(row.metadata.margin_percent),
+    metadata_favorite:
+      row.metadata?.favorite === true ||
+      String(row.metadata?.favorite ?? '').toLowerCase() === 'true' ||
+      row.metadata?.favorite === 1,
   };
 }
 
@@ -176,6 +192,17 @@ export function productFormToBody(values: CrudFormValues): Record<string, unknow
       : marginPercent !== undefined && Number.isFinite(marginPercent)
         ? Math.max(0, price - price * (marginPercent / 100))
         : 0;
+  const metadata: Record<string, unknown> = parseMetadataStringMap(undefined, {
+    category: asOptionalString(values.metadata_category),
+    kind: asOptionalString(values.metadata_kind),
+    barcode: asOptionalString(values.metadata_barcode),
+    margin_percent: asOptionalString(values.metadata_margin_percent),
+  });
+  if (asBoolean(values.metadata_favorite)) {
+    metadata.favorite = true;
+  } else {
+    delete metadata.favorite;
+  }
   return {
     name: asString(values.name),
     sku: asOptionalString(values.sku),
@@ -189,12 +216,7 @@ export function productFormToBody(values: CrudFormValues): Record<string, unknow
     tags: parsePartyTagCsv(values.tags),
     description: asOptionalString(values.description),
     image_urls: parseImageURLList(values.image_urls),
-    metadata: parseMetadataStringMap(undefined, {
-      category: asOptionalString(values.metadata_category),
-      kind: asOptionalString(values.metadata_kind),
-      barcode: asOptionalString(values.metadata_barcode),
-      margin_percent: asOptionalString(values.metadata_margin_percent),
-    }),
+    metadata,
   };
 }
 
@@ -239,6 +261,11 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     editorModal: {
       fieldConfig: {
         sku: { helperText: 'Código corto para buscar rápido en caja, stock o compras.' },
+        metadata_favorite: { helperText: 'Marcá productos destacados; se muestra una estrella en la lista.' },
+        tags: {
+          helperText:
+            'Separá con comas. Son internas al equipo (campañas, filtros, reportes); no confundir con categoría del catálogo.',
+        },
         metadata_category: { helperText: 'Elegí una categoría predefinida para mantener el catálogo ordenado.' },
         metadata_kind: { helperText: 'Simple para lo habitual; variable o agrupado para catálogos más complejos.' },
         metadata_barcode: { helperText: 'Guardá acá el código de barras para búsquedas o lectores.' },
@@ -247,7 +274,6 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
         cost_price: { helperText: 'Costo directo. Si preferís, podés completar margen y calcularlo en base al precio.' },
         metadata_margin_percent: { helperText: 'Opcional: si no cargás costo, se calcula usando este porcentaje sobre el precio.' },
         tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
-        tags: { helperText: 'Etiquetas internas para campañas, filtros o agrupaciones rápidas.' },
         image_urls: {
           helperText: 'Podés subir imágenes desde tu dispositivo o pegar enlaces si ya los tenés.',
           editControl: ({ value, setValue }) => {

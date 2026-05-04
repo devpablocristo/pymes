@@ -44,7 +44,9 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]servicedomain.Service, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ServiceModel{}).Where("org_id = ?", p.OrgID)
-	if !p.Archived {
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
 		q = q.Where("deleted_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
@@ -202,8 +204,8 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ?", orgID, id).
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Delete(&models.ServiceModel{})
 	if res.Error != nil {
 		return res.Error

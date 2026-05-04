@@ -1,10 +1,11 @@
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
-import { asOptionalNumber, asOptionalString, asString, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
+import { asOptionalNumber, asOptionalString, asString, asBoolean, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
+import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
   buildFullyConnectedStatusStateMachine,
@@ -14,7 +15,7 @@ import {
   openCrudFormDialog,
   openCrudTextDialog,
 } from '../crud';
-import { paymentMethodOptions } from '../../lib/formPresets';
+import { parsePartyTagCsv } from '../parties/partiesHelpers';
 import {
   INVOICE_STATUS_LABELS,
   archiveInvoice,
@@ -77,6 +78,8 @@ export type QuoteRecord = {
   currency?: string;
   valid_until?: string;
   notes?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialPricedLineItem[];
 };
 
@@ -92,6 +95,8 @@ export type SaleRecord = {
   total: number;
   currency?: string;
   notes?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialPricedLineItem[];
 };
 
@@ -120,6 +125,8 @@ export type PurchaseRecord = {
   currency?: string;
   notes?: string;
   received_at?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialCostLineItem[];
 };
 
@@ -203,6 +210,10 @@ export function createInvoiceCrudLineItems(value: CrudFieldValue | undefined): I
 export async function createDemoInvoiceFromCrudValues(values: Record<string, CrudFieldValue | undefined>): Promise<void> {
   const customer = asString(values.customer);
   const invoices = readDemoInvoices();
+  const meta: Record<string, unknown> = {};
+  if (asBoolean(values.metadata_favorite)) {
+    meta.favorite = true;
+  }
   writeDemoInvoices([
     {
       id: nextInvoiceUid(),
@@ -216,6 +227,8 @@ export async function createDemoInvoiceFromCrudValues(values: Record<string, Cru
       tax: asOptionalNumber(values.tax) ?? 21,
       items: createInvoiceCrudLineItems(values.items),
       archived_at: null,
+      tags: parsePartyTagCsv(values.tags),
+      metadata: Object.keys(meta).length > 0 ? meta : undefined,
     },
     ...invoices,
   ]);
@@ -340,7 +353,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status'>({
+  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: opts.renderList,
     label: 'factura',
@@ -348,7 +361,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
     createFromValues: createDemoInvoiceFromCrudValues,
-    searchKeys: ['number', 'customer', 'status'],
+    searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
       { key: 'customer', header: 'Cliente' },
@@ -371,14 +384,30 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
         return rows.filter(matchesArchived) as TRecord[];
       },
       update: async (row, values) => {
-        updateDemoInvoice(row.id, (r) => ({
-          ...r,
-          status: parseInvoiceStatus(values.status),
-          discount: asOptionalNumber(values.discount) ?? r.discount,
-          tax: asOptionalNumber(values.tax) ?? r.tax,
-          issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
-          dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
-        }));
+        updateDemoInvoice(row.id, (r) => {
+          const meta: Record<string, unknown> =
+            r.metadata && typeof r.metadata === 'object'
+              ? { ...(r.metadata as Record<string, unknown>) }
+              : {};
+          if (asBoolean(values.metadata_favorite)) {
+            meta.favorite = true;
+          } else {
+            delete meta.favorite;
+          }
+          return {
+            ...r,
+            customer: asString(values.customer ?? '').trim() || r.customer,
+            initials:
+              invoiceInitials(asString(values.customer ?? '').trim() || r.customer || ''),
+            status: parseInvoiceStatus(values.status),
+            discount: asOptionalNumber(values.discount) ?? r.discount,
+            tax: asOptionalNumber(values.tax) ?? r.tax,
+            issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
+            dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
+            tags: parsePartyTagCsv(values.tags),
+            metadata: Object.keys(meta).length > 0 ? meta : undefined,
+          };
+        });
       },
       deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
       restore: async (row) => updateDemoInvoice(row.id, restoreInvoice),
@@ -449,7 +478,7 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
   ]);
-  const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status'>({
+  const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: () => <></>,
     label: 'factura',
@@ -457,7 +486,7 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
     createFromValues: createDemoInvoiceFromCrudValues,
-    searchKeys: ['number', 'customer', 'status'],
+    searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
       { key: 'customer', header: 'Cliente' },
@@ -477,14 +506,14 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
     { value: 'accepted', label: 'Aceptado', badgeVariant: 'success' },
     { value: 'rejected', label: 'Rechazado', badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes' | 'tags'>({
     resourceId: 'quotes',
     renderList: opts.renderList,
     label: 'presupuesto',
     labelPlural: 'presupuestos',
     labelPluralCap: 'Presupuestos',
     createLabel: '+ Nuevo presupuesto',
-    searchKeys: ['number', 'customer_name', 'status', 'notes'],
+    searchKeys: ['number', 'customer_name', 'status', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Presupuesto', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
@@ -589,14 +618,17 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
     { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
     { value: 'cancelled', label: 'Cancelada', badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'payment_method' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<
+    TRecord,
+    'number' | 'customer_name' | 'status' | 'payment_method' | 'notes' | 'tags'
+  >({
     resourceId: 'sales',
     renderList: opts.renderList,
     label: 'venta',
     labelPlural: 'ventas',
     labelPluralCap: 'Ventas',
     createLabel: '+ Nueva venta',
-    searchKeys: ['number', 'customer_name', 'status', 'payment_method', 'notes'],
+    searchKeys: ['number', 'customer_name', 'status', 'payment_method', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Venta', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
@@ -887,14 +919,17 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
   ]);
 
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<
+    TRecord,
+    'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes' | 'tags'
+  >({
     resourceId: 'purchases',
     renderList: opts.renderList,
     label: 'compra',
     labelPlural: 'compras',
     labelPluralCap: 'Compras',
     createLabel: '+ Nueva compra',
-    searchKeys: ['number', 'supplier_name', 'status', 'payment_status', 'notes'],
+    searchKeys: ['number', 'supplier_name', 'status', 'payment_status', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Compra', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'supplier_name', header: 'Proveedor', render: (_v, row: TRecord) => row.supplier_name || '—' },

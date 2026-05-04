@@ -589,6 +589,21 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
       }),
     };
 
+    if (segment === 'products') {
+      const activeRow = rows.products();
+      const row = path.endsWith('/archived')
+        ? {
+            ...activeRow,
+            id: 'prod-arch-e2e-1',
+            sku: 'SKU-ARCH-E2E',
+            name: 'Producto archivado E2E',
+            deleted_at: iso(),
+          }
+        : activeRow;
+      await fulfillJson(paginated([row]));
+      return;
+    }
+
     const builder = rows[segment];
     if (builder) {
       await fulfillJson(paginated([builder()]));

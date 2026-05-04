@@ -44,7 +44,9 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND type = 'product'", p.OrgID)
-	if !p.Archived {
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
 		q = q.Where("deleted_at IS NULL")
 	}
 	if tag := strings.TrimSpace(p.Tag); tag != "" {
@@ -212,16 +214,36 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).
-		Delete(&models.ProductModel{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return nil
+	// Borrado físico solo si está archivado (deleted_at). Antes: liberar FKs que no tienen ON DELETE CASCADE.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			"DELETE FROM stock_movements WHERE org_id = ? AND product_id = ?",
+			orgID, id,
+		).Error; err != nil {
+			return err
+		}
+		updates := []string{
+			`UPDATE quote_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM quotes q WHERE q.id = quote_items.quote_id AND q.org_id = ?)`,
+			`UPDATE sale_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM sales s WHERE s.id = sale_items.sale_id AND s.org_id = ?)`,
+			`UPDATE purchase_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM purchases p WHERE p.id = purchase_items.purchase_id AND p.org_id = ?)`,
+			`UPDATE return_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM returns r WHERE r.id = return_items.return_id AND r.org_id = ?)`,
+		}
+		for _, stmt := range updates {
+			if err := tx.Exec(stmt, id, orgID).Error; err != nil {
+				return err
+			}
+		}
+		res := tx.Unscoped().
+			Where("org_id = ? AND id = ? AND type = 'product' AND deleted_at IS NOT NULL", orgID, id).
+			Delete(&models.ProductModel{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 }
 
 func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ProductModel, error) {

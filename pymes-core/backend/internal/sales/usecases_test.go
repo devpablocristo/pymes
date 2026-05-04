@@ -31,6 +31,9 @@ func (m *mockRepo) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledo
 func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	return m.voidFn(ctx, orgID, saleID)
 }
+func (m *mockRepo) PatchSale(context.Context, uuid.UUID, uuid.UUID, SalePatchFields) (saledomain.Sale, error) {
+	return saledomain.Sale{}, nil
+}
 func (m *mockRepo) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
 	return m.getTenantSettingsFn(ctx, orgID)
 }

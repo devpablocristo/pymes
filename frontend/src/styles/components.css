@@ -48,6 +48,13 @@
   min-width: 0;
 }
 
+/* Fila de chips de creador + fila de etiquetas internas (p. ej. Compras / productos) */
+.page-header.crud-page-shell__header .crud-list-header-lead--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
 /* Slot encima del título sin API nueva en CrudPageShell (solo flex order + :has). */
 .page-header.crud-page-shell__header
   .crud-page-shell__header-main:has(.crud-list-header-lead--above-title)

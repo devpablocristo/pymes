@@ -206,7 +206,7 @@ export function createCustomerColumns<T extends CustomerRecord>(): CrudColumn<T>
     { key: 'tax_id', header: 'CUIT/CUIL', render: (_v, row) => row.tax_id || '—' },
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '—' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '—' },
-    { key: 'tags', header: 'Etiquetas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
+    { key: 'tags', header: 'Etiquetas Internas', render: (_v, row) => formatPartyTagList(row.tags) || '—' },
     { key: 'address', header: 'Dirección', render: (_v, row) => formatPartyAddress(row.address) || '—' },
     { key: 'notes', header: 'Notas', className: 'cell-notes' },
   ];
@@ -234,7 +234,7 @@ export function customerFormFields(label = 'cliente'): CrudFormField[] {
       type: 'select',
       options: customerGenderOptions,
     },
-    { key: 'tags', label: 'Etiquetas', placeholder: 'vip, mayorista, mora' },
+    { key: 'tags', label: 'Etiquetas Internas', placeholder: 'vip, mayorista, mora' },
     { key: 'address_street', label: 'Calle', fullWidth: true, placeholder: 'Direccion principal' },
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad' },
     { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
@@ -272,7 +272,7 @@ export function supplierFormFields(): CrudFormField[] {
     { key: 'address_city', label: 'Ciudad', placeholder: 'Ciudad principal' },
     { key: 'address_state', label: 'Provincia', type: 'select', options: argentinaProvinceOptions },
     { key: 'address_country', label: 'País', type: 'select', options: countryOptions },
-    { key: 'tags', label: 'Etiquetas internas', placeholder: 'importado, insumos, logistico' },
+    { key: 'tags', label: 'Etiquetas Internas', placeholder: 'importado, insumos, logistico' },
     { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
   ];
 }
@@ -395,7 +395,7 @@ export const partyFormFields: CrudFormField[] = [
   { key: 'email', label: 'Email', type: 'email' as const },
   { key: 'phone', label: 'Teléfono', type: 'tel' as const },
   { key: 'tax_id', label: 'CUIT / CUIL' },
-  { key: 'tags', label: 'Etiquetas', placeholder: 'cliente, proveedor' },
+  { key: 'tags', label: 'Etiquetas Internas', placeholder: 'cliente, proveedor' },
   { key: 'person_first_name', label: 'Nombre persona' },
   { key: 'person_last_name', label: 'Apellido persona' },
   { key: 'org_legal_name', label: 'Razon social', fullWidth: true },

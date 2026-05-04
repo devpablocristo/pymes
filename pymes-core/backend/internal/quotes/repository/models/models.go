@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type QuoteModel struct {
@@ -25,6 +26,8 @@ type QuoteModel struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	ArchivedAt   *time.Time
+	Tags         pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
+	Metadata     []byte         `gorm:"type:jsonb;not null;default:'{}'"`
 }
 
 func (QuoteModel) TableName() string { return "quotes" }

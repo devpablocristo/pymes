@@ -1,5 +1,15 @@
-import type { CrudResourceConfigMap } from '../components/CrudPage';
-import { createStockCrudConfig, fetchStockLevels, type StockRecord, type StockLevelRow } from '../modules/inventory';
+import type { CrudFormValues, CrudResourceConfigMap } from '../components/CrudPage';
+import {
+  createStockCrudConfig,
+  fetchStockLevels,
+  productFormFields,
+  buildProductFormValues,
+  productFormToBody,
+  isValidProductForm,
+  type StockRecord,
+  type StockLevelRow,
+  type ProductRecord,
+} from '../modules/inventory';
 import { createCreditNotesCrudConfig, type CreditNoteRecord } from '../modules/billing/billingHelpers';
 import {
   createCashflowCrudConfig,
@@ -34,20 +44,23 @@ const operationsResourceConfigs: CrudResourceConfigMap = {
       hardDelete: async (row: StockLevelRow) => {
         await apiRequest(`/v1/products/${row.product_id}`, { method: 'DELETE' });
       },
+      update: async (row: StockLevelRow, values: CrudFormValues) => {
+        await apiRequest(`/v1/products/${row.product_id}`, {
+          method: 'PATCH',
+          body: productFormToBody(values),
+        });
+      },
     },
-    formFields: [],
+    editorModal: {
+      loadRecord: async (row: StockLevelRow) =>
+        apiRequest<ProductRecord>(`/v1/products/${row.product_id}`) as unknown as StockLevelRow,
+    },
+    formFields: productFormFields(),
     searchText: (row: StockLevelRow) =>
       [row.product_name, row.sku, String(row.quantity), String(row.min_quantity)].filter(Boolean).join(' '),
-    toFormValues: (row: StockLevelRow) => ({
-      product_id: row.product_id,
-      product_name: row.product_name ?? '',
-      sku: row.sku ?? '',
-      quantity: String(row.quantity ?? ''),
-      min_quantity: String(row.min_quantity ?? ''),
-      is_low_stock: row.is_low_stock ? 'true' : 'false',
-      updated_at: String(row.updated_at ?? ''),
-    }),
-    isValid: () => true,
+    toFormValues: buildProductFormValues as unknown as (row: StockLevelRow) => CrudFormValues,
+    toBody: productFormToBody,
+    isValid: isValidProductForm,
   },
   payments: createPaymentsCrudConfig(),
   recurring: createRecurringExpensesCrudConfig(),

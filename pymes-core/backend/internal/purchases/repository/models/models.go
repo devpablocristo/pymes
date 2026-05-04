@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type PurchaseModel struct {
@@ -24,6 +25,8 @@ type PurchaseModel struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
+	Metadata      []byte         `gorm:"type:jsonb;not null;default:'{}'"`
 }
 
 func (PurchaseModel) TableName() string { return "purchases" }

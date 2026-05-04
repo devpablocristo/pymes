@@ -27,6 +27,7 @@ type usecasesPort interface {
 	Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error)
+	PatchAnnotations(ctx context.Context, orgID, quoteID uuid.UUID, patch QuotePatchFields, actor string) (quotedomain.Quote, error)
 	Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
 	Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
 	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
@@ -51,6 +52,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.POST(quotesBasePath, rbac.RequirePermission("quotes", "create"), h.Create)
 	auth.GET(quotesItemPath, rbac.RequirePermission("quotes", "read"), h.Get)
 	auth.PUT(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Update)
+	auth.PATCH(quotesItemPath, rbac.RequirePermission("quotes", "update"), h.Patch)
 	auth.DELETE(quotesItemPath, rbac.RequirePermission("quotes", "delete"), h.Delete)
 	auth.POST(quotesItemPath+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("quotes", "delete"), h.Restore)
 	auth.DELETE(quotesItemPath+"/"+crudpaths.SegmentHard, rbac.RequirePermission("quotes", "delete"), h.HardDelete)
@@ -209,6 +211,8 @@ func (h *Handler) Create(c *gin.Context) {
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
 		CreatedBy:    a.Actor,
+		Tags:         req.Tags,
+		Metadata:     req.Metadata,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -292,8 +296,45 @@ func (h *Handler) Update(c *gin.Context) {
 		Items:        items,
 		Notes:        req.Notes,
 		ValidUntil:   validUntil,
+		Tags:         req.Tags,
+		Metadata:     req.Metadata,
 		Actor:        a.Actor,
 	})
+	if err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, toQuoteResponse(out))
+}
+
+func (h *Handler) Patch(c *gin.Context) {
+	a := handlers.GetAuthContext(c)
+	orgID, err := uuid.Parse(a.OrgID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		return
+	}
+	quoteID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var req dto.PatchQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	patch := QuotePatchFields{
+		Tags:         req.Tags,
+		Metadata:     req.Metadata,
+		Notes:        req.Notes,
+		CustomerName: req.CustomerName,
+	}
+	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.CustomerName == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no patch fields"})
+		return
+	}
+	out, err := h.uc.PatchAnnotations(c.Request.Context(), orgID, quoteID, patch, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -446,6 +487,13 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 		CreatedBy:    in.CreatedBy,
 		CreatedAt:    in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:    in.UpdatedAt.UTC().Format(time.RFC3339),
+		Tags:         append([]string(nil), in.Tags...),
+		Metadata:     map[string]any{},
+	}
+	if in.Metadata != nil {
+		for k, v := range in.Metadata {
+			resp.Metadata[k] = v
+		}
 	}
 	if in.BranchID != nil {
 		resp.BranchID = in.BranchID.String()

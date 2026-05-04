@@ -263,7 +263,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
 
     const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="services" />);
-    expect(screen.getByText('cols:name:Nombre|tags:Etiquetas')).toBeInTheDocument();
+    expect(screen.getByText('cols:name:Nombre|tags:Etiquetas Internas')).toBeInTheDocument();
 
     currentConfig = {
       ...currentConfig,

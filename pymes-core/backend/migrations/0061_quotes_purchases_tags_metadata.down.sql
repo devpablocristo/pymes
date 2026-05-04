@@ -1,0 +1,7 @@
+ALTER TABLE purchases
+    DROP COLUMN IF EXISTS tags,
+    DROP COLUMN IF EXISTS metadata;
+
+ALTER TABLE quotes
+    DROP COLUMN IF EXISTS tags,
+    DROP COLUMN IF EXISTS metadata;

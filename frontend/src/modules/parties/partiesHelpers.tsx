@@ -526,16 +526,7 @@ export function createCustomerCrudConfig<T extends CustomerRecord>(options: {
     toBody: customerFormToBody,
     isValid: isValidCustomerForm,
     editorModal: {
-      fieldConfig: {
-        name: { helperText: 'Usá el nombre con el que atendés o buscás a la persona.' },
-        phone: { helperText: 'Se normaliza automáticamente con formato argentino para usarlo luego en WhatsApp.' },
-        metadata_gender: { helperText: 'Dato útil para segmentar campañas o búsquedas sin volver a pedirlo.' },
-        address_city: { helperText: 'Elegí la ciudad para mantener la base ordenada y reutilizable.' },
-        address_state: { helperText: 'Elegí la provincia desde la lista para evitar variantes cargadas a mano.' },
-        address_country: { helperText: 'Definí el país para futuras búsquedas, filtros e integraciones.' },
-        tags: { helperText: 'Etiquetas internas cortas para agrupar clientes sin tocar su ficha principal.' },
-        notes: { helperText: 'Anotá contexto comercial o recordatorios que sirvan al equipo.' },
-      },
+      fieldConfig: {},
     },
   };
 }

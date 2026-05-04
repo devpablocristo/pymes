@@ -1,7 +1,9 @@
 import type { CrudColumn, CrudFormField } from '@devpablocristo/modules-crud-ui';
-import type { CrudPageConfig } from '../components/CrudPage';
+import type { CrudEditorModalFieldConfig, CrudPageConfig } from '../components/CrudPage';
+import { extractCrudRecordImageUrls, formatCrudRecordImageUrlsToForm } from '../modules/crud/crudLinkedEntityImageUrls';
 import { formatPartyTagList, parsePartyTagCsv } from '../modules/parties';
-import { asBoolean } from './resourceConfigs.shared';
+import { asBoolean, parseImageURLList } from './resourceConfigs.shared';
+import { buildStandardCrudImageUrlsModalFieldConfig } from './standardCrudMedia';
 
 /** Recursos donde las anotaciones estándar no aplican (listados técnicos o backend incompleto). */
 const STANDARD_ANNOTATIONS_OPT_OUT = new Set(['audit', 'attachments', 'timeline', 'webhooks']);
@@ -15,36 +17,33 @@ function readFavoriteFromRecord(row: Record<string, unknown>): boolean {
   );
 }
 
-function mergeEditorModalForAnnotations<T extends { id: string }>(
+function mergeEditorModalStandardFields<T extends { id: string }>(
   editorModal: CrudPageConfig<T>['editorModal'],
-  injectTags: boolean,
-  injectFavorite: boolean,
+  injectImages: boolean,
 ): CrudPageConfig<T>['editorModal'] {
-  if (!editorModal) return undefined;
-  if (!injectTags && !injectFavorite) return editorModal;
+  if (!injectImages) {
+    return editorModal;
+  }
 
-  const fieldConfigExtra: Record<string, { helperText?: string; fullWidth?: boolean }> = {
-    ...(injectTags ? { tags: { helperText: 'Etiquetas libres para agrupar y filtrar.' } } : {}),
-    ...(injectFavorite
-      ? {
-          metadata_favorite: {
-            helperText: 'Marcá registros destacados cuando la vista muestre el indicador.',
-          },
-        }
-      : {}),
+  const base = editorModal ?? {};
+  const fieldConfigExtra: Record<string, CrudEditorModalFieldConfig> = {
+    image_urls: buildStandardCrudImageUrlsModalFieldConfig(),
   };
 
   return {
-    ...editorModal,
+    ...base,
+    mediaFieldKey: base.mediaFieldKey ?? (injectImages ? 'image_urls' : undefined),
     fieldConfig: {
-      ...(editorModal.fieldConfig ?? {}),
+      ...(base.fieldConfig ?? {}),
       ...fieldConfigExtra,
     },
   };
 }
 
 /**
- * Inyecta campos `tags` + `metadata_favorite` y fusiona toBody/search/columnas cuando el recurso no los define ya.
+ * Inyecta campos estándar (`tags`, `metadata_favorite`, `image_urls`) y fusiona modal/search/toBody cuando el recurso no los define ya.
+ *
+ * Las imágenes se guardan en **`metadata.image_urls`**. Los productos mantienen también `image_urls` en el JSON del API para la columna del catálogo; es el mismo conjunto de URLs.
  */
 export function applyStandardCrudAnnotations<T extends { id: string }>(
   resourceId: string,
@@ -57,17 +56,32 @@ export function applyStandardCrudAnnotations<T extends { id: string }>(
   const fields = config.formFields ?? [];
   const hasTags = fields.some((f) => f.key === 'tags');
   const hasFavorite = fields.some((f) => f.key === 'metadata_favorite');
-  if (hasTags && hasFavorite) {
-    return config;
-  }
+  const hasImageUrls = fields.some((f) => f.key === 'image_urls');
 
   const injectTags = !hasTags;
   const injectFavorite = !hasFavorite;
+  const injectImages =
+    !hasImageUrls && config.featureFlags?.standardMedia !== false;
+
+  if (!injectTags && !injectFavorite && !injectImages) {
+    return config;
+  }
 
   const extraFields: CrudFormField[] = [
     ...(injectFavorite ? [{ key: 'metadata_favorite', label: 'Favorito', type: 'checkbox' as const }] : []),
     ...(injectTags
       ? [{ key: 'tags', label: 'Etiquetas Internas', placeholder: 'coma, separadas' }]
+      : []),
+    ...(injectImages
+      ? [
+          {
+            key: 'image_urls',
+            label: 'Imágenes',
+            type: 'textarea' as const,
+            fullWidth: true,
+            placeholder: 'Subí archivos con el selector de abajo o pegá URLs / data URLs, una por línea.',
+          },
+        ]
       : []),
   ];
 
@@ -91,12 +105,18 @@ export function applyStandardCrudAnnotations<T extends { id: string }>(
     formFields: [...extraFields, ...fields],
     columns:
       injectTags && config.columns ? ([...config.columns, tagColumn] as CrudPageConfig<T>['columns']) : config.columns,
-    editorModal: mergeEditorModalForAnnotations(config.editorModal, injectTags, injectFavorite),
+    editorModal: mergeEditorModalStandardFields(config.editorModal, injectImages),
     searchText: (row) => {
-      const base = prevSearchText(row);
-      if (!injectTags) return base;
-      const tagStr = formatPartyTagList((row as Record<string, unknown>).tags as string[] | undefined);
-      return [base, tagStr].filter(Boolean).join(' ');
+      const rec = row as Record<string, unknown>;
+      const parts: string[] = [];
+      parts.push(prevSearchText(row));
+      if (injectTags) {
+        parts.push(formatPartyTagList(rec.tags as string[] | undefined));
+      }
+      if (injectImages) {
+        parts.push(extractCrudRecordImageUrls(rec).join(' '));
+      }
+      return parts.filter(Boolean).join(' ');
     },
     toFormValues: (row) => ({
       ...prevToFormValues(row),
@@ -104,6 +124,7 @@ export function applyStandardCrudAnnotations<T extends { id: string }>(
         ? { tags: formatPartyTagList((row as Record<string, unknown>).tags as string[] | undefined) }
         : {}),
       ...(injectFavorite ? { metadata_favorite: readFavoriteFromRecord(row as Record<string, unknown>) } : {}),
+      ...(injectImages ? { image_urls: formatCrudRecordImageUrlsToForm(row as Record<string, unknown>) } : {}),
     }),
     toBody: (values) => {
       const base = prevToBody ? prevToBody(values) : {};
@@ -111,15 +132,25 @@ export function applyStandardCrudAnnotations<T extends { id: string }>(
       if (injectTags) {
         body = { ...body, tags: parsePartyTagCsv(values.tags) };
       }
-      if (injectFavorite) {
+      if (injectFavorite || injectImages) {
         const prevMeta =
           typeof body.metadata === 'object' && body.metadata !== null
             ? ({ ...(body.metadata as Record<string, unknown>) } as Record<string, unknown>)
             : {};
-        if (asBoolean(values.metadata_favorite)) {
-          prevMeta.favorite = true;
-        } else {
-          delete prevMeta.favorite;
+        if (injectFavorite) {
+          if (asBoolean(values.metadata_favorite)) {
+            prevMeta.favorite = true;
+          } else {
+            delete prevMeta.favorite;
+          }
+        }
+        if (injectImages) {
+          const urls = parseImageURLList(values.image_urls);
+          if (urls.length > 0) {
+            prevMeta.image_urls = urls;
+          } else {
+            delete prevMeta.image_urls;
+          }
         }
         body = { ...body, metadata: prevMeta };
       }

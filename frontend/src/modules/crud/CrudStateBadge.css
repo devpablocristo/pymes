@@ -1,6 +1,6 @@
 .crud-state-badge {
   display: inline-block;
-  font-size: var(--text-role-caption);
+  font-size: var(--crud-ui-font-size);
   font-weight: var(--font-weight-semibold);
   line-height: 1.2;
   padding: var(--space-1) var(--space-2);

@@ -50,7 +50,17 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	urls, err := normalizeProductImageURLs(in.ImageURLs)
+	meta := in.Metadata
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	urls := append([]string(nil), in.ImageURLs...)
+	if len(urls) == 0 {
+		if fromMeta, ok := parseImageURLsFromMetadata(meta); ok {
+			urls = append(urls, fromMeta...)
+		}
+	}
+	urls, err := normalizeProductImageURLs(urls)
 	if err != nil {
 		return productdomain.Product{}, err
 	}
@@ -59,7 +69,8 @@ func (u *Usecases) Create(ctx context.Context, in productdomain.Product, actor s
 	if len(in.ImageURLs) > 0 {
 		in.ImageURL = in.ImageURLs[0]
 	}
-	if len(in.ImageURL) > maxProductImageURLLen {
+	in.Metadata = mergeProductMetadataImageURLs(meta, urlsForMetadataSync(in))
+	if len(in.ImageURL) > maxLenForProductImageURL(in.ImageURL) {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if in.Unit == "" {
@@ -136,6 +147,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		v := *in.TaxRate
 		current.TaxRate = &v
 	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
+	}
+	if in.Tags != nil {
+		current.Tags = append([]string(nil), (*in.Tags)...)
+	}
 	if in.ImageURLs != nil {
 		urls, err := normalizeProductImageURLs(*in.ImageURLs)
 		if err != nil {
@@ -147,8 +164,18 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		} else {
 			current.ImageURL = ""
 		}
-	}
-	if in.ImageURL != nil && in.ImageURLs == nil {
+	} else if mdRaw, mdOK := parseImageURLsFromMetadata(current.Metadata); mdOK {
+		urls, err := normalizeProductImageURLs(mdRaw)
+		if err != nil {
+			return productdomain.Product{}, err
+		}
+		current.ImageURLs = urls
+		if len(urls) > 0 {
+			current.ImageURL = urls[0]
+		} else {
+			current.ImageURL = ""
+		}
+	} else if in.ImageURL != nil {
 		current.ImageURL = strings.TrimSpace(*in.ImageURL)
 		current.ImageURLs = nil
 	}
@@ -158,17 +185,12 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
 	}
-	if in.Tags != nil {
-		current.Tags = append([]string(nil), (*in.Tags)...)
-	}
-	if in.Metadata != nil {
-		current.Metadata = *in.Metadata
-	}
+	current.Metadata = mergeProductMetadataImageURLs(current.Metadata, urlsForMetadataSync(current))
 
 	if len(current.Name) < 2 {
 		return productdomain.Product{}, fmt.Errorf("name must be at least 2 characters: %w", httperrors.ErrBadInput)
 	}
-	if len(current.ImageURL) > maxProductImageURLLen {
+	if len(current.ImageURL) > maxLenForProductImageURL(current.ImageURL) {
 		return productdomain.Product{}, fmt.Errorf("image_url too long: %w", httperrors.ErrBadInput)
 	}
 	if strings.TrimSpace(current.Currency) == "" {

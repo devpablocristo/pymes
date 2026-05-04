@@ -2,6 +2,8 @@
   position: fixed;
   inset: 0;
   z-index: 1400;
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
 }
 
 .crud-image-fs-backdrop {
@@ -29,7 +31,7 @@
   border-radius: 999px;
   width: 2.25rem;
   height: 2.25rem;
-  font-size: 1.25rem;
+  font-size: inherit;
   line-height: 1;
   background: rgba(15, 23, 42, 0.82);
   color: #fff;

@@ -130,13 +130,5 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
     }),
     toBody: serviceToBody,
     isValid: (values) => asString(values.name).trim().length >= 2 && Number(asString(values.sale_price) || '0') >= 0,
-    editorModal: {
-      fieldConfig: {
-        code: { helperText: 'Código corto para buscar el servicio sin recordar el nombre completo.' },
-        category_code: { helperText: 'Agrupalo por rubro o familia para reportes y filtros.' },
-        tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
-        tags: { helperText: 'Etiquetas internas para campañas, filtros o automatizaciones.' },
-      },
-    },
   };
 }

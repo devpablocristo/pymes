@@ -1,6 +1,6 @@
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
-import { asOptionalNumber, asOptionalString, asString, asBoolean, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
+import { asOptionalNumber, asOptionalString, asString, asBoolean, formatDate, parseJSONArray, parseImageURLList } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
@@ -157,12 +157,13 @@ function formatPaymentMethodLabel(value: unknown): string {
   return paymentMethodOptions.find((option) => option.value === raw)?.label ?? raw ?? '—';
 }
 
-function buildCommercialLineItemsBlock(sectionId = 'items') {
+function buildCommercialLineItemsBlock(sectionId = 'items', label = 'Renglones') {
   return {
     id: 'items',
     kind: 'lineItems' as const,
     field: 'items',
     sectionId,
+    label,
     visible: ({ editing }: { editing: boolean }) => editing,
   };
 }
@@ -394,6 +395,12 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
           } else {
             delete meta.favorite;
           }
+          const imgUrls = parseImageURLList(values.image_urls);
+          if (imgUrls.length > 0) {
+            meta.image_urls = imgUrls;
+          } else {
+            delete meta.image_urls;
+          }
           return {
             ...r,
             customer: asString(values.customer ?? '').trim() || r.customer,
@@ -536,9 +543,6 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       ],
       fieldConfig: {
         customer_id: { hidden: true },
-        customer_name: { helperText: 'Cliente al que le estás armando este presupuesto.' },
-        valid_until: { helperText: 'Fecha límite hasta la que mantenés este precio u oferta.' },
-        notes: { helperText: 'Agregá alcance, aclaraciones o condiciones comerciales.' },
       },
     },
     kanban: {
@@ -654,9 +658,6 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       fieldConfig: {
         customer_id: { hidden: true },
         quote_id: { hidden: true },
-        customer_name: { helperText: 'Cliente al que le cobrás esta operación.' },
-        payment_method: { helperText: 'Elegí cómo se cobró o se va a cobrar esta venta.' },
-        notes: { helperText: 'Usalo para observaciones rápidas de caja o entrega.' },
       },
     },
     kanban: {
@@ -947,15 +948,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
-      blocks: [
-        {
-          id: 'items',
-          kind: 'lineItems',
-          field: 'items',
-          sectionId: 'items',
-          visible: ({ editing }) => editing,
-        },
-      ],
+      blocks: [buildCommercialLineItemsBlock('items')],
       sections: [
         {
           id: 'summary',

@@ -2,6 +2,7 @@ import { confirmAction } from '@devpablocristo/core-browser';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import { StandardCrudImageUrlsEditor } from '../../crud/standardCrudMedia';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
 import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
@@ -158,6 +159,16 @@ type ResolvedSection = CrudEntityEditorModalSection & {
 /** Orden global del modal: favorito, etiquetas, primer campo de imágenes conocido, resto en orden declarado. */
 const CRUD_MODAL_PINNED_FIELD_IDS = ['metadata_favorite', 'tags'] as const;
 const CRUD_MODAL_IMAGE_FIELD_IDS = ['image_urls', 'image_url', 'images'] as const;
+const CRUD_MODAL_IMAGE_FIELD_ID_SET = new Set<string>(CRUD_MODAL_IMAGE_FIELD_IDS);
+
+/** Nunca `<textarea>` con base64: cualquier recurso que olvide `editControl` sigue usando el editor estándar. */
+const defaultModalImageUrlsEditControl: NonNullable<CrudEntityEditorModalField['editControl']> = ({ value, setValue }) => (
+  <StandardCrudImageUrlsEditor value={value} setValue={setValue} />
+);
+
+function resolveModalImageFieldEditControl(field: CrudEntityEditorModalField): CrudEntityEditorModalField['editControl'] | undefined {
+  return field.editControl ?? (CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id) ? defaultModalImageUrlsEditControl : undefined);
+}
 
 function dedupeModalFieldsById(fields: CrudEntityEditorModalField[]): CrudEntityEditorModalField[] {
   const seen = new Set<string>();
@@ -347,8 +358,19 @@ export function CrudEntityEditorModal({
   const suppressBackdropCloseRef = useRef(false);
   /** Ratón/táctil: la activación se hace en pointerup tras capture; el click siguiente se ignora. */
   const pointerActivatedEditRef = useRef(false);
-  /** Libera suppressBackdrop tras una ventana fija (el click fantasma puede ir después del microtask). */
+  /** Libera suppressBackdrop tras una ventana (el click fantasma puede ir muy después del pointerup). */
   const suppressBackdropTimerRef = useRef<number | null>(null);
+
+  const armBackdropSuppress = () => {
+    suppressBackdropCloseRef.current = true;
+    if (suppressBackdropTimerRef.current !== null) {
+      window.clearTimeout(suppressBackdropTimerRef.current);
+    }
+    suppressBackdropTimerRef.current = window.setTimeout(() => {
+      suppressBackdropCloseRef.current = false;
+      suppressBackdropTimerRef.current = null;
+    }, 1200);
+  };
 
   // Sincronizar valores cuando cambian datos de formulario; no reiniciar modo lectura/edición
   // aquí: `initialValues` suele ser un objeto nuevo en cada render del padre y eso devolvía
@@ -379,6 +401,16 @@ export function CrudEntityEditorModal({
   );
 
   const resolvedSections = useMemo(() => resolveSections(fields, blocks, sections), [blocks, fields, sections]);
+  const mediaPreviewOwnedByImageEditControl = useMemo(() => {
+    if (!mediaFieldId) return false;
+    return resolvedSections.some((section) =>
+      section.fields.some((field) => {
+        if (field.id !== mediaFieldId) return false;
+        if (field.editControl) return true;
+        return CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id);
+      }),
+    );
+  }, [mediaFieldId, resolvedSections]);
   const hasHeaderContent = Boolean(eyebrow || title || subtitle);
   const resolvedMediaUrls = useMemo(() => {
     if (mediaFieldId) {
@@ -539,14 +571,7 @@ export function CrudEntityEditorModal({
 
   const scheduleActivateEditing = () => {
     if (!allowEdit || isEditing) return;
-    suppressBackdropCloseRef.current = true;
-    if (suppressBackdropTimerRef.current !== null) {
-      window.clearTimeout(suppressBackdropTimerRef.current);
-    }
-    suppressBackdropTimerRef.current = window.setTimeout(() => {
-      suppressBackdropCloseRef.current = false;
-      suppressBackdropTimerRef.current = null;
-    }, 450);
+    armBackdropSuppress();
     // Macrotask: el «click» del mismo gesto ocurre antes que setTimeout(0); así el botón sigue en el DOM
     // durante el click y no “cae” en Cerrar/backdrop al desmontarse en flushSync.
     window.setTimeout(() => {
@@ -596,6 +621,8 @@ export function CrudEntityEditorModal({
             onPointerDown={(event) => {
               if (!allowEdit || isEditing) return;
               if (event.pointerType === 'mouse' && event.button !== 0) return;
+              // Antes del pointerup: si el layout cambia al pasar a edición, el click fantasma puede caer en el backdrop.
+              armBackdropSuppress();
               try {
                 (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId);
               } catch {
@@ -667,6 +694,11 @@ export function CrudEntityEditorModal({
         ? field.readValue({ value: values[field.id], values })
         : field.readValue;
     }
+    if (CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id)) {
+      const urls = parseCrudLinkedEntityImageUrlList(String(values[field.id] ?? ''));
+      if (!urls.length) return '—';
+      return <CrudEntityMediaCarousel urls={urls} variant="read" ariaLabel={field.label} />;
+    }
     const value = values[field.id];
     if (field.type === 'checkbox') return value ? 'Sí' : 'No';
     if (field.type === 'select') {
@@ -684,7 +716,11 @@ export function CrudEntityEditorModal({
         setValues((current) => ({ ...current, [block.field]: nextValue }));
       return (
         <div key={block.id} className="crud-entity-editor-modal__field crud-entity-editor-modal__field--full">
-          {block.label ? <span>{block.label}</span> : null}
+          {block.label ? (
+            <div className="crud-entity-editor-modal__section-head">
+              <h3>{block.label}</h3>
+            </div>
+          ) : null}
           <CrudLineItemsEditor value={values[block.field]} onChange={setValue} />
         </div>
       );
@@ -748,7 +784,7 @@ export function CrudEntityEditorModal({
           </div>
         ) : null}
 
-        {!loading && resolvedMediaUrls?.length ? (
+        {!loading && resolvedMediaUrls?.length && !(isEditing && mediaPreviewOwnedByImageEditControl) ? (
           <div className="crud-entity-editor-modal__media">
             <CrudEntityMediaCarousel urls={resolvedMediaUrls} variant={isEditing ? 'edit' : 'read'} />
           </div>
@@ -756,9 +792,20 @@ export function CrudEntityEditorModal({
 
         {!loading
           ? resolvedSections.map((section) => {
-              const visibleFields = section.fields.filter((field) =>
-                field.visible ? field.visible({ value: values[field.id], values, editing: isEditing }) : true,
-              );
+              const visibleFields = section.fields.filter((field) => {
+                if (field.visible && !field.visible({ value: values[field.id], values, editing: isEditing })) {
+                  return false;
+                }
+                if (
+                  !isEditing &&
+                  mediaFieldId &&
+                  field.id === mediaFieldId &&
+                  (resolvedMediaUrls?.length ?? 0) > 0
+                ) {
+                  return false;
+                }
+                return true;
+              });
               const visibleBlocks = section.blocks.filter((block) =>
                 block.visible ? block.visible({ values, editing: isEditing, row }) : isEditing,
               );
@@ -766,7 +813,9 @@ export function CrudEntityEditorModal({
               return (
                 <section key={section.id} className="crud-entity-editor-modal__section">
                   <div className="crud-entity-editor-modal__fields">
-                    {visibleFields.map((field) => (
+                    {visibleFields.map((field) => {
+                      const resolvedEditControl = resolveModalImageFieldEditControl(field);
+                      return (
                       <label
                         key={field.id}
                         className={cx(
@@ -794,8 +843,8 @@ export function CrudEntityEditorModal({
                         ) : (
                           <>
                             <span>{field.label}</span>
-                            {field.editControl ? (
-                              field.editControl({
+                            {resolvedEditControl ? (
+                              resolvedEditControl({
                                 value: values[field.id],
                                 values,
                                 setValue: (nextValue) =>
@@ -844,9 +893,9 @@ export function CrudEntityEditorModal({
                             )}
                           </>
                         )}
-                        {isEditing && field.helperText ? <small>{field.helperText}</small> : null}
                       </label>
-                    ))}
+                      );
+                    })}
                     {visibleBlocks.map((block) => renderBlock(block))}
                   </div>
                 </section>

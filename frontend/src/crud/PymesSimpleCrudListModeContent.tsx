@@ -17,7 +17,6 @@ import {
   CrudPaginationBar,
   CrudTableSurface,
   CrudValueKanbanSurface,
-  collectCrudImageUrls,
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
   buildFreeMovementStateMachine,
@@ -30,6 +29,7 @@ import {
   type CrudEntityEditorModalStat,
   type CrudTableSurfaceColumn,
 } from '../modules/crud';
+import { extractCrudRecordImageUrls, pickGalleryHeroCrudImageSrc } from '../modules/crud/crudLinkedEntityImageUrls';
 import type {
   CrudColumn,
   CrudHelpers,
@@ -40,6 +40,10 @@ import type {
   CrudRowAction,
   CrudViewModeId,
 } from '../components/CrudPage';
+import { buildStandardCrudImageUrlsModalFieldConfig } from './standardCrudMedia';
+
+/** Fallback cuando `editorModal.fieldConfig.image_urls` viene incompleto (sin `editControl`) — evita el textarea con base64. */
+const CRUD_IMAGE_URLS_EDITOR_DEFAULTS = buildStandardCrudImageUrlsModalFieldConfig();
 
 type CrudListResponse<T> = {
   items: T[];
@@ -56,12 +60,20 @@ function resolveEditorFieldConfig(
   overrides?: CrudEditorModalFieldConfig,
   fallbackSectionId?: string,
 ): CrudEditorModalFieldConfig {
+  // Importante: propagar editControl / visible / readValue desde editorModal.fieldConfig.
+  // Para `image_urls`, fusionar con defaults del carrusel: si el recurso solo pasó helperText u otras
+  // props parciales, un spread simple no rellena editControl y React cae en <textarea> con data URLs.
+  const defaults = field.key === 'image_urls' ? CRUD_IMAGE_URLS_EDITOR_DEFAULTS : undefined;
+  const o = overrides ?? {};
   return {
-    sectionId: overrides?.sectionId ?? fallbackSectionId,
-    helperText: overrides?.helperText,
-    fullWidth: overrides?.fullWidth ?? field.fullWidth,
-    hidden: overrides?.hidden,
-    readOnly: overrides?.readOnly,
+    sectionId: o.sectionId ?? fallbackSectionId ?? defaults?.sectionId,
+    fullWidth: o.fullWidth ?? field.fullWidth ?? defaults?.fullWidth,
+    helperText: o.helperText ?? defaults?.helperText,
+    hidden: o.hidden ?? defaults?.hidden,
+    readOnly: o.readOnly ?? defaults?.readOnly,
+    visible: o.visible ?? defaults?.visible,
+    readValue: o.readValue ?? defaults?.readValue,
+    editControl: o.editControl ?? defaults?.editControl,
   };
 }
 
@@ -191,19 +203,8 @@ function toSortablePrimitive(value: unknown): string | number | boolean | null {
 function buildEditorMediaUrls<T extends { id: string }>(row: T | undefined) {
   if (!row) return undefined;
   const record = row as Record<string, unknown>;
-  return collectCrudImageUrls({
-    imageUrls: Array.isArray(record.image_urls)
-      ? record.image_urls.filter((value): value is string => typeof value === 'string')
-      : Array.isArray(record.imageUrls)
-        ? record.imageUrls.filter((value): value is string => typeof value === 'string')
-        : undefined,
-    legacyImageUrl:
-      typeof record.image_url === 'string'
-        ? record.image_url
-        : typeof record.imageUrl === 'string'
-          ? record.imageUrl
-          : undefined,
-  });
+  const urls = extractCrudRecordImageUrls(record);
+  return urls.length ? urls : undefined;
 }
 
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
@@ -659,6 +660,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
   const cardMeta = (row: T) =>
     kanbanCardConfig?.meta?.(row) ??
     pickStringValue(rowRecordValues(row), ['total', 'amount', 'price', 'created_at', 'valid_until', 'next_due_date']);
+  const cardImageSrc = (row: T) => pickGalleryHeroCrudImageSrc(rowRecordValues(row));
 
   if (!crudConfig) {
     return (
@@ -711,6 +713,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             title: cardTitle,
             subtitle: (row) => cardSubtitle(row),
             meta: (row) => cardMeta(row),
+            imageSrc: cardImageSrc,
+            imageAlt: cardTitle,
           }}
           onSelect={(row) => {
             selectItem(row.id);

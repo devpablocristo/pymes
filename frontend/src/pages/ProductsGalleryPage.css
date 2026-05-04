@@ -16,7 +16,7 @@
   gap: 16px;
   padding-top: 16px;
   color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--crud-ui-font-size);
 }
 
 .products-gallery-pagination__meta {

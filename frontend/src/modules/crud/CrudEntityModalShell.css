@@ -32,6 +32,8 @@
   min-width: 0;
   max-width: 100%;
   max-height: min(92vh, 920px);
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
   background: var(--color-bg);
   color: var(--color-text);
   border: 1px solid var(--color-border);

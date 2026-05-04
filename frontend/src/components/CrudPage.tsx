@@ -25,6 +25,8 @@ export type CrudFeatureFlags = ModulesCrudFeatureFlags & {
   tagPills?: boolean;
   /** Si es `false`, no se inyectan campos estándar `tags` + favorito (`metadata.favorite`). Por defecto activo salvo opt-out por recurso. */
   standardAnnotations?: boolean;
+  /** Si es `false`, no se inyecta campo/modal estándar de imágenes (`metadata.image_urls` / preview). */
+  standardMedia?: boolean;
 };
 
 export type CrudExplorerMetricConfig<T> = {

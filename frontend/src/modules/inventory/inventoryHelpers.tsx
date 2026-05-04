@@ -1,20 +1,19 @@
 import { type CrudColumn, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
 import { renderTagBadges } from '../../crud/crudTagBadges';
-import { buildStandardCrudViewModes } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
   asOptionalNumber,
   asOptionalString,
   asString,
-  formatProductImageURLsToForm,
   parseImageURLList,
 } from '../../crud/resourceConfigs.shared';
-import { renderCrudActiveBadge } from '../../modules/crud';
+import { buildStandardCrudImageUrlsModalFieldConfig } from '../../crud/standardCrudMedia';
+import { formatCrudRecordImageUrlsToForm } from '../../modules/crud/crudLinkedEntityImageUrls';
+import { buildStandardCrudViewModes, renderCrudActiveBadge } from '../../modules/crud';
 import { formatPartyTagList, parsePartyTagCsv } from '../parties';
 import {
-  asCrudString,
   currencyOptions,
   parseMetadataStringMap,
   productCategoryOptions,
@@ -104,7 +103,6 @@ export function productFormFields(): CrudFormField[] {
       label: 'Imágenes',
       type: 'textarea',
       fullWidth: true,
-      placeholder: 'Las imágenes cargadas se guardan acá. También podés pegarlas una por línea si ya las tenés.',
     },
     { key: 'name', label: 'Nombre', required: true, placeholder: 'Nombre del producto' },
     { key: 'sku', label: 'Código interno', placeholder: 'PROD-001' },
@@ -168,7 +166,7 @@ export function buildProductFormValues(row: ProductRecord) {
     track_stock: row.track_stock ?? true,
     is_active: row.is_active ? 'true' : 'false',
     tags: formatPartyTagList(row.tags),
-    image_urls: formatProductImageURLsToForm(row.image_urls, row.image_url),
+    image_urls: formatCrudRecordImageUrlsToForm(row as unknown as Record<string, unknown>),
     description: row.description ?? '',
     metadata_category: typeof row.metadata?.category === 'string' ? row.metadata.category : '',
     metadata_kind: typeof row.metadata?.kind === 'string' ? row.metadata.kind : 'simple',
@@ -203,6 +201,12 @@ export function productFormToBody(values: CrudFormValues): Record<string, unknow
   } else {
     delete metadata.favorite;
   }
+  const imgUrls = parseImageURLList(values.image_urls);
+  if (imgUrls.length > 0) {
+    metadata.image_urls = imgUrls;
+  } else {
+    delete metadata.image_urls;
+  }
   return {
     name: asString(values.name),
     sku: asOptionalString(values.sku),
@@ -215,7 +219,7 @@ export function productFormToBody(values: CrudFormValues): Record<string, unknow
     is_active: asOptionalString(values.is_active) === undefined ? true : asBoolean(values.is_active),
     tags: parsePartyTagCsv(values.tags),
     description: asOptionalString(values.description),
-    image_urls: parseImageURLList(values.image_urls),
+    image_urls: imgUrls,
     metadata,
   };
 }
@@ -259,60 +263,10 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     toBody: productFormToBody,
     isValid: isValidProductForm,
     editorModal: {
+      /** Carrusel superior sincronizado con el mismo campo que guardamos (`values.image_urls`). */
+      mediaFieldKey: 'image_urls',
       fieldConfig: {
-        sku: { helperText: 'Código corto para buscar rápido en caja, stock o compras.' },
-        metadata_favorite: { helperText: 'Marcá productos destacados; se muestra una estrella en la lista.' },
-        tags: {
-          helperText:
-            'Separá con comas. Son internas al equipo (campañas, filtros, reportes); no confundir con categoría del catálogo.',
-        },
-        metadata_category: { helperText: 'Elegí una categoría predefinida para mantener el catálogo ordenado.' },
-        metadata_kind: { helperText: 'Simple para lo habitual; variable o agrupado para catálogos más complejos.' },
-        metadata_barcode: { helperText: 'Guardá acá el código de barras para búsquedas o lectores.' },
-        unit: { helperText: 'Definí cómo se vende o controla este producto.' },
-        price: { helperText: 'Precio de venta sugerido o actual.' },
-        cost_price: { helperText: 'Costo directo. Si preferís, podés completar margen y calcularlo en base al precio.' },
-        metadata_margin_percent: { helperText: 'Opcional: si no cargás costo, se calcula usando este porcentaje sobre el precio.' },
-        tax_rate: { helperText: 'Podés dejarlo heredado o elegir una alícuota puntual.' },
-        image_urls: {
-          helperText: 'Podés subir imágenes desde tu dispositivo o pegar enlaces si ya los tenés.',
-          editControl: ({ value, setValue }) => {
-            return (
-              <div className="crud-inline-upload">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={async (event) => {
-                    const files = Array.from(event.target.files ?? []);
-                    if (!files.length) return;
-                    try {
-                      const encoded = await Promise.all(
-                        files.map(
-                          (file) =>
-                            new Promise<string>((resolve, reject) => {
-                              const reader = new FileReader();
-                              reader.onload = () => resolve(String(reader.result ?? ''));
-                              reader.onerror = () => reject(reader.error ?? new Error('upload_failed'));
-                              reader.readAsDataURL(file);
-                            }),
-                        ),
-                      );
-                      const current = asCrudString(value)
-                        .split('\n')
-                        .map((entry) => entry.trim())
-                        .filter(Boolean);
-                      setValue([...current, ...encoded].join('\n'));
-                    } finally {
-                      event.currentTarget.value = '';
-                    }
-                  }}
-                />
-                <small>Subí una o varias fotos desde el dispositivo.</small>
-              </div>
-            );
-          },
-        },
+        image_urls: buildStandardCrudImageUrlsModalFieldConfig(),
       },
     },
   };

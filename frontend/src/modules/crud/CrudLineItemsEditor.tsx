@@ -72,35 +72,40 @@ export function CrudLineItemsEditor({
 
   return (
     <div className="crud-line-items-editor">
+      <div className="crud-line-items-editor__labels-row">
+        <span className="crud-line-items-editor__heading">Concepto</span>
+      </div>
       {items.map((item, index) => (
         <div key={index} className="crud-line-items-editor__row">
           <div className="crud-line-items-editor__field crud-line-items-editor__field--full">
-            <span>Concepto</span>
             <input
               type="text"
               value={item.description}
               onChange={(event) => setItem(index, { description: event.target.value })}
-              placeholder="Qué se compró"
+              placeholder="Descripción del renglón"
+              aria-label="Concepto"
             />
           </div>
           <div className="crud-line-items-editor__field">
-            <span>Cantidad</span>
             <input
               type="number"
               min="1"
               step="any"
               value={Number.isFinite(item.quantity) ? item.quantity : 1}
               onChange={(event) => setItem(index, { quantity: Number(asString(event.target.value)) || 1 })}
+              placeholder="Cant."
+              aria-label="Cantidad"
             />
           </div>
           <div className="crud-line-items-editor__field">
-            <span>Importe unitario</span>
             <input
               type="number"
               min="0"
               step="any"
               value={Number.isFinite(item.unit_amount) ? item.unit_amount : 0}
               onChange={(event) => setItem(index, { unit_amount: Number(asString(event.target.value)) || 0 })}
+              placeholder="Unitario"
+              aria-label="Importe unitario"
             />
           </div>
           <div className="crud-line-items-editor__actions">

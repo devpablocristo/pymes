@@ -365,4 +365,26 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
   });
+
+  it('campos image_urls sin editControl no usan textarea (editor estándar)', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Nuevo"
+        mode="create"
+        editBehavior="edit-only"
+        mediaFieldId="image_urls"
+        fields={[
+          { id: 'image_urls', label: 'Imágenes', type: 'textarea', fullWidth: true, defaultValue: '' },
+          { id: 'name', label: 'Nombre', defaultValue: 'x' },
+        ]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const form = document.getElementById('crud-entity-editor-modal-form');
+    expect(form?.querySelector('textarea')).toBeNull();
+    expect(screen.getByText('Seleccionar imágenes del equipo…')).toBeInTheDocument();
+  });
 });

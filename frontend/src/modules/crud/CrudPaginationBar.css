@@ -13,7 +13,7 @@
 
 .crud-pagination-bar__meta {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--crud-ui-font-size);
   font-weight: var(--font-weight-medium);
 }
 

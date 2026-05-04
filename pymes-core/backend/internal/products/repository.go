@@ -269,7 +269,7 @@ func toDomain(row models.ProductModel) productdomain.Product {
 	if meta == nil {
 		meta = map[string]any{}
 	}
-	return productdomain.Product{
+	p := productdomain.Product{
 		ID:          row.ID,
 		OrgID:       row.OrgID,
 		SKU:         row.SKU,
@@ -290,4 +290,17 @@ func toDomain(row models.ProductModel) productdomain.Product {
 		UpdatedAt:   row.UpdatedAt,
 		DeletedAt:   row.DeletedAt,
 	}
+	// Reconciliar filas antiguas: metadata.image_urls poblado pero columna image_urls vacía.
+	if len(p.ImageURLs) == 0 {
+		raw, ok := parseImageURLsFromMetadata(p.Metadata)
+		if ok {
+			if urls, err := normalizeProductImageURLs(raw); err == nil && len(urls) > 0 {
+				p.ImageURLs = urls
+				if strings.TrimSpace(p.ImageURL) == "" {
+					p.ImageURL = urls[0]
+				}
+			}
+		}
+	}
+	return p
 }

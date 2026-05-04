@@ -11,6 +11,7 @@ import type { RestaurantDiningArea, RestaurantDiningTable } from '../../lib/rest
 import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
+import { buildStandardCrudViewModes } from '../crud';
 
 export function renderRestaurantTableStatusBadge(value: unknown) {
   const status = String(value ?? '');
@@ -65,7 +66,7 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
       tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.name).trim().length >= 2,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningAreas" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="restaurantDiningAreas" />),
   };
 }
 
@@ -149,6 +150,6 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
       tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.area_id).trim().length > 0 && asString(values.code).trim().length >= 1,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="restaurantDiningTables" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="restaurantDiningTables" />),
   };
 }

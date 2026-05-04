@@ -3,6 +3,7 @@ package sales
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -118,6 +119,8 @@ type CreateInput struct {
 	Tags          []string
 	Notes         string
 	CreatedBy     string
+	Tags          []string
+	Metadata      map[string]any
 	Items         []CreateItemInput
 }
 
@@ -158,6 +161,8 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 			Notes:         strings.TrimSpace(in.Notes),
 			CreatedBy:     strings.TrimSpace(in.CreatedBy),
 			CreatedAt:     time.Now().UTC(),
+			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
+			Metadata:      metadataToJSONBytesSales(in.Metadata),
 		}
 		if err := tx.Create(&saleRow).Error; err != nil {
 			return err
@@ -325,6 +330,44 @@ func (r *Repository) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledom
 	return r.GetByID(ctx, orgID, saleID)
 }
 
+// PatchSale actualiza campos editables desde el CRUD (no líneas ni totales).
+func (r *Repository) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error) {
+	var row models.SaleModel
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, saleID).Take(&row).Error; err != nil {
+		return saledomain.Sale{}, err
+	}
+	updates := map[string]any{}
+	if in.Tags != nil {
+		updates["tags"] = pq.StringArray(utils.NormalizeTags(*in.Tags))
+	}
+	if in.Metadata != nil {
+		merged, err := mergeMetadataJSONSales(row.Metadata, *in.Metadata)
+		if err != nil {
+			return saledomain.Sale{}, err
+		}
+		updates["metadata"] = merged
+	}
+	if in.Notes != nil {
+		updates["notes"] = strings.TrimSpace(*in.Notes)
+	}
+	if in.PaymentMethod != nil {
+		updates["payment_method"] = strings.TrimSpace(*in.PaymentMethod)
+	}
+	if in.CustomerName != nil {
+		updates["party_name"] = strings.TrimSpace(*in.CustomerName)
+	}
+	if in.BranchID != nil {
+		updates["branch_id"] = in.BranchID
+	}
+	if len(updates) == 0 {
+		return r.GetByID(ctx, orgID, saleID)
+	}
+	if err := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ? AND id = ?", orgID, saleID).Updates(updates).Error; err != nil {
+		return saledomain.Sale{}, err
+	}
+	return r.GetByID(ctx, orgID, saleID)
+}
+
 func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantBusinessSettings, error) {
 	var tenant tenantBusinessSettings
 	err := tx.WithContext(ctx).
@@ -444,6 +487,8 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 		CreatedBy:     saleRow.CreatedBy,
 		CreatedAt:     saleRow.CreatedAt,
 		VoidedAt:      saleRow.VoidedAt,
+		Tags:          append([]string(nil), saleRow.Tags...),
+		Metadata:      metadataFromJSONBytesSales(saleRow.Metadata),
 	}
 }
 
@@ -452,4 +497,54 @@ func coalesce(v, def string) string {
 		return def
 	}
 	return strings.TrimSpace(v)
+}
+
+func metadataFromJSONBytesSales(b []byte) map[string]any {
+	if len(b) == 0 {
+		return map[string]any{}
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil || m == nil {
+		return map[string]any{}
+	}
+	return m
+}
+
+func metadataToJSONBytesSales(m map[string]any) []byte {
+	if m == nil || len(m) == 0 {
+		return []byte("{}")
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
+}
+
+func mergeMetadataJSONSales(current []byte, patch map[string]any) ([]byte, error) {
+	base := metadataFromJSONBytesSales(current)
+	for k, v := range patch {
+		if k == "favorite" && !truthyMetadataSales(v) {
+			delete(base, "favorite")
+			continue
+		}
+		base[k] = v
+	}
+	return json.Marshal(base)
+}
+
+func truthyMetadataSales(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		s := strings.TrimSpace(strings.ToLower(t))
+		return s == "true" || s == "1"
+	case float64:
+		return t != 0
+	case int:
+		return t != 0
+	default:
+		return v != nil
+	}
 }

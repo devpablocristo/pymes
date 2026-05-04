@@ -10,9 +10,9 @@ import type { ConversationDetail, ConversationSummary } from '../lib/aiApi';
 import type { PymesAssistantChatResponse } from '../types/aiChat';
 
 const aiMocks = vi.hoisted(() => ({
-  listConversations: vi.fn<[number?], Promise<{ items: ConversationSummary[] }>>(),
-  getConversation: vi.fn<[string], Promise<ConversationDetail>>(),
-  pymesAssistantChat: vi.fn<[], Promise<PymesAssistantChatResponse>>(),
+  listConversations: vi.fn<(limit?: number) => Promise<{ items: ConversationSummary[] }>>(),
+  getConversation: vi.fn<(conversationId: string) => Promise<ConversationDetail>>(),
+  pymesAssistantChat: vi.fn<() => Promise<PymesAssistantChatResponse>>(),
 }));
 
 vi.mock('../lib/aiApi', () => ({

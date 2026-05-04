@@ -1,32 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { collectCrudImageUrls, parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
+import { parseCrudLinkedEntityImageUrlList, pickGalleryHeroCrudImageSrc } from './crudLinkedEntityImageUrls';
 
-describe('crudLinkedEntityImageUrls', () => {
-  it('recomposes split data urls from multiline values', () => {
-    const value = 'data:image/jpeg;base64\nAAAA\nhttps://example.com/a.jpg';
-    expect(parseCrudLinkedEntityImageUrlList(value)).toEqual([
-      'data:image/jpeg;base64,AAAA',
-      'https://example.com/a.jpg',
-    ]);
+describe('parseCrudLinkedEntityImageUrlList', () => {
+  it('preserva data URLs completas (coma después de base64)', () => {
+    const data = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    expect(parseCrudLinkedEntityImageUrlList(data)).toEqual([data]);
   });
 
-  it('preserves regular urls from collected values', () => {
-    expect(
-      collectCrudImageUrls({
-        imageUrls: ['https://example.com/a.jpg', ' https://example.com/a.jpg ', 'data:image/png;base64', 'BBBB'],
-      }),
-    ).toEqual(['https://example.com/a.jpg', 'data:image/png;base64,BBBB']);
+  it('separa solo por líneas', () => {
+    const a = 'https://a.example/a.png';
+    const b = 'data:image/png;base64,QQ==';
+    expect(parseCrudLinkedEntityImageUrlList(`${a}\n${b}`)).toEqual([a, b]);
   });
 
-  it('rebuilds bare base64 entries using the detected prefix', () => {
+  it('elimina duplicados conservando orden', () => {
+    expect(parseCrudLinkedEntityImageUrlList('https://x/z\nhttps://x/z')).toEqual(['https://x/z']);
+  });
+});
+
+describe('pickGalleryHeroCrudImageSrc', () => {
+  it('elige la última URL https válida', () => {
     expect(
-      collectCrudImageUrls({
-        imageUrls: ['data:image/jpeg;base64,/9j/AAAA', '/9j/BBBB', '/9j/CCCC'],
+      pickGalleryHeroCrudImageSrc({
+        image_urls: ['https://a.example/old.png', 'https://b.example/new.png'],
       }),
-    ).toEqual([
-      'data:image/jpeg;base64,/9j/AAAA',
-      'data:image/jpeg;base64,/9j/BBBB',
-      'data:image/jpeg;base64,/9j/CCCC',
-    ]);
+    ).toBe('https://b.example/new.png');
+  });
+
+  it('prefiere la última data URL renderizable si está al final', () => {
+    const first = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const second = 'data:image/png;base64,QQ==';
+    expect(pickGalleryHeroCrudImageSrc({ image_urls: [first, second] })).toBe(second);
+  });
+
+  it('ignora entradas no mostrables y toma la anterior', () => {
+    expect(
+      pickGalleryHeroCrudImageSrc({
+        image_urls: ['https://ok.example/x.png', 'not-a-url'],
+      }),
+    ).toBe('https://ok.example/x.png');
   });
 });

@@ -7,10 +7,10 @@ import type { BillingStatus, MeProfileResponse, SessionResponse } from '../lib/t
 import { SettingsPage } from './SettingsPage';
 
 const apiMocks = vi.hoisted(() => ({
-  getSession: vi.fn<[], Promise<SessionResponse>>(),
-  getMe: vi.fn<[], Promise<MeProfileResponse>>(),
-  getBillingStatus: vi.fn<[], Promise<BillingStatus>>(),
-  createPortal: vi.fn<[], Promise<{ portal_url: string }>>(),
+  getSession: vi.fn<() => Promise<SessionResponse>>(),
+  getMe: vi.fn<() => Promise<MeProfileResponse>>(),
+  getBillingStatus: vi.fn<() => Promise<BillingStatus>>(),
+  createPortal: vi.fn<() => Promise<{ portal_url: string }>>(),
 }));
 
 vi.mock('../lib/auth', () => ({

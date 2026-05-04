@@ -6,18 +6,18 @@ import { LanguageProvider } from '../lib/i18n';
 import type { BillingStatus, MeProfileResponse, SessionResponse } from '../lib/types';
 
 const apiMocks = vi.hoisted(() => ({
-  getSession: vi.fn<[], Promise<SessionResponse>>(),
-  getMe: vi.fn<[], Promise<MeProfileResponse>>(),
-  getBillingStatus: vi.fn<[], Promise<BillingStatus>>(),
+  getSession: vi.fn<() => Promise<SessionResponse>>(),
+  getMe: vi.fn<() => Promise<MeProfileResponse>>(),
+  getBillingStatus: vi.fn<() => Promise<BillingStatus>>(),
   updateTenantSettings: vi.fn(),
 }));
 
-const signOutMock = vi.hoisted(() => vi.fn<[], Promise<void>>().mockResolvedValue(undefined));
-const setActiveMock = vi.hoisted(() => vi.fn<[{ organization: string }], Promise<void>>().mockResolvedValue(undefined));
+const signOutMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
+const setActiveMock = vi.hoisted(() => vi.fn<(args: { organization: string }) => Promise<void>>().mockResolvedValue(undefined));
 const createOrganizationMock = vi.hoisted(() =>
-  vi.fn<[{ name: string }], Promise<{ id: string }>>().mockResolvedValue({ id: 'org_new' }),
+  vi.fn<(args: { name: string }) => Promise<{ id: string }>>().mockResolvedValue({ id: 'org_new' }),
 );
-const sessionReloadMock = vi.hoisted(() => vi.fn<[], Promise<void>>().mockResolvedValue(undefined));
+const sessionReloadMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 
 const useUserMock = vi.hoisted(() =>
   vi.fn(() => ({

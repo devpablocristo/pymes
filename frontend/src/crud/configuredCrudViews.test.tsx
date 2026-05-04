@@ -12,11 +12,10 @@ import {
   ConfiguredCrudStandalonePage,
 } from './configuredCrudViews';
 
-const loadLazyCrudPageConfigMock = vi.fn<[string], Promise<CrudPageConfig<{ id: string }> | null>>();
+const loadLazyCrudPageConfigMock = vi.fn<(resourceId: string) => Promise<CrudPageConfig<{ id: string }> | null>>();
 
 vi.mock('./lazyCrudPage', () => ({
   loadLazyCrudPageConfig: (resourceId: string) => loadLazyCrudPageConfigMock(resourceId),
-  LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
 vi.mock('./PymesSimpleCrudListModeContent', () => ({

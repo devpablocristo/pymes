@@ -1,13 +1,13 @@
-# Review (Nexus): contexto de build = padre del repo pymes (hermanos nexus/, pymes/, core/).
+# Review (Nexus Governance): contexto de build = padre del repo pymes (hermanos nexus/, pymes/, core/).
 # COPY alineado con ese contexto; evita Dockerfile.dev antiguo en nexus con COPY go.mod en la raíz.
 FROM golang:1.26-alpine
 
 RUN apk add --no-cache git wget
 RUN GOBIN=/usr/local/bin go install github.com/air-verse/air@v1.61.7
 
-WORKDIR /workspace/nexus/v3/review
+WORKDIR /workspace/nexus/governance
 
-COPY nexus/v3/review/go.mod nexus/v3/review/go.sum ./
+COPY nexus/governance/go.mod nexus/governance/go.sum ./
 RUN go mod download
 
 EXPOSE 8080

@@ -1596,9 +1596,6 @@ def _build_internal_analysis_settings() -> _InternalAnalysisCompletionSettings:
     if provider == "gemini":
         model = settings.gemini_model
         api_key = settings.gemini_api_key
-    elif provider == "ollama":
-        model = settings.ollama_model
-        base_url = settings.ollama_base_url
 
     return _InternalAnalysisCompletionSettings(
         llm_provider=provider,

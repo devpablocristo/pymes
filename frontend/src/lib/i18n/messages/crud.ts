@@ -44,7 +44,7 @@ export const crudMessages: TranslationsByLanguage = {
     'crud.products.detail.active': 'Estado comercial',
     'crud.products.detail.activeYes': 'Activo',
     'crud.products.detail.activeNo': 'Inactivo',
-    'crud.products.detail.tags': 'Etiquetas',
+    'crud.products.detail.tags': 'Etiquetas Internas',
     'crud.products.detail.description': 'Descripción',
     'crud.products.detail.metadata': 'Metadatos',
     'crud.products.detail.prevImage': 'Imagen anterior',

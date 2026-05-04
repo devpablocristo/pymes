@@ -24,9 +24,11 @@ type Quote struct {
 	Notes        string      `json:"notes"`
 	ValidUntil   *time.Time  `json:"valid_until,omitempty"`
 	CreatedBy    string      `json:"created_by"`
-	CreatedAt    time.Time   `json:"created_at"`
-	UpdatedAt    time.Time   `json:"updated_at"`
-	ArchivedAt   *time.Time  `json:"archived_at,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	ArchivedAt   *time.Time     `json:"archived_at,omitempty"`
+	Tags         []string       `json:"tags,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
 }
 
 type QuoteItem struct {

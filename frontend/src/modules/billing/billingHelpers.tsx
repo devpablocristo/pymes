@@ -1,36 +1,35 @@
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
-import { asOptionalString, asString, formatDate, parseJSONArray } from '../../crud/resourceConfigs.shared';
+import { asOptionalNumber, asOptionalString, asString, asBoolean, formatDate, parseJSONArray, parseImageURLList } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
+import { paymentMethodOptions } from '../../lib/formPresets';
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
-  buildStandardInternalFields,
   buildFullyConnectedStatusStateMachine,
   buildStandardCrudViewModes,
-  formatTagCsv,
   formatCrudLocalizedMoney,
   hasReadableCrudValue,
   openCrudFormDialog,
   openCrudTextDialog,
-  parseTagCsv,
 } from '../crud';
-import { renderTagBadges } from '../../crud/crudTagBadges';
-import { paymentMethodOptions } from '../../lib/formPresets';
+import { parsePartyTagCsv } from '../parties/partiesHelpers';
 import {
   INVOICE_STATUS_LABELS,
+  archiveInvoice,
+  invoiceInitials,
+  nextInvoiceUid,
+  readDemoInvoices,
+  removeDemoInvoice,
+  restoreInvoice,
+  updateDemoInvoice,
+  writeDemoInvoices,
   type InvoiceLineItem,
   type InvoiceRecord,
   type InvoiceStatus,
-} from './invoiceMath';
-import {
-  createInvoiceFromCrudValues,
-  fetchInvoices,
-  invoiceUpdateBodyFromCrud,
-  updateInvoiceStatus,
-} from '../../lib/invoicesApi';
+} from './invoicesDemo';
 
 export type CommercialDocumentStatusOption<TStatus extends string> = {
   value: TStatus;
@@ -78,9 +77,9 @@ export type QuoteRecord = {
   total: number;
   currency?: string;
   valid_until?: string;
-  is_favorite?: boolean;
-  tags?: string[];
   notes?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialPricedLineItem[];
 };
 
@@ -95,9 +94,9 @@ export type SaleRecord = {
   payment_method?: string;
   total: number;
   currency?: string;
-  is_favorite?: boolean;
-  tags?: string[];
   notes?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialPricedLineItem[];
 };
 
@@ -126,13 +125,13 @@ export type PurchaseRecord = {
   currency?: string;
   notes?: string;
   received_at?: string;
-  is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
   items?: CommercialCostLineItem[];
 };
 
 function buildCrudNotesField() {
-  return { key: 'notes', label: 'Notas internas', type: 'textarea' as const, fullWidth: true };
+  return { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true };
 }
 
 function buildCrudNameField(
@@ -158,12 +157,13 @@ function formatPaymentMethodLabel(value: unknown): string {
   return paymentMethodOptions.find((option) => option.value === raw)?.label ?? raw ?? '—';
 }
 
-function buildCommercialLineItemsBlock(sectionId = 'items') {
+function buildCommercialLineItemsBlock(sectionId = 'items', label = 'Renglones') {
   return {
     id: 'items',
     kind: 'lineItems' as const,
     field: 'items',
     sectionId,
+    label,
     visible: ({ editing }: { editing: boolean }) => editing,
   };
 }
@@ -196,31 +196,43 @@ export function parseInvoiceStatus(value: CrudFieldValue | undefined): InvoiceSt
 }
 
 export function createInvoiceCrudLineItems(value: CrudFieldValue | undefined): InvoiceLineItem[] {
-  // Acepta tanto el formato legacy (qty, unitPrice) como el del editor visual
-  // compartido (quantity, unit_price/unit_cost). Ver CrudLineItemsEditor.
-  return parseJSONArray<{
-    id?: string;
-    description?: string;
-    qty?: number;
-    quantity?: number;
-    unit?: string;
-    unitPrice?: number;
-    unit_price?: number;
-    unit_cost?: number;
-  }>(value, 'Los items deben ser un arreglo JSON')
-    .map((item, index) => ({
-      id: String(item.id ?? index + 1),
-      description: String(item.description ?? ''),
-      qty: Number(item.qty ?? item.quantity ?? 1),
-      unit: String(item.unit ?? 'unidad'),
-      unitPrice: Number(item.unitPrice ?? item.unit_price ?? item.unit_cost ?? 0),
-    }))
-    .filter((item) => item.description.trim().length > 0);
+  return parseJSONArray<{ id?: string; description?: string; qty?: number; unit?: string; unitPrice?: number }>(
+    value,
+    'Los items deben ser un arreglo JSON',
+  ).map((item, index) => ({
+    id: String(item.id ?? index + 1),
+    description: String(item.description ?? ''),
+    qty: Number(item.qty ?? 1),
+    unit: String(item.unit ?? 'unidad'),
+    unitPrice: Number(item.unitPrice ?? 0),
+  }));
 }
 
-// Shim de compatibilidad: delega al cliente REST centralizado en `lib/invoicesApi`.
 export async function createDemoInvoiceFromCrudValues(values: Record<string, CrudFieldValue | undefined>): Promise<void> {
-  await createInvoiceFromCrudValues(values);
+  const customer = asString(values.customer);
+  const invoices = readDemoInvoices();
+  const meta: Record<string, unknown> = {};
+  if (asBoolean(values.metadata_favorite)) {
+    meta.favorite = true;
+  }
+  writeDemoInvoices([
+    {
+      id: nextInvoiceUid(),
+      number: asOptionalString(values.number) ?? `INV-${3500 + Math.floor(Math.random() * 100)}`,
+      customer,
+      initials: invoiceInitials(customer),
+      issuedDate: asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
+      dueDate: asOptionalString(values.dueDate) ?? asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
+      status: parseInvoiceStatus(values.status),
+      discount: asOptionalNumber(values.discount) ?? 0,
+      tax: asOptionalNumber(values.tax) ?? 21,
+      items: createInvoiceCrudLineItems(values.items),
+      archived_at: null,
+      tags: parsePartyTagCsv(values.tags),
+      metadata: Object.keys(meta).length > 0 ? meta : undefined,
+    },
+    ...invoices,
+  ]);
 }
 
 export function parseCommercialPricedLineItems(value: CrudFieldValue | undefined): CommercialPricedLineItem[] {
@@ -342,7 +354,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status'>({
+  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: opts.renderList,
     label: 'factura',
@@ -350,7 +362,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
     createFromValues: createDemoInvoiceFromCrudValues,
-    searchKeys: ['number', 'customer', 'status'],
+    searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
       { key: 'customer', header: 'Cliente' },
@@ -364,34 +376,54 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     allowCreate: true,
     allowEdit: true,
     stateMachine,
-    // REST contra pymes-core `/v1/invoices` con las 7 operaciones canónicas.
+    // Demo localStorage: expone list/update/archive/restore/delete contra el store.
     dataSource: {
       ...existingDataSource,
       list: async ({ archived }) => {
-        const rows = await fetchInvoices({ archived: Boolean(archived) });
-        return rows as TRecord[];
-      },
-      create: async (values) => {
-        await createInvoiceFromCrudValues(values);
+        const rows = readDemoInvoices();
+        const matchesArchived = (r: InvoiceRecord) => (archived ? r.archived_at != null : r.archived_at == null);
+        return rows.filter(matchesArchived) as TRecord[];
       },
       update: async (row, values) => {
-        await apiRequest(`/v1/invoices/${row.id}`, { method: 'PATCH', body: invoiceUpdateBodyFromCrud(values) });
+        updateDemoInvoice(row.id, (r) => {
+          const meta: Record<string, unknown> =
+            r.metadata && typeof r.metadata === 'object'
+              ? { ...(r.metadata as Record<string, unknown>) }
+              : {};
+          if (asBoolean(values.metadata_favorite)) {
+            meta.favorite = true;
+          } else {
+            delete meta.favorite;
+          }
+          const imgUrls = parseImageURLList(values.image_urls);
+          if (imgUrls.length > 0) {
+            meta.image_urls = imgUrls;
+          } else {
+            delete meta.image_urls;
+          }
+          return {
+            ...r,
+            customer: asString(values.customer ?? '').trim() || r.customer,
+            initials:
+              invoiceInitials(asString(values.customer ?? '').trim() || r.customer || ''),
+            status: parseInvoiceStatus(values.status),
+            discount: asOptionalNumber(values.discount) ?? r.discount,
+            tax: asOptionalNumber(values.tax) ?? r.tax,
+            issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
+            dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
+            tags: parsePartyTagCsv(values.tags),
+            metadata: Object.keys(meta).length > 0 ? meta : undefined,
+          };
+        });
       },
-      deleteItem: async (row) => {
-        await apiRequest(`/v1/invoices/${row.id}`, { method: 'DELETE' });
-      },
-      restore: async (row) => {
-        await apiRequest(`/v1/invoices/${row.id}/restore`, { method: 'POST', body: {} });
-      },
-      hardDelete: async (row) => {
-        await apiRequest(`/v1/invoices/${row.id}/hard`, { method: 'DELETE' });
-      },
+      deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
+      restore: async (row) => updateDemoInvoice(row.id, restoreInvoice),
+      hardDelete: async (row) => removeDemoInvoice(row.id),
     },
     supportsArchived: true,
     editorModal: {
       eyebrow: 'Facturación',
-      sections: [{ id: 'default' }, { id: 'items' }],
-      blocks: [buildCommercialLineItemsBlock()],
+      sections: [{ id: 'default' }],
     },
     kanban: {
       card: {
@@ -402,7 +434,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       createFooterLabel: 'Añadir factura',
       persistMove: async ({ row, nextValue }: { row: TRecord; field: string; nextValue: string }) => {
         const status = parseInvoiceStatus(nextValue);
-        await updateInvoiceStatus(row.id, status);
+        updateDemoInvoice(row.id, (r) => ({ ...r, status }));
         return { ...(row as InvoiceRecord), status } as TRecord;
       },
     },
@@ -423,7 +455,14 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
-      ...buildStandardInternalFields({ tagsPlaceholder: 'factura, urgente, prioritario', includeNotes: false }),
+      {
+        key: 'items',
+        label: 'Detalle',
+        type: 'textarea',
+        fullWidth: true,
+        required: true,
+        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
+      },
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -434,14 +473,9 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       discount: String(row.discount ?? 0),
       tax: String(row.tax ?? 21),
       items: JSON.stringify(row.items ?? []),
-      is_favorite: row.is_favorite ?? false,
-      tags: formatTagCsv(row.tags),
     }),
-    isValid: (values) => {
-      if (asString(values.customer).trim().length < 2) return false;
-      const lines = createInvoiceCrudLineItems(values.items);
-      return lines.length > 0;
-    },
+    isValid: (values) =>
+      asString(values.customer).trim().length >= 2 && asString(values.items).trim().length > 0,
   };
 }
 
@@ -451,7 +485,7 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
     { value: 'pending', label: INVOICE_STATUS_LABELS.pending, badgeVariant: 'warning' },
     { value: 'overdue', label: INVOICE_STATUS_LABELS.overdue, badgeVariant: 'danger' },
   ]);
-  const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status'>({
+  const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
     renderList: () => <></>,
     label: 'factura',
@@ -459,7 +493,7 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
     createFromValues: createDemoInvoiceFromCrudValues,
-    searchKeys: ['number', 'customer', 'status'],
+    searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
       { key: 'customer', header: 'Cliente' },
@@ -479,21 +513,21 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
     { value: 'accepted', label: 'Aceptado', badgeVariant: 'success' },
     { value: 'rejected', label: 'Rechazado', badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'notes' | 'tags'>({
     resourceId: 'quotes',
     renderList: opts.renderList,
     label: 'presupuesto',
     labelPlural: 'presupuestos',
     labelPluralCap: 'Presupuestos',
     createLabel: '+ Nuevo presupuesto',
-    searchKeys: ['number', 'customer_name', 'status', 'notes'],
+    searchKeys: ['number', 'customer_name', 'status', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Presupuesto', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
       { key: 'valid_until', header: 'Vence', render: (value) => String(value ?? '').trim() || '—' },
-      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });
   return {
@@ -525,7 +559,6 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       { key: 'customer_id', label: 'Cliente' },
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'valid_until', label: 'Válido hasta', type: 'date' },
-      ...buildStandardInternalFields({ tagsPlaceholder: 'cotización, prioritario', includeNotes: false }),
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -563,8 +596,6 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_name: row.customer_name ?? '',
       valid_until: row.valid_until ? String(row.valid_until).slice(0, 10) : '',
       items: JSON.stringify(row.items ?? []),
-      is_favorite: row.is_favorite ?? false,
-      tags: formatTagCsv(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -573,8 +604,6 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
       items: parseCommercialPricedLineItems(values.items),
-      is_favorite: Boolean(values.is_favorite),
-      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -593,27 +622,29 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
     { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
     { value: 'cancelled', label: 'Cancelada', badgeVariant: 'danger' },
   ]);
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer_name' | 'status' | 'payment_method' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<
+    TRecord,
+    'number' | 'customer_name' | 'status' | 'payment_method' | 'notes' | 'tags'
+  >({
     resourceId: 'sales',
     renderList: opts.renderList,
     label: 'venta',
     labelPlural: 'ventas',
     labelPluralCap: 'Ventas',
     createLabel: '+ Nueva venta',
-    searchKeys: ['number', 'customer_name', 'status', 'payment_method', 'notes'],
+    searchKeys: ['number', 'customer_name', 'status', 'payment_method', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Venta', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'customer_name', header: 'Cliente', render: (_v, row: TRecord) => row.customer_name || '—' },
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_method', header: 'Cobro', render: (value) => formatPaymentMethodLabel(value) },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
-      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });
 
   return {
     basePath: '/v1/sales',
-    // El PATCH del backend solo acepta favorito/tags/notes (el resto es inmutable post-creación).
     allowEdit: true,
     allowDelete: false,
     ...base.config,
@@ -640,11 +671,10 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
         apiRequest<TRecord>(`/v1/sales/${row.id}/status`, { method: 'PATCH', body: { status: nextValue } }),
     },
     formFields: [
-      { key: 'customer_id', label: 'Cliente', createOnly: true },
-      { ...buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'), createOnly: true },
-      { key: 'quote_id', label: 'Presupuesto relacionado', createOnly: true },
-      { ...buildPaymentMethodField(), createOnly: true },
-      ...buildStandardInternalFields({ tagsPlaceholder: 'venta, frecuente, prioridad', includeNotes: false }),
+      { key: 'customer_id', label: 'Cliente' },
+      buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
+      { key: 'quote_id', label: 'Presupuesto relacionado' },
+      buildPaymentMethodField(),
       buildCrudNotesField(),
     ],
     rowActions: [
@@ -708,7 +738,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
               },
               {
                 id: 'notes',
-                label: 'Notas internas',
+                label: 'Notas',
                 type: 'textarea',
                 rows: 3,
                 placeholder: 'Opcional',
@@ -756,8 +786,6 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       quote_id: row.quote_id ?? '',
       payment_method: row.payment_method ?? 'cash',
       items: JSON.stringify(row.items ?? []),
-      is_favorite: row.is_favorite ?? false,
-      tags: formatTagCsv(row.tags),
       notes: row.notes ?? '',
     }),
     toBody: (values) => ({
@@ -767,8 +795,6 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       quote_id: asOptionalString(values.quote_id),
       payment_method: asString(values.payment_method),
       items: parseCommercialPricedLineItems(values.items),
-      is_favorite: Boolean(values.is_favorite),
-      tags: parseTagCsv(values.tags),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -797,7 +823,7 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     allowHardDelete: false,
     allowCreate: true,
     createLabel: '+ Nueva nota de crédito',
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',
@@ -894,61 +920,35 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
     { value: 'voided', label: 'Anulada', badgeVariant: 'danger' },
   ]);
 
-  const base = createCommercialDocumentCrudConfig<TRecord, 'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes'>({
+  const base = createCommercialDocumentCrudConfig<
+    TRecord,
+    'number' | 'supplier_name' | 'status' | 'payment_status' | 'notes' | 'tags'
+  >({
     resourceId: 'purchases',
     renderList: opts.renderList,
     label: 'compra',
     labelPlural: 'compras',
     labelPluralCap: 'Compras',
     createLabel: '+ Nueva compra',
-    searchKeys: ['number', 'supplier_name', 'status', 'payment_status', 'notes'],
+    searchKeys: ['number', 'supplier_name', 'status', 'payment_status', 'notes', 'tags'],
     columns: [
       { key: 'number', header: 'Compra', className: 'cell-name', render: (_v, row: TRecord) => row.number || row.id },
       { key: 'supplier_name', header: 'Proveedor', render: (_v, row: TRecord) => row.supplier_name || '—' },
       { key: 'status', header: 'Estado', render: (_v, row: TRecord) => row.status || 'draft' },
       { key: 'payment_status', header: 'Pago' },
       { key: 'total', header: 'Total', render: (value, row: TRecord) => formatCrudLocalizedMoney(value, row.currency || 'ARS') },
-      { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
+      { key: 'notes', header: 'Notas', className: 'cell-notes' },
     ],
   });
   return {
     basePath: '/v1/purchases',
-    allowEdit: true,
-    allowDelete: true,
+    allowDelete: false,
     ...base.config,
-    renderTagsCell: (row) => renderTagBadges(row.tags),
-    dataSource: {
-      ...(base.config.dataSource ?? {}),
-      update: async (row, values) => {
-        await apiRequest<TRecord>(`/v1/purchases/${row.id}`, {
-          method: 'PATCH',
-          body: {
-            branch_id: readActiveBranchId() ?? undefined,
-            supplier_id: asOptionalString(values.supplier_id),
-            supplier_name: asString(values.supplier_name),
-            status: asOptionalString(values.status),
-            payment_status: asOptionalString(values.payment_status),
-            is_favorite: Boolean(values.is_favorite),
-            tags: parseTagCsv(values.tags),
-            items: parseCommercialCostLineItems(values.items),
-            notes: asOptionalString(values.notes),
-          },
-        });
-      },
-    },
     stateMachine,
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
-      blocks: [
-        {
-          id: 'items',
-          kind: 'lineItems',
-          field: 'items',
-          sectionId: 'items',
-          visible: ({ editing }) => editing,
-        },
-      ],
+      blocks: [buildCommercialLineItemsBlock('items')],
       sections: [
         {
           id: 'summary',
@@ -1017,7 +1017,6 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       },
       { key: 'total', label: 'Total' },
       { key: 'received_at', label: 'Fecha de recepción' },
-      ...buildStandardInternalFields({ tagsPlaceholder: 'insumos, urgente, importado', includeNotes: false }),
       buildCrudNotesField(),
     ],
     toFormValues: (row: TRecord) => ({
@@ -1027,8 +1026,6 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       payment_status: row.payment_status ?? '',
       total: formatCrudLocalizedMoney(row.total ?? 0, row.currency || 'ARS'),
       received_at: row.received_at ? formatDate(row.received_at) : '',
-      is_favorite: row.is_favorite ?? false,
-      tags: formatTagCsv(row.tags),
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
     }),
@@ -1038,8 +1035,6 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),
       payment_status: asOptionalString(values.payment_status),
-      is_favorite: Boolean(values.is_favorite),
-      tags: parseTagCsv(values.tags),
       items: parseCommercialCostLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),

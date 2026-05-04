@@ -1,6 +1,8 @@
 import { confirmAction } from '@devpablocristo/core-browser';
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
+import { StandardCrudImageUrlsEditor } from '../../crud/standardCrudMedia';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
 import { CrudEntityModalShell } from './CrudEntityModalShell';
 import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
@@ -146,13 +148,81 @@ export type CrudEntityEditorModalProps = {
     onDelete: () => Promise<void> | void;
   };
   onCancel: () => void;
-  onSubmit: (values: Record<string, CrudFieldValue>) => Promise<void> | void;
+  onSubmit: (values: Record<string, CrudFieldValue>) => void;
 };
 
 type ResolvedSection = CrudEntityEditorModalSection & {
   fields: CrudEntityEditorModalField[];
   blocks: CrudEntityEditorModalBlock[];
 };
+
+/** Orden global del modal: favorito, etiquetas, primer campo de imágenes conocido, resto en orden declarado. */
+const CRUD_MODAL_PINNED_FIELD_IDS = ['metadata_favorite', 'tags'] as const;
+const CRUD_MODAL_IMAGE_FIELD_IDS = ['image_urls', 'image_url', 'images'] as const;
+const CRUD_MODAL_IMAGE_FIELD_ID_SET = new Set<string>(CRUD_MODAL_IMAGE_FIELD_IDS);
+
+/** Nunca `<textarea>` con base64: cualquier recurso que olvide `editControl` sigue usando el editor estándar. */
+const defaultModalImageUrlsEditControl: NonNullable<CrudEntityEditorModalField['editControl']> = ({ value, setValue }) => (
+  <StandardCrudImageUrlsEditor value={value} setValue={setValue} />
+);
+
+function resolveModalImageFieldEditControl(field: CrudEntityEditorModalField): CrudEntityEditorModalField['editControl'] | undefined {
+  return field.editControl ?? (CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id) ? defaultModalImageUrlsEditControl : undefined);
+}
+
+function dedupeModalFieldsById(fields: CrudEntityEditorModalField[]): CrudEntityEditorModalField[] {
+  const seen = new Set<string>();
+  const out: CrudEntityEditorModalField[] = [];
+  for (const f of fields) {
+    if (seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
+}
+
+function dedupeModalBlocksById(blocks: CrudEntityEditorModalBlock[]): CrudEntityEditorModalBlock[] {
+  const seen = new Set<string>();
+  const out: CrudEntityEditorModalBlock[] = [];
+  for (const b of blocks) {
+    if (seen.has(b.id)) continue;
+    seen.add(b.id);
+    out.push(b);
+  }
+  return out;
+}
+
+function reorderPinnedModalFields(fields: CrudEntityEditorModalField[]): CrudEntityEditorModalField[] {
+  const byId = new Map(fields.map((f) => [f.id, f]));
+  const head: CrudEntityEditorModalField[] = [];
+  for (const id of CRUD_MODAL_PINNED_FIELD_IDS) {
+    const f = byId.get(id);
+    if (f) head.push(f);
+  }
+  const imageId = CRUD_MODAL_IMAGE_FIELD_IDS.find((id) => byId.has(id));
+  if (imageId) head.push(byId.get(imageId)!);
+  const headIds = new Set(head.map((f) => f.id));
+  const tail = fields.filter((f) => !headIds.has(f.id));
+  return [...head, ...tail];
+}
+
+/** Un solo panel de formulario: sin fraccionar por secciones con marcos (convención Pymes). */
+function mergeResolvedSectionsToSingleBody(sections: ResolvedSection[]): ResolvedSection[] {
+  if (sections.length === 0) return sections;
+  if (sections.length === 1) {
+    const only = sections[0];
+    return [
+      {
+        ...only,
+        fields: reorderPinnedModalFields(dedupeModalFieldsById(only.fields)),
+        blocks: dedupeModalBlocksById(only.blocks),
+      },
+    ];
+  }
+  const mergedFields = reorderPinnedModalFields(dedupeModalFieldsById(sections.flatMap((s) => s.fields)));
+  const mergedBlocks = dedupeModalBlocksById(sections.flatMap((s) => s.blocks));
+  return [{ id: 'crud-form-unified', fields: mergedFields, blocks: mergedBlocks }];
+}
 
 type PendingConfirmDialog = {
   title: string;
@@ -161,56 +231,7 @@ type PendingConfirmDialog = {
   cancelLabel: string;
   tone?: 'default' | 'danger';
   onConfirm: () => Promise<void>;
-  onCancel?: () => void;
 };
-
-const PRIORITY_FIELDS_IN_EDITOR_MODAL = new Set(['tags', 'is_favorite']);
-
-function prioritizeEditorFieldsInFirstSection(sections: ResolvedSection[]): ResolvedSection[] {
-  if (!sections.length) {
-    return sections;
-  }
-
-  const promoted: CrudEntityEditorModalField[] = [];
-  const nextSections = sections.map((section) => {
-    const remainingFields = section.fields.filter((field) => {
-      if (PRIORITY_FIELDS_IN_EDITOR_MODAL.has(field.id)) {
-        promoted.push(field);
-        return false;
-      }
-      return true;
-    });
-
-    return {
-      ...section,
-      fields: remainingFields,
-    };
-  });
-
-  if (promoted.length === 0) {
-    return nextSections.filter((section) => section.fields.length > 0 || section.blocks.length > 0);
-  }
-
-  const normalizedSections = nextSections.filter((section) => section.fields.length > 0 || section.blocks.length > 0);
-  const firstSection = normalizedSections[0];
-  if (!firstSection) {
-    return [
-      {
-        id: 'general',
-        fields: promoted,
-        blocks: [],
-      },
-    ];
-  }
-
-  return [
-    {
-      ...firstSection,
-      fields: [...promoted, ...firstSection.fields],
-    },
-    ...normalizedSections.slice(1),
-  ];
-}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -258,16 +279,16 @@ function resolveSections(
         blocks: restBlocks,
       });
     }
-    return resolved;
+    return mergeResolvedSectionsToSingleBody(resolved);
   }
 
-  return [
+  return mergeResolvedSectionsToSingleBody([
     {
       id: 'general',
       fields,
       blocks,
     },
-  ];
+  ]);
 }
 
 function renderStatValue(
@@ -275,13 +296,6 @@ function renderStatValue(
   values: Record<string, CrudFieldValue>,
 ): ReactNode {
   return typeof stat.value === 'function' ? stat.value(values) : stat.value;
-}
-
-function normalizeReadString(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  if (/^[-\u2010-\u2015\s]+$/.test(trimmed)) return '';
-  return trimmed;
 }
 
 export function CrudEntityEditorModal({
@@ -295,10 +309,10 @@ export function CrudEntityEditorModal({
   mediaUrls,
   mediaFieldId,
   mode = 'create',
-  cancelLabel = 'Cerrar',
+  cancelLabel = 'Cancelar',
   submitLabel = 'Guardar',
   editLabel = 'Editar',
-  cancelEditLabel = 'Cerrar',
+  cancelEditLabel = 'Cancelar',
   closeLabel = 'Cerrar',
   fields,
   blocks = [],
@@ -326,8 +340,6 @@ export function CrudEntityEditorModal({
 }: CrudEntityEditorModalProps) {
   const titleId = 'crud-entity-editor-modal-title';
   const formId = 'crud-entity-editor-modal-form';
-  const formRef = useRef<HTMLFormElement | null>(null);
-  const resolvedEditCloseLabel = cancelEditLabel || closeLabel;
   const initialValues = useMemo(
     () => ({
       ...Object.fromEntries(fields.map((field) => [field.id, field.defaultValue ?? (field.type === 'checkbox' ? false : '')])),
@@ -342,17 +354,44 @@ export function CrudEntityEditorModal({
   const [deleting, setDeleting] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmDialog | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /** Evita cierre por backdrop justo después de activar edición (race con pointer). */
+  const suppressBackdropCloseRef = useRef(false);
+  /** Ratón/táctil: la activación se hace en pointerup tras capture; el click siguiente se ignora. */
+  const pointerActivatedEditRef = useRef(false);
+  /** Libera suppressBackdrop tras una ventana (el click fantasma puede ir muy después del pointerup). */
+  const suppressBackdropTimerRef = useRef<number | null>(null);
+
+  const armBackdropSuppress = () => {
+    suppressBackdropCloseRef.current = true;
+    if (suppressBackdropTimerRef.current !== null) {
+      window.clearTimeout(suppressBackdropTimerRef.current);
+    }
+    suppressBackdropTimerRef.current = window.setTimeout(() => {
+      suppressBackdropCloseRef.current = false;
+      suppressBackdropTimerRef.current = null;
+    }, 1200);
+  };
+
+  // Sincronizar valores cuando cambian datos de formulario; no reiniciar modo lectura/edición
+  // aquí: `initialValues` suele ser un objeto nuevo en cada render del padre y eso devolvía
+  // al usuario al visor justo después de pulsar "Editar".
+  useLayoutEffect(() => {
+    setValues(initialValues);
+  }, [initialValues]);
 
   useEffect(() => {
-    const shouldStartEditing = mode === 'create' || editBehavior === 'edit-only';
-    setValues(initialValues);
-    setIsEditing((current) => (shouldStartEditing ? true : current));
-  }, [editBehavior, initialValues, mode]);
+    setIsEditing(mode === 'create' || editBehavior === 'edit-only');
+  }, [editBehavior, mode]);
 
   useEffect(() => {
     if (!open) {
       setPendingConfirm(null);
       setConfirming(false);
+      if (suppressBackdropTimerRef.current !== null) {
+        window.clearTimeout(suppressBackdropTimerRef.current);
+        suppressBackdropTimerRef.current = null;
+      }
+      suppressBackdropCloseRef.current = false;
     }
   }, [open]);
 
@@ -361,10 +400,17 @@ export function CrudEntityEditorModal({
     [initialValues, values],
   );
 
-  const resolvedSections = useMemo(() => {
-    const resolved = resolveSections(fields, blocks, sections);
-    return prioritizeEditorFieldsInFirstSection(resolved);
-  }, [blocks, fields, sections]);
+  const resolvedSections = useMemo(() => resolveSections(fields, blocks, sections), [blocks, fields, sections]);
+  const mediaPreviewOwnedByImageEditControl = useMemo(() => {
+    if (!mediaFieldId) return false;
+    return resolvedSections.some((section) =>
+      section.fields.some((field) => {
+        if (field.id !== mediaFieldId) return false;
+        if (field.editControl) return true;
+        return CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id);
+      }),
+    );
+  }, [mediaFieldId, resolvedSections]);
   const hasHeaderContent = Boolean(eyebrow || title || subtitle);
   const resolvedMediaUrls = useMemo(() => {
     if (mediaFieldId) {
@@ -380,30 +426,42 @@ export function CrudEntityEditorModal({
   }, [mediaFieldId, mediaUrls, values]);
 
   const requestCancel = async () => {
-    if (!dirty) {
+    if (mode === 'update' && editBehavior !== 'edit-only' && isEditing) {
+      if (!dirty) {
+        setValues(initialValues);
+        setIsEditing(false);
+        return;
+      }
+      if (!confirmDiscard) {
+        setValues(initialValues);
+        setIsEditing(false);
+        return;
+      }
+      const confirmed = await confirmAction({
+        title: confirmDiscard.title,
+        description: confirmDiscard.description,
+        confirmLabel: confirmDiscard.confirmLabel ?? 'Descartar cambios',
+        cancelLabel: confirmDiscard.cancelLabel ?? 'Seguir editando',
+        tone: 'danger',
+      });
+      if (confirmed) {
+        setValues(initialValues);
+        setIsEditing(false);
+      }
+      return;
+    }
+    if (!dirty || !confirmDiscard) {
       onCancel();
       return;
     }
-    setPendingConfirm({
-      title: confirmDiscard?.title ?? 'Desea guardar los cambios?',
-      description: confirmDiscard?.description ?? 'Hay cambios sin guardar.',
-      confirmLabel: 'Guardar',
-      cancelLabel: 'Cerrar',
-      onConfirm: async () => {
-        const saved = await submitCurrentValues(formRef.current);
-        if (!saved) return;
-        onCancel();
-      },
-      onCancel: () => {
-        setPendingConfirm(null);
-        setConfirming(false);
-        setValues(initialValues);
-        if (mode === 'update' && editBehavior !== 'edit-only') {
-          setIsEditing(false);
-        }
-        onCancel();
-      },
+    const confirmed = await confirmAction({
+      title: confirmDiscard.title,
+      description: confirmDiscard.description,
+      confirmLabel: confirmDiscard.confirmLabel ?? 'Descartar cambios',
+      cancelLabel: confirmDiscard.cancelLabel ?? 'Seguir editando',
+      tone: 'danger',
     });
+    if (confirmed) onCancel();
   };
 
   const resolvedEditingStartActions =
@@ -418,15 +476,11 @@ export function CrudEntityEditorModal({
         })
       : headerActions;
 
-  const submitCurrentValues = async (form: HTMLFormElement | null) => {
-    if (!form?.reportValidity()) return false;
-    await onSubmit(values);
-    return true;
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await submitCurrentValues(event.currentTarget);
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    onSubmit(values);
   };
 
   const handleArchive = async () => {
@@ -515,16 +569,16 @@ export function CrudEntityEditorModal({
     }
   };
 
-  const startEditing = () => {
-    if (typeof window === 'undefined') {
-      setIsEditing(true);
-      return;
-    }
-    window.setTimeout(() => setIsEditing(true), 0);
-  };
-
-  const handleSecondaryClose = () => {
-    void requestCancel();
+  const scheduleActivateEditing = () => {
+    if (!allowEdit || isEditing) return;
+    armBackdropSuppress();
+    // Macrotask: el «click» del mismo gesto ocurre antes que setTimeout(0); así el botón sigue en el DOM
+    // durante el click y no “cae” en Cerrar/backdrop al desmontarse en flushSync.
+    window.setTimeout(() => {
+      flushSync(() => {
+        setIsEditing(true);
+      });
+    }, 0);
   };
 
   const footer =
@@ -561,15 +615,56 @@ export function CrudEntityEditorModal({
           <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
             {closeLabel}
           </button>
-          {allowEdit ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={startEditing}
-            >
-              {editLabel}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={cx('btn btn-primary', !allowEdit && 'crud-entity-editor-modal__edit-btn--blocked')}
+            onPointerDown={(event) => {
+              if (!allowEdit || isEditing) return;
+              if (event.pointerType === 'mouse' && event.button !== 0) return;
+              // Antes del pointerup: si el layout cambia al pasar a edición, el click fantasma puede caer en el backdrop.
+              armBackdropSuppress();
+              try {
+                (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId);
+              } catch {
+                /* capture opcional según plataforma */
+              }
+            }}
+            onPointerCancel={(event) => {
+              const el = event.currentTarget as HTMLButtonElement;
+              try {
+                if (typeof el.hasPointerCapture === 'function' && el.hasPointerCapture(event.pointerId)) {
+                  el.releasePointerCapture(event.pointerId);
+                }
+              } catch {
+                /* noop */
+              }
+            }}
+            onPointerUp={(event) => {
+              if (!allowEdit || isEditing) return;
+              if (event.pointerType === 'mouse' && event.button !== 0) return;
+              const el = event.currentTarget as HTMLButtonElement;
+              try {
+                if (typeof el.hasPointerCapture === 'function' && el.hasPointerCapture(event.pointerId)) {
+                  el.releasePointerCapture(event.pointerId);
+                }
+              } catch {
+                /* noop */
+              }
+              pointerActivatedEditRef.current = true;
+              scheduleActivateEditing();
+            }}
+            onClick={() => {
+              if (pointerActivatedEditRef.current) {
+                pointerActivatedEditRef.current = false;
+                return;
+              }
+              scheduleActivateEditing();
+            }}
+            aria-disabled={!allowEdit}
+            title={!allowEdit ? 'Este registro no admite edición' : undefined}
+          >
+            {editLabel}
+          </button>
         </div>
       </div>
     ) : (
@@ -578,8 +673,8 @@ export function CrudEntityEditorModal({
           {resolvedEditingStartActions}
         </div>
         <div className="crud-entity-editor-modal__footer-group crud-entity-editor-modal__footer-group--end">
-          <button type="button" className="btn btn-secondary" onClick={handleSecondaryClose}>
-            {mode === 'update' && editBehavior !== 'edit-only' ? resolvedEditCloseLabel : cancelLabel}
+          <button type="button" className="btn btn-secondary" onClick={() => void requestCancel()}>
+            {mode === 'update' && editBehavior !== 'edit-only' ? cancelEditLabel : cancelLabel}
           </button>
           <button
             type="submit"
@@ -599,13 +694,19 @@ export function CrudEntityEditorModal({
         ? field.readValue({ value: values[field.id], values })
         : field.readValue;
     }
+    if (CRUD_MODAL_IMAGE_FIELD_ID_SET.has(field.id)) {
+      const urls = parseCrudLinkedEntityImageUrlList(String(values[field.id] ?? ''));
+      if (!urls.length) return '—';
+      return <CrudEntityMediaCarousel urls={urls} variant="read" ariaLabel={field.label} />;
+    }
     const value = values[field.id];
     if (field.type === 'checkbox') return value ? 'Sí' : 'No';
     if (field.type === 'select') {
       const match = field.options?.find((option) => option.value === String(value ?? ''));
-      return normalizeReadString(String(match?.label ?? value ?? ''));
+      return match?.label ?? String(value ?? '');
     }
-    return normalizeReadString(String(value ?? ''));
+    const stringValue = String(value ?? '').trim();
+    return stringValue;
   };
 
   const renderBlock = (block: CrudEntityEditorModalBlock) => {
@@ -615,7 +716,11 @@ export function CrudEntityEditorModal({
         setValues((current) => ({ ...current, [block.field]: nextValue }));
       return (
         <div key={block.id} className="crud-entity-editor-modal__field crud-entity-editor-modal__field--full">
-          {block.label ? <span>{block.label}</span> : null}
+          {block.label ? (
+            <div className="crud-entity-editor-modal__section-head">
+              <h3>{block.label}</h3>
+            </div>
+          ) : null}
           <CrudLineItemsEditor value={values[block.field]} onChange={setValue} />
         </div>
       );
@@ -631,6 +736,10 @@ export function CrudEntityEditorModal({
         titleId={titleId}
         ariaLabel={typeof title === 'string' && title.trim().length > 0 ? title : 'Detalle'}
         onRequestClose={() => void requestCancel()}
+        onBackdropRequestClose={() => {
+          if (suppressBackdropCloseRef.current) return;
+          void requestCancel();
+        }}
         rootClassName={cx('crud-entity-editor-modal-root', rootClassName)}
         backdropClassName="crud-entity-editor-modal__backdrop"
         panelClassName={cx('crud-entity-editor-modal', panelClassName)}
@@ -657,7 +766,7 @@ export function CrudEntityEditorModal({
         }
         footer={footer}
       >
-        <form ref={formRef} id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
+        <form id={formId} className="crud-entity-editor-modal__form" onSubmit={handleSubmit}>
         {loading ? <p className="crud-entity-editor-modal__loading">{loadingLabel}</p> : null}
         {error ? <p className="crud-entity-editor-modal__error">{error}</p> : null}
 
@@ -675,7 +784,7 @@ export function CrudEntityEditorModal({
           </div>
         ) : null}
 
-        {!loading && resolvedMediaUrls?.length ? (
+        {!loading && resolvedMediaUrls?.length && !(isEditing && mediaPreviewOwnedByImageEditControl) ? (
           <div className="crud-entity-editor-modal__media">
             <CrudEntityMediaCarousel urls={resolvedMediaUrls} variant={isEditing ? 'edit' : 'read'} />
           </div>
@@ -683,9 +792,20 @@ export function CrudEntityEditorModal({
 
         {!loading
           ? resolvedSections.map((section) => {
-              const visibleFields = section.fields.filter((field) =>
-                field.visible ? field.visible({ value: values[field.id], values, editing: isEditing }) : true,
-              );
+              const visibleFields = section.fields.filter((field) => {
+                if (field.visible && !field.visible({ value: values[field.id], values, editing: isEditing })) {
+                  return false;
+                }
+                if (
+                  !isEditing &&
+                  mediaFieldId &&
+                  field.id === mediaFieldId &&
+                  (resolvedMediaUrls?.length ?? 0) > 0
+                ) {
+                  return false;
+                }
+                return true;
+              });
               const visibleBlocks = section.blocks.filter((block) =>
                 block.visible ? block.visible({ values, editing: isEditing, row }) : isEditing,
               );
@@ -693,7 +813,9 @@ export function CrudEntityEditorModal({
               return (
                 <section key={section.id} className="crud-entity-editor-modal__section">
                   <div className="crud-entity-editor-modal__fields">
-                    {visibleFields.map((field) => (
+                    {visibleFields.map((field) => {
+                      const resolvedEditControl = resolveModalImageFieldEditControl(field);
+                      return (
                       <label
                         key={field.id}
                         className={cx(
@@ -704,17 +826,8 @@ export function CrudEntityEditorModal({
                       >
                         {!isEditing ? (
                           <>
-                            {field.type === 'checkbox' ? (
-                              <div className="crud-entity-editor-modal__checkbox-row crud-entity-editor-modal__checkbox-row--read">
-                                <input type="checkbox" checked={Boolean(values[field.id])} readOnly disabled />
-                                <span>{field.label}</span>
-                              </div>
-                            ) : (
-                              <>
-                                <span>{field.label}</span>
-                                <div className="crud-entity-editor-modal__read-value">{renderFieldValue(field)}</div>
-                              </>
-                            )}
+                            <span>{field.label}</span>
+                            <div className="crud-entity-editor-modal__read-value">{renderFieldValue(field)}</div>
                           </>
                         ) : field.type === 'checkbox' ? (
                           <div className="crud-entity-editor-modal__checkbox-row">
@@ -730,8 +843,8 @@ export function CrudEntityEditorModal({
                         ) : (
                           <>
                             <span>{field.label}</span>
-                            {field.editControl ? (
-                              field.editControl({
+                            {resolvedEditControl ? (
+                              resolvedEditControl({
                                 value: values[field.id],
                                 values,
                                 setValue: (nextValue) =>
@@ -745,7 +858,7 @@ export function CrudEntityEditorModal({
                                 }
                                 placeholder={field.placeholder}
                                 required={field.required}
-                                rows={field.rows ?? 2}
+                                rows={field.rows ?? (field.id === 'notes' ? 2 : 4)}
                                 readOnly={field.readOnly}
                               />
                             ) : field.type === 'select' ? (
@@ -780,9 +893,9 @@ export function CrudEntityEditorModal({
                             )}
                           </>
                         )}
-                        {isEditing && field.helperText ? <small>{field.helperText}</small> : null}
                       </label>
-                    ))}
+                      );
+                    })}
                     {visibleBlocks.map((block) => renderBlock(block))}
                   </div>
                 </section>
@@ -817,18 +930,7 @@ export function CrudEntityEditorModal({
         footer={
           pendingConfirm ? (
             <div className="crud-entity-editor-modal__confirm-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={confirming}
-                onClick={() => {
-                  if (pendingConfirm.onCancel) {
-                    pendingConfirm.onCancel();
-                    return;
-                  }
-                  setPendingConfirm(null);
-                }}
-              >
+              <button type="button" className="btn btn-secondary" disabled={confirming} onClick={() => setPendingConfirm(null)}>
                 {pendingConfirm.cancelLabel}
               </button>
               <button

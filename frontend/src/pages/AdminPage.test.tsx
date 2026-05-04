@@ -7,11 +7,11 @@ import type { AuditEntry, SessionResponse, TenantSettings } from '../lib/types';
 import { AdminPage } from './AdminPage';
 
 const apiMocks = vi.hoisted(() => ({
-  getTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
+  getTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
   updateTenantSettings: vi.fn(),
-  getAuditEntries: vi.fn<[], Promise<{ items: AuditEntry[] }>>(),
-  getSession: vi.fn<[], Promise<SessionResponse>>(),
-  downloadAuditExportCsv: vi.fn<[], Promise<string>>(),
+  getAuditEntries: vi.fn<() => Promise<{ items: AuditEntry[] }>>(),
+  getSession: vi.fn<() => Promise<SessionResponse>>(),
+  downloadAuditExportCsv: vi.fn<() => Promise<string>>(),
 }));
 
 vi.mock('../lib/api', () => ({

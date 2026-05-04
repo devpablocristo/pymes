@@ -5,10 +5,8 @@ type Props = {
 };
 
 export function TagPillsBar({ tags, value, onChange }: Props) {
-  if (tags.length === 0) return null;
-
   return (
-    <div className="crud-creator-badges" role="group" aria-label="Filtrar por etiqueta">
+    <div className="crud-creator-badges" role="group" aria-label="Filtrar por etiquetas internas">
       <button
         type="button"
         className={`badge crud-creator-badge${value === 'all' ? ' crud-creator-badge--active' : ''}`}

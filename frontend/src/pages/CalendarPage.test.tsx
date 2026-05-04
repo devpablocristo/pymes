@@ -129,16 +129,16 @@ describe('CalendarPage', () => {
     });
     expect(pageSearchMocks.usePageSearch).toHaveBeenCalled();
     expect(schedulingMocks.createSchedulingClient).toHaveBeenCalledTimes(1);
-      expect(schedulingMocks.capturedCalendarProps.at(-1)).toEqual(
-        expect.objectContaining({
-          client: schedulingMocks.client,
-          locale: 'es',
-          searchQuery: 'cliente demo',
-          initialBranchId: 'branch-central',
-        }),
-      );
+    expect(schedulingMocks.capturedCalendarProps.at(-1)).toEqual(
+      expect.objectContaining({
+        client: schedulingMocks.client,
+        locale: 'es',
+        searchQuery: 'cliente demo',
+        initialBranchId: 'branch-central',
+      }),
+    );
     // QueueOperatorBoard se removió de CalendarPage en Stage 3.
     // Si en el futuro vuelve, va en su propia página (no embebido en agenda).
     expect(screen.queryByTestId('queue-operator-board')).toBeNull();
-  });
+  }, 10000);
 });

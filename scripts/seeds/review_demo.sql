@@ -1,3 +1,23 @@
+DELETE FROM action_types
+WHERE name IN (
+  'appointment.book',
+  'appointment.reschedule',
+  'appointment.cancel',
+  'discount.apply',
+  'payment_link.generate',
+  'refund.create',
+  'notification.send',
+  'notification.bulk_send',
+  'sale.create',
+  'quote.create',
+  'cashflow.movement',
+  'work_order.delay_notify',
+  'vehicle.service_reminder',
+  'purchase.draft',
+  'procurement.request',
+  'procurement.submit'
+);
+
 INSERT INTO action_types (name, risk_class, enabled) VALUES
   ('appointment.book', 'low', true),
   ('appointment.reschedule', 'low', true),
@@ -14,11 +34,7 @@ INSERT INTO action_types (name, risk_class, enabled) VALUES
   ('vehicle.service_reminder', 'low', true),
   ('purchase.draft', 'low', true),
   ('procurement.request', 'medium', true),
-  ('procurement.submit', 'medium', true)
-ON CONFLICT (name) DO UPDATE
-SET risk_class = EXCLUDED.risk_class,
-    enabled = EXCLUDED.enabled,
-    updated_at = now();
+  ('procurement.submit', 'medium', true);
 
 DELETE FROM policies
 WHERE name IN (

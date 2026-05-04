@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { isDisplayableCrudImageSrc } from './crudLinkedEntityImageUrls';
 import './CrudEntityMediaCarousel.css';
 
 function cx(...parts: Array<string | false | null | undefined>) {
@@ -9,43 +10,51 @@ export type CrudEntityMediaCarouselProps = {
   urls: string[];
   variant?: 'read' | 'edit';
   ariaLabel?: string;
-  activeIndex?: number;
-  onActiveIndexChange?: (nextIndex: number) => void;
-  onRemoveAt?: (index: number) => void;
+  /** En edición: quitar una URL del listado (p. ej. sincronizar con el campo del formulario). */
+  onRequestRemoveAt?: (index: number) => void;
 };
 
 export function CrudEntityMediaCarousel({
   urls,
   variant = 'read',
   ariaLabel = 'Imágenes',
-  activeIndex,
-  onActiveIndexChange,
-  onRemoveAt,
+  onRequestRemoveAt,
 }: CrudEntityMediaCarouselProps) {
   const safeUrls = useMemo(() => urls.filter(Boolean), [urls]);
-  const [internalIndex, setInternalIndex] = useState(0);
+  const [index, setIndex] = useState(0);
 
   if (!safeUrls.length) return null;
 
-  const resolvedIndex = Math.min(activeIndex ?? internalIndex, safeUrls.length - 1);
-  const activeUrl = safeUrls[resolvedIndex];
-  const setIndex = (nextIndex: number) => {
-    onActiveIndexChange?.(nextIndex);
-    if (activeIndex === undefined) {
-      setInternalIndex(nextIndex);
-    }
-  };
+  const activeIndex = Math.min(index, safeUrls.length - 1);
+  const activeUrl = safeUrls[activeIndex];
+  const renderHeroSlide = (url: string) =>
+    isDisplayableCrudImageSrc(url) ? (
+      <img src={url} alt="" loading="lazy" />
+    ) : (
+      <span className="crud-entity-media-carousel__invalid-src" title={url}>
+        Sin vista previa (pegá una URL https://… o elegí imágenes locales).
+      </span>
+    );
+
+  const renderThumbSlide = (url: string) =>
+    isDisplayableCrudImageSrc(url) ? (
+      <img src={url} alt="" loading="lazy" />
+    ) : (
+      <span className="crud-entity-media-carousel__thumb-invalid" title={url} aria-hidden>
+        …
+      </span>
+    );
 
   return (
     <section className={cx('crud-entity-media-carousel', `crud-entity-media-carousel--${variant}`)} aria-label={ariaLabel}>
       <div className="crud-entity-media-carousel__hero">
-        <img src={activeUrl} alt="" loading="lazy" />
+        {renderHeroSlide(activeUrl)}
         {safeUrls.length > 1 ? (
           <>
             <button
               type="button"
               className="crud-entity-media-carousel__nav crud-entity-media-carousel__nav--prev"
-              onClick={() => setIndex((resolvedIndex - 1 + safeUrls.length) % safeUrls.length)}
+              onClick={() => setIndex((current) => (current - 1 + safeUrls.length) % safeUrls.length)}
               aria-label="Imagen anterior"
             >
               ‹
@@ -53,38 +62,42 @@ export function CrudEntityMediaCarousel({
             <button
               type="button"
               className="crud-entity-media-carousel__nav crud-entity-media-carousel__nav--next"
-              onClick={() => setIndex((resolvedIndex + 1) % safeUrls.length)}
+              onClick={() => setIndex((current) => (current + 1) % safeUrls.length)}
               aria-label="Imagen siguiente"
             >
               ›
             </button>
             <span className="crud-entity-media-carousel__counter">
-              {resolvedIndex + 1} / {safeUrls.length}
+              {activeIndex + 1} / {safeUrls.length}
             </span>
           </>
         ) : null}
       </div>
-      {safeUrls.length > 1 ? (
+      {safeUrls.length > 0 ? (
         <div className="crud-entity-media-carousel__thumbs" role="tablist" aria-label="Miniaturas">
           {safeUrls.map((url, thumbIndex) => (
-            <div key={`${url}-${thumbIndex}`} className="crud-entity-media-carousel__thumb-item">
+            <div key={`${url}-${thumbIndex}`} className="crud-entity-media-carousel__thumb-wrap">
               <button
                 type="button"
                 className={cx(
                   'crud-entity-media-carousel__thumb',
-                  thumbIndex === resolvedIndex && 'crud-entity-media-carousel__thumb--active',
+                  thumbIndex === activeIndex && 'crud-entity-media-carousel__thumb--active',
                 )}
-                aria-selected={thumbIndex === resolvedIndex}
+                aria-selected={thumbIndex === activeIndex}
                 onClick={() => setIndex(thumbIndex)}
               >
-                <img src={url} alt="" loading="lazy" />
+                {renderThumbSlide(url)}
               </button>
-              {onRemoveAt ? (
+              {onRequestRemoveAt ? (
                 <button
                   type="button"
                   className="crud-entity-media-carousel__thumb-remove"
-                  aria-label={`Eliminar imagen ${thumbIndex + 1}`}
-                  onClick={() => onRemoveAt(thumbIndex)}
+                  aria-label={`Quitar imagen ${thumbIndex + 1}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onRequestRemoveAt(thumbIndex);
+                  }}
                 >
                   ×
                 </button>

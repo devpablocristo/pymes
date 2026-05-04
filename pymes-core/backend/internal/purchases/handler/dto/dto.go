@@ -18,7 +18,18 @@ type CreatePurchaseRequest struct {
 	IsFavorite    *bool                 `json:"is_favorite,omitempty"`
 	Tags          []string              `json:"tags,omitempty"`
 	Notes         string                `json:"notes,omitempty"`
+	Tags          []string              `json:"tags,omitempty"`
+	Metadata      map[string]any        `json:"metadata,omitempty"`
 	Items         []PurchaseItemPayload `json:"items" binding:"required"`
+}
+
+// PatchPurchaseRequest actualización parcial de campos editables fuera del flujo PUT borrador.
+type PatchPurchaseRequest struct {
+	Tags          *[]string       `json:"tags"`
+	Metadata      *map[string]any `json:"metadata"`
+	Notes         *string         `json:"notes"`
+	PaymentStatus *string         `json:"payment_status"`
+	SupplierName  *string         `json:"supplier_name"`
 }
 
 type UpdatePurchaseStatusRequest struct {

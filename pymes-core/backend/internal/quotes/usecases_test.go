@@ -40,6 +40,11 @@ func (m *mockQuoteRepo) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (
 func (m *mockQuoteRepo) UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error) {
 	return quotedomain.Quote{}, nil
 }
+
+func (m *mockQuoteRepo) PatchAnnotations(context.Context, uuid.UUID, uuid.UUID, QuotePatchFields) (quotedomain.Quote, error) {
+	return quotedomain.Quote{}, nil
+}
+
 func (m *mockQuoteRepo) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error { return nil }
 func (m *mockQuoteRepo) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error     { return nil }
 func (m *mockQuoteRepo) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error     { return nil }

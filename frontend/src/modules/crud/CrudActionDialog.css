@@ -1,5 +1,7 @@
 .crud-action-dialog {
   width: min(520px, 100%);
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
 }
 
 .crud-action-dialog__header,
@@ -16,14 +18,14 @@
 
 .crud-action-dialog__title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: inherit;
   font-weight: 600;
 }
 
 .crud-action-dialog__subtitle {
   margin: 0.35rem 0 0;
   color: var(--color-text-secondary);
-  font-size: 0.875rem;
+  font-size: inherit;
 }
 
 .crud-action-dialog__form {
@@ -43,7 +45,7 @@
 }
 
 .crud-action-dialog__field span {
-  font-size: 0.8rem;
+  font-size: inherit;
   font-weight: 600;
   color: var(--color-text-secondary);
 }

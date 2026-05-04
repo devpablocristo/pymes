@@ -48,6 +48,13 @@
   min-width: 0;
 }
 
+/* Fila de chips de creador + fila de etiquetas internas (p. ej. Compras / productos) */
+.page-header.crud-page-shell__header .crud-list-header-lead--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
 /* Slot encima del título sin API nueva en CrudPageShell (solo flex order + :has). */
 .page-header.crud-page-shell__header
   .crud-page-shell__header-main:has(.crud-list-header-lead--above-title)
@@ -379,12 +386,15 @@ thead th {
   white-space: nowrap;
 }
 
-.crud-table thead th.col-actions {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
-  line-height: 1.1;
+/* Tablas CRUD: cabeceras al mismo tamaño/fuente que celdas y modal de entidad */
+.crud-table thead th {
+  font-family: var(--crud-ui-font-family);
+  font-size: var(--crud-ui-font-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+  line-height: var(--leading-snug);
 }
 
 tbody td {
@@ -576,7 +586,7 @@ button.crud-creator-badge {
   border: 1px solid var(--color-border);
   cursor: pointer;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--crud-ui-font-size);
   text-transform: none;
   letter-spacing: normal;
   line-height: 1.1;

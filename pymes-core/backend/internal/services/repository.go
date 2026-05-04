@@ -207,8 +207,8 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 }
 
 func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).
-		Where("org_id = ? AND id = ?", orgID, id).
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
 		Delete(&models.ServiceModel{})
 	if res.Error != nil {
 		return res.Error

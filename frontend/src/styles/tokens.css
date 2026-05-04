@@ -130,6 +130,10 @@
   --text-role-caption: var(--text-xs);
   --text-role-micro: var(--text-2xs);
 
+  /* CRUD: listado, galería, modal de entidad y diálogos — mismo cuerpo que --text-role-body */
+  --crud-ui-font-family: var(--font-body);
+  --crud-ui-font-size: var(--text-role-body);
+
   /* Interlineado */
   --leading-tight: 1.25;
   --leading-snug: 1.4;

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	saasmiddleware "github.com/devpablocristo/core/saas/go/shared/middleware"
 	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
@@ -32,52 +33,42 @@ func GinSaaSAuthMiddleware(svc *SaaSServices) gin.HandlerFunc {
 }
 
 func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
-	authMethod, _ := reqCtx.Value(ctxkeys.AuthMethod).(string)
+	principal, ok := saasmiddleware.PrincipalFromContext(reqCtx)
+	if !ok {
+		return
+	}
+	authMethod := strings.TrimSpace(principal.AuthMethod)
 
 	var orgIDStr string
-	if v := reqCtx.Value(ctxkeys.OrgID); v != nil {
-		if id, ok := v.(uuid.UUID); ok {
-			orgIDStr = id.String()
-			c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
-		}
+	if id, err := uuid.Parse(strings.TrimSpace(principal.TenantID)); err == nil {
+		orgIDStr = id.String()
+		c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
+	} else if strings.TrimSpace(principal.TenantID) != "" {
+		orgIDStr = strings.TrimSpace(principal.TenantID)
+		c.Set(ctxkeys.CtxKeyOrgID, orgIDStr)
 	}
 
 	if authMethod == "api_key" {
-		if v := reqCtx.Value(ctxkeys.Actor); v != nil {
-			if s, ok := v.(string); ok && s != "" {
-				c.Set(ctxkeys.CtxKeyActor, s)
-			} else {
-				c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
-			}
-		} else {
+		if strings.TrimSpace(principal.Actor) != "" {
+			c.Set(ctxkeys.CtxKeyActor, strings.TrimSpace(principal.Actor))
+		} else if orgIDStr != "" {
 			c.Set(ctxkeys.CtxKeyActor, "api_key:"+orgIDStr)
 		}
-		if v := reqCtx.Value(ctxkeys.Role); v != nil {
-			if s, ok := v.(string); ok && s != "" {
-				c.Set(ctxkeys.CtxKeyRole, s)
-			} else {
-				c.Set(ctxkeys.CtxKeyRole, "service")
-			}
+		if strings.TrimSpace(principal.Role) != "" {
+			c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(principal.Role))
 		} else {
 			c.Set(ctxkeys.CtxKeyRole, "service")
 		}
 	} else {
-		if v := reqCtx.Value(ctxkeys.Actor); v != nil {
-			if s, ok := v.(string); ok && s != "" {
-				c.Set(ctxkeys.CtxKeyActor, s)
-			}
+		if strings.TrimSpace(principal.Actor) != "" {
+			c.Set(ctxkeys.CtxKeyActor, strings.TrimSpace(principal.Actor))
 		}
-		if v := reqCtx.Value(ctxkeys.Role); v != nil {
-			if s, ok := v.(string); ok && s != "" {
-				c.Set(ctxkeys.CtxKeyRole, s)
-			}
+		if strings.TrimSpace(principal.Role) != "" {
+			c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(principal.Role))
 		}
 	}
 
-	var scopes []string
-	if v := reqCtx.Value(ctxkeys.Scopes); v != nil {
-		scopes, _ = v.([]string)
-	}
+	scopes := append([]string(nil), principal.Scopes...)
 	if authMethod == "api_key" {
 		reqScopes := splitScopesCSV(c.GetHeader("X-Scopes"))
 		if len(reqScopes) > 0 {

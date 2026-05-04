@@ -9,9 +9,9 @@ import type { TenantSettings } from '../lib/types';
 import { OnboardingPage } from './OnboardingPage';
 
 const apiMocks = vi.hoisted(() => ({
-  updateTenantSettings: vi.fn<[], Promise<TenantSettings>>(),
-  listSchedulingBranches: vi.fn<[], Promise<{ items: Array<Record<string, unknown>> }>>(),
-  createSchedulingBranch: vi.fn<[], Promise<Record<string, unknown>>>(),
+  updateTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
+  listSchedulingBranches: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
+  createSchedulingBranch: vi.fn<() => Promise<Record<string, unknown>>>(),
 }));
 
 const navigationMocks = vi.hoisted(() => ({
@@ -294,7 +294,7 @@ describe('OnboardingPage scheduling setup', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Bares \/ Restaurantes/i }));
     expect(screen.getByRole('button', { name: /^Restaurante/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Bar Barra/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Bar\s*Barra/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Caf[eé] \/ Cafeter[ií]a/i })).toBeInTheDocument();
   });
 });

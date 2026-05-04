@@ -8,15 +8,15 @@ require (
 	github.com/devpablocristo/core/authz/go v0.1.0
 	github.com/devpablocristo/core/calendar/ics/go v0.1.0
 	github.com/devpablocristo/core/calendar/sync/google/go v0.1.0
-	github.com/devpablocristo/core/concurrency/go v0.1.1
-	github.com/devpablocristo/core/config/go v0.0.0-20260328151810-084828e80b26
+	github.com/devpablocristo/core/concurrency/go v0.2.0
+	github.com/devpablocristo/core/config/go v0.1.0
 	github.com/devpablocristo/core/databases/postgres/go v0.1.1
 	github.com/devpablocristo/core/errors/go v0.1.0
-	github.com/devpablocristo/core/governance/go v0.0.0-20260328151810-084828e80b26
+	github.com/devpablocristo/core/governance/go v0.1.0
 	github.com/devpablocristo/core/http/gin/go v0.1.1
 	github.com/devpablocristo/core/http/go v0.1.1
 	github.com/devpablocristo/core/notifications/go v0.3.0
-	github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26
+	github.com/devpablocristo/core/saas/go v0.1.0
 	github.com/devpablocristo/core/security/go v0.1.0
 	github.com/devpablocristo/core/validate/go v0.1.1
 	github.com/devpablocristo/modules/crud/archive/go v0.1.0
@@ -39,7 +39,7 @@ require (
 	cel.dev/expr v0.24.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/gin-contrib/cors v1.7.6 // indirect
-	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
+	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

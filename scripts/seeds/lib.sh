@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFAULT_LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/.." && pwd)/local-infra"
 
 # `make seed` y los scripts hijo corren en bash sin pasar por docker compose: leen `.env` de la raíz del monorepo.
-if [[ -f "$ROOT_DIR/.env" ]]; then
+# Para cargar seeds contra GCP con URI propia (proxy TCP), exportá PYMES_SEEDS_SKIP_DOTENV=1 antes de source.
+if [[ "${PYMES_SEEDS_SKIP_DOTENV:-}" != "1" ]] && [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$ROOT_DIR/.env"
@@ -13,7 +14,7 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
 fi
 
 LOCAL_INFRA_DIR="${LOCAL_INFRA_DIR:-$DEFAULT_LOCAL_INFRA_DIR}"
-DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose --project-directory $ROOT_DIR -f $LOCAL_INFRA_DIR/docker-compose.yml -f $ROOT_DIR/docker-compose.yml}"
+DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose --project-directory $ROOT_DIR -f $ROOT_DIR/docker-compose.yml}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 REVIEW_DB_NAME="${REVIEW_DB_NAME:-nexus_review}"
@@ -47,8 +48,8 @@ ensure_seed_dbs_ready() {
 
 require_seed_org_external_id() {
   if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
-    echo "PYMES_SEED_DEMO_ORG_EXTERNAL_ID is required" >&2
-    exit 1
+    PYMES_SEED_DEMO_ORG_EXTERNAL_ID="org_local_demo"
+    export PYMES_SEED_DEMO_ORG_EXTERNAL_ID
   fi
 }
 
@@ -64,13 +65,12 @@ resolve_target_org_uuid() {
   require_seed_org_external_id
 
   local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
+  local external_id_sql="${external_id//\'/\'\'}"
 
-  # psql no sustituye :'var' en -c de modo no interactivo; por stdin sí (PG 16 en imagen oficial).
   local org_uuid
   org_uuid="$(
-    printf '%s\n' "SELECT cast(id as text) FROM orgs WHERE external_id = :'external_id';" \
-      | dc exec -T postgres \
-        psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
+    dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
+      -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -n "$org_uuid" ]]; then
@@ -79,9 +79,8 @@ resolve_target_org_uuid() {
   fi
 
   org_uuid="$(
-    printf '%s\n' "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/org/' || :'external_id') as text);" \
-      | dc exec -T postgres \
-        psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 -v "external_id=$external_id"
+    dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
+      -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/org/' || '$external_id_sql') as text);"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -z "$org_uuid" ]]; then
@@ -125,17 +124,38 @@ PY
 
 run_pymes_sql_file() {
   local file="$1"
-  render_seed_sql "$file" | dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -v ON_ERROR_STOP=1
+  local tmp_name tmp_path
+  tmp_name="pymes-seed-$RANDOM-$(basename "$file")"
+  tmp_path="/tmp/$tmp_name"
+  render_seed_sql "$file" > "$tmp_path"
+  dc cp "$tmp_path" "postgres:/tmp/$tmp_name"
+  dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+  dc exec -T postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
+  rm -f "$tmp_path"
 }
 
 run_pymes_sql_inline() {
   local sql="$1"
-  printf '%s\n' "$sql" | dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -v ON_ERROR_STOP=1
+  local tmp_name tmp_path
+  tmp_name="pymes-seed-inline-$RANDOM.sql"
+  tmp_path="/tmp/$tmp_name"
+  printf '%s\n' "$sql" > "$tmp_path"
+  dc cp "$tmp_path" "postgres:/tmp/$tmp_name"
+  dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+  dc exec -T postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
+  rm -f "$tmp_path"
 }
 
 run_review_sql_inline() {
   local sql="$1"
-  printf '%s\n' "$sql" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
+  local tmp_name tmp_path
+  tmp_name="review-seed-inline-$RANDOM.sql"
+  tmp_path="/tmp/$tmp_name"
+  printf '%s\n' "$sql" > "$tmp_path"
+  dc cp "$tmp_path" "review-postgres:/tmp/$tmp_name"
+  dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+  dc exec -T review-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
+  rm -f "$tmp_path"
 }
 
 run_review_sql_file() {
@@ -146,7 +166,11 @@ run_review_sql_file() {
   else
     fullpath="$ROOT_DIR/$file"
   fi
-  cat "$fullpath" | dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1
+  local tmp_name
+  tmp_name="review-seed-$RANDOM-$(basename "$file")"
+  dc cp "$fullpath" "review-postgres:/tmp/$tmp_name"
+  dc exec -T review-postgres psql -U "$REVIEW_DB_USER" -d "$REVIEW_DB_NAME" -v ON_ERROR_STOP=1 -f "/tmp/$tmp_name"
+  dc exec -T review-postgres rm -f "/tmp/$tmp_name" >/dev/null 2>&1 || true
 }
 
 export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE PYMES_DB_NAME PYMES_DB_USER

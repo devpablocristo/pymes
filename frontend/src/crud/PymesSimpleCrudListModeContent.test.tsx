@@ -256,6 +256,103 @@ describe('PymesSimpleCrudListModeContent', () => {
     );
   });
 
+  it('propaga editControl desde editorModal.fieldConfig al diálogo', async () => {
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    const innerEditControl = vi.fn(() => null);
+    currentConfig = {
+      label: 'producto',
+      labelPlural: 'productos',
+      labelPluralCap: 'Productos',
+      basePath: '/v1/products',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'image_urls', label: 'Imágenes', type: 'textarea', fullWidth: true }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({
+        name: row.name ?? '',
+        image_urls: '',
+      }),
+      isValid: () => true,
+      allowEdit: true,
+      editorModal: {
+        mediaFieldKey: 'image_urls',
+        fieldConfig: {
+          image_urls: { editControl: innerEditControl, helperText: 'Ayuda imágenes' },
+        },
+      },
+      dataSource: {
+        list: async () => [],
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="products" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() => {
+      expect(openCrudFormDialogMock).toHaveBeenCalled();
+    });
+    const payload = openCrudFormDialogMock.mock.calls[0][0] as {
+      fields: Array<{
+        id: string;
+        editControl?: (ctx: {
+          value: unknown;
+          values: Record<string, unknown>;
+          setValue: (v: unknown) => void;
+        }) => unknown;
+        helperText?: unknown;
+      }>;
+    };
+    const imageField = payload.fields.find((f) => f.id === 'image_urls');
+    expect(typeof imageField?.editControl).toBe('function');
+    imageField?.editControl?.({ value: '', values: {}, setValue: vi.fn() });
+    expect(innerEditControl).toHaveBeenCalledTimes(1);
+    expect(imageField?.helperText).toBe('Ayuda imágenes');
+  });
+
+  it('usa editor visual por defecto para image_urls si fieldConfig no trae editControl', async () => {
+    openCrudFormDialogMock.mockResolvedValueOnce(null);
+    currentConfig = {
+      label: 'producto',
+      labelPlural: 'productos',
+      labelPluralCap: 'Productos',
+      basePath: '/v1/products',
+      columns: [{ key: 'name', header: 'Nombre' }],
+      formFields: [{ key: 'image_urls', label: 'Imágenes', type: 'textarea', fullWidth: true }],
+      searchText: (row: { id: string; name: string }) => row.name,
+      toFormValues: (row: { id: string; name: string }) => ({
+        name: row.name ?? '',
+        image_urls: '',
+      }),
+      isValid: () => true,
+      allowEdit: true,
+      editorModal: {
+        mediaFieldKey: 'image_urls',
+        fieldConfig: {
+          image_urls: { helperText: 'Solo texto de ayuda, sin editControl explícito' },
+        },
+      },
+      dataSource: {
+        list: async () => [],
+      },
+    } as unknown as CrudPageConfig<{ id: string; name: string }>;
+
+    render(<PymesSimpleCrudListModeContent resourceId="products" />);
+    fireEvent.click(screen.getByRole('button', { name: 'open-row' }));
+
+    await waitFor(() => {
+      expect(openCrudFormDialogMock).toHaveBeenCalled();
+    });
+    const payload = openCrudFormDialogMock.mock.calls[0][0] as {
+      fields: Array<{
+        id: string;
+        editControl?: (ctx: unknown) => unknown;
+        helperText?: unknown;
+      }>;
+    };
+    const imageField = payload.fields.find((f) => f.id === 'image_urls');
+    expect(typeof imageField?.editControl).toBe('function');
+    expect(imageField?.helperText).toBe('Solo texto de ayuda, sin editControl explícito');
+  });
+
   it('mantiene orden de hooks cuando la config llega después del primer render', () => {
     currentConfig = null;
     const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="customers" />);
@@ -295,7 +392,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     } as unknown as CrudPageConfig<{ id: string; name: string }>;
 
     const { rerender } = render(<PymesSimpleCrudListModeContent resourceId="services" />);
-    expect(screen.getByText('cols:name:Nombre|tags:Etiquetas')).toBeInTheDocument();
+    expect(screen.getByText('cols:name:Nombre|tags:Etiquetas Internas')).toBeInTheDocument();
 
     currentConfig = {
       ...currentConfig,
@@ -439,7 +536,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     expect(screen.getByText('pagination:1:1:false:true')).toBeInTheDocument();
   });
 
-  it('en archivados abre solo con restaurar y eliminar', async () => {
+  it('en archivados abre con Editar habilitado además de restaurar y eliminar', async () => {
     archivedState = true;
     openCrudFormDialogMock.mockResolvedValueOnce(null);
     currentConfig = {
@@ -466,7 +563,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     await waitFor(() =>
       expect(openCrudFormDialogMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          allowEdit: false,
+          allowEdit: true,
           closeLabel: 'Salir',
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
@@ -554,7 +651,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     await waitFor(() =>
       expect(openCrudFormDialogMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          allowEdit: false,
+          allowEdit: true,
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
           deleteAction: expect.objectContaining({ label: 'Eliminar' }),

@@ -4,11 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrudPageConfig } from '../components/CrudPage';
 import { ConfiguredCrudSectionPage } from './ConfiguredCrudSectionPage';
 
-const loadLazyCrudPageConfigMock = vi.fn<[string], Promise<CrudPageConfig<{ id: string }> | null>>();
+const loadLazyCrudPageConfigMock = vi.fn<(resourceId: string) => Promise<CrudPageConfig<{ id: string }> | null>>();
 
 vi.mock('../crud/lazyCrudPage', () => ({
   loadLazyCrudPageConfig: (resourceId: string) => loadLazyCrudPageConfigMock(resourceId),
-  LazyConfiguredCrudPage: ({ resourceId }: { resourceId: string }) => <div>lazy:{resourceId}</div>,
 }));
 
 function buildInventoryConfig(): CrudPageConfig<{ id: string }> {
@@ -66,7 +65,7 @@ describe('inventory configured section shell', () => {
     );
 
     expect(await screen.findByText('configure-screen')).toBeInTheDocument();
-    const tabs = screen.getByRole('navigation', { name: 'Vistas de inventario' });
+    const tabs = await screen.findByRole('navigation', { name: 'Vistas de inventario' });
     expect(await within(tabs).findByRole('link', { name: 'Lista' })).toBeInTheDocument();
     expect(within(tabs).getByRole('link', { name: 'Galería' })).toBeInTheDocument();
     expect(within(tabs).getByRole('link', { name: 'Tablero' })).toBeInTheDocument();

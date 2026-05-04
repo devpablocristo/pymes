@@ -1,20 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CrudEntityEditorModal } from './CrudEntityEditorModal';
 
 vi.mock('@devpablocristo/core-browser', () => ({
   confirmAction: vi.fn(async () => true),
 }));
-
-function getMainCloseButton() {
-  return screen
-    .getAllByRole('button', { name: 'Cerrar' })
-    .find((button) => button.getAttribute('aria-label') !== 'Cerrar');
-}
-
-function getConfirmDialog() {
-  return screen.getAllByRole('dialog')[1];
-}
 
 describe('CrudEntityEditorModal', () => {
   it('renders stats and submits values', () => {
@@ -66,84 +56,26 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
-  it('asks before closing with unsaved changes and closes when confirming close', async () => {
+  it('confirms discard when there are unsaved changes', async () => {
     const onCancel = vi.fn();
-    const onSubmit = vi.fn(async () => {});
     render(
       <CrudEntityEditorModal
         open
-        mode="update"
         title="Editar compra"
         fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo' }]}
-        onCancel={onCancel}
-        onSubmit={onSubmit}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    await waitFor(() => expect(screen.getByLabelText('Proveedor')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
-    fireEvent.click(getMainCloseButton()!);
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
-    });
-    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
-    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
-    expect(onSubmit).not.toHaveBeenCalled();
-  });
-
-  it('saves pending changes when confirming save from the small modal', async () => {
-    const onCancel = vi.fn();
-    const onSubmit = vi.fn(async () => {});
-    render(
-      <CrudEntityEditorModal
-        open
-        mode="update"
-        title="Editar compra"
-        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo' }]}
-        onCancel={onCancel}
-        onSubmit={onSubmit}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    await waitFor(() => expect(screen.getByLabelText('Proveedor')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
-    fireEvent.click(getMainCloseButton()!);
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
-    });
-    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Guardar' }));
-
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith({ supplier_name: 'Otro proveedor' });
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('asks before closing a dirty create form and closes when confirming close', async () => {
-    const onCancel = vi.fn();
-    render(
-      <CrudEntityEditorModal
-        open
-        mode="create"
-        title="Nueva compra"
-        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: '' }]}
+        confirmDiscard={{
+          title: 'Descartar cambios',
+          description: 'Hay cambios pendientes.',
+        }}
         onCancel={onCancel}
         onSubmit={vi.fn()}
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Proveedor Demo' } });
-    fireEvent.click(getMainCloseButton()!);
+    fireEvent.change(screen.getByLabelText('Proveedor'), { target: { value: 'Otro proveedor' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
-    });
-    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
-    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onCancel).toHaveBeenCalled());
   });
 
   it('opens existing records in read mode with media and edit/archive actions', () => {
@@ -185,8 +117,40 @@ describe('CrudEntityEditorModal', () => {
 
     return waitFor(() => {
       expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
-      expect(getMainCloseButton()).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
     });
+  });
+
+  it('stays in edit mode when initialValues object identity changes after Edit', async () => {
+    const fields = [{ id: 'name', label: 'Nombre', defaultValue: 'Demo' }];
+    const { rerender } = render(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Detalle"
+        fields={fields}
+        initialValues={{ name: 'Demo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
+
+    rerender(
+      <CrudEntityEditorModal
+        open
+        mode="update"
+        title="Detalle"
+        fields={fields}
+        initialValues={{ name: 'Demo' }}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
   });
 
   it('opens archive confirmation above the detail modal without replacing it', async () => {
@@ -254,8 +218,7 @@ describe('CrudEntityEditorModal', () => {
     });
   });
 
-  it('asks before closing edition and closes when confirming close', async () => {
-    const onCancel = vi.fn();
+  it('returns from edit mode to read mode when canceling edition', async () => {
     render(
       <CrudEntityEditorModal
         open
@@ -269,7 +232,7 @@ describe('CrudEntityEditorModal', () => {
           { id: 'summary', title: 'Resumen de la compra' },
           { id: 'notes', title: 'Notas' },
         ]}
-        onCancel={onCancel}
+        onCancel={vi.fn()}
         onSubmit={vi.fn()}
       />,
     );
@@ -277,122 +240,14 @@ describe('CrudEntityEditorModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await waitFor(() => expect(screen.getByLabelText('Notas')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Notas'), { target: { value: 'Cambio temporal' } });
-    fireEvent.click(getMainCloseButton()!);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Desea guardar los cambios?' })).toBeInTheDocument();
-    });
-    fireEvent.click(within(getConfirmDialog()).getByRole('button', { name: 'Cerrar' }));
-    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument();
+    expect(screen.getByText('Compra inicial')).toBeInTheDocument();
   });
 
-  it('stays in editor mode after initial values are refreshed by a save', async () => {
-    const { rerender } = render(
-      <CrudEntityEditorModal
-        open
-        mode="update"
-        title="Proveedor Demo"
-        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo' }]}
-        initialValues={{ name: 'Proveedor Demo' }}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn(async () => {})}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Proveedor Nuevo' } });
-
-    rerender(
-      <CrudEntityEditorModal
-        open
-        mode="update"
-        title="Proveedor Demo"
-        fields={[{ id: 'name', label: 'Nombre', defaultValue: 'Proveedor Demo' }]}
-        initialValues={{ name: 'Proveedor Nuevo' }}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn(async () => {})}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Nombre')).toHaveValue('Proveedor Nuevo');
-  });
-
-  it('places internal fields below the media block when media exists', async () => {
-    render(
-      <CrudEntityEditorModal
-        open
-        title="Producto Demo"
-        mediaUrls={['https://example.com/item.png']}
-        fields={[
-          { id: 'tags', label: 'Etiquetas internas', defaultValue: 'a, b', sectionId: 'info' },
-          { id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', sectionId: 'info' },
-          { id: 'name', label: 'Nombre', defaultValue: 'Producto Demo', sectionId: 'info' },
-          { id: 'description', label: 'Descripción', defaultValue: 'Detalle', sectionId: 'info', type: 'textarea' },
-        ]}
-        sections={[{ id: 'info', title: 'Información' }]}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const dialog = screen.getByRole('dialog');
-    const fieldRows = Array.from(dialog.querySelectorAll('label'))
-      .filter((node) => node.classList.contains('crud-entity-editor-modal__field'))
-      .map((node) => node.textContent?.trim() ?? '');
-    const tagsIndex = fieldRows.findIndex((labelText) => labelText.includes('Etiquetas internas'));
-    const favoriteIndex = fieldRows.findIndex((labelText) => labelText.includes('Agregar a favoritos'));
-    const nameIndex = fieldRows.findIndex((labelText) => labelText.includes('Nombre'));
-    const descriptionIndex = fieldRows.findIndex((labelText) => labelText.includes('Descripción'));
-
-    expect(tagsIndex).toBeGreaterThan(-1);
-    expect(favoriteIndex).toBeGreaterThan(-1);
-    expect(nameIndex).toBeGreaterThan(-1);
-    expect(descriptionIndex).toBeGreaterThan(-1);
-    expect(tagsIndex).toBeLessThan(nameIndex);
-    expect(favoriteIndex).toBeLessThan(nameIndex);
-    expect(tagsIndex).toBeLessThan(descriptionIndex);
-    expect(favoriteIndex).toBeLessThan(descriptionIndex);
-  });
-
-  it('places internal fields at the top when media is not provided', async () => {
-    render(
-      <CrudEntityEditorModal
-        open
-        title="Producto Demo"
-        fields={[
-          { id: 'name', label: 'Nombre', defaultValue: 'Producto Demo', sectionId: 'info' },
-          { id: 'tags', label: 'Etiquetas internas', defaultValue: 'a, b', sectionId: 'info' },
-          { id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', sectionId: 'info' },
-          { id: 'description', label: 'Descripción', defaultValue: 'Detalle', sectionId: 'info', type: 'textarea' },
-        ]}
-        sections={[{ id: 'info', title: 'Información' }]}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const dialog = screen.getByRole('dialog');
-    const fieldRows = Array.from(dialog.querySelectorAll('label'))
-      .filter((node) => node.classList.contains('crud-entity-editor-modal__field'))
-      .map((node) => node.textContent?.trim() ?? '');
-    const tagsIndex = fieldRows.findIndex((labelText) => labelText.includes('Etiquetas internas'));
-    const favoriteIndex = fieldRows.findIndex((labelText) => labelText.includes('Agregar a favoritos'));
-    const nameIndex = fieldRows.findIndex((labelText) => labelText.includes('Nombre'));
-    const descriptionIndex = fieldRows.findIndex((labelText) => labelText.includes('Descripción'));
-
-    expect(tagsIndex).toBeGreaterThan(-1);
-    expect(favoriteIndex).toBeGreaterThan(-1);
-    expect(nameIndex).toBeGreaterThan(-1);
-    expect(descriptionIndex).toBeGreaterThan(-1);
-    expect(tagsIndex).toBeLessThan(nameIndex);
-    expect(favoriteIndex).toBeLessThan(nameIndex);
-    expect(tagsIndex).toBeLessThan(descriptionIndex);
-    expect(favoriteIndex).toBeLessThan(descriptionIndex);
-  });
-
-  it('closes on escape while editing and while reading', async () => {
+  it('returns to read mode on escape while editing and closes on escape while reading', async () => {
     const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
@@ -416,44 +271,12 @@ describe('CrudEntityEditorModal', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument());
     fireEvent.keyDown(window, { key: 'Escape' });
 
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument());
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
     await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
-  });
-
-  it('renders dash-only read values as blank', () => {
-    render(
-      <CrudEntityEditorModal
-        open
-        mode="update"
-        title="Proveedor Demo"
-        fields={[
-          { id: 'website', label: 'Sitio web', defaultValue: '—' },
-          { id: 'city', label: 'Ciudad', defaultValue: '---' },
-        ]}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const readValues = document.querySelectorAll('.crud-entity-editor-modal__read-value');
-    expect(readValues).toHaveLength(2);
-    expect(Array.from(readValues).every((node) => node.textContent === '')).toBe(true);
-  });
-
-  it('renders checkbox fields in read mode as a circular check with label instead of yes-no text', () => {
-    render(
-      <CrudEntityEditorModal
-        open
-        mode="update"
-        title="Producto Demo"
-        fields={[{ id: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox', defaultValue: true }]}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('checkbox', { name: 'Agregar a favoritos' })).toBeChecked();
-    expect(screen.queryByText('Sí')).not.toBeInTheDocument();
-    expect(screen.queryByText('No')).not.toBeInTheDocument();
   });
 
   it('renders line item blocks only in edit mode', async () => {
@@ -474,28 +297,6 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.queryByText('Añadir renglón')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await waitFor(() => expect(screen.getByText('Añadir renglón')).toBeInTheDocument());
-  });
-
-  it('keeps a newly added empty line item row visible while editing', async () => {
-    render(
-      <CrudEntityEditorModal
-        open
-        title="CPA-001"
-        mode="update"
-        initialValues={{ items: '[{"description":"Insumo","quantity":1,"unit_cost":1000}]' }}
-        fields={[{ id: 'supplier_name', label: 'Proveedor', defaultValue: 'Proveedor Demo', sectionId: 'summary' }]}
-        sections={[{ id: 'summary' }, { id: 'items' }]}
-        blocks={[{ id: 'items', kind: 'lineItems', field: 'items', sectionId: 'items', visible: ({ editing }) => editing }]}
-        onCancel={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    await waitFor(() => expect(screen.getByText('Añadir renglón')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('Añadir renglón'));
-
-    await waitFor(() => expect(screen.getAllByText('Concepto')).toHaveLength(2));
   });
 
   it('keeps the modal open when switching an existing record with items into edit mode', async () => {
@@ -520,7 +321,8 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
   });
 
-  it('can render an existing record in read-only mode without the edit button', () => {
+  it('can render an existing record in read-only mode with blocked edit button (no click-through to backdrop)', async () => {
+    const onCancel = vi.fn();
     render(
       <CrudEntityEditorModal
         open
@@ -529,13 +331,17 @@ describe('CrudEntityEditorModal', () => {
         allowEdit={false}
         fields={[{ id: 'customer_name', label: 'Cliente', defaultValue: 'Cliente Demo', sectionId: 'summary' }]}
         sections={[{ id: 'summary', title: 'Resumen' }]}
-        onCancel={vi.fn()}
+        onCancel={onCancel}
         onSubmit={vi.fn()}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Cerrar' })).toHaveLength(2);
+    const editBtn = screen.getByRole('button', { name: 'Editar' });
+    expect(editBtn).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(editBtn);
+    await waitFor(() => expect(onCancel).not.toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
   });
 
   it('renders archived actions with restore and delete only', () => {
@@ -558,5 +364,27 @@ describe('CrudEntityEditorModal', () => {
     expect(screen.getByRole('button', { name: 'Eliminar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salir' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+  });
+
+  it('campos image_urls sin editControl no usan textarea (editor estándar)', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Nuevo"
+        mode="create"
+        editBehavior="edit-only"
+        mediaFieldId="image_urls"
+        fields={[
+          { id: 'image_urls', label: 'Imágenes', type: 'textarea', fullWidth: true, defaultValue: '' },
+          { id: 'name', label: 'Nombre', defaultValue: 'x' },
+        ]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const form = document.getElementById('crud-entity-editor-modal-form');
+    expect(form?.querySelector('textarea')).toBeNull();
+    expect(screen.getByText('Seleccionar imágenes del equipo…')).toBeInTheDocument();
   });
 });

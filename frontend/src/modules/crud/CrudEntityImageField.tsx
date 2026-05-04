@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type ChangeEvent } from 'react';
+import { useId, useMemo, type ChangeEvent } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
 import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
 import { parseCrudLinkedEntityImageUrlList } from './crudLinkedEntityImageUrls';
@@ -38,18 +38,7 @@ export function CrudEntityImageField({
   label?: string;
 }) {
   const urls = useMemo(() => parseCrudLinkedEntityImageUrlList(asImageFieldString(value)), [value]);
-  const [index, setIndex] = useState(0);
   const inputId = useId();
-
-  useEffect(() => {
-    if (!urls.length) {
-      setIndex(0);
-      return;
-    }
-    if (index > urls.length - 1) {
-      setIndex(urls.length - 1);
-    }
-  }, [index, urls]);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -57,7 +46,6 @@ export function CrudEntityImageField({
     try {
       const encoded = await Promise.all(files.map(fileToDataUrl));
       setValue(stringifyImageField([...urls, ...encoded]));
-      setIndex(urls.length);
     } finally {
       event.currentTarget.value = '';
     }
@@ -66,11 +54,6 @@ export function CrudEntityImageField({
   const handleRemoveAt = (removeIndex: number) => {
     const nextUrls = urls.filter((_, indexToKeep) => indexToKeep !== removeIndex);
     setValue(stringifyImageField(nextUrls));
-    setIndex((current) => {
-      if (!nextUrls.length) return 0;
-      if (current > removeIndex) return current - 1;
-      return Math.min(current, nextUrls.length - 1);
-    });
   };
 
   return (
@@ -96,9 +79,7 @@ export function CrudEntityImageField({
         <CrudEntityMediaCarousel
           urls={urls}
           variant={readOnly ? 'read' : 'edit'}
-          onRemoveAt={readOnly ? undefined : handleRemoveAt}
-          activeIndex={index}
-          onActiveIndexChange={setIndex}
+          onRequestRemoveAt={readOnly ? undefined : handleRemoveAt}
         />
       ) : null}
     </div>

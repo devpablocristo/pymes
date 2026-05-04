@@ -19,6 +19,8 @@ type CreateQuoteRequest struct {
 	Tags         []string           `json:"tags"`
 	Notes        string             `json:"notes"`
 	ValidUntil   *string            `json:"valid_until"`
+	Tags         []string           `json:"tags,omitempty"`
+	Metadata     map[string]any     `json:"metadata,omitempty"`
 }
 
 type UpdateQuoteRequest struct {
@@ -29,6 +31,15 @@ type UpdateQuoteRequest struct {
 	Tags         *[]string           `json:"tags"`
 	Notes        *string             `json:"notes"`
 	ValidUntil   *string             `json:"valid_until"`
+	Tags         *[]string           `json:"tags"`
+	Metadata     *map[string]any     `json:"metadata"`
+}
+
+type PatchQuoteRequest struct {
+	Tags         *[]string       `json:"tags"`
+	Metadata     *map[string]any `json:"metadata"`
+	Notes        *string         `json:"notes"`
+	CustomerName *string         `json:"customer_name"`
 }
 
 type ToSaleRequest struct {
@@ -70,6 +81,8 @@ type QuoteResponse struct {
 	CreatedAt    string              `json:"created_at"`
 	UpdatedAt    string              `json:"updated_at"`
 	ArchivedAt   string              `json:"archived_at,omitempty"`
+	Tags         []string            `json:"tags,omitempty"`
+	Metadata     map[string]any      `json:"metadata,omitempty"`
 }
 
 type ListQuotesResponse struct {

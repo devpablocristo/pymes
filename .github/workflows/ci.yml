@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -91,6 +94,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # El runner no tiene .env; Settings valida Gemini al importar módulos durante pytest.
+    env:
+      GEMINI_API_KEY: ci-placeholder-not-used
     defaults:
       run:
         working-directory: ai
@@ -127,7 +133,35 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      # Build-time env (opcional): definir en GitHub → Settings → Secrets and variables → Actions.
+      # Si quedan vacíos en PR/forks, el bundle usa los mismos defaults que un build local sin .env.
+      # Para dev hosting (misma origin + rewrites en firebase.json) suele bastar dejar URLs vacías;
+      # verticals/AI pueden necesitar secrets *_DEV si no van por proxy.
+      - name: Build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL_DEV }}
+          VITE_AI_API_URL: ${{ secrets.VITE_AI_API_URL_DEV }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY_DEV }}
+          VITE_API_ACTOR: ${{ secrets.VITE_API_ACTOR_DEV }}
+          VITE_API_ROLE: ${{ secrets.VITE_API_ROLE_DEV }}
+          VITE_API_SCOPES: ${{ secrets.VITE_API_SCOPES_DEV }}
+          VITE_PROFESSIONALS_API_URL: ${{ secrets.VITE_PROFESSIONALS_API_URL_DEV }}
+          VITE_WORKSHOPS_API_URL: ${{ secrets.VITE_WORKSHOPS_API_URL_DEV }}
+          VITE_BEAUTY_API_URL: ${{ secrets.VITE_BEAUTY_API_URL_DEV }}
+          VITE_RESTAURANTS_API_URL: ${{ secrets.VITE_RESTAURANTS_API_URL_DEV }}
+        run: npm run build
+
+      # Obligatorio en el repo: Secret FIREBASE_SERVICE_ACCOUNT_PYMES_DEV = JSON de cuenta de servicio
+      # con permisos Firebase Hosting Admin en el proyecto pymes-dev-352318 (Firebase console → Project settings → Service accounts).
+      - name: Deploy Firebase Hosting (dev)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PYMES_DEV }}
+          projectId: pymes-dev-352318
+          entryPoint: .
 
   review-notifications-e2e:
     name: review-notifications-e2e

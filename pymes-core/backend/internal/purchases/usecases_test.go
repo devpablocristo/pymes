@@ -37,6 +37,10 @@ func (m *mockPurchasesRepo) Update(ctx context.Context, in UpdateInput) (purchas
 	}
 	return m.updateFn(ctx, in)
 }
+
+func (m *mockPurchasesRepo) PatchAnnotations(context.Context, uuid.UUID, uuid.UUID, PurchasePatchFields) (purchasesdomain.Purchase, error) {
+	return purchasesdomain.Purchase{}, nil
+}
 func (m *mockPurchasesRepo) UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error) {
 	return m.updateStatusFn(ctx, in)
 }

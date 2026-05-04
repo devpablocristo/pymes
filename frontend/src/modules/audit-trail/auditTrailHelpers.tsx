@@ -1,7 +1,7 @@
 import { parseListItemsFromResponse } from '@devpablocristo/core-browser/crud';
 import type { CrudFieldValue, CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
-import { renderCrudActiveBadge } from '../crud';
+import { buildStandardCrudViewModes, renderCrudActiveBadge } from '../crud';
 
 export type AttachmentRow = {
   id: string;
@@ -95,12 +95,12 @@ export function createAttachmentsCrudConfig<TRecord extends AttachmentRow>(opts:
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista adjuntos', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista adjuntos' }),
     label: 'adjunto',
     labelPlural: 'adjuntos',
     labelPluralCap: 'Adjuntos',
     allowCreate: false,
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: true,
     searchPlaceholder: 'Buscar...',
     emptyState: 'Indicá en la URL ?entity=sales|quotes|purchases|…&entity_id=<UUID> (GET /v1/:entity/:id/attachments).',
@@ -164,12 +164,12 @@ export function createAuditCrudConfig<TRecord extends AuditEntryRow>(opts: {
   'viewModes' | 'label' | 'labelPlural' | 'labelPluralCap' | 'allowCreate' | 'allowEdit' | 'allowDelete' | 'searchPlaceholder' | 'emptyState' | 'dataSource' | 'columns' | 'formFields' | 'searchText' | 'toFormValues' | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista auditoría', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista auditoría' }),
     label: 'evento',
     labelPlural: 'eventos',
     labelPluralCap: 'Auditoría',
     allowCreate: false,
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay eventos de auditoría recientes.',
@@ -224,11 +224,11 @@ export function createTimelineCrudConfig<TRecord extends TimelineEntryRow>(opts:
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista historial', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista historial' }),
     label: 'entrada',
     labelPlural: 'entradas',
     labelPluralCap: 'Historial',
-    allowEdit: false,
+    allowEdit: true,
     allowDelete: false,
     allowCreate: true,
     createLabel: '+ Nota manual',
@@ -295,7 +295,7 @@ export function createWebhooksCrudConfig<TRecord extends WebhookEndpoint>(opts: 
   | 'isValid'
 > {
   return {
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista webhooks', isDefault: true, render: opts.renderList }],
+    viewModes: buildStandardCrudViewModes(opts.renderList, { ariaLabel: 'Vista webhooks' }),
     basePath: '/v1/webhook-endpoints',
     label: 'endpoint webhook',
     labelPlural: 'endpoints webhook',

@@ -31,28 +31,29 @@ const PLACEHOLDER_IMAGE =
 const gridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-  gap: 16,
+  gap: 'var(--space-4)',
   width: '100%',
 };
 
 const cardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  background: 'var(--surface, #fff)',
-  border: '1px solid var(--border, #e5e7eb)',
-  borderRadius: 8,
+  background: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-sm)',
   overflow: 'hidden',
   cursor: 'pointer',
   textAlign: 'left',
   padding: 0,
-  font: 'inherit',
+  fontFamily: 'var(--crud-ui-font-family)',
+  fontSize: 'var(--crud-ui-font-size)',
   color: 'inherit',
 };
 
 const imageWrapStyle: CSSProperties = {
   width: '100%',
   aspectRatio: '1 / 1',
-  background: '#f3f4f6',
+  background: 'var(--color-border-subtle)',
   display: 'block',
 };
 
@@ -64,33 +65,33 @@ const imageStyle: CSSProperties = {
 };
 
 const bodyStyle: CSSProperties = {
-  padding: 8,
+  padding: 'var(--space-2)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 2,
-  color: '#111111',
+  gap: 'var(--space-1)',
+  color: 'var(--color-text)',
 };
 
 const titleStyle: CSSProperties = {
   fontWeight: 600,
-  fontSize: 11,
+  fontSize: 'var(--crud-ui-font-size)',
   lineHeight: 1.2,
-  color: '#111111',
+  color: 'var(--color-text)',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 };
 
 const subtitleStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 'var(--crud-ui-font-size)',
   fontWeight: 500,
-  color: '#111111',
+  color: 'var(--color-text-secondary)',
 };
 
 const metaStyle: CSSProperties = {
-  fontSize: 9,
-  color: '#111111',
-  opacity: 0.85,
+  fontSize: 'var(--crud-ui-font-size)',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
 };
 
 function compactText(value: string | undefined, max: number): string {

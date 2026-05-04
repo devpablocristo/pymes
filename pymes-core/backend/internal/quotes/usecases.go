@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
@@ -23,6 +24,7 @@ type RepositoryPort interface {
 	Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
 	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error)
+	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error)
 	DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error
 	Archive(ctx context.Context, orgID, quoteID uuid.UUID) error
 	Restore(ctx context.Context, orgID, quoteID uuid.UUID) error
@@ -31,6 +33,14 @@ type RepositoryPort interface {
 	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error)
 	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
 	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+}
+
+// QuotePatchFields actualización parcial fuera del borrador (CRUD unificado).
+type QuotePatchFields struct {
+	Tags         *[]string
+	Metadata     *map[string]any
+	Notes        *string
+	CustomerName *string
 }
 
 type SalesPort interface {
@@ -72,6 +82,8 @@ type CreateQuoteInput struct {
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
+	Tags         []string
+	Metadata     map[string]any
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
@@ -108,6 +120,8 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 		Notes:        in.Notes,
 		ValidUntil:   in.ValidUntil,
 		CreatedBy:    in.CreatedBy,
+		Tags:         in.Tags,
+		Metadata:     in.Metadata,
 		Items:        items,
 	})
 	if err != nil {
@@ -132,6 +146,8 @@ type UpdateQuoteInput struct {
 	Tags         *[]string
 	Notes        *string
 	ValidUntil   **time.Time
+	Tags         *[]string
+	Metadata     *map[string]any
 	Actor        string
 }
 
@@ -202,6 +218,26 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		return quotedomain.Quote{}, err
 	}
 
+	tags := append([]string(nil), current.Tags...)
+	if in.Tags != nil {
+		tags = utils.NormalizeTags(*in.Tags)
+	}
+	meta := map[string]any{}
+	if current.Metadata != nil {
+		for k, v := range current.Metadata {
+			meta[k] = v
+		}
+	}
+	if in.Metadata != nil {
+		for k, v := range *in.Metadata {
+			if k == "favorite" && !isTruthyQuoteMeta(v) {
+				delete(meta, "favorite")
+				continue
+			}
+			meta[k] = v
+		}
+	}
+
 	out, err := u.repo.UpdateDraft(ctx, UpdateInput{
 		OrgID:        in.OrgID,
 		ID:           in.ID,
@@ -215,6 +251,8 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		Tags:         tags,
 		Notes:        notes,
 		ValidUntil:   validUntil,
+		Tags:         tags,
+		Metadata:     meta,
 		Items:        items,
 	})
 	if err != nil {
@@ -231,6 +269,45 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 			"status": out.Status,
 			"total":  out.Total,
 		})
+	}
+	return out, nil
+}
+
+func isTruthyQuoteMeta(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		s := strings.TrimSpace(strings.ToLower(t))
+		return s == "true" || s == "1"
+	case float64:
+		return t != 0
+	case int:
+		return t != 0
+	default:
+		return v != nil
+	}
+}
+
+func (u *Usecases) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields, actor string) (quotedomain.Quote, error) {
+	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.CustomerName == nil {
+		return quotedomain.Quote{}, fmt.Errorf("no patch fields: %w", httperrors.ErrBadInput)
+	}
+	if _, err := u.repo.GetByID(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return quotedomain.Quote{}, err
+	}
+	out, err := u.repo.PatchAnnotations(ctx, orgID, id, patch)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
+		}
+		return quotedomain.Quote{}, err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "quote.annotations_updated", "quote", id.String(), map[string]any{})
 	}
 	return out, nil
 }

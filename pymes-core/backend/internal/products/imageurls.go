@@ -11,7 +11,42 @@ import (
 const (
 	maxProductImages      = 20
 	maxProductImageURLLen = 5 * 1024 * 1024
+
+	metadataImageURLsKey = "image_urls"
 )
+
+func parseImageURLsFromMetadata(meta map[string]any) ([]string, bool) {
+	if meta == nil {
+		return nil, false
+	}
+	raw, ok := meta[metadataImageURLsKey]
+	if !ok {
+		return nil, false
+	}
+	switch v := raw.(type) {
+	case []string:
+		return v, true
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, strOk := item.(string); strOk {
+				out = append(out, s)
+			}
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func mergeProductMetadataImageURLs(meta map[string]any, urls []string) map[string]any {
+	out := make(map[string]any, len(meta)+1)
+	for k, v := range meta {
+		out[k] = v
+	}
+	out[metadataImageURLsKey] = urls
+	return out
+}
 
 func inferProductImageDataPrefix(raw string) string {
 	trimmed := strings.TrimSpace(raw)

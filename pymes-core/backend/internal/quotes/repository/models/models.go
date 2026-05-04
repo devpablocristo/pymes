@@ -21,14 +21,13 @@ type QuoteModel struct {
 	Total        float64    `gorm:"type:numeric(15,2)"`
 	Currency     string
 	IsFavorite   bool           `gorm:"column:is_favorite;not null"`
-	Tags         pq.StringArray `gorm:"type:text[]"`
+	Tags         pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	ArchivedAt   *time.Time
-	Tags         pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
 	Metadata     []byte         `gorm:"type:jsonb;not null;default:'{}'"`
 }
 

@@ -18,9 +18,8 @@ type CreateSaleRequest struct {
 	PaymentMethod string            `json:"payment_method"`
 	Items         []SaleItemPayload `json:"items" binding:"required"`
 	IsFavorite    *bool             `json:"is_favorite"`
-	Tags          []string          `json:"tags"`
-	Notes         string            `json:"notes"`
 	Tags          []string          `json:"tags,omitempty"`
+	Notes         string            `json:"notes"`
 	Metadata      map[string]any    `json:"metadata,omitempty"`
 }
 
@@ -70,11 +69,10 @@ type SaleResponse struct {
 	Total         float64            `json:"total"`
 	Currency      string             `json:"currency"`
 	IsFavorite    bool               `json:"is_favorite"`
-	Tags          []string           `json:"tags"`
+	Tags          []string           `json:"tags,omitempty"`
 	Notes         string             `json:"notes"`
 	CreatedBy     string             `json:"created_by"`
 	CreatedAt     string             `json:"created_at"`
-	Tags          []string           `json:"tags,omitempty"`
 	Metadata      map[string]any     `json:"metadata,omitempty"`
 }
 

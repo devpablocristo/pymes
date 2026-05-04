@@ -21,13 +21,12 @@ type Sale struct {
 	TaxTotal      float64    `json:"tax_total"`
 	Total         float64    `json:"total"`
 	Currency      string     `json:"currency"`
-	IsFavorite    bool       `json:"is_favorite"`
-	Tags          []string   `json:"tags"`
-	Notes         string     `json:"notes"`
-	CreatedBy     string     `json:"created_by"`
+	IsFavorite    bool           `json:"is_favorite"`
+	Tags          []string       `json:"tags,omitempty"`
+	Notes         string         `json:"notes"`
+	CreatedBy     string         `json:"created_by"`
 	CreatedAt     time.Time      `json:"created_at"`
 	VoidedAt      *time.Time     `json:"voided_at,omitempty"`
-	Tags          []string       `json:"tags,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
 }
 

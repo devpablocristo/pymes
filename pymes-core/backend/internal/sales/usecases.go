@@ -109,7 +109,6 @@ type CreateSaleInput struct {
 	IsFavorite    bool
 	Tags          []string
 	Notes         string
-	Tags          []string
 	Metadata      map[string]any
 	CreatedBy     string
 }
@@ -250,7 +249,6 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		IsFavorite:    in.IsFavorite,
 		Tags:          in.Tags,
 		Notes:         strings.TrimSpace(in.Notes),
-		Tags:          in.Tags,
 		Metadata:      in.Metadata,
 		CreatedBy:     strings.TrimSpace(in.CreatedBy),
 		Items:         createItems,

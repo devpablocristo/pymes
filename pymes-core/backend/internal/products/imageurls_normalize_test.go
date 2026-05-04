@@ -8,7 +8,8 @@ import (
 func TestNormalizeProductImageURLs_HTTPRejectedOver2048(t *testing.T) {
 	t.Parallel()
 
-	long := "https://x.example/" + strings.Repeat("a", 2100)
+	prefix := "https://x.example/"
+	long := prefix + strings.Repeat("a", maxProductImageURLLen-len(prefix)+1)
 	_, err := normalizeProductImageURLs([]string{long})
 	if err == nil {
 		t.Fatal("expected error for long http url")
@@ -34,7 +35,7 @@ func TestNormalizeProductImageURLs_DataURLRejectedOverCap(t *testing.T) {
 	t.Parallel()
 
 	prefix := "data:image/png;base64,"
-	body := strings.Repeat("A", 4*1024*1024)
+	body := strings.Repeat("A", maxProductImageURLLen-len(prefix)+1)
 	u := prefix + body
 	_, err := normalizeProductImageURLs([]string{u})
 	if err == nil {

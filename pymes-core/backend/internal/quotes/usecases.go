@@ -82,7 +82,6 @@ type CreateQuoteInput struct {
 	Notes        string
 	ValidUntil   *time.Time
 	CreatedBy    string
-	Tags         []string
 	Metadata     map[string]any
 }
 
@@ -120,7 +119,6 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 		Notes:        in.Notes,
 		ValidUntil:   in.ValidUntil,
 		CreatedBy:    in.CreatedBy,
-		Tags:         in.Tags,
 		Metadata:     in.Metadata,
 		Items:        items,
 	})
@@ -146,7 +144,6 @@ type UpdateQuoteInput struct {
 	Tags         *[]string
 	Notes        *string
 	ValidUntil   **time.Time
-	Tags         *[]string
 	Metadata     *map[string]any
 	Actor        string
 }
@@ -186,9 +183,9 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 	if in.IsFavorite != nil {
 		isFavorite = *in.IsFavorite
 	}
-	tags := current.Tags
+	tags := append([]string(nil), current.Tags...)
 	if in.Tags != nil {
-		tags = *in.Tags
+		tags = utils.NormalizeTags(*in.Tags)
 	}
 
 	itemInputs := make([]QuoteItemInput, 0, len(current.Items))
@@ -218,10 +215,6 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		return quotedomain.Quote{}, err
 	}
 
-	tags := append([]string(nil), current.Tags...)
-	if in.Tags != nil {
-		tags = utils.NormalizeTags(*in.Tags)
-	}
 	meta := map[string]any{}
 	if current.Metadata != nil {
 		for k, v := range current.Metadata {
@@ -251,7 +244,6 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		Tags:         tags,
 		Notes:        notes,
 		ValidUntil:   validUntil,
-		Tags:         tags,
 		Metadata:     meta,
 		Items:        items,
 	})

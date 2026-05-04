@@ -23,12 +23,11 @@ type SaleModel struct {
 	Total         float64    `gorm:"type:numeric(15,2)"`
 	Currency      string
 	IsFavorite    bool           `gorm:"column:is_favorite;not null"`
-	Tags          pq.StringArray `gorm:"type:text[]"`
+	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
 	Notes         string
 	CreatedBy     string
 	CreatedAt     time.Time
 	VoidedAt      *time.Time
-	Tags          pq.StringArray `gorm:"type:text[];not null;default:'{}'"`
 	Metadata      []byte         `gorm:"type:jsonb;not null;default:'{}'"`
 }
 

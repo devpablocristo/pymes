@@ -16,10 +16,9 @@ type CreateQuoteRequest struct {
 	CustomerName string             `json:"customer_name"`
 	Items        []QuoteItemPayload `json:"items" binding:"required"`
 	IsFavorite   *bool              `json:"is_favorite"`
-	Tags         []string           `json:"tags"`
+	Tags         []string           `json:"tags,omitempty"`
 	Notes        string             `json:"notes"`
 	ValidUntil   *string            `json:"valid_until"`
-	Tags         []string           `json:"tags,omitempty"`
 	Metadata     map[string]any     `json:"metadata,omitempty"`
 }
 
@@ -28,11 +27,10 @@ type UpdateQuoteRequest struct {
 	CustomerName *string             `json:"customer_name"`
 	Items        *[]QuoteItemPayload `json:"items"`
 	IsFavorite   *bool               `json:"is_favorite"`
-	Tags         *[]string           `json:"tags"`
+	Tags         *[]string           `json:"tags,omitempty"`
 	Notes        *string             `json:"notes"`
 	ValidUntil   *string             `json:"valid_until"`
-	Tags         *[]string           `json:"tags"`
-	Metadata     *map[string]any     `json:"metadata"`
+	Metadata     *map[string]any     `json:"metadata,omitempty"`
 }
 
 type PatchQuoteRequest struct {
@@ -74,14 +72,13 @@ type QuoteResponse struct {
 	Total        float64             `json:"total"`
 	Currency     string              `json:"currency"`
 	IsFavorite   bool                `json:"is_favorite"`
-	Tags         []string            `json:"tags"`
+	Tags         []string            `json:"tags,omitempty"`
 	Notes        string              `json:"notes"`
 	ValidUntil   string              `json:"valid_until,omitempty"`
 	CreatedBy    string              `json:"created_by"`
 	CreatedAt    string              `json:"created_at"`
 	UpdatedAt    string              `json:"updated_at"`
 	ArchivedAt   string              `json:"archived_at,omitempty"`
-	Tags         []string            `json:"tags,omitempty"`
 	Metadata     map[string]any      `json:"metadata,omitempty"`
 }
 

@@ -119,7 +119,6 @@ type CreateInput struct {
 	Tags          []string
 	Notes         string
 	CreatedBy     string
-	Tags          []string
 	Metadata      map[string]any
 	Items         []CreateItemInput
 }
@@ -161,7 +160,6 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 			Notes:         strings.TrimSpace(in.Notes),
 			CreatedBy:     strings.TrimSpace(in.CreatedBy),
 			CreatedAt:     time.Now().UTC(),
-			Tags:          pq.StringArray(utils.NormalizeTags(in.Tags)),
 			Metadata:      metadataToJSONBytesSales(in.Metadata),
 		}
 		if err := tx.Create(&saleRow).Error; err != nil {
@@ -487,7 +485,6 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 		CreatedBy:     saleRow.CreatedBy,
 		CreatedAt:     saleRow.CreatedAt,
 		VoidedAt:      saleRow.VoidedAt,
-		Tags:          append([]string(nil), saleRow.Tags...),
 		Metadata:      metadataFromJSONBytesSales(saleRow.Metadata),
 	}
 }

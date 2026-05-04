@@ -29,7 +29,7 @@ export function CrudViewModeSwitch({
   modes,
   groupAriaLabel,
   description,
-  actionLink,
+  actionLink: _actionLink,
 }: Props) {
   const { pathname } = useLocation();
   const contextualMenuItems = useHeaderMenuItems();

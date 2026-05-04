@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- infraestructura de lazy loading CRUD */
 import type { CrudPageConfig } from '../components/CrudPage';
 import { hasCrudModule } from './crudModuleCatalog';
 

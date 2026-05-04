@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEFAULT_LOCAL_INFRA_DIR="$(cd "$ROOT_DIR/.." && pwd)/local-infra"
 
 # `make seed` y los scripts hijo corren en bash sin pasar por docker compose: leen `.env` de la raíz del monorepo.
-if [[ -f "$ROOT_DIR/.env" ]]; then
+# Para cargar seeds contra GCP con URI propia (proxy TCP), exportá PYMES_SEEDS_SKIP_DOTENV=1 antes de source.
+if [[ "${PYMES_SEEDS_SKIP_DOTENV:-}" != "1" ]] && [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$ROOT_DIR/.env"

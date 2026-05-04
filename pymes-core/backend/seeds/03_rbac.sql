@@ -12,6 +12,8 @@ DECLARE
     r_warehouse uuid;
 
     pl_default uuid;
+    pl_wholesale uuid;
+    pl_vip uuid;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
         RETURN;
@@ -23,6 +25,8 @@ BEGIN
     r_accountant := uuid_generate_v5(v_org, 'pymes-seed/v1/role/contador');
     r_warehouse := uuid_generate_v5(v_org, 'pymes-seed/v1/role/almacenero');
     pl_default := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/default');
+    pl_wholesale := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/wholesale');
+    pl_vip := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/vip');
 
     INSERT INTO roles (id, org_id, name, description, is_system)
     VALUES
@@ -117,5 +121,11 @@ BEGIN
 
     INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
     VALUES (pl_default, v_org, 'Retail', 'Default local price list', true, 0, true)
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
+    VALUES
+        (pl_wholesale, v_org, 'Mayorista', 'Lista demo mayorista', false, -5, true),
+        (pl_vip, v_org, 'VIP', 'Lista demo clientes VIP', false, -10, true)
     ON CONFLICT (id) DO NOTHING;
 END $$;

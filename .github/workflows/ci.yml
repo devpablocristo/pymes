@@ -81,6 +81,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # El runner no tiene .env; Settings valida Gemini al importar módulos durante pytest.
+    env:
+      GEMINI_API_KEY: ci-placeholder-not-used
     defaults:
       run:
         working-directory: ai

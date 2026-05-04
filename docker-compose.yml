@@ -1,22 +1,23 @@
 services:
+  # DNS interno sigue siendo `review` para no cambiar REVIEW_URL en cp-backend/ai.
+  # Imagen = Nexus Governance actual (repo hermano `nexus` o `nexus-governance`; ver Makefile `NEXUS_GOVERNANCE_CONTEXT`).
   review:
     restart: unless-stopped
     build:
-      context: ..
-      dockerfile: pymes/docker/review.Dockerfile.dev
+      # CI (checkout `nexus` junto a `pymes`): ../nexus/governance. Local con Makefile: export absoluto.
+      context: ${NEXUS_GOVERNANCE_CONTEXT:-../nexus/governance}
+      dockerfile: Dockerfile
     ports:
       - "18084:8080"
-    volumes:
-      - ../nexus/v3/review:/workspace/nexus/v3/review
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://postgres:postgres@review-postgres:5432/nexus_review?sslmode=disable
-      NEXUS_API_KEYS: admin=${REVIEW_API_KEY:-nexus-review-admin-dev-key}
       APPROVAL_DEFAULT_TTL: "3600"
-      NEXUS_SIGNING_KEY: nexus-dev-signing-key-change-in-production
-      REVIEW_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
-      REVIEW_APPROVAL_PENDING_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback
-      REVIEW_APPROVAL_RESOLVED_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback,http://ai:8000/v1/internal/review-callback
+      GOVERNANCE_API_KEYS: admin=${REVIEW_API_KEY:-nexus-review-admin-dev-key}|service_principal=true|scopes=nexus:requests:read+nexus:requests:write+nexus:requests:result+nexus:approvals:decide+nexus:policies:admin+nexus:rbac:admin+nexus:evidence:write+nexus:cross_org
+      GOVERNANCE_SIGNING_KEY: ${GOVERNANCE_SIGNING_KEY:-nexus-dev-signing-key-change-in-production}
+      GOVERNANCE_CALLBACK_TOKEN: ${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}
+      GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback
+      GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS: http://cp-backend:8080/v1/internal/v1/review-callback,http://ai:8000/v1/internal/review-callback
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null 2>&1 || exit 1"]
       interval: 5s
@@ -66,6 +67,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailhog:
+        condition: service_started
       review:
         condition: service_healthy
 

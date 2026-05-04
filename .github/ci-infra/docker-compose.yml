@@ -1,13 +1,11 @@
-# Overlay compose usado por el CI para proveer `postgres` y `review-postgres`
-# sin depender del repo externo `local-infra` (su layout difiere entre local y
-# remoto, lo que rompía el smoke test del E2E).
-#
-# Se combina con `docker-compose.yml` del proyecto:
-#   docker compose -f .github/ci-compose.yml -f docker-compose.yml up ...
+# Overlay compose usado por el CI y como fallback de `make up` cuando no hay repo `local-infra`:
+# Postgres (+ puertos host), Review Postgres y Mailhog.
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    ports:
+      - "5434:5432"
     environment:
       POSTGRES_DB: pymes
       POSTGRES_USER: postgres
@@ -21,6 +19,8 @@ services:
   review-postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    ports:
+      - "15434:5432"
     environment:
       POSTGRES_DB: nexus_review
       POSTGRES_USER: postgres
@@ -30,3 +30,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # SMTP local esperado por cp-backend (`SMTP_HOST=mailhog`); sin esto el stack seguiría pero fallarían envíos de mail en dev.
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"

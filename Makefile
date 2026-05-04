@@ -8,8 +8,43 @@
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
-LOCAL_INFRA_DIR ?= /home/pablo/Projects/Pablo/local-infra
-DC = docker compose --project-directory $(CURDIR) -f $(LOCAL_INFRA_DIR)/docker-compose.yml -f $(CURDIR)/docker-compose.yml
+# Repo hermano `local-infra`. Override por CLI: `make up LOCAL_INFRA_DIR=/ruta/al/local-infra`.
+#
+# GNU Make importa variables del shell; `?=´ respeta el entorno y un export viejo (p. ej. ruta de otra
+# máquina como /home/pablo/...) rompe `make up`. Si LOCAL_INFRA_DIR viene del entorno pero esa ruta
+# no existe, lo ignoramos y usamos ../local-infra portable.
+LOCAL_INFRA_DEFAULT := $(abspath $(CURDIR)/../local-infra)
+ifeq ($(origin LOCAL_INFRA_DIR),environment)
+  ifneq ($(strip $(LOCAL_INFRA_DIR)),)
+    ifeq ($(wildcard $(LOCAL_INFRA_DIR)/.),)
+      override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+    endif
+  else
+    override LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+  endif
+endif
+ifndef LOCAL_INFRA_DIR
+  LOCAL_INFRA_DIR := $(LOCAL_INFRA_DEFAULT)
+endif
+
+# Compose padre: `local-infra` del ecosistema si existe; si no, overlay mínimo del repo (paridad con CI / sin checkout extra).
+LOCAL_INFRA_COMPOSE := $(LOCAL_INFRA_DIR)/docker-compose.yml
+ifeq ($(wildcard $(LOCAL_INFRA_COMPOSE)),)
+BASE_COMPOSE := $(abspath $(CURDIR)/.github/ci-infra/docker-compose.yml)
+else
+BASE_COMPOSE := $(abspath $(LOCAL_INFRA_COMPOSE))
+endif
+DC = docker compose --project-directory $(CURDIR) -f $(BASE_COMPOSE) -f $(CURDIR)/docker-compose.yml
+
+# Nexus Governance (servicio Docker `review`): mismo módulo que en CI (`../nexus/governance`) o checkout renombrado `../nexus-governance/governance`.
+ifneq ($(wildcard $(abspath $(CURDIR)/../nexus/governance/go.mod)),)
+  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus/governance)
+else ifneq ($(wildcard $(abspath $(CURDIR)/../nexus-governance/governance/go.mod)),)
+  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus-governance/governance)
+else
+  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus/governance)
+endif
+export NEXUS_GOVERNANCE_CONTEXT
 
 # Calidad
 
@@ -57,16 +92,28 @@ modules-check:
 
 # Stack local
 
-# Levanta Ollama compartido del ecosistema local
+# Levanta Ollama compartido del ecosistema local (opcional si existe el compose en LOCAL_INFRA_DIR)
 llm-up:
-	docker compose --project-directory $(LOCAL_INFRA_DIR) -f $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml up -d
+	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ]; then \
+		docker compose --project-directory "$(LOCAL_INFRA_DIR)" -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" up -d; \
+	else \
+		echo "Skipping llm-up: $(LOCAL_INFRA_DIR)/docker-compose.ollama.yml not found (clone local-infra alongside pymes or set LOCAL_INFRA_DIR)."; \
+	fi
 
 # Asegura el modelo LLM local por defecto en el Ollama compartido
 llm-pull:
-	$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh gemma4:e4b
+	@if [ -f "$(LOCAL_INFRA_DIR)/docker-compose.ollama.yml" ] && [ -f "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" ]; then \
+		bash "$(LOCAL_INFRA_DIR)/scripts/pull-ollama-model.sh" gemma4:e4b; \
+	else \
+		echo "Skipping llm-pull: no Ollama stack under LOCAL_INFRA_DIR=$(LOCAL_INFRA_DIR)."; \
+	fi
 
 # Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
 up:
+	@if [ ! -f "$(NEXUS_GOVERNANCE_CONTEXT)/go.mod" ]; then \
+		echo "Falta Nexus governance en $(NEXUS_GOVERNANCE_CONTEXT)/go.mod — cloná github.com/devpablocristo/nexus junto a pymes como ../nexus o ../nexus-governance." >&2; \
+		exit 1; \
+	fi
 	@$(MAKE) llm-up
 	@$(MAKE) llm-pull
 	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai

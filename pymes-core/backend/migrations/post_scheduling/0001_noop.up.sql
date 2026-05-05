@@ -1,1 +1,0 @@
--- No-op inicial para mantener válido el embed de migraciones post-scheduling.

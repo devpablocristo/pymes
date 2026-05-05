@@ -32,7 +32,7 @@ const (
 	postServicesSplit         uint = 43 // pymes-core hasta acá: 0041 usa scheduling_branches, 0042 crea catalog_services, 0043 lo renombra a `services`
 	schedulingBranchesVersion uint = 2  // scheduling hasta acá antes de necesitar services
 
-	// golang-migrate usa esta tabla para los SQL embebidos de pymes-core (post_scheduling incl.).
+	// golang-migrate usa esta tabla para los SQL embebidos de pymes-core (solo *.sql en la raíz de migrations/).
 	// NO usar el default `schema_migrations`: core/saas/go registra migraciones propias en
 	// `schema_migrations` con columna `scope`; compartir tabla rompe el arranque.
 	pymesCoreMigrationsTable = "pymes_core_schema_migrations"

@@ -1,5 +1,3 @@
--- Safety net for existing local databases where migration 0058 was already marked
--- as applied before `sales.branch_id` was introduced into the file contents.
 ALTER TABLE sales
     ADD COLUMN IF NOT EXISTS branch_id uuid;
 

@@ -1,7 +1,6 @@
 export * from './CrudArchivedSearchParamToggle';
 export * from './CrudActionDialog';
 export * from './CrudEntityEditorModal';
-export * from './CrudEntityImageField';
 export * from './CrudKanbanColumnCreateButton';
 export * from './CrudEntityMediaCarousel';
 export * from './CrudEntityModalShell';

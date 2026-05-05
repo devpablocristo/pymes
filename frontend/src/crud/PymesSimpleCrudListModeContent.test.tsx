@@ -43,7 +43,11 @@ vi.mock('./usePymesCrudHeaderFeatures', () => ({
   }),
 }));
 
-vi.mock('../modules/crud', () => ({
+vi.mock('../modules/crud', async () => {
+  const { isDisplayableCrudImageSrc, parseCrudLinkedEntityImageUrlList } = await import(
+    '../modules/crud/crudLinkedEntityImageUrls'
+  );
+  return {
   CrudEntityDetailModal: ({ open, title }: { open: boolean; title: string }) =>
     open ? <div>detail-open:{title}</div> : null,
   useCrudArchivedSearchParam: () => ({ archived: archivedState }),
@@ -85,11 +89,26 @@ vi.mock('../modules/crud', () => ({
       ) : null}
     </div>
   ),
-  CrudGallerySurface: ({ items, card }: { items: Array<{ id: string }> ; card: { imageSrc?: (row: Record<string, unknown>) => string | undefined }}) => (
+  CrudGallerySurface: ({
+    items,
+    card,
+  }: {
+    items: Array<{ id: string }>;
+    card: {
+      imageSrc?: (row: Record<string, unknown>) => string | undefined;
+      imageUrls?: (row: Record<string, unknown>) => string[] | undefined;
+    };
+  }) => (
     <div>
       gallery
       <span data-testid="gallery-image">
-        {items.map((item) => card.imageSrc?.(item) ?? 'none').join('|')}
+        {items
+          .map((item) => {
+            const urls = card.imageUrls?.(item)?.filter(Boolean);
+            if (urls?.length) return urls.join(',');
+            return card.imageSrc?.(item) ?? 'none';
+          })
+          .join('|')}
       </span>
     </div>
   ),
@@ -156,7 +175,10 @@ vi.mock('../modules/crud', () => ({
     isColumnDroppable: vi.fn(),
   }),
   resolveCrudValueFilterOptions: () => [],
-}));
+  isDisplayableCrudImageSrc,
+  parseCrudLinkedEntityImageUrlList,
+  };
+});
 
 vi.mock('./PymesCrudResourceShellHeader', () => ({
   PymesCrudResourceShellHeader: (props: Record<string, unknown>) => {
@@ -180,7 +202,7 @@ describe('PymesSimpleCrudListModeContent', () => {
     mockGalleryItem = { id: '1', name: 'Cliente Uno', image_urls: ['https://img.example.com/one.jpg', 'https://img.example.com/two.jpg'] };
   });
 
-  it('muestra en galería la primera imagen válida para cualquier entidad', () => {
+  it('muestra en galería todas las imágenes válidas para cualquier entidad', () => {
     mockGalleryItem = {
       id: '1',
       name: 'Producto Uno',
@@ -200,7 +222,9 @@ describe('PymesSimpleCrudListModeContent', () => {
 
     render(<PymesSimpleCrudListModeContent resourceId="products" mode="gallery" />);
 
-    expect(screen.getByTestId('gallery-image')).toHaveTextContent('https://img.example.com/first.jpg');
+    expect(screen.getByTestId('gallery-image')).toHaveTextContent(
+      'https://img.example.com/first.jpg,https://img.example.com/second.jpg',
+    );
   });
 
   it('preconfigura el estado al crear desde el pie de una columna kanban', async () => {
@@ -550,6 +574,7 @@ describe('PymesSimpleCrudListModeContent', () => {
       toFormValues: (row: { id: string; name: string }) => ({ name: row.name ?? '' }),
       isValid: () => true,
       supportsArchived: true,
+      allowEdit: true,
       dataSource: {
         list: async () => [],
         restore: async () => undefined,

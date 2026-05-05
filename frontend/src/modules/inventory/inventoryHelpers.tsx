@@ -1,6 +1,6 @@
 import { type CrudColumn, type CrudFieldValue, type CrudFormField, type CrudFormValues, type CrudPageConfig } from '../../components/CrudPage';
 import type { CrudToolbarAction } from '@devpablocristo/modules-crud-ui';
-import { CrudEntityImageField, buildStandardCrudViewModes, formatCrudLinkedEntityImageUrlsToForm, parseCrudLinkedEntityImageUrlList } from '../../modules/crud';
+import { buildStandardCrudViewModes, formatCrudLinkedEntityImageUrlsToForm, parseCrudLinkedEntityImageUrlList } from '../../modules/crud';
 import {
   asBoolean,
   asNumber,
@@ -184,7 +184,6 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
   | 'toFormValues'
   | 'toBody'
   | 'isValid'
-  | 'editorModal'
 > {
   return {
     supportsArchived: true,
@@ -203,19 +202,6 @@ export function createProductCrudConfig<T extends ProductRecord>(options: {
     toFormValues: buildProductFormValues as CrudPageConfig<T & { id: string }>['toFormValues'],
     toBody: productFormToBody,
     isValid: isValidProductForm,
-    editorModal: {
-      disableBuiltInMedia: true,
-      fieldConfig: {
-        image_urls: {
-          readValue: ({ value }) => (
-            <CrudEntityImageField value={value} setValue={() => {}} readOnly />
-          ),
-          editControl: ({ value, setValue }) => (
-            <CrudEntityImageField value={value} setValue={(next) => setValue(next)} />
-          ),
-        },
-      },
-    },
   };
 }
 

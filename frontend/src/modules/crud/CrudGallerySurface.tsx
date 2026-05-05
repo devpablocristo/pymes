@@ -1,9 +1,15 @@
 import type { CSSProperties } from 'react';
 
+import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
+import { isDisplayableCrudImageSrc } from './crudLinkedEntityImageUrls';
+
 export type CrudGalleryCard<T extends { id: string }> = {
   title: (item: T) => string;
   subtitle?: (item: T) => string;
   meta?: (item: T) => string;
+  /** URLs para el mismo carrusel que el modal CRUD (varias por ítem). */
+  imageUrls?: (item: T) => string[] | undefined;
+  /** Legacy: una sola URL; si hay `imageUrls`, tiene prioridad. */
   imageSrc?: (item: T) => string | undefined;
   imageAlt?: (item: T) => string;
 };
@@ -54,6 +60,12 @@ const imageWrapStyle: CSSProperties = {
   width: '100%',
   aspectRatio: '1 / 1',
   background: 'var(--color-border-subtle)',
+  display: 'block',
+};
+
+const carouselSlotStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
   display: 'block',
 };
 
@@ -121,7 +133,10 @@ export function CrudGallerySurface<T extends { id: string }>({
         const title = card.title(item);
         const subtitle = card.subtitle?.(item);
         const meta = card.meta?.(item);
-        const imageSrc = card.imageSrc?.(item)?.trim() || PLACEHOLDER_IMAGE;
+        const fromList = card.imageUrls?.(item)?.filter(isDisplayableCrudImageSrc) ?? [];
+        const legacy = card.imageSrc?.(item)?.trim();
+        const displayUrls =
+          fromList.length > 0 ? fromList : legacy && isDisplayableCrudImageSrc(legacy) ? [legacy] : [];
         const imageAlt = card.imageAlt?.(item) ?? title;
         return (
           <button
@@ -133,15 +148,19 @@ export function CrudGallerySurface<T extends { id: string }>({
             aria-label={title}
           >
             <span style={imageWrapStyle}>
-              <img
-                src={imageSrc}
-                alt={imageAlt}
-                style={imageStyle}
-                loading="lazy"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_IMAGE;
-                }}
-              />
+              {displayUrls.length > 0 ? (
+                <span style={carouselSlotStyle}>
+                  <CrudEntityMediaCarousel
+                    urls={displayUrls}
+                    variant="read"
+                    compact
+                    containInteractiveEvents
+                    ariaLabel={imageAlt}
+                  />
+                </span>
+              ) : (
+                <img src={PLACEHOLDER_IMAGE} alt={imageAlt} style={imageStyle} loading="lazy" />
+              )}
             </span>
             <span style={bodyStyle}>
               <span style={titleStyle} title={title}>{compactText(title, 26)}</span>

@@ -8,6 +8,7 @@ import { readActiveBranchId } from '../lib/branchSelectionStorage';
 import { useI18n } from '../lib/i18n';
 import { PymesCrudResourceShellHeader } from './PymesCrudResourceShellHeader';
 import { appendBranchIdToCrudListQuery, isBranchScopedCrudResource } from './branchScopedCrud';
+import { StandardCrudImageUrlsEditor } from './standardCrudMedia';
 import { usePymesCrudConfigQuery } from './usePymesCrudConfigQuery';
 import { usePymesCrudHeaderFeatures } from './usePymesCrudHeaderFeatures';
 import {
@@ -18,6 +19,7 @@ import {
   CrudValueKanbanSurface,
   parseCrudLinkedEntityImageUrlList,
   collectCrudImageUrls,
+  isDisplayableCrudImageSrc,
   getCrudStateMachineColumnDefaultState,
   openCrudFormDialog,
   buildFreeMovementStateMachine,
@@ -40,6 +42,17 @@ import type {
   CrudRowAction,
   CrudViewModeId,
 } from '../components/CrudPage';
+
+/** Misma convención que `CrudEntityEditorModal`: textarea `image_urls` sin control explícito usa editor estándar. */
+const CRUD_DIALOG_IMAGE_FIELD_IDS = new Set<string>(['image_urls', 'image_url', 'images']);
+
+function defaultModalImageUrlsEditControl(ctx: {
+  value: CrudFieldValue | undefined;
+  values: Record<string, CrudFieldValue>;
+  setValue: (nextValue: CrudFieldValue) => void;
+}) {
+  return <StandardCrudImageUrlsEditor value={ctx.value} setValue={ctx.setValue} />;
+}
 
 type CrudListResponse<T> = {
   items: T[];
@@ -75,6 +88,9 @@ function toDialogField(
   fallbackSectionId?: string,
 ): CrudActionDialogField {
   const resolvedEditorFieldConfig = resolveEditorFieldConfig(field, editorFieldConfig, fallbackSectionId);
+  const resolvedEditControl =
+    resolvedEditorFieldConfig.editControl ??
+    (CRUD_DIALOG_IMAGE_FIELD_IDS.has(field.key) ? defaultModalImageUrlsEditControl : undefined);
   return {
     id: field.key,
     label: field.label,
@@ -97,9 +113,9 @@ function toDialogField(
     helperText: resolvedEditorFieldConfig.helperText,
     fullWidth: resolvedEditorFieldConfig.fullWidth,
     readOnly: resolvedEditorFieldConfig.readOnly,
-    editControl: resolvedEditorFieldConfig.editControl
+    editControl: resolvedEditControl
       ? ({ value, values: dialogValues, setValue }) =>
-          resolvedEditorFieldConfig.editControl?.({ value, values: dialogValues, setValue })
+          resolvedEditControl({ value, values: dialogValues, setValue })
       : undefined,
     visible: resolvedEditorFieldConfig.visible
       ? ({ value, values: dialogValues, editing }) =>
@@ -226,9 +242,9 @@ function buildEditorMediaUrls<T extends { id: string }>(row: T | undefined) {
   return collectCrudImageUrls({ imageUrls: collected });
 }
 
-function getFirstCrudImageUrl<T extends { id: string }>(row: T | undefined): string | undefined {
+function listGalleryDisplayableImageUrls<T extends { id: string }>(row: T): string[] {
   const urls = buildEditorMediaUrls(row);
-  return urls?.[0];
+  return (urls ?? []).filter(isDisplayableCrudImageSrc);
 }
 
 export function PymesSimpleCrudListModeContent<T extends { id: string }>({
@@ -400,7 +416,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
     ) {
       mappedColumns.push({
         id: 'tags',
-        header: 'Etiquetas',
+        header: 'Etiquetas Internas',
         className: 'cell-tags',
         render: (row) => crudConfig.renderTagsCell?.(row) ?? '—',
       });
@@ -487,7 +503,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         title: editing ? '' : dialogTitle,
         subtitle: undefined,
         eyebrow: editing ? undefined : crudConfig.editorModal?.eyebrow ?? crudConfig.labelPluralCap,
-        allowEdit: archived ? false : allowEditRecord,
+        allowEdit: allowEditRecord,
         mediaUrls:
           editing && !crudConfig.editorModal?.disableBuiltInMedia ? buildEditorMediaUrls(editorRow) : undefined,
         mediaFieldId: crudConfig.editorModal?.disableBuiltInMedia ? undefined : crudConfig.editorModal?.mediaFieldKey,
@@ -734,7 +750,7 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
             title: cardTitle,
             subtitle: (row) => cardSubtitle(row),
             meta: (row) => cardMeta(row),
-            imageSrc: (row) => getFirstCrudImageUrl(row),
+            imageUrls: (row) => listGalleryDisplayableImageUrls(row),
           }}
           onSelect={(row) => {
             selectItem(row.id);

@@ -1,10 +1,8 @@
 name: Deploy AI DEV (Cloud Run)
 
 on:
-  workflow_run:
-    workflows: ["CI"]
+  push:
     branches: [develop]
-    types: [completed]
   workflow_dispatch:
     inputs:
       ref:
@@ -14,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 concurrency:
@@ -22,7 +21,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: dev
     env:
@@ -52,7 +50,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref || github.event.workflow_run.head_sha || github.ref_name }}
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
 
       - name: Auth GCP
         uses: google-github-actions/auth@v2
@@ -70,6 +68,48 @@ jobs:
 
       - name: Resolve deploy SHA
         run: echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Wait for CI success
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 1800))
+          while (( SECONDS < deadline )); do
+            runs_json="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "CI" \
+              --commit "$DEPLOY_SHA" \
+              --event push \
+              --json databaseId,status,conclusion \
+              --limit 5)"
+            parsed="$(RUNS_JSON="$runs_json" python3 - <<'PY'
+          import json
+          import os
+
+          runs = json.loads(os.environ.get("RUNS_JSON", "[]"))
+          if not runs:
+              print("missing missing missing")
+          else:
+              run = runs[0]
+              print(run.get("databaseId"), run.get("status"), run.get("conclusion"))
+          PY
+          )"
+            read -r run_id status conclusion <<<"$parsed"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "CI $run_id pasó para $DEPLOY_SHA."
+                exit 0
+              fi
+              echo "::error::CI $run_id terminó con conclusion=$conclusion para $DEPLOY_SHA."
+              exit 1
+            fi
+            echo "Esperando CI para $DEPLOY_SHA (run=${run_id:-missing}, status=${status:-missing})..."
+            sleep 15
+          done
+          echo "::error::Timeout esperando CI para $DEPLOY_SHA."
+          exit 1
 
       - name: Build y push imagen
         run: |

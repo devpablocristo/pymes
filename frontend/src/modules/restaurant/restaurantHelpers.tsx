@@ -8,7 +8,7 @@ import {
   updateRestaurantDiningTable,
 } from '../../lib/restaurantsApi';
 import type { RestaurantDiningArea, RestaurantDiningTable } from '../../lib/restaurantTypes';
-import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
+import { asNumber, asOptionalNumber, asOptionalString, asString, formatDate, mergeStandardCrudMetadataFromForm } from '../../crud/resourceConfigs.shared';
 import { buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 import { buildStandardCrudViewModes } from '../crud';
@@ -37,6 +37,7 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
           sort_order: asNumber(values.sort_order),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(undefined, values as Record<string, unknown>),
         });
       },
       update: async (row: RestaurantDiningArea, values) => {
@@ -45,6 +46,7 @@ export function createRestaurantDiningAreasCrudConfig(): CrudResourceConfigMap['
           sort_order: asOptionalNumber(values.sort_order),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(row.metadata, values as Record<string, unknown>),
         });
       },
     },
@@ -87,6 +89,7 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           notes: asOptionalString(values.notes),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(undefined, values as Record<string, unknown>),
         });
       },
       update: async (row: RestaurantDiningTable, values) => {
@@ -99,6 +102,7 @@ export function createRestaurantDiningTablesCrudConfig(): CrudResourceConfigMap[
           notes: asOptionalString(values.notes),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(row.metadata, values as Record<string, unknown>),
         });
       },
     },

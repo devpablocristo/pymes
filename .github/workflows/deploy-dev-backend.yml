@@ -34,10 +34,10 @@ jobs:
       CLOUDSQL_INSTANCE: new-nexus-dev:us-central1:nexus-db-dev
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      REVIEW_URL: https://nexus-review-396554427884.us-central1.run.app
+      GOVERNANCE_URL: https://nexus-review-396554427884.us-central1.run.app
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
-      SECRET_REVIEW_API_KEY_NAME: REVIEW_API_KEY
+      SECRET_GOVERNANCE_API_KEY_NAME: REVIEW_API_KEY
       AUTH_ENABLE_JWT: "true"
       AUTH_ALLOW_API_KEY: "true"
       NOTIFICATION_BACKEND: noop
@@ -103,8 +103,8 @@ jobs:
           if gcloud secrets describe "$SECRET_CLERK_SECRET_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
             secret_flags="${secret_flags},CLERK_SECRET_KEY=${SECRET_CLERK_SECRET_KEY_NAME}:latest"
           fi
-          if gcloud secrets describe "$SECRET_REVIEW_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
-            secret_flags="${secret_flags},REVIEW_API_KEY=${SECRET_REVIEW_API_KEY_NAME}:latest"
+          if gcloud secrets describe "$SECRET_GOVERNANCE_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
           fi
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
@@ -127,8 +127,8 @@ jobs:
           if [[ -n "${JWT_ISSUER}" ]]; then
             env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
           fi
-          if [[ -n "${REVIEW_URL}" ]]; then
-            env_vars="${env_vars},REVIEW_URL=${REVIEW_URL}"
+          if [[ -n "${GOVERNANCE_URL}" ]]; then
+            env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"
           fi
           if [[ -n "${AI_SERVICE_URL_EXISTING:-}" ]]; then
             env_vars="${env_vars},AI_SERVICE_URL=${AI_SERVICE_URL_EXISTING}"
@@ -189,7 +189,7 @@ jobs:
               print("ERROR: tráfico no está 100% en latestRevision.")
               sys.exit(1)
           envs = svc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0].get("env", [])
-          watched = {"PUBLIC_BASE_URL", "FRONTEND_URL", "AI_SERVICE_URL", "REVIEW_URL"}
+          watched = {"PUBLIC_BASE_URL", "FRONTEND_URL", "AI_SERVICE_URL", "GOVERNANCE_URL"}
           for env in envs:
               name = env.get("name", "")
               value = env.get("value", "")

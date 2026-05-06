@@ -20,6 +20,7 @@ type Session struct {
 	Metadata        map[string]any
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 type SessionNote struct {

@@ -10,7 +10,7 @@ from runtime.chat.stream import (
 )
 from runtime.types import LLMProvider, Message, ToolDeclaration
 
-_FALLBACK_REPLY_ES = "No pude generar una respuesta en este momento."
+_STREAM_FAILURE_REPLY_ES = "No pude generar una respuesta en este momento."
 
 
 async def stream_orchestrated_chat(
@@ -34,7 +34,7 @@ async def stream_orchestrated_chat(
         failure_event=failure_event,
         failure_context=failure_context,
         on_success=on_success,
-        fallback_reply=_FALLBACK_REPLY_ES,
+        fallback_reply=_STREAM_FAILURE_REPLY_ES,
     ):
         yield event
 

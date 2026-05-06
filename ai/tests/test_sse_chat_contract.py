@@ -11,6 +11,7 @@ from src.api.public_router import router as public_chat_router
 import src.api.quota as quota_module
 from src.api.router import router as internal_chat_router
 from src.agents.service_support import CommercialChatResult
+from src.internal_chat.service import InternalChatError
 import src.api.public_router as public_router_module
 import src.api.router as router_module
 
@@ -208,8 +209,45 @@ def test_internal_chat_success_returns_json_contract(monkeypatch) -> None:
         "blocks": [{"type": "text", "text": "respuesta final"}],
         "routed_agent": "customers",
         "routing_source": "orchestrator",
+        "analysis_scope": "general",
+        "answer_mode": "analysis",
+        "deterministic": {"used": False, "summary": "", "blocks": []},
+        "dashboard_links": [],
+        "llm": {"used": False, "provider": None, "model": None, "status": "unavailable"},
+        "evidence": {"tools": [], "record_counts": {}, "period": None},
     }
     assert captured["route_hint"] is None
+
+
+def test_internal_chat_visible_gemini_error_returns_structured_json(monkeypatch) -> None:
+    repo = StubRepo()
+    client = create_internal_client(repo)
+
+    monkeypatch.setattr(router_module, "get_request_id", lambda: "req-chat-visible")
+
+    async def fake_run_internal_orchestrated_chat(**_kwargs):
+        raise InternalChatError(
+            status_code=503,
+            code="gemini_unavailable",
+            message="Gemini no está disponible para el asistente interno.",
+            details={"reason": "test"},
+        )
+
+    monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
+
+    response = client.post("/v1/chat", json={"message": "hola"})
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "error": {
+            "code": "gemini_unavailable",
+            "message": "Gemini no está disponible para el asistente interno.",
+            "details": {"reason": "test"},
+            "request_id": "req-chat-visible",
+        }
+    }
+    assert repo.append_calls == []
+    assert repo.track_calls == []
 
 
 def test_internal_chat_bypasses_quota_when_plan_limits_are_disabled(monkeypatch) -> None:

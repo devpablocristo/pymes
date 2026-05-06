@@ -1,7 +1,7 @@
 import type { CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import { apiRequest } from '../../lib/api';
 import { buildStandardCrudViewModes, buildStandardInternalFields, formatTagCsv, parseTagCsv } from '../crud';
-import { asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
+import { asOptionalString, asString, formatDate, mergeStandardCrudMetadataFromForm } from '../../crud/resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export type EmployeeStatus = 'active' | 'inactive' | 'terminated';
@@ -25,6 +25,8 @@ export type EmployeeRow = {
   created_at: string;
   updated_at: string;
   archived_at?: string | null;
+  /** JSON libre (p. ej. carrusel estándar `image_urls`). */
+  metadata?: Record<string, unknown>;
 };
 
 type ListResponse = {
@@ -46,7 +48,7 @@ function normalizeStatus(value: unknown): EmployeeStatus {
   return 'active';
 }
 
-function employeeToBody(values: CrudFormValues): Record<string, unknown> {
+function employeeToBody(values: CrudFormValues, existing?: EmployeeRow): Record<string, unknown> {
   return {
     first_name: asOptionalString(values.first_name) ?? '',
     last_name: asOptionalString(values.last_name) ?? '',
@@ -59,6 +61,7 @@ function employeeToBody(values: CrudFormValues): Record<string, unknown> {
     notes: asOptionalString(values.notes) ?? '',
     is_favorite: Boolean(values.is_favorite),
     tags: parseTagCsv(values.tags),
+    metadata: mergeStandardCrudMetadataFromForm(existing?.metadata, values as Record<string, unknown>),
   };
 }
 
@@ -84,7 +87,7 @@ export function createEmployeesCrudConfig(): CrudPageConfig<EmployeeRow> {
         await apiRequest('/v1/employees', { method: 'POST', body: employeeToBody(values) });
       },
       update: async (row, values) => {
-        await apiRequest(`/v1/employees/${row.id}`, { method: 'PATCH', body: employeeToBody(values) });
+        await apiRequest(`/v1/employees/${row.id}`, { method: 'PATCH', body: employeeToBody(values, row) });
       },
       deleteItem: async (row) => {
         await apiRequest(`/v1/employees/${row.id}`, { method: 'DELETE' });

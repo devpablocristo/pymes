@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import ReactMarkdown from 'react-markdown';
 import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@devpablocristo/modules-search';
 import { pymesAssistantChat, listConversations, getConversation } from '../lib/aiApi';
@@ -35,7 +36,17 @@ type Msg = {
   badgeTones?: MsgBadgeTone[];
 };
 
-type MsgBadgeTone = 'sales' | 'collections' | 'purchases' | 'customers' | 'products' | 'general' | 'neutral';
+type MsgBadgeTone =
+  | 'sales'
+  | 'collections'
+  | 'purchases'
+  | 'customers'
+  | 'products'
+  | 'employees'
+  | 'general'
+  | 'deterministic'
+  | 'gemini'
+  | 'neutral';
 type AssistantReplyRow = Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels' | 'badgeTones'>;
 
 let nextMsgId = 100;
@@ -44,9 +55,11 @@ function normalizeManualRouteHint(value: string | null | undefined): ManualRoute
   if (
     value === 'customers' ||
     value === 'products' ||
+    value === 'services' ||
     value === 'sales' ||
     value === 'collections' ||
-    value === 'purchases'
+    value === 'purchases' ||
+    value === 'employees'
   ) {
     return value;
   }
@@ -81,7 +94,8 @@ function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
   if (mode === 'collections') return 'collections';
   if (mode === 'purchases' || mode === 'internal_procurement') return 'purchases';
   if (mode === 'customers') return 'customers';
-  if (mode === 'products') return 'products';
+  if (mode === 'products' || mode === 'services') return 'products';
+  if (mode === 'employees') return 'employees';
   if (mode === 'general' || mode === 'insight_chat') return 'general';
   return 'neutral';
 }
@@ -107,6 +121,16 @@ function formatIsoTime(iso: string | null | undefined, language: LanguageCode): 
   }
 }
 
+export function AssistantMarkdown({ text }: { text: string }) {
+  return (
+    <div className="cht__markdown">
+      <ReactMarkdown allowedElements={['p', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'code', 'pre', 'blockquote']}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 function resolvePreferredLanguage(contentLanguage: string | undefined, fallbackLanguage: LanguageCode): LanguageCode {
   if (contentLanguage === 'en' || contentLanguage === 'es') {
     return contentLanguage;
@@ -120,7 +144,12 @@ function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
   if (mode === 'sales') return humanRoutedLabel('sales', language);
   if (mode === 'collections') return humanRoutedLabel('collections', language);
   if (mode === 'purchases') return humanRoutedLabel('purchases', language);
+  if (mode === 'employees') return humanRoutedLabel('employees', language);
   return humanRoutedLabel('general', language);
+}
+
+function isDeterministicReply(reply: PymesAssistantChatResponse): boolean {
+  return reply.answer_mode === 'facts_only' || Boolean(reply.deterministic?.used && !reply.llm?.used);
 }
 
 function buildAssistantMetaLabel(
@@ -134,7 +163,33 @@ function buildAssistantMetaLabel(
     humanRoutedLabel(reply.routed_agent, language),
     humanRoutingSourceLabel(reply.routing_source, language),
   ];
+  if (reply.analysis_scope) {
+    parts.push(humanInsightScopeLabel(reply.analysis_scope, language));
+  }
   return parts.join(' · ');
+}
+
+function formatAssistantHttpError(
+  err: unknown,
+  fallback: string,
+): string {
+  const body = typeof (err as { body?: unknown } | null)?.body === 'string'
+    ? String((err as { body?: string }).body)
+    : '';
+  if (body) {
+    try {
+      const parsed = JSON.parse(body) as { error?: { code?: string; message?: string } };
+      if (parsed.error?.code === 'gemini_unavailable' && parsed.error.message) {
+        return parsed.error.message;
+      }
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+    } catch {
+      // formatFetchErrorForUser handles the original error message below.
+    }
+  }
+  return formatFetchErrorForUser(err, fallback);
 }
 
 function buildNotificationHandoffMetaLabel(
@@ -164,11 +219,40 @@ function buildRouteHintMetaLabel(
 }
 
 function buildAssistantBadgeLabels(reply: PymesAssistantChatResponse, language: LanguageCode): string[] {
-  return [humanBadgeCategoryLabel(reply.routed_agent, language)];
+  const labels = [humanBadgeCategoryLabel(reply.routed_agent, language)];
+  if (isDeterministicReply(reply)) {
+    labels.push(language === 'en' ? 'Deterministic' : 'Determinista');
+  }
+  if (reply.llm?.used && reply.llm.model) {
+    labels.push(`Gemini ${reply.llm.model}`);
+  }
+  const toolCount = reply.evidence?.tools?.length ?? reply.tool_calls?.length ?? 0;
+  if (toolCount > 0) {
+    labels.push(language === 'en' ? `${toolCount} evidence tools` : `${toolCount} herramientas`);
+  }
+  const period = reply.evidence?.period;
+  if (period?.label) {
+    labels.push(language === 'en' ? `Period ${period.label}` : `Período ${period.label}`);
+  }
+  return labels;
 }
 
 function buildAssistantBadgeTones(reply: PymesAssistantChatResponse): MsgBadgeTone[] {
-  return [badgeToneForRoute(reply.routed_agent)];
+  const tones: MsgBadgeTone[] = [badgeToneForRoute(reply.routed_agent)];
+  if (isDeterministicReply(reply)) {
+    tones.push('deterministic');
+  }
+  if (reply.llm?.used && reply.llm.model) {
+    tones.push('gemini');
+  }
+  const toolCount = reply.evidence?.tools?.length ?? reply.tool_calls?.length ?? 0;
+  if (toolCount > 0) {
+    tones.push('neutral');
+  }
+  if (reply.evidence?.period?.label) {
+    tones.push('neutral');
+  }
+  return tones;
 }
 
 function applyPymesReply(
@@ -400,7 +484,7 @@ export function UnifiedChatPage() {
         const additions = buildAssistantMessages(AI_PYMES_ID, reply, language, t);
         setMsgs((p) => [...p, ...additions]);
       } catch (err) {
-        setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
+        setError(formatAssistantHttpError(err, t('ai.chat.error.unreachable')));
       }
     };
     void run();
@@ -493,7 +577,7 @@ export function UnifiedChatPage() {
         const additions = buildAssistantMessages(AI_PYMES_ID, reply, language, t);
         setMsgs((p) => [...p, ...additions]);
       } catch (err) {
-        setError(formatFetchErrorForUser(err, t('ai.chat.error.unreachable')));
+        setError(formatAssistantHttpError(err, t('ai.chat.error.unreachable')));
       }
     },
     [busy, chatIds, chatMutation, language, pendingRouteHintsByContact, t],
@@ -614,7 +698,7 @@ export function UnifiedChatPage() {
                       if (block.type === 'text') {
                         return (
                           <div key={`${m.id}-block-${index}`} className="cht__block-text">
-                            {block.text}
+                            <AssistantMarkdown text={block.text} />
                           </div>
                         );
                       }
@@ -720,7 +804,7 @@ export function UnifiedChatPage() {
                     })}
                   </div>
                 ) : (
-                  m.text
+                  m.fromMe ? m.text : <AssistantMarkdown text={m.text} />
                 )}
                 <div className="cht__msg-time">{m.time}</div>
               </div>

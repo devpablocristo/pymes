@@ -33,7 +33,7 @@ BEGIN
             OR (
                 nsp.nspname = 'public'
                 AND (
-                    (cls.relname LIKE 'scheduling\_%' ESCAPE '\' AND cls.relname <> 'scheduling_branches')
+                    cls.relname LIKE 'scheduling\_%' ESCAPE '\'
                     OR cls.relname IN (
                         'parties',
                         'pymes_in_app_notifications',
@@ -44,6 +44,8 @@ BEGIN
                         'whatsapp_opt_ins',
                         'payment_preferences',
                         'ai_conversations',
+                        'employees',
+                        'invoices',
                         'credit_notes',
                         'returns',
                         'payments',
@@ -113,6 +115,21 @@ WHERE NOT EXISTS (
 "
 
 run_review_sql_inline "
+BEGIN;
+
+-- request_events es append-only (migración Nexus governance); TRUNCATE dispara BEFORE TRUNCATE.
+DO \$\$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'request_events'
+    ) THEN
+        EXECUTE 'ALTER TABLE public.request_events DISABLE TRIGGER USER';
+    END IF;
+END \$\$;
+
 DO \$\$
 DECLARE
     tables_to_truncate text;
@@ -127,4 +144,18 @@ BEGIN
         EXECUTE 'TRUNCATE TABLE ' || tables_to_truncate || ' RESTART IDENTITY CASCADE';
     END IF;
 END \$\$;
+
+DO \$\$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'request_events'
+    ) THEN
+        EXECUTE 'ALTER TABLE public.request_events ENABLE TRIGGER USER';
+    END IF;
+END \$\$;
+
+COMMIT;
 "

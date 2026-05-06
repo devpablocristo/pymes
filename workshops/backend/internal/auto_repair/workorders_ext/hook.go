@@ -18,7 +18,7 @@ import (
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
 
-// Hook es la implementación de workorders.Hook para target_type="vehicle".
+// Hook es la implementación de workorders.Hook para asset_type="vehicle".
 type Hook struct {
 	assets vehicleLookupPort
 }
@@ -30,7 +30,7 @@ type vehicleLookupPort interface {
 // New construye un hook nuevo para auto_repair.
 func New(assets vehicleLookupPort) workorders.Hook { return &Hook{assets: assets} }
 
-// TargetType identifica este hook para el registry.
+// TargetType identifica este hook para el registry legacy de hooks.
 func (h *Hook) TargetType() string { return "vehicle" }
 
 // BeforeCreate corre antes de validar/persistir una OT nueva de auto_repair.
@@ -51,9 +51,9 @@ func (h *Hook) BeforeCreate(ctx context.Context, wo *domain.WorkOrder) error {
 	return nil
 }
 
-// BeforeUpdate solo revalida el asset si el target cambia.
+// BeforeUpdate solo revalida el asset si cambia la referencia.
 func (h *Hook) BeforeUpdate(ctx context.Context, current, next *domain.WorkOrder) error {
-	if current.TargetID == next.TargetID {
+	if current.AssetID == next.AssetID {
 		return nil
 	}
 	return h.syncVehicle(ctx, next)
@@ -66,7 +66,7 @@ func (h *Hook) AfterStatusChange(_ context.Context, _ *domain.WorkOrder, _ strin
 // ReadyForPickupMessage devuelve el texto del WhatsApp para "listo para retirar".
 // Menciona la patente del vehículo si está disponible.
 func (h *Hook) ReadyForPickupMessage(wo *domain.WorkOrder) string {
-	plate := strings.TrimSpace(wo.TargetLabel)
+	plate := strings.TrimSpace(wo.AssetLabel)
 	number := strings.TrimSpace(wo.Number)
 	if plate != "" {
 		return fmt.Sprintf("Hola: su vehículo está listo para retirar. Orden %s · Patente %s. Coordiná la entrega con el taller.", number, plate)
@@ -78,14 +78,15 @@ func (h *Hook) syncVehicle(ctx context.Context, wo *domain.WorkOrder) error {
 	if h.assets == nil {
 		return nil
 	}
-	asset, err := h.assets.GetByID(ctx, wo.OrgID, wo.TargetID)
+	asset, err := h.assets.GetByID(ctx, wo.OrgID, wo.AssetID)
 	if err != nil {
 		if errors.Is(err, httperrors.ErrNotFound) {
-			return fmt.Errorf("target_id is invalid: %w", httperrors.ErrBadInput)
+			return fmt.Errorf("asset_id is invalid: %w", httperrors.ErrBadInput)
 		}
 		return err
 	}
-	if strings.TrimSpace(wo.TargetLabel) == "" {
+	if strings.TrimSpace(wo.AssetLabel) == "" {
+		wo.AssetLabel = asset.LicensePlate
 		wo.TargetLabel = asset.LicensePlate
 	}
 	if wo.CustomerID == nil && asset.CustomerID != nil {

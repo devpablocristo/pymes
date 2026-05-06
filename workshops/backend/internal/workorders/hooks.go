@@ -7,19 +7,18 @@ import (
 )
 
 // Hook permite a cada vertical engancharse al ciclo de vida de la work order
-// sin duplicar el CRUD base. Cada hook debe inspeccionar wo.TargetType y
+// sin duplicar el CRUD base. Cada hook se enruta por wo.AssetType y
 // retornar early si no le aplica (no es su segmento).
 //
 // Las extensiones (auto_repair/workorders_ext, bike_shop/workorders_ext) implementan
 // esta interface y se registran en el constructor del módulo base.
 type Hook interface {
-	// TargetType devuelve el tipo de target que esta extensión maneja ("vehicle", "bicycle", ...).
-	// El módulo base usa esto para enrutar hooks al vertical correcto.
+	// TargetType devuelve el asset_type que esta extensión maneja ("vehicle", "bicycle", ...).
+	// El nombre queda por compatibilidad de código; el contrato de negocio es asset_type.
 	TargetType() string
 
 	// BeforeCreate corre antes de validar/persistir una OT nueva.
-	// Útil para validar el target_id contra la tabla del vertical (vehicles, bicycles)
-	// o para enriquecer target_label desde el asset.
+	// Útil para validar el asset_id contra customer_assets o para enriquecer asset_label.
 	BeforeCreate(ctx context.Context, wo *domain.WorkOrder) error
 
 	// BeforeUpdate corre antes de persistir cambios sobre una OT existente.
@@ -43,7 +42,7 @@ type noopHook struct {
 	targetType string
 }
 
-// NewNoopHook crea un hook neutro para un target type específico.
+// NewNoopHook crea un hook neutro para un asset_type específico.
 func NewNoopHook(targetType string) Hook {
 	return &noopHook{targetType: targetType}
 }
@@ -55,7 +54,7 @@ func (h *noopHook) AfterStatusChange(_ context.Context, _ *domain.WorkOrder, _ s
 }
 func (h *noopHook) ReadyForPickupMessage(_ *domain.WorkOrder) string { return "" }
 
-// hookRegistry indexa hooks por target_type para despacho rápido.
+// hookRegistry indexa hooks por asset_type para despacho rápido.
 type hookRegistry struct {
 	byType map[string]Hook
 }

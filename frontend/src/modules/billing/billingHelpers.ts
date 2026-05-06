@@ -1,11 +1,31 @@
+import { Fragment, createElement } from 'react';
 import type { CrudFieldValue, CrudPageConfig } from '../../components/CrudPage';
 import type { CrudResourceShellHeaderConfigLike } from '../crud/CrudResourceShellHeader';
-import { asOptionalNumber, asOptionalString, asString, asBoolean, formatDate, parseJSONArray, parseImageURLList } from '../../crud/resourceConfigs.shared';
+import { asBoolean, asOptionalString, asString, formatDate } from '../../crud/resourceConfigs.shared';
 import { mergeCsvOptionsForResource } from '../../crud/csvEntityPolicy';
 import { withCSVToolbar } from '../../crud/csvToolbar';
 import { apiRequest, createSalePayment, downloadAPIFile, listSalePayments } from '../../lib/api';
 import { readActiveBranchId } from '../../lib/branchSelectionStorage';
 import { paymentMethodOptions } from '../../lib/formPresets';
+import {
+  archiveInvoiceById,
+  createInvoiceFromCrudValues,
+  fetchInvoices,
+  hardDeleteInvoiceById,
+  restoreInvoiceById,
+  updateInvoiceFromCrudValues,
+  updateInvoiceStatus,
+} from '../../lib/invoicesApi';
+import {
+  parseCommercialCostLineItems,
+  parseCommercialPricedLineItems,
+  parseInvoiceStatus,
+  type CreditNoteRecord,
+  type InvoiceRecord,
+  type PurchaseRecord,
+  type QuoteRecord,
+  type SaleRecord,
+} from './billingDocuments';
 import {
   buildCrudSelectFieldOptionsFromStateMachine,
   buildFullyConnectedStatusStateMachine,
@@ -15,120 +35,28 @@ import {
   openCrudFormDialog,
   openCrudTextDialog,
 } from '../crud';
-import { parsePartyTagCsv } from '../parties/partiesHelpers';
-import {
-  INVOICE_STATUS_LABELS,
-  archiveInvoice,
-  invoiceInitials,
-  nextInvoiceUid,
-  readDemoInvoices,
-  removeDemoInvoice,
-  restoreInvoice,
-  updateDemoInvoice,
-  writeDemoInvoices,
+import { formatPartyTagList, parsePartyTagCsv } from '../parties/partiesHelpers';
+import { INVOICE_STATUS_LABELS } from './invoicesDemo';
+
+export {
+  buildCommercialDocumentStatusOptions,
+  createDemoInvoiceFromCrudValues,
+  createInvoiceCrudLineItems,
+  parseCommercialCostLineItems,
+  parseCommercialPricedLineItems,
+  parseInvoiceStatus,
+  type CommercialCostLineItem,
+  type CommercialDocumentStatusOption,
+  type CommercialPricedLineItem,
+  type CreditNoteRecord,
   type InvoiceLineItem,
   type InvoiceRecord,
   type InvoiceStatus,
-} from './invoicesDemo';
+  type PurchaseRecord,
+  type QuoteRecord,
+  type SaleRecord,
+} from './billingDocuments';
 
-export type CommercialDocumentStatusOption<TStatus extends string> = {
-  value: TStatus;
-  label: string;
-  badgeClass: string;
-};
-
-export function buildCommercialDocumentStatusOptions<TStatus extends string>(
-  labels: Record<TStatus, string>,
-  badgeClasses: Record<TStatus, string>,
-): Array<CommercialDocumentStatusOption<TStatus>> {
-  return (Object.keys(labels) as TStatus[]).map((value) => ({
-    value,
-    label: labels[value],
-    badgeClass: badgeClasses[value],
-  }));
-}
-
-export type CommercialPricedLineItem = {
-  product_id?: string;
-  service_id?: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-  tax_rate?: number;
-  sort_order: number;
-};
-
-export type CommercialCostLineItem = {
-  product_id?: string;
-  service_id?: string;
-  description: string;
-  quantity: number;
-  unit_cost: number;
-  tax_rate?: number;
-};
-
-export type QuoteRecord = {
-  id: string;
-  branch_id?: string;
-  number: string;
-  customer_id?: string;
-  customer_name: string;
-  status: string;
-  total: number;
-  currency?: string;
-  valid_until?: string;
-  notes?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  items?: CommercialPricedLineItem[];
-};
-
-export type SaleRecord = {
-  id: string;
-  branch_id?: string;
-  number: string;
-  customer_id?: string;
-  customer_name: string;
-  quote_id?: string;
-  status: string;
-  payment_method?: string;
-  total: number;
-  currency?: string;
-  notes?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  items?: CommercialPricedLineItem[];
-};
-
-export type CreditNoteRecord = {
-  id: string;
-  number: string;
-  party_id: string;
-  return_id: string;
-  amount: number;
-  used_amount: number;
-  balance: number;
-  status: string;
-  created_at: string;
-  expires_at?: string;
-};
-
-export type PurchaseRecord = {
-  id: string;
-  branch_id?: string;
-  number: string;
-  supplier_id?: string;
-  supplier_name: string;
-  status: string;
-  payment_status: string;
-  total: number;
-  currency?: string;
-  notes?: string;
-  received_at?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  items?: CommercialCostLineItem[];
-};
 
 function buildCrudNotesField() {
   return { key: 'notes', label: 'Notas', type: 'textarea' as const, fullWidth: true };
@@ -168,6 +96,41 @@ function buildCommercialLineItemsBlock(sectionId = 'items', label = 'Renglones')
   };
 }
 
+function buildInvoiceLineItemsBlock(sectionId = 'items') {
+  return {
+    id: 'items',
+    kind: 'lineItems' as const,
+    field: 'items',
+    sectionId,
+    visible: ({ editing }: { editing: boolean }) => editing,
+  };
+}
+
+function buildInternalFavoriteField() {
+  return { key: 'is_favorite', label: 'Agregar a favoritos', type: 'checkbox' as const };
+}
+
+function buildInternalTagsField(placeholder: string) {
+  return { key: 'tags', label: 'Etiquetas internas', placeholder };
+}
+
+function readCommercialFavorite(row: unknown): boolean {
+  const record = row as { is_favorite?: unknown; metadata?: { favorite?: unknown } };
+  return Boolean(record.is_favorite ?? record.metadata?.favorite);
+}
+
+function readCommercialTags(row: unknown): string {
+  const tags = (row as { tags?: unknown }).tags;
+  return Array.isArray(tags) ? formatPartyTagList(tags.map((tag) => String(tag))) : '';
+}
+
+function commercialAnnotationsToBody(values: Record<string, CrudFieldValue | undefined>) {
+  return {
+    is_favorite: asBoolean(values.is_favorite),
+    tags: parsePartyTagCsv(values.tags),
+  };
+}
+
 const purchasePaymentStatusOptions = [
   { value: 'pending', label: 'Pendiente' },
   { value: 'partial', label: 'Parcial' },
@@ -187,79 +150,6 @@ function buildCrudSectionField(sectionId: string, extra?: Record<string, unknown
     sectionId,
     ...(extra ?? {}),
   };
-}
-
-export function parseInvoiceStatus(value: CrudFieldValue | undefined): InvoiceStatus {
-  const raw = asOptionalString(value);
-  if (raw === 'paid' || raw === 'pending' || raw === 'overdue') return raw;
-  return 'pending';
-}
-
-export function createInvoiceCrudLineItems(value: CrudFieldValue | undefined): InvoiceLineItem[] {
-  return parseJSONArray<{ id?: string; description?: string; qty?: number; unit?: string; unitPrice?: number }>(
-    value,
-    'Los items deben ser un arreglo JSON',
-  ).map((item, index) => ({
-    id: String(item.id ?? index + 1),
-    description: String(item.description ?? ''),
-    qty: Number(item.qty ?? 1),
-    unit: String(item.unit ?? 'unidad'),
-    unitPrice: Number(item.unitPrice ?? 0),
-  }));
-}
-
-export async function createDemoInvoiceFromCrudValues(values: Record<string, CrudFieldValue | undefined>): Promise<void> {
-  const customer = asString(values.customer);
-  const invoices = readDemoInvoices();
-  const meta: Record<string, unknown> = {};
-  if (asBoolean(values.metadata_favorite)) {
-    meta.favorite = true;
-  }
-  writeDemoInvoices([
-    {
-      id: nextInvoiceUid(),
-      number: asOptionalString(values.number) ?? `INV-${3500 + Math.floor(Math.random() * 100)}`,
-      customer,
-      initials: invoiceInitials(customer),
-      issuedDate: asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
-      dueDate: asOptionalString(values.dueDate) ?? asOptionalString(values.issuedDate) ?? new Date().toISOString().slice(0, 10),
-      status: parseInvoiceStatus(values.status),
-      discount: asOptionalNumber(values.discount) ?? 0,
-      tax: asOptionalNumber(values.tax) ?? 21,
-      items: createInvoiceCrudLineItems(values.items),
-      archived_at: null,
-      tags: parsePartyTagCsv(values.tags),
-      metadata: Object.keys(meta).length > 0 ? meta : undefined,
-    },
-    ...invoices,
-  ]);
-}
-
-export function parseCommercialPricedLineItems(value: CrudFieldValue | undefined): CommercialPricedLineItem[] {
-  return parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON')
-    .map((item, index) => ({
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      service_id: asOptionalString(item.service_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_price: Number(item.unit_price ?? 0),
-      tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
-      sort_order: Number(item.sort_order ?? index),
-    }))
-    .filter((item) => item.description && item.quantity > 0);
-}
-
-export function parseCommercialCostLineItems(value: CrudFieldValue | undefined): CommercialCostLineItem[] {
-  return parseJSONArray<Record<string, unknown>>(value, 'Los items deben ser un arreglo JSON')
-    .map((item) => ({
-      product_id: asOptionalString(item.product_id as CrudFieldValue),
-      service_id: asOptionalString(item.service_id as CrudFieldValue),
-      description: String(item.description ?? '').trim(),
-      quantity: Number(item.quantity ?? 0),
-      unit_cost: Number(item.unit_cost ?? 0),
-      tax_rate: item.tax_rate === undefined || item.tax_rate === null ? undefined : Number(item.tax_rate),
-    }))
-    .filter((item) => item.description && item.quantity > 0);
 }
 
 export function createCommercialDocumentCrudConfig<
@@ -361,7 +251,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     labelPlural: 'facturas',
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
-    createFromValues: createDemoInvoiceFromCrudValues,
+    createFromValues: createInvoiceFromCrudValues,
     searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
@@ -376,54 +266,21 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
     allowCreate: true,
     allowEdit: true,
     stateMachine,
-    // Demo localStorage: expone list/update/archive/restore/delete contra el store.
     dataSource: {
       ...existingDataSource,
-      list: async ({ archived }) => {
-        const rows = readDemoInvoices();
-        const matchesArchived = (r: InvoiceRecord) => (archived ? r.archived_at != null : r.archived_at == null);
-        return rows.filter(matchesArchived) as TRecord[];
-      },
+      list: async ({ archived }) => (await fetchInvoices({ archived: Boolean(archived) })) as TRecord[],
       update: async (row, values) => {
-        updateDemoInvoice(row.id, (r) => {
-          const meta: Record<string, unknown> =
-            r.metadata && typeof r.metadata === 'object'
-              ? { ...(r.metadata as Record<string, unknown>) }
-              : {};
-          if (asBoolean(values.metadata_favorite)) {
-            meta.favorite = true;
-          } else {
-            delete meta.favorite;
-          }
-          const imgUrls = parseImageURLList(values.image_urls);
-          if (imgUrls.length > 0) {
-            meta.image_urls = imgUrls;
-          } else {
-            delete meta.image_urls;
-          }
-          return {
-            ...r,
-            customer: asString(values.customer ?? '').trim() || r.customer,
-            initials:
-              invoiceInitials(asString(values.customer ?? '').trim() || r.customer || ''),
-            status: parseInvoiceStatus(values.status),
-            discount: asOptionalNumber(values.discount) ?? r.discount,
-            tax: asOptionalNumber(values.tax) ?? r.tax,
-            issuedDate: asOptionalString(values.issuedDate) ?? r.issuedDate,
-            dueDate: asOptionalString(values.dueDate) ?? r.dueDate,
-            tags: parsePartyTagCsv(values.tags),
-            metadata: Object.keys(meta).length > 0 ? meta : undefined,
-          };
-        });
+        await updateInvoiceFromCrudValues(row.id, values);
       },
-      deleteItem: async (row) => updateDemoInvoice(row.id, archiveInvoice),
-      restore: async (row) => updateDemoInvoice(row.id, restoreInvoice),
-      hardDelete: async (row) => removeDemoInvoice(row.id),
+      deleteItem: async (row) => archiveInvoiceById(row.id),
+      restore: async (row) => restoreInvoiceById(row.id),
+      hardDelete: async (row) => hardDeleteInvoiceById(row.id),
     },
     supportsArchived: true,
     editorModal: {
       eyebrow: 'Facturación',
-      sections: [{ id: 'default' }],
+      blocks: [buildInvoiceLineItemsBlock()],
+      sections: [{ id: 'default' }, { id: 'items' }],
     },
     kanban: {
       card: {
@@ -434,7 +291,7 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       createFooterLabel: 'Añadir factura',
       persistMove: async ({ row, nextValue }: { row: TRecord; field: string; nextValue: string }) => {
         const status = parseInvoiceStatus(nextValue);
-        updateDemoInvoice(row.id, (r) => ({ ...r, status }));
+        await updateInvoiceStatus(row.id, status);
         return { ...(row as InvoiceRecord), status } as TRecord;
       },
     },
@@ -455,14 +312,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       },
       { key: 'discount', label: 'Descuento (%)', type: 'number' },
       { key: 'tax', label: 'Impuesto (%)', type: 'number' },
-      {
-        key: 'items',
-        label: 'Detalle',
-        type: 'textarea',
-        fullWidth: true,
-        required: true,
-        placeholder: '[{"description":"Servicio","qty":1,"unit":"unidad","unitPrice":1000}]',
-      },
+      buildInternalFavoriteField(),
+      buildInternalTagsField('factura, urgente, prioritario'),
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -473,6 +324,8 @@ export function createInvoicesCrudConfig<TRecord extends InvoiceRecord>(opts: {
       discount: String(row.discount ?? 0),
       tax: String(row.tax ?? 21),
       items: JSON.stringify(row.items ?? []),
+      is_favorite: readCommercialFavorite(row),
+      tags: readCommercialTags(row),
     }),
     isValid: (values) =>
       asString(values.customer).trim().length >= 2 && asString(values.items).trim().length > 0,
@@ -487,12 +340,12 @@ export function createInvoicesShellConfig<TRecord extends InvoiceRecord>(): Crud
   ]);
   const shellConfig = createCommercialDocumentCrudConfig<TRecord, 'number' | 'customer' | 'status' | 'tags'>({
     resourceId: 'invoices',
-    renderList: () => <></>,
+    renderList: () => createElement(Fragment),
     label: 'factura',
     labelPlural: 'facturas',
     labelPluralCap: 'Facturación',
     createLabel: '+ Nueva factura',
-    createFromValues: createDemoInvoiceFromCrudValues,
+    createFromValues: createInvoiceFromCrudValues,
     searchKeys: ['number', 'customer', 'status', 'tags'],
     columns: [
       { key: 'number', header: 'N°' },
@@ -560,6 +413,8 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       buildCrudNameField('customer_name', 'Cliente', 'Nombre del cliente'),
       { key: 'valid_until', label: 'Válido hasta', type: 'date' },
       buildCrudNotesField(),
+      buildInternalFavoriteField(),
+      buildInternalTagsField('presupuesto, urgente, prioritario'),
     ],
     rowActions: [
       {
@@ -597,6 +452,8 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       valid_until: row.valid_until ? String(row.valid_until).slice(0, 10) : '',
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
+      is_favorite: readCommercialFavorite(row),
+      tags: readCommercialTags(row),
     }),
     toBody: (values) => ({
       branch_id: readActiveBranchId() ?? undefined,
@@ -604,6 +461,7 @@ export function createQuotesCrudConfig<TRecord extends QuoteRecord>(opts: {
       customer_name: asString(values.customer_name),
       valid_until: asOptionalString(values.valid_until),
       items: parseCommercialPricedLineItems(values.items),
+      ...commercialAnnotationsToBody(values),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -676,6 +534,8 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       { key: 'quote_id', label: 'Presupuesto relacionado' },
       buildPaymentMethodField(),
       buildCrudNotesField(),
+      buildInternalFavoriteField(),
+      buildInternalTagsField('venta, mostrador, mayorista'),
     ],
     rowActions: [
       {
@@ -787,6 +647,8 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       payment_method: row.payment_method ?? 'cash',
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
+      is_favorite: readCommercialFavorite(row),
+      tags: readCommercialTags(row),
     }),
     toBody: (values) => ({
       branch_id: readActiveBranchId() ?? undefined,
@@ -795,6 +657,7 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
       quote_id: asOptionalString(values.quote_id),
       payment_method: asString(values.payment_method),
       items: parseCommercialPricedLineItems(values.items),
+      ...commercialAnnotationsToBody(values),
       notes: asOptionalString(values.notes),
     }),
     isValid: (values) =>
@@ -942,9 +805,27 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
   });
   return {
     basePath: '/v1/purchases',
+    allowEdit: true,
     allowDelete: false,
     ...base.config,
     stateMachine,
+    dataSource: {
+      update: async (row, values) => {
+        await apiRequest(`/v1/purchases/${row.id}`, {
+          method: 'PATCH',
+          body: {
+            branch_id: readActiveBranchId() ?? undefined,
+            supplier_id: asOptionalString(values.supplier_id),
+            supplier_name: asString(values.supplier_name),
+            status: asOptionalString(values.status),
+            payment_status: asOptionalString(values.payment_status),
+            ...commercialAnnotationsToBody(values),
+            items: parseCommercialCostLineItems(values.items),
+            notes: asOptionalString(values.notes),
+          },
+        });
+      },
+    },
     editorModal: {
       eyebrow: 'Compras',
       loadRecord: async (row) => apiRequest<TRecord>(`/v1/purchases/${row.id}`),
@@ -1018,6 +899,8 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       { key: 'total', label: 'Total' },
       { key: 'received_at', label: 'Fecha de recepción' },
       buildCrudNotesField(),
+      buildInternalFavoriteField(),
+      buildInternalTagsField('insumos, urgente, importado'),
     ],
     toFormValues: (row: TRecord) => ({
       number: row.number ?? '',
@@ -1028,6 +911,8 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       received_at: row.received_at ? formatDate(row.received_at) : '',
       items: JSON.stringify(row.items ?? []),
       notes: row.notes ?? '',
+      is_favorite: readCommercialFavorite(row),
+      tags: readCommercialTags(row),
     }),
     toBody: (values) => ({
       branch_id: readActiveBranchId() ?? undefined,
@@ -1035,6 +920,7 @@ export function createPurchasesCrudConfig<TRecord extends PurchaseRecord>(opts: 
       supplier_name: asString(values.supplier_name),
       status: asOptionalString(values.status),
       payment_status: asOptionalString(values.payment_status),
+      ...commercialAnnotationsToBody(values),
       items: parseCommercialCostLineItems(values.items),
       notes: asOptionalString(values.notes),
     }),

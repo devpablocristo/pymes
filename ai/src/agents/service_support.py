@@ -11,10 +11,10 @@ from src.agents.audit import record_agent_event
 from src.agents.policy import CommercialPolicy
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.core.dossier import build_operating_context_for_prompt, infer_business_vertical
+from src.core.dossier import build_operating_context_for_prompt, infer_business_vertical, sync_business_from_settings
 from src.core.internal_conversations import can_access_internal_conversation, get_internal_conversation_user_id
 from runtime.types import ToolDeclaration
-from src.db.repository import AIRepository
+from src.db.repository import AIRepository, DEFAULT_DOSSIER
 from runtime.logging import get_logger
 from src.runtime_contracts import DEFAULT_LANGUAGE_CODE
 from src.tools import (
@@ -30,6 +30,7 @@ from src.tools import (
     scheduling,
     suppliers,
 )
+from src.tools import settings as settings_tools
 
 logger = get_logger(__name__)
 
@@ -818,3 +819,48 @@ async def _load_internal_conversation(repo: AIRepository, auth: AuthContext, con
         user_id=get_internal_conversation_user_id(auth),
         title=message[:60],
     )
+
+
+async def _get_runtime_dossier(repo: AIRepository, org_id: str) -> dict[str, Any]:
+    getter = getattr(repo, "get_or_create_dossier", None)
+    if getter is None:
+        return copy.deepcopy(DEFAULT_DOSSIER)
+    dossier = await getter(org_id)
+    if isinstance(dossier, dict):
+        return dossier
+    return copy.deepcopy(DEFAULT_DOSSIER)
+
+
+async def _persist_dossier_if_changed(repo: AIRepository, org_id: str, before: dict[str, Any], after: dict[str, Any]) -> None:
+    if after == before:
+        return
+    updater = getattr(repo, "update_dossier", None)
+    if updater is None:
+        return
+    await updater(org_id, after)
+
+
+async def hydrate_dossier_from_backend_settings(
+    *,
+    repo: AIRepository,
+    backend_client: BackendClient,
+    org_id: str,
+    auth: AuthContext | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    dossier = await _get_runtime_dossier(repo, org_id)
+    snapshot = copy.deepcopy(dossier)
+    if auth is None:
+        return dossier, snapshot
+    requester = getattr(backend_client, "request", None)
+    if requester is None:
+        return dossier, snapshot
+    try:
+        tenant_settings = await settings_tools.get_tenant_settings(backend_client, auth)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("assistant_dossier_hydration_failed", org_id=org_id, error=str(exc))
+        return dossier, snapshot
+    if isinstance(tenant_settings, dict) and tenant_settings:
+        sync_business_from_settings(dossier, tenant_settings)
+        await _persist_dossier_if_changed(repo, org_id, snapshot, dossier)
+        snapshot = copy.deepcopy(dossier)
+    return dossier, snapshot

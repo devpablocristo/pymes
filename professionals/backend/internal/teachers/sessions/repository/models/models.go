@@ -20,6 +20,7 @@ type SessionModel struct {
 	Metadata        []byte `gorm:"type:jsonb"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 func (SessionModel) TableName() string { return "professionals.sessions" }

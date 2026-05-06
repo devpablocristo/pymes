@@ -8,6 +8,8 @@ function buildBaseConfig(): CrudPageConfig<{ id: string; category?: string }> {
     label: 'demo',
     labelPlural: 'demos',
     labelPluralCap: 'Demos',
+    /** Aislar defaults del runtime sin anotaciones estándar (tags / carrusel). */
+    featureFlags: { standardAnnotations: false, standardMedia: false },
     columns: [{ key: 'category', header: 'Categoría' }],
     formFields: [{ key: 'category', label: 'Categoría' }],
     searchText: (row) => row.category ?? '',
@@ -77,6 +79,9 @@ describe('resourceConfigs.runtime', () => {
       columnSort: true,
       tagsColumn: true,
     });
+    expect(config.viewModes?.map((m) => m.id)).toEqual(['list', 'gallery', 'kanban']);
+    expect(config.viewModes?.map((m) => m.path)).toEqual(['list', 'gallery', 'board']);
+    expect(config.viewModes?.filter((m) => m.isDefault)).toHaveLength(1);
   });
 
   it('respeta overrides explícitos del recurso', () => {

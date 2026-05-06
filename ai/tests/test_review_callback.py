@@ -13,7 +13,7 @@ from src.api.review_callback import router
 def create_client() -> TestClient:
     app = FastAPI()
     app.include_router(router)
-    app.state.settings = SimpleNamespace(review_callback_token="test-token")
+    app.state.settings = SimpleNamespace(governance_callback_token="test-token")
     return TestClient(app)
 
 

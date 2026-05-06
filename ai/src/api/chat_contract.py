@@ -19,12 +19,45 @@ from src.localization import LanguageCode
 from src.runtime_contracts import OUTPUT_KIND_CHAT_REPLY
 
 
-RoutedAgent = Literal["general", "insight_chat", "customers", "products", "services", "sales", "collections", "purchases"]
-ChatRouteHint = Literal["general", "insight_chat", "customers", "products", "services", "sales", "collections", "purchases"]
+RoutedAgent = Literal[
+    "general",
+    "insight_chat",
+    "customers",
+    "products",
+    "services",
+    "sales",
+    "collections",
+    "purchases",
+    "employees",
+]
+ChatRouteHint = Literal[
+    "general",
+    "insight_chat",
+    "customers",
+    "products",
+    "services",
+    "sales",
+    "collections",
+    "purchases",
+    "employees",
+]
 RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback", "ui_hint"]
 ChatHandoffSource = Literal["in_app_notification", "direct"]
 InsightScope = Literal["sales_collections", "inventory_profit", "customers_retention"]
 InsightPeriod = Literal["today", "week", "month"]
+ChatAnalysisScope = Literal[
+    "general",
+    "sales_collections",
+    "customers",
+    "products",
+    "services",
+    "purchases",
+    "scheduling",
+    "operations",
+    "employees",
+]
+ChatLLMStatus = Literal["ok", "unavailable", "error"]
+ChatAnswerMode = Literal["facts_only", "analysis"]
 
 
 class ChatHandoff(BaseModel):
@@ -107,6 +140,43 @@ class ChatRequest(BaseChatRequest):
     )
 
 
+class ChatLLMMetadata(BaseModel):
+    used: bool = Field(default=False, description="Indica si el turno fue generado por Gemini/Vertex.")
+    provider: str | None = Field(default=None, description="Proveedor LLM efectivo.")
+    model: str | None = Field(default=None, description="Modelo LLM efectivo.")
+    status: ChatLLMStatus = Field(default="unavailable", description="Estado de la llamada al LLM.")
+
+
+class ChatEvidencePeriod(BaseModel):
+    label: str = Field(default="", description="Etiqueta humana del período usado para evidencia.")
+    from_: str = Field(default="", alias="from", serialization_alias="from", description="Fecha inicial ISO.")
+    to: str = Field(default="", description="Fecha final ISO.")
+
+
+class ChatEvidenceMetadata(BaseModel):
+    tools: list[str] = Field(default_factory=list, description="Herramientas read-only usadas para armar evidencia.")
+    record_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Cantidad de registros o agregados leídos por herramienta.",
+    )
+    period: ChatEvidencePeriod | None = Field(default=None, description="Período principal analizado.")
+
+
+class ChatDeterministicMetadata(BaseModel):
+    used: bool = Field(default=False, description="Indica si se armo una respuesta o resumen determinista.")
+    summary: str = Field(default="", description="Resumen calculado desde evidencia read-only del negocio.")
+    blocks: list[ChatBlock] = Field(
+        default_factory=list,
+        description="Bloques deterministas renderizables: KPI, tablas y acciones de detalle.",
+    )
+
+
+class ChatDashboardLink(BaseModel):
+    label: str = Field(..., min_length=1, description="Texto visible del link de detalle.")
+    url: str = Field(..., min_length=1, description="Ruta del panel o reporte sugerido.")
+    kind: Literal["dashboard", "reports", "module"] = Field(default="dashboard", description="Tipo de destino.")
+
+
 class ChatResponse(BaseChatResponse):
     output_kind: Literal["chat_reply"] = Field(default=OUTPUT_KIND_CHAT_REPLY)
     content_language: LanguageCode = Field(
@@ -125,18 +195,50 @@ class ChatResponse(BaseChatResponse):
         ...,
         description="Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint",
     )
+    analysis_scope: ChatAnalysisScope = Field(
+        default="general",
+        description="Alcance de análisis usado para seleccionar evidencia real del negocio.",
+    )
+    answer_mode: ChatAnswerMode = Field(
+        default="analysis",
+        description="Modo de respuesta: facts_only usa solo datos deterministas; analysis suma Gemini.",
+    )
+    deterministic: ChatDeterministicMetadata = Field(
+        default_factory=ChatDeterministicMetadata,
+        description="Metadata y bloques calculados por backend/reportes antes de Gemini.",
+    )
+    dashboard_links: list[ChatDashboardLink] = Field(
+        default_factory=list,
+        description="Links de detalle sugeridos para ver numeros completos en dashboard o reportes.",
+    )
+    llm: ChatLLMMetadata = Field(
+        default_factory=ChatLLMMetadata,
+        description="Metadata explícita sobre uso de Gemini/Vertex.",
+    )
+    evidence: ChatEvidenceMetadata = Field(
+        default_factory=ChatEvidenceMetadata,
+        description="Resumen de la evidencia read-only consultada antes de llamar al LLM.",
+    )
 
 
 # Re-exportar tipos base para que los consumidores existentes no rompan.
 __all__ = [
     "ChatAction",
     "ChatActionsBlock",
+    "ChatAnswerMode",
+    "ChatAnalysisScope",
     "ChatBlock",
+    "ChatDashboardLink",
+    "ChatDeterministicMetadata",
+    "ChatEvidenceMetadata",
+    "ChatEvidencePeriod",
     "ChatHandoff",
     "ChatHandoffSource",
     "ChatInsightCardBlock",
     "ChatKpiGroupBlock",
     "ChatKpiItem",
+    "ChatLLMMetadata",
+    "ChatLLMStatus",
     "ChatRequest",
     "ChatResponse",
     "ChatRouteHint",

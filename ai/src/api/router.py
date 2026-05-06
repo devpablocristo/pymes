@@ -3,10 +3,11 @@ from __future__ import annotations
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.agents.catalog import normalize_routed_agent, normalize_routing_source
-from src.agents.service import run_internal_orchestrated_chat
+from src.internal_chat.service import InternalChatError, run_internal_orchestrated_chat
 from src.api.chat_contract import ChatBlock, ChatRequest, ChatResponse
 from src.api.deps import get_auth_context, get_backend_client, get_llm_provider, get_repository
 from src.api.quota import check_quota
@@ -149,6 +150,26 @@ async def chat_internal(
             route_hint=req.route_hint,
             preferred_language=preferred_language,
         )
+    except InternalChatError as exc:
+        logger.warning(
+            "chat_internal_visible_error",
+            request_id=request_id,
+            org_id=auth.org_id,
+            user_id=auth.actor,
+            code=exc.code,
+            error=exc.message,
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "details": exc.details,
+                    "request_id": request_id,
+                }
+            },
+        )
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -179,4 +200,10 @@ async def chat_internal(
         blocks=result.blocks,
         routed_agent=normalize_routed_agent(result.routed_agent),
         routing_source=normalize_routing_source(result.routing_source),
+        analysis_scope=getattr(result, "analysis_scope", "general") or "general",
+        answer_mode=getattr(result, "answer_mode", "analysis") or "analysis",
+        deterministic=getattr(result, "deterministic", None) or {},
+        dashboard_links=getattr(result, "dashboard_links", None) or [],
+        llm=getattr(result, "llm", None) or {},
+        evidence=getattr(result, "evidence", None) or {},
     )

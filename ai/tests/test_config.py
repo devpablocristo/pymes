@@ -39,6 +39,19 @@ def test_settings_requires_gemini_credentials() -> None:
         )
 
 
+def test_settings_accepts_vertex_project_without_gemini_api_key() -> None:
+    settings = Settings(
+        _env_file=None,
+        ai_environment="development",
+        internal_service_token="",
+        gemini_api_key="",
+        gemini_vertex_project="pymes-dev-352318",
+    )
+
+    assert settings.gemini_api_key == ""
+    assert settings.gemini_vertex_project == "pymes-dev-352318"
+
+
 def test_settings_reject_missing_internal_token_outside_local() -> None:
     with pytest.raises(ValidationError):
         Settings(

@@ -98,9 +98,9 @@ const BICYCLE_FIELDS: FieldMapping = {
 function buildCreatePayload(fields: FieldMapping, targetType: WorkOrderTargetKind, withBooking: boolean, withNumber: boolean, values: Record<string, CrudFieldValue | undefined>) {
   return {
     ...(withNumber ? { number: asOptionalString(values.number) } : {}),
-    target_type: targetType,
-    target_id: asString(values[fields.targetIdKey]),
-    target_label: asOptionalString(values[fields.targetLabelKey]),
+    asset_type: targetType,
+    asset_id: asString(values[fields.targetIdKey]),
+    asset_label: asOptionalString(values[fields.targetLabelKey]),
     customer_id: asOptionalString(values.customer_id),
     customer_name: asOptionalString(values.customer_name),
     ...(withBooking ? { booking_id: asOptionalString(values.booking_id) } : {}),
@@ -120,8 +120,8 @@ function buildCreatePayload(fields: FieldMapping, targetType: WorkOrderTargetKin
 
 function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: Record<string, CrudFieldValue | undefined>) {
   return {
-    target_id: asOptionalString(values[fields.targetIdKey]),
-    target_label: asOptionalString(values[fields.targetLabelKey]),
+    asset_id: asOptionalString(values[fields.targetIdKey]),
+    asset_label: asOptionalString(values[fields.targetLabelKey]),
     customer_id: asOptionalString(values.customer_id),
     customer_name: asOptionalString(values.customer_name),
     ...(withBooking ? { booking_id: asOptionalString(values.booking_id) } : {}),
@@ -136,6 +136,18 @@ function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: 
     tags: parseTagCsv(values.tags),
     items: parseWorkOrderItems(values.items),
   };
+}
+
+function getAssetLabel(row: WorkOrder, targetType: WorkOrderTargetKind): string {
+  if (row.asset_label) return row.asset_label;
+  if (row.target_label) return row.target_label;
+  return targetType === 'vehicle' ? (row.vehicle_plate ?? '') : (row.bicycle_label ?? '');
+}
+
+function getAssetId(row: WorkOrder, targetType: WorkOrderTargetKind): string {
+  if (row.asset_id) return row.asset_id;
+  if (row.target_id) return row.target_id;
+  return targetType === 'vehicle' ? (row.vehicle_id ?? '') : (row.bicycle_id ?? '');
 }
 
 type WorkOrdersCrudFactoryOptions = {
@@ -170,7 +182,7 @@ export function createWorkOrdersCrudConfig({
     kind: 'secondary',
     isVisible: (row) => !row.booking_id,
     onClick: async (row, helpers) => {
-      const assetLabel = targetType === 'vehicle' ? row.vehicle_plate : row.bicycle_label;
+      const assetLabel = getAssetLabel(row, targetType);
       const values = await openCrudFormDialog({
         title: 'Agendar turno',
         subtitle: row.number || row.id,
@@ -209,11 +221,15 @@ export function createWorkOrdersCrudConfig({
         targetType === 'vehicle'
           ? {
               work_order_id: row.id,
+              asset_id: row.asset_id,
+              asset_label: row.asset_label,
               vehicle_id: row.vehicle_id,
               vehicle_plate: row.vehicle_plate,
             }
           : {
               work_order_id: row.id,
+              asset_id: row.asset_id,
+              asset_label: row.asset_label,
               bicycle_id: row.bicycle_id,
               bicycle_label: row.bicycle_label,
             };
@@ -318,9 +334,9 @@ export function createWorkOrdersCrudConfig({
     dataSource: {
       list: async ({ archived }) => {
         if (archived) {
-          return (await getUnifiedWorkOrdersArchived({ target_type: targetType })) as unknown as WorkOrder[];
+          return (await getUnifiedWorkOrdersArchived({ asset_type: targetType })) as unknown as WorkOrder[];
         }
-        return (await getAllUnifiedWorkOrders({ target_type: targetType })) as unknown as WorkOrder[];
+        return (await getAllUnifiedWorkOrders({ asset_type: targetType })) as unknown as WorkOrder[];
       },
       create: async (values) => {
         await createUnifiedWorkOrder(buildCreatePayload(fields, targetType, withBooking, withNumber, values));
@@ -335,7 +351,7 @@ export function createWorkOrdersCrudConfig({
       {
         key: fields.targetLabelKey,
         header: fields.targetLabelField,
-        render: (_v, row) => (row as unknown as Record<string, string>)[fields.targetLabelKey] || row[fields.targetIdKey] || '',
+        render: (_v, row) => getAssetLabel(row, targetType) || getAssetId(row, targetType),
       },
       { key: 'customer_name', header: 'Cliente', render: (_v, row) => row.customer_name || '' },
       { key: 'status', header: 'Estado', render: (value) => renderWorkshopWorkOrderStatusBadge(value) },
@@ -347,7 +363,7 @@ export function createWorkOrdersCrudConfig({
     searchText: (row) =>
       [
         row.number,
-        targetType === 'vehicle' ? row.vehicle_plate : row.bicycle_label,
+        getAssetLabel(row, targetType),
         row.customer_name,
         row.status,
         row.requested_work,
@@ -359,8 +375,8 @@ export function createWorkOrdersCrudConfig({
         .join(' '),
     toFormValues: (row) => ({
       ...(withNumber ? { number: row.number ?? '' } : {}),
-      [fields.targetIdKey]: (row as unknown as Record<string, string>)[fields.targetIdKey] ?? '',
-      [fields.targetLabelKey]: (row as unknown as Record<string, string>)[fields.targetLabelKey] ?? '',
+      [fields.targetIdKey]: getAssetId(row, targetType),
+      [fields.targetLabelKey]: getAssetLabel(row, targetType),
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
       ...(withBooking ? { booking_id: row.booking_id ?? '' } : {}),

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LOCAL_INTERNAL_SERVICE_TOKEN = "local-internal-token"
@@ -41,10 +41,12 @@ class Settings(BaseSettings):
     otel_service_name: str = "pymes-ai"
     otel_exporter_otlp_endpoint: str = ""
 
-    # Nexus Review — gobernanza de acciones
-    review_url: str = ""
-    review_api_key: str = ""
-    review_callback_token: str = ""
+    # Nexus Governance (URLs/paths legacy siguen usando `review` en algunos clientes HTTP).
+    governance_url: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_URL", "REVIEW_URL"))
+    governance_api_key: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_API_KEY", "REVIEW_API_KEY"))
+    governance_callback_token: str = Field(
+        default="", validation_alias=AliasChoices("GOVERNANCE_CALLBACK_TOKEN", "REVIEW_CALLBACK_TOKEN")
+    )
 
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 
@@ -57,8 +59,8 @@ class Settings(BaseSettings):
         return self.normalized_environment in LOCAL_ENVIRONMENTS
 
     @property
-    def review_enabled(self) -> bool:
-        return bool(self.review_url.strip())
+    def governance_enabled(self) -> bool:
+        return bool(self.governance_url.strip())
 
     @field_validator("llm_provider")
     @classmethod

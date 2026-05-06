@@ -20,6 +20,7 @@ for sql_file in \
   "pymes-core/backend/seeds/03_rbac.sql" \
   "pymes-core/backend/seeds/04_full_demo.sql" \
   "pymes-core/backend/seeds/05_scheduling_demo.sql" \
+  "pymes-core/backend/seeds/06_bulk_demo.sql" \
   "workshops/backend/seeds/auto_repair_demo.sql" \
   "workshops/backend/seeds/bike_shop_demo.sql" \
   "professionals/backend/seeds/demo.sql" \

@@ -43,8 +43,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("recurring", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("recurring", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("recurring", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("recurring", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("recurring", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("recurring", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("recurring", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("recurring", "delete"), h.HardDelete)
 }
 
@@ -62,7 +62,7 @@ func (h *Handler) List(c *gin.Context) {
 			httperrors.Respond(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": items})
+		handlers.WriteOffsetListResponse(c, items, limit, len(items))
 		return
 	}
 	items, err := h.uc.List(c.Request.Context(), orgID, activeOnly, limit)
@@ -70,7 +70,7 @@ func (h *Handler) List(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
@@ -84,19 +84,19 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateRecurringExpenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := createRecurringPayload(orgID, req, authCtx.Actor)
@@ -133,7 +133,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateRecurringExpenseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := updateRecurringPayload(orgID, id, req)
@@ -163,7 +163,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, id, ok := parseOrgID(c)
 	if !ok {
@@ -269,7 +273,7 @@ func parseOrg(c *gin.Context) (uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, false
 	}
 	return orgID, true
@@ -282,7 +286,7 @@ func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true

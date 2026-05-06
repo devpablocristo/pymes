@@ -47,8 +47,21 @@ func ParseAfterUUIDQuery(c *gin.Context) (*uuid.UUID, bool) {
 	}
 	id, err := uuid.Parse(v)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
+		WriteValidation(c, "invalid after")
 		return nil, false
 	}
 	return &id, true
+}
+
+func WriteListResponse(c *gin.Context, items any, total int64, hasMore bool, nextCursor string) {
+	c.JSON(http.StatusOK, gin.H{
+		"items":       items,
+		"total":       total,
+		"has_more":    hasMore,
+		"next_cursor": nextCursor,
+	})
+}
+
+func WriteOffsetListResponse(c *gin.Context, items any, limit int, total int) {
+	WriteListResponse(c, items, int64(total), total > limit, "")
 }

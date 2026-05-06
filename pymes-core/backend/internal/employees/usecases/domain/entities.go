@@ -29,6 +29,7 @@ type Employee struct {
 	Notes      string         `json:"notes"`
 	IsFavorite bool           `json:"is_favorite"`
 	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
 	CreatedBy  string         `json:"created_by"`
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`

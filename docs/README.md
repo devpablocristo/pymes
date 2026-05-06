@@ -10,7 +10,12 @@
 
 ## Arquitectura
 
-- `architecture/` — diagramas o notas adicionales (vacío hasta que se agregue contenido).
+| Documento | Descripción |
+|-----------|-------------|
+| [Estándar CRUD Pymes](CRUD_STANDARD.md) | Contrato objetivo para rutas, listas, errores, arquitectura hexagonal y compatibilidad de CRUDs. |
+| [Ledger de deuda técnica](TECH_DEBT_LEDGER.md) | Registro explícito de compatibilidades, fallbacks y parches con criterio de retiro. |
+
+`architecture/` — diagramas o notas adicionales (vacío hasta que se agregue contenido).
 
 ## Agentes, API y gobernanza
 

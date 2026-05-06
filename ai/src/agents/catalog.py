@@ -44,6 +44,7 @@ SERVICES_DOMAIN_AGENT_NAME: Final[str] = "services"
 SALES_DOMAIN_AGENT_NAME: Final[str] = "sales"
 COLLECTIONS_DOMAIN_AGENT_NAME: Final[str] = "collections"
 PURCHASES_DOMAIN_AGENT_NAME: Final[str] = "purchases"
+EMPLOYEES_DOMAIN_AGENT_NAME: Final[str] = "employees"
 
 DOMAIN_AGENT_NAMES: Final[tuple[str, ...]] = (
     CUSTOMERS_DOMAIN_AGENT_NAME,
@@ -52,6 +53,7 @@ DOMAIN_AGENT_NAMES: Final[tuple[str, ...]] = (
     SALES_DOMAIN_AGENT_NAME,
     COLLECTIONS_DOMAIN_AGENT_NAME,
     PURCHASES_DOMAIN_AGENT_NAME,
+    EMPLOYEES_DOMAIN_AGENT_NAME,
 )
 
 ALL_ROUTED_AGENT_NAMES: Final[tuple[str, ...]] = (

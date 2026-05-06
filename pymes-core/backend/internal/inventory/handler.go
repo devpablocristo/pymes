@@ -42,7 +42,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -54,7 +54,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -86,19 +86,19 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	productID, err := uuid.Parse(c.Param("product_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+		handlers.WriteValidation(c, "invalid product_id")
 		return
 	}
 	var branchID *uuid.UUID
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -115,24 +115,24 @@ func (h *Handler) Adjust(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	productID, err := uuid.Parse(c.Param("product_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+		handlers.WriteValidation(c, "invalid product_id")
 		return
 	}
 	var req dto.AdjustStockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var branchID *uuid.UUID
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -149,7 +149,7 @@ func (h *Handler) ListMovements(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -161,7 +161,7 @@ func (h *Handler) ListMovements(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("product_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+			handlers.WriteValidation(c, "invalid product_id")
 			return
 		}
 		productID = &id
@@ -170,7 +170,7 @@ func (h *Handler) ListMovements(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -201,7 +201,7 @@ func (h *Handler) LowStock(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -213,7 +213,7 @@ func (h *Handler) LowStock(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id

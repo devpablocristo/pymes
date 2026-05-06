@@ -80,17 +80,17 @@ func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity_id"})
+		handlers.WriteValidation(c, "invalid entity_id")
 		return
 	}
 	creditLimit := 0.0

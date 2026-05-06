@@ -180,6 +180,25 @@ export async function createInvoiceFromCrudValues(values: Record<string, CrudFie
   await apiRequest('/v1/invoices', { method: 'POST', body: invoiceCreateBodyFromCrud(values) });
 }
 
+export async function updateInvoiceFromCrudValues(
+  id: string,
+  values: Record<string, CrudFieldValue | undefined>,
+): Promise<void> {
+  await apiRequest(`/v1/invoices/${id}`, { method: 'PATCH', body: invoiceUpdateBodyFromCrud(values) });
+}
+
 export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
   await apiRequest(`/v1/invoices/${id}`, { method: 'PATCH', body: { status } });
+}
+
+export async function archiveInvoiceById(id: string): Promise<void> {
+  await apiRequest(`/v1/invoices/${id}`, { method: 'DELETE' });
+}
+
+export async function restoreInvoiceById(id: string): Promise<void> {
+  await apiRequest(`/v1/invoices/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteInvoiceById(id: string): Promise<void> {
+  await apiRequest(`/v1/invoices/${id}/hard`, { method: 'DELETE' });
 }

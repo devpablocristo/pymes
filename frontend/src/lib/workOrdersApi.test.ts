@@ -29,29 +29,29 @@ describe('workOrdersApi branch scoping', () => {
   });
 
   it('scopes active work orders to the globally selected branch by default', async () => {
-    await getWorkOrders({ target_type: 'vehicle', search: 'ford' });
+    await getWorkOrders({ asset_type: 'vehicle', search: 'ford' });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders?branch_id=branch-active&target_type=vehicle&search=ford');
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders?branch_id=branch-active&asset_type=vehicle&search=ford');
   });
 
   it('uses the explicit branch filter when the caller provides one', async () => {
-    await getWorkOrdersArchived({ target_type: 'vehicle', branch_id: 'branch-north' });
+    await getWorkOrdersArchived({ asset_type: 'vehicle', branch_id: 'branch-north' });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders/archived?branch_id=branch-north&target_type=vehicle');
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders/archived?branch_id=branch-north&asset_type=vehicle');
   });
 
   it('injects the active branch into work order creation when the form omits it', async () => {
     await createWorkOrder({
-      target_type: 'vehicle',
-      target_id: 'vehicle-1',
+      asset_type: 'vehicle',
+      asset_id: 'vehicle-1',
       items: [],
     });
 
     expect(apiMocks.request).toHaveBeenCalledWith('/v1/auto-repair/work-orders', {
       method: 'POST',
       body: {
-        target_type: 'vehicle',
-        target_id: 'vehicle-1',
+        asset_type: 'vehicle',
+        asset_id: 'vehicle-1',
         items: [],
         branch_id: 'branch-active',
       },
@@ -76,9 +76,9 @@ describe('workOrdersApi branch scoping', () => {
   });
 
   it('routes bicycle work orders to the bike shop module', async () => {
-    await getWorkOrders({ target_type: 'bicycle' });
+    await getWorkOrders({ asset_type: 'bicycle' });
 
-    expect(apiMocks.request).toHaveBeenCalledWith('/v1/bike-shop/work-orders?branch_id=branch-active&target_type=bicycle');
+    expect(apiMocks.request).toHaveBeenCalledWith('/v1/bike-shop/work-orders?branch_id=branch-active&asset_type=bicycle');
   });
 
   it('routes bicycle bookings to the bike shop module', async () => {

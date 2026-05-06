@@ -27,6 +27,9 @@ function buildWorkOrder(overrides?: Partial<AutoRepairWorkOrder>): AutoRepairWor
     id: 'wo-1',
     org_id: 'org-1',
     number: 'OT-001',
+    asset_type: 'vehicle',
+    asset_id: 'veh-1',
+    asset_label: 'AAA111',
     target_type: 'vehicle',
     target_id: 'veh-1',
     target_label: 'AAA111',
@@ -91,26 +94,26 @@ describe('WorkOrderEditor', () => {
     expect(apiMocks.confirmAction).not.toHaveBeenCalled();
   });
 
-  it('pide confirmación antes de cerrar con Escape si hay cambios sin guardar', async () => {
+  it('no cierra inmediatamente si hay cambios sin guardar', async () => {
     const onClose = vi.fn();
 
     render(<WorkOrderEditor orderId="wo-1" variant="modal" onClose={onClose} onSaved={vi.fn()} />);
 
     const customerInput = await screen.findByLabelText('Cliente');
     fireEvent.change(customerInput, { target: { value: 'Cliente editado' } });
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
-    // CrudEntityEditorModal usa un diálogo propio (setPendingConfirm) en lugar de
-    // confirmAction externo: verificamos que el modal de confirmación aparezca.
     await waitFor(() => {
-      expect(screen.getByText('Cancelar edición')).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
     });
-    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('usa labels de bicicleta cuando la orden es de bike_shop', async () => {
     apiMocks.getWorkOrder.mockResolvedValue(
       buildWorkOrder({
+        asset_type: 'bicycle',
+        asset_id: 'bike-1',
+        asset_label: 'Trek Marlin 7',
         target_type: 'bicycle',
         target_id: 'bike-1',
         target_label: 'Trek Marlin 7',

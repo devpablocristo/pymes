@@ -1,36 +1,20 @@
--- Demo taller auto_repair: vehículo, servicios, órdenes.
--- Cliente/producto: mismas claves uuid v5 que pymes-core/seeds/02_core_business.sql.
+-- Demo taller auto_repair: 10 vehiculos y 10 ordenes.
+-- Cliente/producto: mismas claves uuid v5 que pymes-core/seeds.
 
 DO $$
 DECLARE
     v_org uuid := '__SEED_ORG_ID__';
-    c1 uuid;
     p1 uuid;
-    veh1 uuid;
     srv1 uuid;
     srv2 uuid;
-    wo1 uuid;
-    wo2 uuid;
-    woi1 uuid;
-    woi2 uuid;
 BEGIN
-    c1 := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1');
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+        RETURN;
+    END IF;
+
     p1 := uuid_generate_v5(v_org, 'pymes-seed/v1/product/1');
-    veh1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/1');
     srv1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/service/oil');
     srv2 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/service/brake');
-    wo1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/1');
-    wo2 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/2');
-    woi1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/1');
-    woi2 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/2');
-
-    INSERT INTO workshops.vehicles (id, org_id, customer_id, customer_name, license_plate, vin, make, model, year, kilometers, color, notes)
-    VALUES (
-        veh1, v_org, c1, 'Cliente Demo Uno', 'AB 123 CD', '9BWZZZ377VT004251', 'Ford', 'Focus', 2018, 98500, 'Gris',
-        'Vehículo semilla taller'
-    )
-    ON CONFLICT (id) DO NOTHING;
-    SELECT id INTO veh1 FROM workshops.vehicles WHERE org_id = v_org AND license_plate = 'AB 123 CD' LIMIT 1;
 
     INSERT INTO services (
         id, org_id, code, name, description, category_code,
@@ -38,8 +22,8 @@ BEGIN
         default_duration_minutes, is_active, tags, metadata
     )
     VALUES
-        (srv1, v_org, 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estándar', 'mantenimiento', 25000, 0, 21, 'ARS', 30, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair')),
-        (srv2, v_org, 'SRV-BRAKE', 'Revisión de frenos', 'Inspección y ajuste', 'frenos', 45000, 0, 21, 'ARS', 90, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'))
+        (srv1, v_org, 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estandar', 'mantenimiento', 25000, 0, 21, 'ARS', 30, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair')),
+        (srv2, v_org, 'SRV-BRAKE', 'Revision de frenos', 'Inspeccion y ajuste', 'frenos', 45000, 0, 21, 'ARS', 90, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'))
     ON CONFLICT (org_id, code) WHERE deleted_at IS NULL AND code IS NOT NULL AND code <> '' DO UPDATE
         SET name = EXCLUDED.name,
             description = EXCLUDED.description,
@@ -53,51 +37,190 @@ BEGIN
             tags = EXCLUDED.tags,
             metadata = EXCLUDED.metadata,
             updated_at = now();
-    SELECT id INTO srv1 FROM services WHERE org_id = v_org AND code = 'SRV-OIL' AND deleted_at IS NULL LIMIT 1;
-    SELECT id INTO srv2 FROM services WHERE org_id = v_org AND code = 'SRV-BRAKE' AND deleted_at IS NULL LIMIT 1;
 
-    IF veh1 IS NULL OR srv1 IS NULL OR srv2 IS NULL THEN
-        RAISE EXCEPTION 'workshops seed: missing vehicle or services for org %', v_org;
-    END IF;
+    INSERT INTO workshops.customer_assets (
+        id, org_id, asset_type, customer_id, customer_name, label, brand, model, serial_number, year,
+        color, notes, metadata, is_favorite, tags, updated_at
+    )
+    SELECT
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
+        v_org,
+        'vehicle',
+        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        (ARRAY[
+            'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
+            'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
+            'Gimnasio Activo', 'Cafe Martinez Demo'
+        ])[gs],
+        (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
+        (ARRAY['Ford', 'Toyota', 'Volkswagen', 'Chevrolet', 'Renault', 'Peugeot', 'Fiat', 'Nissan', 'Citroen', 'Honda'])[gs],
+        (ARRAY['Focus', 'Corolla', 'Gol Trend', 'Cruze', 'Kangoo', 'Partner', 'Cronos', 'Frontier', 'C4 Lounge', 'Fit'])[gs],
+        'VINSEEDAUTO' || lpad(gs::text, 6, '0'),
+        (ARRAY[2018, 2020, 2017, 2021, 2019, 2016, 2022, 2018, 2017, 2020])[gs],
+        (ARRAY['Gris', 'Blanco', 'Rojo', 'Azul', 'Negro', 'Plata', 'Bordo', 'Verde', 'Grafito', 'Celeste'])[gs],
+        'Vehiculo seed taller ' || gs::text,
+        jsonb_build_object(
+            'license_plate', (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
+            'vin', 'VINSEEDAUTO' || lpad(gs::text, 6, '0'),
+            'kilometers', (ARRAY[98500, 45200, 120400, 38000, 76500, 141000, 22000, 88200, 101300, 53400])[gs]
+        ),
+        gs IN (2, 8),
+        ARRAY['seed', 'auto_repair'],
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (id) DO UPDATE
+        SET asset_type = EXCLUDED.asset_type,
+            customer_id = EXCLUDED.customer_id,
+            customer_name = EXCLUDED.customer_name,
+            label = EXCLUDED.label,
+            brand = EXCLUDED.brand,
+            model = EXCLUDED.model,
+            serial_number = EXCLUDED.serial_number,
+            year = EXCLUDED.year,
+            color = EXCLUDED.color,
+            notes = EXCLUDED.notes,
+            metadata = EXCLUDED.metadata,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            archived_at = NULL,
+            updated_at = now();
 
     INSERT INTO workshops.work_orders (
-        id, org_id, number, target_type, target_id, target_label, customer_id, customer_name, status,
+        id, org_id, number, asset_type, asset_id, asset_label, target_type, target_id, target_label, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency, metadata,
-        subtotal_services, subtotal_parts, tax_total, total, created_by
+        subtotal_services, subtotal_parts, tax_total, total, opened_at, promised_at, ready_at, delivered_at,
+        is_favorite, tags, created_by, updated_at
     )
-    VALUES (
-        wo1, v_org, 'OT-SEED-001', 'vehicle', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'received',
-        'Cambio de aceite y ruido al frenar', '', 'Orden abierta (semilla)', '', 'ARS', jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'),
-        25000, 15000, 8400, 48400, 'seed'
+    SELECT
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        v_org,
+        'OT-SEED-' || lpad(gs::text, 3, '0'),
+        'vehicle',
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
+        (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
+        'vehicle',
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
+        (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
+        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        (ARRAY[
+            'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
+            'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
+            'Gimnasio Activo', 'Cafe Martinez Demo'
+        ])[gs],
+        (ARRAY['received', 'diagnosing', 'quote_pending', 'awaiting_parts', 'in_progress', 'quality_check', 'ready_for_pickup', 'delivered', 'on_hold', 'in_progress'])[gs],
+        (ARRAY[
+            'Cambio de aceite y ruido al frenar',
+            'Service 20.000 km',
+            'Revision por testigo de motor',
+            'Cambio de pastillas y discos',
+            'Alineacion y balanceo',
+            'Diagnostico electrico',
+            'Control pre-viaje',
+            'Entrega post service',
+            'Falla intermitente en arranque',
+            'Cambio de correa auxiliar'
+        ])[gs],
+        (ARRAY[
+            'Filtro y aceite vencidos',
+            'Pastillas delanteras al limite',
+            'Sensor pendiente de escaneo',
+            'Discos marcados',
+            'Cubiertas con desgaste irregular',
+            'Bateria con baja carga',
+            'Frenos y fluidos revisados',
+            'Trabajo finalizado',
+            'Burro de arranque requiere control',
+            'Correa con fisuras visibles'
+        ])[gs],
+        'Orden de auto seed ' || gs::text,
+        CASE WHEN gs IN (3, 6, 9) THEN 'Requiere llamar al cliente antes de avanzar' ELSE '' END,
+        'ARS',
+        jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair', 'source', 'seed'),
+        (20000 + gs * 5000)::double precision,
+        (10000 + gs * 3500)::double precision,
+        round(((30000 + gs * 8500) * 0.21)::numeric, 2)::double precision,
+        round(((30000 + gs * 8500) * 1.21)::numeric, 2)::double precision,
+        now() - ((12 - gs) || ' days')::interval,
+        now() + ((gs + 2) || ' days')::interval,
+        CASE WHEN gs IN (7, 8) THEN now() - '1 day'::interval ELSE NULL END,
+        CASE WHEN gs = 8 THEN now() ELSE NULL END,
+        gs IN (3, 6),
+        ARRAY['seed', 'auto_repair'],
+        'seed',
+        now()
+    FROM generate_series(1, 10) AS gs
+    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO UPDATE
+        SET asset_type = EXCLUDED.asset_type,
+            asset_id = EXCLUDED.asset_id,
+            asset_label = EXCLUDED.asset_label,
+            target_type = EXCLUDED.target_type,
+            target_id = EXCLUDED.target_id,
+            target_label = EXCLUDED.target_label,
+            customer_id = EXCLUDED.customer_id,
+            customer_name = EXCLUDED.customer_name,
+            status = EXCLUDED.status,
+            requested_work = EXCLUDED.requested_work,
+            diagnosis = EXCLUDED.diagnosis,
+            notes = EXCLUDED.notes,
+            internal_notes = EXCLUDED.internal_notes,
+            currency = EXCLUDED.currency,
+            metadata = EXCLUDED.metadata,
+            subtotal_services = EXCLUDED.subtotal_services,
+            subtotal_parts = EXCLUDED.subtotal_parts,
+            tax_total = EXCLUDED.tax_total,
+            total = EXCLUDED.total,
+            opened_at = EXCLUDED.opened_at,
+            promised_at = EXCLUDED.promised_at,
+            ready_at = EXCLUDED.ready_at,
+            delivered_at = EXCLUDED.delivered_at,
+            is_favorite = EXCLUDED.is_favorite,
+            tags = EXCLUDED.tags,
+            created_by = EXCLUDED.created_by,
+            updated_at = now();
+
+    DELETE FROM workshops.work_order_items
+    WHERE org_id = v_org
+      AND work_order_id IN (
+        SELECT uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text)
+        FROM generate_series(1, 10) AS gs
+      );
+
+    INSERT INTO workshops.work_order_items (
+        id, org_id, work_order_id, item_type, service_id, product_id,
+        description, quantity, unit_price, tax_rate, sort_order, metadata
     )
-    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
-    SELECT id INTO wo1 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-001' LIMIT 1;
-
-    INSERT INTO workshops.work_orders (
-        id, org_id, number, target_type, target_id, target_label, customer_id, customer_name, status,
-        requested_work, diagnosis, notes, internal_notes, currency, metadata,
-        subtotal_services, subtotal_parts, tax_total, total, created_by
-    )
-    VALUES (
-        wo2, v_org, 'OT-SEED-002', 'vehicle', veh1, 'AB 123 CD', c1, 'Cliente Demo Uno', 'in_progress',
-        'Service 20.000 km', 'Pastillas delanteras al límite', 'En taller', 'Prioridad media', 'ARS', jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'),
-        45000, 0, 9450, 54450, 'seed'
-    )
-    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO NOTHING;
-    SELECT id INTO wo2 FROM workshops.work_orders WHERE org_id = v_org AND number = 'OT-SEED-002' LIMIT 1;
-
-    IF wo1 IS NULL OR wo2 IS NULL THEN
-        RAISE EXCEPTION 'workshops seed: missing work orders for org %', v_org;
-    END IF;
-
-    INSERT INTO workshops.work_order_items (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
-    VALUES
-        (woi1, v_org, wo1, 'service', srv1, NULL, 'Cambio de aceite y filtro', 1, 25000, 21, 0, '{}'::jsonb),
-        (woi2, v_org, wo1, 'part', NULL, p1, 'Producto Demo A (repuesto)', 1, 15000, 21, 1, '{}'::jsonb)
-    ON CONFLICT (id) DO NOTHING;
-
-    INSERT INTO workshops.work_order_items (id, org_id, work_order_id, item_type, service_id, product_id, description, quantity, unit_price, tax_rate, sort_order, metadata)
-    VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/3'), v_org, wo2, 'service', srv2, NULL, 'Revisión de frenos', 1, 45000, 21, 0, '{}'::jsonb)
+    SELECT
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/' || gs::text || '/service'),
+        v_org,
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        'service',
+        CASE WHEN gs % 2 = 0 THEN srv2 ELSE srv1 END,
+        NULL,
+        CASE WHEN gs % 2 = 0 THEN 'Revision de frenos' ELSE 'Cambio de aceite y filtro' END,
+        1,
+        (20000 + gs * 5000)::double precision,
+        21,
+        1,
+        '{}'::jsonb
+    FROM generate_series(1, 10) AS gs
+    UNION ALL
+    SELECT
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/' || gs::text || '/part'),
+        v_org,
+        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        'part',
+        NULL,
+        p1,
+        (ARRAY[
+            'Filtro de aceite', 'Liquido de frenos', 'Sensor generico', 'Pastillas delanteras',
+            'Valvula de cubierta', 'Terminal bateria', 'Kit fluidos', 'Insumos entrega',
+            'Relay arranque', 'Correa auxiliar'
+        ])[gs],
+        1,
+        (10000 + gs * 3500)::double precision,
+        21,
+        2,
+        '{}'::jsonb
+    FROM generate_series(1, 10) AS gs
     ON CONFLICT (id) DO NOTHING;
 END $$;

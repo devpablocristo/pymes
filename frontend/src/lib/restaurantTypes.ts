@@ -5,6 +5,7 @@ export type RestaurantDiningArea = {
   sort_order: number;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
@@ -20,6 +21,7 @@ export type RestaurantDiningTable = {
   notes: string;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };

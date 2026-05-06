@@ -25,12 +25,12 @@ func (m *RBACMiddleware) RequirePermission(resource, action string) gin.HandlerF
 	action = strings.TrimSpace(action)
 	return func(c *gin.Context) {
 		if m == nil || m.checker == nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "rbac_not_configured"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"code": "INTERNAL", "message": "rbac_not_configured"})
 			return
 		}
 		authCtx := GetAuthContext(c)
 		if authCtx.OrgID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": "UNAUTHORIZED", "message": "unauthorized"})
 			return
 		}
 		if m.checker.HasPermission(c.Request.Context(), authCtx.OrgID, authCtx.Actor, authCtx.Role, authCtx.Scopes, authCtx.AuthMethod, resource, action) {
@@ -38,7 +38,8 @@ func (m *RBACMiddleware) RequirePermission(resource, action string) gin.HandlerF
 			return
 		}
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-			"error":    "forbidden",
+			"code":     "FORBIDDEN",
+			"message":  "forbidden",
 			"required": resource + ":" + action,
 		})
 	}

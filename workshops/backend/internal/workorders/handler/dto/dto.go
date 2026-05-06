@@ -27,21 +27,24 @@ type WorkOrderLineItem struct {
 }
 
 // WorkOrderItem es el shape de salida unificado.
-// Incluye los campos polimórficos (target_type/target_id/target_label) Y aliases por
-// compatibilidad con clientes que esperan vehicle_id/vehicle_plate o bicycle_id/bicycle_label.
-// Los aliases solo se llenan cuando target_type matchea.
+// Asset* es el contrato canónico. Target* y vehicle/bicycle son aliases de compatibilidad.
 type WorkOrderItem struct {
 	ID       string `json:"id"`
 	OrgID    string `json:"org_id"`
 	BranchID string `json:"branch_id,omitempty"`
 	Number   string `json:"number"`
 
-	// Polimorfismo unificado.
+	// Contrato canónico: objeto/activo del cliente que entra al taller.
+	AssetType  string `json:"asset_type"`
+	AssetID    string `json:"asset_id"`
+	AssetLabel string `json:"asset_label"`
+
+	// Alias legacy.
 	TargetType  string `json:"target_type"`
 	TargetID    string `json:"target_id"`
 	TargetLabel string `json:"target_label"`
 
-	// Aliases por compat (solo se llenan si target_type matchea).
+	// Aliases por compat (solo se llenan si asset_type matchea).
 	VehicleID    string `json:"vehicle_id,omitempty"`
 	VehiclePlate string `json:"vehicle_plate,omitempty"`
 	BicycleID    string `json:"bicycle_id,omitempty"`
@@ -91,13 +94,17 @@ type ListWorkOrdersResponse struct {
 	NextCursor string          `json:"next_cursor,omitempty"`
 }
 
-// CreateWorkOrderRequest soporta tanto los nombres unificados como los aliases legacy.
-// El handler resuelve cuál usar según target_type.
+// CreateWorkOrderRequest soporta asset_* como forma preferida y aliases legacy.
 type CreateWorkOrderRequest struct {
 	BranchID string `json:"branch_id"`
 	Number   string `json:"number"`
 
-	// Forma unificada (preferida).
+	// Forma canónica (preferida).
+	AssetType  string `json:"asset_type"`
+	AssetID    string `json:"asset_id"`
+	AssetLabel string `json:"asset_label"`
+
+	// Alias legacy.
 	TargetType  string `json:"target_type"`
 	TargetID    string `json:"target_id"`
 	TargetLabel string `json:"target_label"`
@@ -127,7 +134,12 @@ type CreateWorkOrderRequest struct {
 
 type UpdateWorkOrderRequest struct {
 	BranchID *string `json:"branch_id"`
-	// Unificados (preferidos).
+
+	// Canónicos (preferidos).
+	AssetID    *string `json:"asset_id"`
+	AssetLabel *string `json:"asset_label"`
+
+	// Legacy.
 	TargetID    *string `json:"target_id"`
 	TargetLabel *string `json:"target_label"`
 

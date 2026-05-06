@@ -20,6 +20,7 @@ type IntakeModel struct {
 	Payload         []byte         `gorm:"type:jsonb"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 func (IntakeModel) TableName() string { return "professionals.intakes" }

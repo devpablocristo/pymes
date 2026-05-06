@@ -1,16 +1,17 @@
 package specialties
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -20,6 +21,9 @@ type RepositoryPort interface {
 	Update(ctx context.Context, in domain.Specialty) (domain.Specialty, error)
 	CodeExists(ctx context.Context, orgID uuid.UUID, code string, excludeID *uuid.UUID) (bool, error)
 	AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID) error
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -86,6 +90,7 @@ type UpdateInput struct {
 	IsActive    *bool
 	IsFavorite  *bool
 	Tags        *[]string
+	Metadata    *map[string]any
 }
 
 func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error) {
@@ -94,6 +99,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
 		}
+		return domain.Specialty{}, err
+	}
+	if err := archive.IfArchived(current.DeletedAt, "specialty"); err != nil {
 		return domain.Specialty{}, err
 	}
 
@@ -125,6 +133,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.Tags != nil {
 		current.Tags = *in.Tags
 	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
+	}
 
 	if len(current.Code) < 2 {
 		return domain.Specialty{}, fmt.Errorf("code must be at least 2 characters: %w", httperrors.ErrBadInput)
@@ -144,6 +155,45 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "specialty.updated", "specialty", out.ID.String(), map[string]any{"code": out.Code, "name": out.Name})
 	}
 	return out, nil
+}
+
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.archived", "specialty", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.restored", "specialty", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("specialty not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "specialty.deleted", "specialty", id.String(), map[string]any{})
+	}
+	return nil
 }
 
 func (u *Usecases) AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error {

@@ -15,6 +15,8 @@ type Specialty struct {
 	IsActive    bool
 	IsFavorite  bool
 	Tags        []string
+	Metadata    map[string]any
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }

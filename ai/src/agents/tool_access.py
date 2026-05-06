@@ -157,7 +157,7 @@ LEGACY_INTERNAL_ROLE_TOOLS: dict[str, str | frozenset[str]] = {
     ),
 }
 
-LEGACY_INTERNAL_FALLBACK_TOOLS = frozenset({"search_help"})
+LEGACY_INTERNAL_DEFAULT_TOOLS = frozenset({"search_help"})
 
 TOOL_MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "get_sales_summary": frozenset({"sales"}),
@@ -231,7 +231,7 @@ def resolve_commercial_internal_procurement_tools(role: str, modules_active: Ite
 
 
 def is_legacy_internal_tool_allowed(role: str, modules_active: Iterable[str], tool_name: str) -> bool:
-    allowed = LEGACY_INTERNAL_ROLE_TOOLS.get(normalize_role(role), LEGACY_INTERNAL_FALLBACK_TOOLS)
+    allowed = LEGACY_INTERNAL_ROLE_TOOLS.get(normalize_role(role), LEGACY_INTERNAL_DEFAULT_TOOLS)
     if allowed == "*":
         return tool_name in filter_tools_by_modules({tool_name}, modules_active)
     filtered = filter_tools_by_modules(allowed, modules_active)

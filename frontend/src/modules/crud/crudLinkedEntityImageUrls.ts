@@ -67,6 +67,17 @@ export function extractCrudRecordImageUrls(record: Record<string, unknown>): str
     }
   }
 
+  let fromPayload: string[] = [];
+  const payload = record.payload;
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const rawPl = (payload as Record<string, unknown>).image_urls;
+    if (Array.isArray(rawPl)) {
+      fromPayload = rawPl
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+        .map((s) => s.trim());
+    }
+  }
+
   const legacySingle =
     typeof record.image_url === 'string' && record.image_url.trim().length > 0
       ? record.image_url.trim()
@@ -75,7 +86,7 @@ export function extractCrudRecordImageUrls(record: Record<string, unknown>): str
         : undefined;
 
   return collectCrudImageUrls({
-    imageUrls: [...top, ...fromMeta],
+    imageUrls: [...top, ...fromMeta, ...fromPayload],
     legacyImageUrl: legacySingle,
   });
 }

@@ -93,7 +93,7 @@ func (h *Handler) Create(c *gin.Context) {
 	auth := handlers.GetAuthContext(c)
 	var body dto.CreateRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	lines := toDomainLines(body.Lines)
@@ -135,7 +135,7 @@ func (h *Handler) Update(c *gin.Context) {
 	auth := handlers.GetAuthContext(c)
 	var body dto.UpdateRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	lines := toDomainLines(body.Lines)
@@ -276,7 +276,7 @@ func (h *Handler) CreatePolicy(c *gin.Context) {
 	auth := handlers.GetAuthContext(c)
 	var body dto.CreatePolicyRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	created, err := h.uc.CreatePolicy(c.Request.Context(), PolicyCreateInput{
@@ -306,7 +306,7 @@ func (h *Handler) UpdatePolicy(c *gin.Context) {
 	auth := handlers.GetAuthContext(c)
 	var body dto.UpdatePolicyRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		handlers.WriteValidation(c, "invalid body")
 		return
 	}
 	updated, err := h.uc.UpdatePolicy(c.Request.Context(), PolicyUpdateInput{

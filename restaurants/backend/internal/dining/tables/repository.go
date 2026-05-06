@@ -2,6 +2,7 @@ package tables
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -26,6 +27,11 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.DiningTable, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	q := r.db.WithContext(ctx).Model(&models.DiningTableModel{}).Where("org_id = ?", p.OrgID)
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("deleted_at IS NULL")
+	}
 	if p.AreaID != nil && *p.AreaID != uuid.Nil {
 		q = q.Where("area_id = ?", *p.AreaID)
 	}
@@ -63,6 +69,11 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.DiningTab
 }
 
 func (r *Repository) Create(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error) {
+	md := in.Metadata
+	if md == nil {
+		md = map[string]any{}
+	}
+	meta, _ := json.Marshal(md)
 	row := models.DiningTableModel{
 		ID:         uuid.New(),
 		OrgID:      in.OrgID,
@@ -74,6 +85,7 @@ func (r *Repository) Create(ctx context.Context, in domain.DiningTable) (domain.
 		Notes:      in.Notes,
 		IsFavorite: in.IsFavorite,
 		Tags:       pq.StringArray(utils.NormalizeTags(in.Tags)),
+		Metadata:   meta,
 		CreatedAt:  time.Now().UTC(),
 		UpdatedAt:  time.Now().UTC(),
 	}
@@ -98,6 +110,11 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.D
 }
 
 func (r *Repository) Update(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error) {
+	md := in.Metadata
+	if md == nil {
+		md = map[string]any{}
+	}
+	meta, _ := json.Marshal(md)
 	updates := map[string]any{
 		"area_id":     in.AreaID,
 		"code":        in.Code,
@@ -107,10 +124,11 @@ func (r *Repository) Update(ctx context.Context, in domain.DiningTable) (domain.
 		"notes":       in.Notes,
 		"is_favorite": in.IsFavorite,
 		"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+		"metadata":    meta,
 		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.DiningTableModel{}).
-		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		if httperrors.IsUniqueViolation(res.Error) {
@@ -122,6 +140,62 @@ func (r *Repository) Update(ctx context.Context, in domain.DiningTable) (domain.
 		return domain.DiningTable{}, gorm.ErrRecordNotFound
 	}
 	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt != nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.DiningTableModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt == nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.DiningTableModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Delete(&models.DiningTableModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.DiningTableModel, error) {
+	var row models.DiningTableModel
+	err := r.db.WithContext(ctx).
+		Select("id, deleted_at").
+		Where("org_id = ? AND id = ?", orgID, id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.DiningTableModel{}, gorm.ErrRecordNotFound
+		}
+		return models.DiningTableModel{}, err
+	}
+	return row, nil
 }
 
 func (r *Repository) SetStatus(ctx context.Context, orgID, tableID uuid.UUID, status string) error {
@@ -141,6 +215,13 @@ func (r *Repository) SetStatus(ctx context.Context, orgID, tableID uuid.UUID, st
 var ErrDuplicateTableCode = errors.New("duplicate table code")
 
 func toDomain(row models.DiningTableModel) domain.DiningTable {
+	var meta map[string]any
+	if len(row.Metadata) > 0 {
+		_ = json.Unmarshal(row.Metadata, &meta)
+	}
+	if meta == nil {
+		meta = map[string]any{}
+	}
 	return domain.DiningTable{
 		ID:         row.ID,
 		OrgID:      row.OrgID,
@@ -152,7 +233,9 @@ func toDomain(row models.DiningTableModel) domain.DiningTable {
 		Notes:      row.Notes,
 		IsFavorite: row.IsFavorite,
 		Tags:       append([]string(nil), row.Tags...),
+		Metadata:   meta,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
+		DeletedAt:  row.DeletedAt,
 	}
 }

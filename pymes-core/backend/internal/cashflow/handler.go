@@ -49,8 +49,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("cashflow", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("cashflow", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("cashflow", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("cashflow", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("cashflow", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("cashflow", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("cashflow", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("cashflow", "delete"), h.HardDelete)
 }
 
@@ -58,7 +58,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -68,17 +68,17 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	from, err := parseDatePtr(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from date"})
+		handlers.WriteValidation(c, "invalid from date")
 		return
 	}
 	to, err := parseDatePtr(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to date"})
+		handlers.WriteValidation(c, "invalid to date")
 		return
 	}
 	branchID, err := parseBranchID(c.Query("branch_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{OrgID: orgID, BranchID: branchID, Limit: limit, After: after, Type: c.Query("type"), Category: c.Query("category"), From: from, To: to})
@@ -100,26 +100,26 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateCashMovementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var refID *uuid.UUID
 	if req.ReferenceID != nil && strings.TrimSpace(*req.ReferenceID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.ReferenceID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reference_id"})
+			handlers.WriteValidation(c, "invalid reference_id")
 			return
 		}
 		refID = &id
 	}
 	branchID, err := parseBranchID(rawStringPtr(req.BranchID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	currency := ""
@@ -156,7 +156,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -193,7 +193,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateCashMovementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -238,7 +238,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, id, ok := parseOrgAndID(c)
 	if !ok {
@@ -268,12 +272,12 @@ func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true
@@ -283,22 +287,22 @@ func (h *Handler) Summary(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	from, err := parseDate(c.Query("from"), time.Now().UTC().AddDate(0, 0, -30))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from"})
+		handlers.WriteValidation(c, "invalid from")
 		return
 	}
 	to, err := parseDate(c.Query("to"), time.Now().UTC())
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
+		handlers.WriteValidation(c, "invalid to")
 		return
 	}
 	branchID, err := parseBranchID(c.Query("branch_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	sum, err := h.uc.Summary(c.Request.Context(), orgID, branchID, from, to)
@@ -313,13 +317,13 @@ func (h *Handler) DailySummary(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
 	branchID, err := parseBranchID(c.Query("branch_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	items, err := h.uc.DailySummary(c.Request.Context(), orgID, branchID, days)
@@ -331,7 +335,7 @@ func (h *Handler) DailySummary(c *gin.Context) {
 	for _, it := range items {
 		out = append(out, dto.DailySummaryItem{Date: it.PeriodStart.Format("2006-01-02"), Income: it.TotalIncome, Expense: it.TotalExpense, Balance: it.Balance})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": out})
+	handlers.WriteListResponse(c, out, int64(len(out)), false, "")
 }
 
 func toCashMovementItem(in cashdomain.CashMovement) dto.CashMovementItem {

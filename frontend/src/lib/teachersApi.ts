@@ -78,6 +78,7 @@ export async function createTeacher(data: {
   accepts_new_clients?: boolean;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherProfile> {
   return teachersRequest('/v1/teachers/professionals', { method: 'POST', body: data });
 }
@@ -97,6 +98,7 @@ export async function updateTeacher(
     accepts_new_clients: boolean;
     is_favorite: boolean;
     tags: string[];
+    metadata: Record<string, unknown>;
   }>,
 ): Promise<TeacherProfile> {
   return teachersRequest(`/v1/teachers/professionals/${id}`, { method: 'PATCH', body: data });
@@ -115,13 +117,22 @@ export async function createTeacherSpecialty(data: {
   is_active?: boolean;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherSpecialty> {
   return teachersRequest('/v1/teachers/specialties', { method: 'POST', body: data });
 }
 
 export async function updateTeacherSpecialty(
   id: string,
-  data: Partial<{ code: string; name: string; description: string; is_active: boolean; is_favorite: boolean; tags: string[] }>,
+  data: Partial<{
+    code: string;
+    name: string;
+    description: string;
+    is_active: boolean;
+    is_favorite: boolean;
+    tags: string[];
+    metadata: Record<string, unknown>;
+  }>,
 ): Promise<TeacherSpecialty> {
   return teachersRequest(`/v1/teachers/specialties/${id}`, { method: 'PATCH', body: data });
 }
@@ -174,7 +185,7 @@ export async function getTeacherIntake(id: string): Promise<TeacherIntake> {
 
 export async function createTeacherIntake(data: {
   profile_id: string;
-  notes: string;
+  payload: Record<string, unknown>;
   is_favorite?: boolean;
   tags?: string[];
 }): Promise<TeacherIntake> {
@@ -195,7 +206,7 @@ export async function createTeacherIntake(data: {
     method: 'POST',
     body: {
       profile_id: data.profile_id,
-      payload: { notes: data.notes },
+      payload: data.payload,
       is_favorite: data.is_favorite,
       tags: data.tags,
     },
@@ -205,8 +216,12 @@ export async function createTeacherIntake(data: {
 
 export async function updateTeacherIntake(
   id: string,
-  data: Partial<{ notes: string; is_favorite: boolean; tags: string[] }>,
+  data: Partial<{ payload: Record<string, unknown>; is_favorite: boolean; tags: string[] }>,
 ): Promise<TeacherIntake> {
+  const body: Record<string, unknown> = {};
+  if (data.payload !== undefined) body.payload = data.payload;
+  if (data.is_favorite !== undefined) body.is_favorite = data.is_favorite;
+  if (data.tags !== undefined) body.tags = data.tags;
   const response = await teachersRequest<{
     id: string;
     org_id?: string;
@@ -222,11 +237,7 @@ export async function updateTeacherIntake(
     updated_at: string;
   }>(`/v1/teachers/intakes/${id}`, {
     method: 'PATCH',
-    body: {
-      payload: { notes: data.notes ?? '' },
-      is_favorite: data.is_favorite,
-      tags: data.tags,
-    },
+    body,
   });
   return mapIntake(response);
 }
@@ -263,6 +274,7 @@ export async function createTeacherSession(data: {
   service_id?: string;
   started_at: string;
   summary?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<TeacherSession> {
   return teachersRequest('/v1/teachers/sessions', { method: 'POST', body: data });
 }

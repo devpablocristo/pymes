@@ -20,7 +20,7 @@ type stubIntakesUsecases struct {
 	received domain.Intake
 }
 
-func (s *stubIntakesUsecases) List(_ context.Context, _ uuid.UUID) ([]domain.Intake, error) {
+func (s *stubIntakesUsecases) List(_ context.Context, _ ListParams) ([]domain.Intake, error) {
 	return nil, nil
 }
 
@@ -43,6 +43,18 @@ func (s *stubIntakesUsecases) Update(_ context.Context, _, _ uuid.UUID, _ Update
 
 func (s *stubIntakesUsecases) Submit(_ context.Context, _, _ uuid.UUID, _ string) (domain.Intake, error) {
 	return domain.Intake{}, nil
+}
+
+func (s *stubIntakesUsecases) Archive(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (s *stubIntakesUsecases) Restore(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (s *stubIntakesUsecases) Delete(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
 }
 
 func TestCreateUsesServiceIDContract(t *testing.T) {

@@ -18,7 +18,8 @@ import (
 )
 
 // ListParams agrupa filtros de listado.
-// TargetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
+// AssetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
+// TargetType queda como alias de compatibilidad.
 type ListParams struct {
 	OrgID      uuid.UUID
 	BranchID   *uuid.UUID
@@ -26,13 +27,16 @@ type ListParams struct {
 	After      *uuid.UUID
 	Search     string
 	Status     string
+	AssetType  string
 	TargetType string
 }
 
-// UpdateInput agrupa los campos parcheables. TargetID/TargetLabel pueden cambiar
-// si se reasigna la OT a otro asset (mover a otro vehículo/bici).
+// UpdateInput agrupa los campos parcheables. AssetID/AssetLabel pueden cambiar
+// si se reasigna la OT a otro asset. Target* queda como alias de compat.
 type UpdateInput struct {
 	BranchID      *string
+	AssetID       *string
+	AssetLabel    *string
 	TargetID      *string
 	TargetLabel   *string
 	CustomerID    *string
@@ -143,7 +147,8 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 		in.Metadata = map[string]any{}
 	}
 
-	hook := u.hooks.lookup(in.TargetType)
+	syncAssetCompat(&in)
+	hook := u.hooks.lookup(in.AssetType)
 	if err := hook.BeforeCreate(ctx, &in); err != nil {
 		return domain.WorkOrder{}, err
 	}
@@ -160,6 +165,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.created", "work_order", out.ID.String(), map[string]any{
 			"number":      out.Number,
+			"asset_type":  out.AssetType,
 			"target_type": out.TargetType,
 		})
 	}
@@ -185,18 +191,26 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	prevCanon := normalizeWorkOrderStatus(current.Status)
 	next := current
 
-	if in.TargetID != nil {
-		parsed, err := uuid.Parse(strings.TrimSpace(*in.TargetID))
+	assetIDRaw := in.AssetID
+	if assetIDRaw == nil {
+		assetIDRaw = in.TargetID
+	}
+	if assetIDRaw != nil {
+		parsed, err := uuid.Parse(strings.TrimSpace(*assetIDRaw))
 		if err != nil {
-			return domain.WorkOrder{}, fmt.Errorf("target_id is invalid: %w", httperrors.ErrBadInput)
+			return domain.WorkOrder{}, fmt.Errorf("asset_id is invalid: %w", httperrors.ErrBadInput)
 		}
-		next.TargetID = parsed
+		next.AssetID = parsed
 	}
 	if in.BranchID != nil {
 		next.BranchID = vertvalues.ParseOptionalUUID(*in.BranchID)
 	}
-	if in.TargetLabel != nil {
-		next.TargetLabel = strings.TrimSpace(*in.TargetLabel)
+	assetLabelRaw := in.AssetLabel
+	if assetLabelRaw == nil {
+		assetLabelRaw = in.TargetLabel
+	}
+	if assetLabelRaw != nil {
+		next.AssetLabel = strings.TrimSpace(*assetLabelRaw)
 	}
 	if in.CustomerID != nil {
 		next.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -248,7 +262,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		next.Tags = *in.Tags
 	}
 
-	hook := u.hooks.lookup(next.TargetType)
+	syncAssetCompat(&next)
+	hook := u.hooks.lookup(next.AssetType)
 	if err := hook.BeforeUpdate(ctx, &current, &next); err != nil {
 		return domain.WorkOrder{}, err
 	}
@@ -282,6 +297,7 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{
 			"number":      out.Number,
 			"status":      out.Status,
+			"asset_type":  out.AssetType,
 			"target_type": out.TargetType,
 		})
 	}
@@ -410,6 +426,8 @@ func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUI
 
 func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.Number = strings.ToUpper(strings.TrimSpace(in.Number))
+	in.AssetType = strings.ToLower(strings.TrimSpace(in.AssetType))
+	in.AssetLabel = strings.TrimSpace(in.AssetLabel)
 	in.TargetType = strings.ToLower(strings.TrimSpace(in.TargetType))
 	in.TargetLabel = strings.TrimSpace(in.TargetLabel)
 	in.CustomerName = strings.TrimSpace(in.CustomerName)
@@ -422,11 +440,12 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	if in.Currency == "" {
 		in.Currency = "ARS"
 	}
-	if in.TargetType == "" {
-		return fmt.Errorf("target_type is required: %w", httperrors.ErrBadInput)
+	syncAssetCompat(in)
+	if in.AssetType == "" {
+		return fmt.Errorf("asset_type is required: %w", httperrors.ErrBadInput)
 	}
-	if in.TargetID == uuid.Nil {
-		return fmt.Errorf("target_id is required: %w", httperrors.ErrBadInput)
+	if in.AssetID == uuid.Nil {
+		return fmt.Errorf("asset_id is required: %w", httperrors.ErrBadInput)
 	}
 	if in.Number == "" {
 		return fmt.Errorf("number is required: %w", httperrors.ErrBadInput)
@@ -469,6 +488,27 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.TaxTotal = taxTotal
 	in.Total = subtotalServices + subtotalParts + taxTotal
 	return nil
+}
+
+func syncAssetCompat(in *domain.WorkOrder) {
+	if in.AssetType == "" {
+		in.AssetType = in.TargetType
+	}
+	if in.TargetType == "" {
+		in.TargetType = in.AssetType
+	}
+	if in.AssetID == uuid.Nil {
+		in.AssetID = in.TargetID
+	}
+	if in.TargetID == uuid.Nil {
+		in.TargetID = in.AssetID
+	}
+	if in.AssetLabel == "" {
+		in.AssetLabel = in.TargetLabel
+	}
+	if in.TargetLabel == "" {
+		in.TargetLabel = in.AssetLabel
+	}
 }
 
 func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) error {

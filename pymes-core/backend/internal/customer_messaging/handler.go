@@ -152,10 +152,10 @@ func (h *Handler) HandleWebhook(c *gin.Context) {
 	payload, err := c.GetRawData()
 	if err != nil {
 		if ginmw.IsBodyTooLarge(err) {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
+			httperrors.Write(c, http.StatusRequestEntityTooLarge, "VALIDATION", "payload too large")
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		httperrors.Write(c, http.StatusBadRequest, "VALIDATION", "invalid payload")
 		return
 	}
 	if err := h.uc.ValidateWebhookSignature(strings.TrimSpace(c.GetHeader("X-Hub-Signature-256")), payload); err != nil {

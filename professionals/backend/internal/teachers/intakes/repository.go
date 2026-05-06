@@ -21,12 +21,15 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) List(ctx context.Context, orgID uuid.UUID) ([]domain.Intake, error) {
+func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Intake, error) {
 	var rows []models.IntakeModel
-	if err := r.db.WithContext(ctx).
-		Where("org_id = ?", orgID).
-		Order("created_at DESC").
-		Find(&rows).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("org_id = ?", p.OrgID)
+	if p.Archived {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("deleted_at IS NULL")
+	}
+	if err := q.Order("created_at DESC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]domain.Intake, 0, len(rows))
@@ -83,7 +86,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intak
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
-		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Intake{}, res.Error
@@ -92,6 +95,62 @@ func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intak
 		return domain.Intake{}, gorm.ErrRecordNotFound
 	}
 	return r.GetByID(ctx, in.OrgID, in.ID)
+}
+
+func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt != nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if state.DeletedAt == nil {
+		return nil
+	}
+	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
+	return res.Error
+}
+
+func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Delete(&models.IntakeModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.IntakeModel, error) {
+	var row models.IntakeModel
+	err := r.db.WithContext(ctx).
+		Select("id, deleted_at").
+		Where("org_id = ? AND id = ?", orgID, id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.IntakeModel{}, gorm.ErrRecordNotFound
+		}
+		return models.IntakeModel{}, err
+	}
+	return row, nil
 }
 
 func toDomain(row models.IntakeModel) domain.Intake {
@@ -115,6 +174,7 @@ func toDomain(row models.IntakeModel) domain.Intake {
 		Payload:         payload,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
+		DeletedAt:       row.DeletedAt,
 	}
 }
 

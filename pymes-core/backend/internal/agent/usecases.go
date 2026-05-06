@@ -254,7 +254,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 	reviewStatus := ""
 	if capability.RequiresReview {
 		if u.review == nil {
-			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Review no esta configurado")
+			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Governance no esta configurado")
 		}
 		if reviewRequestID == "" {
 			resp, err := u.review.SubmitRequest(ctx, idempotencyKey, reviewclient.SubmitRequestBody{
@@ -296,7 +296,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 					ReviewDecision:  reviewDecision,
 					ReviewStatus:    reviewStatus,
 					ExecutorStatus:  capability.ExecutorStatus,
-					Message:         "Nexus Review debe aprobar esta accion antes de ejecutarla.",
+					Message:         "Nexus Governance debe aprobar esta accion antes de ejecutarla.",
 					Requirements: map[string]any{
 						"review":       true,
 						"confirmation": capability.RequiresConfirmation,

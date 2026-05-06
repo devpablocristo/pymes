@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -104,7 +105,7 @@ func LoadFromEnv() Config {
 		ExchangeRateProvider:             envconfig.Get("EXCHANGE_RATE_PROVIDER", "manual"),
 		InternalServiceToken:             strings.TrimSpace(envconfig.Get("INTERNAL_SERVICE_TOKEN", localInternalServiceToken)),
 		AIServiceURL:                     envconfig.Get("AI_SERVICE_URL", "http://ai:8000"),
-		ReviewCallbackToken:              strings.TrimSpace(envconfig.Get("REVIEW_CALLBACK_TOKEN", "")),
+		ReviewCallbackToken:              EnvFirstNonEmpty("GOVERNANCE_CALLBACK_TOKEN", "REVIEW_CALLBACK_TOKEN"),
 		ReviewSyncInterval:               envconfig.Duration("REVIEW_SYNC_INTERVAL_SECONDS", 30*time.Second),
 		WhatsAppWebhookVerifyToken:       envconfig.Get("WHATSAPP_WEBHOOK_VERIFY_TOKEN", ""),
 		WhatsAppAppSecret:                envconfig.Get("WHATSAPP_APP_SECRET", ""),
@@ -137,4 +138,15 @@ func validateInternalServiceToken(environment, token string) error {
 		return fmt.Errorf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment))
 	}
 	return nil
+}
+
+// EnvFirstNonEmpty devuelve el primer valor de entorno no vacío (tras trim).
+// Orden canónico: variables GOVERNANCE_* antes que REVIEW_* (legacy).
+func EnvFirstNonEmpty(keys ...string) string {
+	for _, k := range keys {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return v
+		}
+	}
+	return ""
 }

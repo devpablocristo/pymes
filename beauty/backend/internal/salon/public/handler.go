@@ -9,6 +9,7 @@ import (
 
 	"github.com/devpablocristo/pymes/beauty/backend/internal/shared/pymescore"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 )
 
 // coreServicesPort expone el catálogo público de servicios servido por pymes-core.
@@ -40,11 +41,11 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 func (h *Handler) ListServices(c *gin.Context) {
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return
 	}
 	if h.coreServices == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core services not configured"})
+		verticalgin.WriteError(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "core services not configured")
 		return
 	}
 	items, err := h.coreServices.ListPublicServices(
@@ -76,22 +77,22 @@ func (h *Handler) ListServices(c *gin.Context) {
 			"tax_rate":         item.TaxRate,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	verticalgin.WriteListResponse(c, publicItems, int64(len(publicItems)), false, "")
 }
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {

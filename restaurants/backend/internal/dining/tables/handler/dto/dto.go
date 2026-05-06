@@ -1,18 +1,20 @@
 package dto
 
 type DiningTableItem struct {
-	ID         string   `json:"id"`
-	OrgID      string   `json:"org_id"`
-	AreaID     string   `json:"area_id"`
-	Code       string   `json:"code"`
-	Label      string   `json:"label"`
-	Capacity   int      `json:"capacity"`
-	Status     string   `json:"status"`
-	Notes      string   `json:"notes"`
-	IsFavorite bool     `json:"is_favorite"`
-	Tags       []string `json:"tags"`
-	CreatedAt  string   `json:"created_at"`
-	UpdatedAt  string   `json:"updated_at"`
+	ID         string         `json:"id"`
+	OrgID      string         `json:"org_id"`
+	AreaID     string         `json:"area_id"`
+	Code       string         `json:"code"`
+	Label      string         `json:"label"`
+	Capacity   int            `json:"capacity"`
+	Status     string         `json:"status"`
+	Notes      string         `json:"notes"`
+	IsFavorite bool           `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
+	DeletedAt  *string        `json:"deleted_at,omitempty"`
 }
 
 type ListDiningTablesResponse struct {
@@ -23,23 +25,25 @@ type ListDiningTablesResponse struct {
 }
 
 type CreateDiningTableRequest struct {
-	AreaID     string   `json:"area_id" binding:"required"`
-	Code       string   `json:"code" binding:"required"`
-	Label      string   `json:"label"`
-	Capacity   int      `json:"capacity"`
-	Status     string   `json:"status"`
-	Notes      string   `json:"notes"`
-	IsFavorite *bool    `json:"is_favorite,omitempty"`
-	Tags       []string `json:"tags,omitempty"`
+	AreaID     string         `json:"area_id" binding:"required"`
+	Code       string         `json:"code" binding:"required"`
+	Label      string         `json:"label"`
+	Capacity   int            `json:"capacity"`
+	Status     string         `json:"status"`
+	Notes      string         `json:"notes"`
+	IsFavorite *bool          `json:"is_favorite,omitempty"`
+	Tags       []string       `json:"tags,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 type UpdateDiningTableRequest struct {
-	AreaID     *string   `json:"area_id"`
-	Code       *string   `json:"code"`
-	Label      *string   `json:"label"`
-	Capacity   *int      `json:"capacity"`
-	Status     *string   `json:"status"`
-	Notes      *string   `json:"notes"`
-	IsFavorite *bool     `json:"is_favorite,omitempty"`
-	Tags       *[]string `json:"tags,omitempty"`
+	AreaID     *string         `json:"area_id"`
+	Code       *string         `json:"code"`
+	Label      *string         `json:"label"`
+	Capacity   *int            `json:"capacity"`
+	Status     *string         `json:"status"`
+	Notes      *string         `json:"notes"`
+	IsFavorite *bool           `json:"is_favorite,omitempty"`
+	Tags       *[]string       `json:"tags,omitempty"`
+	Metadata   *map[string]any `json:"metadata"`
 }

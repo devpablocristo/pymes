@@ -10,25 +10,25 @@ import (
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
 
-func TestListForcesBicycleTargetType(t *testing.T) {
+func TestListForcesBicycleAssetType(t *testing.T) {
 	t.Parallel()
 
 	base := &fakeBasePort{}
 	uc := NewUsecases(base)
 
-	_, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: uuid.New(), TargetType: "vehicle"})
+	_, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: uuid.New(), AssetType: "vehicle"})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if base.lastList.TargetType != targetType {
-		t.Fatalf("List() target_type = %q, want %q", base.lastList.TargetType, targetType)
+	if base.lastList.AssetType != targetType {
+		t.Fatalf("List() asset_type = %q, want %q", base.lastList.AssetType, targetType)
 	}
 }
 
 func TestGetByIDRejectsOtherSubvertical(t *testing.T) {
 	t.Parallel()
 
-	base := &fakeBasePort{getByIDResult: WorkOrder{ID: uuid.New(), OrgID: uuid.New(), TargetType: "vehicle"}}
+	base := &fakeBasePort{getByIDResult: WorkOrder{ID: uuid.New(), OrgID: uuid.New(), AssetType: "vehicle"}}
 	uc := NewUsecases(base)
 
 	_, err := uc.GetByID(context.Background(), uuid.New(), uuid.New())
@@ -37,18 +37,18 @@ func TestGetByIDRejectsOtherSubvertical(t *testing.T) {
 	}
 }
 
-func TestCreateForcesBicycleTargetType(t *testing.T) {
+func TestCreateForcesBicycleAssetType(t *testing.T) {
 	t.Parallel()
 
 	base := &fakeBasePort{}
 	uc := NewUsecases(base)
 
-	_, err := uc.Create(context.Background(), WorkOrder{OrgID: uuid.New(), TargetType: "vehicle"}, "tester")
+	_, err := uc.Create(context.Background(), WorkOrder{OrgID: uuid.New(), AssetType: "vehicle"}, "tester")
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if base.lastCreated.TargetType != targetType {
-		t.Fatalf("Create() target_type = %q, want %q", base.lastCreated.TargetType, targetType)
+	if base.lastCreated.AssetType != targetType {
+		t.Fatalf("Create() asset_type = %q, want %q", base.lastCreated.AssetType, targetType)
 	}
 }
 

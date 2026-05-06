@@ -4,7 +4,7 @@
  * La vertical mantiene un endpoint unificado legado (`/v1/work-orders`) por
  * compatibilidad, pero el ownership real vive en los módulos por subvertical:
  * `auto_repair` y `bike_shop`. Este cliente resuelve el prefijo correcto según
- * `target_type` y cae al endpoint legado solo cuando no puede inferirlo.
+ * `asset_type` y cae al endpoint legado solo cuando no puede inferirlo.
  */
 import { createVerticalRequest } from './verticalApi';
 import { readActiveBranchId } from './branchSelectionStorage';
@@ -34,25 +34,25 @@ const workOrdersRequest = createVerticalRequest({
 });
 
 const WORK_ORDERS_COMPAT_PREFIX = '/v1/work-orders';
-const WORK_ORDERS_PREFIX_BY_TARGET_TYPE: Record<string, string> = {
+const WORK_ORDERS_PREFIX_BY_ASSET_TYPE: Record<string, string> = {
   vehicle: '/v1/auto-repair/work-orders',
   bicycle: '/v1/bike-shop/work-orders',
 };
-const WORKSHOP_BOOKINGS_PREFIX_BY_TARGET_TYPE: Record<string, string> = {
+const WORKSHOP_BOOKINGS_PREFIX_BY_ASSET_TYPE: Record<string, string> = {
   vehicle: '/v1/auto-repair/workshop-bookings',
   bicycle: '/v1/bike-shop/workshop-bookings',
 };
 
-function normalizeTargetType(targetType?: WorkOrderTargetType | null): string {
-  return typeof targetType === 'string' ? targetType.trim().toLowerCase() : '';
+function normalizeAssetType(assetType?: WorkOrderAssetType | null): string {
+  return typeof assetType === 'string' ? assetType.trim().toLowerCase() : '';
 }
 
-function resolveWorkOrdersPrefix(targetType?: WorkOrderTargetType | null): string {
-  return WORK_ORDERS_PREFIX_BY_TARGET_TYPE[normalizeTargetType(targetType)] ?? WORK_ORDERS_COMPAT_PREFIX;
+function resolveWorkOrdersPrefix(assetType?: WorkOrderAssetType | null): string {
+  return WORK_ORDERS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)] ?? WORK_ORDERS_COMPAT_PREFIX;
 }
 
-function resolveWorkshopBookingsPrefix(targetType?: WorkOrderTargetType | null): string {
-  return WORKSHOP_BOOKINGS_PREFIX_BY_TARGET_TYPE[normalizeTargetType(targetType)] ?? '/v1/workshop-bookings';
+function resolveWorkshopBookingsPrefix(assetType?: WorkOrderAssetType | null): string {
+  return WORKSHOP_BOOKINGS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)] ?? '/v1/workshop-bookings';
 }
 
 function resolveBranchId(branchId?: string | null): string | undefined {
@@ -65,7 +65,8 @@ function resolveBranchId(branchId?: string | null): string | undefined {
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
-export type WorkOrderTargetType = 'vehicle' | 'bicycle' | string;
+export type WorkOrderAssetType = 'vehicle' | 'bicycle' | string;
+export type WorkOrderTargetType = WorkOrderAssetType;
 
 export type WorkOrderLineItem = {
   id?: string;
@@ -86,12 +87,17 @@ export type WorkOrder = {
   branch_id?: string;
   number: string;
 
-  // Forma unificada (preferida).
-  target_type: WorkOrderTargetType;
-  target_id: string;
-  target_label: string;
+  // Contrato canónico: objeto/activo del cliente que entra al taller.
+  asset_type: WorkOrderAssetType;
+  asset_id: string;
+  asset_label: string;
 
-  // Aliases legacy populados por el backend según target_type.
+  // Alias legacy devuelto por compatibilidad.
+  target_type?: WorkOrderTargetType;
+  target_id?: string;
+  target_label?: string;
+
+  // Aliases legacy populados por el backend según asset_type.
   vehicle_id?: string;
   vehicle_plate?: string;
   bicycle_id?: string;
@@ -143,6 +149,7 @@ type ListResponse = {
 
 export type ListWorkOrdersParams = {
   branch_id?: string;
+  asset_type?: WorkOrderAssetType;
   target_type?: WorkOrderTargetType;
   limit?: number;
   search?: string;
@@ -153,11 +160,12 @@ export type ListWorkOrdersParams = {
 // ── Listar / paginar ───────────────────────────────────────────────────────
 
 export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<ListResponse> {
-  const prefix = resolveWorkOrdersPrefix(params?.target_type);
+  const assetType = params?.asset_type ?? params?.target_type;
+  const prefix = resolveWorkOrdersPrefix(assetType);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
   if (branchId) q.set('branch_id', branchId);
-  if (params?.target_type) q.set('target_type', params.target_type);
+  if (assetType) q.set('asset_type', assetType);
   if (params?.limit != null) q.set('limit', String(params.limit));
   if (params?.search) q.set('search', params.search);
   if (params?.status) q.set('status', params.status);
@@ -168,6 +176,7 @@ export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<List
 
 export async function getAllWorkOrders(params?: {
   branch_id?: string;
+  asset_type?: WorkOrderAssetType;
   target_type?: WorkOrderTargetType;
   search?: string;
   status?: string;
@@ -185,13 +194,15 @@ export async function getAllWorkOrders(params?: {
 
 export async function getWorkOrdersArchived(params?: {
   branch_id?: string;
+  asset_type?: WorkOrderAssetType;
   target_type?: WorkOrderTargetType;
 }): Promise<WorkOrder[]> {
-  const prefix = resolveWorkOrdersPrefix(params?.target_type);
+  const assetType = params?.asset_type ?? params?.target_type;
+  const prefix = resolveWorkOrdersPrefix(assetType);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
   if (branchId) q.set('branch_id', branchId);
-  if (params?.target_type) q.set('target_type', params.target_type);
+  if (assetType) q.set('asset_type', assetType);
   const suffix = q.toString() ? `?${q.toString()}` : '';
   const data = await workOrdersRequest<{ items?: WorkOrder[] }>(
     `${prefix}/archived${suffix}`,
@@ -201,8 +212,8 @@ export async function getWorkOrdersArchived(params?: {
 
 // ── Detalle ────────────────────────────────────────────────────────────────
 
-export async function getWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`);
+export async function getWorkOrder(id: string, assetType?: WorkOrderAssetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}`);
 }
 
 // ── Crear ──────────────────────────────────────────────────────────────────
@@ -210,9 +221,9 @@ export async function getWorkOrder(id: string, targetType?: WorkOrderTargetType)
 export type CreateWorkOrderInput = {
   branch_id?: string;
   number?: string;
-  target_type: WorkOrderTargetType;
-  target_id: string;
-  target_label?: string;
+  asset_type: WorkOrderAssetType;
+  asset_id: string;
+  asset_label?: string;
   customer_id?: string;
   customer_name?: string;
   booking_id?: string;
@@ -230,7 +241,7 @@ export type CreateWorkOrderInput = {
 
 export async function createWorkOrder(data: CreateWorkOrderInput): Promise<WorkOrder> {
   const branchId = resolveBranchId(data.branch_id);
-  return workOrdersRequest(resolveWorkOrdersPrefix(data.target_type), {
+  return workOrdersRequest(resolveWorkOrdersPrefix(data.asset_type), {
     method: 'POST',
     body: branchId ? { ...data, branch_id: branchId } : data,
   });
@@ -240,9 +251,11 @@ export async function createWorkOrder(data: CreateWorkOrderInput): Promise<WorkO
 
 export type UpdateWorkOrderInput = Partial<{
   branch_id: string;
+  asset_id: string;
+  asset_label: string;
+  // Aliases legacy aceptados por el backend.
   target_id: string;
   target_label: string;
-  // Aliases legacy aceptados por el backend (mapean a target_id/target_label).
   vehicle_id: string;
   vehicle_plate: string;
   bicycle_id: string;
@@ -262,33 +275,33 @@ export type UpdateWorkOrderInput = Partial<{
   items: WorkOrderLineItem[];
 }>;
 
-export async function updateWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PATCH', body: data });
+export async function updateWorkOrder(id: string, data: UpdateWorkOrderInput, assetType?: WorkOrderAssetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}`, { method: 'PATCH', body: data });
 }
 
-export async function patchWorkOrder(id: string, data: UpdateWorkOrderInput, targetType?: WorkOrderTargetType): Promise<WorkOrder> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'PATCH', body: data });
+export async function patchWorkOrder(id: string, data: UpdateWorkOrderInput, assetType?: WorkOrderAssetType): Promise<WorkOrder> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}`, { method: 'PATCH', body: data });
 }
 
 // ── Archive / Restore / Hard delete ────────────────────────────────────────
 
-export async function archiveWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
-  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}`, { method: 'DELETE' });
+export async function archiveWorkOrder(id: string, assetType?: WorkOrderAssetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}`, { method: 'DELETE' });
 }
 
-export async function restoreWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
-  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}/restore`, { method: 'POST', body: {} });
+export async function restoreWorkOrder(id: string, assetType?: WorkOrderAssetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}/restore`, { method: 'POST', body: {} });
 }
 
-export async function hardDeleteWorkOrder(id: string, targetType?: WorkOrderTargetType): Promise<void> {
-  await workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${id}/hard`, { method: 'DELETE' });
+export async function hardDeleteWorkOrder(id: string, assetType?: WorkOrderAssetType): Promise<void> {
+  await workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${id}/hard`, { method: 'DELETE' });
 }
 
 // ── Fragmento CRUD genérico (paridad con el patrón verticalApi) ────────────
 
 /**
  * Devuelve los handlers list/deleteItem/restore/hardDelete que el CRUD genérico
- * espera, atados al endpoint unificado y filtrados por target_type.
+ * espera, atados al endpoint unificado y filtrados por asset_type.
  *
  * Uso: workOrdersArchivedCrud('vehicle') / workOrdersArchivedCrud('bicycle').
  */
@@ -302,45 +315,45 @@ export type WorkOrderPaymentLink = {
 
 export async function createWorkshopBooking(
   data: Record<string, unknown>,
-  targetType: WorkOrderTargetType = 'vehicle',
+  assetType: WorkOrderAssetType = 'vehicle',
 ): Promise<{ id: string; [key: string]: unknown }> {
   const branchId =
     typeof data.branch_id === 'string' && data.branch_id.trim()
       ? data.branch_id.trim()
       : resolveBranchId();
-  return workOrdersRequest(resolveWorkshopBookingsPrefix(targetType), {
+  return workOrdersRequest(resolveWorkshopBookingsPrefix(assetType), {
     method: 'POST',
     body: branchId ? { ...data, branch_id: branchId } : data,
   });
 }
 
-export async function createWorkOrderQuote(workOrderId: string, targetType?: WorkOrderTargetType): Promise<{ id: string }> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/quote`, { method: 'POST', body: {} });
+export async function createWorkOrderQuote(workOrderId: string, assetType?: WorkOrderAssetType): Promise<{ id: string }> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${workOrderId}/quote`, { method: 'POST', body: {} });
 }
 
-export async function createWorkOrderSale(workOrderId: string, targetType?: WorkOrderTargetType): Promise<{ id: string }> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/sale`, { method: 'POST', body: {} });
+export async function createWorkOrderSale(workOrderId: string, assetType?: WorkOrderAssetType): Promise<{ id: string }> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${workOrderId}/sale`, { method: 'POST', body: {} });
 }
 
-export async function createWorkOrderPaymentLink(workOrderId: string, targetType?: WorkOrderTargetType): Promise<WorkOrderPaymentLink> {
-  return workOrdersRequest(`${resolveWorkOrdersPrefix(targetType)}/${workOrderId}/payment-link`, {
+export async function createWorkOrderPaymentLink(workOrderId: string, assetType?: WorkOrderAssetType): Promise<WorkOrderPaymentLink> {
+  return workOrdersRequest(`${resolveWorkOrdersPrefix(assetType)}/${workOrderId}/payment-link`, {
     method: 'POST',
     body: {},
   });
 }
 
-export function workOrdersArchivedCrud(targetType: WorkOrderTargetType) {
+export function workOrdersArchivedCrud(assetType: WorkOrderAssetType) {
   return {
     list: async <T>(params?: { archived?: boolean }): Promise<T[]> => {
       if (params?.archived === true) {
-        const items = await getWorkOrdersArchived({ target_type: targetType });
+        const items = await getWorkOrdersArchived({ asset_type: assetType });
         return items as unknown as T[];
       }
-      const data = await getWorkOrders({ target_type: targetType, limit: 250 });
+      const data = await getWorkOrders({ asset_type: assetType, limit: 250 });
       return (data.items ?? []) as unknown as T[];
     },
-    deleteItem: async (row: { id: string }) => archiveWorkOrder(row.id, targetType),
-    restore: async (row: { id: string }) => restoreWorkOrder(row.id, targetType),
-    hardDelete: async (row: { id: string }) => hardDeleteWorkOrder(row.id, targetType),
+    deleteItem: async (row: { id: string }) => archiveWorkOrder(row.id, assetType),
+    restore: async (row: { id: string }) => restoreWorkOrder(row.id, assetType),
+    hardDelete: async (row: { id: string }) => hardDeleteWorkOrder(row.id, assetType),
   };
 }

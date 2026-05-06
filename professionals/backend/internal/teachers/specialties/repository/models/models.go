@@ -16,8 +16,10 @@ type SpecialtyModel struct {
 	IsActive    bool           `gorm:"not null;default:true"`
 	IsFavorite  bool           `gorm:"column:is_favorite;not null"`
 	Tags        pq.StringArray `gorm:"type:text[]"`
+	Metadata    []byte         `gorm:"type:jsonb"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 func (SpecialtyModel) TableName() string { return "professionals.specialties" }

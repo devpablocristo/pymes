@@ -9,6 +9,8 @@ export type ProfessionalProfile = {
   accepts_new_clients: boolean;
   is_favorite?: boolean;
   tags?: string[];
+  /** JSON libre del backend (p. ej. `image_urls` para carrusel estándar). */
+  metadata?: Record<string, unknown>;
   specialties: Array<string | { id: string; code: string; name: string }>;
   created_at: string;
   updated_at: string;
@@ -29,6 +31,7 @@ export type Specialty = {
   is_active: boolean;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };

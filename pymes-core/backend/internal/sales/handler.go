@@ -42,7 +42,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -64,7 +64,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("customer_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &id
@@ -72,12 +72,12 @@ func (h *Handler) List(c *gin.Context) {
 
 	from, err := parseDatePtr(c.Query("from"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid from"})
+		handlers.WriteValidation(c, "invalid from")
 		return
 	}
 	to, err := parseDatePtr(c.Query("to"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to"})
+		handlers.WriteValidation(c, "invalid to")
 		return
 	}
 
@@ -114,13 +114,13 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 
 	var req dto.CreateSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.CustomerID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer_id"})
+			handlers.WriteValidation(c, "invalid customer_id")
 			return
 		}
 		customerID = &id
@@ -138,7 +138,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.QuoteID != nil && strings.TrimSpace(*req.QuoteID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.QuoteID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote_id"})
+			handlers.WriteValidation(c, "invalid quote_id")
 			return
 		}
 		quoteID = &id
@@ -146,7 +146,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -158,7 +158,7 @@ func (h *Handler) Create(c *gin.Context) {
 		if it.ProductID != nil && strings.TrimSpace(*it.ProductID) != "" {
 			id, err := uuid.Parse(strings.TrimSpace(*it.ProductID))
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product_id"})
+				handlers.WriteValidation(c, "invalid product_id")
 				return
 			}
 			productID = &id
@@ -167,7 +167,7 @@ func (h *Handler) Create(c *gin.Context) {
 		if it.ServiceID != nil && strings.TrimSpace(*it.ServiceID) != "" {
 			id, err := uuid.Parse(strings.TrimSpace(*it.ServiceID))
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
+				handlers.WriteValidation(c, "invalid service_id")
 				return
 			}
 			serviceID = &id
@@ -211,12 +211,12 @@ func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -231,17 +231,17 @@ func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	var req dto.UpdateSaleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateSaleInput{
@@ -263,12 +263,12 @@ func (h *Handler) Void(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 

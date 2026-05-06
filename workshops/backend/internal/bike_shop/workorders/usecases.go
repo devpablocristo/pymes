@@ -39,6 +39,7 @@ func NewUsecases(base basePort) *Usecases {
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]WorkOrder, int64, bool, *uuid.UUID, error) {
+	p.AssetType = targetType
 	p.TargetType = targetType
 	return u.base.List(ctx, p)
 }
@@ -48,6 +49,7 @@ func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *
 }
 
 func (u *Usecases) Create(ctx context.Context, in WorkOrder, actor string) (WorkOrder, error) {
+	in.AssetType = targetType
 	in.TargetType = targetType
 	return u.base.Create(ctx, in, actor)
 }
@@ -99,7 +101,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func ensureSubverticalOwnership(order WorkOrder) error {
-	if order.TargetType != targetType {
+	if order.AssetType != targetType && order.TargetType != targetType {
 		return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 	}
 	return nil

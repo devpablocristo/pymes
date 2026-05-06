@@ -3,18 +3,18 @@ package professional_profiles
 import (
 	"context"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
+	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/handler/dto"
+	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
-	"github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/handler/dto"
-	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 )
 
 type usecasesPort interface {
@@ -22,6 +22,9 @@ type usecasesPort interface {
 	Create(ctx context.Context, in domain.ProfessionalProfile, actor string) (domain.ProfessionalProfile, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.ProfessionalProfile, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -31,32 +34,44 @@ type Handler struct {
 func NewHandler(uc usecasesPort) *Handler { return &Handler{uc: uc} }
 
 func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
-	authGroup.GET("/professionals", h.List)
-	authGroup.POST("/professionals", h.Create)
-	authGroup.GET("/professionals/:id", h.Get)
-	authGroup.PATCH("/professionals/:id", h.Update)
+	const basePath = "/professionals"
+	const itemPath = basePath + "/:id"
+
+	authGroup.GET(basePath, h.List)
+	authGroup.GET(basePath+"/"+crudpaths.SegmentArchived, h.ListArchived)
+	authGroup.POST(basePath, h.Create)
+	authGroup.GET(itemPath, h.Get)
+	authGroup.PATCH(itemPath, h.Update)
+	authGroup.DELETE(itemPath, h.Delete)
+	authGroup.POST(itemPath+"/"+crudpaths.SegmentArchive, h.Archive)
+	authGroup.POST(itemPath+"/"+crudpaths.SegmentRestore, h.Restore)
+	authGroup.DELETE(itemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
+	h.list(c, false)
+}
+
+func (h *Handler) ListArchived(c *gin.Context) {
+	h.list(c, true)
+}
+
+func (h *Handler) list(c *gin.Context, forceArchived bool) {
 	orgID, ok := verticalgin.ParseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if v := strings.TrimSpace(c.Query("after")); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &id
+	limit := verticalgin.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := verticalgin.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:  orgID,
-		Limit:  limit,
-		After:  after,
-		Search: c.Query("search"),
+		OrgID:    orgID,
+		Limit:    limit,
+		After:    after,
+		Search:   c.Query("search"),
+		Archived: forceArchived || c.Query("archived") == "true",
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -80,12 +95,12 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	partyID, err := uuid.Parse(req.PartyID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
+		verticalgin.WriteValidation(c, "invalid party_id")
 		return
 	}
 	profile := domain.ProfessionalProfile{
@@ -131,6 +146,46 @@ func (h *Handler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, toProfileItem(out))
 }
 
+func (h *Handler) Delete(c *gin.Context) {
+	h.Archive(c)
+}
+
+func (h *Handler) Archive(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
 	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
@@ -139,7 +194,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
@@ -180,6 +235,7 @@ func toProfileItem(in domain.ProfessionalProfile) dto.ProfileItem {
 		Metadata:          in.Metadata,
 		CreatedAt:         in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:         in.UpdatedAt.UTC().Format(time.RFC3339),
+		DeletedAt:         formatOptionalTime(in.DeletedAt),
 	}
 	if len(in.Specialties) > 0 {
 		item.Specialties = make([]dto.SpecialtyRef, 0, len(in.Specialties))
@@ -192,4 +248,12 @@ func toProfileItem(in domain.ProfessionalProfile) dto.ProfileItem {
 		}
 	}
 	return item
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
 }

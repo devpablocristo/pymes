@@ -40,6 +40,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.PATCH("/purchases/:id", rbac.RequirePermission("purchases", "update"), h.Update)
 	auth.PATCH("/purchases/:id/status", rbac.RequirePermission("purchases", "update"), h.UpdateStatus)
 	auth.DELETE("/purchases/:id", rbac.RequirePermission("purchases", "delete"), h.Delete)
+	auth.POST("/purchases/:id/"+crudpaths.SegmentArchive, rbac.RequirePermission("purchases", "update"), h.Archive)
 	auth.POST("/purchases/:id/"+crudpaths.SegmentRestore, rbac.RequirePermission("purchases", "delete"), h.Restore)
 	auth.DELETE("/purchases/:id/"+crudpaths.SegmentHard, rbac.RequirePermission("purchases", "delete"), h.HardDelete)
 }
@@ -54,7 +55,7 @@ func (h *Handler) List(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -64,7 +65,7 @@ func (h *Handler) List(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
@@ -77,7 +78,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return
 		}
 		branchID = &id
@@ -87,19 +88,19 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreatePurchaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
@@ -136,7 +137,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.CreatePurchaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
@@ -160,7 +161,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	}
 	var req dto.UpdatePurchaseStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
@@ -186,6 +187,10 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
 }
 
 func (h *Handler) Restore(c *gin.Context) {

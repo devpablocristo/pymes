@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 // --- fakes ---
@@ -64,6 +65,38 @@ func (f *fakeRepo) Update(_ context.Context, in domain.ProfessionalProfile) (dom
 	}
 	f.profiles[in.ID] = in
 	return in, nil
+}
+
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if p.DeletedAt == nil {
+		now := time.Now().UTC()
+		p.DeletedAt = &now
+		f.profiles[id] = p
+	}
+	return nil
+}
+
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	p.DeletedAt = nil
+	f.profiles[id] = p
+	return nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	p, ok := f.profiles[id]
+	if !ok || p.OrgID != orgID || p.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(f.profiles, id)
+	return nil
 }
 
 func (f *fakeRepo) ListPublic(_ context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {

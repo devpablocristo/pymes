@@ -9,16 +9,18 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/restaurants/backend/internal/dining/tables/usecases/domain"
 )
 
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
-	AreaID *uuid.UUID
+	OrgID    uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
+	AreaID   *uuid.UUID
+	Archived bool
 }
 
 type UpdateInput struct {
@@ -30,6 +32,7 @@ type UpdateInput struct {
 	Notes      *string
 	IsFavorite *bool
 	Tags       *[]string
+	Metadata   *map[string]any
 }
 
 type RepositoryPort interface {
@@ -37,6 +40,9 @@ type RepositoryPort interface {
 	Create(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.DiningTable, error)
 	Update(ctx context.Context, in domain.DiningTable) (domain.DiningTable, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AreaLookup interface {
@@ -104,6 +110,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.DiningTable{}, err
 	}
+	if err := archive.IfArchived(current.DeletedAt, "dining table"); err != nil {
+		return domain.DiningTable{}, err
+	}
 	if in.AreaID != nil {
 		current.AreaID = *in.AreaID
 	}
@@ -127,6 +136,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	}
 	if in.Tags != nil {
 		current.Tags = *in.Tags
+	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
 	}
 	if err := u.normalizeAndValidate(&current); err != nil {
 		return domain.DiningTable{}, err
@@ -152,6 +164,45 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "restaurant.table.updated", "dining_table", out.ID.String(), nil)
 	}
 	return out, nil
+}
+
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("dining table not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.table.archived", "dining_table", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("dining table not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.table.restored", "dining_table", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("dining table not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "restaurant.table.deleted", "dining_table", id.String(), map[string]any{})
+	}
+	return nil
 }
 
 func (u *Usecases) normalizeAndValidate(in *domain.DiningTable) error {

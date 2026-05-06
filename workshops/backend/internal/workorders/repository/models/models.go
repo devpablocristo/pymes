@@ -7,13 +7,19 @@ import (
 	"github.com/lib/pq"
 )
 
-// WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
+// WorkOrderModel mapea workshops.work_orders. Asset* es el contrato canónico;
+// Target* se conserva como columnas legacy sincronizadas.
 type WorkOrderModel struct {
 	ID       uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID *uuid.UUID `gorm:"type:uuid;index"`
 	Number   string     `gorm:"not null"`
 
+	AssetType  string    `gorm:"not null"`
+	AssetID    uuid.UUID `gorm:"type:uuid;not null"`
+	AssetLabel string    `gorm:"not null;default:''"`
+
+	// Compatibilidad: columnas legacy mantenidas para rutas/clientes que siguen hablando target_*.
 	TargetType  string    `gorm:"not null"`
 	TargetID    uuid.UUID `gorm:"type:uuid;not null"`
 	TargetLabel string    `gorm:"not null;default:''"`

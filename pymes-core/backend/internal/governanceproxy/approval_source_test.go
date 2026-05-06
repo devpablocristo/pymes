@@ -1,4 +1,4 @@
-package reviewproxy
+package governanceproxy
 
 import (
 	"context"

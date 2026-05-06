@@ -179,7 +179,7 @@ func TestReviewCallback(t *testing.T) {
 	inbox := &stubNotificationInbox{affected: 2}
 	handler := &Handler{notificationInbox: inbox}
 	group := router.Group("/v1/internal/v1")
-	handler.RegisterReviewCallbackRoutes(group)
+	handler.RegisterGovernanceCallbackRoutes(group)
 
 	body, err := json.Marshal(map[string]any{
 		"event":       "approval_resolved",
@@ -193,7 +193,7 @@ func TestReviewCallback(t *testing.T) {
 		t.Fatalf("marshal request: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/internal/v1/review-callback", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/internal/v1/governance-callback", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, req)

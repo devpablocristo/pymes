@@ -1,4 +1,4 @@
-package reviewproxy
+package governanceproxy
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy/handler/dto"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 )
 
 var (

@@ -114,6 +114,7 @@ jobs:
         run: |
           python -m compileall -q src
           ruff check src
+          python -c "import src.main"
           pytest -q
 
   frontend:
@@ -155,6 +156,30 @@ jobs:
 
       # Hosting DEV: solo en merge/push a `develop` vía `.github/workflows/deploy-dev-frontend.yml`
       # (WIF + smoke). No desplegar DEV desde pushes a `main`.
+
+  audits:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run architecture audits
+        run: |
+          make audit-debt
+          make audit-crud-strict
+
+  docker-prod-builds:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production backend image
+        run: docker build -f pymes-core/backend/Dockerfile.prod -t pymes-core-prod-ci ..
+      - name: Build production AI image
+        run: docker build -f ai/Dockerfile.prod -t pymes-ai-prod-ci .
+      - name: Smoke AI production image imports
+        run: docker run --rm -e GEMINI_API_KEY=ci-placeholder-not-used pymes-ai-prod-ci python -c "import src.main"
 
   review-notifications-e2e:
     name: review-notifications-e2e
@@ -203,8 +228,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         working-directory: nexus
         run: |
-          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/review-callback
-          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/review-callback,http://host.docker.internal:8200/v1/internal/review-callback
+          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/review-callback
           export GOVERNANCE_CALLBACK_TOKEN=local-review-callback-token
           docker compose up -d --build governance governance-postgres
 
@@ -302,10 +327,10 @@ jobs:
             printenv GOVERNANCE_CALLBACK_TOKEN GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS || true
           echo "--- governance → cp-backend connectivity (expect 401 without token) ---"
           docker compose exec -T governance \
-            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/review-callback --post-data='{}' --header='Content-Type: application/json' 2>&1 | head -20 || true
+            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback --post-data='{}' --header='Content-Type: application/json' 2>&1 | head -20 || true
           echo "--- governance → cp-backend with token ---"
           docker compose exec -T governance \
-            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/review-callback \
+            wget -qSO- http://host.docker.internal:8100/v1/internal/v1/governance-callback \
               --post-data='{"event":"approval_pending","request_id":"debug"}' \
               --header='Content-Type: application/json' \
               --header='Authorization: Bearer local-review-callback-token' \

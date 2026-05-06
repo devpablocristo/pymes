@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.agents.commercial_runtime import (
     CommercialChatResult as CommercialChatResult,
+    CommercialRunState as CommercialRunState,
     _load_internal_conversation as _load_internal_conversation,
     _persist_dossier_if_changed as _persist_dossier_if_changed,
     build_commercial_prompt as build_commercial_prompt,

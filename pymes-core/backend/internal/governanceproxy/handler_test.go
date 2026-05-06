@@ -1,4 +1,4 @@
-package reviewproxy
+package governanceproxy
 
 import (
 	"context"
@@ -10,42 +10,42 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy/handler/dto"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 )
 
-type stubReviewClient struct {
+type stubGovernanceClient struct {
 	listPendingApprovals func(ctx context.Context) (int, []byte, error)
 }
 
-func (s stubReviewClient) ListPolicies(context.Context) (int, []byte, error) {
+func (s stubGovernanceClient) ListPolicies(context.Context) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubReviewClient) CreatePolicy(context.Context, any) (int, []byte, error) {
+func (s stubGovernanceClient) CreatePolicy(context.Context, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubReviewClient) UpdatePolicy(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) UpdatePolicy(context.Context, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubReviewClient) DeletePolicy(context.Context, string) (int, error) {
+func (s stubGovernanceClient) DeletePolicy(context.Context, string) (int, error) {
 	return http.StatusNotImplemented, errors.New("not implemented")
 }
 
-func (s stubReviewClient) ListActionTypes(context.Context) (int, []byte, error) {
+func (s stubGovernanceClient) ListActionTypes(context.Context) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubReviewClient) ListPendingApprovals(ctx context.Context) (int, []byte, error) {
+func (s stubGovernanceClient) ListPendingApprovals(ctx context.Context) (int, []byte, error) {
 	return s.listPendingApprovals(ctx)
 }
 
-func (s stubReviewClient) Approve(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) Approve(context.Context, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubReviewClient) Reject(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) Reject(context.Context, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
@@ -54,7 +54,7 @@ func TestListPendingApprovalsReturnsEmptyListWhenReviewUnavailable(t *testing.T)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewHandler(stubReviewClient{
+	handler := NewHandler(stubGovernanceClient{
 		listPendingApprovals: func(context.Context) (int, []byte, error) {
 			return 0, nil, errors.New("dial tcp: connection refused")
 		},
@@ -83,7 +83,7 @@ func TestListPendingApprovalsPassesThroughReviewResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	payload := []byte(`{"approvals":[{"id":"appr-1","request_id":"req-1","action_type":"sales.refund","target_resource":"sale-1","reason":"manual","risk_level":"medium","status":"pending","created_at":"2026-03-31T00:00:00Z"}],"total":1}`)
-	handler := NewHandler(stubReviewClient{
+	handler := NewHandler(stubGovernanceClient{
 		listPendingApprovals: func(context.Context) (int, []byte, error) {
 			return http.StatusOK, payload, nil
 		},
@@ -102,4 +102,4 @@ func TestListPendingApprovalsPassesThroughReviewResponse(t *testing.T) {
 	}
 }
 
-var _ reviewClient = stubReviewClient{}
+var _ governanceClient = stubGovernanceClient{}

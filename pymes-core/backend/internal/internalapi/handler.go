@@ -151,8 +151,8 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 	internal.POST("/customer-messaging/send-text", h.InternalSendWhatsAppText)
 }
 
-func (h *Handler) RegisterReviewCallbackRoutes(internal *gin.RouterGroup) {
-	internal.POST("/review-callback", h.ReviewCallback)
+func (h *Handler) RegisterGovernanceCallbackRoutes(internal *gin.RouterGroup) {
+	internal.POST("/governance-callback", h.ReviewCallback)
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {

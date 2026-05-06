@@ -33,6 +33,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dashboard"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/dataio"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/employees"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/internalapi"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inventory"
@@ -54,7 +55,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/recurring"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reports"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/returns"
-	"github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/scheduler"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/services"
@@ -216,18 +216,18 @@ func InitializeApp() *app.App {
 	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL)
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
-	reviewURL := config.EnvFirstNonEmpty("GOVERNANCE_URL", "REVIEW_URL")
-	reviewAPIKey := config.EnvFirstNonEmpty("GOVERNANCE_API_KEY", "REVIEW_API_KEY")
-	var reviewClient *reviewproxy.Client
+	governanceURL := strings.TrimSpace(os.Getenv("GOVERNANCE_URL"))
+	governanceAPIKey := strings.TrimSpace(os.Getenv("GOVERNANCE_API_KEY"))
+	var governanceClient *governanceproxy.Client
 	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
-	if reviewURL != "" {
-		reviewClient = reviewproxy.NewClient(reviewURL, reviewAPIKey)
+	if governanceURL != "" {
+		governanceClient = governanceproxy.NewClient(governanceURL, governanceAPIKey)
 		inAppNotifUC = inappnotifications.NewUsecases(
 			inAppNotifRepo,
-			inappnotifications.WithApprovalSource(reviewproxy.NewPendingApprovalSource(reviewClient)),
+			inappnotifications.WithApprovalSource(governanceproxy.NewPendingApprovalSource(governanceClient)),
 		)
 	}
-	agentUC := agent.NewUsecases(agentRepo, reviewClient, auditUC)
+	agentUC := agent.NewUsecases(agentRepo, governanceClient, auditUC)
 	businessInsightsUC := businessinsights.NewService(businessInsightsRepo, inAppNotifUC, businessinsights.Config{
 		FeaturedSaleThreshold:    cfg.InsightsFeaturedSaleThreshold,
 		FeaturedPaymentThreshold: cfg.InsightsFeaturedPaymentThreshold,
@@ -323,10 +323,10 @@ func InitializeApp() *app.App {
 		},
 		scheduler: schedulerHandler,
 	})
-	registerInternalV1Routes(v1, cfg.InternalServiceToken, strings.TrimSpace(cfg.ReviewCallbackToken), internalV1Registrars{
-		api:             internalAPIHandler,
-		scheduling:      schedulingHandler,
-		reviewCallbacks: internalAPIHandler,
+	registerInternalV1Routes(v1, cfg.InternalServiceToken, strings.TrimSpace(cfg.GovernanceCallbackToken), internalV1Registrars{
+		api:                 internalAPIHandler,
+		scheduling:          schedulingHandler,
+		governanceCallbacks: internalAPIHandler,
 	}, rbacMiddleware.RequirePermission)
 	registerTenantPublicRoutes(v1, tenantPublicRegistrars{
 		api:            publicAPIHandler,
@@ -378,7 +378,7 @@ func InitializeApp() *app.App {
 		},
 		paymentGateway: paymentGatewayHandler,
 	})
-	registerReviewRuntime(authGroup, reviewClient, reviewURL, cfg.ReviewSyncInterval, inAppNotifUC, logger)
+	registerGovernanceRuntime(authGroup, governanceClient, governanceURL, cfg.GovernanceSyncInterval, inAppNotifUC, logger)
 
 	AttachSaaSUnmatchedRoutes(router, saasSvc)
 

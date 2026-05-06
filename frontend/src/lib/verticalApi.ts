@@ -36,14 +36,16 @@ function resolveVerticalBaseURLs(envVar: string, devPorts: number[]): string[] {
     candidates.push(configured);
   }
 
-  // Solo usar puertos de desarrollo basados en el hostname actual del navegador.
-  // No hardcodear localhost para evitar requests a localhost en produccion.
+  // Solo usar puertos de desarrollo cuando el navegador corre localmente.
+  // En hosting real, un puerto como web.app:8282 es un falso destino y rompe DEV.
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
-    devPorts.forEach((port) => {
-      candidates.push(`${protocol}//${hostname}:${port}`);
-    });
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      devPorts.forEach((port) => {
+        candidates.push(`${protocol}//${hostname}:${port}`);
+      });
+    }
   }
 
   return [...new Set(candidates)];

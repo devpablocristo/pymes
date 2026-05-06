@@ -31,12 +31,12 @@ func TestRegisterInternalV1RoutesUsesExpectedGroups(t *testing.T) {
 	v1 := router.Group("/v1")
 
 	registerInternalV1Routes(v1, "internal-token", "review-token", internalV1Registrars{
-		api:             fakeGroupRoutesRegistrar{path: "/bootstrap"},
-		scheduling:      fakePermissionRoutesRegistrar{path: "/scheduling/bookings"},
-		reviewCallbacks: fakeReviewCallbackRoutesRegistrar{path: "/review-callback"},
+		api:                 fakeGroupRoutesRegistrar{path: "/bootstrap"},
+		scheduling:          fakePermissionRoutesRegistrar{path: "/scheduling/bookings"},
+		governanceCallbacks: fakeGovernanceCallbackRoutesRegistrar{path: "/governance-callback"},
 	}, nil)
 
-	assertRoutePaths(t, router, "GET /v1/internal/v1/bootstrap", "GET /v1/internal/v1/scheduling/bookings", "POST /v1/internal/v1/review-callback")
+	assertRoutePaths(t, router, "GET /v1/internal/v1/bootstrap", "GET /v1/internal/v1/scheduling/bookings", "POST /v1/internal/v1/governance-callback")
 }
 
 func TestRegisterTenantPublicRoutesUsesOrgScopedGroup(t *testing.T) {
@@ -133,11 +133,11 @@ func (f fakeExternalRoutesRegistrar) RegisterExternalRoutes(group *gin.RouterGro
 	group.GET(f.path, noopHandler)
 }
 
-type fakeReviewCallbackRoutesRegistrar struct {
+type fakeGovernanceCallbackRoutesRegistrar struct {
 	path string
 }
 
-func (f fakeReviewCallbackRoutesRegistrar) RegisterReviewCallbackRoutes(group *gin.RouterGroup) {
+func (f fakeGovernanceCallbackRoutesRegistrar) RegisterGovernanceCallbackRoutes(group *gin.RouterGroup) {
 	group.POST(f.path, noopHandler)
 }
 

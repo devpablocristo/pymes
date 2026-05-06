@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 	"github.com/google/uuid"
 )
 
@@ -24,9 +24,9 @@ type RepositoryPort interface {
 	ListAgentEvents(ctx context.Context, orgID uuid.UUID, limit int, capabilityID, requestID string) ([]AgentEvent, error)
 }
 
-type ReviewClient interface {
-	SubmitRequest(ctx context.Context, idempotencyKey string, body reviewclient.SubmitRequestBody) (reviewclient.SubmitResponse, error)
-	GetRequest(ctx context.Context, id string) (reviewclient.RequestSummary, int, error)
+type GovernanceClient interface {
+	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	GetRequest(ctx context.Context, id string) (governanceclient.RequestSummary, int, error)
 }
 
 type AuditPort interface {
@@ -36,11 +36,11 @@ type AuditPort interface {
 type Usecases struct {
 	registry *Registry
 	repo     RepositoryPort
-	review   ReviewClient
+	review   GovernanceClient
 	audit    AuditPort
 }
 
-func NewUsecases(repo RepositoryPort, review ReviewClient, audit AuditPort) *Usecases {
+func NewUsecases(repo RepositoryPort, review GovernanceClient, audit AuditPort) *Usecases {
 	return &Usecases{registry: NewRegistry(), repo: repo, review: review, audit: audit}
 }
 
@@ -257,7 +257,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Governance no esta configurado")
 		}
 		if reviewRequestID == "" {
-			resp, err := u.review.SubmitRequest(ctx, idempotencyKey, reviewclient.SubmitRequestBody{
+			resp, err := u.review.SubmitRequest(ctx, idempotencyKey, governanceclient.SubmitRequestBody{
 				RequesterType:  requesterType(in.Auth.AuthMethod),
 				RequesterID:    strings.TrimSpace(in.Auth.Actor),
 				RequesterName:  strings.TrimSpace(in.Auth.Actor),

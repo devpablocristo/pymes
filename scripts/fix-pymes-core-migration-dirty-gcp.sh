@@ -7,6 +7,7 @@
 #
 # Uso:
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh status
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh rewind-to 40
 #
 # rewind-to N: deja la tabla de migraciones en versión N sin dirty (el próximo arranque del backend
@@ -94,9 +95,26 @@ show_status() {
   "${psql_cmd[@]}" -c "SELECT 'post_scheduling', version, dirty FROM pymes_core_post_scheduling_schema_migrations ORDER BY version;" 2>/dev/null || true
 }
 
+check_clean() {
+  local dirty_rows
+  dirty_rows="$("${psql_cmd[@]}" -Atq -c "SELECT 'pymes_core:' || version FROM pymes_core_schema_migrations WHERE dirty IS TRUE;" || true)"
+  dirty_rows="${dirty_rows}"$'\n'"$("${psql_cmd[@]}" -Atq -c "SELECT 'post_scheduling:' || version FROM pymes_core_post_scheduling_schema_migrations WHERE dirty IS TRUE;" 2>/dev/null || true)"
+  dirty_rows="$(printf '%s' "$dirty_rows" | sed '/^[[:space:]]*$/d')"
+  if [[ -n "$dirty_rows" ]]; then
+    echo "ERROR: migraciones dirty detectadas:" >&2
+    printf '%s\n' "$dirty_rows" >&2
+    show_status >&2
+    exit 3
+  fi
+  echo "OK: no hay migraciones dirty."
+}
+
 case "$MODE" in
   status)
     show_status
+    ;;
+  check-clean)
+    check_clean
     ;;
   clear-dirty)
     "${psql_cmd[@]}" -c "UPDATE pymes_core_schema_migrations SET dirty = false WHERE dirty = true;"
@@ -112,7 +130,7 @@ INSERT INTO pymes_core_schema_migrations (version, dirty) VALUES ($ARG, false);"
     show_status
     ;;
   *)
-    echo "Modos: status | clear-dirty | rewind-to <n>" >&2
+    echo "Modos: status | check-clean | clear-dirty | rewind-to <n>" >&2
     exit 1
     ;;
 esac

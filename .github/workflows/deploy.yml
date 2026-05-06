@@ -41,8 +41,8 @@ jobs:
       - name: Start Nexus governance
         working-directory: nexus
         run: |
-          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/review-callback
-          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/review-callback,http://host.docker.internal:8200/v1/internal/review-callback
+          export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
+          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/review-callback
           export GOVERNANCE_CALLBACK_TOKEN=local-review-callback-token
           docker compose up -d --build governance governance-postgres
 

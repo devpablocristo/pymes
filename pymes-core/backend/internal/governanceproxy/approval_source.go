@@ -1,4 +1,4 @@
-package reviewproxy
+package governanceproxy
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/devpablocristo/core/governance/go/reviewclient"
+	"github.com/devpablocristo/core/governance/go/governanceclient"
+	reviewdto "github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
-	reviewdto "github.com/devpablocristo/pymes/pymes-core/backend/internal/reviewproxy/handler/dto"
 )
 
 type pendingApprovalSourceClient interface {
@@ -34,7 +34,7 @@ func (s *PendingApprovalSource) ListPendingApprovals(ctx context.Context) ([]ina
 		return nil, err
 	}
 	if status != http.StatusOK {
-		return nil, fmt.Errorf("review pending approvals: status %d body %s", status, reviewclient.ParseErrorBody(data))
+		return nil, fmt.Errorf("review pending approvals: status %d body %s", status, governanceclient.ParseErrorBody(data))
 	}
 
 	var payload pendingApprovalListPayload

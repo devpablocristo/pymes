@@ -79,6 +79,8 @@ github.com/devpablocristo/core/errors/go v0.1.0 h1:AGcc9fPrlymjOhrh/rtFx+gqWcRdZ
 github.com/devpablocristo/core/errors/go v0.1.0/go.mod h1:Ju3mqSVdV7FlIf4/FtQt8U8+nd0EC+erBj+Kk9xjx+c=
 github.com/devpablocristo/core/governance/go v0.1.0 h1:g+485c7j/dSrjRgGJtCzsZzALZlPfKN8k7JdBATvYEk=
 github.com/devpablocristo/core/governance/go v0.1.0/go.mod h1:IoHJZyEg61+lhQawpoWvDgVdL5JV6YZXxWmaz1Rke+0=
+github.com/devpablocristo/core/governance/go v0.2.0 h1:XMtz+NjuSnVZIYixyhtYBrgzJ2M8eAHjfKl1EWOi2cY=
+github.com/devpablocristo/core/governance/go v0.2.0/go.mod h1:IoHJZyEg61+lhQawpoWvDgVdL5JV6YZXxWmaz1Rke+0=
 github.com/devpablocristo/core/http/gin/go v0.1.1 h1:9KL8IyfVaep0LiYVXmBG3QZq4NNo6gvrU3cbBiYiP1Y=
 github.com/devpablocristo/core/http/gin/go v0.1.1/go.mod h1:DEXd4u2NC4EPp+3oRi7SVfH8i8D/e2AN6d5Gj9WFfR8=
 github.com/devpablocristo/core/http/go v0.1.1 h1:sTqSbMjbULIpl7XMK/CJjZ8Gned3/LcxyQbx6h6ioMo=

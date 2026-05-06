@@ -15,6 +15,9 @@ permissions:
   actions: read
   id-token: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: pymes-deploy-dev-backend
   cancel-in-progress: true

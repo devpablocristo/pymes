@@ -35,6 +35,7 @@ jobs:
       AI_SERVICE_NAME: pymes-ai
       FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
       FRONTEND_CLERK_PUBLISHABLE_KEY: pk_test_c2VsZWN0ZWQtdGljay00OC5jbGVyay5hY2NvdW50cy5kZXYk
+      FRONTEND_CLERK_DEFAULT_ORG_ID: org_3BGpccLTlKu8qo6pSNekrUDEANC
       FIREBASE_TOOLS_VERSION: "13"
 
     steps:
@@ -119,6 +120,7 @@ jobs:
           VITE_RESTAURANTS_API_URL="/" \
           VITE_MEDICAL_API_URL="/" \
           VITE_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY}" \
+          VITE_CLERK_DEFAULT_ORG_ID="${FRONTEND_CLERK_DEFAULT_ORG_ID}" \
           npm run build
 
       - name: Write Firebase target config

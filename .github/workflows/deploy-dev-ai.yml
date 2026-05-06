@@ -138,13 +138,21 @@ jobs:
           fi
           echo "BACKEND_URL=${backend_url}" >> "$GITHUB_ENV"
 
-      - name: Resolve available GCP secrets
+      - name: Resolve required GCP secrets
         run: |
           set -euo pipefail
+          for secret_name in \
+            "$SECRET_DATABASE_URL_NAME" \
+            "$SECRET_GOVERNANCE_API_KEY_NAME"; do
+            if ! gcloud secrets versions access latest \
+              --secret="$secret_name" \
+              --project="$GCP_PROJECT_ID" >/dev/null; then
+              echo "::error::No se pudo acceder al secret requerido $secret_name."
+              exit 1
+            fi
+          done
           secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
-          if gcloud secrets describe "$SECRET_GOVERNANCE_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
-            secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
-          fi
+          secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloud Run (DEV)

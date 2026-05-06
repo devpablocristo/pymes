@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	saasmiddleware "github.com/devpablocristo/core/saas/go/shared/middleware"
+	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
 	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 

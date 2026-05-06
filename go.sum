@@ -77,8 +77,6 @@ github.com/devpablocristo/core/databases/postgres/go v0.1.1 h1:bvMaT5i+AFUeKdYDR
 github.com/devpablocristo/core/databases/postgres/go v0.1.1/go.mod h1:6lpx7COXzInJodKpqsLonSyzkcUIH3raRV2AEBCy7BQ=
 github.com/devpablocristo/core/errors/go v0.1.0 h1:AGcc9fPrlymjOhrh/rtFx+gqWcRdZJkUff1qivVNjkY=
 github.com/devpablocristo/core/errors/go v0.1.0/go.mod h1:Ju3mqSVdV7FlIf4/FtQt8U8+nd0EC+erBj+Kk9xjx+c=
-github.com/devpablocristo/core/governance/go v0.1.0 h1:g+485c7j/dSrjRgGJtCzsZzALZlPfKN8k7JdBATvYEk=
-github.com/devpablocristo/core/governance/go v0.1.0/go.mod h1:IoHJZyEg61+lhQawpoWvDgVdL5JV6YZXxWmaz1Rke+0=
 github.com/devpablocristo/core/governance/go v0.2.0 h1:XMtz+NjuSnVZIYixyhtYBrgzJ2M8eAHjfKl1EWOi2cY=
 github.com/devpablocristo/core/governance/go v0.2.0/go.mod h1:IoHJZyEg61+lhQawpoWvDgVdL5JV6YZXxWmaz1Rke+0=
 github.com/devpablocristo/core/http/gin/go v0.1.1 h1:9KL8IyfVaep0LiYVXmBG3QZq4NNo6gvrU3cbBiYiP1Y=
@@ -87,8 +85,8 @@ github.com/devpablocristo/core/http/go v0.1.1 h1:sTqSbMjbULIpl7XMK/CJjZ8Gned3/Lc
 github.com/devpablocristo/core/http/go v0.1.1/go.mod h1:z4xQjIs6RFYQ0DdKZPi7N/0aWkOJFdBVTSPpf5kHcYA=
 github.com/devpablocristo/core/notifications/go v0.3.0 h1:fSC3NQDSUZiX2Ek40k0kPZwjTt1pMGW7XlP/aJ2u0c0=
 github.com/devpablocristo/core/notifications/go v0.3.0/go.mod h1:UVw3va9HdLxnyxDgzudfM2P5VBnY9DUf7PhxPHvoen0=
-github.com/devpablocristo/core/saas/go v0.1.0 h1:IqDjbrPXbn3UhR83S44YeFElAZ0EYThQb81mJeHoL3E=
-github.com/devpablocristo/core/saas/go v0.1.0/go.mod h1:HwVkouS7mCQ4Wfg203DWoXBCUOLhOjTTfxA9C1taafE=
+github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26 h1:LNqzG0dCS4VDmZAMiyU4mTvvDZ86infbBhepIblDQ1M=
+github.com/devpablocristo/core/saas/go v0.1.1-0.20260328151810-084828e80b26/go.mod h1:jI4YD87zCS8mjqEoNDSUZOLAztZtxxnGkxNWkcYRYZY=
 github.com/devpablocristo/core/scheduling/go v0.1.0 h1:WMZFNCzyuPrdSRNQhEJ5JRqcvJRX/NRmZOBikSdc1nM=
 github.com/devpablocristo/core/scheduling/go v0.1.0/go.mod h1:zp4UFTTle6z+7SEt4bh9eZX2eANzSrN/96Jj1OJ2OSM=
 github.com/devpablocristo/core/security/go v0.1.0 h1:cG1y35bN2RFF2NAnCtDho0kTF8zBjYEOx9fKnHzjjmw=

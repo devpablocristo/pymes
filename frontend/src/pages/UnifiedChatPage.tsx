@@ -1,322 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import ReactMarkdown from 'react-markdown';
-import { useSearchParams } from 'react-router-dom';
 import { useSearch } from '@devpablocristo/modules-search';
 import { pymesAssistantChat, listConversations, getConversation } from '../lib/aiApi';
-import { humanInsightScopeLabel, humanRoutedLabel, humanRoutingSourceLabel } from '../lib/aiLabels';
-import { formatFetchErrorForUser } from '../lib/formatFetchError';
-import { useI18n, type LanguageCode } from '../lib/i18n';
+import { humanRoutedLabel } from '../lib/aiLabels';
+import { useI18n } from '../lib/i18n';
 import {
   NOTIFICATION_CHAT_HANDOFF_KEY,
   buildChatRequestHandoff,
   buildHandoffUserMessage,
   type NotificationChatHandoff,
 } from '../lib/notificationChatHandoff';
-import type { CommercialChatRequest, PymesAssistantAction, PymesAssistantChatBlock, PymesAssistantChatResponse } from '../types/aiChat';
+import type { CommercialChatRequest, PymesAssistantAction } from '../types/aiChat';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { queryKeys } from '../lib/queryKeys';
+import { AI_PYMES_ID, type ManualRouteHint, type Msg } from './UnifiedChatPage.model';
+import {
+  badgeToneForRoute,
+  buildAssistantMessages,
+  buildNotificationHandoffMetaLabel,
+  buildRouteHintMetaLabel,
+  formatAssistantHttpError,
+  formatChatTime,
+  formatIsoTime,
+  hasPromptForQueryBlock,
+  nextChatMsgId,
+  normalizeManualRouteHint,
+  resolveInputPrompt,
+  resolvePreferredLanguage,
+} from './UnifiedChatPage.helpers';
+import { ChatComposer } from './UnifiedChatComposer';
+import { ChatThread } from './UnifiedChatThread';
+export { AssistantMarkdown } from './UnifiedChatMarkdown';
 import './UnifiedChatPage.css';
-
-type ManualRouteHint = Exclude<NonNullable<CommercialChatRequest['route_hint']>, 'general' | 'insight_chat'>;
-
-const AI_PYMES_ID = 'ai-pymes';
-
-type Msg = {
-  id: string;
-  contactId: string;
-  text: string;
-  fromMe: boolean;
-  time: string;
-  blocks?: PymesAssistantChatBlock[];
-  routedLabel?: string;
-  metaLabel?: string;
-  badgeLabels?: string[];
-  badgeTones?: MsgBadgeTone[];
-};
-
-type MsgBadgeTone =
-  | 'sales'
-  | 'collections'
-  | 'purchases'
-  | 'customers'
-  | 'products'
-  | 'employees'
-  | 'general'
-  | 'deterministic'
-  | 'gemini'
-  | 'neutral';
-type AssistantReplyRow = Pick<Msg, 'text' | 'fromMe' | 'routedLabel' | 'blocks' | 'metaLabel' | 'badgeLabels' | 'badgeTones'>;
-
-let nextMsgId = 100;
-
-function normalizeManualRouteHint(value: string | null | undefined): ManualRouteHint | undefined {
-  if (
-    value === 'customers' ||
-    value === 'products' ||
-    value === 'services' ||
-    value === 'sales' ||
-    value === 'collections' ||
-    value === 'purchases' ||
-    value === 'employees'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function hasPromptForQueryBlock(blocks: PymesAssistantChatBlock[] | undefined): boolean {
-  return Boolean(
-    blocks?.some(
-      (block) =>
-        block.type === 'actions' &&
-        (block.actions ?? []).some((action) => action.selection_behavior === 'prompt_for_query'),
-    ),
-  );
-}
-
-function buttonClassName(style?: PymesAssistantAction['style']): string {
-  if (style === 'primary') return 'btn-primary btn-sm';
-  if (style === 'ghost') return 'cht__block-action cht__block-action--ghost';
-  return 'btn-secondary btn-sm';
-}
-
-function kpiTrendClassName(trend?: 'up' | 'down' | 'flat' | 'unknown' | null): string {
-  if (trend === 'up') return 'cht__kpi-item-trend cht__kpi-item-trend--up';
-  if (trend === 'down') return 'cht__kpi-item-trend cht__kpi-item-trend--down';
-  if (trend === 'flat') return 'cht__kpi-item-trend cht__kpi-item-trend--flat';
-  return 'cht__kpi-item-trend';
-}
-
-function badgeToneForRoute(mode: string | null | undefined): MsgBadgeTone {
-  if (mode === 'sales' || mode === 'internal_sales') return 'sales';
-  if (mode === 'collections') return 'collections';
-  if (mode === 'purchases' || mode === 'internal_procurement') return 'purchases';
-  if (mode === 'customers') return 'customers';
-  if (mode === 'products' || mode === 'services') return 'products';
-  if (mode === 'employees') return 'employees';
-  if (mode === 'general' || mode === 'insight_chat') return 'general';
-  return 'neutral';
-}
-
-function badgeClassName(tone: MsgBadgeTone): string {
-  return `cht__msg-badge cht__msg-badge--${tone}`;
-}
-
-function localeForLanguage(language: LanguageCode): string {
-  return language === 'en' ? 'en-US' : 'es-AR';
-}
-
-function formatChatTime(language: LanguageCode): string {
-  return new Date().toLocaleTimeString(localeForLanguage(language), { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatIsoTime(iso: string | null | undefined, language: LanguageCode): string {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleTimeString(localeForLanguage(language), { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
-export function AssistantMarkdown({ text }: { text: string }) {
-  return (
-    <div className="cht__markdown">
-      <ReactMarkdown allowedElements={['p', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'code', 'pre', 'blockquote']}>
-        {text}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
-function resolvePreferredLanguage(contentLanguage: string | undefined, fallbackLanguage: LanguageCode): LanguageCode {
-  if (contentLanguage === 'en' || contentLanguage === 'es') {
-    return contentLanguage;
-  }
-  return fallbackLanguage;
-}
-
-function humanBadgeCategoryLabel(mode: string, language: LanguageCode): string {
-  if (mode === 'customers') return humanRoutedLabel('customers', language);
-  if (mode === 'products') return humanRoutedLabel('products', language);
-  if (mode === 'sales') return humanRoutedLabel('sales', language);
-  if (mode === 'collections') return humanRoutedLabel('collections', language);
-  if (mode === 'purchases') return humanRoutedLabel('purchases', language);
-  if (mode === 'employees') return humanRoutedLabel('employees', language);
-  return humanRoutedLabel('general', language);
-}
-
-function isDeterministicReply(reply: PymesAssistantChatResponse): boolean {
-  return reply.answer_mode === 'facts_only' || Boolean(reply.deterministic?.used && !reply.llm?.used);
-}
-
-function buildAssistantMetaLabel(
-  reply: PymesAssistantChatResponse,
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): string {
-  const parts = [
-    `${t('ai.chat.meta.request')} ${reply.request_id}`,
-    reply.output_kind,
-    humanRoutedLabel(reply.routed_agent, language),
-    humanRoutingSourceLabel(reply.routing_source, language),
-  ];
-  if (reply.analysis_scope) {
-    parts.push(humanInsightScopeLabel(reply.analysis_scope, language));
-  }
-  return parts.join(' · ');
-}
-
-function formatAssistantHttpError(
-  err: unknown,
-  fallback: string,
-): string {
-  const body = typeof (err as { body?: unknown } | null)?.body === 'string'
-    ? String((err as { body?: string }).body)
-    : '';
-  if (body) {
-    try {
-      const parsed = JSON.parse(body) as { error?: { code?: string; message?: string } };
-      if (parsed.error?.code === 'gemini_unavailable' && parsed.error.message) {
-        return parsed.error.message;
-      }
-      if (parsed.error?.message) {
-        return parsed.error.message;
-      }
-    } catch {
-      // formatFetchErrorForUser handles the original error message below.
-    }
-  }
-  return formatFetchErrorForUser(err, fallback);
-}
-
-function buildNotificationHandoffMetaLabel(
-  handoff: NotificationChatHandoff,
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): string | null {
-  const parts = [`${t('ai.chat.meta.notification')} ${handoff.notificationId}`];
-  const routedAgent = handoff.routedAgent;
-  const showAgentLabel = Boolean(routedAgent) && !(routedAgent === 'insight_chat' && handoff.scope);
-  if (showAgentLabel && routedAgent) {
-    parts.push(`${t('ai.chat.meta.agent')} ${humanRoutedLabel(routedAgent, language)}`);
-  }
-  if (handoff.scope) {
-    parts.push(`${t('ai.chat.meta.context')} ${humanInsightScopeLabel(handoff.scope, language)}`);
-  }
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-function buildRouteHintMetaLabel(
-  routeHint: CommercialChatRequest['route_hint'],
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): string | undefined {
-  if (!routeHint) return undefined;
-  return `${t('ai.chat.meta.manualRoute')} · ${humanRoutedLabel(routeHint, language)}`;
-}
-
-function buildAssistantBadgeLabels(reply: PymesAssistantChatResponse, language: LanguageCode): string[] {
-  const labels = [humanBadgeCategoryLabel(reply.routed_agent, language)];
-  if (isDeterministicReply(reply)) {
-    labels.push(language === 'en' ? 'Deterministic' : 'Determinista');
-  }
-  if (reply.llm?.used && reply.llm.model) {
-    labels.push(`Gemini ${reply.llm.model}`);
-  }
-  const toolCount = reply.evidence?.tools?.length ?? reply.tool_calls?.length ?? 0;
-  if (toolCount > 0) {
-    labels.push(language === 'en' ? `${toolCount} evidence tools` : `${toolCount} herramientas`);
-  }
-  const period = reply.evidence?.period;
-  if (period?.label) {
-    labels.push(language === 'en' ? `Period ${period.label}` : `Período ${period.label}`);
-  }
-  return labels;
-}
-
-function buildAssistantBadgeTones(reply: PymesAssistantChatResponse): MsgBadgeTone[] {
-  const tones: MsgBadgeTone[] = [badgeToneForRoute(reply.routed_agent)];
-  if (isDeterministicReply(reply)) {
-    tones.push('deterministic');
-  }
-  if (reply.llm?.used && reply.llm.model) {
-    tones.push('gemini');
-  }
-  const toolCount = reply.evidence?.tools?.length ?? reply.tool_calls?.length ?? 0;
-  if (toolCount > 0) {
-    tones.push('neutral');
-  }
-  if (reply.evidence?.period?.label) {
-    tones.push('neutral');
-  }
-  return tones;
-}
-
-function applyPymesReply(
-  reply: PymesAssistantChatResponse,
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): AssistantReplyRow[] {
-  const agentLabel = humanRoutedLabel(reply.routed_agent, language);
-  const sourceLabel = humanRoutingSourceLabel(reply.routing_source, language);
-  const routedLabel = agentLabel === sourceLabel ? agentLabel : `${agentLabel} · ${sourceLabel}`;
-  return [
-    {
-      text: reply.reply,
-      fromMe: false,
-      routedLabel,
-      metaLabel: buildAssistantMetaLabel(reply, language, t),
-      badgeLabels: buildAssistantBadgeLabels(reply, language),
-      badgeTones: buildAssistantBadgeTones(reply),
-      blocks: reply.blocks ?? [],
-    },
-  ];
-}
-
-function materializeAssistantReplyRows(contactId: string, rows: AssistantReplyRow[], language: LanguageCode): Msg[] {
-  const time = formatChatTime(language);
-  return rows.map((row) => ({
-    id: String(++nextMsgId),
-    contactId,
-    text: row.text,
-    blocks: row.blocks,
-    fromMe: row.fromMe,
-    time,
-    routedLabel: row.routedLabel,
-    metaLabel: row.metaLabel,
-    badgeLabels: row.badgeLabels,
-    badgeTones: row.badgeTones,
-  }));
-}
-
-function buildAssistantMessages(
-  contactId: string,
-  reply: PymesAssistantChatResponse,
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): Msg[] {
-  return materializeAssistantReplyRows(contactId, applyPymesReply(reply, language, t), language);
-}
-
-function resolveInputPrompt(
-  routeHint: ManualRouteHint | undefined,
-  language: LanguageCode,
-  t: (key: string, variables?: Record<string, string | number>) => string,
-): string {
-  if (routeHint) {
-    return t('ai.chat.input.routePlaceholder', {
-      label: humanRoutedLabel(routeHint, language),
-    });
-  }
-  return t('ai.chat.input.defaultPlaceholder');
-}
 
 export function UnifiedChatPage() {
   const { language, t } = useI18n();
-  const [searchParams] = useSearchParams();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [chatIds, setChatIds] = useState<Record<string, string | undefined>>({});
   const [pendingConfirmationsByContact, setPendingConfirmationsByContact] = useState<Record<string, string[]>>({});
@@ -395,11 +114,7 @@ export function UnifiedChatPage() {
     (m: Msg) => [m.text, m.routedLabel, m.metaLabel, ...(m.badgeLabels ?? [])].filter(Boolean).join(' '),
     [],
   );
-  const filteredThread = useSearch(
-    thread,
-    threadSearchText,
-    pageSearch,
-  );
+  const filteredThread = useSearch(thread, threadSearchText, pageSearch);
   const activePendingConfirmations = useMemo(
     () => pendingConfirmationsByContact[AI_PYMES_ID] ?? [],
     [pendingConfirmationsByContact],
@@ -409,14 +124,6 @@ export function UnifiedChatPage() {
     () => resolveInputPrompt(activePendingRouteHint, language, t),
     [activePendingRouteHint, language, t],
   );
-
-  useEffect(() => {
-    const agent = searchParams.get('agent');
-    const legacy = searchParams.get('legacy');
-    if (agent === 'ai-sales' || agent === 'ai-procurement' || legacy === 'commercial') {
-      return;
-    }
-  }, [searchParams]);
 
   // Aviso in-app → Asistente Pymes: primer turno automático con contexto
   useEffect(() => {
@@ -456,7 +163,7 @@ export function UnifiedChatPage() {
 
     const time = formatChatTime(language);
     const userMsg: Msg = {
-      id: String(++nextMsgId),
+      id: nextChatMsgId(),
       contactId: AI_PYMES_ID,
       text,
       fromMe: true,
@@ -532,7 +239,7 @@ export function UnifiedChatPage() {
 
       const time = formatChatTime(language);
       const userMsg: Msg = {
-        id: String(++nextMsgId),
+        id: nextChatMsgId(),
         contactId: AI_PYMES_ID,
         text: options?.echoText ?? trimmed,
         fromMe: true,
@@ -565,8 +272,7 @@ export function UnifiedChatPage() {
             [AI_PYMES_ID]: undefined,
           }));
         } else {
-          const nextStickyRouteHint =
-            normalizeManualRouteHint(reply.routed_agent) ?? apiRouteHint ?? undefined;
+          const nextStickyRouteHint = normalizeManualRouteHint(reply.routed_agent) ?? apiRouteHint ?? undefined;
           if (nextStickyRouteHint) {
             setPendingRouteHintsByContact((prev) => ({
               ...prev,
@@ -620,25 +326,25 @@ export function UnifiedChatPage() {
         if (action.selection_behavior === 'prompt_for_query' && action.route_hint) {
           const routeHint = action.route_hint as ManualRouteHint;
           const routeLabel = humanRoutedLabel(routeHint, language);
-              const now = formatChatTime(language);
-              setPendingRouteHintsByContact((prev) => ({
-                ...prev,
-                [AI_PYMES_ID]: routeHint,
-              }));
-              setMsgs((prev) => [
-                ...prev,
-                {
-                  id: String(++nextMsgId),
-                  contactId: AI_PYMES_ID,
-                  text: t('ai.chat.action.categoryPrefix', { label: action.label }),
-                  fromMe: true,
-                  time: now,
-                },
-                {
-                  id: String(++nextMsgId),
-                  contactId: AI_PYMES_ID,
-                  text: t('ai.chat.action.askAboutRoute', { label: routeLabel }),
-                  fromMe: false,
+          const now = formatChatTime(language);
+          setPendingRouteHintsByContact((prev) => ({
+            ...prev,
+            [AI_PYMES_ID]: routeHint,
+          }));
+          setMsgs((prev) => [
+            ...prev,
+            {
+              id: nextChatMsgId(),
+              contactId: AI_PYMES_ID,
+              text: t('ai.chat.action.categoryPrefix', { label: action.label }),
+              fromMe: true,
+              time: now,
+            },
+            {
+              id: nextChatMsgId(),
+              contactId: AI_PYMES_ID,
+              text: t('ai.chat.action.askAboutRoute', { label: routeLabel }),
+              fromMe: false,
               time: now,
               badgeLabels: [routeLabel],
               badgeTones: [badgeToneForRoute(routeHint)],
@@ -670,183 +376,24 @@ export function UnifiedChatPage() {
               {error}
             </p>
           ) : null}
-          <div
-            className="cht__messages"
-            role="log"
-            aria-live="polite"
-            aria-relevant="additions text"
-            aria-busy={busy || loadingHistory}
-            aria-label={t('ai.chat.messagesAria')}
-          >
-            {loadingHistory && (
-              <div className="spinner cht__history-spinner" role="status" aria-label="Cargando historial" />
-            )}
-            {filteredThread.map((m) => (
-              <div key={m.id} className={`cht__msg ${m.fromMe ? 'cht__msg--me' : 'cht__msg--them'}`}>
-                {m.badgeLabels && m.badgeLabels.length > 0 ? (
-                  <div className="cht__msg-badges">
-                    {m.badgeLabels.map((badge, index) => (
-                      <span key={`${m.id}-${badge}`} className={badgeClassName(m.badgeTones?.[index] ?? 'neutral')}>
-                        {badge}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {m.blocks && m.blocks.length > 0 ? (
-                  <div className="cht__blocks">
-                    {m.blocks.map((block, index) => {
-                      if (block.type === 'text') {
-                        return (
-                          <div key={`${m.id}-block-${index}`} className="cht__block-text">
-                            <AssistantMarkdown text={block.text} />
-                          </div>
-                        );
-                      }
-                      if (block.type === 'actions') {
-                        const actions = block.actions ?? [];
-                        return (
-                          <div key={`${m.id}-block-${index}`} className="cht__block-actions">
-                            {actions.map((action) => (
-                              <button
-                                key={action.id}
-                                type="button"
-                                className={buttonClassName(action.style)}
-                                disabled={busy}
-                                onClick={() => void handleAssistantBlockAction(action)}
-                              >
-                                {action.label}
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      }
-                      if (block.type === 'insight_card') {
-                        return (
-                          <section key={`${m.id}-block-${index}`} className="cht__insight-card">
-                            <div className="cht__insight-title">{block.title}</div>
-                            {block.scope ? <div className="cht__insight-scope">{block.scope}</div> : null}
-                            <p className="cht__insight-summary">{block.summary}</p>
-                            {block.highlights?.length ? (
-                              <div className="cht__insight-highlights">
-                                {block.highlights.map((item) => (
-                                  <div key={`${item.label}-${item.value}`} className="cht__insight-highlight">
-                                    <span>{item.label}</span>
-                                    <strong>{item.value}</strong>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                            {block.recommendations?.length ? (
-                              <div className="cht__insight-recommendations">
-                                {block.recommendations.map((item) => (
-                                  <div key={item} className="cht__insight-recommendation">
-                                    {item}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                          </section>
-                        );
-                      }
-                      if (block.type === 'kpi_group') {
-                        const items = block.items ?? [];
-                        return (
-                          <section key={`${m.id}-block-${index}`} className="cht__kpi-group">
-                            {block.title ? <div className="cht__kpi-group-title">{block.title}</div> : null}
-                            <div className="cht__kpi-grid">
-                              {items.map((item) => (
-                                <div key={`${item.label}-${item.value}`} className="cht__kpi-item">
-                                  <div className="cht__kpi-item-label">{item.label}</div>
-                                  <div className="cht__kpi-item-value">{item.value}</div>
-                                  {item.context ? (
-                                    <div className={kpiTrendClassName(item.trend)}>{item.context}</div>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          </section>
-                        );
-                      }
-                      if (block.type === 'table') {
-                        const columns = block.columns ?? [];
-                        const rows = block.rows ?? [];
-                        return (
-                          <section key={`${m.id}-block-${index}`} className="cht__table-block">
-                            <div className="cht__table-title">{block.title}</div>
-                            {rows.length > 0 ? (
-                              <div className="cht__table-wrap">
-                                <table className="cht__table">
-                                  <thead>
-                                    <tr>
-                                      {columns.map((column) => (
-                                        <th key={column}>{column}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {rows.map((row, rowIndex) => (
-                                      <tr key={`${block.title}-row-${rowIndex}`}>
-                                        {row.map((cell, cellIndex) => (
-                                          <td key={`${block.title}-row-${rowIndex}-cell-${cellIndex}`}>{cell}</td>
-                                        ))}
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="cht__table-empty">{block.empty_state ?? t('ai.chat.table.empty')}</div>
-                            )}
-                          </section>
-                        );
-                      }
-                      return null;
-                    })}
-                  </div>
-                ) : (
-                  m.fromMe ? m.text : <AssistantMarkdown text={m.text} />
-                )}
-                <div className="cht__msg-time">{m.time}</div>
-              </div>
-            ))}
-            <div ref={endRef} />
-          </div>
-          {activePendingConfirmations.length > 0 ? (
-            <div className="cht__pending-bar">
-              <span>Pendientes: {activePendingConfirmations.join(', ')}</span>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                disabled={busy}
-                onClick={() => void confirmPendingActions()}
-              >
-                Confirmar acciones
-              </button>
-            </div>
-          ) : null}
-          <div className="cht__input-bar">
-            <input
-              aria-label={inputPrompt}
-              placeholder={inputPrompt}
-              value={input}
-              disabled={busy}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn-primary btn-sm"
-              disabled={busy || !input.trim()}
-              onClick={() => void send()}
-            >
-              {busy ? t('ai.chat.sending') : t('ai.chat.send')}
-            </button>
-          </div>
+          <ChatThread
+            messages={filteredThread}
+            busy={busy}
+            loadingHistory={loadingHistory}
+            endRef={endRef}
+            onAction={(action) => void handleAssistantBlockAction(action)}
+            t={t}
+          />
+          <ChatComposer
+            input={input}
+            busy={busy}
+            inputPrompt={inputPrompt}
+            pendingConfirmations={activePendingConfirmations}
+            onInputChange={setInput}
+            onSend={() => void send()}
+            onConfirmPending={() => void confirmPendingActions()}
+            t={t}
+          />
         </div>
       </div>
     </PageLayout>

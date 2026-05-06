@@ -7,8 +7,7 @@ import (
 )
 
 // WorkOrder es la entidad unificada de órdenes de trabajo del vertical workshops.
-// La OT apunta a un asset del cliente (asset_type + asset_id). Target* queda como alias
-// de compatibilidad para clientes/rutas legacy que todavía hablan vehicle/bicycle.
+// La OT apunta a un asset del cliente (asset_type + asset_id).
 type WorkOrder struct {
 	ID       uuid.UUID
 	OrgID    uuid.UUID
@@ -18,11 +17,6 @@ type WorkOrder struct {
 	AssetType  string    // 'vehicle' | 'bicycle' por compat de vertical; extensible.
 	AssetID    uuid.UUID // referencia al customer_asset
 	AssetLabel string    // denormalizado: patente, "Trek Marlin 7", etc.
-
-	// Aliases legacy sincronizados con Asset*.
-	TargetType  string
-	TargetID    uuid.UUID
-	TargetLabel string
 
 	CustomerID   *uuid.UUID
 	CustomerName string

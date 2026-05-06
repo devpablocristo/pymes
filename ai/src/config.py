@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     otel_service_name: str = "pymes-ai"
     otel_exporter_otlp_endpoint: str = ""
 
-    # Nexus Governance (URLs/paths legacy siguen usando `review` en algunos clientes HTTP).
+    # Nexus Governance conserva variables REVIEW_* hasta completar la migración de configuración.
     governance_url: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_URL", "REVIEW_URL"))
     governance_api_key: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_API_KEY", "REVIEW_API_KEY"))
     governance_callback_token: str = Field(

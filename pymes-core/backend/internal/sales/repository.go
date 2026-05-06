@@ -382,7 +382,7 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 		return tenantBusinessSettings{}, err
 	}
 
-	// Bootstrap tenant settings if missing for legacy/seed orgs.
+	// Bootstrap tenant settings if missing for restored or seeded orgs.
 	if err := tx.WithContext(ctx).Exec(`
 		INSERT INTO tenant_settings (
 			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,

@@ -66,41 +66,32 @@ function parseWorkOrderItems(value: CrudFieldValue | undefined): WorkOrderItem[]
 }
 
 type FieldMapping = {
-  targetIdKey: 'vehicle_id' | 'bicycle_id';
-  targetLabelKey: 'vehicle_plate' | 'bicycle_label';
-  targetIdLabel: string;
-  targetIdPlaceholder: string;
-  targetLabelField: string;
-  targetLabelPlaceholder: string;
-  columnSubtitleLabel: (row: WorkOrder) => string;
+  assetIdLabel: string;
+  assetIdPlaceholder: string;
+  assetLabelField: string;
+  assetLabelPlaceholder: string;
 };
 
 const VEHICLE_FIELDS: FieldMapping = {
-  targetIdKey: 'vehicle_id',
-  targetLabelKey: 'vehicle_plate',
-  targetIdLabel: 'Vehicle ID',
-  targetIdPlaceholder: 'UUID del vehiculo',
-  targetLabelField: 'Patente',
-  targetLabelPlaceholder: 'Se autocompleta si ya la conoces',
-  columnSubtitleLabel: (row) => `${row.vehicle_plate || row.vehicle_id} · ${row.customer_name || 'Sin cliente'}`,
+  assetIdLabel: 'Vehicle ID',
+  assetIdPlaceholder: 'UUID del vehiculo',
+  assetLabelField: 'Patente',
+  assetLabelPlaceholder: 'Se autocompleta si ya la conoces',
 };
 
 const BICYCLE_FIELDS: FieldMapping = {
-  targetIdKey: 'bicycle_id',
-  targetLabelKey: 'bicycle_label',
-  targetIdLabel: 'Bicycle ID',
-  targetIdPlaceholder: 'UUID de la bicicleta',
-  targetLabelField: 'Etiqueta bicicleta',
-  targetLabelPlaceholder: 'Se autocompleta',
-  columnSubtitleLabel: (row) => `${row.bicycle_label || row.bicycle_id} · ${row.customer_name || 'Sin cliente'}`,
+  assetIdLabel: 'Bicycle ID',
+  assetIdPlaceholder: 'UUID de la bicicleta',
+  assetLabelField: 'Etiqueta bicicleta',
+  assetLabelPlaceholder: 'Se autocompleta',
 };
 
 function buildCreatePayload(fields: FieldMapping, targetType: WorkOrderTargetKind, withBooking: boolean, withNumber: boolean, values: Record<string, CrudFieldValue | undefined>) {
   return {
     ...(withNumber ? { number: asOptionalString(values.number) } : {}),
     asset_type: targetType,
-    asset_id: asString(values[fields.targetIdKey]),
-    asset_label: asOptionalString(values[fields.targetLabelKey]),
+    asset_id: asString(values.asset_id),
+    asset_label: asOptionalString(values.asset_label),
     customer_id: asOptionalString(values.customer_id),
     customer_name: asOptionalString(values.customer_name),
     ...(withBooking ? { booking_id: asOptionalString(values.booking_id) } : {}),
@@ -120,8 +111,8 @@ function buildCreatePayload(fields: FieldMapping, targetType: WorkOrderTargetKin
 
 function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: Record<string, CrudFieldValue | undefined>) {
   return {
-    asset_id: asOptionalString(values[fields.targetIdKey]),
-    asset_label: asOptionalString(values[fields.targetLabelKey]),
+    asset_id: asOptionalString(values.asset_id),
+    asset_label: asOptionalString(values.asset_label),
     customer_id: asOptionalString(values.customer_id),
     customer_name: asOptionalString(values.customer_name),
     ...(withBooking ? { booking_id: asOptionalString(values.booking_id) } : {}),
@@ -138,16 +129,14 @@ function buildUpdatePayload(fields: FieldMapping, withBooking: boolean, values: 
   };
 }
 
-function getAssetLabel(row: WorkOrder, targetType: WorkOrderTargetKind): string {
+function getAssetLabel(row: WorkOrder): string {
   if (row.asset_label) return row.asset_label;
-  if (row.target_label) return row.target_label;
-  return targetType === 'vehicle' ? (row.vehicle_plate ?? '') : (row.bicycle_label ?? '');
+  return '';
 }
 
-function getAssetId(row: WorkOrder, targetType: WorkOrderTargetKind): string {
+function getAssetId(row: WorkOrder): string {
   if (row.asset_id) return row.asset_id;
-  if (row.target_id) return row.target_id;
-  return targetType === 'vehicle' ? (row.vehicle_id ?? '') : (row.bicycle_id ?? '');
+  return '';
 }
 
 type WorkOrdersCrudFactoryOptions = {
@@ -182,7 +171,7 @@ export function createWorkOrdersCrudConfig({
     kind: 'secondary',
     isVisible: (row) => !row.booking_id,
     onClick: async (row, helpers) => {
-      const assetLabel = getAssetLabel(row, targetType);
+      const assetLabel = getAssetLabel(row);
       const values = await openCrudFormDialog({
         title: 'Agendar turno',
         subtitle: row.number || row.id,
@@ -217,22 +206,18 @@ export function createWorkOrdersCrudConfig({
       const startAtInput = String(values.start_at ?? '').trim();
       if (!startAtInput) return;
       const duration = Number(values.duration || '60');
-      const metadata =
-        targetType === 'vehicle'
-          ? {
-              work_order_id: row.id,
-              asset_id: row.asset_id,
-              asset_label: row.asset_label,
-              vehicle_id: row.vehicle_id,
-              vehicle_plate: row.vehicle_plate,
-            }
-          : {
-              work_order_id: row.id,
-              asset_id: row.asset_id,
-              asset_label: row.asset_label,
-              bicycle_id: row.bicycle_id,
-              bicycle_label: row.bicycle_label,
-            };
+        const metadata =
+          targetType === 'vehicle'
+            ? {
+                work_order_id: row.id,
+                asset_id: row.asset_id,
+                asset_label: row.asset_label,
+              }
+            : {
+                work_order_id: row.id,
+                asset_id: row.asset_id,
+                asset_label: row.asset_label,
+              };
       const booking = await createWorkshopBooking({
         branch_id: row.branch_id,
         customer_id: row.customer_id,
@@ -291,8 +276,8 @@ export function createWorkOrdersCrudConfig({
     formFields.push({ key: 'number', label: 'Numero OT', placeholder: 'Autogenerado si lo dejas vacio', createOnly: true });
   }
   formFields.push(
-    { key: fields.targetIdKey, label: fields.targetIdLabel, required: true, placeholder: fields.targetIdPlaceholder, createOnly: true },
-    { key: fields.targetLabelKey, label: fields.targetLabelField, placeholder: fields.targetLabelPlaceholder, createOnly: true },
+    { key: 'asset_id', label: fields.assetIdLabel, required: true, placeholder: fields.assetIdPlaceholder, createOnly: true },
+    { key: 'asset_label', label: fields.assetLabelField, placeholder: fields.assetLabelPlaceholder, createOnly: true },
     { key: 'customer_id', label: 'Customer / Party ID', placeholder: 'UUID del dueño en el core', createOnly: true },
     { key: 'customer_name', label: 'Cliente', placeholder: 'Se autocompleta si el ID existe', createOnly: true },
   );
@@ -349,9 +334,9 @@ export function createWorkOrdersCrudConfig({
     columns: [
       { key: 'number', header: 'OT', className: 'cell-name', render: (_v, row) => row.number || row.id },
       {
-        key: fields.targetLabelKey,
-        header: fields.targetLabelField,
-        render: (_v, row) => getAssetLabel(row, targetType) || getAssetId(row, targetType),
+        key: 'asset_label',
+        header: fields.assetLabelField,
+        render: (_v, row) => getAssetLabel(row) || getAssetId(row),
       },
       { key: 'customer_name', header: 'Cliente', render: (_v, row) => row.customer_name || '' },
       { key: 'status', header: 'Estado', render: (value) => renderWorkshopWorkOrderStatusBadge(value) },
@@ -363,7 +348,7 @@ export function createWorkOrdersCrudConfig({
     searchText: (row) =>
       [
         row.number,
-        getAssetLabel(row, targetType),
+        getAssetLabel(row),
         row.customer_name,
         row.status,
         row.requested_work,
@@ -375,8 +360,8 @@ export function createWorkOrdersCrudConfig({
         .join(' '),
     toFormValues: (row) => ({
       ...(withNumber ? { number: row.number ?? '' } : {}),
-      [fields.targetIdKey]: getAssetId(row, targetType),
-      [fields.targetLabelKey]: getAssetLabel(row, targetType),
+      asset_id: getAssetId(row),
+      asset_label: getAssetLabel(row),
       customer_id: row.customer_id ?? '',
       customer_name: row.customer_name ?? '',
       ...(withBooking ? { booking_id: row.booking_id ?? '' } : {}),
@@ -393,7 +378,7 @@ export function createWorkOrdersCrudConfig({
       items: stringifyJSON(row.items ?? []),
     }),
     isValid: (values) =>
-      asString(values[fields.targetIdKey]).trim().length > 0 &&
+      asString(values.asset_id).trim().length > 0 &&
       Boolean(toRFC3339(values.opened_at)) &&
       asString(values.items).trim().length > 0,
   };

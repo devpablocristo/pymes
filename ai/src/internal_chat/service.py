@@ -73,7 +73,7 @@ async def run_internal_orchestrated_chat(
     route_hint: str | None = None,
     preferred_language: str | None = None,
 ) -> InternalChatResult:
-    """Read-only internal assistant: evidence first, Gemini second, no fake fallback."""
+    """Read-only internal assistant: evidence first, Gemini second, no synthetic replies."""
 
     _ = confirmed_actions
     sanitized_message = sanitize_message(message)

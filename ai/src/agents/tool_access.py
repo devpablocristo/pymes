@@ -96,7 +96,7 @@ COMMERCIAL_INTERNAL_PROCUREMENT_ROLE_TOOLS: dict[str, frozenset[str]] = {
     "accountant": COMMERCIAL_INTERNAL_PROCUREMENT_ACCOUNTANT_TOOLS,
 }
 
-LEGACY_INTERNAL_ROLE_TOOLS: dict[str, str | frozenset[str]] = {
+INTERNAL_ROLE_TOOLS: dict[str, str | frozenset[str]] = {
     "admin": "*",
     "seller": frozenset(
         {
@@ -157,7 +157,7 @@ LEGACY_INTERNAL_ROLE_TOOLS: dict[str, str | frozenset[str]] = {
     ),
 }
 
-LEGACY_INTERNAL_DEFAULT_TOOLS = frozenset({"search_help"})
+INTERNAL_DEFAULT_TOOLS = frozenset({"search_help"})
 
 TOOL_MODULE_REQUIREMENTS: dict[str, frozenset[str]] = {
     "get_sales_summary": frozenset({"sales"}),
@@ -230,8 +230,8 @@ def resolve_commercial_internal_procurement_tools(role: str, modules_active: Ite
     return filter_tools_by_modules(base, modules_active)
 
 
-def is_legacy_internal_tool_allowed(role: str, modules_active: Iterable[str], tool_name: str) -> bool:
-    allowed = LEGACY_INTERNAL_ROLE_TOOLS.get(normalize_role(role), LEGACY_INTERNAL_DEFAULT_TOOLS)
+def is_internal_tool_allowed(role: str, modules_active: Iterable[str], tool_name: str) -> bool:
+    allowed = INTERNAL_ROLE_TOOLS.get(normalize_role(role), INTERNAL_DEFAULT_TOOLS)
     if allowed == "*":
         return tool_name in filter_tools_by_modules({tool_name}, modules_active)
     filtered = filter_tools_by_modules(allowed, modules_active)

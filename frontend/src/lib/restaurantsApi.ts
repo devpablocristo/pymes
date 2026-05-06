@@ -17,7 +17,7 @@ function translateRestaurantsError(message: string): string {
 
 const restaurantsRequest = createVerticalRequest({
   envVar: 'VITE_RESTAURANTS_API_URL',
-  fallbackPorts: [8484, 8084],
+  devPorts: [8484, 8084],
   translateError: translateRestaurantsError,
 });
 

@@ -64,15 +64,11 @@ func InitializeApp() *app.App {
 		autoRepairWoExt.New(vehiclesUC),
 		bikeShopWoExt.New(bicyclesUC),
 	)
-	workOrdersCompatHandler := unifiedworkorders.NewHandler(workOrdersBaseUC)
 	autoRepairWoUC := autoRepairWorkOrders.NewUsecases(workOrdersBaseUC)
 	autoRepairWoHandler := autoRepairWorkOrders.NewHandler(autoRepairWoUC)
 	bikeShopWoUC := bikeShopWorkOrders.NewUsecases(workOrdersBaseUC)
 	bikeShopWoHandler := bikeShopWorkOrders.NewHandler(bikeShopWoUC)
 
-	// Rutas de compatibilidad sobre el endpoint unificado heredado.
-	woOrchestrationCompatUC := woorchestration.NewUsecases(cpClient, workOrdersBaseUC, auditLog)
-	woOrchestrationCompatHandler := orchestrationhandler.NewHandler(woOrchestrationCompatUC)
 	autoRepairWoOrchestrationUC := woorchestration.NewUsecases(cpClient, autoRepairWoUC, auditLog)
 	autoRepairWoOrchestrationHandler := orchestrationhandler.NewHandler(autoRepairWoOrchestrationUC)
 	bikeShopWoOrchestrationUC := woorchestration.NewUsecases(cpClient, bikeShopWoUC, auditLog)
@@ -106,10 +102,6 @@ func InitializeApp() *app.App {
 	bikeShopWoHandler.RegisterRoutes(bikeShopGroup)
 	bikeShopWoOrchestrationHandler.RegisterBookingRoutes(bikeShopGroup)
 	bikeShopWoOrchestrationHandler.RegisterWorkOrderRoutes(bikeShopGroup)
-
-	// Compatibilidad heredada: endpoint unificado /v1/work-orders.
-	workOrdersCompatHandler.RegisterRoutes(authGroup)
-	woOrchestrationCompatHandler.RegisterRoutes(authGroup)
 
 	return &app.App{Router: router}
 }

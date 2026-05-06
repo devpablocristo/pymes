@@ -21,7 +21,7 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder, actor string) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error)
@@ -69,14 +69,13 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:      orgID,
-		BranchID:   branchID,
-		Limit:      limit,
-		After:      after,
-		Search:     c.Query("search"),
-		Status:     c.Query("status"),
-		AssetType:  c.Query("asset_type"),
-		TargetType: c.Query("target_type"),
+		OrgID:     orgID,
+		BranchID:  branchID,
+		Limit:     limit,
+		After:     after,
+		Search:    c.Query("search"),
+		Status:    c.Query("status"),
+		AssetType: c.Query("asset_type"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -100,9 +99,6 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		return
 	}
 	assetType := c.Query("asset_type")
-	if strings.TrimSpace(assetType) == "" {
-		assetType = c.Query("target_type")
-	}
 	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, assetType)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -309,41 +305,16 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// resolveAssetFromCreate detecta asset_type, asset_id, asset_label desde el request,
-// soportando también target_* y aliases legacy.
+// resolveAssetFromCreate detecta asset_type, asset_id, asset_label desde el request.
 func resolveAssetFromCreate(req dto.CreateWorkOrderRequest) (string, string, string) {
-	if t := strings.TrimSpace(req.AssetType); t != "" {
-		return t, req.AssetID, req.AssetLabel
-	}
-	if t := strings.TrimSpace(req.TargetType); t != "" {
-		return t, req.TargetID, req.TargetLabel
-	}
-	if id := strings.TrimSpace(req.VehicleID); id != "" {
-		return "vehicle", id, req.VehiclePlate
-	}
-	if id := strings.TrimSpace(req.BicycleID); id != "" {
-		return "bicycle", id, req.BicycleLabel
-	}
-	return "", "", ""
+	return strings.TrimSpace(req.AssetType), req.AssetID, req.AssetLabel
 }
 
 func resolveAssetFromUpdate(req dto.UpdateWorkOrderRequest) (*string, *string) {
 	if req.AssetID != nil {
 		return req.AssetID, req.AssetLabel
 	}
-	if req.TargetID != nil {
-		return req.TargetID, req.TargetLabel
-	}
-	if req.VehicleID != nil {
-		return req.VehicleID, req.VehiclePlate
-	}
-	if req.BicycleID != nil {
-		return req.BicycleID, req.BicycleLabel
-	}
-	if req.AssetLabel != nil {
-		return nil, req.AssetLabel
-	}
-	return nil, req.TargetLabel
+	return nil, req.AssetLabel
 }
 
 func toItems(payload []dto.WorkOrderLineInput) []domain.WorkOrderItem {
@@ -383,9 +354,6 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		AssetType:        item.AssetType,
 		AssetID:          item.AssetID.String(),
 		AssetLabel:       item.AssetLabel,
-		TargetType:       item.TargetType,
-		TargetID:         item.TargetID.String(),
-		TargetLabel:      item.TargetLabel,
 		CustomerName:     item.CustomerName,
 		Status:           item.Status,
 		RequestedWork:    item.RequestedWork,
@@ -408,15 +376,6 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 	}
 	if item.BranchID != nil {
 		result.BranchID = item.BranchID.String()
-	}
-	// Aliases por compat: solo se llenan según asset_type.
-	switch item.AssetType {
-	case "vehicle":
-		result.VehicleID = item.AssetID.String()
-		result.VehiclePlate = item.AssetLabel
-	case "bicycle":
-		result.BicycleID = item.AssetID.String()
-		result.BicycleLabel = item.AssetLabel
 	}
 	if item.CustomerID != nil {
 		value := item.CustomerID.String()

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
 import { dotIcon } from './ShellIcons';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
@@ -42,7 +42,7 @@ const PRIMARY_SIDEBAR_MODULE_IDS = new Set([
 export function Shell({ children }: { children: ReactNode }) {
   const { t, localizeUiText, sentenceCase } = useI18n();
   const slug = useTenantSlug();
-  const link = (path: string) => tenantLink(path, slug);
+  const link = useCallback((path: string) => tenantLink(path, slug), [slug]);
   const [catalog, setCatalog] = useState<{ groups: ModuleGroup[]; modules: ModuleListItem[] }>({
     groups: [],
     modules: [],
@@ -79,7 +79,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const homeNav = useMemo<AppShellNavItem[]>(
     () => [{ to: link('/dashboard'), label: t('shell.nav.dashboard'), icon: dotIcon }],
-    [t, slug],
+    [link, t],
   );
 
   const dailyNav = useMemo<AppShellNavItem[]>(
@@ -88,7 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link('/chat'), label: t('shell.nav.chat'), icon: dotIcon },
       { to: link('/notifications'), label: t('shell.nav.notifications'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const commercialNav = useMemo<AppShellNavItem[]>(
@@ -96,7 +96,7 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link('/invoices'), label: t('shell.nav.invoices'), icon: dotIcon },
       { to: link('/employees'), label: 'Empleados', icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const whatsappNav = useMemo<AppShellNavItem[]>(
@@ -104,7 +104,7 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link('/customer-messaging/inbox'), label: t('shell.nav.whatsappInbox'), icon: dotIcon },
       { to: link('/customer-messaging/campaigns'), label: t('shell.nav.whatsappCampaigns'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const professionalsNav = useMemo<AppShellNavItem[]>(
@@ -114,7 +114,7 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link('/intakes'), label: t('shell.nav.teachersIntakes'), icon: dotIcon },
       { to: link('/sessions'), label: t('shell.nav.teachersSessions'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const workshopsNav = useMemo<AppShellNavItem[]>(
@@ -122,21 +122,21 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link(`/${toCrudResourceSlug('workshopVehicles')}`), label: t('shell.nav.autoRepairVehicles'), icon: dotIcon },
       { to: link(`/${toCrudResourceSlug('carWorkOrders')}/list`), label: t('shell.nav.autoRepairOrders'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const bikeShopNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: link(`/${toCrudResourceSlug('bikeWorkOrders')}/list`), label: t('shell.nav.bikeOrders'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const beautyNav = useMemo<AppShellNavItem[]>(
     () => [
       { to: link('/employees'), label: t('shell.nav.beautyStaff'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const restaurantsNav = useMemo<AppShellNavItem[]>(
@@ -145,7 +145,7 @@ export function Shell({ children }: { children: ReactNode }) {
       { to: link(`/${toCrudResourceSlug('restaurantDiningTables')}`), label: t('shell.nav.restaurantTables'), icon: dotIcon },
       { to: link('/restaurants/dining/sessions'), label: t('shell.nav.restaurantSessions'), icon: dotIcon },
     ],
-    [t, slug],
+    [link, t],
   );
 
   const sections = useMemo(() => {
@@ -228,6 +228,7 @@ export function Shell({ children }: { children: ReactNode }) {
     commercialNav,
     dailyNav,
     homeNav,
+    link,
     localizeUiText,
     professionalsNav,
     restaurantsNav,

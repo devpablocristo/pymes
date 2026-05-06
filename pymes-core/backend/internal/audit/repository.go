@@ -36,14 +36,14 @@ func (r *Repository) Add(in domain.LogInput) domain.Entry {
 	actorType := normalizeActorType(in.Actor.Type)
 	actorLabel := strings.TrimSpace(in.Actor.Label)
 	if actorLabel == "" {
-		actorLabel = strings.TrimSpace(in.Actor.Legacy)
+		actorLabel = strings.TrimSpace(in.Actor.Raw)
 	}
 	createdAt := time.Now().UTC()
 
 	m := models.AuditLogModel{
 		ID:           uuid.New(),
 		OrgID:        in.OrgID,
-		Actor:        strings.TrimSpace(in.Actor.Legacy),
+		Actor:        strings.TrimSpace(in.Actor.Raw),
 		ActorType:    actorType,
 		ActorID:      in.Actor.ID,
 		ActorLabel:   actorLabel,
@@ -84,7 +84,7 @@ func (r *Repository) Verify(orgID uuid.UUID) domain.VerifyResult {
 			return result
 		}
 		if row.HashVersion < 2 {
-			result.LegacyRows++
+			result.HashV1Rows++
 			prevHash = row.Hash
 			continue
 		}
@@ -100,8 +100,8 @@ func (r *Repository) Verify(orgID uuid.UUID) domain.VerifyResult {
 		}
 		prevHash = row.Hash
 	}
-	if result.LegacyRows > 0 {
-		result.Message = "audit chain verified; legacy rows checked for chain links only"
+	if result.HashV1Rows > 0 {
+		result.Message = "audit chain verified; hash v1 rows checked for chain links only"
 	}
 	return result
 }

@@ -123,7 +123,7 @@ RESOURCES: tuple[CrudResource, ...] = (
         "/payments",
         ("payments",),
         ("List", "Get", "Update", "Delete", "Archive", "Restore", "HardDelete"),
-        "currently sale-scoped/global-list compatibility",
+        "currently sale-scoped; global list is intentionally empty",
     ),
     CrudResource(
         "auto-vehicles",

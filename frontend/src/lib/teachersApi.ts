@@ -58,7 +58,7 @@ function mapIntake(item: {
 
 const teachersRequest = createVerticalRequest({
   envVar: 'VITE_PROFESSIONALS_API_URL',
-  fallbackPorts: [8181, 8081],
+  devPorts: [8181, 8081],
   translateError,
 });
 

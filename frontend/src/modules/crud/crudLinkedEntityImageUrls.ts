@@ -33,9 +33,9 @@ export function parseCrudLinkedEntityImageUrlList(value: string | undefined | nu
 
 export function collectCrudImageUrls(input: {
   imageUrls?: string[] | null;
-  legacyImageUrl?: string | null;
+  singleImageUrl?: string | null;
 }): string[] {
-  const raw = input.imageUrls?.length ? input.imageUrls : input.legacyImageUrl?.trim() ? [input.legacyImageUrl.trim()] : [];
+  const raw = input.imageUrls?.length ? input.imageUrls : input.singleImageUrl?.trim() ? [input.singleImageUrl.trim()] : [];
   const out: string[] = [];
   const seen = new Set<string>();
   for (const value of raw) {
@@ -47,7 +47,7 @@ export function collectCrudImageUrls(input: {
   return out;
 }
 
-/** URLs desde `image_urls` top-level, `metadata.image_urls` o legados `image_url` / `imageUrl`. */
+/** URLs desde `image_urls` top-level, `metadata.image_urls` o el campo simple `image_url` / `imageUrl`. */
 export function extractCrudRecordImageUrls(record: Record<string, unknown>): string[] {
   const top =
     Array.isArray(record.image_urls) ?
@@ -78,7 +78,7 @@ export function extractCrudRecordImageUrls(record: Record<string, unknown>): str
     }
   }
 
-  const legacySingle =
+  const singleImageUrl =
     typeof record.image_url === 'string' && record.image_url.trim().length > 0
       ? record.image_url.trim()
       : typeof record.imageUrl === 'string' && record.imageUrl.trim().length > 0
@@ -87,7 +87,7 @@ export function extractCrudRecordImageUrls(record: Record<string, unknown>): str
 
   return collectCrudImageUrls({
     imageUrls: [...top, ...fromMeta, ...fromPayload],
-    legacyImageUrl: legacySingle,
+    singleImageUrl,
   });
 }
 
@@ -107,8 +107,8 @@ export function pickGalleryHeroCrudImageSrc(record: Record<string, unknown>): st
 
 export function formatCrudLinkedEntityImageUrlsToForm(
   urls: string[] | undefined,
-  legacySingle?: string,
+  singleImageUrl?: string,
 ): string {
-  const list = urls?.length ? urls : legacySingle?.trim() ? [legacySingle.trim()] : [];
+  const list = urls?.length ? urls : singleImageUrl?.trim() ? [singleImageUrl.trim()] : [];
   return list.join('\n');
 }

@@ -8,7 +8,7 @@ import { useCrudListCreatedByMerge } from '../lib/useCrudListCreatedByMerge';
 
 type ResourceConfigMap = CrudResourceConfigMap;
 
-/** Contrato único: tres modos con ids y paths canónicos (el runtime usa fallback genérico si falta render). */
+/** Contrato único: tres modos con ids y paths canónicos. */
 function isCanonicalCrudViewModesTriplet(vm: CrudViewModeConfig[]): boolean {
   if (vm.length !== 3) return false;
   const byId = new Map(vm.map((m) => [m.id, m]));

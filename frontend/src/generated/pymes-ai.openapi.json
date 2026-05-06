@@ -1351,11 +1351,10 @@
             "enum": [
               "copilot_agent",
               "orchestrator",
-              "read_fallback",
               "ui_hint"
             ],
             "title": "Routing Source",
-            "description": "Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint"
+            "description": "Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | ui_hint"
           },
           "analysis_scope": {
             "type": "string",
@@ -2460,7 +2459,7 @@
                 "type": "null"
               }
             ],
-            "description": "Contexto estructurado opcional para anclar el turno actual a una notificaci\u00f3n o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atr\u00e1s: si `handoff` no se env\u00eda, el request sigue funcionando con el contrato previo."
+            "description": "Contexto estructurado opcional para anclar el turno actual a una notificaci\u00f3n o insight sin depender solo de `message` y `route_hint`. Si `handoff` no se env\u00eda, el request se enruta con `message` y `route_hint`."
           },
           "route_hint": {
             "anyOf": [

@@ -25,10 +25,10 @@ type Entry struct {
 }
 
 type ActorRef struct {
-	Legacy string
-	Type   string
-	ID     *uuid.UUID
-	Label  string
+	Raw   string
+	Type  string
+	ID    *uuid.UUID
+	Label string
 }
 
 type LogInput struct {
@@ -44,7 +44,7 @@ type VerifyResult struct {
 	OrgID            uuid.UUID `json:"org_id"`
 	Verified         bool      `json:"verified"`
 	CheckedRows      int       `json:"checked_rows"`
-	LegacyRows       int       `json:"legacy_rows"`
+	HashV1Rows       int       `json:"hash_v1_rows"`
 	FirstBrokenID    string    `json:"first_broken_id,omitempty"`
 	FirstBrokenIndex int       `json:"first_broken_index,omitempty"`
 	Message          string    `json:"message"`

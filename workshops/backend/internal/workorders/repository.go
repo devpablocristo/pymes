@@ -31,13 +31,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 250})
 	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if p.BranchID != nil && *p.BranchID != uuid.Nil {
-		// Durante la migración conviene seguir mostrando OTs legacy sin branch asignada.
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
 	}
 	assetType := strings.TrimSpace(p.AssetType)
-	if assetType == "" {
-		assetType = strings.TrimSpace(p.TargetType)
-	}
 	if assetType != "" {
 		q = q.Where("asset_type = ?", assetType)
 	}
@@ -46,7 +42,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	}
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
-		q = q.Where("(number ILIKE ? OR asset_label ILIKE ? OR target_label ILIKE ? OR customer_name ILIKE ? OR requested_work ILIKE ?)", like, like, like, like, like)
+		q = q.Where("(number ILIKE ? OR asset_label ILIKE ? OR customer_name ILIKE ? OR requested_work ILIKE ?)", like, like, like, like)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -81,14 +77,14 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
 	q := r.db.WithContext(ctx).
 		Model(&models.WorkOrderModel{}).
 		Where("org_id = ? AND archived_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
-	if t := strings.TrimSpace(targetType); t != "" {
+	if t := strings.TrimSpace(assetType); t != "" {
 		q = q.Where("asset_type = ?", t)
 	}
 	var rows []models.WorkOrderModel
@@ -117,9 +113,6 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			AssetType:        in.AssetType,
 			AssetID:          in.AssetID,
 			AssetLabel:       in.AssetLabel,
-			TargetType:       in.TargetType,
-			TargetID:         in.TargetID,
-			TargetLabel:      in.TargetLabel,
 			CustomerID:       in.CustomerID,
 			CustomerName:     in.CustomerName,
 			BookingID:        in.BookingID,
@@ -181,9 +174,6 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			"asset_type":        in.AssetType,
 			"asset_id":          in.AssetID,
 			"asset_label":       in.AssetLabel,
-			"target_type":       in.TargetType,
-			"target_id":         in.TargetID,
-			"target_label":      in.TargetLabel,
 			"customer_id":       in.CustomerID,
 			"customer_name":     in.CustomerName,
 			"booking_id":        in.BookingID,
@@ -379,12 +369,9 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 		OrgID:            row.OrgID,
 		BranchID:         row.BranchID,
 		Number:           row.Number,
-		AssetType:        firstNonEmpty(row.AssetType, row.TargetType),
-		AssetID:          firstNonNilUUID(row.AssetID, row.TargetID),
-		AssetLabel:       firstNonEmpty(row.AssetLabel, row.TargetLabel),
-		TargetType:       firstNonEmpty(row.TargetType, row.AssetType),
-		TargetID:         firstNonNilUUID(row.TargetID, row.AssetID),
-		TargetLabel:      firstNonEmpty(row.TargetLabel, row.AssetLabel),
+		AssetType:        row.AssetType,
+		AssetID:          row.AssetID,
+		AssetLabel:       row.AssetLabel,
 		CustomerID:       row.CustomerID,
 		CustomerName:     row.CustomerName,
 		BookingID:        row.BookingID,
@@ -413,18 +400,4 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 		UpdatedAt:        row.UpdatedAt,
 		Items:            items,
 	}
-}
-
-func firstNonEmpty(value, fallback string) string {
-	if strings.TrimSpace(value) != "" {
-		return value
-	}
-	return fallback
-}
-
-func firstNonNilUUID(value, fallback uuid.UUID) uuid.UUID {
-	if value != uuid.Nil {
-		return value
-	}
-	return fallback
 }

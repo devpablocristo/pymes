@@ -20,8 +20,8 @@ func TestListForcesBicycleAssetType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
-	if base.lastList.AssetType != targetType {
-		t.Fatalf("List() asset_type = %q, want %q", base.lastList.AssetType, targetType)
+	if base.lastList.AssetType != assetType {
+		t.Fatalf("List() asset_type = %q, want %q", base.lastList.AssetType, assetType)
 	}
 }
 
@@ -47,8 +47,8 @@ func TestCreateForcesBicycleAssetType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if base.lastCreated.AssetType != targetType {
-		t.Fatalf("Create() asset_type = %q, want %q", base.lastCreated.AssetType, targetType)
+	if base.lastCreated.AssetType != assetType {
+		t.Fatalf("Create() asset_type = %q, want %q", base.lastCreated.AssetType, assetType)
 	}
 }
 

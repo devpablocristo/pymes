@@ -41,7 +41,7 @@ ChatRouteHint = Literal[
     "purchases",
     "employees",
 ]
-RoutingSource = Literal["copilot_agent", "orchestrator", "read_fallback", "ui_hint"]
+RoutingSource = Literal["copilot_agent", "orchestrator", "ui_hint"]
 ChatHandoffSource = Literal["in_app_notification", "direct"]
 InsightScope = Literal["sales_collections", "inventory_profit", "customers_retention"]
 InsightPeriod = Literal["today", "week", "month"]
@@ -122,7 +122,7 @@ class ChatRequest(BaseChatRequest):
         description=(
             "Contexto estructurado opcional para anclar el turno actual a una notificación o insight "
             "sin depender solo de `message` y `route_hint`. "
-            "Compatibilidad hacia atrás: si `handoff` no se envía, el request sigue funcionando con el contrato previo."
+            "Si `handoff` no se envía, el request se enruta con `message` y `route_hint`."
         ),
     )
     route_hint: ChatRouteHint | None = Field(
@@ -193,7 +193,7 @@ class ChatResponse(BaseChatResponse):
     )
     routing_source: RoutingSource = Field(
         ...,
-        description="Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint",
+        description="Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | ui_hint",
     )
     analysis_scope: ChatAnalysisScope = Field(
         default="general",

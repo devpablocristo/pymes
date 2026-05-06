@@ -1,5 +1,4 @@
--- Demo taller bike_shop: 10 bicicletas y 10 OT con target_type='bicycle'.
--- target_id es opaco (cada vertical valida). Usamos uuid_generate_v5 deterministico.
+-- Demo taller bike_shop: 10 bicicletas y 10 OT.
 -- Depende de los clientes de pymes-core/seeds.
 
 DO $$
@@ -59,7 +58,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO workshops.work_orders (
-        id, org_id, number, asset_type, asset_id, asset_label, target_type, target_id, target_label, customer_id, customer_name, status,
+        id, org_id, number, asset_type, asset_id, asset_label, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency, metadata,
         subtotal_services, subtotal_parts, tax_total, total, opened_at, promised_at, ready_at, delivered_at,
         is_favorite, tags, created_by, updated_at
@@ -68,9 +67,6 @@ BEGIN
         uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
         v_org,
         'OT-BIKE-' || lpad(gs::text, 3, '0'),
-        'bicycle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
-        (ARRAY['Trek Marlin 7', 'Specialized Rockhopper', 'Giant Talon 2', 'Scott Aspect 940', 'Cannondale Trail 6', 'Merida Big Nine', 'Venzo Raptor', 'Raleigh Mojave', 'Bianchi Impulso', 'Vairo XR 4.0'])[gs],
         'bicycle',
         uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
         (ARRAY['Trek Marlin 7', 'Specialized Rockhopper', 'Giant Talon 2', 'Scott Aspect 940', 'Cannondale Trail 6', 'Merida Big Nine', 'Venzo Raptor', 'Raleigh Mojave', 'Bianchi Impulso', 'Vairo XR 4.0'])[gs],
@@ -126,9 +122,6 @@ BEGIN
         SET asset_type = EXCLUDED.asset_type,
             asset_id = EXCLUDED.asset_id,
             asset_label = EXCLUDED.asset_label,
-            target_type = EXCLUDED.target_type,
-            target_id = EXCLUDED.target_id,
-            target_label = EXCLUDED.target_label,
             customer_id = EXCLUDED.customer_id,
             customer_name = EXCLUDED.customer_name,
             status = EXCLUDED.status,

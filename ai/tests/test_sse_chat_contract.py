@@ -375,7 +375,7 @@ def test_internal_chat_normalizes_unknown_route_to_general(monkeypatch) -> None:
     assert response.json()["routing_source"] == "orchestrator"
 
 
-def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> None:
+def test_internal_chat_normalizes_unknown_routing_source(monkeypatch) -> None:
     repo = StubRepo()
     client = create_internal_client(repo)
 
@@ -391,7 +391,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
             pending_confirmations=[],
             blocks=[{"type": "text", "text": "Tenés 2 clientes registrados. Algunos son: Acme, Beta."}],
             routed_agent="customers",
-            routing_source="read_fallback",
+            routing_source="read_source",
         )
 
     monkeypatch.setattr(router_module, "run_internal_orchestrated_chat", fake_run_internal_orchestrated_chat)
@@ -404,7 +404,7 @@ def test_internal_chat_preserves_read_fallback_routing_source(monkeypatch) -> No
     assert payload["output_kind"] == "chat_reply"
     assert payload["content_language"] == "es"
     assert payload["routed_agent"] == "customers"
-    assert payload["routing_source"] == "read_fallback"
+    assert payload["routing_source"] == "orchestrator"
 
 
 def test_internal_chat_forwards_route_hint_to_service(monkeypatch) -> None:

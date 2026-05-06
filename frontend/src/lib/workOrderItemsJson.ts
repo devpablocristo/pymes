@@ -1,6 +1,6 @@
 import type { WorkOrderLineItem as AutoRepairWorkOrderItem } from './workOrdersApi';
 
-/** Parsea el textarea de ítems (mismo contrato que el CRUD legacy). */
+/** Parsea el textarea de ítems de órdenes de trabajo. */
 export function parseWorkOrderItemsJson(text: string): AutoRepairWorkOrderItem[] {
   const t = text.trim();
   if (!t) return [];

@@ -27,7 +27,6 @@ def _ensure_runtime_package_stub() -> None:
             "OUTPUT_KIND_INSIGHT_NOTIFICATION",
             "ROUTING_SOURCE_COPILOT_AGENT",
             "ROUTING_SOURCE_ORCHESTRATOR",
-            "ROUTING_SOURCE_READ_FALLBACK",
             "SERVICE_KIND_INSIGHT",
             "is_known_routing_source",
             "normalize_routing_source",

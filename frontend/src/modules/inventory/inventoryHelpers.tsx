@@ -45,8 +45,8 @@ export type StockRecord = {
   updated_at: string;
 };
 
-function formatProductImagesForEditor(values: string[] | undefined, legacySingle?: string): string {
-  return formatCrudLinkedEntityImageUrlsToForm(values, legacySingle);
+function formatProductImagesForEditor(values: string[] | undefined, singleImageUrl?: string): string {
+  return formatCrudLinkedEntityImageUrlsToForm(values, singleImageUrl);
 }
 
 function parseProductImagesFromEditor(value: CrudFieldValue | undefined): string[] {

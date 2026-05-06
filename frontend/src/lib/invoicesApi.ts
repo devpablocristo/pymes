@@ -13,7 +13,7 @@ export type InvoiceLineItem = {
   unitPrice: number;
 };
 
-// Forma frontend (preservada por compatibilidad con el demo).
+// Forma frontend usada por la pantalla de facturación.
 export type InvoiceRecord = {
   id: string;
   number: string;

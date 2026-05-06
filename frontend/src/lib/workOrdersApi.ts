@@ -1,10 +1,5 @@
 /**
- * Cliente de work orders de workshops.
- *
- * La vertical mantiene un endpoint unificado legado (`/v1/work-orders`) por
- * compatibilidad, pero el ownership real vive en los módulos por subvertical:
- * `auto_repair` y `bike_shop`. Este cliente resuelve el prefijo correcto según
- * `asset_type` y cae al endpoint legado solo cuando no puede inferirlo.
+ * Cliente de work orders de workshops por subvertical.
  */
 import { createVerticalRequest } from './verticalApi';
 import { readActiveBranchId } from './branchSelectionStorage';
@@ -26,14 +21,13 @@ function translateWorkOrdersError(message: string): string {
 
 const workOrdersRequest = createVerticalRequest({
   envVar: 'VITE_WORKSHOPS_API_URL',
-  fallbackPorts: [8282, 8082],
+  devPorts: [8282, 8082],
   translateError: translateWorkOrdersError,
   timeoutMs: 60_000,
   timeoutMessage:
     'El backend de talleres no respondió a tiempo. Levantá work-backend (puerto 8282), revisá VITE_WORKSHOPS_API_URL y que las migraciones estén aplicadas.',
 });
 
-const WORK_ORDERS_COMPAT_PREFIX = '/v1/work-orders';
 const WORK_ORDERS_PREFIX_BY_ASSET_TYPE: Record<string, string> = {
   vehicle: '/v1/auto-repair/work-orders',
   bicycle: '/v1/bike-shop/work-orders',
@@ -48,11 +42,19 @@ function normalizeAssetType(assetType?: WorkOrderAssetType | null): string {
 }
 
 function resolveWorkOrdersPrefix(assetType?: WorkOrderAssetType | null): string {
-  return WORK_ORDERS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)] ?? WORK_ORDERS_COMPAT_PREFIX;
+  const prefix = WORK_ORDERS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)];
+  if (!prefix) {
+    throw new Error('asset_type debe ser vehicle o bicycle para órdenes de trabajo.');
+  }
+  return prefix;
 }
 
 function resolveWorkshopBookingsPrefix(assetType?: WorkOrderAssetType | null): string {
-  return WORKSHOP_BOOKINGS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)] ?? '/v1/workshop-bookings';
+  const prefix = WORKSHOP_BOOKINGS_PREFIX_BY_ASSET_TYPE[normalizeAssetType(assetType)];
+  if (!prefix) {
+    throw new Error('asset_type debe ser vehicle o bicycle para turnos de taller.');
+  }
+  return prefix;
 }
 
 function resolveBranchId(branchId?: string | null): string | undefined {
@@ -66,7 +68,6 @@ function resolveBranchId(branchId?: string | null): string | undefined {
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
 export type WorkOrderAssetType = 'vehicle' | 'bicycle' | string;
-export type WorkOrderTargetType = WorkOrderAssetType;
 
 export type WorkOrderLineItem = {
   id?: string;
@@ -91,17 +92,6 @@ export type WorkOrder = {
   asset_type: WorkOrderAssetType;
   asset_id: string;
   asset_label: string;
-
-  // Alias legacy devuelto por compatibilidad.
-  target_type?: WorkOrderTargetType;
-  target_id?: string;
-  target_label?: string;
-
-  // Aliases legacy populados por el backend según asset_type.
-  vehicle_id?: string;
-  vehicle_plate?: string;
-  bicycle_id?: string;
-  bicycle_label?: string;
 
   customer_id?: string;
   customer_name: string;
@@ -150,7 +140,6 @@ type ListResponse = {
 export type ListWorkOrdersParams = {
   branch_id?: string;
   asset_type?: WorkOrderAssetType;
-  target_type?: WorkOrderTargetType;
   limit?: number;
   search?: string;
   status?: string;
@@ -160,7 +149,7 @@ export type ListWorkOrdersParams = {
 // ── Listar / paginar ───────────────────────────────────────────────────────
 
 export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<ListResponse> {
-  const assetType = params?.asset_type ?? params?.target_type;
+  const assetType = params?.asset_type;
   const prefix = resolveWorkOrdersPrefix(assetType);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
@@ -177,7 +166,6 @@ export async function getWorkOrders(params?: ListWorkOrdersParams): Promise<List
 export async function getAllWorkOrders(params?: {
   branch_id?: string;
   asset_type?: WorkOrderAssetType;
-  target_type?: WorkOrderTargetType;
   search?: string;
   status?: string;
 }): Promise<WorkOrder[]> {
@@ -195,9 +183,8 @@ export async function getAllWorkOrders(params?: {
 export async function getWorkOrdersArchived(params?: {
   branch_id?: string;
   asset_type?: WorkOrderAssetType;
-  target_type?: WorkOrderTargetType;
 }): Promise<WorkOrder[]> {
-  const assetType = params?.asset_type ?? params?.target_type;
+  const assetType = params?.asset_type;
   const prefix = resolveWorkOrdersPrefix(assetType);
   const q = new URLSearchParams();
   const branchId = resolveBranchId(params?.branch_id);
@@ -253,13 +240,6 @@ export type UpdateWorkOrderInput = Partial<{
   branch_id: string;
   asset_id: string;
   asset_label: string;
-  // Aliases legacy aceptados por el backend.
-  target_id: string;
-  target_label: string;
-  vehicle_id: string;
-  vehicle_plate: string;
-  bicycle_id: string;
-  bicycle_label: string;
   customer_id: string;
   customer_name: string;
   booking_id: string;

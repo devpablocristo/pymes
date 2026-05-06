@@ -103,8 +103,8 @@ export function mergeCrudPayloadWithImageUrls(
   return base;
 }
 
-export function formatProductImageURLsToForm(urls: string[] | undefined, legacySingle?: string): string {
-  return formatCrudLinkedEntityImageUrlsToForm(urls, legacySingle);
+export function formatProductImageURLsToForm(urls: string[] | undefined, singleImageUrl?: string): string {
+  return formatCrudLinkedEntityImageUrlsToForm(urls, singleImageUrl);
 }
 
 export function openExternalURL(url?: string): void {

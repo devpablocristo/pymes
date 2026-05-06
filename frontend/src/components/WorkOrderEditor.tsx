@@ -6,8 +6,8 @@ import {
   getWorkOrder,
   restoreWorkOrder,
   updateWorkOrder,
+  type WorkOrderAssetType,
   type WorkOrder as UnifiedWorkOrder,
-  type WorkOrderTargetType,
 } from '../lib/workOrdersApi';
 import {
   CrudEntityEditorModal,
@@ -51,25 +51,25 @@ type Draft = {
   items: string;
 };
 
-type EditorTargetConfig = {
-  targetIdLabel: string;
-  targetLabel: string;
+type EditorAssetConfig = {
+  assetIdLabel: string;
+  assetLabel: string;
 };
 
-const TARGET_CONFIG: Record<'vehicle' | 'bicycle', EditorTargetConfig> = {
+const ASSET_CONFIG: Record<'vehicle' | 'bicycle', EditorAssetConfig> = {
   vehicle: {
-    targetIdLabel: 'Vehículo (UUID)',
-    targetLabel: 'Patente',
+    assetIdLabel: 'Vehículo (UUID)',
+    assetLabel: 'Patente',
   },
   bicycle: {
-    targetIdLabel: 'Bicicleta (UUID)',
-    targetLabel: 'Etiqueta bicicleta',
+    assetIdLabel: 'Bicicleta (UUID)',
+    assetLabel: 'Etiqueta bicicleta',
   },
 };
 
 export type WorkOrderEditorProps = {
   orderId: string;
-  targetType?: WorkOrderTargetType;
+  targetType?: WorkOrderAssetType;
   variant: 'modal' | 'page';
   onClose: () => void;
   onSaved: (wo: AutoRepairWorkOrder) => void;
@@ -119,8 +119,8 @@ function valuesToDraft(values: Record<string, CrudFieldValue>): Draft {
 function woToDraft(wo: AutoRepairWorkOrder): Draft {
   return {
     status: wo.status,
-    asset_id: wo.asset_id ?? wo.target_id ?? wo.vehicle_id ?? wo.bicycle_id ?? '',
-    asset_label: wo.asset_label ?? wo.target_label ?? wo.vehicle_plate ?? wo.bicycle_label ?? '',
+    asset_id: wo.asset_id ?? '',
+    asset_label: wo.asset_label ?? '',
     customer_id: wo.customer_id ?? '',
     customer_name: wo.customer_name ?? '',
     booking_id: wo.booking_id ?? '',
@@ -136,13 +136,13 @@ function woToDraft(wo: AutoRepairWorkOrder): Draft {
   };
 }
 
-function resolveEditorTargetType(targetType?: WorkOrderTargetType, wo?: AutoRepairWorkOrder | null): 'vehicle' | 'bicycle' {
-  const resolved = String(targetType ?? wo?.asset_type ?? wo?.target_type ?? 'vehicle').trim().toLowerCase();
+function resolveEditorTargetType(targetType?: WorkOrderAssetType, wo?: AutoRepairWorkOrder | null): 'vehicle' | 'bicycle' {
+  const resolved = String(targetType ?? wo?.asset_type ?? 'vehicle').trim().toLowerCase();
   return resolved === 'bicycle' ? 'bicycle' : 'vehicle';
 }
 
 function buildFields(targetType: 'vehicle' | 'bicycle'): CrudEntityEditorModalField[] {
-  const targetConfig = TARGET_CONFIG[targetType];
+  const assetConfig = ASSET_CONFIG[targetType];
   return [
     {
       id: 'status',
@@ -156,12 +156,12 @@ function buildFields(targetType: 'vehicle' | 'bicycle'): CrudEntityEditorModalFi
     },
     {
       id: 'asset_id',
-      label: targetConfig.targetIdLabel,
+      label: assetConfig.assetIdLabel,
       fullWidth: true,
     },
     {
       id: 'asset_label',
-      label: targetConfig.targetLabel,
+      label: assetConfig.assetLabel,
     },
     {
       id: 'customer_name',
@@ -321,7 +321,7 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
       setArchiveBusy(true);
       setError(null);
       try {
-        await archiveWorkOrder(wo.id, targetType ?? wo.asset_type ?? wo.target_type);
+        await archiveWorkOrder(wo.id, targetType ?? wo.asset_type);
         onRecordRemoved?.(wo.id);
         onClose();
       } catch (e) {
@@ -330,7 +330,7 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
         setArchiveBusy(false);
       }
     },
-    [onClose, onRecordRemoved, wo],
+    [onClose, onRecordRemoved, targetType, wo],
   );
 
   const handleRestore = useCallback(async () => {
@@ -345,8 +345,8 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
     setRestoreBusy(true);
     setError(null);
     try {
-      await restoreWorkOrder(wo.id, targetType ?? wo.asset_type ?? wo.target_type);
-      const restored = await getWorkOrder(wo.id, targetType ?? wo.asset_type ?? wo.target_type);
+      await restoreWorkOrder(wo.id, targetType ?? wo.asset_type);
+      const restored = await getWorkOrder(wo.id, targetType ?? wo.asset_type);
       setWo(restored);
       onSaved(restored);
     } catch (e) {
@@ -354,7 +354,7 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
     } finally {
       setRestoreBusy(false);
     }
-  }, [onSaved, wo]);
+  }, [onSaved, targetType, wo]);
 
   const handleSave = useCallback(
     async (values: Record<string, CrudFieldValue>) => {
@@ -365,10 +365,10 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
       try {
         const body: Parameters<typeof updateWorkOrder>[1] = {};
         if (draft.status !== wo.status) body.status = draft.status;
-        if (draft.asset_id.trim() !== (wo.asset_id ?? wo.target_id ?? '').trim()) {
+        if (draft.asset_id.trim() !== (wo.asset_id ?? '').trim()) {
           body.asset_id = draft.asset_id.trim();
         }
-        if (draft.asset_label !== (wo.asset_label ?? wo.target_label ?? '')) body.asset_label = draft.asset_label;
+        if (draft.asset_label !== (wo.asset_label ?? '')) body.asset_label = draft.asset_label;
         if (draft.customer_id.trim() !== (wo.customer_id ?? '').trim()) {
           const customerId = draft.customer_id.trim();
           body.customer_id = customerId.length > 0 ? customerId : undefined;
@@ -409,7 +409,7 @@ export function WorkOrderEditor({ orderId, targetType, variant, onClose, onSaved
           return;
         }
 
-        const updated = await updateWorkOrder(orderId, body, targetType ?? wo.asset_type ?? wo.target_type);
+        const updated = await updateWorkOrder(orderId, body, targetType ?? wo.asset_type);
         setWo(updated);
         onSaved(updated);
         onClose();

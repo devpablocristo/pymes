@@ -29,8 +29,8 @@ type bicycleLookupPort interface {
 // New construye un hook nuevo para bike_shop.
 func New(assets bicycleLookupPort) workorders.Hook { return &Hook{assets: assets} }
 
-// TargetType identifica este hook para el registry legacy de hooks.
-func (h *Hook) TargetType() string { return "bicycle" }
+// AssetType identifica este hook para el registry de work orders.
+func (h *Hook) AssetType() string { return "bicycle" }
 
 // BeforeCreate asegura que metadata.segment esté seteado para reportes y queries.
 func (h *Hook) BeforeCreate(ctx context.Context, wo *domain.WorkOrder) error {
@@ -84,7 +84,6 @@ func (h *Hook) syncBicycle(ctx context.Context, wo *domain.WorkOrder) error {
 	}
 	if strings.TrimSpace(wo.AssetLabel) == "" {
 		wo.AssetLabel = asset.DisplayLabel()
-		wo.TargetLabel = asset.DisplayLabel()
 	}
 	if wo.CustomerID == nil && asset.CustomerID != nil {
 		value := *asset.CustomerID

@@ -19,26 +19,22 @@ import (
 
 // ListParams agrupa filtros de listado.
 // AssetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
-// TargetType queda como alias de compatibilidad.
 type ListParams struct {
-	OrgID      uuid.UUID
-	BranchID   *uuid.UUID
-	Limit      int
-	After      *uuid.UUID
-	Search     string
-	Status     string
-	AssetType  string
-	TargetType string
+	OrgID     uuid.UUID
+	BranchID  *uuid.UUID
+	Limit     int
+	After     *uuid.UUID
+	Search    string
+	Status    string
+	AssetType string
 }
 
 // UpdateInput agrupa los campos parcheables. AssetID/AssetLabel pueden cambiar
-// si se reasigna la OT a otro asset. Target* queda como alias de compat.
+// si se reasigna la OT a otro asset.
 type UpdateInput struct {
 	BranchID      *string
 	AssetID       *string
 	AssetLabel    *string
-	TargetID      *string
-	TargetLabel   *string
 	CustomerID    *string
 	CustomerName  *string
 	BookingID     *string
@@ -59,7 +55,7 @@ type UpdateInput struct {
 // RepositoryPort define el contrato del adapter de persistencia.
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
@@ -114,8 +110,8 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, 
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
-	return u.repo.ListArchived(ctx, orgID, branchID, targetType)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
+	return u.repo.ListArchived(ctx, orgID, branchID, assetType)
 }
 
 func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
@@ -147,7 +143,6 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 		in.Metadata = map[string]any{}
 	}
 
-	syncAssetCompat(&in)
 	hook := u.hooks.lookup(in.AssetType)
 	if err := hook.BeforeCreate(ctx, &in); err != nil {
 		return domain.WorkOrder{}, err
@@ -164,9 +159,8 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 	}
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.created", "work_order", out.ID.String(), map[string]any{
-			"number":      out.Number,
-			"asset_type":  out.AssetType,
-			"target_type": out.TargetType,
+			"number":     out.Number,
+			"asset_type": out.AssetType,
 		})
 	}
 	return out, nil
@@ -191,12 +185,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	prevCanon := normalizeWorkOrderStatus(current.Status)
 	next := current
 
-	assetIDRaw := in.AssetID
-	if assetIDRaw == nil {
-		assetIDRaw = in.TargetID
-	}
-	if assetIDRaw != nil {
-		parsed, err := uuid.Parse(strings.TrimSpace(*assetIDRaw))
+	if in.AssetID != nil {
+		parsed, err := uuid.Parse(strings.TrimSpace(*in.AssetID))
 		if err != nil {
 			return domain.WorkOrder{}, fmt.Errorf("asset_id is invalid: %w", httperrors.ErrBadInput)
 		}
@@ -205,12 +195,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if in.BranchID != nil {
 		next.BranchID = vertvalues.ParseOptionalUUID(*in.BranchID)
 	}
-	assetLabelRaw := in.AssetLabel
-	if assetLabelRaw == nil {
-		assetLabelRaw = in.TargetLabel
-	}
-	if assetLabelRaw != nil {
-		next.AssetLabel = strings.TrimSpace(*assetLabelRaw)
+	if in.AssetLabel != nil {
+		next.AssetLabel = strings.TrimSpace(*in.AssetLabel)
 	}
 	if in.CustomerID != nil {
 		next.CustomerID = vertvalues.ParseOptionalUUID(*in.CustomerID)
@@ -262,7 +248,6 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		next.Tags = *in.Tags
 	}
 
-	syncAssetCompat(&next)
 	hook := u.hooks.lookup(next.AssetType)
 	if err := hook.BeforeUpdate(ctx, &current, &next); err != nil {
 		return domain.WorkOrder{}, err
@@ -295,10 +280,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	u.maybeNotifyReadyForPickup(ctx, orgID, actor, prevCanon, &out, hook)
 	if u.audit != nil {
 		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{
-			"number":      out.Number,
-			"status":      out.Status,
-			"asset_type":  out.AssetType,
-			"target_type": out.TargetType,
+			"number":     out.Number,
+			"status":     out.Status,
+			"asset_type": out.AssetType,
 		})
 	}
 	return out, nil
@@ -428,8 +412,6 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.Number = strings.ToUpper(strings.TrimSpace(in.Number))
 	in.AssetType = strings.ToLower(strings.TrimSpace(in.AssetType))
 	in.AssetLabel = strings.TrimSpace(in.AssetLabel)
-	in.TargetType = strings.ToLower(strings.TrimSpace(in.TargetType))
-	in.TargetLabel = strings.TrimSpace(in.TargetLabel)
 	in.CustomerName = strings.TrimSpace(in.CustomerName)
 	in.Status = normalizeWorkOrderStatus(in.Status)
 	in.RequestedWork = strings.TrimSpace(in.RequestedWork)
@@ -440,7 +422,6 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	if in.Currency == "" {
 		in.Currency = "ARS"
 	}
-	syncAssetCompat(in)
 	if in.AssetType == "" {
 		return fmt.Errorf("asset_type is required: %w", httperrors.ErrBadInput)
 	}
@@ -488,27 +469,6 @@ func normalizeWorkOrder(in *domain.WorkOrder) error {
 	in.TaxTotal = taxTotal
 	in.Total = subtotalServices + subtotalParts + taxTotal
 	return nil
-}
-
-func syncAssetCompat(in *domain.WorkOrder) {
-	if in.AssetType == "" {
-		in.AssetType = in.TargetType
-	}
-	if in.TargetType == "" {
-		in.TargetType = in.AssetType
-	}
-	if in.AssetID == uuid.Nil {
-		in.AssetID = in.TargetID
-	}
-	if in.TargetID == uuid.Nil {
-		in.TargetID = in.AssetID
-	}
-	if in.AssetLabel == "" {
-		in.AssetLabel = in.TargetLabel
-	}
-	if in.TargetLabel == "" {
-		in.TargetLabel = in.AssetLabel
-	}
 }
 
 func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) error {

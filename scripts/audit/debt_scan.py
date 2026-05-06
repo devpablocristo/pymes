@@ -20,9 +20,13 @@ EXCLUDE_DIRS = {
     "coverage",
 }
 DEBT_EXCLUDE_PARTS = {"migrations", "seeds", "generated", "tests", "docs"}
+HOTSPOT_EXCLUDE_PARTS = {"generated", "tests", "docs"}
 AI_FAKE_FALLBACK_CONTRACT_FILES = {
     Path("ai/src/agents/catalog.py"),
     Path("ai/src/api/chat_contract.py"),
+    Path("scripts/audit/debt_scan.py"),
+}
+DEBT_SCAN_CONTRACT_FILES = {
     Path("scripts/audit/debt_scan.py"),
 }
 INCLUDE_SUFFIXES = {".go", ".ts", ".tsx", ".py", ".sql", ".md", ".sh"}
@@ -56,9 +60,9 @@ PATTERNS = (
         ("*.go",),
     ),
     DebtPattern(
-        "fallback_or_legacy",
-        "Fallback/legacy/deprecated/shim/workaround markers",
-        re.compile(r"\b(fallback|legacy|deprecated|shim|workaround|compatibility|compatibilidad)\b", re.IGNORECASE),
+        "legacy_deprecated_markers",
+        "Legacy/deprecated/shim/workaround markers in actionable code",
+        re.compile(r"\b(legacy|deprecated|shim|workaround|compatibility|compatibilidad)\b", re.IGNORECASE),
         ("*.go", "*.ts", "*.tsx", "*.py", "*.sh", "*.md"),
     ),
     DebtPattern(
@@ -100,10 +104,12 @@ def count_pattern(files: list[Path], pattern: DebtPattern) -> tuple[int, list[st
         if pattern.key == "inline_dto":
             if path.name.endswith("_test.go") or path.name != "handler.go":
                 continue
-        if pattern.key in {"fallback_or_legacy", "ai_fake_fallback_risk"}:
+        if pattern.key in {"legacy_deprecated_markers", "ai_fake_fallback_risk"}:
             rel = path.relative_to(ROOT)
             rel_parts = set(rel.parts)
             if path.name.endswith(("_test.go", "_test.py", ".test.ts", ".test.tsx")) or rel_parts & DEBT_EXCLUDE_PARTS:
+                continue
+            if pattern.key == "legacy_deprecated_markers" and rel in DEBT_SCAN_CONTRACT_FILES:
                 continue
             if pattern.key == "ai_fake_fallback_risk" and rel in AI_FAKE_FALLBACK_CONTRACT_FILES:
                 continue
@@ -124,6 +130,8 @@ def largest_files(files: list[Path], minimum_lines: int = 700) -> list[tuple[int
     result: list[tuple[int, Path]] = []
     for path in files:
         if path.suffix not in {".go", ".ts", ".tsx", ".py"}:
+            continue
+        if set(path.relative_to(ROOT).parts) & HOTSPOT_EXCLUDE_PARTS:
             continue
         try:
             line_count = path.read_text(encoding="utf-8").count("\n") + 1

@@ -1,12 +1,6 @@
-import { createContext, useContext } from 'react';
+import { HeaderMenuItemsContext, type HeaderMenuItem } from './HeaderMenuContext.model';
 
-export type HeaderMenuItem = {
-  label: string;
-  href: string;
-  onSelect?: () => void;
-};
-
-const HeaderMenuItemsContext = createContext<HeaderMenuItem[]>([]);
+export type { HeaderMenuItem } from './HeaderMenuContext.model';
 
 export function HeaderMenuItemsProvider({
   items,
@@ -16,8 +10,4 @@ export function HeaderMenuItemsProvider({
   children: React.ReactNode;
 }) {
   return <HeaderMenuItemsContext.Provider value={items}>{children}</HeaderMenuItemsContext.Provider>;
-}
-
-export function useHeaderMenuItems() {
-  return useContext(HeaderMenuItemsContext);
 }

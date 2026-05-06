@@ -17,7 +17,7 @@ type AuthMiddleware = ginmw.AuthMiddleware
 // AuthContext re-exporta el tipo de core.
 type AuthContext = ginmw.AuthContext
 
-// APIKeyResolver interfaz legacy para resolver API keys por hash.
+// APIKeyResolver resuelve API keys por hash.
 // Los verticales implementan esto vía verticalwire.NewAPIKeyResolver.
 type APIKeyResolver interface {
 	ResolveAPIKey(raw string) (ResolvedKey, bool)
@@ -53,7 +53,7 @@ func (a *jwtAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*
 	}, nil
 }
 
-// apiKeyAdapter adapta APIKeyResolver legacy a authn.Authenticator.
+// apiKeyAdapter adapta APIKeyResolver a authn.Authenticator.
 type apiKeyAdapter struct {
 	resolver APIKeyResolver
 }

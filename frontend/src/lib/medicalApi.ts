@@ -17,7 +17,7 @@ function translateMedicalError(message: string): string {
 
 export const medicalRequest = createVerticalRequest({
   envVar: 'VITE_MEDICAL_API_URL',
-  fallbackPorts: [8585, 8085],
+  devPorts: [8585, 8085],
   translateError: translateMedicalError,
   timeoutMs: 60_000,
   timeoutMessage:

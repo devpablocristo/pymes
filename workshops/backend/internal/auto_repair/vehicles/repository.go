@@ -169,10 +169,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	var count int64
 	if err := r.db.WithContext(ctx).Table("workshops.work_orders").
-		Where(
-			"org_id = ? AND ((asset_type = ? AND asset_id = ?) OR (target_type = ? AND target_id = ?))",
-			orgID, vehicleAssetType, id, vehicleAssetType, id,
-		).
+		Where("org_id = ? AND asset_type = ? AND asset_id = ?", orgID, vehicleAssetType, id).
 		Count(&count).Error; err != nil {
 		return err
 	}

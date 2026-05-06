@@ -45,9 +45,9 @@ func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourc
 	u.repo.Add(domain.LogInput{
 		OrgID: id,
 		Actor: domain.ActorRef{
-			Legacy: actor,
-			Type:   "user",
-			Label:  actor,
+			Raw:   actor,
+			Type:  "user",
+			Label: actor,
 		},
 		Action:       action,
 		ResourceType: resourceType,

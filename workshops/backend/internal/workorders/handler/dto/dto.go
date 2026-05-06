@@ -27,7 +27,6 @@ type WorkOrderLineItem struct {
 }
 
 // WorkOrderItem es el shape de salida unificado.
-// Asset* es el contrato canónico. Target* y vehicle/bicycle son aliases de compatibilidad.
 type WorkOrderItem struct {
 	ID       string `json:"id"`
 	OrgID    string `json:"org_id"`
@@ -38,17 +37,6 @@ type WorkOrderItem struct {
 	AssetType  string `json:"asset_type"`
 	AssetID    string `json:"asset_id"`
 	AssetLabel string `json:"asset_label"`
-
-	// Alias legacy.
-	TargetType  string `json:"target_type"`
-	TargetID    string `json:"target_id"`
-	TargetLabel string `json:"target_label"`
-
-	// Aliases por compat (solo se llenan si asset_type matchea).
-	VehicleID    string `json:"vehicle_id,omitempty"`
-	VehiclePlate string `json:"vehicle_plate,omitempty"`
-	BicycleID    string `json:"bicycle_id,omitempty"`
-	BicycleLabel string `json:"bicycle_label,omitempty"`
 
 	CustomerID   *string `json:"customer_id,omitempty"`
 	CustomerName string  `json:"customer_name"`
@@ -94,26 +82,14 @@ type ListWorkOrdersResponse struct {
 	NextCursor string          `json:"next_cursor,omitempty"`
 }
 
-// CreateWorkOrderRequest soporta asset_* como forma preferida y aliases legacy.
+// CreateWorkOrderRequest usa asset_* como contrato canónico.
 type CreateWorkOrderRequest struct {
 	BranchID string `json:"branch_id"`
 	Number   string `json:"number"`
 
-	// Forma canónica (preferida).
 	AssetType  string `json:"asset_type"`
 	AssetID    string `json:"asset_id"`
 	AssetLabel string `json:"asset_label"`
-
-	// Alias legacy.
-	TargetType  string `json:"target_type"`
-	TargetID    string `json:"target_id"`
-	TargetLabel string `json:"target_label"`
-
-	// Aliases legacy aceptados.
-	VehicleID    string `json:"vehicle_id"`
-	VehiclePlate string `json:"vehicle_plate"`
-	BicycleID    string `json:"bicycle_id"`
-	BicycleLabel string `json:"bicycle_label"`
 
 	CustomerID    string               `json:"customer_id"`
 	CustomerName  string               `json:"customer_name"`
@@ -135,19 +111,8 @@ type CreateWorkOrderRequest struct {
 type UpdateWorkOrderRequest struct {
 	BranchID *string `json:"branch_id"`
 
-	// Canónicos (preferidos).
 	AssetID    *string `json:"asset_id"`
 	AssetLabel *string `json:"asset_label"`
-
-	// Legacy.
-	TargetID    *string `json:"target_id"`
-	TargetLabel *string `json:"target_label"`
-
-	// Aliases legacy aceptados.
-	VehicleID    *string `json:"vehicle_id"`
-	VehiclePlate *string `json:"vehicle_plate"`
-	BicycleID    *string `json:"bicycle_id"`
-	BicycleLabel *string `json:"bicycle_label"`
 
 	CustomerID    *string               `json:"customer_id"`
 	CustomerName  *string               `json:"customer_name"`

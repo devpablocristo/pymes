@@ -28,18 +28,14 @@ func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, in
 		if p.BranchID != nil && (wo.BranchID == nil || *wo.BranchID != *p.BranchID) {
 			continue
 		}
-		assetType := p.AssetType
-		if assetType == "" {
-			assetType = p.TargetType
-		}
-		if assetType != "" && wo.AssetType != assetType {
+		if p.AssetType != "" && wo.AssetType != p.AssetType {
 			continue
 		}
 		out = append(out, wo)
 	}
 	return out, int64(len(out)), false, nil, nil
 }
-func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
 	out := make([]domain.WorkOrder, 0)
 	for _, wo := range r.store {
 		if wo.OrgID != orgID || wo.ArchivedAt == nil {
@@ -48,7 +44,7 @@ func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uu
 		if branchID != nil && (wo.BranchID == nil || *wo.BranchID != *branchID) {
 			continue
 		}
-		if targetType != "" && wo.AssetType != targetType {
+		if assetType != "" && wo.AssetType != assetType {
 			continue
 		}
 		out = append(out, wo)
@@ -149,9 +145,6 @@ func TestCreateWithVehicleAsset(t *testing.T) {
 	}
 	if out.AssetLabel != "AB 123 CD" {
 		t.Errorf("asset_label = %q", out.AssetLabel)
-	}
-	if out.TargetType != out.AssetType || out.TargetID != out.AssetID || out.TargetLabel != out.AssetLabel {
-		t.Errorf("legacy target fields were not synchronized with asset fields")
 	}
 	if out.Total != 12100 { // 10000 * 1 + 21% IVA
 		t.Errorf("total = %v, want 12100", out.Total)

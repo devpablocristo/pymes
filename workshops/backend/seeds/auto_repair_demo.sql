@@ -86,7 +86,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO workshops.work_orders (
-        id, org_id, number, asset_type, asset_id, asset_label, target_type, target_id, target_label, customer_id, customer_name, status,
+        id, org_id, number, asset_type, asset_id, asset_label, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency, metadata,
         subtotal_services, subtotal_parts, tax_total, total, opened_at, promised_at, ready_at, delivered_at,
         is_favorite, tags, created_by, updated_at
@@ -95,9 +95,6 @@ BEGIN
         uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
         v_org,
         'OT-SEED-' || lpad(gs::text, 3, '0'),
-        'vehicle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
-        (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
         'vehicle',
         uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
         (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
@@ -153,9 +150,6 @@ BEGIN
         SET asset_type = EXCLUDED.asset_type,
             asset_id = EXCLUDED.asset_id,
             asset_label = EXCLUDED.asset_label,
-            target_type = EXCLUDED.target_type,
-            target_id = EXCLUDED.target_id,
-            target_label = EXCLUDED.target_label,
             customer_id = EXCLUDED.customer_id,
             customer_name = EXCLUDED.customer_name,
             status = EXCLUDED.status,

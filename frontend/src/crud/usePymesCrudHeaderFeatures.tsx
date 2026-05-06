@@ -69,7 +69,7 @@ export function usePymesCrudHeaderFeatures<T extends { id: string; created_by?: 
 
   // Las etiquetas internas (tags) son la franja canónica de filtro rápido en el header.
   // Siempre aparecen cuando hay al menos un tag en los datos — se priorizan sobre el
-  // filtro por creador, que queda como fallback solo si no hay tags. Esto evita que
+  // filtro por creador, que queda como opción secundaria solo si no hay tags. Esto evita que
   // aparezcan chips tipo "Asignado a mí", "Seeds" o actor ids en lugar de tags.
   const tagFilterEnabled = hasTagSignals;
 

@@ -3,7 +3,7 @@ import type { CrudEditorModalFieldConfig, CrudPageConfig } from '../components/C
 import { extractCrudRecordImageUrls, formatCrudRecordImageUrlsToForm } from '../modules/crud/crudLinkedEntityImageUrls';
 import { formatPartyTagList, parsePartyTagCsv } from '../modules/parties';
 import { asBoolean, parseImageURLList } from './resourceConfigs.shared';
-import { buildStandardCrudImageUrlsModalFieldConfig } from './standardCrudMedia';
+import { buildStandardCrudImageUrlsModalFieldConfig } from './standardCrudMediaFieldConfig';
 
 /** Solo etiquetas + favorito: listados técnicos. El carrusel/imágenes usa `standardMedia: false` por recurso. */
 const STANDARD_TAGS_FAVORITE_OPT_OUT = new Set(['audit', 'attachments', 'timeline', 'webhooks']);

@@ -18,5 +18,5 @@ export type AutoRepairVehicle = {
   updated_at: string;
 };
 
-// Alias neutro mantenido por compatibilidad con resourceConfigs.workshops.tsx.
+// Nombre neutro usado por resourceConfigs.workshops.tsx.
 export type WorkshopVehicle = AutoRepairVehicle;

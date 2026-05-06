@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react';
 import type { CrudFieldValue } from '@devpablocristo/modules-crud-ui';
-import type { CrudEditorModalFieldConfig } from '../components/CrudPage';
 import { asCrudString } from '../lib/formPresets';
 import { CrudEntityMediaCarousel } from '../modules/crud/CrudEntityMediaCarousel';
 import { parseCrudLinkedEntityImageUrlList } from '../modules/crud/crudLinkedEntityImageUrls';
@@ -95,14 +94,4 @@ export function StandardCrudImageUrlsEditor(props: {
       </div>
     </div>
   );
-}
-
-export function buildStandardCrudImageUrlsModalFieldConfig(
-  overrides?: Partial<CrudEditorModalFieldConfig>,
-): CrudEditorModalFieldConfig {
-  return {
-    fullWidth: true,
-    editControl: ({ value, setValue }) => <StandardCrudImageUrlsEditor value={value} setValue={setValue} />,
-    ...overrides,
-  };
 }

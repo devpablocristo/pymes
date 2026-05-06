@@ -37,7 +37,6 @@ export function humanInsightScopeLabel(scope: string, language: LanguageCode = '
 
 export function humanRoutingSourceLabel(source: PymesRoutingSource, language: LanguageCode = 'es'): string {
   if (source === 'copilot_agent') return pick(language, 'Análisis', 'Insights');
-  if (source === 'read_fallback') return pick(language, 'Fallback lectura', 'Read fallback');
   if (source === 'ui_hint') return pick(language, 'Selección manual', 'Manual selection');
   return pick(language, 'Orquestador', 'Orchestrator');
 }

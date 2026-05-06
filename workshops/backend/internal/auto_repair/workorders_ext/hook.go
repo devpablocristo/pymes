@@ -30,8 +30,8 @@ type vehicleLookupPort interface {
 // New construye un hook nuevo para auto_repair.
 func New(assets vehicleLookupPort) workorders.Hook { return &Hook{assets: assets} }
 
-// TargetType identifica este hook para el registry legacy de hooks.
-func (h *Hook) TargetType() string { return "vehicle" }
+// AssetType identifica este hook para el registry de work orders.
+func (h *Hook) AssetType() string { return "vehicle" }
 
 // BeforeCreate corre antes de validar/persistir una OT nueva de auto_repair.
 // Asegura que metadata.segment esté seteado para reportes y queries cross-vertical.
@@ -87,7 +87,6 @@ func (h *Hook) syncVehicle(ctx context.Context, wo *domain.WorkOrder) error {
 	}
 	if strings.TrimSpace(wo.AssetLabel) == "" {
 		wo.AssetLabel = asset.LicensePlate
-		wo.TargetLabel = asset.LicensePlate
 	}
 	if wo.CustomerID == nil && asset.CustomerID != nil {
 		value := *asset.CustomerID

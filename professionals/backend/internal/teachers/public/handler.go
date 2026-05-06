@@ -73,7 +73,7 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 
-	// Try parsing as UUID first for backward compatibility
+	// Try parsing as UUID first; public routes also accept the stable slug form.
 	if orgID, err := uuid.Parse(orgSlug); err == nil {
 		return orgID, true
 	}

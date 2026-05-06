@@ -141,7 +141,7 @@ func validateInternalServiceToken(environment, token string) error {
 }
 
 // EnvFirstNonEmpty devuelve el primer valor de entorno no vacío (tras trim).
-// Orden canónico: variables GOVERNANCE_* antes que REVIEW_* (legacy).
+// Orden canónico: variables GOVERNANCE_* antes que REVIEW_*.
 func EnvFirstNonEmpty(keys ...string) string {
 	for _, k := range keys {
 		if v := strings.TrimSpace(os.Getenv(k)); v != "" {

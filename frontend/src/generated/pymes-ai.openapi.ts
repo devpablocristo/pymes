@@ -546,10 +546,10 @@ export interface components {
             routed_agent: "general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases" | "employees";
             /**
              * Routing Source
-             * @description Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint
+             * @description Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | ui_hint
              * @enum {string}
              */
-            routing_source: "copilot_agent" | "orchestrator" | "read_fallback" | "ui_hint";
+            routing_source: "copilot_agent" | "orchestrator" | "ui_hint";
             /**
              * Analysis Scope
              * @description Alcance de análisis usado para seleccionar evidencia real del negocio.
@@ -948,7 +948,7 @@ export interface components {
             preferred_language?: ("es" | "en") | null;
             /** Confirmed Actions */
             confirmed_actions?: string[];
-            /** @description Contexto estructurado opcional para anclar el turno actual a una notificación o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atrás: si `handoff` no se envía, el request sigue funcionando con el contrato previo. */
+            /** @description Contexto estructurado opcional para anclar el turno actual a una notificación o insight sin depender solo de `message` y `route_hint`. Si `handoff` no se envía, el request se enruta con `message` y `route_hint`. */
             handoff?: components["schemas"]["ChatHandoff"] | null;
             /**
              * Route Hint

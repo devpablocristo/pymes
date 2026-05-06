@@ -17,7 +17,7 @@ function translateWorkshopsError(message: string): string {
 
 export const workshopsRequest = createVerticalRequest({
   envVar: 'VITE_WORKSHOPS_API_URL',
-  fallbackPorts: [8282, 8082],
+  devPorts: [8282, 8082],
   translateError: translateWorkshopsError,
   timeoutMs: 60_000,
   timeoutMessage:

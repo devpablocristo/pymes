@@ -44,8 +44,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("payments", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("payments", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("payments", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("payments", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("payments", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("payments", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("payments", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("payments", "delete"), h.HardDelete)
 }
 
@@ -60,7 +60,7 @@ func (h *Handler) ListSalePayments(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) CreateSalePayment(c *gin.Context) {
@@ -71,14 +71,14 @@ func (h *Handler) CreateSalePayment(c *gin.Context) {
 	}
 	var req dto.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	receivedAt := time.Now().UTC()
 	if strings.TrimSpace(req.ReceivedAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(req.ReceivedAt))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid received_at"})
+			handlers.WriteValidation(c, "invalid received_at")
 			return
 		}
 		receivedAt = parsed.UTC()
@@ -100,19 +100,19 @@ func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	saleIDRaw := strings.TrimSpace(c.Query("sale_id"))
 	if saleIDRaw == "" {
 		// Sin sale_id no hay listado global: devolvemos lista vacía para que el CRUD del frontend
 		// se renderice sin error.
-		c.JSON(http.StatusOK, gin.H{"items": []any{}})
+		handlers.WriteListResponse(c, []any{}, 0, false, "")
 		return
 	}
 	saleID, err := uuid.Parse(saleIDRaw)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale_id"})
+		handlers.WriteValidation(c, "invalid sale_id")
 		return
 	}
 	items, err := h.uc.ListSalePayments(c.Request.Context(), orgID, saleID)
@@ -124,14 +124,14 @@ func (h *Handler) List(c *gin.Context) {
 	for _, it := range items {
 		resp = append(resp, toPaymentItem(it))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": resp})
+	handlers.WriteListResponse(c, resp, int64(len(resp)), false, "")
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -144,7 +144,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	for _, it := range items {
 		resp = append(resp, toPaymentItem(it))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": resp})
+	handlers.WriteOffsetListResponse(c, resp, limit, len(resp))
 }
 
 func (h *Handler) Get(c *gin.Context) {
@@ -168,7 +168,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -207,7 +207,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, id, ok := parsePaymentOrgID(c)
 	if !ok {
@@ -237,12 +241,12 @@ func parsePaymentOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true
@@ -272,12 +276,12 @@ func toPaymentItem(in paymentsdomain.Payment) dto.PaymentItem {
 func parseOrgSale(c *gin.Context, rawOrgID string) (uuid.UUID, uuid.UUID, bool) {
 	orgID, err := uuid.Parse(rawOrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, uuid.Nil, false
 	}
 	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, saleID, true

@@ -16,6 +16,7 @@ type ProfileItem struct {
 	Specialties       []SpecialtyRef `json:"specialties,omitempty"`
 	CreatedAt         string         `json:"created_at"`
 	UpdatedAt         string         `json:"updated_at"`
+	DeletedAt         *string        `json:"deleted_at,omitempty"`
 }
 
 type SpecialtyRef struct {

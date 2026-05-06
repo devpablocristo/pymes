@@ -56,7 +56,7 @@ func (h *Handler) Replace(c *gin.Context) {
 	}
 	var req dto.ReplaceServiceLinksRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	inputs := req.Links
@@ -64,14 +64,14 @@ func (h *Handler) Replace(c *gin.Context) {
 		inputs = req.Items
 	}
 	if inputs == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "links or items is required"})
+		verticalgin.WriteValidation(c, "links or items is required")
 		return
 	}
 	links := make([]domain.ServiceLink, 0, len(inputs))
 	for _, l := range inputs {
 		serviceID, err := uuid.Parse(l.ServiceID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id: " + l.ServiceID})
+			verticalgin.WriteValidation(c, "invalid service_id: "+l.ServiceID)
 			return
 		}
 		meta := l.Metadata

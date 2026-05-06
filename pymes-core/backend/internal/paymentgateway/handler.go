@@ -15,6 +15,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/handler/dto"
 	gatewaydomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/paymentgateway/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type gatewayUsecases interface {
@@ -175,7 +176,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -197,7 +198,7 @@ func (h *Handler) GetSalePaymentLink(c *gin.Context) {
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -216,7 +217,7 @@ func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
 
@@ -238,7 +239,7 @@ func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
 	}
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
 
@@ -257,7 +258,7 @@ func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -276,7 +277,7 @@ func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
 	}
 	saleID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return
 	}
 
@@ -294,7 +295,7 @@ func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
 func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 	quoteID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid quote id"})
+		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
 	orgRef := strings.TrimSpace(c.Param("org_id"))
@@ -310,10 +311,10 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
 		if ginmw.IsBodyTooLarge(err) {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "payload too large"})
+			httperrors.Write(c, http.StatusRequestEntityTooLarge, "VALIDATION", "payload too large")
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		handlers.WriteValidation(c, "invalid payload")
 		return
 	}
 	if err := h.uc.ProcessWebhook(c.Request.Context(), providerMercadoPago, c.Request.Header, body); err != nil {
@@ -345,24 +346,24 @@ func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkRe
 func handleGatewayError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrPlanRestricted):
-		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "access denied")
 	case errors.Is(err, ErrPlanMonthlyLimitReached):
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		httperrors.Write(c, http.StatusTooManyRequests, "RATE_LIMITED", "rate limit exceeded")
 	case errors.Is(err, ErrGatewayNotConnected):
-		c.JSON(http.StatusPreconditionFailed, gin.H{"error": "mercadopago no conectado"})
+		httperrors.Write(c, http.StatusPreconditionFailed, "PRECONDITION_FAILED", "mercadopago no conectado")
 	case errors.Is(err, ErrInvalidOAuthState):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrInvalidWebhookSignature):
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
 	case errors.Is(err, ErrBankAliasMissing):
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable request"})
+		httperrors.Write(c, http.StatusUnprocessableEntity, "VALIDATION", "unprocessable request")
 	case errors.Is(err, ErrUnsupportedProvider):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrInvalidReference):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	case errors.Is(err, ErrNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "resource not found")
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 	}
 }

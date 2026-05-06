@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/specialties/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 // --- fakes ---
@@ -51,6 +52,38 @@ func (f *fakeRepo) Update(_ context.Context, in domain.Specialty) (domain.Specia
 	}
 	f.specialties[in.ID] = in
 	return in, nil
+}
+
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if s.DeletedAt == nil {
+		now := time.Now().UTC()
+		s.DeletedAt = &now
+		f.specialties[id] = s
+	}
+	return nil
+}
+
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	s.DeletedAt = nil
+	f.specialties[id] = s
+	return nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	s, ok := f.specialties[id]
+	if !ok || s.OrgID != orgID || s.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(f.specialties, id)
+	return nil
 }
 
 func (f *fakeRepo) CodeExists(_ context.Context, _ uuid.UUID, _ string, _ *uuid.UUID) (bool, error) {

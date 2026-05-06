@@ -2,6 +2,7 @@ package bicycles
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -12,9 +13,11 @@ import (
 
 	"github.com/devpablocristo/core/http/go/pagination"
 	utils "github.com/devpablocristo/core/validate/go/stringutil"
-	"github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/repository/models"
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/bike_shop/bicycles/usecases/domain"
+	assetmodels "github.com/devpablocristo/pymes/workshops/backend/internal/customerassets/repository/models"
 )
+
+const bicycleAssetType = "bicycle"
 
 var ErrBicycleHasWorkOrders = errors.New("bicycle has work orders")
 
@@ -26,10 +29,11 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Bicycle, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.BicycleModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
+		Where("org_id = ? AND asset_type = ? AND archived_at IS NULL", p.OrgID, bicycleAssetType)
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
-		q = q.Where("(frame_number ILIKE ? OR brand ILIKE ? OR model ILIKE ? OR customer_name ILIKE ? OR bike_type ILIKE ?)", like, like, like, like, like)
+		q = q.Where("(serial_number ILIKE ? OR brand ILIKE ? OR model ILIKE ? OR customer_name ILIKE ? OR metadata->>'bike_type' ILIKE ?)", like, like, like, like, like)
 	}
 
 	var total int64
@@ -41,7 +45,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Bicycle, 
 	}
 	q = q.Order("id DESC")
 
-	var rows []models.BicycleModel
+	var rows []assetmodels.CustomerAssetModel
 	if err := q.Limit(limit + 1).Find(&rows).Error; err != nil {
 		return nil, 0, false, nil, err
 	}
@@ -62,10 +66,10 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Bicycle, 
 }
 
 func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Bicycle, error) {
-	var rows []models.BicycleModel
+	var rows []assetmodels.CustomerAssetModel
 	err := r.db.WithContext(ctx).
-		Model(&models.BicycleModel{}).
-		Where("org_id = ? AND archived_at IS NOT NULL", orgID).
+		Model(&assetmodels.CustomerAssetModel{}).
+		Where("org_id = ? AND asset_type = ? AND archived_at IS NOT NULL", orgID, bicycleAssetType).
 		Order("updated_at DESC").
 		Limit(200).
 		Find(&rows).Error
@@ -81,25 +85,10 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domai
 
 func (r *Repository) Create(ctx context.Context, in domain.Bicycle) (domain.Bicycle, error) {
 	now := time.Now().UTC()
-	row := models.BicycleModel{
-		ID:              uuid.New(),
-		OrgID:           in.OrgID,
-		CustomerID:      in.CustomerID,
-		CustomerName:    in.CustomerName,
-		FrameNumber:     in.FrameNumber,
-		Brand:           in.Brand,
-		Model:           in.Model,
-		BikeType:        in.BikeType,
-		Size:            in.Size,
-		WheelSizeInches: in.WheelSizeInches,
-		Color:           in.Color,
-		EbikeNotes:      in.EbikeNotes,
-		Notes:           in.Notes,
-		IsFavorite:      in.IsFavorite,
-		Tags:            pq.StringArray(utils.NormalizeTags(in.Tags)),
-		CreatedAt:       now,
-		UpdatedAt:       now,
-	}
+	row := toAssetModel(in)
+	row.ID = uuid.New()
+	row.CreatedAt = now
+	row.UpdatedAt = now
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.Bicycle{}, err
 	}
@@ -107,8 +96,10 @@ func (r *Repository) Create(ctx context.Context, in domain.Bicycle) (domain.Bicy
 }
 
 func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Bicycle, error) {
-	var row models.BicycleModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	var row assetmodels.CustomerAssetModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, bicycleAssetType, id).
+		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Bicycle{}, gorm.ErrRecordNotFound
 		}
@@ -118,24 +109,23 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.B
 }
 
 func (r *Repository) Update(ctx context.Context, in domain.Bicycle) (domain.Bicycle, error) {
+	row := toAssetModel(in)
 	updates := map[string]any{
-		"customer_id":       in.CustomerID,
-		"customer_name":     in.CustomerName,
-		"frame_number":      in.FrameNumber,
-		"brand":             in.Brand,
-		"model":             in.Model,
-		"bike_type":         in.BikeType,
-		"size":              in.Size,
-		"wheel_size_inches": in.WheelSizeInches,
-		"color":             in.Color,
-		"ebike_notes":       in.EbikeNotes,
-		"notes":             in.Notes,
-		"is_favorite":       in.IsFavorite,
-		"tags":              pq.StringArray(utils.NormalizeTags(in.Tags)),
-		"updated_at":        time.Now().UTC(),
+		"customer_id":   row.CustomerID,
+		"customer_name": row.CustomerName,
+		"label":         row.Label,
+		"brand":         row.Brand,
+		"model":         row.Model,
+		"serial_number": row.SerialNumber,
+		"color":         row.Color,
+		"notes":         row.Notes,
+		"metadata":      row.Metadata,
+		"is_favorite":   row.IsFavorite,
+		"tags":          row.Tags,
+		"updated_at":    time.Now().UTC(),
 	}
-	res := r.db.WithContext(ctx).Model(&models.BicycleModel{}).
-		Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).
+	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", in.OrgID, bicycleAssetType, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Bicycle{}, res.Error
@@ -148,8 +138,8 @@ func (r *Repository) Update(ctx context.Context, in domain.Bicycle) (domain.Bicy
 
 func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
-	res := r.db.WithContext(ctx).Model(&models.BicycleModel{}).
-		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
+	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NULL", orgID, bicycleAssetType, id).
 		Updates(map[string]any{"archived_at": now, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -162,8 +152,8 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 
 func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
-	res := r.db.WithContext(ctx).Model(&models.BicycleModel{}).
-		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
+	res := r.db.WithContext(ctx).Model(&assetmodels.CustomerAssetModel{}).
+		Where("org_id = ? AND asset_type = ? AND id = ? AND archived_at IS NOT NULL", orgID, bicycleAssetType, id).
 		Updates(map[string]any{"archived_at": nil, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -177,15 +167,17 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	var count int64
 	if err := r.db.WithContext(ctx).Table("workshops.work_orders").
-		Where("org_id = ? AND target_type = ? AND target_id = ?", orgID, "bicycle", id).
+		Where("org_id = ? AND asset_type = ? AND asset_id = ?", orgID, bicycleAssetType, id).
 		Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return ErrBicycleHasWorkOrders
 	}
-	var row models.BicycleModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	var row assetmodels.CustomerAssetModel
+	if err := r.db.WithContext(ctx).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, bicycleAssetType, id).
+		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return gorm.ErrRecordNotFound
 		}
@@ -194,7 +186,9 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	if row.ArchivedAt == nil {
 		return gorm.ErrRecordNotFound
 	}
-	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.BicycleModel{})
+	res := r.db.WithContext(ctx).
+		Where("org_id = ? AND asset_type = ? AND id = ?", orgID, bicycleAssetType, id).
+		Delete(&assetmodels.CustomerAssetModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -204,25 +198,77 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
-func toDomain(row models.BicycleModel) domain.Bicycle {
+func toAssetModel(in domain.Bicycle) assetmodels.CustomerAssetModel {
+	metadata := map[string]any{
+		"frame_number":      in.FrameNumber,
+		"bike_type":         in.BikeType,
+		"size":              in.Size,
+		"wheel_size_inches": in.WheelSizeInches,
+		"ebike_notes":       in.EbikeNotes,
+	}
+	metadataJSON, _ := json.Marshal(metadata)
+	return assetmodels.CustomerAssetModel{
+		ID:           in.ID,
+		OrgID:        in.OrgID,
+		AssetType:    bicycleAssetType,
+		CustomerID:   in.CustomerID,
+		CustomerName: in.CustomerName,
+		Label:        in.DisplayLabel(),
+		Brand:        in.Brand,
+		Model:        in.Model,
+		SerialNumber: in.FrameNumber,
+		Color:        in.Color,
+		Notes:        in.Notes,
+		Metadata:     metadataJSON,
+		IsFavorite:   in.IsFavorite,
+		Tags:         pq.StringArray(utils.NormalizeTags(in.Tags)),
+		ArchivedAt:   in.ArchivedAt,
+		CreatedAt:    in.CreatedAt,
+		UpdatedAt:    in.UpdatedAt,
+	}
+}
+
+func toDomain(row assetmodels.CustomerAssetModel) domain.Bicycle {
+	metadata := map[string]any{}
+	if len(row.Metadata) > 0 {
+		_ = json.Unmarshal(row.Metadata, &metadata)
+	}
 	return domain.Bicycle{
 		ID:              row.ID,
 		OrgID:           row.OrgID,
 		CustomerID:      row.CustomerID,
 		CustomerName:    row.CustomerName,
-		FrameNumber:     row.FrameNumber,
+		FrameNumber:     stringFromMetadata(metadata, "frame_number", row.SerialNumber),
 		Brand:           row.Brand,
 		Model:           row.Model,
-		BikeType:        row.BikeType,
-		Size:            row.Size,
-		WheelSizeInches: row.WheelSizeInches,
+		BikeType:        stringFromMetadata(metadata, "bike_type", ""),
+		Size:            stringFromMetadata(metadata, "size", ""),
+		WheelSizeInches: intFromMetadata(metadata, "wheel_size_inches"),
 		Color:           row.Color,
-		EbikeNotes:      row.EbikeNotes,
+		EbikeNotes:      stringFromMetadata(metadata, "ebike_notes", ""),
 		Notes:           row.Notes,
 		IsFavorite:      row.IsFavorite,
 		Tags:            append([]string(nil), row.Tags...),
 		ArchivedAt:      row.ArchivedAt,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
+	}
+}
+
+func stringFromMetadata(metadata map[string]any, key string, fallback string) string {
+	if value, ok := metadata[key].(string); ok {
+		return value
+	}
+	return fallback
+}
+
+func intFromMetadata(metadata map[string]any, key string) int {
+	switch value := metadata[key].(type) {
+	case float64:
+		return int(value)
+	case int:
+		return value
+	default:
+		return 0
 	}
 }

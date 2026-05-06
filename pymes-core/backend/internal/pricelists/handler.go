@@ -41,8 +41,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("price_lists", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("price_lists", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("price_lists", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("price_lists", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("price_lists", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("price_lists", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("price_lists", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("price_lists", "delete"), h.HardDelete)
 }
 
@@ -92,7 +92,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreatePriceListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), requestToDomain(orgID, req))
@@ -123,7 +123,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.CreatePriceListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	payload := requestToDomain(orgID, req)
@@ -149,7 +149,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	orgID, id, ok := parseOrgID(c)
 	if !ok {
 		return

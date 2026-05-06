@@ -73,8 +73,38 @@ export function parseImageURLList(value: CrudFieldValue | undefined): string[] {
   return parseCrudLinkedEntityImageUrlList(asString(value));
 }
 
-export function formatProductImageURLsToForm(urls: string[] | undefined, legacySingle?: string): string {
-  return formatCrudLinkedEntityImageUrlsToForm(urls, legacySingle);
+/**
+ * Fusiona `image_urls` estándar del formulario en `metadata` (PATCH suele reemplazar metadata completo en backend).
+ */
+export function mergeStandardCrudMetadataFromForm(
+  existingMetadata: Record<string, unknown> | undefined,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const base = { ...(existingMetadata ?? {}) } as Record<string, unknown>;
+  const urls = parseImageURLList(values.image_urls as CrudFieldValue | undefined);
+  if (urls.length > 0) base.image_urls = urls;
+  else delete base.image_urls;
+  return base;
+}
+
+/**
+ * Intakes / payloads JSON: conserva claves existentes y sincroniza notas + carrusel (`image_urls` en el payload).
+ */
+export function mergeCrudPayloadWithImageUrls(
+  existingPayload: Record<string, unknown> | undefined,
+  values: Record<string, unknown>,
+  notes: string,
+): Record<string, unknown> {
+  const base = { ...(existingPayload ?? {}) } as Record<string, unknown>;
+  base.notes = notes;
+  const urls = parseImageURLList(values.image_urls as CrudFieldValue | undefined);
+  if (urls.length > 0) base.image_urls = urls;
+  else delete base.image_urls;
+  return base;
+}
+
+export function formatProductImageURLsToForm(urls: string[] | undefined, singleImageUrl?: string): string {
+  return formatCrudLinkedEntityImageUrlsToForm(urls, singleImageUrl);
 }
 
 export function openExternalURL(url?: string): void {

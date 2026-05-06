@@ -13,6 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_export/handler/dto"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_export/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 // usecasesPort acota lo que el handler necesita del usecase. Sirve para tests.
@@ -25,8 +26,8 @@ type usecasesPort interface {
 }
 
 type Handler struct {
-	uc          usecasesPort
-	publicBase  string // ej: "https://app.pymes.example" — usado para componer feed_url
+	uc         usecasesPort
+	publicBase string // ej: "https://app.pymes.example" — usado para componer feed_url
 }
 
 // NewHandler construye el handler. publicBase es el origin público desde el
@@ -55,18 +56,18 @@ func (h *Handler) IssueToken(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	var req dto.IssueTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	result, err := h.uc.IssueToken(c.Request.Context(), orgID, authCtx.Actor, req.Name)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_export: issue token failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not issue token"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not issue token")
 		return
 	}
 	c.JSON(http.StatusCreated, dto.IssueTokenResponse{
@@ -80,13 +81,13 @@ func (h *Handler) ListTokens(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	tokens, err := h.uc.ListMyTokens(c.Request.Context(), orgID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_export: list tokens failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list tokens"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not list tokens")
 		return
 	}
 	items := make([]dto.TokenResponse, 0, len(tokens))
@@ -100,21 +101,21 @@ func (h *Handler) RevokeToken(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.RevokeToken(c.Request.Context(), orgID, authCtx.Actor, id); err != nil {
 		if errors.Is(err, ErrTokenNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "token not found"})
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "token not found")
 			return
 		}
 		log.Error().Err(err).Msg("calendar_export: revoke token failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not revoke token"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not revoke token")
 		return
 	}
 	c.Status(http.StatusNoContent)

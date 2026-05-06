@@ -216,8 +216,8 @@ func InitializeApp() *app.App {
 	schedulerUC := scheduler.NewUsecases(schedulerRepo, cfg.ExchangeRateProvider, outwebhooksUC, paymentGatewayUC, schedulingUC, emailSender, cfg.PublicBaseURL)
 	notificationUC := notifications.NewUsecases(notificationRepo, emailSender, logger)
 
-	reviewURL := strings.TrimSpace(os.Getenv("REVIEW_URL"))
-	reviewAPIKey := strings.TrimSpace(os.Getenv("REVIEW_API_KEY"))
+	reviewURL := config.EnvFirstNonEmpty("GOVERNANCE_URL", "REVIEW_URL")
+	reviewAPIKey := config.EnvFirstNonEmpty("GOVERNANCE_API_KEY", "REVIEW_API_KEY")
 	var reviewClient *reviewproxy.Client
 	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
 	if reviewURL != "" {

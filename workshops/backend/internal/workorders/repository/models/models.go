@@ -7,16 +7,16 @@ import (
 	"github.com/lib/pq"
 )
 
-// WorkOrderModel mapea workshops.work_orders (tabla unificada con polimorfismo target_type/target_id).
+// WorkOrderModel mapea workshops.work_orders.
 type WorkOrderModel struct {
 	ID       uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID *uuid.UUID `gorm:"type:uuid;index"`
 	Number   string     `gorm:"not null"`
 
-	TargetType  string    `gorm:"not null"`
-	TargetID    uuid.UUID `gorm:"type:uuid;not null"`
-	TargetLabel string    `gorm:"not null;default:''"`
+	AssetType  string    `gorm:"not null"`
+	AssetID    uuid.UUID `gorm:"type:uuid;not null"`
+	AssetLabel string    `gorm:"not null;default:''"`
 
 	CustomerID   *uuid.UUID `gorm:"type:uuid"`
 	CustomerName string     `gorm:"not null;default:''"`

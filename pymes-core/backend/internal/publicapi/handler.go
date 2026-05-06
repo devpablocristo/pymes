@@ -13,6 +13,7 @@ import (
 
 	"github.com/devpablocristo/core/http/go/pagination"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type repositoryPort interface {
@@ -44,10 +45,10 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 	orgID, err := h.repo.ResolveOrgID(c.Request.Context(), c.Param("org_id"))
 	if err != nil {
 		if errors.Is(err, ErrOrgNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
 			return uuid.Nil, false
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve organization"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve organization")
 		return uuid.Nil, false
 	}
 	return orgID, true
@@ -62,10 +63,10 @@ func (h *Handler) GetBusinessInfo(c *gin.Context) {
 	info, err := h.repo.GetBusinessInfo(c.Request.Context(), orgID)
 	if err != nil {
 		if errors.Is(err, ErrOrgNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch organization info"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch organization info")
 		return
 	}
 
@@ -89,10 +90,10 @@ func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
 		limit,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch service catalog"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch service catalog")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) GetAvailability(c *gin.Context) {
@@ -103,28 +104,28 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 
 	rawDate := strings.TrimSpace(c.Query("date"))
 	if rawDate == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date query param is required (YYYY-MM-DD)"})
+		handlers.WriteValidation(c, "date query param is required (YYYY-MM-DD)")
 		return
 	}
 	day, err := time.Parse("2006-01-02", rawDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date (expected YYYY-MM-DD)"})
+		handlers.WriteValidation(c, "invalid date (expected YYYY-MM-DD)")
 		return
 	}
 	duration, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("duration", "60")))
 	branchID, err := parseUUIDQuery(c.Query("branch_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	serviceID, err := parseUUIDQuery(c.Query("service_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service_id"})
+		handlers.WriteValidation(c, "invalid service_id")
 		return
 	}
 	resourceID, err := parseUUIDQuery(c.Query("resource_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource_id"})
+		handlers.WriteValidation(c, "invalid resource_id")
 		return
 	}
 
@@ -138,10 +139,10 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidInput):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid availability query"})
+			handlers.WriteValidation(c, "invalid availability query")
 			return
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch availability"})
+			httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch availability")
 			return
 		}
 	}
@@ -176,7 +177,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {
@@ -187,13 +188,13 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidInput):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid booking payload"})
+			handlers.WriteValidation(c, "invalid booking payload")
 			return
 		case errors.Is(err, ErrSlotUnavailable):
-			c.JSON(http.StatusConflict, gin.H{"error": "slot not available"})
+			httperrors.Write(c, http.StatusConflict, "CONFLICT", "slot not available")
 			return
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create booking"})
+			httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to create booking")
 			return
 		}
 	}
@@ -218,17 +219,17 @@ func (h *Handler) GetMyBookings(c *gin.Context) {
 
 	phone := strings.TrimSpace(c.Query("phone"))
 	if phone == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "phone query param is required"})
+		handlers.WriteValidation(c, "phone query param is required")
 		return
 	}
 
 	items, err := h.repo.ListByPhone(c.Request.Context(), orgID, phone, 20)
 	if err != nil {
 		if errors.Is(err, ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid phone"})
+			handlers.WriteValidation(c, "invalid phone")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch bookings"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch bookings")
 		return
 	}
 
@@ -246,7 +247,7 @@ func (h *Handler) GetMyBookings(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"items": out})
+	handlers.WriteListResponse(c, out, int64(len(out)), false, "")
 }
 
 func parseUUIDQuery(raw string) (*uuid.UUID, error) {

@@ -42,14 +42,14 @@ func readViewer(c *gin.Context) (dashboarddomain.Viewer, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(strings.TrimSpace(authCtx.OrgID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return dashboarddomain.Viewer{}, false
 	}
 	var branchID *uuid.UUID
 	if v := strings.TrimSpace(c.Query("branch_id")); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			handlers.WriteValidation(c, "invalid branch_id")
 			return dashboarddomain.Viewer{}, false
 		}
 		branchID = &id

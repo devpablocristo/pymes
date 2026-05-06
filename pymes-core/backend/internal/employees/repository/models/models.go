@@ -22,6 +22,7 @@ type EmployeeModel struct {
 	Notes      string         `gorm:"column:notes"`
 	IsFavorite bool           `gorm:"column:is_favorite"`
 	Tags       pq.StringArray `gorm:"column:tags;type:text[]"`
+	Metadata   []byte         `gorm:"column:metadata;type:jsonb"`
 	CreatedBy  string         `gorm:"column:created_by"`
 	CreatedAt  time.Time      `gorm:"column:created_at"`
 	UpdatedAt  time.Time      `gorm:"column:updated_at"`

@@ -28,14 +28,14 @@ func (r *fakeRepo) List(_ context.Context, p ListParams) ([]domain.WorkOrder, in
 		if p.BranchID != nil && (wo.BranchID == nil || *wo.BranchID != *p.BranchID) {
 			continue
 		}
-		if p.TargetType != "" && wo.TargetType != p.TargetType {
+		if p.AssetType != "" && wo.AssetType != p.AssetType {
 			continue
 		}
 		out = append(out, wo)
 	}
 	return out, int64(len(out)), false, nil, nil
 }
-func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error) {
+func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
 	out := make([]domain.WorkOrder, 0)
 	for _, wo := range r.store {
 		if wo.OrgID != orgID || wo.ArchivedAt == nil {
@@ -44,7 +44,7 @@ func (r *fakeRepo) ListArchived(_ context.Context, orgID uuid.UUID, branchID *uu
 		if branchID != nil && (wo.BranchID == nil || *wo.BranchID != *branchID) {
 			continue
 		}
-		if targetType != "" && wo.TargetType != targetType {
+		if assetType != "" && wo.AssetType != assetType {
 			continue
 		}
 		out = append(out, wo)
@@ -117,17 +117,17 @@ func (r *fakeRepo) HardDelete(_ context.Context, _, id uuid.UUID) error {
 	return nil
 }
 
-func TestCreateWithVehicleTarget(t *testing.T) {
+func TestCreateWithVehicleAsset(t *testing.T) {
 	t.Parallel()
 	uc := NewUsecases(newFakeRepo(), nil, nil, nil, NewNoopHook("vehicle"))
 
 	in := domain.WorkOrder{
-		OrgID:       uuid.New(),
-		Number:      "OT-001",
-		TargetType:  "vehicle",
-		TargetID:    uuid.New(),
-		TargetLabel: "AB 123 CD",
-		Status:      "received",
+		OrgID:      uuid.New(),
+		Number:     "OT-001",
+		AssetType:  "vehicle",
+		AssetID:    uuid.New(),
+		AssetLabel: "AB 123 CD",
+		Status:     "received",
 		Items: []domain.WorkOrderItem{{
 			ItemType:    "service",
 			Description: "Cambio de aceite",
@@ -140,25 +140,25 @@ func TestCreateWithVehicleTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if out.TargetType != "vehicle" {
-		t.Errorf("target_type = %q, want vehicle", out.TargetType)
+	if out.AssetType != "vehicle" {
+		t.Errorf("asset_type = %q, want vehicle", out.AssetType)
 	}
-	if out.TargetLabel != "AB 123 CD" {
-		t.Errorf("target_label = %q", out.TargetLabel)
+	if out.AssetLabel != "AB 123 CD" {
+		t.Errorf("asset_label = %q", out.AssetLabel)
 	}
 	if out.Total != 12100 { // 10000 * 1 + 21% IVA
 		t.Errorf("total = %v, want 12100", out.Total)
 	}
 }
 
-func TestCreateRequiresTargetType(t *testing.T) {
+func TestCreateRequiresAssetType(t *testing.T) {
 	t.Parallel()
 	uc := NewUsecases(newFakeRepo(), nil, nil, nil)
 	_, err := uc.Create(context.Background(), domain.WorkOrder{
-		OrgID:    uuid.New(),
-		Number:   "OT-002",
-		TargetID: uuid.New(),
-		Status:   "received",
+		OrgID:   uuid.New(),
+		Number:  "OT-002",
+		AssetID: uuid.New(),
+		Status:  "received",
 		Items: []domain.WorkOrderItem{{
 			ItemType:    "service",
 			Description: "x",
@@ -168,23 +168,23 @@ func TestCreateRequiresTargetType(t *testing.T) {
 		}},
 	}, "tester")
 	if err == nil {
-		t.Fatal("expected target_type required error")
+		t.Fatal("expected asset_type required error")
 	}
 }
 
-func TestListFiltersByTargetType(t *testing.T) {
+func TestListFiltersByAssetType(t *testing.T) {
 	t.Parallel()
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil, nil, nil)
 	orgID := uuid.New()
-	for _, tt := range []struct{ targetType string }{{"vehicle"}, {"vehicle"}, {"bicycle"}} {
+	for _, tt := range []struct{ assetType string }{{"vehicle"}, {"vehicle"}, {"bicycle"}} {
 		_, err := uc.Create(context.Background(), domain.WorkOrder{
-			OrgID:       orgID,
-			Number:      "OT-" + tt.targetType,
-			TargetType:  tt.targetType,
-			TargetID:    uuid.New(),
-			TargetLabel: "x",
-			Status:      "received",
+			OrgID:      orgID,
+			Number:     "OT-" + tt.assetType,
+			AssetType:  tt.assetType,
+			AssetID:    uuid.New(),
+			AssetLabel: "x",
+			Status:     "received",
 			Items: []domain.WorkOrderItem{{
 				ItemType: "service", Description: "x", Quantity: 1, UnitPrice: 1, TaxRate: 0,
 			}},
@@ -193,7 +193,7 @@ func TestListFiltersByTargetType(t *testing.T) {
 			t.Fatalf("create: %v", err)
 		}
 	}
-	got, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID, TargetType: "vehicle"})
+	got, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: orgID, AssetType: "vehicle"})
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -212,13 +212,13 @@ func TestListFiltersByBranch(t *testing.T) {
 
 	for _, branchID := range []*uuid.UUID{&branchA, &branchB, nil} {
 		_, err := uc.Create(context.Background(), domain.WorkOrder{
-			OrgID:       orgID,
-			BranchID:    branchID,
-			Number:      "OT-" + uuid.NewString(),
-			TargetType:  "vehicle",
-			TargetID:    uuid.New(),
-			TargetLabel: "x",
-			Status:      "received",
+			OrgID:      orgID,
+			BranchID:   branchID,
+			Number:     "OT-" + uuid.NewString(),
+			AssetType:  "vehicle",
+			AssetID:    uuid.New(),
+			AssetLabel: "x",
+			Status:     "received",
 			Items: []domain.WorkOrderItem{{
 				ItemType: "service", Description: "x", Quantity: 1, UnitPrice: 1, TaxRate: 0,
 			}},

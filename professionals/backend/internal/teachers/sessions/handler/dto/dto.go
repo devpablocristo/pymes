@@ -14,6 +14,7 @@ type SessionItem struct {
 	Metadata        map[string]any `json:"metadata"`
 	CreatedAt       string         `json:"created_at"`
 	UpdatedAt       string         `json:"updated_at"`
+	DeletedAt       *string        `json:"deleted_at,omitempty"`
 }
 
 type ListSessionsResponse struct {
@@ -31,6 +32,16 @@ type CreateSessionRequest struct {
 	StartedAt       *string        `json:"started_at"`
 	Summary         string         `json:"summary"`
 	Metadata        map[string]any `json:"metadata"`
+}
+
+type UpdateSessionRequest struct {
+	CustomerPartyID *string         `json:"customer_party_id"`
+	ServiceID       *string         `json:"service_id"`
+	Status          *string         `json:"status"`
+	StartedAt       *string         `json:"started_at"`
+	EndedAt         *string         `json:"ended_at"`
+	Summary         *string         `json:"summary"`
+	Metadata        *map[string]any `json:"metadata"`
 }
 
 type SessionNoteItem struct {

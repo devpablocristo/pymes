@@ -2,12 +2,14 @@
 # Verificación preferida: targets `*-docker-*`; `build` y `test` quedan como respaldo nativo.
 .PHONY: \
 	up down ps logs \
-	staticcheck ruff lint \
-	seed seed-clear modules-check cleanup-pablo e2e-review-notifications \
+	go-compile staticcheck ruff lint \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt frontend-typecheck ai-test \
+	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-review-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
 GO_PRIVATE = GOPRIVATE=github.com/devpablocristo/* GONOSUMDB=github.com/devpablocristo/* GONOPROXY=github.com/devpablocristo/* GOPROXY=https://proxy.golang.org,direct
+GO_PACKAGES = ./pymes-core/backend/... ./pymes-core/shared/... ./workshops/backend/... ./professionals/backend/... ./restaurants/backend/... ./beauty/backend/... ./medical/backend/...
 # Repo hermano `local-infra`. Override por CLI: `make up LOCAL_INFRA_DIR=/ruta/al/local-infra`.
 #
 # GNU Make importa variables del shell; `?=´ respeta el entorno y un export viejo (p. ej. ruta de otra
@@ -36,27 +38,45 @@ BASE_COMPOSE := $(abspath $(LOCAL_INFRA_COMPOSE))
 endif
 DC = docker compose --project-directory $(CURDIR) -f $(BASE_COMPOSE) -f $(CURDIR)/docker-compose.yml
 
-# Nexus Governance (servicio Docker `review`): mismo módulo que en CI (`../nexus/governance`) o checkout renombrado `../nexus-governance/governance`.
-ifneq ($(wildcard $(abspath $(CURDIR)/../nexus/governance/go.mod)),)
-  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus/governance)
-else ifneq ($(wildcard $(abspath $(CURDIR)/../nexus-governance/governance/go.mod)),)
-  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus-governance/governance)
-else
-  NEXUS_GOVERNANCE_CONTEXT := $(abspath $(CURDIR)/../nexus/governance)
-endif
-export NEXUS_GOVERNANCE_CONTEXT
-
 # Calidad
+
+# Compilacion rapida de todos los backends Go del monorepo, sin caer en frontend/node_modules.
+go-compile:
+	$(GO_PRIVATE) go test $(GO_PACKAGES) -run '^$$'
 
 # Análisis estático Go (código muerto U1000, imports duplicados, etc.); versión alineada con go.mod
 staticcheck:
-	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+	$(GO_PRIVATE) go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 $(GO_PACKAGES)
 # Lint Python del servicio AI (ruff en ai/src); requiere `pip install -r ai/requirements-dev.txt` o ruff en PATH
 ruff:
 	cd ai && (test -x .venv/bin/ruff && .venv/bin/ruff check src || ruff check src || python3 -m ruff check src)
 
 # Go staticcheck + ruff AI
 lint: staticcheck ruff
+
+# Auditorias de saneamiento arquitectural: no cambian comportamiento productivo.
+audit: audit-crud audit-debt
+
+# Baseline reproducible antes de refactors estructurales.
+audit-baseline: go-compile audit frontend-typecheck ruff ai-test
+
+audit-crud:
+	@python3 scripts/audit/crud_contract.py
+
+audit-crud-json:
+	@python3 scripts/audit/crud_contract.py --format json
+
+audit-crud-strict:
+	@python3 scripts/audit/crud_contract.py --strict
+
+audit-debt:
+	@python3 scripts/audit/debt_scan.py
+
+frontend-typecheck:
+	cd frontend && npm run typecheck
+
+ai-test:
+	cd ai && (test -x .venv/bin/pytest && .venv/bin/pytest -q || pytest -q)
 
 # Seeds y utilidades
 
@@ -68,6 +88,21 @@ seed:
 # Limpia datos CRUD/demo preservando bootstrap del tenant (org, users, members, settings, API keys).
 seed-clear:
 	bash scripts/seeds/clear.sh
+
+# Verifica que seed-clear haya dejado vacias las pantallas operativas sin borrar bootstrap.
+seed-clear-verify:
+	bash scripts/seeds/verify.sh --cleared
+
+# Verifica que los seeds de pantallas operativas tengan al menos 10 registros visibles.
+seed-verify:
+	bash scripts/seeds/verify.sh
+
+# Flujo completo y repetible: limpiar, cargar y verificar.
+seed-reset:
+	bash scripts/seeds/clear.sh
+	bash scripts/seeds/verify.sh --cleared
+	bash scripts/seeds/load.sh
+	bash scripts/seeds/verify.sh
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
 # Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
@@ -102,15 +137,12 @@ llm-pull:
 		echo "Skipping llm-pull: no Ollama stack under LOCAL_INFRA_DIR=$(LOCAL_INFRA_DIR)."; \
 	fi
 
-# Levanta stack local (infra compartida + Review + cp-backend + 4 verticales Go + frontend + AI)
+# Stack local (compose Pymes). Nexus governance corre en el compose del repo ../nexus.
+# Levantá Nexus antes con `make up` (o `docker compose up`) en ese repo.
 up:
-	@if [ ! -f "$(NEXUS_GOVERNANCE_CONTEXT)/go.mod" ]; then \
-		echo "Falta Nexus governance en $(NEXUS_GOVERNANCE_CONTEXT)/go.mod — cloná github.com/devpablocristo/nexus junto a pymes como ../nexus o ../nexus-governance." >&2; \
-		exit 1; \
-	fi
 	@$(MAKE) llm-up
 	@$(MAKE) llm-pull
-	$(DC) build review cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai
+	$(DC) build cp-backend prof-backend work-backend beauty-backend restaurants-backend medical-backend frontend ai
 	$(DC) up -d --no-build
 
 # Baja y elimina contenedores de la red del proyecto

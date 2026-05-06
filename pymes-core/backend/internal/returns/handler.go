@@ -70,8 +70,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.PATCH(item, rbac.RequirePermission("returns", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("returns", "delete"), h.Delete)
 	auth.POST(item+"/void", rbac.RequirePermission("returns", "create"), h.Void)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("returns", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("returns", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("returns", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("returns", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("returns", "delete"), h.HardDelete)
 
 	auth.GET("/credit-notes", rbac.RequirePermission("returns", "read"), h.ListCreditNotes)
@@ -88,7 +88,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req createReturnRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -96,7 +96,7 @@ func (h *Handler) Create(c *gin.Context) {
 	for _, item := range req.Items {
 		saleItemID, err := uuid.Parse(strings.TrimSpace(item.SaleItemID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale_item_id"})
+			handlers.WriteValidation(c, "invalid sale_item_id")
 			return
 		}
 		items = append(items, CreateReturnItemInput{SaleItemID: saleItemID, Quantity: item.Quantity})
@@ -120,7 +120,7 @@ func (h *Handler) List(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) Get(c *gin.Context) {
@@ -147,7 +147,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) Update(c *gin.Context) {
@@ -157,7 +157,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req updateReturnRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -197,7 +197,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	orgID, id, ok := parseOrgID(c)
 	if !ok {
 		return
@@ -248,7 +252,7 @@ func (h *Handler) ListCreditNotes(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) CreateCreditNote(c *gin.Context) {
@@ -258,12 +262,12 @@ func (h *Handler) CreateCreditNote(c *gin.Context) {
 	}
 	var req returndto.CreateCreditNoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	partyID, err := uuid.Parse(strings.TrimSpace(req.PartyID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
+		handlers.WriteValidation(c, "invalid party_id")
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -304,7 +308,7 @@ func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteOffsetListResponse(c, items, limit, len(items))
 }
 
 func (h *Handler) ApplyCredit(c *gin.Context) {
@@ -314,12 +318,12 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 	}
 	var req applyCreditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	creditNoteID, err := uuid.Parse(strings.TrimSpace(req.CreditNoteID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid credit_note_id"})
+		handlers.WriteValidation(c, "invalid credit_note_id")
 		return
 	}
 	auth := handlers.GetAuthContext(c)
@@ -346,7 +350,7 @@ func parseOrgSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	}
 	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sale id"})
+		handlers.WriteValidation(c, "invalid sale id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, saleID, true

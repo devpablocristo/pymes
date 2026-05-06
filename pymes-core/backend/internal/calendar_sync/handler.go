@@ -13,6 +13,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync/handler/dto"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/calendar_sync/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type usecasesPort interface {
@@ -23,8 +24,8 @@ type usecasesPort interface {
 }
 
 type Handler struct {
-	uc           usecasesPort
-	frontendURL  string // origen del frontend para redirigir al usuario después del callback
+	uc          usecasesPort
+	frontendURL string // origen del frontend para redirigir al usuario después del callback
 }
 
 // NewHandler construye el handler. frontendURL se usa para componer el redirect
@@ -56,14 +57,14 @@ func (h *Handler) StartGoogleConnect(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	authURL, err := h.uc.StartGoogleConnect(c.Request.Context(), orgID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_sync: start google connect failed")
 		// Mensaje genérico al cliente; detalle queda en el log.
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not start google connect"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not start google connect")
 		return
 	}
 	c.JSON(http.StatusOK, dto.StartConnectResponse{AuthURL: authURL})
@@ -107,13 +108,13 @@ func (h *Handler) ListConnections(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	conns, err := h.uc.ListMyConnections(c.Request.Context(), orgID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_sync: list connections failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list connections"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not list connections")
 		return
 	}
 	items := make([]dto.ConnectionResponse, 0, len(conns))
@@ -127,21 +128,21 @@ func (h *Handler) RevokeConnection(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(authCtx.OrgID)
 	if err != nil || orgID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid org context"})
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.RevokeConnection(c.Request.Context(), orgID, authCtx.Actor, id); err != nil {
 		if errors.Is(err, ErrConnectionNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "connection not found")
 			return
 		}
 		log.Error().Err(err).Msg("calendar_sync: revoke connection failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not revoke connection"})
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not revoke connection")
 		return
 	}
 	c.Status(http.StatusNoContent)

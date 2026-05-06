@@ -72,6 +72,7 @@ type CreateInput struct {
 	Notes      string
 	IsFavorite bool
 	Tags       []string
+	Metadata   map[string]any
 	CreatedBy  string
 }
 
@@ -104,6 +105,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 		Notes:      in.Notes,
 		IsFavorite: in.IsFavorite,
 		Tags:       in.Tags,
+		Metadata:   in.Metadata,
 		CreatedBy:  in.CreatedBy,
 	})
 	if err != nil {
@@ -131,6 +133,7 @@ type UpdateInput struct {
 	Notes      *string
 	IsFavorite *bool
 	Tags       *[]string
+	Metadata   *map[string]any
 	Actor      string
 }
 
@@ -189,6 +192,9 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (empdomain.Employ
 	}
 	if in.Tags != nil {
 		current.Tags = *in.Tags
+	}
+	if in.Metadata != nil {
+		current.Metadata = *in.Metadata
 	}
 	out, err := u.repo.Update(ctx, current)
 	if err != nil {

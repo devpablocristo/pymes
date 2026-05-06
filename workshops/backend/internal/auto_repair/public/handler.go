@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 	"github.com/devpablocristo/pymes/workshops/backend/internal/shared/pymescore"
+	"github.com/gin-gonic/gin"
 )
 
 // coreServicesPort expone el catálogo público de servicios servido por pymes-core.
@@ -42,7 +43,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 func (h *Handler) resolveOrgRef(c *gin.Context) (string, bool) {
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return "", false
 	}
 	return orgSlug, true
@@ -54,7 +55,7 @@ func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
 		return
 	}
 	if h.coreServices == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core services not configured"})
+		verticalgin.WriteError(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "core services not configured")
 		return
 	}
 	items, err := h.coreServices.ListPublicServices(
@@ -82,7 +83,7 @@ func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
 			"tax_rate":        item.TaxRate,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": publicItems})
+	verticalgin.WriteListResponse(c, publicItems, int64(len(publicItems)), false, "")
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
@@ -105,7 +106,7 @@ func estimatedHoursFromMetadata(svc pymescore.CoreService) float64 {
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
 	orgSlug, ok := h.resolveOrgRef(c)
@@ -114,7 +115,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {

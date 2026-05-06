@@ -22,6 +22,7 @@ type ProfessionalProfileModel struct {
 	Metadata          []byte         `gorm:"type:jsonb"`
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	DeletedAt         *time.Time
 }
 
 func (ProfessionalProfileModel) TableName() string {

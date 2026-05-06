@@ -2,6 +2,7 @@ package employees
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -87,6 +88,11 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (empdomai
 
 func (r *Repository) Create(ctx context.Context, in empdomain.Employee) (empdomain.Employee, error) {
 	now := time.Now().UTC()
+	md := in.Metadata
+	if md == nil {
+		md = map[string]any{}
+	}
+	meta, _ := json.Marshal(md)
 	row := models.EmployeeModel{
 		ID:         uuid.New(),
 		OrgID:      in.OrgID,
@@ -102,6 +108,7 @@ func (r *Repository) Create(ctx context.Context, in empdomain.Employee) (empdoma
 		Notes:      strings.TrimSpace(in.Notes),
 		IsFavorite: in.IsFavorite,
 		Tags:       pq.StringArray(utils.NormalizeTags(in.Tags)),
+		Metadata:   meta,
 		CreatedBy:  strings.TrimSpace(in.CreatedBy),
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -114,6 +121,11 @@ func (r *Repository) Create(ctx context.Context, in empdomain.Employee) (empdoma
 
 func (r *Repository) Update(ctx context.Context, in empdomain.Employee) (empdomain.Employee, error) {
 	now := time.Now().UTC()
+	md := in.Metadata
+	if md == nil {
+		md = map[string]any{}
+	}
+	meta, _ := json.Marshal(md)
 	updates := map[string]any{
 		"first_name":  strings.TrimSpace(in.FirstName),
 		"last_name":   strings.TrimSpace(in.LastName),
@@ -126,6 +138,7 @@ func (r *Repository) Update(ctx context.Context, in empdomain.Employee) (empdoma
 		"notes":       strings.TrimSpace(in.Notes),
 		"is_favorite": in.IsFavorite,
 		"tags":        pq.StringArray(utils.NormalizeTags(in.Tags)),
+		"metadata":    meta,
 		"updated_at":  now,
 	}
 	res := r.db.WithContext(ctx).Model(&models.EmployeeModel{}).
@@ -179,6 +192,13 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 }
 
 func toDomain(row models.EmployeeModel) empdomain.Employee {
+	var meta map[string]any
+	if len(row.Metadata) > 0 {
+		_ = json.Unmarshal(row.Metadata, &meta)
+	}
+	if meta == nil {
+		meta = map[string]any{}
+	}
 	return empdomain.Employee{
 		ID:         row.ID,
 		OrgID:      row.OrgID,
@@ -194,6 +214,7 @@ func toDomain(row models.EmployeeModel) empdomain.Employee {
 		Notes:      row.Notes,
 		IsFavorite: row.IsFavorite,
 		Tags:       append([]string(nil), row.Tags...),
+		Metadata:   meta,
 		CreatedBy:  row.CreatedBy,
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,

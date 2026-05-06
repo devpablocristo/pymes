@@ -49,7 +49,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -69,11 +69,11 @@ func (h *Handler) List(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	resp := gin.H{"items": items, "total": total, "has_more": hasMore}
+	nextCursor := ""
 	if next != nil {
-		resp["next_cursor"] = next.String()
+		nextCursor = next.String()
 	}
-	c.JSON(http.StatusOK, resp)
+	handlers.WriteListResponse(c, items, total, hasMore, nextCursor)
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -83,7 +83,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreatePartyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), fromCreateRequest(orgID, req), actor)
@@ -101,7 +101,7 @@ func (h *Handler) Get(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
@@ -119,12 +119,12 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	var req dto.UpdatePartyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, fromUpdateRequest(orgID, id, req), actor)
@@ -142,7 +142,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.Delete(c.Request.Context(), orgID, id, actor); err != nil {
@@ -159,19 +159,19 @@ func (h *Handler) AddRole(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	var req dto.PartyRoleInput
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var priceListID *uuid.UUID
 	if req.PriceListID != nil && strings.TrimSpace(*req.PriceListID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*req.PriceListID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid price_list_id"})
+			handlers.WriteValidation(c, "invalid price_list_id")
 			return
 		}
 		priceListID = &parsed
@@ -191,7 +191,7 @@ func (h *Handler) RemoveRole(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	if err := h.uc.RemoveRole(c.Request.Context(), orgID, id, c.Param("role"), actor); err != nil {
@@ -208,7 +208,7 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	items, err := h.uc.ListRelationships(c.Request.Context(), orgID, id)
@@ -216,7 +216,7 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	handlers.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) CreateRelationship(c *gin.Context) {
@@ -226,17 +226,17 @@ func (h *Handler) CreateRelationship(c *gin.Context) {
 	}
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return
 	}
 	var req dto.RelationshipInput
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	toPartyID, err := uuid.Parse(req.ToPartyID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid to_party_id"})
+		handlers.WriteValidation(c, "invalid to_party_id")
 		return
 	}
 	fromDate, thruDate, err := parseRelationshipDates(req.FromDate, req.ThruDate)
@@ -264,7 +264,7 @@ func parseOrgActor(c *gin.Context) (uuid.UUID, string, bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, "", false
 	}
 	return orgID, a.Actor, true

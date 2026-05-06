@@ -22,7 +22,7 @@ type reviewClient interface {
 	Reject(ctx context.Context, id string, body any) (int, []byte, error)
 }
 
-// Handler proxies requests del frontend a Nexus Review API.
+// Handler proxies requests del frontend a Nexus Governance API.
 type Handler struct {
 	client reviewClient
 }

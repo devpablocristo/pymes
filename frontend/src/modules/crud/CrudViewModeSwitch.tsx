@@ -1,6 +1,6 @@
 import { NavLink, matchPath, useLocation } from 'react-router-dom';
 import { HeaderMenu } from '../../components/HeaderMenu';
-import { useHeaderMenuItems } from '../../components/HeaderMenuContext';
+import { useHeaderMenuItems } from '../../components/useHeaderMenuItems';
 import '../../styles/viewModeSegmentedSwitch.css';
 import '../../pages/WorkOrdersModuleSection.css';
 

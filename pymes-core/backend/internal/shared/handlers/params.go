@@ -13,7 +13,7 @@ import (
 func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
 	orgID, ok := sharedauth.ParseAuthOrgID(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		WriteValidation(c, "invalid org")
 		return uuid.Nil, false
 	}
 	return orgID, true
@@ -23,7 +23,7 @@ func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool
 	value := strings.TrimSpace(c.Param(param))
 	id, err := uuid.Parse(value)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + field})
+		WriteValidation(c, "invalid "+field)
 		return uuid.Nil, false
 	}
 	return id, true
@@ -48,7 +48,7 @@ func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UU
 	}
 	entity := strings.TrimSpace(strings.ToLower(c.Param(entityParam)))
 	if entity == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity"})
+		WriteValidation(c, "invalid entity")
 		return uuid.Nil, "", uuid.Nil, false
 	}
 	id, ok := ParseUUIDParam(c, idParam, idParam)
@@ -56,4 +56,8 @@ func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UU
 		return uuid.Nil, "", uuid.Nil, false
 	}
 	return orgID, entity, id, true
+}
+
+func WriteValidation(c *gin.Context, message string) {
+	c.JSON(http.StatusBadRequest, gin.H{"code": "VALIDATION", "message": message})
 }

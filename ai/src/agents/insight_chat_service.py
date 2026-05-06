@@ -26,98 +26,6 @@ from runtime.logging import get_logger
 
 logger = get_logger(__name__)
 
-_ANALYTICS_HINTS = (
-    "insight",
-    "insights",
-    "como viene",
-    "cómo viene",
-    "como van",
-    "cómo van",
-    "como vamos",
-    "cómo vamos",
-    "entender",
-    "explica",
-    "explicame",
-    "explicá",
-    "explicar",
-    "resumi",
-    "resumí",
-    "resumen",
-    "analiza",
-    "analizá",
-    "analisis",
-    "análisis",
-    "indicador",
-    "indicadores",
-    "kpi",
-    "kpis",
-    "metric",
-    "métrica",
-    "métricas",
-    "tendencia",
-    "tendencias",
-    "performance",
-    "rendimiento",
-    "panorama",
-    "reporte",
-    "reportes",
-    "salud del negocio",
-    "resumen general",
-    "panorama general",
-    "estado",
-)
-_PERIOD_HINTS = (" hoy", " mes", " semana", " mensual", " semanal", " diario", " diaria")
-_GENERIC_BUSINESS_SCOPE_HINTS = (
-    "negocio",
-    "empresa",
-    "comercio",
-    "local",
-    "operacion",
-    "operación",
-    "resultados",
-    "resultado",
-    "general",
-    "global",
-)
-_OPERATIONAL_HINTS = (
-    "crear ",
-    "crea ",
-    "registr",
-    "cargar ",
-    "agregar ",
-    "actualizar ",
-    "modificar ",
-    "eliminar ",
-    "borrar ",
-    "vender ",
-    "cobrar ",
-    "comprar ",
-    "emitir ",
-    "generar ",
-    "armar ",
-    "hacer ",
-)
-_SPECIFIC_STATUS_HINTS = (
-    "estado del",
-    "estado de la",
-    "estado de ",
-    "seguimiento del",
-    "seguimiento de la",
-    "seguimiento de ",
-)
-_SPECIFIC_ENTITY_HINTS = (
-    " cobro ",
-    " pago ",
-    " venta ",
-    " presupuesto ",
-    " factura ",
-    " orden ",
-    " compra ",
-    " solicitud ",
-)
-_REFERENCE_HINTS = ("#", " id ", " nro ", " n° ", " numero ", " número ")
-
-
 @dataclass(frozen=True)
 class InsightChatResponse:
     reply: str
@@ -152,7 +60,7 @@ class InsightEvidenceHighlight(BaseModel):
 
 
 class InternalInsightEvidence(BaseModel):
-    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff"
+    source: Literal["insight_handoff"] = "insight_handoff"
     notification_id: str | None = None
     scope: Literal["sales_collections", "inventory_profit", "customers_retention"]
     period: Literal["today", "week", "month"]
@@ -166,96 +74,6 @@ class InternalInsightEvidence(BaseModel):
     highlights: list[InsightEvidenceHighlight] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     entity_ids: list[str] = Field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class _InsightRequest:
-    scope: str
-    period: str
-    compare: bool
-
-
-@dataclass(frozen=True)
-class InsightChatMatch:
-    scope: str
-    period: str
-    compare: bool
-
-
-def _has_analytics_intent(text: str) -> bool:
-    padded = f" {text} "
-    if any(hint in padded for hint in _ANALYTICS_HINTS):
-        return True
-    return any(hint in padded for hint in _PERIOD_HINTS)
-
-
-def _has_operational_intent(text: str) -> bool:
-    padded = f" {text} "
-    return any(hint in padded for hint in _OPERATIONAL_HINTS)
-
-
-def _looks_like_specific_status_request(text: str) -> bool:
-    padded = f" {text} "
-    if not any(hint in padded for hint in _SPECIFIC_STATUS_HINTS):
-        return False
-    if not any(entity in padded for entity in _SPECIFIC_ENTITY_HINTS):
-        return False
-    return True
-
-
-def _match_insight_request(message: str) -> _InsightRequest | None:
-    text = message.strip().lower()
-    if not text:
-        return None
-    if _has_operational_intent(text) and not _has_analytics_intent(text):
-        return None
-    if _looks_like_specific_status_request(text):
-        return None
-    if not _has_analytics_intent(text):
-        return None
-
-    period = "month"
-    if " hoy" in f" {text}" or text.startswith("hoy"):
-        period = "today"
-    elif "semana" in text or "semanal" in text:
-        period = "week"
-
-    compare = not any(flag in text for flag in ("sin comparar", "sin comparacion", "sin comparación"))
-
-    if "cliente" in text and any(
-        hint in text
-        for hint in ("retencion", "retención", "recurrencia", "recurrent", "fideliz", "reactiv", "churn")
-    ):
-        return _InsightRequest(scope="customers_retention", period=period, compare=compare)
-
-    if any(hint in text for hint in ("inventario", "stock", "margen", "rentabilidad")):
-        return _InsightRequest(scope="inventory_profit", period=period, compare=compare)
-
-    if any(
-        hint in text
-        for hint in ("ventas", "venta", "cobros", "cobro", "cobranza", "cobranzas", "caja", "facturacion", "facturación", "deuda", "deudores")
-    ):
-        return _InsightRequest(scope="sales_collections", period=period, compare=compare)
-
-    if any(hint in text for hint in _GENERIC_BUSINESS_SCOPE_HINTS):
-        return _InsightRequest(scope="sales_collections", period=period, compare=compare)
-
-    return None
-
-
-def match_insight_chat_request(message: str) -> InsightChatMatch | None:
-    request = _match_insight_request(message)
-    if request is None:
-        return None
-    return InsightChatMatch(
-        scope=request.scope,
-        period=request.period,
-        compare=request.compare,
-    )
-
-
-def looks_like_insight_chat_request(message: str) -> bool:
-    return match_insight_chat_request(message) is not None
 
 
 def _format_scope_label(scope: str, filters: InsightFilters) -> str:
@@ -443,11 +261,9 @@ def build_internal_insight_evidence(
     insight: ResolvedInsight,
     filters: InsightFilters,
     notification_id: str | None = None,
-    source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff",
     computed_at: str | None = None,
 ) -> InternalInsightEvidence:
     return InternalInsightEvidence(
-        source=source,
         notification_id=notification_id,
         scope=insight.scope,
         period=filters.period,
@@ -469,7 +285,6 @@ def _build_insight_chat_response_from_insight(*, insight: ResolvedInsight, filte
         insight=insight,
         filters=filters,
         notification_id=None,
-        source="insight_handoff",
     )
 
 
@@ -478,7 +293,6 @@ def _build_insight_chat_response_with_evidence(
     insight: ResolvedInsight,
     filters: InsightFilters,
     notification_id: str | None,
-    source: Literal["insight_handoff", "insight_chat_legacy_match"],
 ) -> InsightChatResponse:
     if isinstance(insight, SalesCollectionsInsight):
         blocks = _build_sales_collections_blocks(insight, filters)
@@ -493,31 +307,7 @@ def _build_insight_chat_response_with_evidence(
             insight=insight,
             filters=filters,
             notification_id=notification_id,
-            source=source,
         ),
-    )
-
-
-async def maybe_build_insight_chat_response(
-    *,
-    backend_client: BackendClient,
-    auth: AuthContext,
-    user_message: str,
-    preferred_language: str | None = None,
-) -> InsightChatResponse | None:
-    _ = preferred_language
-    request = match_insight_chat_request(user_message)
-    if request is None:
-        return None
-
-    return await build_insight_chat_response_for_scope(
-        backend_client=backend_client,
-        auth=auth,
-        scope=request.scope,
-        period=request.period,
-        compare=request.compare,
-        top_limit=5,
-        evidence_source="insight_chat_legacy_match",
     )
 
 
@@ -530,7 +320,6 @@ async def build_insight_chat_response_for_scope(
     compare: bool,
     top_limit: int,
     notification_id: str | None = None,
-    evidence_source: Literal["insight_handoff", "insight_chat_legacy_match"] = "insight_handoff",
 ) -> InsightChatResponse | None:
     filters = InsightFilters(period=period, compare=compare, top_limit=top_limit)
     service = InsightsService(BackendInsightsRepository(backend_client))
@@ -542,7 +331,6 @@ async def build_insight_chat_response_for_scope(
                 insight=insight,
                 filters=filters,
                 notification_id=notification_id,
-                source=evidence_source,
             )
         if scope == "inventory_profit":
             insight = await service.build_inventory_profit_insight(auth=auth, filters=filters)
@@ -550,7 +338,6 @@ async def build_insight_chat_response_for_scope(
                 insight=insight,
                 filters=filters,
                 notification_id=notification_id,
-                source=evidence_source,
             )
         if scope == "customers_retention":
             insight = await service.build_customers_retention_insight(auth=auth, filters=filters)
@@ -558,7 +345,6 @@ async def build_insight_chat_response_for_scope(
                 insight=insight,
                 filters=filters,
                 notification_id=notification_id,
-                source=evidence_source,
             )
     except Exception as exc:  # noqa: BLE001
         logger.warning("insight_chat_failed", org_id=auth.org_id, error=str(exc))

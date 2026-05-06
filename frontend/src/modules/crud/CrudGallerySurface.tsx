@@ -9,7 +9,7 @@ export type CrudGalleryCard<T extends { id: string }> = {
   meta?: (item: T) => string;
   /** URLs para el mismo carrusel que el modal CRUD (varias por ítem). */
   imageUrls?: (item: T) => string[] | undefined;
-  /** Legacy: una sola URL; si hay `imageUrls`, tiene prioridad. */
+  /** URL simple opcional; si hay `imageUrls`, tiene prioridad. */
   imageSrc?: (item: T) => string | undefined;
   imageAlt?: (item: T) => string;
 };
@@ -134,9 +134,9 @@ export function CrudGallerySurface<T extends { id: string }>({
         const subtitle = card.subtitle?.(item);
         const meta = card.meta?.(item);
         const fromList = card.imageUrls?.(item)?.filter(isDisplayableCrudImageSrc) ?? [];
-        const legacy = card.imageSrc?.(item)?.trim();
+        const singleImage = card.imageSrc?.(item)?.trim();
         const displayUrls =
-          fromList.length > 0 ? fromList : legacy && isDisplayableCrudImageSrc(legacy) ? [legacy] : [];
+          fromList.length > 0 ? fromList : singleImage && isDisplayableCrudImageSrc(singleImage) ? [singleImage] : [];
         const imageAlt = card.imageAlt?.(item) ?? title;
         return (
           <button

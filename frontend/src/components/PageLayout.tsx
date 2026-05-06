@@ -3,7 +3,7 @@ import { CrudShellHeaderActionsColumn } from '@devpablocristo/modules-crud-ui';
 import type { ReactNode } from 'react';
 import { usePageSearchShellControl } from './PageSearch';
 import { HeaderMenu } from './HeaderMenu';
-import { useHeaderMenuItems } from './HeaderMenuContext';
+import { useHeaderMenuItems } from './useHeaderMenuItems';
 
 export type PageLayoutProps = {
   title: ReactNode;

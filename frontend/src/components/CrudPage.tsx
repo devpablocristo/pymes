@@ -89,7 +89,7 @@ export type CrudStateMachineConfig<
 
 export type CrudKanbanConfig<T extends { id: string }> = {
   /**
-   * Contenido textual de la card del tablero. Si no se define, el runtime usa un fallback genérico.
+   * Contenido textual de la card del tablero. Si no se define, el runtime usa el render estándar.
    */
   card?: {
     title: (row: T) => string;

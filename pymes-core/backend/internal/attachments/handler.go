@@ -64,12 +64,12 @@ func (h *Handler) RequestUpload(c *gin.Context) {
 	}
 	var req requestUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity_id"})
+		handlers.WriteValidation(c, "invalid entity_id")
 		return
 	}
 	out, err := h.uc.RequestUpload(c.Request.Context(), orgID, req.EntityType, entityID, req.FileName, req.ContentType, req.SizeBytes)
@@ -83,7 +83,7 @@ func (h *Handler) RequestUpload(c *gin.Context) {
 func (h *Handler) UploadContent(c *gin.Context) {
 	storageKey := strings.TrimPrefix(c.Param("storage_key"), "/")
 	if strings.TrimSpace(storageKey) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid storage_key"})
+		handlers.WriteValidation(c, "invalid storage_key")
 		return
 	}
 	if err := h.uc.UploadContent(c.Request.Context(), storageKey, c.Request.Body); err != nil {
@@ -100,12 +100,12 @@ func (h *Handler) ConfirmUpload(c *gin.Context) {
 	}
 	var req confirmUploadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	entityID, err := uuid.Parse(strings.TrimSpace(req.EntityID))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid entity_id"})
+		handlers.WriteValidation(c, "invalid entity_id")
 		return
 	}
 	auth := handlers.GetAuthContext(c)

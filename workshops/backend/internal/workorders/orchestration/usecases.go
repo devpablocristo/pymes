@@ -57,7 +57,7 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, w
 	}
 	payload := map[string]any{
 		"org_id":        orgID,
-		"customer_name": fallback(order.CustomerName, order.TargetLabel),
+		"customer_name": fallback(order.CustomerName, order.AssetLabel),
 		"notes":         order.Notes,
 		"items":         toCommercialItems(order.Items),
 	}
@@ -91,7 +91,7 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, wo
 	}
 	payload := map[string]any{
 		"org_id":         orgID,
-		"customer_name":  fallback(order.CustomerName, order.TargetLabel),
+		"customer_name":  fallback(order.CustomerName, order.AssetLabel),
 		"payment_method": "transfer",
 		"notes":          order.Notes,
 		"items":          toCommercialItems(order.Items),

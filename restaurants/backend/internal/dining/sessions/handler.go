@@ -46,7 +46,7 @@ func (h *Handler) List(c *gin.Context) {
 	if value := c.Query("table_id"); value != "" {
 		parsed, err := uuid.Parse(value)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table_id"})
+			verticalgin.WriteValidation(c, "invalid table_id")
 			return
 		}
 		tableID = &parsed
@@ -75,12 +75,12 @@ func (h *Handler) Open(c *gin.Context) {
 	}
 	var req dto.OpenTableSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	tableUUID, err := uuid.Parse(req.TableID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table_id"})
+		verticalgin.WriteValidation(c, "invalid table_id")
 		return
 	}
 	guestCount := req.GuestCount

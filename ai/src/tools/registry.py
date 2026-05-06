@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from typing import Any
 
-from src.agents.tool_access import is_legacy_internal_tool_allowed
+from src.agents.tool_access import is_internal_tool_allowed
 from src.backend_client.auth import AuthContext
 from src.backend_client.client import BackendClient
-from src.core.dossier import add_learned_context, set_preference, update_business_field
-from src.core.onboarding import BUSINESS_PROFILES, apply_profile, complete_step, skip_step
+from src.tools.external_registry import build_external_tools
+from src.tools.internal_profile_registry import register_profile_tools
+from src.tools.registry_common import ToolHandler, tool
 from runtime.types import ToolDeclaration
 from src.tools import (
     accounts,
@@ -24,14 +24,9 @@ from src.tools import (
     sales,
     scheduling,
     services,
-    settings,
 )
 
-ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
-
-
-def _tool(name: str, description: str, parameters: dict[str, Any]) -> ToolDeclaration:
-    return ToolDeclaration(name=name, description=description, parameters=parameters)
+__all__ = ["build_external_tools", "build_internal_tools"]
 
 
 def _maybe_add(
@@ -42,7 +37,7 @@ def _maybe_add(
     declaration: ToolDeclaration,
     handler: ToolHandler,
 ) -> None:
-    if not is_legacy_internal_tool_allowed(role, modules_active, declaration.name):
+    if not is_internal_tool_allowed(role, modules_active, declaration.name):
         return
     declarations.append(declaration)
     handlers[declaration.name] = handler
@@ -197,185 +192,26 @@ def build_internal_tools(
             description=description,
         )
 
-    async def _complete_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
-        _ = org_id
-        complete_step(dossier, step)
-        current = dossier.get("onboarding", {}).get("current_step", "")
-        return {"ok": True, "current_step": current, "completed": dossier.get("onboarding", {}).get("steps_completed", [])}
-
-    async def _skip_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
-        _ = org_id
-        skip_step(dossier, step)
-        current = dossier.get("onboarding", {}).get("current_step", "")
-        return {"ok": True, "current_step": current, "skipped": dossier.get("onboarding", {}).get("steps_skipped", [])}
-
-    async def _apply_business_profile(org_id: str, profile: str) -> dict[str, Any]:
-        _ = org_id
-        if profile not in BUSINESS_PROFILES:
-            available = list(BUSINESS_PROFILES.keys())
-            return {"error": f"Perfil desconocido. Opciones: {available}"}
-        apply_profile(dossier, profile)
-        return {"ok": True, "profile": profile, "modules_active": dossier.get("modules_active", [])}
-
-    async def _update_business_info(
-        org_id: str,
-        business_name: str | None = None,
-        business_tax_id: str | None = None,
-        business_address: str | None = None,
-        business_phone: str | None = None,
-        default_currency: str | None = None,
-        default_tax_rate: float | None = None,
-        scheduling_enabled: bool | None = None,
-    ) -> dict[str, Any]:
-        _ = org_id
-        field_map = {
-            "name": business_name, "tax_id": business_tax_id,
-            "address": business_address, "phone": business_phone,
-            "currency": default_currency, "tax_rate": default_tax_rate,
-        }
-        for key, val in field_map.items():
-            if val is not None:
-                update_business_field(dossier, key, val)
-        if scheduling_enabled is not None:
-            set_preference(dossier, "scheduling_enabled", scheduling_enabled)
-        result = await settings.update_business_info(
-            client, auth,
-            business_name=business_name, business_tax_id=business_tax_id,
-            business_address=business_address, business_phone=business_phone,
-            default_currency=default_currency, default_tax_rate=default_tax_rate,
-            scheduling_enabled=scheduling_enabled,
-        )
-        return result
-
-    async def _get_tenant_settings(org_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await settings.get_tenant_settings(client, auth)
-
-    async def _remember_fact(org_id: str, fact: str) -> dict[str, Any]:
-        _ = org_id
-        add_learned_context(dossier, fact)
-        return {"ok": True, "total_facts": len(dossier.get("learned_context", []))}
-
     async def _search_help(org_id: str, query: str) -> dict[str, Any]:
         _ = org_id
         return await help.search_help_docs(query)
 
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool(
-            "complete_onboarding_step",
-            "Marcar un paso del onboarding como completado",
-            {
-                "type": "object",
-                "properties": {
-                    "step": {
-                        "type": "string",
-                        "description": "welcome, business_type, business_info, currency_setup, tax_setup, modules_setup, first_record, feature_tips",
-                    }
-                },
-                "required": ["step"],
-            },
-        ),
-        _complete_onboarding_step,
+    register_profile_tools(
+        declarations=declarations,
+        handlers=handlers,
+        role=role,
+        modules_active=modules_active,
+        client=client,
+        auth=auth,
+        dossier=dossier,
+        add_tool=_maybe_add,
     )
     _maybe_add(
         declarations,
         handlers,
         role,
         modules_active,
-        _tool(
-            "skip_onboarding_step",
-            "Saltar un paso del onboarding",
-            {
-                "type": "object",
-                "properties": {
-                    "step": {
-                        "type": "string",
-                        "description": "welcome, business_type, business_info, currency_setup, tax_setup, modules_setup, first_record, feature_tips",
-                    }
-                },
-                "required": ["step"],
-            },
-        ),
-        _skip_onboarding_step,
-    )
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool(
-            "apply_business_profile",
-            "Aplicar perfil de negocio predefinido que configura modulos y preferencias",
-            {
-                "type": "object",
-                "properties": {
-                    "profile": {
-                        "type": "string",
-                        "description": "comercio_minorista, servicio_profesional, gastronomia, distribuidora, freelancer, otro",
-                    }
-                },
-                "required": ["profile"],
-            },
-        ),
-        _apply_business_profile,
-    )
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool(
-            "update_business_info",
-            "Actualizar datos del negocio (nombre, CUIT, direccion, telefono, moneda, impuesto, scheduling)",
-            {
-                "type": "object",
-                "properties": {
-                    "business_name": {"type": "string"},
-                    "business_tax_id": {"type": "string"},
-                    "business_address": {"type": "string"},
-                    "business_phone": {"type": "string"},
-                    "default_currency": {"type": "string", "description": "ARS, USD, etc"},
-                    "default_tax_rate": {"type": "number", "description": "21.0 para IVA standard"},
-                    "scheduling_enabled": {"type": "boolean"},
-                },
-            },
-        ),
-        _update_business_info,
-    )
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool("get_tenant_settings", "Obtener configuracion actual del negocio", {"type": "object", "properties": {}}),
-        _get_tenant_settings,
-    )
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool(
-            "remember_fact",
-            "Guardar un dato aprendido sobre el negocio para recordarlo en futuras conversaciones",
-            {
-                "type": "object",
-                "properties": {"fact": {"type": "string", "description": "Dato a recordar"}},
-                "required": ["fact"],
-            },
-        ),
-        _remember_fact,
-    )
-    _maybe_add(
-        declarations,
-        handlers,
-        role,
-        modules_active,
-        _tool(
+        tool(
             "get_sales_summary",
             "Ventas por periodo",
             {
@@ -390,7 +226,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_recent_sales",
             "Ultimas ventas",
             {
@@ -405,7 +241,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_top_customers",
             "Top clientes por facturacion",
             {
@@ -424,7 +260,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "search_customers",
             "Buscar clientes",
             {
@@ -443,7 +279,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "search_products",
             "Buscar productos",
             {
@@ -462,7 +298,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "search_services",
             "Buscar servicios del catalogo",
             {
@@ -480,7 +316,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_service",
             "Detalle de un servicio del catalogo",
             {
@@ -496,7 +332,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_low_stock", "Productos con stock bajo", {"type": "object", "properties": {}}),
+        tool("get_low_stock", "Productos con stock bajo", {"type": "object", "properties": {}}),
         _get_low_stock,
     )
     _maybe_add(
@@ -504,7 +340,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_stock_level",
             "Stock de un producto",
             {
@@ -520,7 +356,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_cashflow_summary",
             "Resumen de caja por rango",
             {
@@ -539,7 +375,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_account_balances", "Resumen de cuentas corrientes", {"type": "object", "properties": {}}),
+        tool("get_account_balances", "Resumen de cuentas corrientes", {"type": "object", "properties": {}}),
         _get_account_balances,
     )
     _maybe_add(
@@ -547,7 +383,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_debtors", "Clientes deudores", {"type": "object", "properties": {}}),
+        tool("get_debtors", "Clientes deudores", {"type": "object", "properties": {}}),
         _get_debtors,
     )
     _maybe_add(
@@ -555,7 +391,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_bookings",
             "Listar turnos",
             {
@@ -573,7 +409,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "check_availability",
             "Consultar disponibilidad de turnos",
             {
@@ -592,7 +428,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_quotes",
             "Listar presupuestos",
             {
@@ -612,7 +448,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_purchases", "Resumen de compras", {"type": "object", "properties": {}}),
+        tool("get_purchases", "Resumen de compras", {"type": "object", "properties": {}}),
         _get_purchases,
     )
     _maybe_add(
@@ -620,7 +456,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_recurring_expenses", "Gastos recurrentes", {"type": "object", "properties": {}}),
+        tool("get_recurring_expenses", "Gastos recurrentes", {"type": "object", "properties": {}}),
         _get_recurring_expenses,
     )
     _maybe_add(
@@ -628,7 +464,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool("get_exchange_rates", "Cotizaciones del dia", {"type": "object", "properties": {}}),
+        tool("get_exchange_rates", "Cotizaciones del dia", {"type": "object", "properties": {}}),
         _get_exchange_rates,
     )
     _maybe_add(
@@ -636,7 +472,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "create_quote",
             "Crear presupuesto",
             {
@@ -656,7 +492,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "create_sale",
             "Crear venta",
             {
@@ -677,7 +513,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "generate_payment_link",
             "Generar link de pago para una venta",
             {
@@ -693,7 +529,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "get_payment_status",
             "Consultar estado de link de pago de una venta",
             {
@@ -709,7 +545,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "send_payment_info",
             "Obtener link de WhatsApp con datos de transferencia de una venta",
             {
@@ -725,7 +561,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "book_scheduling",
             "Reservar turno",
             {
@@ -747,7 +583,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "create_cash_movement",
             "Crear movimiento de caja",
             {
@@ -768,7 +604,7 @@ def build_internal_tools(
         handlers,
         role,
         modules_active,
-        _tool(
+        tool(
             "search_help",
             "Buscar ayuda funcional",
             {
@@ -779,121 +615,5 @@ def build_internal_tools(
         ),
         _search_help,
     )
-
-    return declarations, handlers
-
-
-def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
-    declarations: list[ToolDeclaration] = []
-    handlers: dict[str, ToolHandler] = {}
-
-    async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
-
-    async def _book_scheduling(
-        org_id: str,
-        customer_name: str,
-        customer_phone: str,
-        title: str,
-        start_at: str,
-        duration: int = 60,
-    ) -> dict[str, Any]:
-        return await scheduling.book_scheduling(
-            client,
-            org_id=org_id,
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            title=title,
-            start_at=start_at,
-            duration=duration,
-        )
-
-    async def _get_public_services(org_id: str, limit: int = 20) -> dict[str, Any]:
-        return await products.get_public_services(client, org_id=org_id, limit=limit)
-
-    async def _get_business_info(org_id: str) -> dict[str, Any]:
-        return await client.request("GET", f"/v1/public/{org_id}/info", include_internal=True)
-
-    async def _get_my_bookings(org_id: str, phone: str) -> dict[str, Any]:
-        return await scheduling.get_my_bookings(client, org_id=org_id, phone=phone)
-
-    async def _get_payment_link(org_id: str, quote_id: str) -> dict[str, Any]:
-        return await payments.get_public_quote_payment_link(client, org_id=org_id, quote_id=quote_id)
-
-    declarations.append(
-        _tool(
-            "check_availability",
-            "Consultar slots disponibles",
-            {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "YYYY-MM-DD"},
-                    "duration": {"type": "integer", "description": "duracion en minutos"},
-                },
-                "required": ["date"],
-            },
-        )
-    )
-    handlers["check_availability"] = _check_availability
-
-    declarations.append(
-        _tool(
-            "book_scheduling",
-            "Reservar turno",
-            {
-                "type": "object",
-                "properties": {
-                    "customer_name": {"type": "string"},
-                    "customer_phone": {"type": "string"},
-                    "title": {"type": "string"},
-                    "start_at": {"type": "string", "description": "RFC3339"},
-                    "duration": {"type": "integer"},
-                },
-                "required": ["customer_name", "customer_phone", "title", "start_at"],
-            },
-        )
-    )
-    handlers["book_scheduling"] = _book_scheduling
-
-    declarations.append(
-        _tool(
-            "get_public_services",
-            "Listar servicios/productos publicos",
-            {
-                "type": "object",
-                "properties": {"limit": {"type": "integer", "description": "max 100"}},
-            },
-        )
-    )
-    handlers["get_public_services"] = _get_public_services
-
-    declarations.append(_tool("get_business_info", "Informacion del negocio", {"type": "object", "properties": {}}))
-    handlers["get_business_info"] = _get_business_info
-
-    declarations.append(
-        _tool(
-            "get_my_bookings",
-            "Consultar turnos de un cliente por telefono",
-            {
-                "type": "object",
-                "properties": {"phone": {"type": "string"}},
-                "required": ["phone"],
-            },
-        )
-    )
-    handlers["get_my_bookings"] = _get_my_bookings
-
-    declarations.append(
-        _tool(
-            "get_payment_link",
-            "Obtener link de pago de un presupuesto",
-            {
-                "type": "object",
-                "properties": {"quote_id": {"type": "string", "description": "UUID del presupuesto"}},
-                "required": ["quote_id"],
-            },
-        )
-    )
-    handlers["get_payment_link"] = _get_payment_link
 
     return declarations, handlers

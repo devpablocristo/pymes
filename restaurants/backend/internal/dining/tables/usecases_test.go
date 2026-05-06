@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -55,6 +56,38 @@ func (r *fakeRepo) Update(_ context.Context, in domain.DiningTable) (domain.Dini
 	}
 	r.tables[in.ID] = in
 	return in, nil
+}
+
+func (r *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
+	table, ok := r.tables[id]
+	if !ok || table.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	if table.DeletedAt == nil {
+		now := time.Now().UTC()
+		table.DeletedAt = &now
+		r.tables[id] = table
+	}
+	return nil
+}
+
+func (r *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
+	table, ok := r.tables[id]
+	if !ok || table.OrgID != orgID {
+		return gorm.ErrRecordNotFound
+	}
+	table.DeletedAt = nil
+	r.tables[id] = table
+	return nil
+}
+
+func (r *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
+	table, ok := r.tables[id]
+	if !ok || table.OrgID != orgID || table.DeletedAt == nil {
+		return gorm.ErrRecordNotFound
+	}
+	delete(r.tables, id)
+	return nil
 }
 
 type fakeAreaLookup struct {
@@ -297,5 +330,42 @@ func TestListReturnsItems(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Errorf("expected 2 items, got %d", len(items))
+	}
+}
+
+func TestArchiveRestoreAndDelete(t *testing.T) {
+	t.Parallel()
+	repo := newFakeRepo()
+	audit := &fakeAudit{}
+	uc := NewUsecases(repo, &fakeAreaLookup{exists: true}, audit)
+
+	orgID := uuid.New()
+	areaID := uuid.New()
+	id := uuid.New()
+	repo.tables[id] = domain.DiningTable{ID: id, OrgID: orgID, AreaID: areaID, Code: "M01", Capacity: 4, Status: "available"}
+
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	if repo.tables[id].DeletedAt == nil {
+		t.Fatal("expected archived table to have DeletedAt")
+	}
+	if err := uc.Restore(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	if repo.tables[id].DeletedAt != nil {
+		t.Fatal("expected restored table to clear DeletedAt")
+	}
+	if err := uc.Archive(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("archive before delete: %v", err)
+	}
+	if err := uc.Delete(context.Background(), orgID, id, "user-1"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, ok := repo.tables[id]; ok {
+		t.Fatal("expected hard deleted table to be removed")
+	}
+	if audit.calls != 4 {
+		t.Errorf("expected 4 audit calls, got %d", audit.calls)
 	}
 }

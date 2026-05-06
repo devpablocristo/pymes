@@ -3,13 +3,6 @@ import { defineCrudDomain } from './defineCrudDomain';
 import { buildRestCrudDataSource } from './restCrudDataSource';
 import { mergeCsvOptionsForResource } from './csvEntityPolicy';
 import {
-  asBoolean,
-  asNumber,
-  asOptionalNumber,
-  asOptionalString,
-  asString,
-} from './resourceConfigs.shared';
-import {
   createProductCrudConfig,
   productFormToBody,
   type ProductRecord,

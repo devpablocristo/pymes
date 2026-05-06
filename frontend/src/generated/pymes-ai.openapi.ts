@@ -242,7 +242,7 @@ export interface paths {
         put?: never;
         /**
          * Review Callback
-         * @description Recibe notificación de Review cuando una aprobación se resuelve.
+         * @description Recibe notificación de governance cuando una aprobación se resuelve.
          */
         post: operations["review_callback_v1_internal_review_callback_post"];
         delete?: never;
@@ -311,7 +311,7 @@ export interface components {
             /** Url */
             url?: string | null;
             /** Route Hint */
-            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
+            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases" | "employees") | null;
             /** Selection Behavior */
             selection_behavior?: ("route_and_resend" | "prompt_for_query") | null;
             /** Confirmed Actions */
@@ -329,6 +329,84 @@ export interface components {
             type: "actions";
             /** Actions */
             actions?: components["schemas"]["ChatAction"][];
+        };
+        /** ChatDashboardLink */
+        ChatDashboardLink: {
+            /**
+             * Label
+             * @description Texto visible del link de detalle.
+             */
+            label: string;
+            /**
+             * Url
+             * @description Ruta del panel o reporte sugerido.
+             */
+            url: string;
+            /**
+             * Kind
+             * @description Tipo de destino.
+             * @default dashboard
+             * @enum {string}
+             */
+            kind: "dashboard" | "reports" | "module";
+        };
+        /** ChatDeterministicMetadata */
+        ChatDeterministicMetadata: {
+            /**
+             * Used
+             * @description Indica si se armo una respuesta o resumen determinista.
+             * @default false
+             */
+            used: boolean;
+            /**
+             * Summary
+             * @description Resumen calculado desde evidencia read-only del negocio.
+             * @default
+             */
+            summary: string;
+            /**
+             * Blocks
+             * @description Bloques deterministas renderizables: KPI, tablas y acciones de detalle.
+             */
+            blocks?: (components["schemas"]["ChatTextBlock"] | components["schemas"]["ChatActionsBlock"] | components["schemas"]["ChatInsightCardBlock"] | components["schemas"]["ChatKpiGroupBlock"] | components["schemas"]["ChatTableBlock"])[];
+        };
+        /** ChatEvidenceMetadata */
+        ChatEvidenceMetadata: {
+            /**
+             * Tools
+             * @description Herramientas read-only usadas para armar evidencia.
+             */
+            tools?: string[];
+            /**
+             * Record Counts
+             * @description Cantidad de registros o agregados leídos por herramienta.
+             */
+            record_counts?: {
+                [key: string]: number;
+            };
+            /** @description Período principal analizado. */
+            period?: components["schemas"]["ChatEvidencePeriod"] | null;
+        };
+        /** ChatEvidencePeriod */
+        ChatEvidencePeriod: {
+            /**
+             * Label
+             * @description Etiqueta humana del período usado para evidencia.
+             * @default
+             */
+            label: string;
+            /**
+             * From
+             * @description Fecha inicial ISO.
+             * @default
+             */
+            from: string;
+            /**
+             * To
+             * @description Fecha final ISO.
+             * @default
+             */
+            to: string;
         };
         /** ChatHandoff */
         ChatHandoff: {
@@ -405,10 +483,31 @@ export interface components {
             /** Context */
             context?: string | null;
         };
-        /** ChatRequest */
-        ChatRequest: {
-            /** Message */
-            message: string;
+        /** ChatLLMMetadata */
+        ChatLLMMetadata: {
+            /**
+             * Used
+             * @description Indica si el turno fue generado por Gemini/Vertex.
+             * @default false
+             */
+            used: boolean;
+            /**
+             * Provider
+             * @description Proveedor LLM efectivo.
+             */
+            provider?: string | null;
+            /**
+             * Model
+             * @description Modelo LLM efectivo.
+             */
+            model?: string | null;
+            /**
+             * Status
+             * @description Estado de la llamada al LLM.
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "ok" | "unavailable" | "error";
         };
         /** ChatResponse */
         ChatResponse: {
@@ -444,13 +543,38 @@ export interface components {
              * @description Agente o sub-agente seleccionado para este turno: general | insight_chat | customers | products | services | sales | collections | purchases.
              * @enum {string}
              */
-            routed_agent: "general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases";
+            routed_agent: "general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases" | "employees";
             /**
              * Routing Source
-             * @description Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint
+             * @description Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | ui_hint
              * @enum {string}
              */
-            routing_source: "copilot_agent" | "orchestrator" | "read_fallback" | "ui_hint";
+            routing_source: "copilot_agent" | "orchestrator" | "ui_hint";
+            /**
+             * Analysis Scope
+             * @description Alcance de análisis usado para seleccionar evidencia real del negocio.
+             * @default general
+             * @enum {string}
+             */
+            analysis_scope: "general" | "sales_collections" | "customers" | "products" | "services" | "purchases" | "scheduling" | "operations" | "employees";
+            /**
+             * Answer Mode
+             * @description Modo de respuesta: facts_only usa solo datos deterministas; analysis suma Gemini.
+             * @default analysis
+             * @enum {string}
+             */
+            answer_mode: "facts_only" | "analysis";
+            /** @description Metadata y bloques calculados por backend/reportes antes de Gemini. */
+            deterministic?: components["schemas"]["ChatDeterministicMetadata"];
+            /**
+             * Dashboard Links
+             * @description Links de detalle sugeridos para ver numeros completos en dashboard o reportes.
+             */
+            dashboard_links?: components["schemas"]["ChatDashboardLink"][];
+            /** @description Metadata explícita sobre uso de Gemini/Vertex. */
+            llm?: components["schemas"]["ChatLLMMetadata"];
+            /** @description Resumen de la evidencia read-only consultada antes de llamar al LLM. */
+            evidence?: components["schemas"]["ChatEvidenceMetadata"];
         };
         /** ChatTableBlock */
         ChatTableBlock: {
@@ -781,13 +905,6 @@ export interface components {
             /** Items */
             items?: components["schemas"]["NotificationItem"][];
         };
-        /** PublicChatRequest */
-        PublicChatRequest: {
-            /** Message */
-            message: string;
-            /** Phone */
-            phone?: string | null;
-        };
         /** ReviewCallbackPayload */
         ReviewCallbackPayload: {
             /** Request Id */
@@ -813,6 +930,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** ChatRequest */
         src__api__chat_contract__ChatRequest: {
@@ -827,13 +948,13 @@ export interface components {
             preferred_language?: ("es" | "en") | null;
             /** Confirmed Actions */
             confirmed_actions?: string[];
-            /** @description Contexto estructurado opcional para anclar el turno actual a una notificación o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atrás: si `handoff` no se envía, el request sigue funcionando con el contrato previo. */
+            /** @description Contexto estructurado opcional para anclar el turno actual a una notificación o insight sin depender solo de `message` y `route_hint`. Si `handoff` no se envía, el request se enruta con `message` y `route_hint`. */
             handoff?: components["schemas"]["ChatHandoff"] | null;
             /**
              * Route Hint
              * @description Hint opcional para forzar el carril del turno actual: general | insight_chat | customers | products | services | sales | collections | purchases.
              */
-            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases") | null;
+            route_hint?: ("general" | "insight_chat" | "customers" | "products" | "services" | "sales" | "collections" | "purchases" | "employees") | null;
         };
         /** PublicChatRequest */
         src__api__public_router__PublicChatRequest: {
@@ -851,6 +972,18 @@ export interface components {
         };
         /** PublicChatRequest */
         src__domains__professionals__teachers__public_router__PublicChatRequest: {
+            /** Message */
+            message: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** ChatRequest */
+        src__domains__workshops__auto_repair__internal_router__ChatRequest: {
+            /** Message */
+            message: string;
+        };
+        /** PublicChatRequest */
+        src__domains__workshops__auto_repair__public_router__PublicChatRequest: {
             /** Message */
             message: string;
             /** Phone */
@@ -1245,7 +1378,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ChatRequest"];
+                "application/json": components["schemas"]["src__domains__workshops__auto_repair__internal_router__ChatRequest"];
             };
         };
         responses: {
@@ -1280,7 +1413,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PublicChatRequest"];
+                "application/json": components["schemas"]["src__domains__workshops__auto_repair__public_router__PublicChatRequest"];
             };
         };
         responses: {

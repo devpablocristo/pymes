@@ -33,7 +33,7 @@ async def test_resolve_routing_decision_prefers_handoff_over_explicit_domain_hin
 
 
 @pytest.mark.asyncio
-async def test_resolve_routing_decision_ignores_invalid_handoff_without_legacy_match() -> None:
+async def test_resolve_routing_decision_ignores_invalid_handoff() -> None:
     decision = await resolve_routing_decision(
         TurnContext(
             message="hola",
@@ -50,8 +50,6 @@ async def test_resolve_routing_decision_ignores_invalid_handoff_without_legacy_m
             handoff_is_structured_insight=True,
             handoff_is_valid=False,
             handoff_validation_reason="notification_not_found",
-            legacy_insight_request=None,
-            legacy_insight_match=False,
         )
     )
 

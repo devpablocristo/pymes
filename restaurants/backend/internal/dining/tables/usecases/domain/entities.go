@@ -17,6 +17,8 @@ type DiningTable struct {
 	Notes      string
 	IsFavorite bool
 	Tags       []string
+	Metadata   map[string]any
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	DeletedAt  *time.Time
 }

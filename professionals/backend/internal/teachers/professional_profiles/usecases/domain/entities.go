@@ -22,6 +22,7 @@ type ProfessionalProfile struct {
 	Specialties       []Specialty
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	DeletedAt         *time.Time
 }
 
 type Specialty struct {

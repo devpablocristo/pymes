@@ -90,7 +90,7 @@ async def evaluate_action(
     # Acción gobernada → consultar Review
     action_type = GOVERNED_ACTIONS.get(tool_name)
     if action_type is None:
-        # Tool no reconocido → fallback conservador
+        # Tool no reconocido -> decisión conservadora.
         logger.warning("review_gate_unknown_tool", extra={"tool_name": tool_name})
         return ReviewDecision(allowed=False, decision="require_approval", reason="Tool no reconocido en la política de gobernanza")
 
@@ -134,7 +134,7 @@ async def evaluate_action(
             reason=resp.decision_reason,
         )
 
-    # require_approval o fallback
+    # Cualquier otra decisión queda pendiente de aprobación humana.
     return ReviewDecision(
         allowed=False,
         decision="require_approval",

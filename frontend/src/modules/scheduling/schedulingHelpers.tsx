@@ -18,12 +18,21 @@ import {
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../../lib/teachersTypes';
 import {
   buildInternalNotesField,
+  buildStandardCrudViewModes,
   buildStandardInternalFields,
   formatTagCsv,
   openCrudFormDialog,
   parseTagCsv,
 } from '../crud';
-import { asBoolean, asOptionalString, asString, formatDate, toRFC3339 } from '../../crud/resourceConfigs.shared';
+import {
+  asBoolean,
+  asOptionalString,
+  asString,
+  formatDate,
+  mergeCrudPayloadWithImageUrls,
+  mergeStandardCrudMetadataFromForm,
+  toRFC3339,
+} from '../../crud/resourceConfigs.shared';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
 
 export function renderSchedulingBooleanBadge(
@@ -71,6 +80,7 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
           accepts_new_clients: asBoolean(values.accepts_new_clients),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(undefined, values),
         });
       },
       update: async (row: TeacherProfile, values) => {
@@ -83,6 +93,7 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
           accepts_new_clients: asBoolean(values.accepts_new_clients),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(row.metadata, values),
         });
       },
     },
@@ -150,7 +161,9 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
       tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.party_id).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="professionals" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="professionals" />, {
+      ariaLabel: 'Vistas docentes',
+    }),
   };
 }
 
@@ -169,6 +182,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
           is_active: asBoolean(values.is_active),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(undefined, values),
         });
       },
       update: async (row: TeacherSpecialty, values) => {
@@ -179,6 +193,7 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
           is_active: asBoolean(values.is_active),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
+          metadata: mergeStandardCrudMetadataFromForm(row.metadata, values),
         });
       },
     },
@@ -219,7 +234,9 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
       tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.code).trim().length >= 2 && asString(values.name).trim().length >= 2,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="specialties" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="specialties" />, {
+      ariaLabel: 'Vistas especialidades',
+    }),
   };
 }
 
@@ -233,14 +250,14 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
       create: async (values) => {
         await createTeacherIntake({
           profile_id: asString(values.profile_id),
-          notes: asString(values.notes),
+          payload: mergeCrudPayloadWithImageUrls(undefined, values, asString(values.notes)),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
         });
       },
       update: async (row: TeacherIntake, values) => {
         await updateTeacherIntake(row.id, {
-          notes: asString(values.notes),
+          payload: mergeCrudPayloadWithImageUrls(row.payload, values, asString(values.notes)),
           is_favorite: Boolean(values.is_favorite),
           tags: parseTagCsv(values.tags),
         });
@@ -280,7 +297,9 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
       tags: formatTagCsv(row.tags),
     }),
     isValid: (values) => asString(values.profile_id).trim().length > 0,
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="intakes" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="intakes" />, {
+      ariaLabel: 'Vistas consultas',
+    }),
   };
 }
 
@@ -299,6 +318,7 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
           service_id: asOptionalString(values.service_id),
           started_at: toRFC3339(values.started_at) ?? new Date().toISOString(),
           summary: asOptionalString(values.summary),
+          metadata: mergeStandardCrudMetadataFromForm(undefined, values),
         });
       },
     },
@@ -364,6 +384,8 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
       asString(values.booking_id).trim().length > 0 &&
       asString(values.profile_id).trim().length > 0 &&
       Boolean(toRFC3339(values.started_at)),
-    viewModes: [{ id: 'list', label: 'Lista', path: 'list', isDefault: true, render: () => <PymesSimpleCrudListModeContent resourceId="sessions" /> }],
+    viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="sessions" />, {
+      ariaLabel: 'Vistas sesiones',
+    }),
   };
 }

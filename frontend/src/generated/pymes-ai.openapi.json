@@ -538,7 +538,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
+                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__internal_router__ChatRequest"
               }
             }
           },
@@ -590,7 +590,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PublicChatRequest"
+                "$ref": "#/components/schemas/src__domains__workshops__auto_repair__public_router__PublicChatRequest"
               }
             }
           }
@@ -623,7 +623,7 @@
           "review-callback"
         ],
         "summary": "Review Callback",
-        "description": "Recibe notificaci\u00f3n de Review cuando una aprobaci\u00f3n se resuelve.",
+        "description": "Recibe notificaci\u00f3n de governance cuando una aprobaci\u00f3n se resuelve.",
         "operationId": "review_callback_v1_internal_review_callback_post",
         "requestBody": {
           "content": {
@@ -775,7 +775,8 @@
                   "services",
                   "sales",
                   "collections",
-                  "purchases"
+                  "purchases",
+                  "employees"
                 ]
               },
               {
@@ -836,6 +837,148 @@
         ],
         "title": "ChatActionsBlock",
         "description": "Bloque actions con ChatAction extendido (route_hint, etc.)."
+      },
+      "ChatDashboardLink": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Label",
+            "description": "Texto visible del link de detalle."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Url",
+            "description": "Ruta del panel o reporte sugerido."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "dashboard",
+              "reports",
+              "module"
+            ],
+            "title": "Kind",
+            "description": "Tipo de destino.",
+            "default": "dashboard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "url"
+        ],
+        "title": "ChatDashboardLink"
+      },
+      "ChatDeterministicMetadata": {
+        "properties": {
+          "used": {
+            "type": "boolean",
+            "title": "Used",
+            "description": "Indica si se armo una respuesta o resumen determinista.",
+            "default": false
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Resumen calculado desde evidencia read-only del negocio.",
+            "default": ""
+          },
+          "blocks": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ChatTextBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatActionsBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatInsightCardBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatKpiGroupBlock"
+                },
+                {
+                  "$ref": "#/components/schemas/ChatTableBlock"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "actions": "#/components/schemas/ChatActionsBlock",
+                  "insight_card": "#/components/schemas/ChatInsightCardBlock",
+                  "kpi_group": "#/components/schemas/ChatKpiGroupBlock",
+                  "table": "#/components/schemas/ChatTableBlock",
+                  "text": "#/components/schemas/ChatTextBlock"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Blocks",
+            "description": "Bloques deterministas renderizables: KPI, tablas y acciones de detalle."
+          }
+        },
+        "type": "object",
+        "title": "ChatDeterministicMetadata"
+      },
+      "ChatEvidenceMetadata": {
+        "properties": {
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools",
+            "description": "Herramientas read-only usadas para armar evidencia."
+          },
+          "record_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Record Counts",
+            "description": "Cantidad de registros o agregados le\u00eddos por herramienta."
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatEvidencePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per\u00edodo principal analizado."
+          }
+        },
+        "type": "object",
+        "title": "ChatEvidenceMetadata"
+      },
+      "ChatEvidencePeriod": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Etiqueta humana del per\u00edodo usado para evidencia.",
+            "default": ""
+          },
+          "from": {
+            "type": "string",
+            "title": "From",
+            "description": "Fecha inicial ISO.",
+            "default": ""
+          },
+          "to": {
+            "type": "string",
+            "title": "To",
+            "description": "Fecha final ISO.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ChatEvidencePeriod"
       },
       "ChatHandoff": {
         "properties": {
@@ -1059,20 +1202,52 @@
         ],
         "title": "ChatKpiItem"
       },
-      "ChatRequest": {
+      "ChatLLMMetadata": {
         "properties": {
-          "message": {
+          "used": {
+            "type": "boolean",
+            "title": "Used",
+            "description": "Indica si el turno fue generado por Gemini/Vertex.",
+            "default": false
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider",
+            "description": "Proveedor LLM efectivo."
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Modelo LLM efectivo."
+          },
+          "status": {
             "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
+            "enum": [
+              "ok",
+              "unavailable",
+              "error"
+            ],
+            "title": "Status",
+            "description": "Estado de la llamada al LLM.",
+            "default": "unavailable"
           }
         },
         "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "ChatRequest"
+        "title": "ChatLLMMetadata"
       },
       "ChatResponse": {
         "properties": {
@@ -1165,7 +1340,8 @@
               "services",
               "sales",
               "collections",
-              "purchases"
+              "purchases",
+              "employees"
             ],
             "title": "Routed Agent",
             "description": "Agente o sub-agente seleccionado para este turno: general | insight_chat | customers | products | services | sales | collections | purchases."
@@ -1175,11 +1351,57 @@
             "enum": [
               "copilot_agent",
               "orchestrator",
-              "read_fallback",
               "ui_hint"
             ],
             "title": "Routing Source",
-            "description": "Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | read_fallback | ui_hint"
+            "description": "Origen efectivo del turno: copilot_agent (insight_chat) | orchestrator | ui_hint"
+          },
+          "analysis_scope": {
+            "type": "string",
+            "enum": [
+              "general",
+              "sales_collections",
+              "customers",
+              "products",
+              "services",
+              "purchases",
+              "scheduling",
+              "operations",
+              "employees"
+            ],
+            "title": "Analysis Scope",
+            "description": "Alcance de an\u00e1lisis usado para seleccionar evidencia real del negocio.",
+            "default": "general"
+          },
+          "answer_mode": {
+            "type": "string",
+            "enum": [
+              "facts_only",
+              "analysis"
+            ],
+            "title": "Answer Mode",
+            "description": "Modo de respuesta: facts_only usa solo datos deterministas; analysis suma Gemini.",
+            "default": "analysis"
+          },
+          "deterministic": {
+            "$ref": "#/components/schemas/ChatDeterministicMetadata",
+            "description": "Metadata y bloques calculados por backend/reportes antes de Gemini."
+          },
+          "dashboard_links": {
+            "items": {
+              "$ref": "#/components/schemas/ChatDashboardLink"
+            },
+            "type": "array",
+            "title": "Dashboard Links",
+            "description": "Links de detalle sugeridos para ver numeros completos en dashboard o reportes."
+          },
+          "llm": {
+            "$ref": "#/components/schemas/ChatLLMMetadata",
+            "description": "Metadata expl\u00edcita sobre uso de Gemini/Vertex."
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/ChatEvidenceMetadata",
+            "description": "Resumen de la evidencia read-only consultada antes de llamar al LLM."
           }
         },
         "type": "object",
@@ -2118,32 +2340,6 @@
         ],
         "title": "NotificationsResponse"
       },
-      "PublicChatRequest": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Message"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "PublicChatRequest"
-      },
       "ReviewCallbackPayload": {
         "properties": {
           "request_id": {
@@ -2195,6 +2391,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -2256,7 +2459,7 @@
                 "type": "null"
               }
             ],
-            "description": "Contexto estructurado opcional para anclar el turno actual a una notificaci\u00f3n o insight sin depender solo de `message` y `route_hint`. Compatibilidad hacia atr\u00e1s: si `handoff` no se env\u00eda, el request sigue funcionando con el contrato previo."
+            "description": "Contexto estructurado opcional para anclar el turno actual a una notificaci\u00f3n o insight sin depender solo de `message` y `route_hint`. Si `handoff` no se env\u00eda, el request se enruta con `message` y `route_hint`."
           },
           "route_hint": {
             "anyOf": [
@@ -2270,7 +2473,8 @@
                   "services",
                   "sales",
                   "collections",
-                  "purchases"
+                  "purchases",
+                  "employees"
                 ]
               },
               {
@@ -2340,6 +2544,47 @@
         "title": "ChatRequest"
       },
       "src__domains__professionals__teachers__public_router__PublicChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PublicChatRequest"
+      },
+      "src__domains__workshops__auto_repair__internal_router__ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
+      "src__domains__workshops__auto_repair__public_router__PublicChatRequest": {
         "properties": {
           "message": {
             "type": "string",

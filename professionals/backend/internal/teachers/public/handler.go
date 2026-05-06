@@ -15,6 +15,7 @@ import (
 	profdomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
 	sldomain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/service_links/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalgin"
 )
 
 type profilePort interface {
@@ -68,11 +69,11 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return uuid.Nil, false
 	}
 
-	// Try parsing as UUID first for backward compatibility
+	// Try parsing as UUID first; public routes also accept the stable slug form.
 	if orgID, err := uuid.Parse(orgSlug); err == nil {
 		return orgID, true
 	}
@@ -81,13 +82,13 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 	if h.orgs != nil {
 		orgID, err := h.orgs.ResolveOrgID(c.Request.Context(), orgSlug)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "organization not found"})
+			verticalgin.WriteError(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
 			return uuid.Nil, false
 		}
 		return orgID, true
 	}
 
-	c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org identifier"})
+	verticalgin.WriteValidation(c, "invalid org identifier")
 	return uuid.Nil, false
 }
 
@@ -105,7 +106,7 @@ func (h *Handler) ListProfessionals(c *gin.Context) {
 	for _, p := range profiles {
 		items = append(items, publicProfileMap(p))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	verticalgin.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) GetProfessional(c *gin.Context) {
@@ -115,7 +116,7 @@ func (h *Handler) GetProfessional(c *gin.Context) {
 	}
 	slug := strings.TrimSpace(c.Param("slug"))
 	if slug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "slug is required"})
+		verticalgin.WriteValidation(c, "slug is required")
 		return
 	}
 	profile, err := h.profiles.GetBySlug(c.Request.Context(), orgID, slug)
@@ -149,24 +150,24 @@ func (h *Handler) ListCatalog(c *gin.Context) {
 		}
 		items = append(items, item)
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	verticalgin.WriteListResponse(c, items, int64(len(items)), false, "")
 }
 
 func (h *Handler) GetAvailability(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "availability not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "availability not configured")
 		return
 	}
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return
 	}
 	duration := 0
 	if raw := strings.TrimSpace(c.Query("duration")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "duration must be an integer"})
+			verticalgin.WriteValidation(c, "duration must be an integer")
 			return
 		}
 		duration = parsed
@@ -187,17 +188,17 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 
 func (h *Handler) BookScheduling(c *gin.Context) {
 	if h.bookings == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "booking not configured"})
+		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
 	orgSlug := strings.TrimSpace(c.Param("org_slug"))
 	if orgSlug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "org_slug is required"})
+		verticalgin.WriteValidation(c, "org_slug is required")
 		return
 	}
 	var payload map[string]any
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if payload == nil {

@@ -42,8 +42,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("employees", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("employees", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("employees", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("employees", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("employees", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("employees", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("employees", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("employees", "delete"), h.HardDelete)
 }
 
@@ -51,7 +51,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -78,7 +78,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -98,12 +98,12 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateEmployeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	isFavorite := false
@@ -123,6 +123,7 @@ func (h *Handler) Create(c *gin.Context) {
 		Notes:      req.Notes,
 		IsFavorite: isFavorite,
 		Tags:       req.Tags,
+		Metadata:   req.Metadata,
 		CreatedBy:  a.Actor,
 	})
 	if err != nil {
@@ -153,7 +154,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateEmployeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
@@ -170,6 +171,7 @@ func (h *Handler) Update(c *gin.Context) {
 		Notes:      req.Notes,
 		IsFavorite: req.IsFavorite,
 		Tags:       req.Tags,
+		Metadata:   req.Metadata,
 		Actor:      a.Actor,
 	})
 	if err != nil {
@@ -192,7 +194,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, id, ok := parseOrgAndID(c)
 	if !ok {
@@ -222,12 +228,12 @@ func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true
@@ -237,6 +243,10 @@ func toEmployeeResponse(in empdomain.Employee) dto.EmployeeResponse {
 	tags := in.Tags
 	if tags == nil {
 		tags = []string{}
+	}
+	meta := in.Metadata
+	if meta == nil {
+		meta = map[string]any{}
 	}
 	resp := dto.EmployeeResponse{
 		ID:         in.ID.String(),
@@ -250,6 +260,7 @@ func toEmployeeResponse(in empdomain.Employee) dto.EmployeeResponse {
 		Notes:      in.Notes,
 		IsFavorite: in.IsFavorite,
 		Tags:       tags,
+		Metadata:   meta,
 		CreatedBy:  in.CreatedBy,
 		CreatedAt:  in.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:  in.UpdatedAt.UTC().Format(time.RFC3339),

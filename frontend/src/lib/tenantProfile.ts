@@ -49,14 +49,11 @@ function normalizeTenantProfile(profile: TenantProfile | null): TenantProfile | 
   }
 
   const { subVertical: rawSubVertical, ...rest } = profile;
-  const rawVertical = profile.vertical as VerticalType | 'bike_shop';
-  const normalizedVertical: VerticalType = rawVertical === 'bike_shop' ? 'workshops' : rawVertical;
+  const normalizedVertical = profile.vertical;
   const normalizedSubVertical =
-    rawVertical === 'bike_shop'
-      ? 'bike_shop'
-      : rawSubVertical && SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(rawSubVertical)
-        ? rawSubVertical
-        : undefined;
+    rawSubVertical && SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(rawSubVertical)
+      ? rawSubVertical
+      : undefined;
 
   return {
     ...rest,
@@ -101,18 +98,13 @@ export function tenantProfileFromSettings(settings: TenantSettings): TenantProfi
   }
 
   const previousProfile = getTenantProfile();
-  const normalizedVertical = (vertical === 'bike_shop' ? 'workshops' : vertical) as VerticalType;
-  // Si el backend devuelve `vertical='bike_shop'` (alias directo del sub-vertical),
-  // lo promovemos a subVertical aunque no haya profile previo. Sin este fallback,
-  // el primer sync pierde la marca y el routing de work-orders cae en autoreparación.
-  const inferredSubVertical: SubVerticalType | undefined = vertical === 'bike_shop' ? 'bike_shop' : undefined;
+  const normalizedVertical = vertical as VerticalType;
   const preservedSubVertical =
-    inferredSubVertical ??
-    (previousProfile?.vertical === normalizedVertical &&
+    previousProfile?.vertical === normalizedVertical &&
     previousProfile.subVertical &&
     SUB_VERTICAL_BY_VERTICAL[normalizedVertical]?.includes(previousProfile.subVertical)
       ? previousProfile.subVertical
-      : undefined);
+      : undefined;
 
   return {
     businessName: settings.business_name?.trim() || '',

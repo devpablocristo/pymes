@@ -33,7 +33,7 @@ jobs:
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
       CLOUDSQL_INSTANCE: new-nexus-dev:us-central1:nexus-db-dev
       SECRET_DATABASE_URL_NAME: DATABASE_URL
-      SECRET_REVIEW_API_KEY_NAME: REVIEW_API_KEY
+      SECRET_GOVERNANCE_API_KEY_NAME: REVIEW_API_KEY
       AI_LOG_LEVEL: info
       LLM_PROVIDER: gemini
       GEMINI_MODEL: gemini-2.0-flash-lite
@@ -41,7 +41,7 @@ jobs:
       GEMINI_VERTEX_LOCATION: us-central1
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      REVIEW_URL: https://nexus-review-396554427884.us-central1.run.app
+      GOVERNANCE_URL: https://nexus-review-396554427884.us-central1.run.app
       AUTH_ALLOW_API_KEY: "true"
 
     steps:
@@ -91,8 +91,8 @@ jobs:
         run: |
           set -euo pipefail
           secret_flags="DATABASE_URL=${SECRET_DATABASE_URL_NAME}:latest"
-          if gcloud secrets describe "$SECRET_REVIEW_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
-            secret_flags="${secret_flags},REVIEW_API_KEY=${SECRET_REVIEW_API_KEY_NAME}:latest"
+          if gcloud secrets describe "$SECRET_GOVERNANCE_API_KEY_NAME" --project="$GCP_PROJECT_ID" >/dev/null 2>&1; then
+            secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
           fi
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
@@ -106,8 +106,8 @@ jobs:
           if [[ -n "${JWT_ISSUER}" ]]; then
             env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
           fi
-          if [[ -n "${REVIEW_URL}" ]]; then
-            env_vars="${env_vars},REVIEW_URL=${REVIEW_URL}"
+          if [[ -n "${GOVERNANCE_URL}" ]]; then
+            env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"
           fi
           gcloud run deploy "$SERVICE_NAME" \
             --project="$GCP_PROJECT_ID" \

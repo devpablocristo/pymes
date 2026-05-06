@@ -17,7 +17,7 @@ function translateRestaurantsError(message: string): string {
 
 const restaurantsRequest = createVerticalRequest({
   envVar: 'VITE_RESTAURANTS_API_URL',
-  fallbackPorts: [8484, 8084],
+  devPorts: [8484, 8084],
   translateError: translateRestaurantsError,
 });
 
@@ -33,13 +33,14 @@ export async function createRestaurantDiningArea(data: {
   sort_order?: number;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<RestaurantDiningArea> {
   return restaurantsRequest('/v1/restaurants/dining-areas', { method: 'POST', body: data });
 }
 
 export async function updateRestaurantDiningArea(
   id: string,
-  data: Partial<{ name: string; sort_order: number; is_favorite: boolean; tags: string[] }>,
+  data: Partial<{ name: string; sort_order: number; is_favorite: boolean; tags: string[]; metadata: Record<string, unknown> }>,
 ): Promise<RestaurantDiningArea> {
   return restaurantsRequest(`/v1/restaurants/dining-areas/${id}`, { method: 'PATCH', body: data });
 }
@@ -61,6 +62,7 @@ export async function createRestaurantDiningTable(data: {
   notes?: string;
   is_favorite?: boolean;
   tags?: string[];
+  metadata?: Record<string, unknown>;
 }): Promise<RestaurantDiningTable> {
   return restaurantsRequest('/v1/restaurants/dining-tables', { method: 'POST', body: data });
 }
@@ -76,6 +78,7 @@ export async function updateRestaurantDiningTable(
     notes: string;
     is_favorite: boolean;
     tags: string[];
+    metadata: Record<string, unknown>;
   }>,
 ): Promise<RestaurantDiningTable> {
   return restaurantsRequest(`/v1/restaurants/dining-tables/${id}`, { method: 'PATCH', body: data });

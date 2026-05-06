@@ -12,6 +12,7 @@ type CreateEmployeeRequest struct {
 	Notes      string   `json:"notes"`
 	IsFavorite *bool    `json:"is_favorite"`
 	Tags       []string `json:"tags"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 type UpdateEmployeeRequest struct {
@@ -26,6 +27,7 @@ type UpdateEmployeeRequest struct {
 	Notes      *string   `json:"notes"`
 	IsFavorite *bool     `json:"is_favorite"`
 	Tags       *[]string `json:"tags"`
+	Metadata   *map[string]any `json:"metadata"`
 }
 
 type EmployeeResponse struct {
@@ -40,10 +42,11 @@ type EmployeeResponse struct {
 	HireDate   string   `json:"hire_date,omitempty"`
 	EndDate    string   `json:"end_date,omitempty"`
 	UserID     string   `json:"user_id,omitempty"`
-	Notes      string   `json:"notes"`
-	IsFavorite bool     `json:"is_favorite"`
-	Tags       []string `json:"tags"`
-	CreatedBy  string   `json:"created_by"`
+	Notes      string           `json:"notes"`
+	IsFavorite bool             `json:"is_favorite"`
+	Tags       []string         `json:"tags"`
+	Metadata   map[string]any   `json:"metadata"`
+	CreatedBy  string           `json:"created_by"`
 	CreatedAt  string   `json:"created_at"`
 	UpdatedAt  string   `json:"updated_at"`
 	ArchivedAt string   `json:"archived_at,omitempty"`

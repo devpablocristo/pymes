@@ -1,4 +1,4 @@
-"""Endpoint callback para recibir resoluciones de Nexus Review."""
+"""Endpoint callback para recibir resoluciones de Nexus Governance."""
 from __future__ import annotations
 
 import logging
@@ -25,12 +25,12 @@ class ReviewCallbackPayload(BaseModel):
 
 @router.post("/review-callback", status_code=status.HTTP_200_OK)
 async def review_callback(payload: ReviewCallbackPayload, request: Request) -> dict[str, str]:
-    """Recibe notificación de Review cuando una aprobación se resuelve."""
+    """Recibe notificación de governance cuando una aprobación se resuelve."""
     settings = request.app.state.settings
 
     # Validar token interno
     token = request.headers.get("X-Internal-Service-Token", "")
-    if not token or token != settings.review_callback_token:
+    if not token or token != settings.governance_callback_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
 
     try:

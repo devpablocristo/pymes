@@ -242,7 +242,7 @@ const staticModuleCatalog: Record<string, ModuleDefinition> = {
       },
     ],
     notes: [
-      'Los CRUDs usan CSV como formato canónico; esta consola mantiene CSV y XLSX para operación avanzada y compatibilidad.',
+      'Los CRUDs usan CSV como formato canónico; esta consola mantiene CSV y XLSX para operación avanzada.',
     ],
   },
   scheduler: {

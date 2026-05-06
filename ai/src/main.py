@@ -102,17 +102,17 @@ async def lifespan(app: FastAPI):
         internal_token=settings.internal_service_token,
     )
     app.state.llm_provider = build_llm_provider(settings)
-    # Nexus Review — gobernanza de acciones (opcional)
-    if settings.review_enabled:
+    # Nexus Governance — client opcional hacia el binario governance.
+    if settings.governance_enabled:
         app.state.review_client = ReviewClient(
-            base_url=settings.review_url,
-            api_key=settings.review_api_key,
+            base_url=settings.governance_url,
+            api_key=settings.governance_api_key,
             requester=ReviewRequester(
                 requester_id="pymes-ai",
                 requester_name="Pymes AI Service",
             ),
         )
-        logger.info("review_client_enabled", review_url=settings.review_url)
+        logger.info("governance_client_enabled", governance_url=settings.governance_url)
     else:
         app.state.review_client = None
     if not getattr(app.state, "otel_configured", False):

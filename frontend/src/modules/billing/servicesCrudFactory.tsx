@@ -62,8 +62,6 @@ export function createServicesCrudConfig(): CrudPageConfig<ServiceRecord> {
     dataSource: buildRestCrudDataSource<ServiceRecord>({
       basePath: '/v1/services',
       toBody: serviceToBody,
-      softArchiveHttp: 'post_archive',
-      hardDeleteHttp: 'delete_item',
     }),
     columns: [
       {

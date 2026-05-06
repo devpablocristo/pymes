@@ -23,7 +23,7 @@ var WorkOrderFSM = fsm.NewBuilder().
 	AllowAnyTo("cancelled").
 	Build()
 
-// NormalizeStatus mapea valores legacy y devuelve el estado canónico.
+// NormalizeStatus mapea aliases de estado y devuelve el estado canónico.
 func NormalizeStatus(raw string) string {
 	s := strings.TrimSpace(strings.ToLower(raw))
 	switch s {

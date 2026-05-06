@@ -142,7 +142,7 @@ func normalizeProductImageURLs(urls []string) ([]string, error) {
 	return out, nil
 }
 
-// displayProductImageURLs prioriza image_urls persistidos; si está vacío, usa image_url legacy.
+// displayProductImageURLs prioriza image_urls persistidos; si está vacío, usa la imagen principal.
 func displayProductImageURLs(p productdomain.Product) []string {
 	out := normalizedProductImageURLCandidates(p.ImageURLs)
 	if len(out) > 0 {

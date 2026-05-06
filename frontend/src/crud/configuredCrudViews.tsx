@@ -11,7 +11,7 @@ import { crudModuleCatalog } from './crudModuleCatalog';
 import { fromCrudResourceSlug, toCrudResourceSlug } from './crudResourceSlug';
 import { getTenantSlug } from '../lib/tenantSlug';
 
-function fallbackViewModes(): CrudViewModeConfig[] {
+function defaultViewModes(): CrudViewModeConfig[] {
   return [{ id: 'list', label: 'Lista', path: 'list', ariaLabel: 'Vista lista', isDefault: true }];
 }
 
@@ -35,10 +35,10 @@ function resolveViewModes<T extends { id: string }>(
   const resolved = config ? applyCrudUiOverride(resourceId, config) : config;
   const modes =
     resolved == null
-      ? fallbackViewModes()
+      ? defaultViewModes()
       : resolved.viewModes
         ? resolved.viewModes
-        : fallbackViewModes();
+        : defaultViewModes();
   return [...modes].sort((a, b) => {
     const orderA = CANONICAL_VIEW_MODE_ORDER[a.id] ?? 99;
     const orderB = CANONICAL_VIEW_MODE_ORDER[b.id] ?? 99;
@@ -363,8 +363,8 @@ export function ConfiguredCrudRouteModePage() {
   }
 
   if (!mode) {
-    const fallback = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
-    return <Navigate to={`${tenantPrefix}/${urlSlug}/${fallback?.path ?? 'list'}`} replace />;
+    const defaultMode = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
+    return <Navigate to={`${tenantPrefix}/${urlSlug}/${defaultMode?.path ?? 'list'}`} replace />;
   }
 
   return (
@@ -414,8 +414,8 @@ export function ConfiguredCrudNestedRouteModePage({ resourceId, baseRoute }: { r
   }
 
   if (!mode) {
-    const fallback = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
-    return <Navigate to={`${baseRoute}/${fallback?.path ?? 'list'}`} replace />;
+    const defaultMode = viewModes.find((entry) => entry.isDefault) ?? viewModes[0];
+    return <Navigate to={`${baseRoute}/${defaultMode?.path ?? 'list'}`} replace />;
   }
 
   // Este componente siempre se usa dentro de `ConfiguredCrudSectionPage`, que ya

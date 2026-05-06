@@ -19,6 +19,7 @@ type Intake struct {
 	Payload         map[string]any
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 const (

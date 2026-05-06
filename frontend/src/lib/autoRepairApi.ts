@@ -69,6 +69,6 @@ export async function updateAutoRepairVehicle(
   return workshopsRequest(`${WORKSHOPS_AUTO_REPAIR_PREFIX}/vehicles/${id}`, { method: 'PATCH', body: data });
 }
 
-// Aliases neutros mantenidos por compatibilidad con resourceConfigs.workshops.tsx.
+// Nombres neutros usados por resourceConfigs.workshops.tsx.
 export const createWorkshopVehicle = createAutoRepairVehicle;
 export const updateWorkshopVehicle = updateAutoRepairVehicle;

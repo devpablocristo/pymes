@@ -6,6 +6,16 @@ vi.mock('@devpablocristo/core-browser', () => ({
   confirmAction: vi.fn(async () => true),
 }));
 
+function readModalFieldLabels(dialog: HTMLElement): string[] {
+  const fieldRoots = dialog.querySelectorAll('.crud-entity-editor-modal__field');
+  return [...fieldRoots].map((el) => {
+    const direct = el.querySelector(':scope > span');
+    if (direct?.textContent?.trim()) return direct.textContent.trim();
+    const inCheckbox = el.querySelector('.crud-entity-editor-modal__checkbox-row span');
+    return inCheckbox?.textContent?.trim() ?? '';
+  });
+}
+
 describe('CrudEntityEditorModal', () => {
   it('renders stats and submits values', () => {
     const onSubmit = vi.fn();
@@ -386,5 +396,55 @@ describe('CrudEntityEditorModal', () => {
     const form = document.getElementById('crud-entity-editor-modal-form');
     expect(form?.querySelector('textarea')).toBeNull();
     expect(screen.getByText('Seleccionar imágenes del equipo…')).toBeInTheDocument();
+  });
+
+  it('ordena favorito, etiquetas internas e imágenes antes del resto en edición', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Producto"
+        mode="create"
+        editBehavior="edit-only"
+        mediaFieldId="image_urls"
+        fields={[
+          { id: 'name', label: 'Nombre', defaultValue: 'X' },
+          { id: 'image_urls', label: 'Imágenes', type: 'textarea', defaultValue: '', fullWidth: true },
+          { id: 'tags', label: 'Etiquetas Internas', defaultValue: '' },
+          { id: 'is_favorite', label: 'Favorito', type: 'checkbox', defaultValue: false },
+        ]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(readModalFieldLabels(screen.getByRole('dialog'))).toEqual([
+      'Favorito',
+      'Etiquetas Internas',
+      'Imágenes',
+      'Nombre',
+    ]);
+  });
+
+  it('ordena favorito y etiquetas antes del resto en modo lectura (imagen en carrusel superior)', () => {
+    render(
+      <CrudEntityEditorModal
+        open
+        title="Producto"
+        mode="update"
+        mediaFieldId="image_urls"
+        mediaUrls={['https://example.com/p.png']}
+        initialValues={{ image_urls: 'https://example.com/p.png' }}
+        fields={[
+          { id: 'name', label: 'Nombre', defaultValue: 'Demo', readValue: 'Demo' },
+          { id: 'image_urls', label: 'Imágenes', type: 'textarea', defaultValue: '', fullWidth: true },
+          { id: 'tags', label: 'Etiquetas Internas', defaultValue: 'a', readValue: 'a' },
+          { id: 'is_favorite', label: 'Favorito', type: 'checkbox', defaultValue: true, readValue: 'Sí' },
+        ]}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(readModalFieldLabels(screen.getByRole('dialog'))).toEqual(['Favorito', 'Etiquetas Internas', 'Nombre']);
   });
 });

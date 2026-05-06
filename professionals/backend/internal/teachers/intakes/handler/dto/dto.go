@@ -13,6 +13,7 @@ type IntakeItem struct {
 	Payload         map[string]any `json:"payload"`
 	CreatedAt       string         `json:"created_at"`
 	UpdatedAt       string         `json:"updated_at"`
+	DeletedAt       *string        `json:"deleted_at,omitempty"`
 }
 
 type CreateIntakeRequest struct {

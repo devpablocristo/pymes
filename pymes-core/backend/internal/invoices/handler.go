@@ -42,8 +42,8 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 	auth.GET(item, rbac.RequirePermission("invoices", "read"), h.Get)
 	auth.PATCH(item, rbac.RequirePermission("invoices", "update"), h.Update)
 	auth.DELETE(item, rbac.RequirePermission("invoices", "delete"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("invoices", "update"), h.Delete)
-	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("invoices", "update"), h.RestoreAction)
+	auth.POST(item+"/"+crudpaths.SegmentArchive, rbac.RequirePermission("invoices", "update"), h.Archive)
+	auth.POST(item+"/"+crudpaths.SegmentRestore, rbac.RequirePermission("invoices", "update"), h.Restore)
 	auth.DELETE(item+"/"+crudpaths.SegmentHard, rbac.RequirePermission("invoices", "delete"), h.HardDelete)
 }
 
@@ -51,7 +51,7 @@ func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -83,7 +83,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -103,19 +103,19 @@ func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return
 	}
 	var req dto.CreateInvoiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var partyID *uuid.UUID
 	if req.PartyID != nil && strings.TrimSpace(*req.PartyID) != "" {
 		id, err := uuid.Parse(strings.TrimSpace(*req.PartyID))
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid party_id"})
+			handlers.WriteValidation(c, "invalid party_id")
 			return
 		}
 		partyID = &id
@@ -178,7 +178,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateInvoiceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
@@ -214,7 +214,11 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) RestoreAction(c *gin.Context) {
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
+func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
 	orgID, id, ok := parseOrgAndID(c)
 	if !ok {
@@ -244,12 +248,12 @@ func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
 	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid org"})
+		handlers.WriteValidation(c, "invalid org")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
 	return orgID, id, true

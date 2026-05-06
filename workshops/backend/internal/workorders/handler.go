@@ -3,10 +3,10 @@ package workorders
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,7 +21,7 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder, actor string) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error)
@@ -48,6 +48,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(workOrdersItemPath, h.Get)
 	authGroup.PATCH(workOrdersItemPath, h.Update)
 	authGroup.DELETE(workOrdersItemPath, h.Delete)
+	authGroup.POST(workOrdersItemPath+"/"+crudpaths.SegmentArchive, h.Archive)
 	authGroup.POST(workOrdersItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
 	authGroup.DELETE(workOrdersItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
@@ -57,29 +58,24 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if value := c.Query("after"); value != "" {
-		parsed, err := uuid.Parse(value)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &parsed
+	limit := verticalgin.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := verticalgin.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	branchID, err := parseOptionalUUIDQuery(c, "branch_id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		verticalgin.WriteValidation(c, "invalid branch_id")
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:      orgID,
-		BranchID:   branchID,
-		Limit:      limit,
-		After:      after,
-		Search:     c.Query("search"),
-		Status:     c.Query("status"),
-		TargetType: c.Query("target_type"),
+		OrgID:     orgID,
+		BranchID:  branchID,
+		Limit:     limit,
+		After:     after,
+		Search:    c.Query("search"),
+		Status:    c.Query("status"),
+		AssetType: c.Query("asset_type"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -99,10 +95,11 @@ func (h *Handler) ListArchived(c *gin.Context) {
 	}
 	branchID, err := parseOptionalUUIDQuery(c, "branch_id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		verticalgin.WriteValidation(c, "invalid branch_id")
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, c.Query("target_type"))
+	assetType := c.Query("asset_type")
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, assetType)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -119,34 +116,34 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateWorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	branchID, err := parseOptionalUUIDQueryValue(req.BranchID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+		verticalgin.WriteValidation(c, "invalid branch_id")
 		return
 	}
 
-	targetType, targetIDRaw, targetLabel := resolveTargetFromCreate(req)
-	if targetType == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "target_type is required"})
+	assetType, assetIDRaw, assetLabel := resolveAssetFromCreate(req)
+	if assetType == "" {
+		verticalgin.WriteValidation(c, "asset_type is required")
 		return
 	}
-	targetID, err := uuid.Parse(strings.TrimSpace(targetIDRaw))
+	assetID, err := uuid.Parse(strings.TrimSpace(assetIDRaw))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid target_id"})
+		verticalgin.WriteValidation(c, "invalid asset_id")
 		return
 	}
 
 	openedAt, err := verticalgin.ParseRFC3339(req.OpenedAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid opened_at"})
+		verticalgin.WriteValidation(c, "invalid opened_at")
 		return
 	}
 	promisedAt, err := verticalgin.ParseOptionalRFC3339(req.PromisedAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid promised_at"})
+		verticalgin.WriteValidation(c, "invalid promised_at")
 		return
 	}
 
@@ -163,9 +160,9 @@ func (h *Handler) Create(c *gin.Context) {
 		OrgID:         orgID,
 		BranchID:      branchID,
 		Number:        req.Number,
-		TargetType:    targetType,
-		TargetID:      targetID,
-		TargetLabel:   targetLabel,
+		AssetType:     assetType,
+		AssetID:       assetID,
+		AssetLabel:    assetLabel,
 		CustomerID:    vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName:  req.CustomerName,
 		BookingID:     vertvalues.ParseOptionalUUID(req.BookingID),
@@ -210,28 +207,28 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateWorkOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
 		if _, err := uuid.Parse(strings.TrimSpace(*req.BranchID)); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid branch_id"})
+			verticalgin.WriteValidation(c, "invalid branch_id")
 			return
 		}
 	}
 	promisedAt, err := verticalgin.ParseOptionalRFC3339Ptr(req.PromisedAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid promised_at"})
+		verticalgin.WriteValidation(c, "invalid promised_at")
 		return
 	}
 	readyAt, err := verticalgin.ParseNullableRFC3339Ptr(req.ReadyAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ready_at"})
+		verticalgin.WriteValidation(c, "invalid ready_at")
 		return
 	}
 	deliveredAt, err := verticalgin.ParseNullableRFC3339Ptr(req.DeliveredAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid delivered_at"})
+		verticalgin.WriteValidation(c, "invalid delivered_at")
 		return
 	}
 	var items *[]domain.WorkOrderItem
@@ -240,11 +237,11 @@ func (h *Handler) Update(c *gin.Context) {
 		items = &converted
 	}
 
-	targetID, targetLabel := resolveTargetFromUpdate(req)
+	assetID, assetLabel := resolveAssetFromUpdate(req)
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
 		BranchID:      req.BranchID,
-		TargetID:      targetID,
-		TargetLabel:   targetLabel,
+		AssetID:       assetID,
+		AssetLabel:    assetLabel,
 		CustomerID:    req.CustomerID,
 		CustomerName:  req.CustomerName,
 		BookingID:     req.BookingID,
@@ -280,6 +277,10 @@ func (h *Handler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
+}
+
 func (h *Handler) Restore(c *gin.Context) {
 	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
 	if !ok {
@@ -304,32 +305,16 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// resolveTargetFromCreate detecta target_type, target_id, target_label desde el request,
-// soportando tanto la forma unificada como los aliases legacy.
-func resolveTargetFromCreate(req dto.CreateWorkOrderRequest) (string, string, string) {
-	if t := strings.TrimSpace(req.TargetType); t != "" {
-		return t, req.TargetID, req.TargetLabel
-	}
-	if id := strings.TrimSpace(req.VehicleID); id != "" {
-		return "vehicle", id, req.VehiclePlate
-	}
-	if id := strings.TrimSpace(req.BicycleID); id != "" {
-		return "bicycle", id, req.BicycleLabel
-	}
-	return "", "", ""
+// resolveAssetFromCreate detecta asset_type, asset_id, asset_label desde el request.
+func resolveAssetFromCreate(req dto.CreateWorkOrderRequest) (string, string, string) {
+	return strings.TrimSpace(req.AssetType), req.AssetID, req.AssetLabel
 }
 
-func resolveTargetFromUpdate(req dto.UpdateWorkOrderRequest) (*string, *string) {
-	if req.TargetID != nil {
-		return req.TargetID, req.TargetLabel
+func resolveAssetFromUpdate(req dto.UpdateWorkOrderRequest) (*string, *string) {
+	if req.AssetID != nil {
+		return req.AssetID, req.AssetLabel
 	}
-	if req.VehicleID != nil {
-		return req.VehicleID, req.VehiclePlate
-	}
-	if req.BicycleID != nil {
-		return req.BicycleID, req.BicycleLabel
-	}
-	return nil, req.TargetLabel
+	return nil, req.AssetLabel
 }
 
 func toItems(payload []dto.WorkOrderLineInput) []domain.WorkOrderItem {
@@ -366,9 +351,9 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 		ID:               item.ID.String(),
 		OrgID:            item.OrgID.String(),
 		Number:           item.Number,
-		TargetType:       item.TargetType,
-		TargetID:         item.TargetID.String(),
-		TargetLabel:      item.TargetLabel,
+		AssetType:        item.AssetType,
+		AssetID:          item.AssetID.String(),
+		AssetLabel:       item.AssetLabel,
 		CustomerName:     item.CustomerName,
 		Status:           item.Status,
 		RequestedWork:    item.RequestedWork,
@@ -391,15 +376,6 @@ func toWorkOrderItem(item domain.WorkOrder) dto.WorkOrderItem {
 	}
 	if item.BranchID != nil {
 		result.BranchID = item.BranchID.String()
-	}
-	// Aliases por compat: solo se llenan según target_type.
-	switch item.TargetType {
-	case "vehicle":
-		result.VehicleID = item.TargetID.String()
-		result.VehiclePlate = item.TargetLabel
-	case "bicycle":
-		result.BicycleID = item.TargetID.String()
-		result.BicycleLabel = item.TargetLabel
 	}
 	if item.CustomerID != nil {
 		value := item.CustomerID.String()

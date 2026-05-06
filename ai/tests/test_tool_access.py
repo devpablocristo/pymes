@@ -39,7 +39,7 @@ def test_internal_procurement_policy_uses_same_shared_matrix() -> None:
     )
 
 
-def test_registry_legacy_internal_tools_use_shared_access_rules() -> None:
+def test_registry_internal_tools_use_shared_access_rules() -> None:
     declarations, _handlers = build_internal_tools(
         SimpleNamespace(),
         _auth(role="seller"),

@@ -11,11 +11,11 @@ import (
 	domain "github.com/devpablocristo/pymes/workshops/backend/internal/workorders/usecases/domain"
 )
 
-const targetType = "vehicle"
+const assetType = "vehicle"
 
 type basePort interface {
 	List(ctx context.Context, p baseworkorders.ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, targetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder, actor string) (domain.WorkOrder, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, in baseworkorders.UpdateInput, actor string) (domain.WorkOrder, error)
@@ -39,16 +39,16 @@ func NewUsecases(base basePort) *Usecases {
 }
 
 func (u *Usecases) List(ctx context.Context, p ListParams) ([]WorkOrder, int64, bool, *uuid.UUID, error) {
-	p.TargetType = targetType
+	p.AssetType = assetType
 	return u.base.List(ctx, p)
 }
 
 func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, _ string) ([]WorkOrder, error) {
-	return u.base.ListArchived(ctx, orgID, branchID, targetType)
+	return u.base.ListArchived(ctx, orgID, branchID, assetType)
 }
 
 func (u *Usecases) Create(ctx context.Context, in WorkOrder, actor string) (WorkOrder, error) {
-	in.TargetType = targetType
+	in.AssetType = assetType
 	return u.base.Create(ctx, in, actor)
 }
 
@@ -99,7 +99,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 }
 
 func ensureSubverticalOwnership(order WorkOrder) error {
-	if order.TargetType != targetType {
+	if order.AssetType != assetType {
 		return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 	}
 	return nil

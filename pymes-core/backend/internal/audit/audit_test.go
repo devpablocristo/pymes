@@ -25,7 +25,7 @@ func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 	entry := domain.Entry{
 		ID:           uuid.New(),
 		OrgID:        in.OrgID,
-		Actor:        in.Actor.Legacy,
+		Actor:        in.Actor.Raw,
 		ActorType:    in.Actor.Type,
 		ActorID:      in.Actor.ID,
 		ActorLabel:   in.Actor.Label,
@@ -197,10 +197,10 @@ func TestAuditLogWithActor_Service(t *testing.T) {
 	uc.LogWithActor(context.Background(), domain.LogInput{
 		OrgID: orgID,
 		Actor: domain.ActorRef{
-			Legacy: "mercadopago_webhook",
-			Type:   "service",
-			ID:     &serviceID,
-			Label:  "Mercado Pago webhook",
+			Raw:   "mercadopago_webhook",
+			Type:  "service",
+			ID:    &serviceID,
+			Label: "Mercado Pago webhook",
 		},
 		Action:       "payment_gateway.payment.approved",
 		ResourceType: "sale",

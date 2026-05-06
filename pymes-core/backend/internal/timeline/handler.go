@@ -54,7 +54,7 @@ func (h *Handler) AddNote(c *gin.Context) {
 	}
 	var req addNoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	auth := handlers.GetAuthContext(c)

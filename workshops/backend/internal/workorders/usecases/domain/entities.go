@@ -7,19 +7,16 @@ import (
 )
 
 // WorkOrder es la entidad unificada de órdenes de trabajo del vertical workshops.
-// Soporta polimorfismo vía TargetType + TargetID (vehicle, bicycle, futuro: pet, asset, etc.).
-// Cada vertical (auto_repair, bike_shop) consume el mismo dominio y enriquece comportamiento
-// vía hooks (workorders.Hook).
+// La OT apunta a un asset del cliente (asset_type + asset_id).
 type WorkOrder struct {
 	ID       uuid.UUID
 	OrgID    uuid.UUID
 	BranchID *uuid.UUID
 	Number   string
 
-	// Polimorfismo: a qué activo apunta esta OT.
-	TargetType  string    // 'vehicle' | 'bicycle' (extensible)
-	TargetID    uuid.UUID // referencia opaca al asset
-	TargetLabel string    // denormalizado: patente, "Trek Marlin 7", etc.
+	AssetType  string    // 'vehicle' | 'bicycle' por compat de vertical; extensible.
+	AssetID    uuid.UUID // referencia al customer_asset
+	AssetLabel string    // denormalizado: patente, "Trek Marlin 7", etc.
 
 	CustomerID   *uuid.UUID
 	CustomerName string

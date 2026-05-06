@@ -13,7 +13,7 @@ import (
 )
 
 // GinSaaSAuthMiddleware runs core/saas/go net/http auth and copies principal into Gin context
-// using the same keys as the legacy handlers package (org_id, actor, role, scopes, auth_method).
+// using the shared handler keys (org_id, actor, role, scopes, auth_method).
 func GinSaaSAuthMiddleware(svc *SaaSServices) gin.HandlerFunc {
 	if svc == nil || svc.AuthMiddleware == nil {
 		return func(c *gin.Context) { c.Next() }

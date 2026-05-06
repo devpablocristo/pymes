@@ -31,7 +31,7 @@ describe('messagingHelpers', () => {
     ).toBe('3 visibles · 1 draft · 2 completadas');
   });
 
-  it('formats conversation timestamp fallback', () => {
+  it('formats empty conversation timestamp', () => {
     expect(formatMessagingConversationTimestamp()).toBe('Sin actividad todavía');
   });
 });

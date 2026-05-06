@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import pytest
 
 from src.api.chat_contract import ChatHandoff
-from src.agents.insight_chat_service import InsightChatMatch
 from src.routing import TurnContext
 from src.routing.resolve import resolve_routing_decision
 
@@ -85,37 +84,11 @@ and deterministic.
             {},
         ),
         (
-            "legacy_insight_chat_with_match",
-            TurnContext(
-                message="como vienen las ventas esta semana",
-                route_hint="insight_chat",
-                route_hint_source="explicit",
-                legacy_insight_request=InsightChatMatch(
-                    scope="sales_collections",
-                    period="week",
-                    compare=True,
-                ),
-                legacy_insight_match=True,
-            ),
-            "insight_lane",
-            "sales_collections",
-            "legacy_insight_hint",
-            {
-                "source": "insight_chat_legacy_match",
-                "notification_id": None,
-                "period": "week",
-                "compare": True,
-                "top_limit": 5,
-            },
-        ),
-        (
             "insight_chat_without_match",
             TurnContext(
                 message="hola",
                 route_hint="insight_chat",
                 route_hint_source="explicit",
-                legacy_insight_request=None,
-                legacy_insight_match=False,
             ),
             "orchestrator",
             "general",

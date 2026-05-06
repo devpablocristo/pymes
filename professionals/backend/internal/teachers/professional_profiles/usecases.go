@@ -1,16 +1,17 @@
 package professional_profiles
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	domain "github.com/devpablocristo/pymes/professionals/backend/internal/teachers/professional_profiles/usecases/domain"
+	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
@@ -21,6 +22,9 @@ type RepositoryPort interface {
 	SlugExists(ctx context.Context, orgID uuid.UUID, slug string, excludeID *uuid.UUID) (bool, error)
 	Update(ctx context.Context, in domain.ProfessionalProfile) (domain.ProfessionalProfile, error)
 	ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -92,6 +96,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		}
 		return domain.ProfessionalProfile{}, err
 	}
+	if err := archive.IfArchived(current.DeletedAt, "professional profile"); err != nil {
+		return domain.ProfessionalProfile{}, err
+	}
 
 	if in.PublicSlug != nil {
 		slug := strings.ToLower(strings.TrimSpace(*in.PublicSlug))
@@ -143,6 +150,45 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		u.audit.Log(ctx, out.OrgID.String(), actor, "professional_profile.updated", "professional_profile", out.ID.String(), map[string]any{"slug": out.PublicSlug})
 	}
 	return out, nil
+}
+
+func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.archived", "professional_profile", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.restored", "professional_profile", id.String(), map[string]any{})
+	}
+	return nil
+}
+
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("professional profile not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	if u.audit != nil {
+		u.audit.Log(ctx, orgID.String(), actor, "professional_profile.deleted", "professional_profile", id.String(), map[string]any{})
+	}
+	return nil
 }
 
 func (u *Usecases) ListPublic(ctx context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {

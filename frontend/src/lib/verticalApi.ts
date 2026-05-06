@@ -2,7 +2,7 @@ import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fe
 
 type VerticalRequestConfig = {
   envVar: string;
-  fallbackPorts: number[];
+  devPorts: number[];
   translateError?: (message: string) => string;
   /** Límite de espera (ms). 0 = sin límite. Evita spinners infinitos si el vertical no responde. */
   timeoutMs?: number;
@@ -28,7 +28,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
   });
 }
 
-function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): string[] {
+function resolveVerticalBaseURLs(envVar: string, devPorts: number[]): string[] {
   const candidates: string[] = [];
   const env = import.meta.env as Record<string, string | undefined>;
   const configured = env[envVar]?.trim();
@@ -36,12 +36,12 @@ function resolveVerticalBaseURLs(envVar: string, fallbackPorts: number[]): strin
     candidates.push(configured);
   }
 
-  // Solo usar fallbacks basados en el hostname actual del navegador.
+  // Solo usar puertos de desarrollo basados en el hostname actual del navegador.
   // No hardcodear localhost para evitar requests a localhost en produccion.
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol || 'http:';
     const hostname = window.location.hostname || 'localhost';
-    fallbackPorts.forEach((port) => {
+    devPorts.forEach((port) => {
       candidates.push(`${protocol}//${hostname}:${port}`);
     });
   }
@@ -69,7 +69,7 @@ function normalizeErrorMessage(raw: string, translateError?: (message: string) =
 }
 
 export function createVerticalRequest(config: VerticalRequestConfig) {
-  const baseURLs = resolveVerticalBaseURLs(config.envVar, config.fallbackPorts);
+  const baseURLs = resolveVerticalBaseURLs(config.envVar, config.devPorts);
   const timeoutMs = config.timeoutMs ?? 0;
   const timeoutMessage =
     config.timeoutMessage ??

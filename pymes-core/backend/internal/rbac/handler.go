@@ -65,7 +65,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 
 	var req dto.CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 	}
 	var req dto.UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
 	var perms []rbacdomain.Permission
@@ -184,7 +184,7 @@ func toPermissions(in []dto.PermissionInput) []rbacdomain.Permission {
 func requireAdmin(c *gin.Context) (handlers.AuthContext, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	if !authz.IsAdmin(authCtx.Role, authCtx.Scopes) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin permissions required"})
+		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin permissions required")
 		return handlers.AuthContext{}, false
 	}
 	return authCtx, true

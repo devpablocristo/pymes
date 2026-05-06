@@ -3,9 +3,9 @@ package bicycles
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/devpablocristo/core/http/go/pagination"
 	crudpaths "github.com/devpablocristo/modules/crud/paths/go/paths"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 	authGroup.GET(bicyclesItemPath, h.Get)
 	authGroup.PATCH(bicyclesItemPath, h.Update)
 	authGroup.DELETE(bicyclesItemPath, h.Delete)
+	authGroup.POST(bicyclesItemPath+"/"+crudpaths.SegmentArchive, h.Archive)
 	authGroup.POST(bicyclesItemPath+"/"+crudpaths.SegmentRestore, h.Restore)
 	authGroup.DELETE(bicyclesItemPath+"/"+crudpaths.SegmentHard, h.HardDelete)
 }
@@ -54,15 +55,10 @@ func (h *Handler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	var after *uuid.UUID
-	if value := c.Query("after"); value != "" {
-		parsed, err := uuid.Parse(value)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid after"})
-			return
-		}
-		after = &parsed
+	limit := verticalgin.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
+	after, ok := verticalgin.ParseAfterUUIDQuery(c)
+	if !ok {
+		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
 		OrgID:  orgID,
@@ -103,7 +99,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	var req dto.CreateBicycleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	isFavorite := false
@@ -153,7 +149,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	var req dto.UpdateBicycleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
@@ -188,6 +184,10 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) Archive(c *gin.Context) {
+	h.Delete(c)
 }
 
 func (h *Handler) Restore(c *gin.Context) {

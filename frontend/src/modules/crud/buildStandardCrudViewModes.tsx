@@ -10,7 +10,7 @@ type BuildStandardCrudViewModesOptions<T extends { id: string }> = {
 /**
  * Contrato estándar de modos para un CRUD reutilizable.
  * Siempre emite Lista, Galería y Tablero. El render de cada modo es opcional;
- * si no se pasa, el runtime usa el fallback genérico de PymesSimpleCrudListModeContent.
+ * si no se pasa, el runtime usa el render estándar de PymesSimpleCrudListModeContent.
  */
 export function buildStandardCrudViewModes<T extends { id: string }>(
   renderList: NonNullable<CrudPageConfig<T>['viewModes']>[number]['render'],

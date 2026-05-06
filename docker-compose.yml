@@ -101,6 +101,7 @@ services:
       VITE_AI_API_URL: ${VITE_AI_API_URL:-http://localhost:8200}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+      VITE_CLERK_DEFAULT_ORG_ID: ${VITE_CLERK_DEFAULT_ORG_ID:-org_3BGpccLTlKu8qo6pSNekrUDEANC}
       VITE_API_KEY: ${VITE_API_KEY:-psk_local_admin}
       VITE_API_ACTOR: ${VITE_API_ACTOR:-local-admin}
       VITE_API_ROLE: ${VITE_API_ROLE:-admin}

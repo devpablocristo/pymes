@@ -60,7 +60,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   );
   const tenantQuery = useQuery({
     queryKey: queryKeys.tenant.settings,
-    queryFn: getTenantSettings,
+    queryFn: () => getTenantSettings(),
     staleTime: 60_000,
   });
   const auditQuery = useQuery({
@@ -73,7 +73,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   });
   const sessionQuery = useQuery({
     queryKey: queryKeys.session.current,
-    queryFn: getSession,
+    queryFn: () => getSession(),
     staleTime: 5 * 60_000,
   });
   const settings = tenantQuery.data ?? null;

@@ -1,9 +1,8 @@
-import type { ReactNode } from 'react';
 import { Route, Routes, Navigate, useParams } from 'react-router-dom';
 import type { CrudViewModeId } from '../components/CrudPage';
 import { PageLayout } from '../components/PageLayout';
 import { useBranchSelection } from '../lib/useBranchSelection';
-import { useTenantSlug } from '../lib/tenantSlug';
+import { useOptionalTenantAccess } from '../lib/tenantAccessContext';
 import {
   CalendarPage,
   ConfiguredCrudSectionPage,
@@ -78,27 +77,17 @@ function MedicalOccupationalHealthExamsSectionLayout({ slug }: { slug: string })
   );
 }
 
-/** Raíz: resuelve el slug del tenant activo y redirige al dashboard; si no hay profile, a /onboarding. */
+/** Raíz protegida: solo redirige si el TenantAccessBoundary ya validó el tenant. */
 function RootTenantRedirect() {
-  const slug = useTenantSlug();
+  const slug = useOptionalTenantAccess()?.tenantSlug ?? null;
   if (!slug) return <Navigate to="/onboarding" replace />;
   return <Navigate to={`/${slug}/dashboard`} replace />;
 }
 
-/** Valida que el :tenantSlug de la URL coincida con el profile. Si no hay profile, manda a /onboarding. */
-function TenantSlugGate({ children }: { children: ReactNode }) {
-  const { tenantSlug = '' } = useParams();
-  const slug = useTenantSlug();
-  if (!slug) return <Navigate to="/onboarding" replace />;
-  // Dev: aceptamos cualquier slug en la URL. En prod con backend esto se valida contra tenants.slug.
-  void tenantSlug;
-  return <>{children}</>;
-}
-
 function TenantScopedRoutes() {
   const { tenantSlug = '' } = useParams();
-  const profileSlug = useTenantSlug();
-  const slug = profileSlug ?? tenantSlug;
+  const accessSlug = useOptionalTenantAccess()?.tenantSlug ?? null;
+  const slug = accessSlug ?? tenantSlug;
   return (
     <Routes>
       <Route index element={<Navigate to="dashboard" replace />} />
@@ -145,8 +134,9 @@ function TenantScopedRoutes() {
 /**
  * Rutas bajo el Shell autenticado (producto).
  *
- * Política de URL: `/{tenant-slug}/{recurso}/{subpath}`. El tenant slug se
- * deriva de `tenantProfile.businessName` slugificado.
+ * Política de URL: `/{tenant-slug}/{recurso}/{subpath}`.
+ * El slug ya fue validado por `TenantAccessBoundary`; acá no se corrige
+ * silenciosamente una URL manipulada.
  */
 export function ShellRoutes() {
   return (
@@ -156,11 +146,7 @@ export function ShellRoutes() {
       {/* Rutas autenticadas bajo tenant slug */}
       <Route
         path="/:tenantSlug/*"
-        element={
-          <TenantSlugGate>
-            <TenantScopedRoutes />
-          </TenantSlugGate>
-        }
+        element={<TenantScopedRoutes />}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -55,7 +55,7 @@ func fixedDashboardWidgets() []dashboarddomain.WidgetDefinition {
 		{
 			WidgetKey:         "sales.recent",
 			Title:             "Ventas recientes",
-			Description:       "Ultimas ventas registradas en la organizacion.",
+			Description:       "Ultimas ventas registradas en el tenant.",
 			Domain:            "control-plane",
 			Kind:              "feed",
 			SupportedContexts: []string{"home"},

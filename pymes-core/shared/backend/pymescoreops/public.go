@@ -16,12 +16,12 @@ type AvailabilityParams struct {
 	ResourceID string
 }
 
-func GetBusinessInfo(ctx context.Context, client *pymescorehttp.Client, orgRef string) (map[string]any, error) {
-	return client.Get(ctx, fmt.Sprintf("/v1/public/%s/info", url.PathEscape(orgRef)), "")
+func GetBusinessInfo(ctx context.Context, client *pymescorehttp.Client, tenantRef string) (map[string]any, error) {
+	return client.Get(ctx, fmt.Sprintf("/v1/public/%s/info", url.PathEscape(tenantRef)), "")
 }
 
-func GetAvailability(ctx context.Context, client *pymescorehttp.Client, orgRef string, params AvailabilityParams) (map[string]any, error) {
-	path := fmt.Sprintf("/v1/public/%s/availability", url.PathEscape(orgRef))
+func GetAvailability(ctx context.Context, client *pymescorehttp.Client, tenantRef string, params AvailabilityParams) (map[string]any, error) {
+	path := fmt.Sprintf("/v1/public/%s/availability", url.PathEscape(tenantRef))
 	query := url.Values{}
 	if params.Date != "" {
 		query.Set("date", params.Date)
@@ -44,8 +44,8 @@ func GetAvailability(ctx context.Context, client *pymescorehttp.Client, orgRef s
 	return client.Get(ctx, path, "")
 }
 
-func BookScheduling(ctx context.Context, client *pymescorehttp.Client, orgRef string, payload map[string]any) (map[string]any, error) {
-	return client.Post(ctx, fmt.Sprintf("/v1/public/%s/book", url.PathEscape(orgRef)), "", payload)
+func BookScheduling(ctx context.Context, client *pymescorehttp.Client, tenantRef string, payload map[string]any) (map[string]any, error) {
+	return client.Post(ctx, fmt.Sprintf("/v1/public/%s/book", url.PathEscape(tenantRef)), "", payload)
 }
 
 // CoreService is the minimal shape exposed by the public service catalog.
@@ -62,7 +62,7 @@ type CoreService struct {
 	Metadata               map[string]any `json:"metadata"`
 }
 
-func ListPublicServices(ctx context.Context, client *pymescorehttp.Client, orgRef, vertical, segment, search string) ([]CoreService, error) {
+func ListPublicServices(ctx context.Context, client *pymescorehttp.Client, tenantRef, vertical, segment, search string) ([]CoreService, error) {
 	query := url.Values{}
 	if vertical != "" {
 		query.Set("vertical", vertical)
@@ -73,7 +73,7 @@ func ListPublicServices(ctx context.Context, client *pymescorehttp.Client, orgRe
 	if search != "" {
 		query.Set("search", search)
 	}
-	path := fmt.Sprintf("/v1/public/%s/catalog/services", url.PathEscape(orgRef))
+	path := fmt.Sprintf("/v1/public/%s/catalog/services", url.PathEscape(tenantRef))
 	if encoded := query.Encode(); encoded != "" {
 		path += "?" + encoded
 	}

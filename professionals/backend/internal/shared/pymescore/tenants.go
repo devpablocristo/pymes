@@ -6,7 +6,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
-// GetBootstrap fetches the organization bootstrap payload from pymes-core.
+// GetBootstrap fetches the tenant bootstrap payload from pymes-core.
 func (c *Client) GetBootstrap(ctx context.Context, tenantID string) (map[string]any, error) {
 	return pymescoreops.GetBootstrap(ctx, c.Client, tenantID)
 }

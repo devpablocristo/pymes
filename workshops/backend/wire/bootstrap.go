@@ -44,6 +44,7 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreTenantRefResolver(cpClient.Client))
 	auditLog := verticalaudit.NewLogger(logger)
 
 	vehiclesRepo := vehicles.NewRepository(db)
@@ -87,7 +88,7 @@ func InitializeApp() *app.App {
 	publicHandler.RegisterRoutes(publicGroup)
 
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	// auto_repair conserva módulos propios y reutiliza la base común de work orders.
 	autoRepairGroup := authGroup.Group("/auto-repair")

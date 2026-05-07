@@ -25,7 +25,7 @@ type RepositoryPort interface {
 }
 
 type GovernanceClient interface {
-	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	SubmitRequestForTenant(ctx context.Context, tenantID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 	GetRequest(ctx context.Context, id string) (governanceclient.RequestSummary, int, error)
 }
 
@@ -75,7 +75,7 @@ type ConfirmationOutput struct {
 func (u *Usecases) CreateConfirmation(ctx context.Context, in CreateConfirmationInput) (ConfirmationOutput, error) {
 	tenantID, err := uuid.Parse(strings.TrimSpace(in.Auth.TenantID))
 	if err != nil {
-		return ConfirmationOutput{}, agentError(http.StatusBadRequest, "invalid_org", "org invalida")
+		return ConfirmationOutput{}, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
 	capability, ok := u.registry.Get(in.CapabilityID)
 	if !ok {
@@ -201,7 +201,7 @@ type ExecuteResult struct {
 func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult, error) {
 	tenantID, err := uuid.Parse(strings.TrimSpace(in.Auth.TenantID))
 	if err != nil {
-		return ExecuteResult{}, agentError(http.StatusBadRequest, "invalid_org", "org invalida")
+		return ExecuteResult{}, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
 	capability, ok := u.registry.Get(in.CapabilityID)
 	if !ok {
@@ -257,7 +257,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Governance no esta configurado")
 		}
 		if reviewRequestID == "" {
-			resp, err := u.review.SubmitRequest(ctx, idempotencyKey, governanceclient.SubmitRequestBody{
+			resp, err := u.review.SubmitRequestForTenant(ctx, tenantID.String(), idempotencyKey, governanceclient.SubmitRequestBody{
 				RequesterType:  requesterType(in.Auth.AuthMethod),
 				RequesterID:    strings.TrimSpace(in.Auth.Actor),
 				RequesterName:  strings.TrimSpace(in.Auth.Actor),
@@ -333,7 +333,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 func (u *Usecases) ListEvents(ctx context.Context, auth ActorContext, limit int, capabilityID, requestID string) ([]AgentEvent, error) {
 	tenantID, err := uuid.Parse(strings.TrimSpace(auth.TenantID))
 	if err != nil {
-		return nil, agentError(http.StatusBadRequest, "invalid_org", "org invalida")
+		return nil, agentError(http.StatusBadRequest, "invalid_tenant", "tenant invalido")
 	}
 	return u.repo.ListAgentEvents(ctx, tenantID, limit, strings.TrimSpace(capabilityID), strings.TrimSpace(requestID))
 }

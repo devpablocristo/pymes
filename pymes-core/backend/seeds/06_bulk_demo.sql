@@ -3,32 +3,32 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
     local_user uuid := '00000000-0000-0000-0000-000000000002';
     v_branch uuid;
     v_sched_service uuid;
     v_sched_resource uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
     SELECT id INTO v_branch
       FROM scheduling_branches
-     WHERE org_id = v_org
+     WHERE org_id = v_tenant
      ORDER BY created_at
      LIMIT 1;
 
     SELECT id INTO v_sched_service
       FROM scheduling_services
-     WHERE org_id = v_org
+     WHERE org_id = v_tenant
        AND active = true
      ORDER BY CASE WHEN code = 'general_consultation' THEN 0 ELSE 1 END, code
      LIMIT 1;
 
     SELECT id INTO v_sched_resource
       FROM scheduling_resources
-     WHERE org_id = v_org
+     WHERE org_id = v_tenant
        AND active = true
      ORDER BY code
      LIMIT 1;
@@ -39,8 +39,8 @@ BEGIN
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
+        v_tenant,
         CASE WHEN gs % 3 = 0 THEN 'organization' ELSE 'person' END,
         CASE gs
             WHEN 4 THEN 'Almacen Don Luis'
@@ -78,7 +78,7 @@ BEGIN
 
     INSERT INTO party_persons (party_id, first_name, last_name)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
         split_part(name, ' ', 1),
         substring(name from position(' ' in name) + 1)
     FROM (
@@ -98,7 +98,7 @@ BEGIN
 
     INSERT INTO party_organizations (party_id, legal_name, trade_name, tax_condition)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
         CASE gs WHEN 6 THEN 'Distribuidora Norte SRL' WHEN 9 THEN 'Taller Beta SA' END,
         CASE gs WHEN 6 THEN 'Distribuidora Norte' WHEN 9 THEN 'Taller Beta' END,
         'responsable_inscripto'
@@ -111,9 +111,9 @@ BEGIN
 
     INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer-role/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer-role/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
+        v_tenant,
         'customer',
         true,
         NULL::uuid,
@@ -130,8 +130,8 @@ BEGIN
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text),
+        v_tenant,
         'organization',
         CASE gs
             WHEN 4 THEN 'Insumos Rio'
@@ -169,7 +169,7 @@ BEGIN
 
     INSERT INTO party_organizations (party_id, legal_name, trade_name, tax_condition)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text),
         'Proveedor Demo ' || gs::text || ' SRL',
         CASE gs
             WHEN 4 THEN 'Insumos Rio'
@@ -189,9 +189,9 @@ BEGIN
 
     INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/supplier-role/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier-role/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text),
+        v_tenant,
         'supplier',
         true,
         NULL::uuid,
@@ -209,8 +209,8 @@ BEGIN
         image_url, image_urls, is_favorite, created_at, updated_at, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text),
+        v_tenant,
         'product',
         'DEMO-PROD-' || lpad(gs::text, 3, '0'),
         CASE gs
@@ -263,8 +263,8 @@ BEGIN
         metadata, is_active, is_favorite, created_at, updated_at, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/service/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/service/' || gs::text),
+        v_tenant,
         'DEMO-SVC-' || lpad(gs::text, 3, '0'),
         CASE gs
             WHEN 4 THEN 'Diagnostico tecnico'
@@ -309,8 +309,8 @@ BEGIN
 
     INSERT INTO stock_levels (tenant_id, product_id, quantity, min_quantity)
     SELECT
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text),
         12 + gs * 4,
         3 + (gs % 4)
     FROM generate_series(4, 10) AS gs
@@ -327,11 +327,11 @@ BEGIN
         is_favorite, created_at, updated_at, archived_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/quote/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote/' || gs::text),
+        v_tenant,
         'PRE-' || lpad(gs::text, 5, '0'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
-        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
+        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)),
         (ARRAY['draft','sent','accepted','rejected','expired'])[(gs % 5) + 1],
         18000 + gs * 3500,
         round((18000 + gs * 3500) * 0.21, 2),
@@ -370,10 +370,10 @@ BEGIN
         unit_price, tax_rate, subtotal, sort_order, discount_type, discount_value
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/quote-item/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/quote/' || gs::text),
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
-        CASE WHEN gs % 2 = 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text) ELSE NULL END,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote-item/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote/' || gs::text),
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
+        CASE WHEN gs % 2 = 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text) ELSE NULL END,
         CASE WHEN gs % 2 = 0 THEN 'Producto presupuesto demo ' ELSE 'Servicio presupuesto demo ' END || gs::text,
         CASE WHEN gs % 2 = 0 THEN 2 ELSE 1 END,
         CASE WHEN gs % 2 = 0 THEN 9000 + gs * 800 ELSE 18000 + gs * 1000 END,
@@ -401,12 +401,12 @@ BEGIN
         tags, metadata, is_favorite, created_at, voided_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text),
+        v_tenant,
         'VTA-' || lpad(gs::text, 5, '0'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
-        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)),
-        CASE WHEN gs IN (4, 6, 8, 10) THEN uuid_generate_v5(v_org, 'pymes-seed/v2/quote/' || gs::text) ELSE NULL END,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
+        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)),
+        CASE WHEN gs IN (4, 6, 8, 10) THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote/' || gs::text) ELSE NULL END,
         'completed',
         (ARRAY['cash','card','transfer','check','other','credit','mixed'])[(gs % 7) + 1],
         16000 + gs * 4200,
@@ -448,10 +448,10 @@ BEGIN
         unit_price, cost_price, tax_rate, subtotal, sort_order, discount_type, discount_value
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/sale-item/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text),
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
-        CASE WHEN gs % 2 = 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text) ELSE NULL END,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale-item/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text),
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
+        CASE WHEN gs % 2 = 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text) ELSE NULL END,
         CASE WHEN gs % 2 = 0 THEN 'Producto venta demo ' ELSE 'Servicio venta demo ' END || gs::text,
         CASE WHEN gs % 2 = 0 THEN 2 ELSE 1 END,
         CASE WHEN gs % 2 = 0 THEN 8000 + gs * 900 ELSE 17000 + gs * 900 END,
@@ -475,13 +475,13 @@ BEGIN
 
     INSERT INTO stock_movements (id, tenant_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/stock-move/' || gs::text),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/stock-move/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text),
         CASE WHEN gs % 2 = 0 THEN 'out' ELSE 'in' END,
         CASE WHEN gs % 2 = 0 THEN -2 ELSE 8 END,
         CASE WHEN gs % 2 = 0 THEN 'sale' ELSE 'purchase' END,
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text) ELSE NULL END,
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text) ELSE NULL END,
         'Movimiento stock seed ampliado ' || gs::text,
         'seed',
         now() - make_interval(days => 14 - gs)
@@ -499,8 +499,8 @@ BEGIN
         created_at, is_favorite, tags, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/cash-move/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/cash-move/' || gs::text),
+        v_tenant,
         CASE WHEN gs IN (7, 10) THEN 'expense' ELSE 'income' END,
         CASE WHEN gs IN (7, 10) THEN 9000 + gs * 600 ELSE round((16000 + gs * 4200) * 1.21, 2) END,
         'ARS',
@@ -508,7 +508,7 @@ BEGIN
         'Movimiento caja seed ampliado ' || gs::text,
         (ARRAY['cash','card','transfer','check','other'])[(gs % 5) + 1],
         CASE WHEN gs IN (7, 10) THEN 'expense' ELSE 'sale' END,
-        CASE WHEN gs IN (7, 10) THEN NULL ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text) END,
+        CASE WHEN gs IN (7, 10) THEN NULL ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text) END,
         'seed',
         now() - make_interval(days => 14 - gs),
         gs IN (6, 9),
@@ -535,19 +535,19 @@ BEGIN
         tags, metadata, is_favorite, created_at, updated_at, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text),
+        v_tenant,
         'COMP-' || lpad(gs::text, 5, '0'),
         CASE
-            WHEN gs = 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/3')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text)
+            WHEN gs = 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/3')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text)
         END,
         (
             SELECT display_name
             FROM parties
             WHERE id = CASE
-                WHEN gs = 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/3')
-                ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text)
+                WHEN gs = 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/3')
+                ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text)
             END
         ),
         (ARRAY['draft','received','partial'])[(gs % 3) + 1],
@@ -584,12 +584,12 @@ BEGIN
 
     INSERT INTO purchase_items (id, purchase_id, product_id, service_id, description, quantity, unit_cost, tax_rate, subtotal, sort_order)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/purchase-item/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text),
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase-item/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text),
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
         CASE
-            WHEN gs = 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/product/6')
-            WHEN gs % 2 = 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text)
+            WHEN gs = 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/6')
+            WHEN gs % 2 = 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/service/' || LEAST(gs, 8)::text)
             ELSE NULL
         END,
         'Item compra demo ' || gs::text,
@@ -612,21 +612,21 @@ BEGIN
     -- Cuentas y movimientos hasta 10.
     INSERT INTO accounts (id, tenant_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/account/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/account/' || gs::text),
+        v_tenant,
         CASE WHEN gs % 2 = 0 THEN 'receivable' ELSE 'payable' END,
         CASE
-            WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
-            WHEN gs = 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/3')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text)
+            WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
+            WHEN gs = 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/3')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text)
         END,
         (
             SELECT display_name
             FROM parties
             WHERE id = CASE
-                WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
-                WHEN gs = 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/3')
-                ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text)
+                WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
+                WHEN gs = 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/3')
+                ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || gs::text)
             END
         ),
         CASE WHEN gs % 2 = 0 THEN 5000 + gs * 1200 ELSE 8000 + gs * 1600 END,
@@ -644,15 +644,15 @@ BEGIN
         reference_type, reference_id, created_by, created_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/account-movement/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/account/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/account-movement/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/account/' || gs::text),
+        v_tenant,
         CASE WHEN gs % 2 = 0 THEN 'charge' ELSE 'payment' END,
         4000 + gs * 900,
         5000 + gs * 1200,
         'Movimiento cuenta seed ampliado ' || gs::text,
         CASE WHEN gs % 2 = 0 THEN 'sale' ELSE 'purchase' END,
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text) ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text) END,
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text) ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text) END,
         'seed',
         now() - make_interval(days => 12 - gs)
     FROM generate_series(4, 10) AS gs
@@ -670,10 +670,10 @@ BEGIN
         notes, received_at, created_by, created_at, is_favorite, tags, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/payment/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/payment/' || gs::text),
+        v_tenant,
         CASE WHEN gs IN (7, 10) THEN 'purchase' ELSE 'sale' END,
-        CASE WHEN gs IN (7, 10) THEN uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text) ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text) END,
+        CASE WHEN gs IN (7, 10) THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text) ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text) END,
         (ARRAY['cash','card','transfer','check','other','mercadopago'])[(gs % 6) + 1],
         CASE WHEN gs IN (7, 10) THEN 8000 + gs * 700 ELSE round((16000 + gs * 4200) * 0.7, 2) END,
         'Pago seed ampliado ' || gs::text,
@@ -701,8 +701,8 @@ BEGIN
         is_favorite, tags, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/recurring/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/recurring/' || gs::text),
+        v_tenant,
         (ARRAY['Seguro local','Software gestion','Limpieza','Telefonia','Monitoreo','Alarma','Honorarios','Hosting'])[(gs - 3) + 1],
         25000 + gs * 4500,
         'ARS',
@@ -710,7 +710,7 @@ BEGIN
         (ARRAY['transfer','debit','cash','card','debit','transfer','transfer','card'])[(gs - 3) + 1],
         (ARRAY['monthly','monthly','weekly','monthly','monthly','monthly','monthly','yearly'])[(gs - 3) + 1],
         LEAST(28, gs + 3),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || LEAST(10, gs + 1)),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/supplier/' || LEAST(10, gs + 1)),
         true,
         CURRENT_DATE + (gs || ' days')::interval,
         CURRENT_DATE - ((20 - gs) || ' days')::interval,
@@ -746,8 +746,8 @@ BEGIN
         updated_at, archived_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/procurement/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/procurement/' || gs::text),
+        v_tenant,
         'seed',
         'Solicitud de compra demo ' || gs::text,
         'Pedido de reposicion y operaciones ampliado ' || gs::text,
@@ -756,7 +756,7 @@ BEGIN
         12000 + gs * 2600,
         'ARS',
         jsonb_build_object('decision', CASE WHEN gs % 2 = 0 THEN 'require_approval' ELSE 'allow' END, 'source', 'seed-bulk'),
-        CASE WHEN gs IN (4, 8) THEN uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text) ELSE NULL END,
+        CASE WHEN gs IN (4, 8) THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text) ELSE NULL END,
         now() - make_interval(days => 14 - gs),
         now(),
         NULL
@@ -774,10 +774,10 @@ BEGIN
 
     INSERT INTO procurement_request_lines (id, request_id, description, product_id, quantity, unit_price_estimate, sort_order)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/procurement-line/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/procurement/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/procurement-line/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/procurement/' || gs::text),
         'Linea procurement demo ' || gs::text,
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || gs::text) ELSE NULL END,
         1 + (gs % 3),
         5000 + gs * 900,
         1
@@ -796,11 +796,11 @@ BEGIN
         is_favorite, tags, created_by, created_at, updated_at, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/invoice/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/invoice/' || gs::text),
+        v_tenant,
         'INV-' || (4000 + gs)::text,
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
-        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text),
+        (SELECT display_name FROM parties WHERE id = uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)),
         CURRENT_DATE - (20 - gs),
         CURRENT_DATE - (10 - gs),
         (ARRAY['paid','pending','overdue'])[(gs % 3) + 1],
@@ -834,14 +834,14 @@ BEGIN
 
     DELETE FROM invoice_line_items
      WHERE invoice_id IN (
-        SELECT uuid_generate_v5(v_org, 'pymes-seed/v2/invoice/' || gs::text)
+        SELECT uuid_generate_v5(v_tenant, 'pymes-seed/v2/invoice/' || gs::text)
         FROM generate_series(6, 10) AS gs
      );
 
     INSERT INTO invoice_line_items (id, invoice_id, description, qty, unit, unit_price, line_total, sort_order)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/invoice-line/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/invoice/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/invoice-line/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/invoice/' || gs::text),
         'Concepto factura demo ' || gs::text,
         1 + (gs % 4),
         CASE WHEN gs % 2 = 0 THEN 'servicio' ELSE 'unidad' END,
@@ -857,8 +857,8 @@ BEGIN
         updated_at, deleted_at, metadata
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/' || gs::text),
+        v_tenant,
         (ARRAY['Diego','Sofia','Martin','Valentina','Nicolas','Camila','Agustin'])[(gs - 4) + 1],
         (ARRAY['Lopez','Suarez','Pereyra','Acosta','Herrera','Molina','Castro'])[(gs - 4) + 1],
         'empleado' || gs::text || '@demo.pymes',
@@ -912,18 +912,18 @@ BEGIN
         now(),
         NULL
     FROM employees e
-    WHERE e.tenant_id = v_org
+    WHERE e.tenant_id = v_tenant
       AND e.id IN (
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/4'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/5'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/6'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/7'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/8'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/9'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/10')
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/1'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/2'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/3'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/4'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/5'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/6'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/7'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/8'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/9'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/10')
       )
     ON CONFLICT (id) DO UPDATE
         SET party_type = EXCLUDED.party_type,
@@ -940,18 +940,18 @@ BEGIN
     INSERT INTO party_persons (party_id, first_name, last_name)
     SELECT e.id, e.first_name, e.last_name
     FROM employees e
-    WHERE e.tenant_id = v_org
+    WHERE e.tenant_id = v_tenant
       AND e.id IN (
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/4'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/5'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/6'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/7'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/8'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/9'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/10')
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/1'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/2'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/3'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/4'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/5'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/6'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/7'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/8'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/9'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/10')
       )
     ON CONFLICT (party_id) DO UPDATE
         SET first_name = EXCLUDED.first_name,
@@ -959,7 +959,7 @@ BEGIN
 
     INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee-party-role/' || e.id::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee-party-role/' || e.id::text),
         e.id,
         e.tenant_id,
         'employee',
@@ -968,18 +968,18 @@ BEGIN
         jsonb_build_object('source', 'seed-bulk', 'employee_id', e.id, 'status', e.status),
         now()
     FROM employees e
-    WHERE e.tenant_id = v_org
+    WHERE e.tenant_id = v_tenant
       AND e.id IN (
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/4'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/5'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/6'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/7'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/8'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/9'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/employee/10')
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/1'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/2'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/3'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/4'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/5'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/6'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/7'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/8'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/9'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/employee/10')
       )
     ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = true,
@@ -992,10 +992,10 @@ BEGIN
         tags, deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/return/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/return/' || gs::text),
+        v_tenant,
         'DEV-' || lpad(gs::text, 5, '0'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || GREATEST(gs, 4)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || GREATEST(gs, 4)::text),
         (ARRAY['defective','wrong_item','changed_mind','other'])[(gs % 4) + 1],
         5000 + gs * 900,
         round((5000 + gs * 900) * 0.21, 2),
@@ -1024,10 +1024,10 @@ BEGIN
 
     INSERT INTO return_items (id, return_id, sale_item_id, product_id, description, quantity, unit_price, tax_rate, subtotal)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/return-item/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/return/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/sale-item/' || GREATEST(gs, 4)::text),
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || GREATEST(gs, 4)::text) ELSE NULL END,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/return-item/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/return/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale-item/' || GREATEST(gs, 4)::text),
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/product/' || GREATEST(gs, 4)::text) ELSE NULL END,
         'Item devolucion seed ' || gs::text,
         1,
         5000 + gs * 900,
@@ -1046,11 +1046,11 @@ BEGIN
         balance, expires_at, status, created_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/credit-note/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/credit-note/' || gs::text),
+        v_tenant,
         'NC-' || lpad(gs::text, 5, '0'),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || GREATEST(gs, 4)::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v2/return/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || GREATEST(gs, 4)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/return/' || gs::text),
         round((5000 + gs * 900) * 1.21, 2),
         CASE WHEN gs % 3 = 0 THEN 1000 ELSE 0 END,
         round((5000 + gs * 900) * 1.21, 2) - CASE WHEN gs % 3 = 0 THEN 1000 ELSE 0 END,
@@ -1073,14 +1073,14 @@ BEGIN
         chat_context, read_at, created_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/in-app-notif/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/in-app-notif/' || gs::text),
+        v_tenant,
         local_user,
         'Notificacion demo ' || gs::text,
         'Evento demo para probar notificaciones y handoff del asistente ' || gs::text,
         CASE WHEN gs % 2 = 0 THEN 'insight' ELSE 'system' END,
         CASE WHEN gs % 2 = 0 THEN 'sale' ELSE 'org' END,
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text)::text ELSE v_org::text END,
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text)::text ELSE v_tenant::text END,
         jsonb_build_object('scope', CASE WHEN gs % 2 = 0 THEN 'sales_collections' ELSE 'general' END),
         CASE WHEN gs IN (4, 7) THEN now() - make_interval(hours => gs) ELSE NULL END,
         now() - make_interval(hours => gs)
@@ -1100,10 +1100,10 @@ BEGIN
         description, actor, metadata, created_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/timeline/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/timeline/' || gs::text),
+        v_tenant,
         CASE WHEN gs % 2 = 0 THEN 'sales' ELSE 'purchases' END,
-        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_org, 'pymes-seed/v2/sale/' || gs::text) ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/purchase/' || gs::text) END,
+        CASE WHEN gs % 2 = 0 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v2/sale/' || gs::text) ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/purchase/' || gs::text) END,
         'note',
         'Actividad demo ' || gs::text,
         'Entrada de timeline seed ampliada ' || gs::text,
@@ -1121,8 +1121,8 @@ BEGIN
 
     INSERT INTO webhook_endpoints (id, tenant_id, url, secret, events, is_active, created_by, created_at, updated_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v2/webhook/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v2/webhook/' || gs::text),
+        v_tenant,
         'https://example.invalid/hooks/pymes/' || gs::text,
         'seed-secret-' || gs::text,
         ARRAY['sale.created', 'customer.updated', CASE WHEN gs % 2 = 0 THEN 'purchase.received' ELSE 'invoice.created' END],
@@ -1142,8 +1142,8 @@ BEGIN
     IF v_sched_service IS NOT NULL THEN
         INSERT INTO scheduling_resources (id, org_id, branch_id, code, name, kind, capacity, timezone, active)
         SELECT
-            uuid_generate_v5(v_org, 'modules-scheduling/v2/resource/' || br.code || '/demo'),
-            v_org,
+            uuid_generate_v5(v_tenant, 'modules-scheduling/v2/resource/' || br.code || '/demo'),
+            v_tenant,
             br.id,
             'demo_' || br.code,
             'Recurso Demo ' || br.name,
@@ -1152,12 +1152,12 @@ BEGIN
             br.timezone,
             true
         FROM scheduling_branches br
-        WHERE br.org_id = v_org
+        WHERE br.org_id = v_tenant
           AND br.active = true
           AND NOT EXISTS (
               SELECT 1
               FROM scheduling_resources existing
-              WHERE existing.org_id = v_org
+              WHERE existing.org_id = v_tenant
                 AND existing.branch_id = br.id
                 AND existing.active = true
           )
@@ -1171,19 +1171,19 @@ BEGIN
         INSERT INTO scheduling_service_resources (service_id, resource_id)
         SELECT v_sched_service, r.id
         FROM scheduling_resources r
-        WHERE r.org_id = v_org
+        WHERE r.org_id = v_tenant
           AND r.active = true
           AND EXISTS (
               SELECT 1
               FROM scheduling_branches br
               WHERE br.id = r.branch_id
-                AND br.org_id = v_org
+                AND br.org_id = v_tenant
                 AND br.active = true
           )
         ON CONFLICT (service_id, resource_id) DO NOTHING;
 
         DELETE FROM scheduling_bookings
-         WHERE org_id = v_org
+         WHERE org_id = v_tenant
            AND created_by = 'seed';
 
         INSERT INTO scheduling_bookings (
@@ -1193,22 +1193,22 @@ BEGIN
             created_by, confirmed_at, created_at, updated_at
         )
         SELECT
-            uuid_generate_v5(v_org, 'modules-scheduling/v2/booking/' || br.code || '/demo-' || gs::text),
-            v_org,
+            uuid_generate_v5(v_tenant, 'modules-scheduling/v2/booking/' || br.code || '/demo-' || gs::text),
+            v_tenant,
             br.id,
             v_sched_service,
             r.id,
             CASE
-                WHEN gs <= 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || gs::text)
-                ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
+                WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+                ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
             END,
             'DEMO-' || upper(br.code) || '-' || lpad(gs::text, 3, '0'),
             (
                 SELECT display_name
                 FROM parties
                 WHERE id = CASE
-                    WHEN gs <= 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || gs::text)
-                    ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
+                    WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+                    ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
                 END
             ),
             '+54911' || lpad((50000000 + (row_number() OVER (ORDER BY br.code, gs)))::text, 8, '0'),
@@ -1229,14 +1229,14 @@ BEGIN
         JOIN LATERAL (
             SELECT r.id
             FROM scheduling_resources r
-            WHERE r.org_id = v_org
+            WHERE r.org_id = v_tenant
               AND r.branch_id = br.id
               AND r.active = true
             ORDER BY r.code
             LIMIT 1
         ) r ON true
         CROSS JOIN generate_series(1, 10) AS gs
-        WHERE br.org_id = v_org
+        WHERE br.org_id = v_tenant
           AND br.active = true
         ON CONFLICT (id) DO UPDATE
             SET party_id = EXCLUDED.party_id,
@@ -1262,5 +1262,5 @@ BEGIN
        SET next_quote_number = GREATEST(next_quote_number, 11),
            next_sale_number = GREATEST(next_sale_number, 11),
            updated_at = now()
-     WHERE tenant_id = v_org;
+     WHERE tenant_id = v_tenant;
 END $$;

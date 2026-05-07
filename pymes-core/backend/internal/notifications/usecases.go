@@ -156,7 +156,7 @@ func templateFor(notifType string, data map[string]string) (subject string, text
 		})
 	case "plan_upgraded":
 		subject = "Plan actualizado"
-		textBody = "Tu organizacion actualizo su plan."
+		textBody = "Tu tenant actualizo su plan."
 		htmlBody, _ = renderBaseTemplate(templateData{
 			Title:   "Plan actualizado",
 			Message: textBody,

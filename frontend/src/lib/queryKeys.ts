@@ -1,6 +1,14 @@
 /**
  * Claves estables para TanStack Query — evitar strings sueltos en páginas.
  */
+export function tenantKey<T extends readonly unknown[]>(tenantId: string, key: T): readonly ['tenant', string, ...T] {
+  return ['tenant', tenantId, ...key] as const;
+}
+
+export function tenantSlugKey<T extends readonly unknown[]>(tenantSlug: string, key: T): readonly ['tenant-slug', string, ...T] {
+  return ['tenant-slug', tenantSlug, ...key] as const;
+}
+
 export const queryKeys = {
   ai: {
     conversations: {

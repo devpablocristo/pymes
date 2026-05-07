@@ -3,9 +3,9 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
@@ -14,8 +14,8 @@ BEGIN
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        v_tenant,
         'person',
         (ARRAY[
             'Dra. Demo Profesional', 'Dr. Martin Ruiz', 'Lic. Ana Torres', 'Dra. Paula Rivas',
@@ -47,7 +47,7 @@ BEGIN
 
     INSERT INTO party_persons (party_id, first_name, last_name)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
         split_part(full_name, ' ', 1),
         substring(full_name from position(' ' in full_name) + 1)
     FROM (
@@ -64,9 +64,9 @@ BEGIN
 
     INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/role/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/role/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
+        v_tenant,
         'professional',
         true,
         NULL::uuid,
@@ -82,9 +82,9 @@ BEGIN
         is_public, is_bookable, accepts_new_clients, is_favorite, tags, metadata, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile/' || gs::text),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/party/' || gs::text),
         'demo-profesional-' || lpad(gs::text, 2, '0'),
         'Perfil profesional seed ' || gs::text,
         (ARRAY[
@@ -118,11 +118,11 @@ BEGIN
     )
     SELECT
         CASE gs
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/clinical')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/pediatrics')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/' || gs::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/clinical')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/pediatrics')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/' || gs::text)
         END,
-        v_org,
+        v_tenant,
         (ARRAY['CLINICAL','PEDIATRICS','SPEC-003','SPEC-004','SPEC-005','SPEC-006','SPEC-007','SPEC-008','SPEC-009','SPEC-010'])[gs],
         (ARRAY[
             'Clinica general', 'Traumatologia', 'Psicologia', 'Pediatria', 'Nutricion',
@@ -146,13 +146,13 @@ BEGIN
 
     INSERT INTO professionals.professional_specialties (id, tenant_id, profile_id, specialty_id)
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile-specialty/' || gs::text),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile-specialty/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || gs::text),
         CASE gs
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/clinical')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/pediatrics')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/professional/specialty/' || gs::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/clinical')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/pediatrics')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/specialty/' || gs::text)
         END
     FROM generate_series(1, 10) AS gs
     ON CONFLICT (id) DO UPDATE
@@ -165,13 +165,13 @@ BEGIN
         status, payload, is_favorite, tags, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/intake/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/intake/' || gs::text),
+        v_tenant,
         NULL::uuid,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
         CASE
-            WHEN gs <= 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || gs::text)
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
+            WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
         END,
         NULL::uuid,
         (ARRAY['draft','submitted','reviewed','submitted','draft','submitted','reviewed','submitted','draft','submitted'])[gs],
@@ -195,13 +195,13 @@ BEGIN
         status, started_at, ended_at, summary, metadata, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/session/' || gs::text),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/booking/' || gs::text),
-        uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/session/' || gs::text),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/booking/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/professional/profile/' || (((gs - 1) % 10) + 1)::text),
         CASE
-            WHEN gs <= 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || gs::text)
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text)
+            WHEN gs <= 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || gs::text)
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v2/customer/' || gs::text)
         END,
         NULL::uuid,
         (ARRAY['completed','scheduled','completed','cancelled','completed','scheduled','completed','completed','scheduled','completed'])[gs],

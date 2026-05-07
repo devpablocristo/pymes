@@ -5,7 +5,7 @@ export const onboardingMessages: TranslationsByLanguage = {
     // Clerk
     'onboarding.clerk.sessionNotReady': 'Todavía se está cargando tu sesión. Esperá un momento y volvé a intentar.',
     'onboarding.clerk.organizationFailed':
-      'No se pudo crear o activar la organización. Reintentá o volvé a iniciar sesión.',
+      'No se pudo crear o activar el tenant. Reintentá o volvé a iniciar sesión.',
 
     // Header
     'onboarding.header.title': 'Configurá tu espacio',

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSchedulingBranch, getTenantSettings, listSchedulingBranches, updateTenantSettings } from './api';
+import {
+  createSchedulingBranch,
+  getTenantSettings,
+  listSchedulingBranches,
+  registerTenantSlugProvider,
+  updateTenantSettings,
+} from './api';
 import type { TenantSettings } from './types';
 
 const fetchMocks = vi.hoisted(() => ({
@@ -70,6 +76,8 @@ describe('tenant settings API', () => {
   beforeEach(() => {
     fetchMocks.request.mockReset();
     fetchMocks.requestResponse.mockReset();
+    registerTenantSlugProvider(() => null)();
+    window.history.pushState({}, '', '/');
   });
 
   it('normalizes scheduling_enabled on get', async () => {
@@ -97,7 +105,7 @@ describe('tenant settings API', () => {
 
     const result = await listSchedulingBranches();
 
-    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/scheduling/branches');
+    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/scheduling/branches', {});
     expect(result.items).toHaveLength(1);
   });
 
@@ -118,6 +126,36 @@ describe('tenant settings API', () => {
         name: 'Principal',
         timezone: 'UTC',
         active: true,
+      },
+    });
+  });
+
+  it('adds the validated tenant slug header to console requests', async () => {
+    const unregister = registerTenantSlugProvider(() => 'bicimax');
+    fetchMocks.request.mockResolvedValue(buildTenantSettings());
+
+    try {
+      await getTenantSettings();
+    } finally {
+      unregister();
+    }
+
+    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/admin/tenant-settings', {
+      headers: {
+        'X-Pymes-Tenant-Slug': 'bicimax',
+      },
+    });
+  });
+
+  it('uses the route tenant slug as a pre-provider fallback for early console requests', async () => {
+    window.history.pushState({}, '', '/bicimax/dashboard');
+    fetchMocks.request.mockResolvedValue(buildTenantSettings());
+
+    await getTenantSettings();
+
+    expect(fetchMocks.request).toHaveBeenCalledWith('/v1/admin/tenant-settings', {
+      headers: {
+        'X-Pymes-Tenant-Slug': 'bicimax',
       },
     });
   });

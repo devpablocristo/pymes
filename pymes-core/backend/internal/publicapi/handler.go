@@ -41,32 +41,32 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/my-bookings", h.GetMyBookings)
 }
 
-func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
+func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 	tenantID, err := h.repo.ResolveTenantID(c.Request.Context(), c.Param("tenant_id"))
 	if err != nil {
-		if errors.Is(err, ErrOrgNotFound) {
-			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
+		if errors.Is(err, ErrTenantNotFound) {
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 			return uuid.Nil, false
 		}
-		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve organization")
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve tenant")
 		return uuid.Nil, false
 	}
 	return tenantID, true
 }
 
 func (h *Handler) GetBusinessInfo(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
 
 	info, err := h.repo.GetBusinessInfo(c.Request.Context(), tenantID)
 	if err != nil {
-		if errors.Is(err, ErrOrgNotFound) {
-			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
+		if errors.Is(err, ErrTenantNotFound) {
+			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 			return
 		}
-		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch organization info")
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to fetch tenant info")
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *Handler) GetBusinessInfo(c *gin.Context) {
 // GetPublicServiceCatalog devuelve el catálogo rico desde public.services con filtros
 // opcionales por vertical/segment (almacenados en metadata jsonb).
 func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
 }
 
 func (h *Handler) GetAvailability(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -170,7 +170,7 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 }
 
 func (h *Handler) BookScheduling(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -212,7 +212,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 }
 
 func (h *Handler) GetMyBookings(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}

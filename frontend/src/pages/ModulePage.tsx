@@ -24,7 +24,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   const [showAllOperations, setShowAllOperations] = useState(false);
   const sessionQuery = useQuery({
     queryKey: queryKeys.session.current,
-    queryFn: getSession,
+    queryFn: () => getSession(),
     retry: false,
   });
 

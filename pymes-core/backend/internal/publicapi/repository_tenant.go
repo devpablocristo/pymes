@@ -9,11 +9,11 @@ import (
 	"gorm.io/gorm"
 )
 
-type orgResolveByIDRow struct {
+type tenantResolveByIDRow struct {
 	ID uuid.UUID `gorm:"column:id"`
 }
 
-type orgResolveBySlugRow struct {
+type tenantResolveBySlugRow struct {
 	ID uuid.UUID
 }
 
@@ -31,11 +31,11 @@ type businessInfoRow struct {
 func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
-		return uuid.Nil, ErrOrgNotFound
+		return uuid.Nil, ErrTenantNotFound
 	}
 
 	if parsed, err := uuid.Parse(trimmed); err == nil {
-		var row orgResolveByIDRow
+		var row tenantResolveByIDRow
 		err = r.db.WithContext(ctx).
 			Table("tenants").
 			Select("id").
@@ -46,7 +46,7 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 		}
 	}
 
-	var row orgResolveBySlugRow
+	var row tenantResolveBySlugRow
 	err := r.db.WithContext(ctx).
 		Table("tenants").
 		Select("id").
@@ -54,13 +54,15 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return uuid.Nil, ErrOrgNotFound
+			return uuid.Nil, ErrTenantNotFound
 		}
 		return uuid.Nil, err
 	}
 	return row.ID, nil
 }
 
+// ResolveOrgID satisfies the current scheduling public module contract.
+// Pymes still resolves and stores this as a tenant id.
 func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
 	return r.ResolveTenantID(ctx, ref)
 }
@@ -85,7 +87,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (B
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return BusinessInfo{}, ErrOrgNotFound
+			return BusinessInfo{}, ErrTenantNotFound
 		}
 		return BusinessInfo{}, err
 	}

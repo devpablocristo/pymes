@@ -46,5 +46,5 @@ class AutoRepairBackendClient(HTTPBackendClient):
     async def create_payment_link(self, auth: AuthContext, work_order_id: str) -> dict[str, Any]:
         return await self.request("POST", f"/v1/auto-repair/work-orders/{work_order_id}/payment-link", auth=auth)
 
-    async def public_book_scheduling(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", f"/v1/public/{org_slug}/auto-repair/bookings", include_internal=True, json=data)
+    async def public_book_scheduling(self, tenant_slug: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", f"/v1/public/{tenant_slug}/auto-repair/bookings", include_internal=True, json=data)

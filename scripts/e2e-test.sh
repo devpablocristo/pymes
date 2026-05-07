@@ -9,7 +9,7 @@ set -euo pipefail
 
 BASE_URL="${1:-http://localhost:8100}"
 API_KEY="${API_KEY:-psk_local_admin}"
-ORG_ID="${ORG_ID:?ORG_ID is required (UUID interno de la org demo cargada por seeds; obtenela con 'docker compose exec postgres psql -U postgres -d pymes -c "SELECT id FROM tenants WHERE external_id = '\''$PYMES_SEED_DEMO_ORG_EXTERNAL_ID'\'';"')}"
+TENANT_ID="${TENANT_ID:?TENANT_ID is required (UUID interno del tenant demo cargado por seeds; obtenelo con 'docker compose exec postgres psql -U postgres -d pymes -c "SELECT id FROM tenants WHERE external_id = '\''$PYMES_SEED_DEMO_TENANT_EXTERNAL_ID'\'';"')}"
 
 PASS=0
 FAIL=0
@@ -150,7 +150,7 @@ echo ""
 bold "▸ Admin"
 assert_status_capture "GET /v1/admin/tenant-settings" GET "$BASE_URL/v1/admin/tenant-settings" 200
 assert_json_field "tenant plan_code = starter" "$BODY" "plan_code" "starter"
-assert_json_field "tenant tenant_id matches seed" "$BODY" "tenant_id" "$ORG_ID"
+assert_json_field "tenant tenant_id matches seed" "$BODY" "tenant_id" "$TENANT_ID"
 
 assert_status_capture "GET /v1/admin/bootstrap" GET "$BASE_URL/v1/admin/bootstrap" 200
 
@@ -167,9 +167,9 @@ assert_status_capture "GET /v1/admin/activity" GET "$BASE_URL/v1/admin/activity"
 # ── API Keys ──
 echo ""
 bold "▸ API Keys"
-assert_status_capture "GET /v1/tenants/:tenant_id/api-keys" GET "$BASE_URL/v1/tenants/$ORG_ID/api-keys" 200
+assert_status_capture "GET /v1/tenants/:tenant_id/api-keys" GET "$BASE_URL/v1/tenants/$TENANT_ID/api-keys" 200
 
-assert_status_capture "POST /v1/tenants/:tenant_id/api-keys (create)" POST "$BASE_URL/v1/tenants/$ORG_ID/api-keys" 201 \
+assert_status_capture "POST /v1/tenants/:tenant_id/api-keys (create)" POST "$BASE_URL/v1/tenants/$TENANT_ID/api-keys" 201 \
     -d '{"name":"e2e-test-key","scopes":["read"]}'
 NEW_KEY_ID=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('key',{}).get('id',''))" 2>/dev/null || echo "")
 NEW_RAW_KEY=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('raw_key',''))" 2>/dev/null || echo "")
@@ -179,9 +179,9 @@ if [ -n "$NEW_KEY_ID" ] && [ "$NEW_KEY_ID" != "" ]; then
     PASS=$((PASS + 1))
     printf "  %-50s %s id=%s\n" "created key has id" "$(green "PASS")" "${NEW_KEY_ID:0:8}..."
 
-    assert_status_capture "POST rotate key" POST "$BASE_URL/v1/tenants/$ORG_ID/api-keys/$NEW_KEY_ID/rotate" 200
+    assert_status_capture "POST rotate key" POST "$BASE_URL/v1/tenants/$TENANT_ID/api-keys/$NEW_KEY_ID/rotate" 200
 
-    assert_status "DELETE /v1/tenants/:tenant_id/api-keys/:id" DELETE "$BASE_URL/v1/tenants/$ORG_ID/api-keys/$NEW_KEY_ID" 204 > /dev/null
+    assert_status "DELETE /v1/tenants/:tenant_id/api-keys/:id" DELETE "$BASE_URL/v1/tenants/$TENANT_ID/api-keys/$NEW_KEY_ID" 204 > /dev/null
 else
     TOTAL=$((TOTAL + 1))
     FAIL=$((FAIL + 1))
@@ -191,7 +191,7 @@ fi
 # ── Members ──
 echo ""
 bold "▸ Members"
-assert_status_capture "GET /v1/tenants/:tenant_id/members" GET "$BASE_URL/v1/tenants/$ORG_ID/members" 200
+assert_status_capture "GET /v1/tenants/:tenant_id/members" GET "$BASE_URL/v1/tenants/$TENANT_ID/members" 200
 
 # ── Audit ──
 echo ""

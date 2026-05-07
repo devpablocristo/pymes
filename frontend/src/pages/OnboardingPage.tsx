@@ -3,7 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
-import { createSchedulingBranch, createTenant, listSchedulingBranches, updateTenantSettings } from '../lib/api';
+import {
+  createSchedulingBranch,
+  createTenant,
+  listSchedulingBranches,
+  listTenants,
+  updateTenantSettings,
+} from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
@@ -151,8 +157,9 @@ function resolveDefaultBranchTimezone(): string {
   return timezone || 'UTC';
 }
 
-async function ensureDefaultBranchExists(): Promise<void> {
-  const current = await listSchedulingBranches();
+async function ensureDefaultBranchExists(tenantSlug?: string): Promise<void> {
+  const options = tenantSlug ? { tenantSlug } : {};
+  const current = await listSchedulingBranches(options);
   if ((current.items ?? []).length > 0) {
     return;
   }
@@ -163,9 +170,9 @@ async function ensureDefaultBranchExists(): Promise<void> {
     active: true,
   };
   try {
-    await createSchedulingBranch(payload);
+    await createSchedulingBranch(payload, options);
   } catch (error) {
-    const refreshed = await listSchedulingBranches();
+    const refreshed = await listSchedulingBranches(options);
     if ((refreshed.items ?? []).length > 0) {
       return;
     }
@@ -201,7 +208,7 @@ const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
 type ClerkOnboardingBridges = {
   loaded: boolean;
   setActive: (params: { organization: string }) => Promise<void>;
-  organization: { id: string } | null;
+  organization: { id: string; slug?: string } | null;
   orgLoaded: boolean;
   afterSetActiveOrg?: () => Promise<void>;
 };
@@ -214,7 +221,7 @@ function OnboardingPageClerkBridge() {
   const bridges: ClerkOnboardingBridges = {
     loaded: clerk.loaded,
     setActive: (params) => clerk.setActive(params),
-    organization: organization ? { id: organization.id } : null,
+    organization: organization ? { id: organization.id, slug: organization.slug ?? undefined } : null,
     orgLoaded,
     afterSetActiveOrg: session
       ? async () => {
@@ -308,6 +315,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
     setFinishError('');
     setFinishing(true);
+    let tenantSlugForSetup = '';
 
     if (clerkBridges) {
       if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
@@ -317,10 +325,24 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
       }
       try {
         const name = profile.businessName.trim();
+        let activeClerkOrgID = clerkBridges.organization?.id ?? '';
         if (!clerkBridges.organization) {
           const created = await createTenant({ name });
+          activeClerkOrgID = created.clerk_org_id;
+          tenantSlugForSetup = created.slug ?? '';
           await clerkBridges.setActive({ organization: created.clerk_org_id });
           await clerkBridges.afterSetActiveOrg?.();
+        } else {
+          tenantSlugForSetup = clerkBridges.organization.slug ?? '';
+        }
+        if (!tenantSlugForSetup && activeClerkOrgID) {
+          const tenants = await listTenants();
+          tenantSlugForSetup =
+            tenants.items.find((tenant) => tenant.clerk_org_id === activeClerkOrgID)?.slug ??
+            '';
+        }
+        if (!tenantSlugForSetup) {
+          throw new Error('No se pudo resolver el slug del tenant activo.');
         }
       } catch (err) {
         setFinishError(formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')));
@@ -330,7 +352,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     }
 
     try {
-      await ensureDefaultBranchExists();
+      await ensureDefaultBranchExists(tenantSlugForSetup);
       const updated = await updateTenantSettings({
         business_name: profile.businessName,
         team_size: profile.teamSize,
@@ -342,7 +364,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         payment_method: profile.paymentMethod,
         vertical: profile.vertical,
         onboarding_completed_at: profile.completedAt,
-      });
+      }, tenantSlugForSetup ? { tenantSlug: tenantSlugForSetup } : {});
       queryClient.setQueryData(queryKeys.tenant.settings, updated);
       const syncedProfile = syncTenantProfileFromSettings(updated);
       saveTenantProfile({

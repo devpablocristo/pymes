@@ -160,7 +160,7 @@ export function AdminRbacSection({ tenantId }: { tenantId: string }) {
         <span className="badge badge-neutral">Solo administradores de consola</span>
       </div>
       <p className="admin-settings-hint">
-        Asigná roles personalizados del catálogo <code>/v1/roles</code> a usuarios de la organización y consultá
+        Asigná roles personalizados del catálogo <code>/v1/roles</code> a usuarios del tenant y consultá
         permisos efectivos.
       </p>
       {error ? <p className="form-error">{error}</p> : null}

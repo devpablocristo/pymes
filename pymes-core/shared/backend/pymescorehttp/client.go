@@ -45,7 +45,7 @@ func (c *Client) Post(ctx context.Context, path, tenantID string, payload any) (
 	return c.decode(status, body)
 }
 
-// ResolveTenantRef traduce Clerk org_..., slug o UUID a tenant_id interno (vía core internal API).
+// ResolveTenantRef traduce una referencia externa de identidad, slug o UUID a tenant_id interno.
 func (c *Client) ResolveTenantRef(ctx context.Context, ref string) (map[string]any, error) {
 	q := url.Values{}
 	q.Set("ref", ref)
@@ -58,7 +58,7 @@ func (c *Client) headerOpts(tenantID string) []httpclient.RequestOption {
 		opts = append(opts, httpclient.WithHeader("X-Internal-Service-Token", c.token))
 	}
 	if tenantID != "" {
-		opts = append(opts, httpclient.WithHeader("X-Org-ID", tenantID))
+		opts = append(opts, httpclient.WithHeader("X-Pymes-Tenant-ID", tenantID))
 	}
 	return opts
 }

@@ -88,7 +88,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Chat External */
-        post: operations["chat_external_v1_public__org_slug__chat_post"];
+        post: operations["chat_external_v1_public__tenant_slug__chat_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -105,7 +105,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Identify External */
-        post: operations["identify_external_v1_public__org_slug__chat_identify_post"];
+        post: operations["identify_external_v1_public__tenant_slug__chat_identify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -122,7 +122,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** External Sales Chat */
-        post: operations["external_sales_chat_v1_public__org_slug__sales_agent_chat_post"];
+        post: operations["external_sales_chat_v1_public__tenant_slug__sales_agent_chat_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -139,7 +139,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** External Sales Contract */
-        post: operations["external_sales_contract_v1_public__org_slug__sales_agent_contracts_post"];
+        post: operations["external_sales_contract_v1_public__tenant_slug__sales_agent_contracts_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -190,7 +190,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Chat Teachers Public */
-        post: operations["chat_teachers_public_v1_professionals_teachers_public__org_slug__chat_post"];
+        post: operations["chat_teachers_public_v1_professionals_teachers_public__tenant_slug__chat_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -224,7 +224,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Chat Auto Repair Public */
-        post: operations["chat_auto_repair_public_v1_workshops_auto_repair_public__org_slug__chat_post"];
+        post: operations["chat_auto_repair_public_v1_workshops_auto_repair_public__tenant_slug__chat_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -616,7 +616,7 @@ export interface components {
         CommercialContractPayload: {
             /** Request Id */
             request_id: string;
-            /** Org Id */
+            /** Tenant Id */
             tenant_id: string;
             /** Counterparty Id */
             counterparty_id: string;
@@ -724,7 +724,7 @@ export interface components {
         };
         /** CustomerMessagingInboundRequest */
         CustomerMessagingInboundRequest: {
-            /** Org Id */
+            /** Tenant Id */
             tenant_id: string;
             /** Phone Number Id */
             phone_number_id: string;
@@ -1126,7 +1126,7 @@ export interface operations {
             };
         };
     };
-    chat_external_v1_public__org_slug__chat_post: {
+    chat_external_v1_public__tenant_slug__chat_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1161,7 +1161,7 @@ export interface operations {
             };
         };
     };
-    identify_external_v1_public__org_slug__chat_identify_post: {
+    identify_external_v1_public__tenant_slug__chat_identify_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1196,7 +1196,7 @@ export interface operations {
             };
         };
     };
-    external_sales_chat_v1_public__org_slug__sales_agent_chat_post: {
+    external_sales_chat_v1_public__tenant_slug__sales_agent_chat_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1231,7 +1231,7 @@ export interface operations {
             };
         };
     };
-    external_sales_contract_v1_public__org_slug__sales_agent_contracts_post: {
+    external_sales_contract_v1_public__tenant_slug__sales_agent_contracts_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1334,7 +1334,7 @@ export interface operations {
             };
         };
     };
-    chat_teachers_public_v1_professionals_teachers_public__org_slug__chat_post: {
+    chat_teachers_public_v1_professionals_teachers_public__tenant_slug__chat_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1402,7 +1402,7 @@ export interface operations {
             };
         };
     };
-    chat_auto_repair_public_v1_workshops_auto_repair_public__org_slug__chat_post: {
+    chat_auto_repair_public_v1_workshops_auto_repair_public__tenant_slug__chat_post: {
         parameters: {
             query?: never;
             header?: never;

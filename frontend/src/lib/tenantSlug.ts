@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useOptionalTenantAccess } from './tenantAccessContext';
 import { getTenantProfile, type TenantProfile } from './tenantProfile';
 
 /**
@@ -28,20 +29,20 @@ export function getTenantSlug(profile: TenantProfile | null = getTenantProfile()
   return slug || null;
 }
 
-/** Hook reactivo: slug del tenant activo (null si no hay profile). */
+/** Hook reactivo: slug del tenant validado (null fuera del TenantAccessBoundary). */
 export function useTenantSlug(): string | null {
-  return useMemo(() => getTenantSlug(), []);
+  return useOptionalTenantAccess()?.tenantSlug ?? null;
 }
 
 /**
- * Hook que lee el `:orgSlug` de la URL actual. Si no está, cae al slug del profile.
+ * Hook que lee el `:tenantSlug` de la URL actual. Si no está, cae al slug del profile.
  * Usar este cuando se arman links internos a partir del URL actual (p. ej. tabs).
  */
 export function useActiveTenantSlug(): string | null {
   const params = useParams();
-  const profileSlug = useTenantSlug();
-  const urlSlug = typeof params.orgSlug === 'string' ? params.orgSlug : null;
-  return urlSlug || profileSlug;
+  const accessSlug = useTenantSlug();
+  const urlSlug = typeof params.tenantSlug === 'string' ? params.tenantSlug : null;
+  return accessSlug || urlSlug;
 }
 
 /**

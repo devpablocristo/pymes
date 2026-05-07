@@ -70,7 +70,23 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		apiKeyVerifier = &apiKeyPrincipalVerifier{store: store}
 	}
 
+	resolveTenantRef := func(ctx context.Context, ref string) (uuid.UUID, bool, error) {
+		idStr, ok, err := store.ResolveTenantIDByExternalRef(ctx, ref)
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+		if !ok {
+			return uuid.Nil, false, nil
+		}
+		id, err := uuid.Parse(strings.TrimSpace(idStr))
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+		return id, true, nil
+	}
+
 	authMW := newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier)
+	authMW = withTenantSlugBinding(authMW, resolveTenantRef)
 	billingRuntime := saasbilling.NewRuntime(saasbilling.RuntimeConfig{
 		StripeSecretKey:       cfg.StripeSecretKey,
 		StripeWebhookSecret:   cfg.StripeWebhookSecret,
@@ -86,21 +102,6 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		JWTIssuer: strings.TrimSpace(cfg.JWTIssuer),
 	})
 	saasbilling.NewWebhookHandler(billingRuntime).Register(mux)
-
-	resolveTenantRef := func(ctx context.Context, ref string) (uuid.UUID, bool, error) {
-		idStr, ok, err := store.ResolveTenantIDByExternalRef(ctx, ref)
-		if err != nil {
-			return uuid.Nil, false, err
-		}
-		if !ok {
-			return uuid.Nil, false, nil
-		}
-		id, err := uuid.Parse(strings.TrimSpace(idStr))
-		if err != nil {
-			return uuid.Nil, false, err
-		}
-		return id, true, nil
-	}
 
 	return &SaaSServices{
 		Mux:              mux,

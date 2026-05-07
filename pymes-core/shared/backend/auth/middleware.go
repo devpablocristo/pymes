@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,6 +25,8 @@ type AuthContext struct {
 	Scopes     []string
 	AuthMethod string
 }
+
+const TenantSlugHeader = "X-Pymes-Tenant-Slug"
 
 // APIKeyResolver resuelve API keys por hash.
 // Los verticales implementan esto vía verticalwire.NewAPIKeyResolver.
@@ -94,6 +98,43 @@ func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, a
 		apiKeyAuth = &apiKeyAdapter{resolver: keyResolver}
 	}
 	return ginmw.NewAuthMiddleware(jwtAuth, apiKeyAuth)
+}
+
+// RequireTenantSlugBinding fuerza que el slug de consola matchee el tenant autenticado.
+// Las API keys service-to-service pueden omitirlo; si lo envían, también debe coincidir.
+func RequireTenantSlugBinding(resolver TenantRefResolver) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authCtx := GetAuthContext(c)
+		slug := strings.TrimSpace(c.GetHeader(TenantSlugHeader))
+		authMethod := strings.TrimSpace(authCtx.AuthMethod)
+		if slug == "" {
+			if authMethod == "api_key" {
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_slug_required",
+				"message": "tenant slug header is required",
+			})
+			return
+		}
+		if resolver == nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		resolvedTenantID, err := resolver.ResolveTenantID(c.Request.Context(), slug)
+		if err != nil || !strings.EqualFold(strings.TrimSpace(authCtx.TenantID), strings.TrimSpace(resolvedTenantID)) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		c.Next()
+	}
 }
 
 // GetAuthContext extrae el contexto de autenticación. Delega a core.

@@ -30,7 +30,7 @@ export function SettingsHubPage() {
   const sectionTextFn = useCallback((s: SettingsSectionCard) => `${s.label} ${s.desc}`, []);
   const sessionQuery = useQuery({
     queryKey: queryKeys.session.current,
-    queryFn: getSession,
+    queryFn: () => getSession(),
     staleTime: 5 * 60_000,
   });
   const [searchParams, setSearchParams] = useSearchParams();

@@ -8,19 +8,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
+	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
 )
 
 type governanceClient interface {
-	ListPolicies(ctx context.Context, opts ...governanceclient.RequestOption) (int, []byte, error)
-	CreatePolicy(ctx context.Context, body any, opts ...governanceclient.RequestOption) (int, []byte, error)
-	UpdatePolicy(ctx context.Context, id string, updates any, opts ...governanceclient.RequestOption) (int, []byte, error)
-	DeletePolicy(ctx context.Context, id string, opts ...governanceclient.RequestOption) (int, error)
+	ListPoliciesForTenant(ctx context.Context, tenantID string) (int, []byte, error)
+	CreatePolicyForTenant(ctx context.Context, tenantID string, body any) (int, []byte, error)
+	UpdatePolicyForTenant(ctx context.Context, tenantID, id string, updates any) (int, []byte, error)
+	DeletePolicyForTenant(ctx context.Context, tenantID, id string) (int, error)
 	ListActionTypes(ctx context.Context) (int, []byte, error)
-	ListPendingApprovals(ctx context.Context) (int, []byte, error)
-	Approve(ctx context.Context, id string, body any) (int, []byte, error)
-	Reject(ctx context.Context, id string, body any) (int, []byte, error)
+	ListPendingApprovalsForTenant(ctx context.Context, tenantID string) (int, []byte, error)
+	ApproveForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
+	RejectForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
 }
 
 // Handler proxies requests del frontend a Nexus Governance API.
@@ -57,7 +57,11 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 func (h *Handler) listPolicies(c *gin.Context) {
-	status, data, err := h.client.ListPolicies(c.Request.Context())
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
+	status, data, err := h.client.ListPoliciesForTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: list policies failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -67,6 +71,10 @@ func (h *Handler) listPolicies(c *gin.Context) {
 }
 
 func (h *Handler) createPolicy(c *gin.Context) {
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
 	var req dto.CreatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "Datos de la regla incompletos"})
@@ -89,7 +97,7 @@ func (h *Handler) createPolicy(c *gin.Context) {
 		"mode":        req.Mode,
 	}
 
-	status, data, err := h.client.CreatePolicy(c.Request.Context(), governanceBody)
+	status, data, err := h.client.CreatePolicyForTenant(c.Request.Context(), tenantID, governanceBody)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: create policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -99,6 +107,10 @@ func (h *Handler) createPolicy(c *gin.Context) {
 }
 
 func (h *Handler) updatePolicy(c *gin.Context) {
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "ID de regla requerido"})
@@ -126,7 +138,7 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 		updates["expression"] = BuildCELExpression("", req.Condition)
 	}
 
-	status, data, err := h.client.UpdatePolicy(c.Request.Context(), id, updates)
+	status, data, err := h.client.UpdatePolicyForTenant(c.Request.Context(), tenantID, id, updates)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: update policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -136,13 +148,17 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 }
 
 func (h *Handler) deletePolicy(c *gin.Context) {
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "ID de regla requerido"})
 		return
 	}
 
-	status, err := h.client.DeletePolicy(c.Request.Context(), id)
+	status, err := h.client.DeletePolicyForTenant(c.Request.Context(), tenantID, id)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: delete policy failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -162,7 +178,11 @@ func (h *Handler) listActionTypes(c *gin.Context) {
 }
 
 func (h *Handler) listPendingApprovals(c *gin.Context) {
-	status, data, err := h.client.ListPendingApprovals(c.Request.Context())
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
+	status, data, err := h.client.ListPendingApprovalsForTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		// La bandeja de notificaciones usa approvals como señal opcional.
 		// Si Governance no está disponible en local o en entornos sin governance,
@@ -175,6 +195,10 @@ func (h *Handler) listPendingApprovals(c *gin.Context) {
 }
 
 func (h *Handler) approve(c *gin.Context) {
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "ID de aprobación requerido"})
@@ -188,7 +212,7 @@ func (h *Handler) approve(c *gin.Context) {
 
 	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	status, data, err := h.client.Approve(c.Request.Context(), id, body)
+	status, data, err := h.client.ApproveForTenant(c.Request.Context(), tenantID, id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: approve failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -198,6 +222,10 @@ func (h *Handler) approve(c *gin.Context) {
 }
 
 func (h *Handler) reject(c *gin.Context) {
+	tenantID, ok := tenantIDFromAuth(c)
+	if !ok {
+		return
+	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "ID de aprobación requerido"})
@@ -211,7 +239,7 @@ func (h *Handler) reject(c *gin.Context) {
 
 	body := map[string]string{"decided_by": "owner", "note": req.Note}
 
-	status, data, err := h.client.Reject(c.Request.Context(), id, body)
+	status, data, err := h.client.RejectForTenant(c.Request.Context(), tenantID, id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: reject failed")
 		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
@@ -224,4 +252,14 @@ func (h *Handler) getConditionTemplates(c *gin.Context) {
 	actionType := strings.TrimSpace(c.Param("action_type"))
 	templates := GetConditionTemplates(actionType)
 	c.JSON(http.StatusOK, dto.ConditionTemplatesResponse{Templates: templates})
+}
+
+func tenantIDFromAuth(c *gin.Context) (string, bool) {
+	auth := handlers.GetAuthContext(c)
+	tenantID := strings.TrimSpace(auth.TenantID)
+	if tenantID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"code": "tenant_required", "message": "tenant activo requerido"})
+		return "", false
+	}
+	return tenantID, true
 }

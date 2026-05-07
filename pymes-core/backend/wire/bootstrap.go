@@ -293,7 +293,7 @@ func InitializeApp() *app.App {
 	customerMessagingHandler := customer_messaging.NewHandler(customerMessagingUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
-	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
+	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrTenantNotFound })
 	var resolveTenantRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
 		resolveTenantRefFn = saasSvc.ResolveTenantRef
@@ -302,7 +302,10 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{cfg.FrontendURL}}))
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{cfg.FrontendURL},
+		AllowHeaders: []string{tenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error {
 		return store.Ping(ctx, db)
 	})

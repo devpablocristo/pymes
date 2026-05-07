@@ -173,10 +173,10 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 	tenantID := uuid.New()
 	purchaseID := uuid.New()
 	repo := &mockPurchasesRepo{
-		getByIDFn: func(ctx context.Context, gotOrgID, gotID uuid.UUID) (purchasesdomain.Purchase, error) {
+		getByIDFn: func(ctx context.Context, gotTenantID, gotID uuid.UUID) (purchasesdomain.Purchase, error) {
 			return purchasesdomain.Purchase{
 				ID:            gotID,
-				TenantID:      gotOrgID,
+				TenantID:      gotTenantID,
 				Number:        "CPA-00004",
 				Status:        "received",
 				PaymentStatus: "pending",

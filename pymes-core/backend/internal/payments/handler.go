@@ -51,7 +51,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) ListSalePayments(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, saleID, ok := parseOrgSale(c, authCtx.TenantID)
+	tenantID, saleID, ok := parseTenantSale(c, authCtx.TenantID)
 	if !ok {
 		return
 	}
@@ -65,7 +65,7 @@ func (h *Handler) ListSalePayments(c *gin.Context) {
 
 func (h *Handler) CreateSalePayment(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, saleID, ok := parseOrgSale(c, authCtx.TenantID)
+	tenantID, saleID, ok := parseTenantSale(c, authCtx.TenantID)
 	if !ok {
 		return
 	}
@@ -148,7 +148,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentTenantID(c)
 	if !ok {
 		return
 	}
@@ -162,7 +162,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentTenantID(c)
 	if !ok {
 		return
 	}
@@ -196,7 +196,7 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete realiza soft delete (archiva).
 func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentTenantID(c)
 	if !ok {
 		return
 	}
@@ -213,7 +213,7 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentTenantID(c)
 	if !ok {
 		return
 	}
@@ -226,7 +226,7 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentTenantID(c)
 	if !ok {
 		return
 	}
@@ -237,7 +237,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func parsePaymentOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parsePaymentTenantID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
 	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
@@ -273,8 +273,8 @@ func toPaymentItem(in paymentsdomain.Payment) dto.PaymentItem {
 	return out
 }
 
-func parseOrgSale(c *gin.Context, rawOrgID string) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, err := uuid.Parse(rawOrgID)
+func parseTenantSale(c *gin.Context, rawTenantID string) (uuid.UUID, uuid.UUID, bool) {
+	tenantID, err := uuid.Parse(rawTenantID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, uuid.Nil, false

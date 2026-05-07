@@ -85,10 +85,10 @@ class ClerkBearerVerifier:
         if not actor:
             return None
 
-        raw_org = _first_string_claim(claims, "tenant_id", "tenant_id", "o.id")
-        if not raw_org:
-            raw_org = _clerk_compact_org_id_from_claims(claims)
-        tenant_id = await self._resolve_org_id(raw_org)
+        raw_tenant = _first_string_claim(claims, "tenant_id", "tenant_id", "o.id")
+        if not raw_tenant:
+            raw_tenant = _clerk_compact_tenant_id_from_claims(claims)
+        tenant_id = await self._resolve_tenant_id(raw_tenant)
         if not tenant_id:
             return None
 
@@ -144,7 +144,7 @@ class ClerkBearerVerifier:
         self._jwks_by_kid = parsed
         self._jwks_loaded_at = time.monotonic()
 
-    async def _resolve_org_id(self, ref: str) -> str:
+    async def _resolve_tenant_id(self, ref: str) -> str:
         normalized = ref.strip()
         if not normalized:
             return ""
@@ -237,11 +237,11 @@ def _split_scopes(raw: str) -> list[str]:
     return [part for part in normalized.split() if part]
 
 
-def _clerk_compact_org_id_from_claims(claims: dict[str, Any]) -> str:
-    raw_org = claims.get("o")
-    if not isinstance(raw_org, dict):
+def _clerk_compact_tenant_id_from_claims(claims: dict[str, Any]) -> str:
+    raw_tenant = claims.get("o")
+    if not isinstance(raw_tenant, dict):
         return ""
-    value = raw_org.get("id")
+    value = raw_tenant.get("id")
     if not isinstance(value, str):
         return ""
     return value.strip()

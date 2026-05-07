@@ -39,18 +39,18 @@ def clean_phone(raw: str) -> str:
     return "".join(ch for ch in raw if ch.isdigit() or ch == "+")
 
 
-async def resolve_org_id(backend_client: BackendClient, tenant_slug: str) -> str:
+async def resolve_tenant_id(backend_client: BackendClient, tenant_slug: str) -> str:
     try:
         payload = await backend_client.request("GET", f"/v1/public/{tenant_slug}/info", include_internal=True)
     except Exception as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         if status_code == status.HTTP_404_NOT_FOUND:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found") from exc
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found") from exc
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="backend unavailable") from exc
 
     tenant_id = str(payload.get("tenant_id", "")).strip()
     if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant not found")
     return tenant_id
 
 

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
@@ -25,6 +27,31 @@ func (scopedAPIKeyVerifier) Verify(ctx context.Context, token string) (tenantPri
 		Scopes:     []string{"admin:console:read", "admin:console:write"},
 		AuthMethod: "api_key",
 	}, nil
+}
+
+type scopedJWTVerifier struct{}
+
+func (scopedJWTVerifier) Verify(ctx context.Context, token string) (tenantPrincipal, error) {
+	_ = ctx
+	_ = token
+	return tenantPrincipal{
+		TenantID:   "00000000-0000-0000-0000-000000000001",
+		Actor:      "user-1",
+		Role:       "member",
+		Scopes:     []string{"admin:console:read"},
+		AuthMethod: "jwt",
+	}, nil
+}
+
+func testTenantResolver(_ context.Context, ref string) (uuid.UUID, bool, error) {
+	switch ref {
+	case "bicimax", "00000000-0000-0000-0000-000000000001":
+		return uuid.MustParse("00000000-0000-0000-0000-000000000001"), true, nil
+	case "medlab":
+		return uuid.MustParse("00000000-0000-0000-0000-000000000002"), true, nil
+	default:
+		return uuid.Nil, false, nil
+	}
 }
 
 func TestGinSaaSAuthMiddlewareCopiesPrincipalScopes(t *testing.T) {
@@ -92,9 +119,86 @@ func TestGinSaaSAuthMiddlewareCopiesTenantIntoCoreOrgContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	if auth.OrgID != "00000000-0000-0000-0000-000000000001" {
-		t.Fatalf("unexpected core org id %q", auth.OrgID)
+		t.Fatalf("unexpected core tenant id %q", auth.OrgID)
 	}
 	if auth.AuthMethod != "api_key" {
 		t.Fatalf("unexpected auth method %q", auth.AuthMethod)
+	}
+}
+
+func TestTenantSlugBindingRequiresHeaderForJWT(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+	}))
+	router.GET("/v1/invoices", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/invoices", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "tenant_slug_required") {
+		t.Fatalf("expected tenant_slug_required body, got %s", rec.Body.String())
+	}
+}
+
+func TestTenantSlugBindingRejectsSlugMismatch(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+	}))
+	router.GET("/v1/invoices", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/invoices", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set(tenantSlugHeader, "medlab")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "tenant_mismatch") {
+		t.Fatalf("expected tenant_mismatch body, got %s", rec.Body.String())
+	}
+}
+
+func TestTenantSlugBindingAllowsMatchingSlug(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+	}))
+	router.GET("/v1/invoices", func(c *gin.Context) {
+		c.JSON(http.StatusOK, handlers.GetAuthContext(c))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/invoices", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set(tenantSlugHeader, "bicimax")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 }

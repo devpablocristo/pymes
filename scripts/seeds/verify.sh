@@ -19,8 +19,8 @@ if [[ "${1:-}" == "--cleared" ]]; then
 fi
 
 ensure_pymes_seed_db_ready
-require_seed_org_external_id
-TARGET_ORG_UUID="$(resolve_target_org_uuid)"
+require_seed_tenant_external_id
+TARGET_TENANT_UUID="$(resolve_target_tenant_uuid)"
 
 week_from="$(date -u -d '1 day ago' +%Y-%m-%dT00:00:00Z)"
 week_to="$(date -u -d '14 days' +%Y-%m-%dT23:59:59Z)"
@@ -65,7 +65,7 @@ check_empty() {
 
 query_count() {
   local sql="$1"
-  sql="${sql//__ORG_ID__/$TARGET_ORG_UUID}"
+  sql="${sql//__TENANT_ID__/$TARGET_TENANT_UUID}"
   host_pymes_psql -Atq -v ON_ERROR_STOP=1 -c "$sql" | tr -d '[:space:]'
 }
 
@@ -76,9 +76,9 @@ api_count() {
 }
 
 if (( CLEAR_MODE == 1 )); then
-  printf 'Verificando seed-clear DB org=%s\n' "$TARGET_ORG_UUID"
+  printf 'Verificando seed-clear DB tenant=%s\n' "$TARGET_TENANT_UUID"
 else
-  printf 'Verificando seeds DB org=%s\n' "$TARGET_ORG_UUID"
+  printf 'Verificando seeds DB tenant=%s\n' "$TARGET_TENANT_UUID"
 fi
 for check in "${SEED_DB_CHECKS[@]}"; do
   IFS='|' read -r name expected sql <<<"$check"
@@ -91,8 +91,8 @@ for check in "${SEED_DB_CHECKS[@]}"; do
 done
 
 if (( CLEAR_MODE == 1 )); then
-  check_min "bootstrapOrg" 1 "$(query_count "SELECT count(*) FROM tenants WHERE id = '__ORG_ID__'::uuid")" "db"
-  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM tenant_memberships WHERE tenant_id = '__ORG_ID__'::uuid")" "db"
+  check_min "bootstrapTenant" 1 "$(query_count "SELECT count(*) FROM tenants WHERE id = '__TENANT_ID__'::uuid")" "db"
+  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM tenant_memberships WHERE tenant_id = '__TENANT_ID__'::uuid")" "db"
   printf 'SKIP API checks (--cleared)\n'
 elif [[ "${SEED_VERIFY_SKIP_API:-}" == "1" ]]; then
   printf 'SKIP API checks (SEED_VERIFY_SKIP_API=1)\n'

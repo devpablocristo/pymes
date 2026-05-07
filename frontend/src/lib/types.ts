@@ -117,6 +117,8 @@ export type BootstrapAuthPayload = {
   tenant_id: string;
   /** Nombre legible desde `tenants.name` (GET /session); puede faltar si no hay fila o está vacío. */
   tenant_name?: string | null;
+  /** Slug canónico validado por backend para rutas tenant-scoped. */
+  tenant_slug?: string | null;
   /** Rol crudo del JWT / API (p. ej. owner, admin, viewer, service). */
   role: string;
   product_role: ProductRole;

@@ -126,7 +126,7 @@ INSERT INTO dashboard_widgets_catalog (
     (
         'sales.recent',
         'Ventas recientes',
-        'Ultimas ventas registradas en la organizacion.',
+        'Ultimas ventas registradas en el tenant.',
         'control-plane',
         'feed',
         6, 3, 4, 3, 8, 6,

@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/devpablocristo/core/governance/go/governanceclient"
+	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 )
 
@@ -18,19 +18,19 @@ type stubGovernanceClient struct {
 	listPendingApprovals func(ctx context.Context) (int, []byte, error)
 }
 
-func (s stubGovernanceClient) ListPolicies(context.Context, ...governanceclient.RequestOption) (int, []byte, error) {
+func (s stubGovernanceClient) ListPoliciesForTenant(context.Context, string) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) CreatePolicy(context.Context, any, ...governanceclient.RequestOption) (int, []byte, error) {
+func (s stubGovernanceClient) CreatePolicyForTenant(context.Context, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) UpdatePolicy(context.Context, string, any, ...governanceclient.RequestOption) (int, []byte, error) {
+func (s stubGovernanceClient) UpdatePolicyForTenant(context.Context, string, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) DeletePolicy(context.Context, string, ...governanceclient.RequestOption) (int, error) {
+func (s stubGovernanceClient) DeletePolicyForTenant(context.Context, string, string) (int, error) {
 	return http.StatusNotImplemented, errors.New("not implemented")
 }
 
@@ -38,16 +38,26 @@ func (s stubGovernanceClient) ListActionTypes(context.Context) (int, []byte, err
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) ListPendingApprovals(ctx context.Context) (int, []byte, error) {
+func (s stubGovernanceClient) ListPendingApprovalsForTenant(ctx context.Context, _ string) (int, []byte, error) {
 	return s.listPendingApprovals(ctx)
 }
 
-func (s stubGovernanceClient) Approve(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) ApproveForTenant(context.Context, string, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) Reject(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) RejectForTenant(context.Context, string, string, any) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
+}
+
+func withTenantContext(router *gin.Engine) {
+	router.Use(func(c *gin.Context) {
+		c.Set(ctxkeys.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
+		c.Set(ctxkeys.CtxKeyActor, "owner@example.com")
+		c.Set(ctxkeys.CtxKeyRole, "owner")
+		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
 }
 
 func TestListPendingApprovalsReturnsEmptyListWhenGovernanceUnavailable(t *testing.T) {
@@ -55,6 +65,7 @@ func TestListPendingApprovalsReturnsEmptyListWhenGovernanceUnavailable(t *testin
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	withTenantContext(router)
 	handler := NewHandler(stubGovernanceClient{
 		listPendingApprovals: func(context.Context) (int, []byte, error) {
 			return 0, nil, errors.New("dial tcp: connection refused")
@@ -83,6 +94,7 @@ func TestListPendingApprovalsPassesThroughGovernanceResponse(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	withTenantContext(router)
 	payload := []byte(`{"approvals":[{"id":"appr-1","request_id":"req-1","action_type":"sales.refund","target_resource":"sale-1","reason":"manual","risk_level":"medium","status":"pending","created_at":"2026-03-31T00:00:00Z"}],"total":1}`)
 	handler := NewHandler(stubGovernanceClient{
 		listPendingApprovals: func(context.Context) (int, []byte, error) {

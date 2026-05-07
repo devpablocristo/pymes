@@ -27,7 +27,7 @@ type gatewayUsecases interface {
 	CreatePreference(ctx context.Context, tenantID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
 	GetPreference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 	GetOrCreatePreference(ctx context.Context, tenantID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
-	GetPublicQuotePaymentLink(ctx context.Context, orgRef string, quoteID uuid.UUID) (gatewaydomain.PaymentPreference, error)
+	GetPublicQuotePaymentLink(ctx context.Context, tenantRef string, quoteID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 
 	GenerateStaticQR(ctx context.Context, tenantID uuid.UUID, size int) ([]byte, error)
 	BuildSalePaymentInfoWhatsApp(ctx context.Context, tenantID uuid.UUID, saleID uuid.UUID) (WhatsAppResult, error)
@@ -76,7 +76,7 @@ func (h *Handler) RegisterExternalRoutes(public *gin.RouterGroup) {
 }
 
 func (h *Handler) Connect(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -104,7 +104,7 @@ func (h *Handler) Callback(c *gin.Context) {
 }
 
 func (h *Handler) Status(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -131,7 +131,7 @@ func (h *Handler) Status(c *gin.Context) {
 }
 
 func (h *Handler) Disconnect(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -143,7 +143,7 @@ func (h *Handler) Disconnect(c *gin.Context) {
 }
 
 func (h *Handler) GetStaticQR(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -156,7 +156,7 @@ func (h *Handler) GetStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) DownloadStaticQR(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -170,7 +170,7 @@ func (h *Handler) DownloadStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -192,7 +192,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLink(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -211,7 +211,7 @@ func (h *Handler) GetSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -233,7 +233,7 @@ func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -252,7 +252,7 @@ func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -271,7 +271,7 @@ func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
-	tenantID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -298,8 +298,8 @@ func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
-	orgRef := strings.TrimSpace(c.Param("tenant_id"))
-	pref, err := h.uc.GetPublicQuotePaymentLink(c.Request.Context(), orgRef, quoteID)
+	tenantRef := strings.TrimSpace(c.Param("tenant_id"))
+	pref, err := h.uc.GetPublicQuotePaymentLink(c.Request.Context(), tenantRef, quoteID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -324,7 +324,7 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-func parseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
+func parseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
 	return handlers.ParseAuthTenantID(c)
 }
 

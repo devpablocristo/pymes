@@ -66,7 +66,7 @@ func (r *Repository) ReplaceForProfile(ctx context.Context, tenantID, profileID 
 	return r.ListByProfile(ctx, tenantID, profileID)
 }
 
-func (r *Repository) ListByOrg(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error) {
+func (r *Repository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error) {
 	var rows []models.ServiceLinkModel
 	err := r.db.WithContext(ctx).
 		Where("tenant_id = ?", tenantID).

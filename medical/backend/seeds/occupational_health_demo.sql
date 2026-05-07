@@ -2,9 +2,9 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
@@ -32,8 +32,8 @@ BEGIN
         deleted_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/medical/occupational-health/exam/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/medical/occupational-health/exam/' || gs::text),
+        v_tenant,
         CASE gs
             WHEN 1 THEN 'Carla Benitez'
             WHEN 2 THEN 'Martin Peralta'

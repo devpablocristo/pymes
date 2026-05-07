@@ -3,56 +3,56 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
     local_user uuid := '00000000-0000-0000-0000-000000000002';
-    c1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1');
-    c2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/customer/2');
-    s1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/1');
-    s2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/supplier/2');
-    p1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/1');
-    p2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/2');
-    p3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/product/3');
+    c1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/1');
+    c2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/2');
+    s1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/1');
+    s2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/2');
+    p1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/1');
+    p2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/2');
+    p3 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/3');
     svc1 uuid;
     svc2 uuid;
-    sale1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/1');
-    sale2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/2');
-    sale_item1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/sale-item/1');
-    q1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/quote/1');
-    pl_default uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/default');
-    emp_party uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1');
-    pur1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/purchase/1');
-    pur2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/purchase/2');
-    pr1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/procurement/1');
-    pr2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/procurement/2');
-    acc_receivable uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/account/receivable-c1');
-    acc_payable uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/account/payable-s1');
-    rec1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/recurring/1');
-    rec2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/recurring/2');
-    wh1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/webhook/1');
-    ret1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/return/1');
-    cn1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/credit-note/1');
-    pay1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/payment/sale/1');
-    pay2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/payment/sale/2');
-    pay3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/payment/purchase/1');
-    notif1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/demo-welcome');
-    notif2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/in-app-notif/review-approval');
-    inv1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1');
-    inv2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2');
-    inv3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/3');
-    inv4 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4');
-    inv5 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/5');
-    emp1 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1');
-    emp2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2');
-    emp3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3');
+    sale1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/sale/1');
+    sale2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/sale/2');
+    sale_item1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/sale-item/1');
+    q1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/quote/1');
+    pl_default uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/price-list/default');
+    emp_party uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/1');
+    pur1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/purchase/1');
+    pur2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/purchase/2');
+    pr1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement/1');
+    pr2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement/2');
+    acc_receivable uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/account/receivable-c1');
+    acc_payable uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/account/payable-s1');
+    rec1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/recurring/1');
+    rec2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/recurring/2');
+    wh1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/webhook/1');
+    ret1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/return/1');
+    cn1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/credit-note/1');
+    pay1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/payment/sale/1');
+    pay2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/payment/sale/2');
+    pay3 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/payment/purchase/1');
+    notif1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/in-app-notif/demo-welcome');
+    notif2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/in-app-notif/review-approval');
+    inv1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/1');
+    inv2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/2');
+    inv3 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/3');
+    inv4 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/4');
+    inv5 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/5');
+    emp1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/1');
+    emp2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/2');
+    emp3 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/3');
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
-    SELECT id INTO svc1 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
-    SELECT id INTO svc2 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE tenant_id = v_tenant AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE tenant_id = v_tenant AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     IF svc1 IS NULL OR svc2 IS NULL THEN
-        RAISE EXCEPTION 'pymes full seed: expected demo services for org %', v_org;
+        RAISE EXCEPTION 'pymes full seed: expected demo services for org %', v_tenant;
     END IF;
 
     INSERT INTO parties (
@@ -60,7 +60,7 @@ BEGIN
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at
     )
     VALUES (
-        emp_party, v_org, 'person', 'Empleado Demo', 'empleado@local.dev', '+54-11-4000-0001', '{}'::jsonb,
+        emp_party, v_tenant, 'person', 'Empleado Demo', 'empleado@local.dev', '+54-11-4000-0001', '{}'::jsonb,
         NULL, 'seed employee', ARRAY['demo', 'employee'], jsonb_build_object('vertical', 'core'),
         now(), now(), NULL
     )
@@ -81,7 +81,7 @@ BEGIN
             last_name = EXCLUDED.last_name;
 
     INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
-    VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/employee/role/1'), emp_party, v_org, 'employee', true, NULL::uuid, '{}'::jsonb, now())
+    VALUES (uuid_generate_v5(v_tenant, 'pymes-seed/v1/employee/role/1'), emp_party, v_tenant, 'employee', true, NULL::uuid, '{}'::jsonb, now())
     ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
@@ -89,7 +89,7 @@ BEGIN
     UPDATE tenant_memberships
        SET party_id = emp_party,
            role = 'admin'
-     WHERE tenant_id = v_org
+     WHERE tenant_id = v_tenant
        AND user_id = local_user;
 
     INSERT INTO price_list_items (price_list_id, product_id, price)
@@ -105,8 +105,8 @@ BEGIN
         subtotal, tax_total, total, currency, notes, received_at, created_by
     )
     VALUES
-        (pur1, v_org, 'COMP-00001', s1, 'Proveedor Demo 1', 'received', 'partial', 22000, 4620, 26620, 'ARS', 'Compra demo recibida', now() - interval '3 days', 'seed'),
-        (pur2, v_org, 'COMP-00002', s2, 'Proveedor Demo 2', 'draft', 'pending', 12000, 2520, 14520, 'ARS', 'Compra demo borrador', NULL, 'seed')
+        (pur1, v_tenant, 'COMP-00001', s1, 'Proveedor Demo 1', 'received', 'partial', 22000, 4620, 26620, 'ARS', 'Compra demo recibida', now() - interval '3 days', 'seed'),
+        (pur2, v_tenant, 'COMP-00002', s2, 'Proveedor Demo 2', 'draft', 'pending', 12000, 2520, 14520, 'ARS', 'Compra demo borrador', NULL, 'seed')
     ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             party_name = EXCLUDED.party_name,
@@ -122,9 +122,9 @@ BEGIN
 
     INSERT INTO purchase_items (id, purchase_id, product_id, service_id, description, quantity, unit_cost, tax_rate, subtotal, sort_order)
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/purchase-item/1'), pur1, p3, NULL, 'Producto Demo C', 2, 6000, 21, 12000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/purchase-item/2'), pur1, NULL, svc2, 'Servicio Demo Mantenimiento', 1, 10000, 21, 10000, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/purchase-item/3'), pur2, p2, NULL, 'Producto Demo B', 2, 6000, 21, 12000, 1)
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/purchase-item/1'), pur1, p3, NULL, 'Producto Demo C', 2, 6000, 21, 12000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/purchase-item/2'), pur1, NULL, svc2, 'Servicio Demo Mantenimiento', 1, 10000, 21, 10000, 2),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/purchase-item/3'), pur2, p2, NULL, 'Producto Demo B', 2, 6000, 21, 12000, 1)
     ON CONFLICT (id) DO UPDATE
         SET description = EXCLUDED.description,
             quantity = EXCLUDED.quantity,
@@ -135,8 +135,8 @@ BEGIN
 
     INSERT INTO accounts (id, tenant_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
     VALUES
-        (acc_receivable, v_org, 'receivable', c1, 'Cliente Demo Uno', 18400, 'ARS', 0, now()),
-        (acc_payable, v_org, 'payable', s1, 'Proveedor Demo 1', 26620, 'ARS', 100000, now())
+        (acc_receivable, v_tenant, 'receivable', c1, 'Cliente Demo Uno', 18400, 'ARS', 0, now()),
+        (acc_payable, v_tenant, 'payable', s1, 'Proveedor Demo 1', 26620, 'ARS', 100000, now())
     ON CONFLICT (id) DO UPDATE
         SET balance = EXCLUDED.balance,
             currency = EXCLUDED.currency,
@@ -148,9 +148,9 @@ BEGIN
         reference_type, reference_id, created_by, created_at
     )
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/account-movement/1'), acc_receivable, v_org, 'charge', 48400, 48400, 'Venta demo VTA-00001', 'sale', sale1, 'seed', now() - interval '5 days'),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/account-movement/2'), acc_receivable, v_org, 'payment', 30000, 18400, 'Cobro parcial venta demo', 'sale', sale1, 'seed', now() - interval '4 days'),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/account-movement/3'), acc_payable, v_org, 'charge', 26620, 26620, 'Compra demo COMP-00001', 'purchase', pur1, 'seed', now() - interval '3 days')
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/account-movement/1'), acc_receivable, v_tenant, 'charge', 48400, 48400, 'Venta demo VTA-00001', 'sale', sale1, 'seed', now() - interval '5 days'),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/account-movement/2'), acc_receivable, v_tenant, 'payment', 30000, 18400, 'Cobro parcial venta demo', 'sale', sale1, 'seed', now() - interval '4 days'),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/account-movement/3'), acc_payable, v_tenant, 'charge', 26620, 26620, 'Compra demo COMP-00001', 'purchase', pur1, 'seed', now() - interval '3 days')
     ON CONFLICT (id) DO UPDATE
         SET amount = EXCLUDED.amount,
             balance = EXCLUDED.balance,
@@ -163,8 +163,8 @@ BEGIN
         notes, created_by, created_at, updated_at
     )
     VALUES
-        (rec1, v_org, 'Alquiler local', 350000, 'ARS', 'rent', 'transfer', 'monthly', 5, s2, true, CURRENT_DATE + 10, CURRENT_DATE - 20, 'Seed recurring rent', 'seed', now(), now()),
-        (rec2, v_org, 'Internet oficina', 45000, 'ARS', 'services', 'debit', 'monthly', 12, s1, true, CURRENT_DATE + 17, CURRENT_DATE - 13, 'Seed recurring internet', 'seed', now(), now())
+        (rec1, v_tenant, 'Alquiler local', 350000, 'ARS', 'rent', 'transfer', 'monthly', 5, s2, true, CURRENT_DATE + 10, CURRENT_DATE - 20, 'Seed recurring rent', 'seed', now(), now()),
+        (rec2, v_tenant, 'Internet oficina', 45000, 'ARS', 'services', 'debit', 'monthly', 12, s1, true, CURRENT_DATE + 17, CURRENT_DATE - 13, 'Seed recurring internet', 'seed', now(), now())
     ON CONFLICT (id) DO UPDATE
         SET description = EXCLUDED.description,
             amount = EXCLUDED.amount,
@@ -186,8 +186,8 @@ BEGIN
         )
         VALUES
             (
-                uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/1'),
-                v_org,
+                uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement-policy/1'),
+                v_tenant,
                 'Auto aprobar compras chicas',
                 'request.estimated_total <= 15000',
                 'allow',
@@ -200,8 +200,8 @@ BEGIN
                 now()
             ),
             (
-                uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/2'),
-                v_org,
+                uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement-policy/2'),
+                v_tenant,
                 'Escalar compras medianas',
                 'request.estimated_total > 15000',
                 'require_approval',
@@ -231,13 +231,13 @@ BEGIN
     )
     VALUES
         (
-            pr1, v_org, 'seed', 'Reposición de insumos taller', 'Compra de reposición para stock crítico',
+            pr1, v_tenant, 'seed', 'Reposición de insumos taller', 'Compra de reposición para stock crítico',
             'inventory', 'pending_approval', 25000, 'ARS',
             jsonb_build_object('decision', 'require_approval', 'policy', 'Escalar compras medianas'),
             NULL, now() - interval '2 days', now() - interval '1 day', NULL
         ),
         (
-            pr2, v_org, 'seed', 'Compra aprobada y convertida', 'Solicitud demo ya materializada en compra',
+            pr2, v_tenant, 'seed', 'Compra aprobada y convertida', 'Solicitud demo ya materializada en compra',
             'operations', 'approved', 26620, 'ARS',
             jsonb_build_object('decision', 'allow', 'policy', 'Auto aprobar compras chicas'),
             pur1, now() - interval '6 days', now() - interval '3 days', NULL
@@ -259,9 +259,9 @@ BEGIN
         id, request_id, description, product_id, quantity, unit_price_estimate, sort_order
     )
     VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-line/1'), pr1, 'Filtro de aceite', p1, 1, 12000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-line/2'), pr1, 'Lubricante', p3, 2, 6500, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-line/3'), pr2, 'Servicio Demo Mantenimiento', NULL, 1, 10000, 1)
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement-line/1'), pr1, 'Filtro de aceite', p1, 1, 12000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement-line/2'), pr1, 'Lubricante', p3, 2, 6500, 2),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/procurement-line/3'), pr2, 'Servicio Demo Mantenimiento', NULL, 1, 10000, 1)
     ON CONFLICT (id) DO UPDATE
         SET description = EXCLUDED.description,
             product_id = EXCLUDED.product_id,
@@ -274,9 +274,9 @@ BEGIN
         notes, received_at, created_by, created_at
     )
     VALUES
-        (pay1, v_org, 'sale', sale1, 'transfer', 30000, 'Cobro parcial seed', now() - interval '4 days', 'seed', now() - interval '4 days'),
-        (pay2, v_org, 'sale', sale2, 'cash', 11495, 'Cobro total seed', now() - interval '3 days', 'seed', now() - interval '3 days'),
-        (pay3, v_org, 'purchase', pur1, 'transfer', 12000, 'Pago parcial compra seed', now() - interval '2 days', 'seed', now() - interval '2 days')
+        (pay1, v_tenant, 'sale', sale1, 'transfer', 30000, 'Cobro parcial seed', now() - interval '4 days', 'seed', now() - interval '4 days'),
+        (pay2, v_tenant, 'sale', sale2, 'cash', 11495, 'Cobro total seed', now() - interval '3 days', 'seed', now() - interval '3 days'),
+        (pay3, v_tenant, 'purchase', pur1, 'transfer', 12000, 'Pago parcial compra seed', now() - interval '2 days', 'seed', now() - interval '2 days')
     ON CONFLICT (id) DO UPDATE
         SET method = EXCLUDED.method,
             amount = EXCLUDED.amount,
@@ -289,7 +289,7 @@ BEGIN
         refund_method, status, notes, created_by, created_at
     )
     VALUES (
-        ret1, v_org, 'DEV-00001', sale1, 'defective', 15000, 3150, 18150,
+        ret1, v_tenant, 'DEV-00001', sale1, 'defective', 15000, 3150, 18150,
         'credit_note', 'completed', 'Devolución demo por defecto', 'seed', now() - interval '2 days'
     )
     ON CONFLICT (tenant_id, number) DO UPDATE
@@ -306,7 +306,7 @@ BEGIN
         id, return_id, sale_item_id, product_id, description, quantity, unit_price, tax_rate, subtotal
     )
     VALUES (
-        uuid_generate_v5(v_org, 'pymes-seed/v1/return-item/1'),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/return-item/1'),
         ret1, sale_item1, p1, 'Producto Demo A', 1, 15000, 21, 15000
     )
     ON CONFLICT (id) DO UPDATE
@@ -320,7 +320,7 @@ BEGIN
         balance, expires_at, status, created_at
     )
     VALUES (
-        cn1, v_org, 'NC-00001', c1, ret1, 18150, 0, 18150,
+        cn1, v_tenant, 'NC-00001', c1, ret1, 18150, 0, 18150,
         now() + interval '90 days', 'active', now() - interval '2 days'
     )
     ON CONFLICT (id) DO UPDATE
@@ -336,20 +336,20 @@ BEGIN
     )
     VALUES
         (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/audit/1'),
-            v_org, 'seed', 'sale.created', 'sale', sale1::text,
+            uuid_generate_v5(v_tenant, 'pymes-seed/v1/audit/1'),
+            v_tenant, 'seed', 'sale.created', 'sale', sale1::text,
             jsonb_build_object('number', 'VTA-00001', 'total', 48400),
             NULL,
-            md5(v_org::text || ':audit:1'),
+            md5(v_tenant::text || ':audit:1'),
             now() - interval '5 days',
             'user', local_user, 'Local Admin'
         ),
         (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/audit/2'),
-            v_org, 'seed', 'purchase.received', 'purchase', pur1::text,
+            uuid_generate_v5(v_tenant, 'pymes-seed/v1/audit/2'),
+            v_tenant, 'seed', 'purchase.received', 'purchase', pur1::text,
             jsonb_build_object('number', 'COMP-00001', 'total', 26620),
-            md5(v_org::text || ':audit:1'),
-            md5(v_org::text || ':audit:2'),
+            md5(v_tenant::text || ':audit:1'),
+            md5(v_tenant::text || ':audit:2'),
             now() - interval '3 days',
             'user', local_user, 'Local Admin'
         )
@@ -369,14 +369,14 @@ BEGIN
     )
     VALUES
         (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/timeline/1'),
-            v_org, 'sales', sale1, 'note', 'Seguimiento comercial',
+            uuid_generate_v5(v_tenant, 'pymes-seed/v1/timeline/1'),
+            v_tenant, 'sales', sale1, 'note', 'Seguimiento comercial',
             'Cliente confirmó recepción del presupuesto y pasó a venta.', 'seed',
             jsonb_build_object('source', 'seed'), now() - interval '5 days'
         ),
         (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/timeline/2'),
-            v_org, 'purchases', pur1, 'note', 'Recepción parcial',
+            uuid_generate_v5(v_tenant, 'pymes-seed/v1/timeline/2'),
+            v_tenant, 'purchases', pur1, 'note', 'Recepción parcial',
             'La compra demo quedó recibida parcialmente con saldo pendiente.', 'seed',
             jsonb_build_object('source', 'seed'), now() - interval '3 days'
         )
@@ -391,7 +391,7 @@ BEGIN
         id, tenant_id, url, secret, events, is_active, created_by, created_at, updated_at
     )
     VALUES (
-        wh1, v_org, 'https://example.invalid/hooks/pymes', 'seed-secret',
+        wh1, v_tenant, 'https://example.invalid/hooks/pymes', 'seed-secret',
         ARRAY['sale.created', 'customer.updated', 'purchase.received'], true, 'seed', now(), now()
     )
     ON CONFLICT (id) DO UPDATE
@@ -406,12 +406,12 @@ BEGIN
     )
     VALUES
         (
-            notif1, v_org, local_user, 'Bienvenido al demo',
+            notif1, v_tenant, local_user, 'Bienvenido al demo',
             'Se cargó un set de datos de ejemplo para revisar el producto.', 'system',
-            'org', v_org::text, '{}'::jsonb, now() - interval '1 day'
+            'org', v_tenant::text, '{}'::jsonb, now() - interval '1 day'
         ),
         (
-            notif2, v_org, local_user, 'Solicitud pendiente',
+            notif2, v_tenant, local_user, 'Solicitud pendiente',
             'La solicitud de compra demo quedó pendiente de aprobación.', 'approval',
             'procurement_request', pr1::text, jsonb_build_object('action', 'approve'), now() - interval '12 hours'
         )
@@ -429,11 +429,11 @@ BEGIN
         id, tenant_id, number, customer_name, issued_date, due_date, status,
         subtotal, discount_percent, tax_percent, total, notes, is_favorite, tags, created_by
     ) VALUES
-        (inv1, v_org, 'INV-4001', 'Distribuidora Norte',   DATE '2026-04-05', DATE '2026-04-15', 'paid',    107500, 5,  21, 123661.125, '', true,  ARRAY['mayorista','recurrente']::text[], 'seed'),
-        (inv2, v_org, 'INV-4002', 'Café Central',          DATE '2026-04-15', DATE '2026-04-25', 'pending',  90800, 0,  21, 109868,     '', false, ARRAY['gastronomia']::text[],            'seed'),
-        (inv3, v_org, 'INV-4003', 'Ferretería Sur',        DATE '2026-03-10', DATE '2026-03-20', 'overdue',  57000, 0,  21, 68970,      '', false, ARRAY['urgente','cobrar']::text[],       'seed'),
-        (inv4, v_org, 'INV-4004', 'Taller Mecánica Beta',  DATE '2026-04-20', DATE '2026-05-05', 'pending',  81000, 10, 21, 88209,      '', false, ARRAY['soporte']::text[],                'seed'),
-        (inv5, v_org, 'INV-4005', 'Panadería La Esquina',  DATE '2026-04-12', DATE '2026-04-22', 'paid',     92000, 0,  21, 111320,     '', true,  ARRAY['gastronomia','mayorista']::text[], 'seed')
+        (inv1, v_tenant, 'INV-4001', 'Distribuidora Norte',   DATE '2026-04-05', DATE '2026-04-15', 'paid',    107500, 5,  21, 123661.125, '', true,  ARRAY['mayorista','recurrente']::text[], 'seed'),
+        (inv2, v_tenant, 'INV-4002', 'Café Central',          DATE '2026-04-15', DATE '2026-04-25', 'pending',  90800, 0,  21, 109868,     '', false, ARRAY['gastronomia']::text[],            'seed'),
+        (inv3, v_tenant, 'INV-4003', 'Ferretería Sur',        DATE '2026-03-10', DATE '2026-03-20', 'overdue',  57000, 0,  21, 68970,      '', false, ARRAY['urgente','cobrar']::text[],       'seed'),
+        (inv4, v_tenant, 'INV-4004', 'Taller Mecánica Beta',  DATE '2026-04-20', DATE '2026-05-05', 'pending',  81000, 10, 21, 88209,      '', false, ARRAY['soporte']::text[],                'seed'),
+        (inv5, v_tenant, 'INV-4005', 'Panadería La Esquina',  DATE '2026-04-12', DATE '2026-04-22', 'paid',     92000, 0,  21, 111320,     '', true,  ARRAY['gastronomia','mayorista']::text[], 'seed')
     ON CONFLICT (id) DO UPDATE
         SET number = EXCLUDED.number,
             customer_name = EXCLUDED.customer_name,
@@ -451,23 +451,23 @@ BEGIN
     -- Line items asociados (limpiamos y recreamos idempotente).
     DELETE FROM invoice_line_items WHERE invoice_id IN (inv1, inv2, inv3, inv4, inv5);
     INSERT INTO invoice_line_items (id, invoice_id, description, qty, unit, unit_price, line_total, sort_order) VALUES
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1/line/1'), inv1, 'Instalación de red',         1,  'servicio', 85000, 85000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/1/line/2'), inv1, 'Cable UTP cat 6',            50, 'metro',      450, 22500, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2/line/1'), inv2, 'Café en grano premium',      10, 'kg',        7800, 78000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/2/line/2'), inv2, 'Vajilla descartable',         4, 'caja',      3200, 12800, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/3/line/1'), inv3, 'Asesoría técnica',            6, 'hora',      9500, 57000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4/line/1'), inv4, 'Mantenimiento de software',   1, 'servicio', 45000, 45000, 1),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/4/line/2'), inv4, 'Capacitación de equipo',      3, 'hora',     12000, 36000, 2),
-        (uuid_generate_v5(v_org, 'pymes-seed/v1/invoice/5/line/1'), inv5, 'Harina 000 bolsa 25 kg',      8, 'bolsa',    11500, 92000, 1);
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/1/line/1'), inv1, 'Instalación de red',         1,  'servicio', 85000, 85000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/1/line/2'), inv1, 'Cable UTP cat 6',            50, 'metro',      450, 22500, 2),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/2/line/1'), inv2, 'Café en grano premium',      10, 'kg',        7800, 78000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/2/line/2'), inv2, 'Vajilla descartable',         4, 'caja',      3200, 12800, 2),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/3/line/1'), inv3, 'Asesoría técnica',            6, 'hora',      9500, 57000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/4/line/1'), inv4, 'Mantenimiento de software',   1, 'servicio', 45000, 45000, 1),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/4/line/2'), inv4, 'Capacitación de equipo',      3, 'hora',     12000, 36000, 2),
+        (uuid_generate_v5(v_tenant, 'pymes-seed/v1/invoice/5/line/1'), inv5, 'Harina 000 bolsa 25 kg',      8, 'bolsa',    11500, 92000, 1);
 
     -- Employees demo (F1): 3 empleados cubriendo estados active / inactive.
     INSERT INTO employees (
         id, tenant_id, first_name, last_name, email, phone, position, status,
         hire_date, notes, is_favorite, tags, created_by
     ) VALUES
-        (emp1, v_org, 'María',    'Gómez',    'maria.gomez@demo.pymes',    '+54 9 11 2345 6789', 'Administración',     'active',   DATE '2024-03-01', '',  true,  ARRAY['administracion']::text[], 'seed'),
-        (emp2, v_org, 'Carlos',   'Ramírez',  'carlos.ramirez@demo.pymes', '+54 9 11 4567 8901', 'Operario',           'active',   DATE '2023-11-15', '',  false, ARRAY['operaciones']::text[],    'seed'),
-        (emp3, v_org, 'Lucía',    'Fernández','lucia.fernandez@demo.pymes','+54 9 11 6789 0123', 'Atención al cliente','inactive', DATE '2022-07-20', '',  false, ARRAY['comercial']::text[],      'seed')
+        (emp1, v_tenant, 'María',    'Gómez',    'maria.gomez@demo.pymes',    '+54 9 11 2345 6789', 'Administración',     'active',   DATE '2024-03-01', '',  true,  ARRAY['administracion']::text[], 'seed'),
+        (emp2, v_tenant, 'Carlos',   'Ramírez',  'carlos.ramirez@demo.pymes', '+54 9 11 4567 8901', 'Operario',           'active',   DATE '2023-11-15', '',  false, ARRAY['operaciones']::text[],    'seed'),
+        (emp3, v_tenant, 'Lucía',    'Fernández','lucia.fernandez@demo.pymes','+54 9 11 6789 0123', 'Atención al cliente','inactive', DATE '2022-07-20', '',  false, ARRAY['comercial']::text[],      'seed')
     ON CONFLICT (id) DO UPDATE
         SET first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name,

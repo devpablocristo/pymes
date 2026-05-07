@@ -1,72 +1,19 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth, useOrganizationList, useSession } from '@clerk/react';
 import { Route, Routes, Navigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { clerkEnabled } from '../lib/auth';
-import { getTenantSettings } from '../lib/api';
 import { BranchProvider } from '../lib/branchContext';
-import { queryKeys } from '../lib/queryKeys';
-import { hasCompletedOnboarding, syncTenantProfileFromSettings } from '../lib/tenantProfile';
+import { clearTenantProfile } from '../lib/tenantProfile';
 import { InviteAcceptPage, LoginPage, OnboardingPage, Shell, SignupPage } from './lazyRoutes';
 import { ShellRoutes } from './ShellRoutes';
 import { Suspended } from './suspended';
-
-function RequireOnboarding({ children }: { children: ReactNode }) {
-  const localProfileExists = hasCompletedOnboarding();
-
-  const tenantSettingsQuery = useQuery({
-    queryKey: queryKeys.tenant.settings,
-    queryFn: getTenantSettings,
-    staleTime: 60_000,
-    retry: 2,
-    retryDelay: 1_000,
-  });
-  const tenantSettings = tenantSettingsQuery.data;
-
-  useEffect(() => {
-    if (!tenantSettings) {
-      return;
-    }
-    syncTenantProfileFromSettings(tenantSettings);
-  }, [tenantSettings]);
-
-  // Si localStorage confirma onboarding completado, no bloquear la UI
-  // mientras la API carga o si falla transitoriamente (hard refresh, token no listo).
-  if (localProfileExists) {
-    if (tenantSettingsQuery.isPending) {
-      return <>{children}</>;
-    }
-  }
-
-  // Sin perfil local, o con perfil local potencialmente viejo: depender de la API.
-  if (tenantSettingsQuery.isPending) {
-    return <div className="spinner" aria-label="Cargando" />;
-  }
-
-  if (tenantSettingsQuery.isError || !tenantSettings) {
-    if (localProfileExists) {
-      return <>{children}</>;
-    }
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>No se pudo cargar la configuración del tenant.</p>
-        <button type="button" onClick={() => tenantSettingsQuery.refetch()} style={{ marginTop: '1rem' }}>
-          Reintentar
-        </button>
-      </div>
-    );
-  }
-
-  if (!tenantSettings.onboarding_completed_at) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  return <>{children}</>;
-}
+import { TenantAccessBoundary } from './TenantAccessBoundary';
 
 function RequireActiveTenant({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const { isLoaded: authLoaded, isSignedIn, orgId } = useAuth();
   const { session } = useSession();
   const {
@@ -86,13 +33,15 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
       }
       setSwitchingTenantID(tenantID);
       try {
+        clearTenantProfile();
+        queryClient.clear();
         await setActive({ organization: tenantID });
         await session?.reload();
       } finally {
         setSwitchingTenantID('');
       }
     },
-    [session, setActive],
+    [queryClient, session, setActive],
   );
 
   useEffect(() => {
@@ -217,7 +166,7 @@ export function App() {
               <ProtectedRoute>
                 {clerkEnabled ? (
                   <RequireActiveTenant>
-                    <RequireOnboarding>
+                    <TenantAccessBoundary>
                       <BranchProvider>
                         <Suspended>
                           <Shell>
@@ -225,10 +174,10 @@ export function App() {
                           </Shell>
                         </Suspended>
                       </BranchProvider>
-                    </RequireOnboarding>
+                    </TenantAccessBoundary>
                   </RequireActiveTenant>
                 ) : (
-                  <RequireOnboarding>
+                  <TenantAccessBoundary>
                     <BranchProvider>
                       <Suspended>
                         <Shell>
@@ -236,7 +185,7 @@ export function App() {
                         </Shell>
                       </Suspended>
                     </BranchProvider>
-                  </RequireOnboarding>
+                  </TenantAccessBoundary>
                 )}
               </ProtectedRoute>
             </StrictDevShell>

@@ -3,9 +3,9 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
@@ -14,10 +14,10 @@ BEGIN
         color, notes, metadata, is_favorite, tags, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
+        v_tenant,
         'bicycle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
         (ARRAY[
             'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
             'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
@@ -64,13 +64,13 @@ BEGIN
         is_favorite, tags, created_by, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
+        v_tenant,
         'OT-BIKE-' || lpad(gs::text, 3, '0'),
         'bicycle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/bicycle/' || gs::text),
         (ARRAY['Trek Marlin 7', 'Specialized Rockhopper', 'Giant Talon 2', 'Scott Aspect 940', 'Cannondale Trail 6', 'Merida Big Nine', 'Venzo Raptor', 'Raleigh Mojave', 'Bianchi Impulso', 'Vairo XR 4.0'])[gs],
-        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
         (ARRAY[
             'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
             'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
@@ -145,9 +145,9 @@ BEGIN
             updated_at = now();
 
     DELETE FROM workshops.work_order_items
-    WHERE tenant_id = v_org
+    WHERE tenant_id = v_tenant
       AND work_order_id IN (
-        SELECT uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text)
+        SELECT uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/bike/' || gs::text)
         FROM generate_series(1, 10) AS gs
       );
 
@@ -156,9 +156,9 @@ BEGIN
         description, quantity, unit_price, tax_rate, sort_order, metadata
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/bike/' || gs::text || '/service'),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/woi/bike/' || gs::text || '/service'),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
         'service',
         NULL::uuid,
         NULL::uuid,
@@ -175,9 +175,9 @@ BEGIN
     FROM generate_series(1, 10) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/bike/' || gs::text || '/part'),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/woi/bike/' || gs::text || '/part'),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/bike/' || gs::text),
         'part',
         NULL::uuid,
         NULL::uuid,

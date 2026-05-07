@@ -16,7 +16,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
 )
 
-// PolicyCreateInput crea una política CEL por organización.
+// PolicyCreateInput crea una política CEL por tenant.
 type PolicyCreateInput struct {
 	TenantID     uuid.UUID
 	Actor        string
@@ -45,10 +45,10 @@ type PolicyUpdateInput struct {
 	SystemFilter string
 }
 
-// ListPoliciesForOrg lista las policies de procurement del tenant — proxy a
-// Nexus, scopeado por X-Org-ID = tenantID. Sin almacenamiento local.
-func (u *Usecases) ListPoliciesForOrg(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error) {
-	st, raw, err := u.governance.ListPolicies(ctx, governanceclient.WithOrgID(tenantID.String()))
+// ListPoliciesForTenant lista las policies de procurement del tenant: proxy a
+// Nexus, sin almacenamiento local en Pymes.
+func (u *Usecases) ListPoliciesForTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error) {
+	st, raw, err := u.governance.ListPoliciesForTenant(ctx, tenantID.String())
 	if err != nil {
 		return nil, fmt.Errorf("nexus list policies: %w", err)
 	}
@@ -69,7 +69,7 @@ func (u *Usecases) ListPoliciesForOrg(ctx context.Context, tenantID uuid.UUID) (
 }
 
 func (u *Usecases) GetPolicy(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementPolicy, error) {
-	st, raw, err := u.governance.GetPolicy(ctx, id.String(), governanceclient.WithOrgID(tenantID.String()))
+	st, raw, err := u.governance.GetPolicyForTenant(ctx, tenantID.String(), id.String())
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus get policy: %w", err)
 	}
@@ -100,7 +100,7 @@ func (u *Usecases) CreatePolicy(ctx context.Context, in PolicyCreateInput) (doma
 	}
 	body := nexusPolicyCreateBody(in, mode)
 
-	st, raw, err := u.governance.CreatePolicy(ctx, body, governanceclient.WithOrgID(in.TenantID.String()))
+	st, raw, err := u.governance.CreatePolicyForTenant(ctx, in.TenantID.String(), body)
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus create policy: %w", err)
 	}
@@ -131,7 +131,7 @@ func (u *Usecases) UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (doma
 	}
 	body := nexusPolicyUpdateBody(in, mode)
 
-	st, raw, err := u.governance.UpdatePolicy(ctx, in.ID.String(), body, governanceclient.WithOrgID(in.TenantID.String()))
+	st, raw, err := u.governance.UpdatePolicyForTenant(ctx, in.TenantID.String(), in.ID.String(), body)
 	if err != nil {
 		return domain.ProcurementPolicy{}, fmt.Errorf("nexus update policy: %w", err)
 	}
@@ -158,7 +158,7 @@ func (u *Usecases) DeletePolicy(ctx context.Context, tenantID, id uuid.UUID, act
 	if strings.TrimSpace(actor) == "" {
 		return domainerr.Validation("actor is required")
 	}
-	st, err := u.governance.DeletePolicy(ctx, id.String(), governanceclient.WithOrgID(tenantID.String()))
+	st, err := u.governance.DeletePolicyForTenant(ctx, tenantID.String(), id.String())
 	if err != nil {
 		return fmt.Errorf("nexus delete policy: %w", err)
 	}

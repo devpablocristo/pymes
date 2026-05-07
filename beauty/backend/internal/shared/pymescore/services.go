@@ -12,6 +12,6 @@ func (c *Client) GetService(ctx context.Context, tenantID, serviceID string) (ma
 
 type CoreService = pymescoreops.CoreService
 
-func (c *Client) ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]CoreService, error) {
-	return pymescoreops.ListPublicServices(ctx, c.Client, orgRef, vertical, segment, search)
+func (c *Client) ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]CoreService, error) {
+	return pymescoreops.ListPublicServices(ctx, c.Client, tenantRef, vertical, segment, search)
 }

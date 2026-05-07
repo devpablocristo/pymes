@@ -21,7 +21,7 @@ export const billingMessages: TranslationsByLanguage = {
     'billing.plan.enterprise': 'Empresas',
     'billing.plan.starterDesc': 'Para equipos pequeños',
     'billing.plan.growthDesc': 'Para empresas en crecimiento',
-    'billing.plan.enterpriseDesc': 'Para grandes organizaciones',
+    'billing.plan.enterpriseDesc': 'Para grandes empresas',
     'billing.notice.stripeNotConfigured':
       'En este entorno los pagos con Stripe no están configurados. Es normal en desarrollo: configurá las variables de Stripe en el backend o usá otro ambiente.',
     'billing.error.unreachable': 'No se pudo conectar con el servicio de facturación.',

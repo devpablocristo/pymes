@@ -46,7 +46,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -117,7 +117,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -131,7 +131,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -155,7 +155,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -178,7 +178,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -195,7 +195,7 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -208,7 +208,7 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -264,9 +264,9 @@ func buildCreateInput(tenantID uuid.UUID, req dto.CreatePurchaseRequest, actor s
 	return CreateInput{TenantID: tenantID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), IsFavorite: isFavorite, Tags: req.Tags, Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	return handlers.ParseAuthTenantID(c)
 }
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

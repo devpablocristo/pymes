@@ -149,7 +149,7 @@ func TestGetWidgetDataRejectsWidgetHiddenByRole(t *testing.T) {
 	}
 }
 
-func TestGetWidgetDataRequiresOrgID(t *testing.T) {
+func TestGetWidgetDataRequiresTenantID(t *testing.T) {
 	repo := &fakeDashboardRepo{
 		widgets: []dashboarddomain.WidgetDefinition{
 			{

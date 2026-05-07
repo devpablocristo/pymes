@@ -25,7 +25,7 @@ Los pagos se validan por DB porque la pantalla/API visible lista pagos asociados
 
 ## Variables utiles
 
-- `PYMES_SEED_DEMO_ORG_EXTERNAL_ID`: tenant/org externo usado como demo.
+- `PYMES_SEED_DEMO_TENANT_EXTERNAL_ID`: tenant/org externo usado como demo.
 - `SEED_VERIFY_API_KEY`: API key para checks HTTP (default: `VITE_API_KEY` o `psk_local_admin`).
 - `SEED_VERIFY_CORE_URL`, `SEED_VERIFY_WORKSHOPS_URL`, `SEED_VERIFY_PROFESSIONALS_URL`, `SEED_VERIFY_RESTAURANTS_URL`: URLs de backends.
 - `SEED_VERIFY_SKIP_API=1`: ejecuta solo checks DB.

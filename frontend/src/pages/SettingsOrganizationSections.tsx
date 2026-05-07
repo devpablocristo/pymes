@@ -8,7 +8,7 @@ import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { queryKeys } from '../lib/queryKeys';
 import { clearTenantProfile, syncTenantProfileFromSettings } from '../lib/tenantProfile';
 
-/** Nombre de organización: solo aquí (y en onboarding), sin OrganizationSwitcher en la barra. */
+/** Nombre de tenant: solo aquí (y en onboarding), sin OrganizationSwitcher en la barra. */
 export function ClerkOrganizationNameSection({ t }: { t: (key: string) => string }) {
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const { orgRole, isLoaded: authLoaded } = useAuth();
@@ -163,7 +163,7 @@ export function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => st
       ]);
       const tenantSettings = await queryClient.fetchQuery({
         queryKey: queryKeys.tenant.settings,
-        queryFn: getTenantSettings,
+        queryFn: () => getTenantSettings(),
       });
       syncTenantProfileFromSettings(tenantSettings);
       navigate(tenantSettings.onboarding_completed_at ? '/' : '/onboarding', { replace: true });

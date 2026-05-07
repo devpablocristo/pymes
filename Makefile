@@ -3,7 +3,7 @@
 .PHONY: \
 	up down ps logs \
 	go-compile staticcheck ruff lint \
-	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt frontend-typecheck ai-test \
+	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt audit-governance frontend-typecheck ai-test \
 	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
@@ -55,7 +55,7 @@ ruff:
 lint: staticcheck ruff
 
 # Auditorias de saneamiento arquitectural: no cambian comportamiento productivo.
-audit: audit-crud audit-debt
+audit: audit-crud audit-debt audit-governance
 
 # Baseline reproducible antes de refactors estructurales.
 audit-baseline: go-compile audit frontend-typecheck ruff ai-test
@@ -71,6 +71,9 @@ audit-crud-strict:
 
 audit-debt:
 	@python3 scripts/audit/debt_scan.py
+
+audit-governance:
+	@bash scripts/audit/governance_boundary.sh
 
 frontend-typecheck:
 	cd frontend && npm run typecheck

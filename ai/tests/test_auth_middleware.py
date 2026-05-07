@@ -71,7 +71,7 @@ def test_professionals_chat_api_key_uses_resolved_identity() -> None:
             "X-API-KEY": "psk_test",
             "X-Actor": "spoofed-user",
             "X-Role": "admin",
-            "X-Org-ID": "spoofed-org",
+            "X-Pymes-Tenant-ID": "spoofed-tenant",
             "X-Scopes": "customers:write,unknown:scope",
         },
     )
@@ -132,7 +132,7 @@ def test_workshops_chat_api_key_uses_resolved_identity() -> None:
         "/v1/workshops/auto-repair/chat",
         headers={
             "X-API-KEY": "psk_test",
-            "X-Org-ID": "spoofed-org",
+            "X-Pymes-Tenant-ID": "spoofed-tenant",
             "X-Scopes": "work_orders:read,unknown:scope",
         },
     )

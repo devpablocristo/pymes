@@ -41,7 +41,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) ListEndpoints(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -54,7 +54,7 @@ func (h *Handler) ListEndpoints(c *gin.Context) {
 }
 
 func (h *Handler) CreateEndpoint(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -73,7 +73,7 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) GetEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handler) GetEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) UpdateEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -115,7 +115,7 @@ func (h *Handler) UpdateEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) DeleteEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) DeleteEndpoint(c *gin.Context) {
 }
 
 func (h *Handler) ListDeliveries(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -141,7 +141,7 @@ func (h *Handler) ListDeliveries(c *gin.Context) {
 }
 
 func (h *Handler) TestEndpoint(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -180,7 +180,7 @@ func (r endpointRequest) IsActiveOrDefault() bool {
 	return *r.IsActive
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	auth := handlers.GetAuthContext(c)
 	tenantID, err := uuid.Parse(auth.TenantID)
 	if err != nil {
@@ -190,8 +190,8 @@ func parseOrg(c *gin.Context) (uuid.UUID, bool) {
 	return tenantID, true
 }
 
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, ok := parseOrg(c)
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}

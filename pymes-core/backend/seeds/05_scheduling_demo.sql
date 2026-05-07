@@ -2,28 +2,28 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
-    v_branch uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/central');
-    v_branch_norte uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/norte');
-    v_branch_sur uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/branch/sur');
-    v_service uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_consultation');
-    v_catchall uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/general_appointment');
-    v_service_quick uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/service/quick_session');
-    v_resource uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-1');
-    v_resource2 uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-2');
-    v_resource3 uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/resource/professional-3');
-    v_queue uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/frontdesk');
-    v_queue2 uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/express');
-    v_queue3 uuid := uuid_generate_v5(v_org, 'modules-scheduling/v1/queue/priority');
+    v_tenant uuid := '__SEED_TENANT_ID__';
+    v_branch uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/branch/central');
+    v_branch_norte uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/branch/norte');
+    v_branch_sur uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/branch/sur');
+    v_service uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/service/general_consultation');
+    v_catchall uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/service/general_appointment');
+    v_service_quick uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/service/quick_session');
+    v_resource uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/resource/professional-1');
+    v_resource2 uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/resource/professional-2');
+    v_resource3 uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/resource/professional-3');
+    v_queue uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/queue/frontdesk');
+    v_queue2 uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/queue/express');
+    v_queue3 uuid := uuid_generate_v5(v_tenant, 'modules-scheduling/v1/queue/priority');
     v_today date := CURRENT_DATE;
     v_rule_base text := 'modules-scheduling/v1/rule/';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
     INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active)
-    VALUES (v_branch, v_org, 'central', 'Sucursal Central', 'America/Argentina/Tucuman', 'Casa central demo', true)
+    VALUES (v_branch, v_tenant, 'central', 'Sucursal Central', 'America/Argentina/Tucuman', 'Casa central demo', true)
     ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
             timezone = EXCLUDED.timezone,
@@ -33,8 +33,8 @@ BEGIN
 
     INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active)
     VALUES
-        (v_branch_norte, v_org, 'norte', 'Sucursal Norte', 'America/Argentina/Tucuman', 'Sede norte demo', true),
-        (v_branch_sur, v_org, 'sur', 'Sucursal Sur', 'America/Argentina/Tucuman', 'Sede sur demo', true)
+        (v_branch_norte, v_tenant, 'norte', 'Sucursal Norte', 'America/Argentina/Tucuman', 'Sede norte demo', true),
+        (v_branch_sur, v_tenant, 'sur', 'Sucursal Sur', 'America/Argentina/Tucuman', 'Sede sur demo', true)
     ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
             timezone = EXCLUDED.timezone,
@@ -49,7 +49,7 @@ BEGIN
         allow_waitlist, active
     )
     VALUES (
-        v_service, v_org, 'general_consultation', 'Consulta general', 'Servicio demo reutilizable para agenda',
+        v_service, v_tenant, 'general_consultation', 'Consulta general', 'Servicio demo reutilizable para agenda',
         'hybrid', 30, 0, 10, 30, 1, 60, true, true
     )
     ON CONFLICT (id) DO UPDATE
@@ -73,7 +73,7 @@ BEGIN
         allow_waitlist, active
     )
     VALUES (
-        v_service_quick, v_org, 'quick_session', 'Sesión rápida', 'Demo de slots cortos para agenda',
+        v_service_quick, v_tenant, 'quick_session', 'Sesión rápida', 'Demo de slots cortos para agenda',
         'schedule', 20, 0, 5, 15, 1, 30, false, true
     )
     ON CONFLICT (id) DO UPDATE
@@ -92,9 +92,9 @@ BEGIN
 
     INSERT INTO scheduling_resources (id, org_id, branch_id, code, name, kind, capacity, timezone, active)
     VALUES
-        (v_resource, v_org, v_branch, 'professional_1', 'Profesional Demo', 'professional', 1, 'America/Argentina/Tucuman', true),
-        (v_resource2, v_org, v_branch, 'professional_2', 'Profesional Demo 2', 'professional', 1, 'America/Argentina/Tucuman', true),
-        (v_resource3, v_org, v_branch, 'professional_3', 'Profesional Demo 3', 'professional', 1, 'America/Argentina/Tucuman', true)
+        (v_resource, v_tenant, v_branch, 'professional_1', 'Profesional Demo', 'professional', 1, 'America/Argentina/Tucuman', true),
+        (v_resource2, v_tenant, v_branch, 'professional_2', 'Profesional Demo 2', 'professional', 1, 'America/Argentina/Tucuman', true),
+        (v_resource3, v_tenant, v_branch, 'professional_3', 'Profesional Demo 3', 'professional', 1, 'America/Argentina/Tucuman', true)
     ON CONFLICT (id) DO UPDATE
         SET branch_id = EXCLUDED.branch_id,
             name = EXCLUDED.name,
@@ -122,7 +122,7 @@ BEGIN
         ticket_prefix, last_issued_number, avg_service_seconds, allow_remote_join
     )
     VALUES (
-        v_queue, v_org, v_branch, v_service, 'frontdesk', 'Front Desk',
+        v_queue, v_tenant, v_branch, v_service, 'frontdesk', 'Front Desk',
         'active', 'fifo', 'FD', 0, 600, true
     )
     ON CONFLICT (id) DO UPDATE
@@ -142,11 +142,11 @@ BEGIN
     )
     VALUES
         (
-            v_queue2, v_org, v_branch, v_service, 'express_desk', 'Mostrador Express',
+            v_queue2, v_tenant, v_branch, v_service, 'express_desk', 'Mostrador Express',
             'active', 'fifo', 'EX', 0, 420, true
         ),
         (
-            v_queue3, v_org, v_branch, v_service_quick, 'quick_lane', 'Sesiones rápidas',
+            v_queue3, v_tenant, v_branch, v_service_quick, 'quick_lane', 'Sesiones rápidas',
             'active', 'fifo', 'QK', 0, 900, true
         )
     ON CONFLICT (id) DO UPDATE
@@ -161,7 +161,7 @@ BEGIN
             updated_at = now();
 
     DELETE FROM scheduling_availability_rules
-    WHERE org_id = v_org
+    WHERE org_id = v_tenant
       AND (
         branch_id IN (v_branch, v_branch_norte, v_branch_sur)
         OR resource_id IN (v_resource, v_resource2, v_resource3)
@@ -171,18 +171,18 @@ BEGIN
         id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'branch/weekday/' || gs::text || '/am'),
-        v_org, v_branch, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'branch/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'branch/weekday/' || gs::text || '/pm'),
-        v_org, v_branch, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'branch/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'branch/' || gs::text),
-        v_org, v_branch, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'branch/' || gs::text),
+        v_tenant, v_branch, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -190,18 +190,18 @@ BEGIN
         id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'norte/branch/weekday/' || gs::text || '/am'),
-        v_org, v_branch_norte, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'norte/branch/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch_norte, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'norte/branch/weekday/' || gs::text || '/pm'),
-        v_org, v_branch_norte, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'norte/branch/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch_norte, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'norte/branch/' || gs::text),
-        v_org, v_branch_norte, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'norte/branch/' || gs::text),
+        v_tenant, v_branch_norte, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -209,18 +209,18 @@ BEGIN
         id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'sur/branch/weekday/' || gs::text || '/am'),
-        v_org, v_branch_sur, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'sur/branch/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch_sur, 'branch', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'sur/branch/weekday/' || gs::text || '/pm'),
-        v_org, v_branch_sur, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'sur/branch/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch_sur, 'branch', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'sur/branch/' || gs::text),
-        v_org, v_branch_sur, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'sur/branch/' || gs::text),
+        v_tenant, v_branch_sur, 'branch', gs, TIME '09:00', TIME '18:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -228,18 +228,18 @@ BEGIN
         id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'resource/weekday/' || gs::text || '/am'),
-        v_org, v_branch, v_resource, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'resource/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch, v_resource, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'resource/weekday/' || gs::text || '/pm'),
-        v_org, v_branch, v_resource, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'resource/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch, v_resource, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'resource/' || gs::text),
-        v_org, v_branch, v_resource, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'resource/' || gs::text),
+        v_tenant, v_branch, v_resource, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -247,18 +247,18 @@ BEGIN
         id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-2/resource/weekday/' || gs::text || '/am'),
-        v_org, v_branch, v_resource2, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-2/resource/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch, v_resource2, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-2/resource/weekday/' || gs::text || '/pm'),
-        v_org, v_branch, v_resource2, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-2/resource/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch, v_resource2, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-2/resource/' || gs::text),
-        v_org, v_branch, v_resource2, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-2/resource/' || gs::text),
+        v_tenant, v_branch, v_resource2, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -266,18 +266,18 @@ BEGIN
         id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-3/resource/weekday/' || gs::text || '/am'),
-        v_org, v_branch, v_resource3, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-3/resource/weekday/' || gs::text || '/am'),
+        v_tenant, v_branch, v_resource3, 'resource', gs, TIME '09:00', TIME '13:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-3/resource/weekday/' || gs::text || '/pm'),
-        v_org, v_branch, v_resource3, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-3/resource/weekday/' || gs::text || '/pm'),
+        v_tenant, v_branch, v_resource3, 'resource', gs, TIME '14:00', TIME '18:00', 30, true
     FROM generate_series(1, 5) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, v_rule_base || 'professional-3/resource/' || gs::text),
-        v_org, v_branch, v_resource3, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
+        uuid_generate_v5(v_tenant, v_rule_base || 'professional-3/resource/' || gs::text),
+        v_tenant, v_branch, v_resource3, 'resource', gs, TIME '09:00', TIME '17:00', 30, true
     FROM unnest(ARRAY[0,6]) AS gs
     ON CONFLICT (id) DO NOTHING;
 
@@ -288,7 +288,7 @@ BEGIN
         allow_waitlist, active, metadata
     )
     VALUES (
-        v_catchall, v_org, 'general_appointment', 'Turno general',
+        v_catchall, v_tenant, 'general_appointment', 'Turno general',
         'Servicio comodín para anotar turnos ad-hoc desde el calendario interno.',
         'schedule', 15, 0, 0, 15, 1, 0, false, true, '{"catchall": true}'::jsonb
     )
@@ -313,8 +313,8 @@ BEGIN
     )
     VALUES
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-1'),
-        v_org, v_branch, v_service, v_resource, uuid_generate_v5(v_org, 'pymes-seed/v1/customer/1'),
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/booking/demo-1'),
+        v_tenant, v_branch, v_service, v_resource, uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/1'),
         'DEMO-001', 'Juan Pérez', '+5491111111111', 'juan@local.dev', 'confirmed', 'admin',
         (v_today + time '10:00') AT TIME ZONE 'America/Argentina/Tucuman',
         (v_today + time '10:30') AT TIME ZONE 'America/Argentina/Tucuman',
@@ -323,8 +323,8 @@ BEGIN
         'Turno demo confirmado', '{}'::jsonb, 'seed', now() - interval '1 day', now(), now()
       ),
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-2'),
-        v_org, v_branch, v_service, v_resource, NULL,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/booking/demo-2'),
+        v_tenant, v_branch, v_service, v_resource, NULL,
         'DEMO-002', 'María López', '+5491122222222', 'maria@local.dev', 'confirmed', 'admin',
         (v_today + time '14:00') AT TIME ZONE 'America/Argentina/Tucuman',
         (v_today + time '14:30') AT TIME ZONE 'America/Argentina/Tucuman',
@@ -333,8 +333,8 @@ BEGIN
         'Turno demo confirmado', '{}'::jsonb, 'seed', now() - interval '1 day', now(), now()
       ),
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-3'),
-        v_org, v_branch, v_service, v_resource, NULL,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/booking/demo-3'),
+        v_tenant, v_branch, v_service, v_resource, NULL,
         'DEMO-003', 'Carlos Gómez', '+5491133333333', 'carlos@local.dev', 'pending_confirmation', 'admin',
         ((v_today + 1) + time '11:00') AT TIME ZONE 'America/Argentina/Tucuman',
         ((v_today + 1) + time '11:30') AT TIME ZONE 'America/Argentina/Tucuman',
@@ -343,8 +343,8 @@ BEGIN
         'Turno demo pendiente', '{}'::jsonb, 'seed', NULL, now(), now()
       ),
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/booking/demo-4'),
-        v_org, v_branch, v_service, v_resource, NULL,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/booking/demo-4'),
+        v_tenant, v_branch, v_service, v_resource, NULL,
         'DEMO-004', 'Ana Martínez', '+5491144444444', 'ana@local.dev', 'confirmed', 'admin',
         ((v_today + 2) + time '15:30') AT TIME ZONE 'America/Argentina/Tucuman',
         ((v_today + 2) + time '16:00') AT TIME ZONE 'America/Argentina/Tucuman',
@@ -374,20 +374,20 @@ BEGIN
     )
     VALUES
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-1'),
-        v_org, v_queue, v_branch, v_service,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/ticket/demo-1'),
+        v_tenant, v_queue, v_branch, v_service,
         'Pedro Sánchez', '+5491155555555', 1, 'FD-001', 'waiting', 0, 'reception',
         now() - interval '15 minutes', now() - interval '15 minutes', now() - interval '15 minutes'
       ),
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-2'),
-        v_org, v_queue, v_branch, v_service,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/ticket/demo-2'),
+        v_tenant, v_queue, v_branch, v_service,
         'Lucía Fernández', '+5491166666666', 2, 'FD-002', 'waiting', 0, 'reception',
         now() - interval '8 minutes', now() - interval '8 minutes', now() - interval '8 minutes'
       ),
       (
-        uuid_generate_v5(v_org, 'modules-scheduling/v1/ticket/demo-3'),
-        v_org, v_queue, v_branch, v_service,
+        uuid_generate_v5(v_tenant, 'modules-scheduling/v1/ticket/demo-3'),
+        v_tenant, v_queue, v_branch, v_service,
         'Roberto Díaz', '+5491177777777', 3, 'FD-003', 'waiting', 0, 'reception',
         now() - interval '3 minutes', now() - interval '3 minutes', now() - interval '3 minutes'
       )

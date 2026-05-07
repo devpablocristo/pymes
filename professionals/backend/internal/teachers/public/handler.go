@@ -24,15 +24,15 @@ type profilePort interface {
 }
 
 type serviceLinkPort interface {
-	ListByOrg(ctx context.Context, tenantID uuid.UUID) ([]sldomain.ServiceLink, error)
+	ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]sldomain.ServiceLink, error)
 }
 
 type bookingPort interface {
-	GetAvailability(ctx context.Context, orgRef string, params corepublic.AvailabilityParams) (map[string]any, error)
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	GetAvailability(ctx context.Context, tenantRef string, params corepublic.AvailabilityParams) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
-type orgResolver interface {
+type tenantResolver interface {
 	ResolveTenantID(ctx context.Context, tenantSlug string) (uuid.UUID, error)
 }
 
@@ -40,10 +40,10 @@ type Handler struct {
 	profiles     profilePort
 	serviceLinks serviceLinkPort
 	bookings     bookingPort
-	tenants      orgResolver
+	tenants      tenantResolver
 }
 
-func NewHandler(profiles profilePort, serviceLinks serviceLinkPort, bookings bookingPort, tenants orgResolver) *Handler {
+func NewHandler(profiles profilePort, serviceLinks serviceLinkPort, bookings bookingPort, tenants tenantResolver) *Handler {
 	return &Handler{
 		profiles:     profiles,
 		serviceLinks: serviceLinks,
@@ -66,7 +66,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.POST("/public/:tenant_slug/bookings", h.BookScheduling)
 }
 
-func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
+func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
 	if tenantSlug == "" {
 		verticalgin.WriteValidation(c, "tenant_slug is required")
@@ -82,7 +82,7 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 	if h.tenants != nil {
 		tenantID, err := h.tenants.ResolveTenantID(c.Request.Context(), tenantSlug)
 		if err != nil {
-			verticalgin.WriteError(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
+			verticalgin.WriteError(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 			return uuid.Nil, false
 		}
 		return tenantID, true
@@ -93,7 +93,7 @@ func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 func (h *Handler) ListProfessionals(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -110,7 +110,7 @@ func (h *Handler) ListProfessionals(c *gin.Context) {
 }
 
 func (h *Handler) GetProfessional(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -128,11 +128,11 @@ func (h *Handler) GetProfessional(c *gin.Context) {
 }
 
 func (h *Handler) ListCatalog(c *gin.Context) {
-	tenantID, ok := h.resolveOrgID(c)
+	tenantID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
-	links, err := h.serviceLinks.ListByOrg(c.Request.Context(), tenantID)
+	links, err := h.serviceLinks.ListByTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

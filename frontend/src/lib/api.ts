@@ -1,4 +1,8 @@
-import { request, requestResponse, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import {
+  request as coreRequest,
+  requestResponse as coreRequestResponse,
+  type RequestOptions,
+} from '@devpablocristo/core-authn/http/fetch';
 import type {
   APIKeyItem,
   BillingStatus,
@@ -10,6 +14,65 @@ import type {
   TenantSettingsUpdatePayload,
 } from './types';
 
+const TENANT_SLUG_HEADER = 'X-Pymes-Tenant-Slug';
+const RESERVED_TENANT_PATHS = new Set(['login', 'signup', 'invite', 'onboarding']);
+
+export type TenantAwareRequestOptions = RequestOptions & {
+  tenantSlug?: string | null;
+  skipTenantSlug?: boolean;
+};
+
+type TenantSlugProvider = () => string | null;
+
+let tenantSlugProvider: TenantSlugProvider | null = null;
+
+export function registerTenantSlugProvider(provider: TenantSlugProvider): () => void {
+  tenantSlugProvider = provider;
+  return () => {
+    if (tenantSlugProvider === provider) {
+      tenantSlugProvider = null;
+    }
+  };
+}
+
+function withTenantSlugHeader(options: TenantAwareRequestOptions = {}): RequestOptions {
+  const { tenantSlug, skipTenantSlug, ...rest } = options;
+  const slug = (
+    tenantSlug ??
+    (skipTenantSlug ? null : tenantSlugProvider?.() ?? readTenantSlugFromLocation()) ??
+    ''
+  ).trim();
+  if (!slug) {
+    return rest;
+  }
+  return {
+    ...rest,
+    headers: {
+      ...(rest.headers ?? {}),
+      [TENANT_SLUG_HEADER]: slug,
+    },
+  };
+}
+
+function readTenantSlugFromLocation(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const segment = window.location.pathname.split('/').find((part) => part.trim() !== '')?.trim() ?? '';
+  if (!segment || RESERVED_TENANT_PATHS.has(segment)) {
+    return null;
+  }
+  return segment;
+}
+
+async function request<T = unknown>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
+  return coreRequest<T>(path, withTenantSlugHeader(options));
+}
+
+async function requestResponse(path: string, options: TenantAwareRequestOptions = {}): Promise<Response> {
+  return coreRequestResponse(path, withTenantSlugHeader(options));
+}
+
 function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
   return {
     ...settings,
@@ -17,17 +80,24 @@ function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
   };
 }
 
-export async function getSession(): Promise<SessionResponse> {
-  return request('/v1/session');
+export async function getSession(options: TenantAwareRequestOptions = {}): Promise<SessionResponse> {
+  return request('/v1/session', options);
 }
 
-export async function getTenantSettings(): Promise<TenantSettings> {
-  const response = await request<TenantSettings>('/v1/admin/tenant-settings');
+export async function getTenantSettings(options: TenantAwareRequestOptions = {}): Promise<TenantSettings> {
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', options);
   return normalizeTenantSettings(response);
 }
 
-export async function updateTenantSettings(payload: TenantSettingsUpdatePayload): Promise<TenantSettings> {
-  const response = await request<TenantSettings>('/v1/admin/tenant-settings', { method: 'PATCH', body: payload });
+export async function updateTenantSettings(
+  payload: TenantSettingsUpdatePayload,
+  options: TenantAwareRequestOptions = {},
+): Promise<TenantSettings> {
+  const response = await request<TenantSettings>('/v1/admin/tenant-settings', {
+    ...options,
+    method: 'PATCH',
+    body: payload,
+  });
   return normalizeTenantSettings(response);
 }
 
@@ -40,8 +110,8 @@ export type SchedulingBranchSummary = {
   active: boolean;
 };
 
-export async function listSchedulingBranches(): Promise<{ items: SchedulingBranchSummary[] }> {
-  return request('/v1/scheduling/branches');
+export async function listSchedulingBranches(options: TenantAwareRequestOptions = {}): Promise<{ items: SchedulingBranchSummary[] }> {
+  return request('/v1/scheduling/branches', options);
 }
 
 export async function createSchedulingBranch(payload: {
@@ -50,8 +120,8 @@ export async function createSchedulingBranch(payload: {
   timezone: string;
   address?: string;
   active?: boolean;
-}): Promise<SchedulingBranchSummary> {
-  return request('/v1/scheduling/branches', { method: 'POST', body: payload });
+}, options: TenantAwareRequestOptions = {}): Promise<SchedulingBranchSummary> {
+  return request('/v1/scheduling/branches', { ...options, method: 'POST', body: payload });
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
@@ -262,11 +332,11 @@ export async function patchMeProfile(payload: {
   return request('/v1/users/me/profile', { method: 'PATCH', body: payload });
 }
 
-export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiRequest<T = unknown>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
   return request<T>(path, options);
 }
 
-export async function downloadAPIFile(path: string, options: RequestOptions = {}): Promise<string> {
+export async function downloadAPIFile(path: string, options: TenantAwareRequestOptions = {}): Promise<string> {
   const response = await requestResponse(path, options);
   const disposition = response.headers.get('content-disposition') ?? '';
   const match = disposition.match(/filename="?([^";]+)"?/i);

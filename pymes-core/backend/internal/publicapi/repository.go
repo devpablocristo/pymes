@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrOrgNotFound     = errors.New("org not found")
+	ErrTenantNotFound  = errors.New("tenant not found")
 	ErrInvalidInput    = errors.New("invalid input")
 	ErrSlotUnavailable = errors.New("slot unavailable")
 )

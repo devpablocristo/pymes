@@ -47,7 +47,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -72,7 +72,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -104,7 +104,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -117,7 +117,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -138,7 +138,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 // Delete realiza soft delete (archiva). Es la semántica canónica CRUD.
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -154,7 +154,7 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -166,7 +166,7 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -202,9 +202,9 @@ func requestToDomain(tenantID uuid.UUID, req dto.CreatePriceListRequest) priceli
 	return pricelistdomain.PriceList{TenantID: tenantID, Name: strings.TrimSpace(req.Name), Description: strings.TrimSpace(req.Description), IsDefault: req.IsDefault, Markup: req.Markup, IsActive: active, IsFavorite: isFavorite, Tags: req.Tags, Items: items}
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	return handlers.ParseAuthTenantID(c)
 }
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

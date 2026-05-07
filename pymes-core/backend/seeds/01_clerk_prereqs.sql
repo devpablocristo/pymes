@@ -1,18 +1,18 @@
 -- Bootstrap autónomo del tenant demo local.
--- Si la org/usuario no existen, los crea; si ya existen, los normaliza.
--- El placeholder __SEED_ORG_ID__ se resuelve antes de ejecutar el SQL.
+-- Si el tenant/usuario no existen, los crea; si ya existen, los normaliza.
+-- El placeholder __SEED_TENANT_ID__ se resuelve antes de ejecutar el SQL.
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
     v_user uuid;
 BEGIN
     INSERT INTO tenants (id, external_id, name, slug, created_at, updated_at)
     VALUES (
-        v_org,
-        '__SEED_ORG_EXTERNAL_ID__',
-        '__SEED_ORG_NAME__',
-        '__SEED_ORG_SLUG__',
+        v_tenant,
+        '__SEED_TENANT_EXTERNAL_ID__',
+        '__SEED_TENANT_NAME__',
+        '__SEED_TENANT_SLUG__',
         now(),
         now()
     )
@@ -58,19 +58,19 @@ BEGIN
     END IF;
 
     INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at)
-    VALUES (v_org, v_user, 'admin', now())
+    VALUES (v_tenant, v_user, 'admin', now())
     ON CONFLICT (tenant_id, user_id) WHERE status = 'active' DO UPDATE
         SET role = EXCLUDED.role,
             updated_at = now();
 
     INSERT INTO tenant_settings (tenant_id, plan_code)
-    VALUES (v_org, 'starter')
+    VALUES (v_tenant, 'starter')
     ON CONFLICT (tenant_id) DO NOTHING;
 
     INSERT INTO tenant_api_keys (id, tenant_id, name, api_key_hash, key_prefix, created_by)
     VALUES (
         '00000000-0000-0000-0000-000000000004',
-        v_org,
+        v_tenant,
         'local-dev-key',
         '91678ad136f46807fd001e50281fcc842e4b40388a83a85c5ea069c4383e739a',
         'psk_local_adm',

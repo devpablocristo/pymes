@@ -42,16 +42,16 @@ type repositoryPort interface {
 }
 
 // governancePort es la superficie del client de Nexus que procurement consume.
-// Contrato HTTP — Pymes nunca evalúa policies en proceso. Nexus es source of
-// truth: las policies viven en Nexus per-tenant (org_id == tenantID).
+// Contrato HTTP: Pymes nunca evalúa policies en proceso. Nexus es source of
+// truth y las policies viven en Nexus por tenant.
 type governancePort interface {
-	SimulateRequest(ctx context.Context, body governanceclient.SimulateRequestBody, opts ...governanceclient.RequestOption) (governanceclient.SimulateResponse, error)
-	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
-	ListPolicies(ctx context.Context, opts ...governanceclient.RequestOption) (int, []byte, error)
-	GetPolicy(ctx context.Context, id string, opts ...governanceclient.RequestOption) (int, []byte, error)
-	CreatePolicy(ctx context.Context, body any, opts ...governanceclient.RequestOption) (int, []byte, error)
-	UpdatePolicy(ctx context.Context, id string, body any, opts ...governanceclient.RequestOption) (int, []byte, error)
-	DeletePolicy(ctx context.Context, id string, opts ...governanceclient.RequestOption) (int, error)
+	SimulateRequestForTenant(ctx context.Context, tenantID string, body governanceclient.SimulateRequestBody) (governanceclient.SimulateResponse, error)
+	SubmitRequestForTenant(ctx context.Context, tenantID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	ListPoliciesForTenant(ctx context.Context, tenantID string) (int, []byte, error)
+	GetPolicyForTenant(ctx context.Context, tenantID, id string) (int, []byte, error)
+	CreatePolicyForTenant(ctx context.Context, tenantID string, body any) (int, []byte, error)
+	UpdatePolicyForTenant(ctx context.Context, tenantID, id string, body any) (int, []byte, error)
+	DeletePolicyForTenant(ctx context.Context, tenantID, id string) (int, error)
 }
 
 type Usecases struct {
@@ -253,9 +253,9 @@ func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor st
 	return nil
 }
 
-// procurementSubmitParams arma los params que viajan a Nexus. El org_id va
-// como tenantID; Pymes service tiene scope nexus:cross_org y el header
-// X-Org-ID se setea per-call vía governanceclient.WithOrgID.
+// procurementSubmitParams arma los params de evidencia que viajan a Nexus.
+// El tenant efectivo viaja por el adapter de governance; el body queda como
+// evidencia de negocio para policy/eval.
 func procurementSubmitParams(req domain.ProcurementRequest, total float64) map[string]any {
 	return map[string]any{
 		"estimated_total": total,
@@ -289,7 +289,6 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 	}
 	req.EstimatedTotal = total
 
-	tenantOrg := tenantID.String()
 	body := governanceclient.SimulateRequestBody{
 		RequesterType:  "human",
 		RequesterID:    actor,
@@ -299,7 +298,7 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 		TargetResource: "procurement_request",
 		Params:         procurementSubmitParams(req, total),
 	}
-	sim, err := u.governance.SimulateRequest(ctx, body, governanceclient.WithOrgID(tenantOrg))
+	sim, err := u.governance.SimulateRequestForTenant(ctx, tenantID.String(), body)
 	if err != nil {
 		return domain.ProcurementRequest{}, fmt.Errorf("nexus simulate procurement.submit: %w", err)
 	}
@@ -336,8 +335,8 @@ func (u *Usecases) Submit(ctx context.Context, tenantID, id uuid.UUID, actor str
 			Reason:         fmt.Sprintf("procurement request %s", req.ID),
 			Context:        "pymes-core procurement.submit",
 		}
-		idemKey := fmt.Sprintf("procurement-%s-%s", tenantOrg, req.ID)
-		submitResp, subErr := u.governance.SubmitRequest(ctx, idemKey, submitBody)
+		idemKey := fmt.Sprintf("procurement-%s-%s", tenantID.String(), req.ID)
+		submitResp, subErr := u.governance.SubmitRequestForTenant(ctx, tenantID.String(), idemKey, submitBody)
 		if subErr != nil {
 			return domain.ProcurementRequest{}, fmt.Errorf("nexus submit procurement.submit (require_approval escalation): %w", subErr)
 		}

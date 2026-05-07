@@ -1,6 +1,5 @@
--- Rollback: re-crea schema sin data (la data, si existe en Nexus, se queda
--- ahí; manualmente exportar de Nexus /v1/policies?org_id=... e importar
--- cada row si se quiere recuperar).
+-- Rollback: re-crea schema sin data. La data, si existe en Nexus, queda ahi;
+-- para repoblar localmente se debe exportar manualmente desde Nexus por tenant.
 
 CREATE TABLE IF NOT EXISTS procurement_policies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,4 +16,4 @@ CREATE TABLE IF NOT EXISTS procurement_policies (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_procurement_policies_org ON procurement_policies(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_policies_tenant ON procurement_policies(tenant_id);

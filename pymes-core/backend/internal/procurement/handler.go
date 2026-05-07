@@ -28,7 +28,7 @@ type usecasesPort interface {
 	Approve(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
 	Reject(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.ProcurementRequest, error)
 
-	ListPoliciesForOrg(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error)
+	ListPoliciesForTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ProcurementPolicy, error)
 	GetPolicy(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementPolicy, error)
 	CreatePolicy(ctx context.Context, in PolicyCreateInput) (domain.ProcurementPolicy, error)
 	UpdatePolicy(ctx context.Context, in PolicyUpdateInput) (domain.ProcurementPolicy, error)
@@ -243,7 +243,7 @@ func (h *Handler) ListPolicies(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListPoliciesForOrg(c.Request.Context(), tenantID)
+	items, err := h.uc.ListPoliciesForTenant(c.Request.Context(), tenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

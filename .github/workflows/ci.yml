@@ -169,6 +169,7 @@ jobs:
       - name: Run architecture audits
         run: |
           make audit-debt
+          make audit-governance
           make audit-crud-strict
 
   docker-prod-builds:

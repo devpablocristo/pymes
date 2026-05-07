@@ -25,7 +25,7 @@ type RepositoryPort interface {
 }
 
 type GovernanceClient interface {
-	SubmitRequest(ctx context.Context, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
+	SubmitRequestForTenant(ctx context.Context, tenantID, idempotencyKey string, body governanceclient.SubmitRequestBody) (governanceclient.SubmitResponse, error)
 	GetRequest(ctx context.Context, id string) (governanceclient.RequestSummary, int, error)
 }
 
@@ -257,7 +257,7 @@ func (u *Usecases) Execute(ctx context.Context, in ExecuteInput) (ExecuteResult,
 			return ExecuteResult{}, agentError(http.StatusServiceUnavailable, "review_unavailable", "Nexus Governance no esta configurado")
 		}
 		if reviewRequestID == "" {
-			resp, err := u.review.SubmitRequest(ctx, idempotencyKey, governanceclient.SubmitRequestBody{
+			resp, err := u.review.SubmitRequestForTenant(ctx, tenantID.String(), idempotencyKey, governanceclient.SubmitRequestBody{
 				RequesterType:  requesterType(in.Auth.AuthMethod),
 				RequesterID:    strings.TrimSpace(in.Auth.Actor),
 				RequesterName:  strings.TrimSpace(in.Auth.Actor),

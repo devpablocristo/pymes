@@ -84,6 +84,8 @@ type customerMessagingSendPort interface {
 	SendText(ctx context.Context, req domain.SendTextRequest) (domain.Message, error)
 }
 
+const internalTenantIDHeader = "X-Pymes-Tenant-ID"
+
 type Handler struct {
 	admin             adminPort
 	parties           partyPort
@@ -98,6 +100,15 @@ type Handler struct {
 	customerMessaging customerMessagingSendPort
 	// resolveTenantRef traduce Clerk org_... / slug / UUID a tenant_id local (opcional; nil = ruta no registrada).
 	resolveTenantRef func(context.Context, string) (uuid.UUID, bool, error)
+}
+
+func internalTenantIDFromHeader(c *gin.Context) (uuid.UUID, bool) {
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader(internalTenantIDHeader)))
+	if err != nil {
+		handlers.WriteValidation(c, internalTenantIDHeader+" header required")
+		return uuid.Nil, false
+	}
+	return tenantID, true
 }
 
 func NewHandler(
@@ -294,9 +305,8 @@ func (h *Handler) GetParty(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid party_id")
 		return
 	}
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	result, err := h.parties.GetByID(c.Request.Context(), tenantID, partyID)
@@ -345,9 +355,8 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 }
 
 func (h *Handler) GetCustomer(c *gin.Context) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	customerID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -384,9 +393,8 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 }
 
 func (h *Handler) ListProducts(c *gin.Context) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	query := c.Query("q")
@@ -408,9 +416,8 @@ func (h *Handler) ListProducts(c *gin.Context) {
 }
 
 func (h *Handler) GetProduct(c *gin.Context) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	productID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -444,9 +451,8 @@ func (h *Handler) GetProduct(c *gin.Context) {
 }
 
 func (h *Handler) GetService(c *gin.Context) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	serviceID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -609,9 +615,8 @@ func (h *Handler) CreateSale(c *gin.Context) {
 }
 
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -647,9 +652,8 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		httperrors.Write(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "customer messaging send unavailable")
 		return
 	}
-	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
-	if err != nil {
-		handlers.WriteValidation(c, "X-Org-ID header required")
+	tenantID, ok := internalTenantIDFromHeader(c)
+	if !ok {
 		return
 	}
 	var req dto.SendCustomerMessagingTextRequest

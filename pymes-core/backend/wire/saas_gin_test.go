@@ -54,6 +54,13 @@ func testTenantResolver(_ context.Context, ref string) (uuid.UUID, bool, error) 
 	}
 }
 
+func testTenantMembershipResolver(_ context.Context, tenantID uuid.UUID, actor string) (string, bool, error) {
+	if actor == "user-1" && tenantID == uuid.MustParse("00000000-0000-0000-0000-000000000002") {
+		return "owner", true, nil
+	}
+	return "", false, nil
+}
+
 func TestGinSaaSAuthMiddlewareCopiesPrincipalScopes(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
@@ -132,7 +139,7 @@ func TestTenantSlugBindingRequiresHeaderForJWT(t *testing.T) {
 
 	router := gin.New()
 	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
-		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver, nil),
 	}))
 	router.GET("/v1/invoices", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -158,7 +165,7 @@ func TestTenantSlugBindingRejectsSlugMismatch(t *testing.T) {
 
 	router := gin.New()
 	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
-		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver, nil),
 	}))
 	router.GET("/v1/invoices", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -179,13 +186,48 @@ func TestTenantSlugBindingRejectsSlugMismatch(t *testing.T) {
 	}
 }
 
+func TestTenantSlugBindingAllowsRequestedTenantWhenUserHasLocalMembership(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver, testTenantMembershipResolver),
+	}))
+	router.GET("/v1/session", func(c *gin.Context) {
+		c.JSON(http.StatusOK, handlers.GetAuthContext(c))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
+	req.Header.Set("Authorization", "Bearer test")
+	req.Header.Set(tenantSlugHeader, "medlab")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	var auth handlers.AuthContext
+	if err := json.Unmarshal(rec.Body.Bytes(), &auth); err != nil {
+		t.Fatal(err)
+	}
+	if auth.TenantID != "00000000-0000-0000-0000-000000000002" {
+		t.Fatalf("unexpected tenant id %q", auth.TenantID)
+	}
+	if auth.Role != "owner" {
+		t.Fatalf("unexpected role %q", auth.Role)
+	}
+}
+
 func TestTenantSlugBindingAllowsMatchingSlug(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
 	router.Use(GinSaaSAuthMiddleware(&SaaSServices{
-		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver),
+		AuthMiddleware: withTenantSlugBinding(newTenantAuthMiddleware(scopedJWTVerifier{}, nil), testTenantResolver, nil),
 	}))
 	router.GET("/v1/invoices", func(c *gin.Context) {
 		c.JSON(http.StatusOK, handlers.GetAuthContext(c))

@@ -30,7 +30,8 @@ type CrudModuleId =
   | 'carWorkOrders'
   | 'bikeWorkOrders'
   | 'restaurantDiningAreas'
-  | 'restaurantDiningTables';
+  | 'restaurantDiningTables'
+  | 'occupationalHealthExams';
 
 type CrudModuleDefaults = {
   title: string;
@@ -84,6 +85,11 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
     labelPlural: 'zonas del salón',
   },
   restaurantDiningTables: { title: 'Mesas', navLabel: 'Mesas', labelPlural: 'mesas' },
+  occupationalHealthExams: {
+    title: 'Medicina laboral',
+    navLabel: 'Exámenes laborales',
+    labelPlural: 'exámenes laborales',
+  },
 };
 
 const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
@@ -283,6 +289,11 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     group: 'operations',
     icon: 'BO',
     summary: 'Órdenes de trabajo de bicicletería: recepción, diagnóstico y entrega.',
+  },
+  occupationalHealthExams: {
+    group: 'medical',
+    icon: 'ML',
+    summary: 'Exámenes preocupacionales, periódicos, reintegros y egresos para medicina laboral.',
   },
 };
 

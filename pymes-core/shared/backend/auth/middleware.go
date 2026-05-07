@@ -102,7 +102,11 @@ func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, a
 
 // RequireTenantSlugBinding fuerza que el slug de consola matchee el tenant autenticado.
 // Las API keys service-to-service pueden omitirlo; si lo envían, también debe coincidir.
-func RequireTenantSlugBinding(resolver TenantRefResolver) gin.HandlerFunc {
+func RequireTenantSlugBinding(resolver TenantRefResolver, membershipResolvers ...TenantMembershipResolver) gin.HandlerFunc {
+	var membershipResolver TenantMembershipResolver
+	if len(membershipResolvers) > 0 {
+		membershipResolver = membershipResolvers[0]
+	}
 	return func(c *gin.Context) {
 		authCtx := GetAuthContext(c)
 		slug := strings.TrimSpace(c.GetHeader(TenantSlugHeader))
@@ -126,7 +130,30 @@ func RequireTenantSlugBinding(resolver TenantRefResolver) gin.HandlerFunc {
 			return
 		}
 		resolvedTenantID, err := resolver.ResolveTenantID(c.Request.Context(), slug)
-		if err != nil || !strings.EqualFold(strings.TrimSpace(authCtx.TenantID), strings.TrimSpace(resolvedTenantID)) {
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "tenant_mismatch",
+				"message": "tenant slug is not valid for this session",
+			})
+			return
+		}
+		if !strings.EqualFold(strings.TrimSpace(authCtx.TenantID), strings.TrimSpace(resolvedTenantID)) {
+			if authMethod == "jwt" && membershipResolver != nil {
+				role, ok, membershipErr := membershipResolver.FindActiveMembershipRole(c.Request.Context(), resolvedTenantID, authCtx.Actor)
+				if membershipErr != nil {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+						"code":    "tenant_mismatch",
+						"message": "tenant slug is not valid for this session",
+					})
+					return
+				}
+				if ok {
+					c.Set(ctxkeys.CtxKeyOrgID, strings.TrimSpace(resolvedTenantID))
+					c.Set(ctxkeys.CtxKeyRole, strings.TrimSpace(role))
+					c.Next()
+					return
+				}
+			}
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"code":    "tenant_mismatch",
 				"message": "tenant slug is not valid for this session",

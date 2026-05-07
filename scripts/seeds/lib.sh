@@ -24,6 +24,10 @@ PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
 GOVERNANCE_DB_NAME="${GOVERNANCE_DB_NAME:-nexus_governance}"
 GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-postgres}"
 
+# Tenant local que reciben `make seed`, `make seed-verify` y `make seed-reset`.
+# Cambiar acá si querés que `make seed` apunte a otro tenant por defecto.
+DEFAULT_SEED_TENANT_SLUG="${DEFAULT_SEED_TENANT_SLUG:-medlab}"
+
 dc() {
   (cd "$ROOT_DIR" && ${DOCKER_COMPOSE} "$@")
 }
@@ -160,13 +164,6 @@ ensure_seed_dbs_ready() {
   ensure_governance_seed_db_ready
 }
 
-require_seed_tenant_external_id() {
-  if [[ -z "${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}" ]]; then
-    PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
-    export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
-  fi
-}
-
 derive_seed_tenant_slug() {
   local external_id="$1"
   local cleaned="${external_id#org_}"
@@ -175,8 +172,119 @@ derive_seed_tenant_slug() {
   printf 'demo-%s\n' "$(printf '%s' "$cleaned" | cut -c1-40)"
 }
 
+seed_tenant_slug_exists() {
+  local slug="$1"
+  local slug_sql="${slug//\'/\'\'}"
+  local found=""
+
+  if command -v psql >/dev/null 2>&1; then
+    found="$(
+      host_pymes_psql \
+        -Atq -v ON_ERROR_STOP=1 \
+        -c "SELECT 1 FROM tenants WHERE slug = '$slug_sql' LIMIT 1;" \
+        2>/dev/null || true
+    )"
+    found="$(printf '%s' "$found" | tr -d '[:space:]')"
+    [[ "$found" == "1" ]] && return 0
+  fi
+
+  found="$(
+    dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
+      -c "SELECT 1 FROM tenants WHERE slug = '$slug_sql' LIMIT 1;" \
+      2>/dev/null || true
+  )"
+  found="$(printf '%s' "$found" | tr -d '[:space:]')"
+  [[ "$found" == "1" ]]
+}
+
+require_seed_tenant_selector() {
+  if [[ -n "${PYMES_SEED_DEMO_TENANT_SLUG:-}" || -n "${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}" ]]; then
+    return
+  fi
+
+  # Local developer default: seed the tenant people are actively testing.
+  # CI/GCP should pass either PYMES_SEED_DEMO_TENANT_SLUG or PYMES_SEED_DEMO_TENANT_EXTERNAL_ID explicitly.
+  if seed_tenant_slug_exists "$DEFAULT_SEED_TENANT_SLUG"; then
+    PYMES_SEED_DEMO_TENANT_SLUG="$DEFAULT_SEED_TENANT_SLUG"
+    export PYMES_SEED_DEMO_TENANT_SLUG
+    return
+  fi
+  if seed_tenant_slug_exists "bicimax"; then
+    PYMES_SEED_DEMO_TENANT_SLUG="bicimax"
+    export PYMES_SEED_DEMO_TENANT_SLUG
+    return
+  fi
+
+  PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
+  export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
+}
+
+require_seed_tenant_external_id() {
+  if [[ -z "${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}" ]]; then
+    PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
+    export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
+  fi
+}
+
+resolve_target_tenant_uuid_by_slug() {
+  local slug="$1"
+  local slug_sql="${slug//\'/\'\'}"
+  local tenant_uuid
+
+  tenant_uuid="$(
+    dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
+      -c "SELECT cast(id as text) FROM tenants WHERE slug = '$slug_sql';"
+  )"
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -n "$tenant_uuid" ]]; then
+    printf '%s\n' "$tenant_uuid"
+    return 0
+  fi
+
+  if command -v psql >/dev/null 2>&1; then
+    tenant_uuid="$(
+      host_pymes_psql \
+        -Atq -v ON_ERROR_STOP=1 \
+        -c "SELECT cast(id as text) FROM tenants WHERE slug = '$slug_sql';" \
+        2>/dev/null || true
+    )"
+    tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+    if [[ -n "$tenant_uuid" ]]; then
+      printf '%s\n' "$tenant_uuid"
+      return 0
+    fi
+  fi
+
+  tenant_uuid="$(
+    dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
+      -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/tenant-slug/' || '$slug_sql') as text);"
+  )"
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -z "$tenant_uuid" ]] && command -v python3 >/dev/null 2>&1; then
+    tenant_uuid="$(
+      python3 - "$slug" <<'PY'
+import sys
+import uuid
+
+print(uuid.uuid5(uuid.NAMESPACE_URL, "pymes-seed/tenant-slug/" + sys.argv[1]))
+PY
+    )"
+    tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  fi
+  if [[ -z "$tenant_uuid" ]]; then
+    echo "No se pudo resolver tenant uuid para slug=$slug" >&2
+    exit 1
+  fi
+  printf '%s\n' "$tenant_uuid"
+}
+
 resolve_target_tenant_uuid() {
-  require_seed_tenant_external_id
+  require_seed_tenant_selector
+
+  if [[ -n "${PYMES_SEED_DEMO_TENANT_SLUG:-}" ]]; then
+    resolve_target_tenant_uuid_by_slug "$PYMES_SEED_DEMO_TENANT_SLUG"
+    return 0
+  fi
 
   local external_id="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}"
   local external_id_sql="${external_id//\'/\'\'}"

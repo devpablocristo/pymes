@@ -38,6 +38,7 @@ type tenantPrincipalVerifier interface {
 }
 
 type tenantRefResolver func(ctx context.Context, ref string) (uuid.UUID, bool, error)
+type tenantMembershipResolver func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error)
 
 const tenantSlugHeader = "X-Pymes-Tenant-Slug"
 
@@ -75,7 +76,7 @@ func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier
 	}
 }
 
-func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenantRefResolver) func(http.Handler) http.Handler {
+func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenantRefResolver, membership tenantMembershipResolver) func(http.Handler) http.Handler {
 	if authMW == nil || resolve == nil {
 		return authMW
 	}
@@ -86,34 +87,52 @@ func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenan
 				writeTenantJSONError(w, http.StatusUnauthorized, "authentication_required", "authentication required")
 				return
 			}
-			if !tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(tenantSlugHeader), principal, resolve, w) {
+			bound, ok := tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(tenantSlugHeader), principal, resolve, membership, w)
+			if !ok {
 				return
 			}
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(contextWithTenantPrincipal(r.Context(), bound)))
 		}))
 	}
 }
 
-func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal tenantPrincipal, resolve tenantRefResolver, w http.ResponseWriter) bool {
+func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal tenantPrincipal, resolve tenantRefResolver, membership tenantMembershipResolver, w http.ResponseWriter) (tenantPrincipal, bool) {
 	slug := strings.TrimSpace(rawSlug)
 	authMethod := strings.TrimSpace(principal.AuthMethod)
 	if slug == "" {
 		if authMethod == "api_key" {
-			return true
+			return principal, true
 		}
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_slug_required", "tenant slug header is required")
-		return false
+		return tenantPrincipal{}, false
 	}
 	resolvedTenantID, ok, err := resolve(ctx, slug)
 	if err != nil {
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
-		return false
+		return tenantPrincipal{}, false
 	}
-	if !ok || !strings.EqualFold(strings.TrimSpace(principal.TenantID), resolvedTenantID.String()) {
+	if !ok {
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
-		return false
+		return tenantPrincipal{}, false
 	}
-	return true
+	if strings.EqualFold(strings.TrimSpace(principal.TenantID), resolvedTenantID.String()) {
+		return principal, true
+	}
+	if authMethod == "jwt" && membership != nil {
+		role, member, accessErr := membership(ctx, resolvedTenantID, principal.Actor)
+		if accessErr != nil {
+			writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
+			return tenantPrincipal{}, false
+		}
+		if member {
+			bound := principal
+			bound.TenantID = resolvedTenantID.String()
+			bound.Role = role
+			return bound, true
+		}
+	}
+	writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
+	return tenantPrincipal{}, false
 }
 
 func writeTenantJSONError(w http.ResponseWriter, status int, code, message string) {

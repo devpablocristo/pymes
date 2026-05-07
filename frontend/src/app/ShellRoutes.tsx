@@ -106,7 +106,15 @@ function TenantScopedRoutes() {
           index
           element={<ConfiguredCrudIndexRedirect resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
         />
-        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route
+          path="configure"
+          element={
+            <CrudUiConfigurePage
+              resourceId="occupationalHealthExams"
+              backPath="/medical/occupational-health/exams/list"
+            />
+          }
+        />
         <Route
           path=":modePath"
           element={<ConfiguredCrudNestedRouteModePage resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
@@ -117,7 +125,7 @@ function TenantScopedRoutes() {
       <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>
         <Route index element={<ConfiguredCrudIndexRedirect resourceId="inventory" baseRoute={`/${slug}/inventory`} />} />
         <Route path="list" element={<InventoryModePage modeId="list" />} />
-        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route path="configure" element={<CrudUiConfigurePage resourceId="inventory" backPath="/inventory/list" />} />
         <Route path="explorer" element={<Navigate to="../list" replace />} />
         <Route path="gallery" element={<InventoryModePage modeId="gallery" />} />
         <Route path="board" element={<InventoryModePage modeId="kanban" />} />

@@ -57,10 +57,6 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 
 func (h *Handler) GetTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	if !authz.CanReadConsoleSettings(authCtx.Role, authCtx.Scopes) {
-		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin read permission required")
-		return
-	}
 	settings, err := h.uc.GetTenantSettings(c.Request.Context(), authCtx.TenantID)
 	if err != nil {
 		httperrors.Respond(c, err)

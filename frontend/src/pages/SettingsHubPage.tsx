@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SectionHubPage } from '@devpablocristo/modules-ui-section-hub';
 import '@devpablocristo/modules-ui-section-hub/styles.css';
 import { HeaderMenu } from '../components/HeaderMenu';
+import { cleanHeaderMenuLabel } from '../components/headerMenuLabels';
 import { usePageSearch } from '../components/PageSearch';
 import { getSession } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
@@ -35,6 +36,24 @@ export function SettingsHubPage() {
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
+  const settingsReturn = useMemo(
+    () => resolveSettingsReturn(searchParams, tenantSlug),
+    [searchParams, tenantSlug],
+  );
+  const buildSearchParams = useCallback(
+    (nextSection: Exclude<SettingsSection, null> | null): URLSearchParams => {
+      const next = new URLSearchParams();
+      if (nextSection) {
+        next.set('section', nextSection);
+      }
+      if (settingsReturn) {
+        next.set('returnLabel', settingsReturn.label);
+        next.set('returnTo', settingsReturn.href);
+      }
+      return next;
+    },
+    [settingsReturn],
+  );
   const waitingForAdminSection = !sessionQuery.data && (requestedSection === 'rbac' || requestedSection === 'audit');
   const isAccountAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const availableSections = useMemo(() => {
@@ -65,19 +84,19 @@ export function SettingsHubPage() {
     const nextSection = sectionFromSearchParam(availableSections, requestedSection);
     setSection(nextSection);
     if (requestedSection && !nextSection) {
-      setSearchParams({}, { replace: true });
+      setSearchParams(buildSearchParams(null), { replace: true });
     }
-  }, [availableSections, requestedSection, setSearchParams, waitingForAdminSection]);
+  }, [availableSections, buildSearchParams, requestedSection, setSearchParams, waitingForAdminSection]);
 
   function openSection(id: Exclude<SettingsSection, null>): void {
     setSection(id);
-    setSearchParams({ section: id }, { replace: true });
+    setSearchParams(buildSearchParams(id), { replace: true });
   }
 
   function goBackToGrid(): void {
     setSection(null);
     if (searchParams.get('section')) {
-      setSearchParams({}, { replace: true });
+      setSearchParams(buildSearchParams(null), { replace: true });
     }
   }
 
@@ -86,7 +105,7 @@ export function SettingsHubPage() {
   return (
     <div className="page-stack stg">
       <div className="page-layout__header-top-row">
-        <HeaderMenu />
+        <HeaderMenu items={settingsReturn ? [settingsReturn] : []} />
       </div>
       <SectionHubPage
         pageTitle="Ajustes"
@@ -115,3 +134,12 @@ export function SettingsHubPage() {
 }
 
 export default SettingsHubPage;
+
+function resolveSettingsReturn(searchParams: URLSearchParams, tenantSlug: string | null) {
+  const label = searchParams.get('returnLabel')?.trim();
+  const href = searchParams.get('returnTo')?.trim();
+  if (!label || !href || label.length > 80) return null;
+  if (!href.startsWith('/') || href.startsWith('//')) return null;
+  if (tenantSlug && href !== `/${tenantSlug}` && !href.startsWith(`/${tenantSlug}/`)) return null;
+  return { label: cleanHeaderMenuLabel(label), href };
+}

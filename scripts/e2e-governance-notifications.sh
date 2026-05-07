@@ -3,13 +3,18 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+# shellcheck source=scripts/seeds/lib.sh
+source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 DECISION="${1:-approve}"
 BASE_URL="${BASE_URL:-http://localhost:8100}"
 GOVERNANCE_URL="${GOVERNANCE_URL:-http://localhost:18084}"
 API_KEY="${API_KEY:-psk_local_admin}"
 GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-governance-admin-dev-key}"
-TENANT_ID="${TENANT_ID:?TENANT_ID is required (UUID interno del tenant cargado por seeds)}"
+if [[ -z "${TENANT_ID:-}" ]]; then
+  ensure_pymes_seed_db_ready
+  TENANT_ID="$(resolve_target_tenant_uuid)"
+fi
 REQUESTER_ID="${REQUESTER_ID:-e2e-governance-tester}"
 ACTION_TYPE="${ACTION_TYPE:-e2e.notification.bulk_send}"
 POLICY_NAME="${POLICY_NAME:-e2e-require-approval-governance-notifications}"

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/devpablocristo/core/config/go/envconfig"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 
@@ -26,6 +27,7 @@ type SaaSConfig struct {
 
 	ClerkSecretKey     string
 	ClerkWebhookSecret string
+	Environment        string
 
 	JWKSURL        string
 	JWTIssuer      string
@@ -59,6 +61,7 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	store := newPymesSaaSStore(db, log, saasDefaultAPIKeyScopes())
 	store.clerk = newClerkBackendClient(strings.TrimSpace(cfg.ClerkSecretKey))
 	store.frontendURL = strings.TrimSpace(cfg.FrontendURL)
+	store.environment = envconfig.NormalizeEnv(cfg.Environment)
 
 	var jwtVerifier tenantPrincipalVerifier
 	if cfg.AuthEnableJWT && strings.TrimSpace(cfg.JWKSURL) != "" {
@@ -85,8 +88,12 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		return id, true, nil
 	}
 
+	resolveMembership := func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error) {
+		return store.FindActiveMembershipRoleByExternalUser(ctx, tenantID.String(), actor)
+	}
+
 	authMW := newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier)
-	authMW = withTenantSlugBinding(authMW, resolveTenantRef)
+	authMW = withTenantSlugBinding(authMW, resolveTenantRef, resolveMembership)
 	billingRuntime := saasbilling.NewRuntime(saasbilling.RuntimeConfig{
 		StripeSecretKey:       cfg.StripeSecretKey,
 		StripeWebhookSecret:   cfg.StripeWebhookSecret,

@@ -19,16 +19,21 @@ const FEATURE_KEYS = [
   ['pagination', 'Paginación'],
 ] as const;
 
-export function CrudUiConfigurePage() {
+type CrudUiConfigurePageProps = {
+  resourceId?: string;
+  backPath?: string;
+};
+
+export function CrudUiConfigurePage({ resourceId, backPath }: CrudUiConfigurePageProps = {}) {
   const { moduleId: routeModuleId = '' } = useParams();
   const tenantSlug = useActiveTenantSlug();
-  const moduleId = fromCrudResourceSlug(routeModuleId);
+  const moduleId = resourceId ?? fromCrudResourceSlug(routeModuleId);
   const moduleDefinition = crudModuleCatalog[moduleId];
   const title = moduleDefinition?.title ?? moduleId;
   const resources = useMemo(() => [{ resourceId: moduleId, label: title }], [moduleId, title]);
-  const backPath =
-    moduleId === 'carWorkOrders' || moduleId === 'bikeWorkOrders' ? `/${routeModuleId}/list` : `/${routeModuleId}`;
-  const backHref = tenantLink(backPath, tenantSlug);
+  const resolvedBackPath =
+    backPath ?? (moduleId === 'carWorkOrders' || moduleId === 'bikeWorkOrders' ? `/${routeModuleId}/list` : `/${routeModuleId}`);
+  const backHref = tenantLink(resolvedBackPath, tenantSlug);
 
   return (
     <div className="crud-configure-page">

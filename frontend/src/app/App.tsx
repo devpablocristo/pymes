@@ -1,6 +1,6 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth, useOrganizationList, useSession } from '@clerk/react';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
 import { ProtectedRoute } from '../components/ProtectedRoute';
@@ -13,6 +13,7 @@ import { Suspended } from './suspended';
 import { TenantAccessBoundary } from './TenantAccessBoundary';
 
 function RequireActiveTenant({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { isLoaded: authLoaded, isSignedIn, orgId } = useAuth();
   const { session } = useSession();
@@ -25,6 +26,10 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
   });
   const [switchingTenantID, setSwitchingTenantID] = useState('');
   const memberships = useMemo(() => userMemberships.data ?? [], [userMemberships.data]);
+  const hasTenantSlugInPath = useMemo(() => {
+    const firstSegment = location.pathname.split('/').find((part) => part.trim() !== '')?.trim() ?? '';
+    return Boolean(firstSegment && !['login', 'signup', 'invite', 'onboarding'].includes(firstSegment));
+  }, [location.pathname]);
 
   const activateTenant = useCallback(
     async (tenantID: string) => {
@@ -64,7 +69,15 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
     userMemberships.isLoading,
   ]);
 
-  if (!authLoaded || !listLoaded || userMemberships.isLoading || switchingTenantID) {
+  if (!authLoaded || switchingTenantID) {
+    return <div className="spinner" aria-label="Cargando" />;
+  }
+
+  if (hasTenantSlugInPath) {
+    return <>{children}</>;
+  }
+
+  if (!listLoaded || userMemberships.isLoading) {
     return <div className="spinner" aria-label="Cargando" />;
   }
 

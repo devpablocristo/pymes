@@ -10,15 +10,16 @@ BEGIN
     INSERT INTO tenants (id, external_id, name, slug, created_at, updated_at)
     VALUES (
         v_tenant,
-        '__SEED_TENANT_EXTERNAL_ID__',
+        NULLIF('__SEED_TENANT_EXTERNAL_ID__', ''),
         '__SEED_TENANT_NAME__',
         '__SEED_TENANT_SLUG__',
         now(),
         now()
     )
-    ON CONFLICT (external_id) DO UPDATE
+    ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
             slug = EXCLUDED.slug,
+            external_id = COALESCE(EXCLUDED.external_id, tenants.external_id),
             updated_at = now();
 
     SELECT id INTO v_user

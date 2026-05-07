@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tenantLink, useTenantSlug } from '../lib/tenantSlug';
 import { type HeaderMenuItem } from './HeaderMenuContext';
+import { cleanHeaderMenuLabel } from './headerMenuLabels';
 import './SettingsMenu.css';
 
 export function HeaderMenu({ items = [] }: { items?: HeaderMenuItem[] }) {
@@ -10,10 +11,15 @@ export function HeaderMenu({ items = [] }: { items?: HeaderMenuItem[] }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
-  const resolvedItems: HeaderMenuItem[] = [
-    ...items,
-    { label: 'Ajustes', href: tenantLink('/settings', slug) },
-  ];
+  const resolvedItems: HeaderMenuItem[] = useMemo(() => {
+    const cleanItems = items.map((item) => ({ ...item, label: cleanHeaderMenuLabel(item.label) }));
+    const settingsHref = buildSettingsHref(slug, cleanItems);
+    const uniqueItems = [...cleanItems, { label: 'Ajustes', href: settingsHref }].filter(
+      (item, index, list) =>
+        list.findIndex((candidate) => candidate.label === item.label && candidate.href === item.href) === index,
+    );
+    return uniqueItems;
+  }, [items, slug]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -72,4 +78,15 @@ export function HeaderMenu({ items = [] }: { items?: HeaderMenuItem[] }) {
       ) : null}
     </div>
   );
+}
+
+function buildSettingsHref(slug: string | null, items: HeaderMenuItem[]): string {
+  const baseHref = tenantLink('/settings', slug);
+  const returnItem = items.find((item) => item.href && item.href !== baseHref && !item.href.startsWith(`${baseHref}?`));
+  if (!returnItem) return baseHref;
+
+  const params = new URLSearchParams();
+  params.set('returnLabel', returnItem.label);
+  params.set('returnTo', returnItem.href);
+  return `${baseHref}?${params.toString()}`;
 }

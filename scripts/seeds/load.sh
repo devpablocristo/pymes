@@ -6,10 +6,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT_DIR/scripts/seeds/lib.sh"
 
 ensure_seed_dbs_ready
-require_seed_tenant_external_id
+require_seed_tenant_selector
 
 TARGET_TENANT_UUID="$(resolve_target_tenant_uuid)"
-SEED_TENANT_EXTERNAL_ID="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID}"
+SEED_TENANT_EXTERNAL_ID="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}"
 SEED_TENANT_NAME="${PYMES_SEED_DEMO_TENANT_NAME:-Pymes Demo Tenant}"
 SEED_TENANT_SLUG="${PYMES_SEED_DEMO_TENANT_SLUG:-$(derive_seed_tenant_slug "$SEED_TENANT_EXTERNAL_ID")}"
 export TARGET_TENANT_UUID SEED_TENANT_EXTERNAL_ID SEED_TENANT_NAME SEED_TENANT_SLUG

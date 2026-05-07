@@ -9,6 +9,7 @@
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh status
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
 #   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh rewind-to 40
+#   PROJECT_ID=pymes-dev-352318 ./scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
 #
 # rewind-to N: deja la tabla de migraciones en versión N sin dirty (el próximo arranque del backend
 # reaplicará N+1...). Si la migración N+1 quedó a medias, puede fallar hasta hacer DROP SCHEMA
@@ -109,6 +110,29 @@ check_clean() {
   echo "OK: no hay migraciones dirty."
 }
 
+repair_known_dev_dirty() {
+  local version dirty has_tenants has_orgs
+  read -r version dirty < <("${psql_cmd[@]}" -Atq -c "SELECT version, dirty FROM pymes_core_schema_migrations LIMIT 1;")
+  has_tenants="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.tenants') IS NOT NULL;")"
+  has_orgs="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.orgs') IS NOT NULL;")"
+
+  if [[ "$version" == "75" && "$dirty" == "t" && ( "$has_tenants" == "t" || "$has_orgs" == "t" ) ]]; then
+    echo "Reparando dirty conocido: migración 75 falló durante el rename/hardening tenant. Rewind a 74 para reejecutarla con SQL idempotente."
+    "${psql_cmd[@]}" -c "DELETE FROM pymes_core_schema_migrations;
+INSERT INTO pymes_core_schema_migrations (version, dirty) VALUES (74, false);"
+    show_status
+    return
+  fi
+
+  if [[ "$dirty" == "t" ]]; then
+    echo "ERROR: dirty state no reconocido para reparación automática: version=$version dirty=$dirty tenants=$has_tenants orgs=$has_orgs" >&2
+    show_status >&2
+    exit 4
+  fi
+
+  echo "OK: no hay dirty state conocido para reparar."
+}
+
 case "$MODE" in
   status)
     show_status
@@ -129,8 +153,11 @@ case "$MODE" in
 INSERT INTO pymes_core_schema_migrations (version, dirty) VALUES ($ARG, false);"
     show_status
     ;;
+  repair-known-dev-dirty)
+    repair_known_dev_dirty
+    ;;
   *)
-    echo "Modos: status | check-clean | clear-dirty | rewind-to <n>" >&2
+    echo "Modos: status | check-clean | clear-dirty | rewind-to <n> | repair-known-dev-dirty" >&2
     exit 1
     ;;
 esac

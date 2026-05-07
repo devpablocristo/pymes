@@ -36,10 +36,10 @@ jobs:
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
       FIREBASE_HOSTING_SITE_ID: pymes-dev-352318
-      CLOUDSQL_INSTANCE: new-nexus-dev:us-central1:nexus-db-dev
+      CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL }}
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL || 'https://governance-dev-mxk6wlxnsq-uc.a.run.app' }}
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
       SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY
@@ -126,7 +126,9 @@ jobs:
         env:
           PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
           CLOUD_SQL_PROXY_BIN: /tmp/cloud-sql-proxy
-        run: scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
+        run: |
+          scripts/fix-pymes-core-migration-dirty-gcp.sh repair-known-dev-dirty
+          scripts/fix-pymes-core-migration-dirty-gcp.sh check-clean
 
       - name: Stage backend build context
         run: |

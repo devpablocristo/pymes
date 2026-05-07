@@ -36,7 +36,7 @@ jobs:
       CLOUD_RUN_SERVICE_ACCOUNT: 884236221349-compute@developer.gserviceaccount.com
       WIF_PROVIDER: projects/884236221349/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
       WIF_SERVICE_ACCOUNT: github-actions@pymes-dev-352318.iam.gserviceaccount.com
-      CLOUDSQL_INSTANCE: new-nexus-dev:us-central1:nexus-db-dev
+      CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY
       AI_LOG_LEVEL: info
@@ -46,7 +46,7 @@ jobs:
       GEMINI_VERTEX_LOCATION: us-central1
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL }}
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL || 'https://governance-dev-mxk6wlxnsq-uc.a.run.app' }}
       AUTH_ALLOW_API_KEY: "true"
 
     steps:

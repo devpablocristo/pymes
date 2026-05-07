@@ -4,20 +4,20 @@
 
 DO $$
 BEGIN
-    IF to_regclass('public.tenants') IS NULL AND to_regclass('public.tenants') IS NOT NULL THEN
-        ALTER TABLE tenants RENAME TO tenants;
+    IF to_regclass('public.tenants') IS NULL AND to_regclass('public.orgs') IS NOT NULL THEN
+        ALTER TABLE orgs RENAME TO tenants;
     END IF;
-    IF to_regclass('public.tenant_memberships') IS NULL AND to_regclass('public.tenant_memberships') IS NOT NULL THEN
-        ALTER TABLE tenant_memberships RENAME TO tenant_memberships;
+    IF to_regclass('public.tenant_memberships') IS NULL AND to_regclass('public.org_members') IS NOT NULL THEN
+        ALTER TABLE org_members RENAME TO tenant_memberships;
     END IF;
-    IF to_regclass('public.tenant_api_keys') IS NULL AND to_regclass('public.tenant_api_keys') IS NOT NULL THEN
-        ALTER TABLE tenant_api_keys RENAME TO tenant_api_keys;
+    IF to_regclass('public.tenant_api_keys') IS NULL AND to_regclass('public.org_api_keys') IS NOT NULL THEN
+        ALTER TABLE org_api_keys RENAME TO tenant_api_keys;
     END IF;
-    IF to_regclass('public.tenant_api_key_scopes') IS NULL AND to_regclass('public.tenant_api_key_scopes') IS NOT NULL THEN
-        ALTER TABLE tenant_api_key_scopes RENAME TO tenant_api_key_scopes;
+    IF to_regclass('public.tenant_api_key_scopes') IS NULL AND to_regclass('public.org_api_key_scopes') IS NOT NULL THEN
+        ALTER TABLE org_api_key_scopes RENAME TO tenant_api_key_scopes;
     END IF;
-    IF to_regclass('public.tenant_usage_counters') IS NULL AND to_regclass('public.tenant_usage_counters') IS NOT NULL THEN
-        ALTER TABLE tenant_usage_counters RENAME TO tenant_usage_counters;
+    IF to_regclass('public.tenant_usage_counters') IS NULL AND to_regclass('public.org_usage_counters') IS NOT NULL THEN
+        ALTER TABLE org_usage_counters RENAME TO tenant_usage_counters;
     END IF;
 END $$;
 
@@ -41,36 +41,36 @@ BEGIN
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'tenant_memberships'
-          AND column_name = 'tenant_id'
+          AND column_name = 'org_id'
     ) THEN
-        ALTER TABLE tenant_memberships RENAME COLUMN tenant_id TO tenant_id;
+        ALTER TABLE tenant_memberships RENAME COLUMN org_id TO tenant_id;
     END IF;
     IF EXISTS (
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'tenant_settings'
-          AND column_name = 'tenant_id'
+          AND column_name = 'org_id'
     ) THEN
-        ALTER TABLE tenant_settings RENAME COLUMN tenant_id TO tenant_id;
+        ALTER TABLE tenant_settings RENAME COLUMN org_id TO tenant_id;
     END IF;
     IF EXISTS (
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'tenant_api_keys'
-          AND column_name = 'tenant_id'
+          AND column_name = 'org_id'
     ) THEN
-        ALTER TABLE tenant_api_keys RENAME COLUMN tenant_id TO tenant_id;
+        ALTER TABLE tenant_api_keys RENAME COLUMN org_id TO tenant_id;
     END IF;
     IF EXISTS (
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'tenant_usage_counters'
-          AND column_name = 'tenant_id'
+          AND column_name = 'org_id'
     ) THEN
-        ALTER TABLE tenant_usage_counters RENAME COLUMN tenant_id TO tenant_id;
+        ALTER TABLE tenant_usage_counters RENAME COLUMN org_id TO tenant_id;
     END IF;
 END $$;
 

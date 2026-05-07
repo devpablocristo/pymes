@@ -58,6 +58,27 @@ func (s *pymesSaaSStore) ResolveTenantIDByExternalRef(ctx context.Context, ref s
 	return "", false, nil
 }
 
+func (s *pymesSaaSStore) FindTenantBySlugForExternalUser(ctx context.Context, slug, externalUserID string) (pymesTenantRow, string, bool, error) {
+	slug = strings.TrimSpace(slug)
+	externalUserID = strings.TrimSpace(externalUserID)
+	if slug == "" || externalUserID == "" {
+		return pymesTenantRow{}, "", false, nil
+	}
+	var row pymesTenantRow
+	err := s.db.WithContext(ctx).Where("slug = ?", slug).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return pymesTenantRow{}, "", false, nil
+	}
+	if err != nil {
+		return pymesTenantRow{}, "", false, err
+	}
+	role, ok, err := s.FindActiveMembershipRoleByExternalUser(ctx, row.ID.String(), externalUserID)
+	if err != nil || !ok {
+		return pymesTenantRow{}, "", ok, err
+	}
+	return row, role, true, nil
+}
+
 func (s *pymesSaaSStore) findTenantIDByUUID(ctx context.Context, ref string) (string, bool, error) {
 	id, err := uuid.Parse(strings.TrimSpace(ref))
 	if err != nil {

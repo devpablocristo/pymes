@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	corepostgres "github.com/devpablocristo/core/databases/postgres/go"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -84,6 +86,9 @@ func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, 
 		}
 		return s.replaceKeyScopesTx(ctx, tx, key.ID, scopes)
 	}); err != nil {
+		if corepostgres.IsUniqueViolation(err) {
+			return "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Conflict("tenant slug already exists")
+		}
 		return "", "", pymesTenantAPIKeyRow{}, nil, err
 	}
 	return org.ID.String(), rawKey, key, scopes, nil

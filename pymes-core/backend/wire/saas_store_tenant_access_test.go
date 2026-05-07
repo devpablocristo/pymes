@@ -56,6 +56,34 @@ func TestFindActiveMembershipRoleByExternalUserUsesLocalRole(t *testing.T) {
 	}
 }
 
+func TestFindTenantBySlugForExternalUserFindsExistingOwnedTenant(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+
+	row, role, ok, err := store.FindTenantBySlugForExternalUser(ctx, "medlab", "user_owner")
+	if err != nil {
+		t.Fatalf("FindTenantBySlugForExternalUser() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("FindTenantBySlugForExternalUser() ok = false, want true")
+	}
+	if row.ID.String() != tenantID {
+		t.Fatalf("tenant id = %q, want %q", row.ID.String(), tenantID)
+	}
+	if role != "owner" {
+		t.Fatalf("role = %q, want owner", role)
+	}
+	if row.ClerkOrgID != nil {
+		t.Fatalf("ClerkOrgID = %q, want nil for local fallback tenant", *row.ClerkOrgID)
+	}
+}
+
 func TestTransferTenantOwnershipKeepsExactlyOneOwner(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)

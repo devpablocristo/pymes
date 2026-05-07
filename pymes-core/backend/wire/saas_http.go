@@ -168,10 +168,27 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 	if slug == "" {
 		slug = slugifyTenantName(name)
 	}
+	if existing, role, ok, err := store.FindTenantBySlugForExternalUser(r.Context(), slug, user.ExternalID); err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	} else if ok {
+		if role != "owner" && role != "admin" {
+			httperr.WriteFrom(w, domainerr.Conflict("tenant slug already exists"))
+			return
+		}
+		created, err := store.CreateAPIKey(r.Context(), existing.ID.String(), "onboarding setup", nil)
+		if err != nil {
+			httperr.WriteFrom(w, err)
+			return
+		}
+		writeCreateTenantResponse(w, http.StatusOK, existing.ID.String(), optionalString(existing.ClerkOrgID), slug, created.Secret, "", created.APIKey)
+		return
+	}
 	if store.clerk == nil {
 		httperr.WriteFrom(w, domainerr.Unavailable("clerk backend client is not configured"))
 		return
 	}
+	clerkOrgID := ""
 	clerkOrg, err := store.clerk.CreateOrganization(r.Context(), clerkCreateOrganizationInput{
 		Name:      name,
 		Slug:      slug,
@@ -184,24 +201,42 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		}
 		slog.Warn("clerk organization create failed in local environment; creating tenant with local membership only", "err", err, "slug", slug)
 	}
-	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, clerkOrg.ID, user.ExternalID, user.Email, user.Name, user.AvatarURL)
+	clerkOrgID = strings.TrimSpace(clerkOrg.ID)
+	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, clerkOrgID, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
-	httperr.WriteJSON(w, http.StatusCreated, map[string]any{
+	writeCreateTenantResponse(w, http.StatusCreated, tenantID, clerkOrgID, slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
+		ID:        key.ID.String(),
+		TenantID:  tenantID,
+		Name:      key.Name,
+		Scopes:    scopes,
+		CreatedAt: key.CreatedAt,
+	})
+}
+
+func writeCreateTenantResponse(w http.ResponseWriter, status int, tenantID, clerkOrgID, slug, rawKey, keyPrefix string, key tenantAPIKeyDTO) {
+	httperr.WriteJSON(w, status, map[string]any{
 		"tenant_id":    tenantID,
-		"clerk_org_id": clerkOrg.ID,
-		"slug":         slug,
+		"clerk_org_id": strings.TrimSpace(clerkOrgID),
+		"slug":         strings.TrimSpace(slug),
 		"raw_key":      rawKey,
 		"key": map[string]any{
-			"id":         key.ID.String(),
+			"id":         key.ID,
 			"name":       key.Name,
-			"key_prefix": key.KeyPrefix,
-			"scopes":     scopes,
+			"key_prefix": strings.TrimSpace(keyPrefix),
+			"scopes":     key.Scopes,
 			"created_at": key.CreatedAt,
 		},
 	})
+}
+
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
 }
 
 func handleListMyTenants(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {

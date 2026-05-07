@@ -1,6 +1,20 @@
 name: Deploy Verticales DEV (Cloud Run)
 
 on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "infra/verticals.yml"
+      - "scripts/infra/**"
+      - "firebase.generated.json"
+      - "firebase.json"
+      - ".github/workflows/deploy-dev-verticals.yml"
+      - "workshops/backend/**"
+      - "professionals/backend/**"
+      - "beauty/backend/**"
+      - "restaurants/backend/**"
+      - "medical/backend/**"
   workflow_dispatch:
     inputs:
       ref:

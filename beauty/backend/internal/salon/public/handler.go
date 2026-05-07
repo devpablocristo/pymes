@@ -14,11 +14,11 @@ import (
 
 // coreServicesPort expone el catálogo público de servicios servido por pymes-core.
 type coreServicesPort interface {
-	ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]pymescore.CoreService, error)
+	ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }
 
 type bookingPort interface {
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -34,14 +34,14 @@ func NewHandler(coreServices coreServicesPort, bookings bookingPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/public/:org_slug/beauty/services", h.ListServices)
-	group.POST("/public/:org_slug/beauty/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/beauty/services", h.ListServices)
+	group.POST("/public/:tenant_slug/beauty/bookings", h.BookScheduling)
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		verticalgin.WriteValidation(c, "org_slug is required")
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	if h.coreServices == nil {
@@ -50,7 +50,7 @@ func (h *Handler) ListServices(c *gin.Context) {
 	}
 	items, err := h.coreServices.ListPublicServices(
 		c.Request.Context(),
-		orgSlug,
+		tenantSlug,
 		"beauty",
 		"salon",
 		strings.TrimSpace(c.Query("search")),
@@ -85,9 +85,9 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		verticalgin.WriteValidation(c, "org_slug is required")
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return
 	}
 	var payload map[string]any
@@ -98,7 +98,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), tenantSlug, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

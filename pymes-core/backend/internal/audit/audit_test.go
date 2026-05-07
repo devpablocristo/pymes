@@ -85,7 +85,7 @@ func TestAuditLog(t *testing.T) {
 	}
 }
 
-func TestAuditLog_InvalidOrgID(t *testing.T) {
+func TestAuditLog_InvalidTenantID(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 
@@ -113,7 +113,7 @@ func TestAuditList(t *testing.T) {
 	}
 }
 
-func TestAuditList_InvalidOrgID(t *testing.T) {
+func TestAuditList_InvalidTenantID(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 

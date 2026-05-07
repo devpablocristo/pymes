@@ -3,18 +3,18 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
     p1 uuid;
     srv1 uuid;
     srv2 uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
-    p1 := uuid_generate_v5(v_org, 'pymes-seed/v1/product/1');
-    srv1 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/service/oil');
-    srv2 := uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/service/brake');
+    p1 := uuid_generate_v5(v_tenant, 'pymes-seed/v1/product/1');
+    srv1 := uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/service/oil');
+    srv2 := uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/service/brake');
 
     INSERT INTO services (
         id, tenant_id, code, name, description, category_code,
@@ -22,8 +22,8 @@ BEGIN
         default_duration_minutes, is_active, tags, metadata
     )
     VALUES
-        (srv1, v_org, 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estandar', 'mantenimiento', 25000, 0, 21, 'ARS', 30, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair')),
-        (srv2, v_org, 'SRV-BRAKE', 'Revision de frenos', 'Inspeccion y ajuste', 'frenos', 45000, 0, 21, 'ARS', 90, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'))
+        (srv1, v_tenant, 'SRV-OIL', 'Cambio de aceite y filtro', 'Servicio estandar', 'mantenimiento', 25000, 0, 21, 'ARS', 30, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair')),
+        (srv2, v_tenant, 'SRV-BRAKE', 'Revision de frenos', 'Inspeccion y ajuste', 'frenos', 45000, 0, 21, 'ARS', 90, true, ARRAY['demo', 'workshops'], jsonb_build_object('vertical', 'workshops', 'segment', 'auto_repair'))
     ON CONFLICT (tenant_id, code) WHERE deleted_at IS NULL AND code IS NOT NULL AND code <> '' DO UPDATE
         SET name = EXCLUDED.name,
             description = EXCLUDED.description,
@@ -43,10 +43,10 @@ BEGIN
         color, notes, metadata, is_favorite, tags, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
+        v_tenant,
         'vehicle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
         (ARRAY[
             'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
             'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
@@ -92,13 +92,13 @@ BEGIN
         is_favorite, tags, created_by, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        v_tenant,
         'OT-SEED-' || lpad(gs::text, 3, '0'),
         'vehicle',
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/vehicle/' || gs::text),
         (ARRAY['AB 123 CD', 'AC 234 EF', 'AD 345 GH', 'AE 456 IJ', 'AF 567 KL', 'AG 678 MN', 'AH 789 OP', 'AI 890 QR', 'AJ 901 ST', 'AK 012 UV'])[gs],
-        uuid_generate_v5(v_org, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/' || (((gs - 1) % 10) + 1)::text),
         (ARRAY[
             'Cliente Demo Uno', 'Mercado Plaza', 'Panaderia La Esquina', 'Distribuidora Norte',
             'Almacen Don Luis', 'Ferreteria Central', 'Kiosco Avenida', 'Libreria Sur',
@@ -173,9 +173,9 @@ BEGIN
             updated_at = now();
 
     DELETE FROM workshops.work_order_items
-    WHERE tenant_id = v_org
+    WHERE tenant_id = v_tenant
       AND work_order_id IN (
-        SELECT uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text)
+        SELECT uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/' || gs::text)
         FROM generate_series(1, 10) AS gs
       );
 
@@ -184,9 +184,9 @@ BEGIN
         description, quantity, unit_price, tax_rate, sort_order, metadata
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/' || gs::text || '/service'),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/woi/' || gs::text || '/service'),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/' || gs::text),
         'service',
         CASE WHEN gs % 2 = 0 THEN srv2 ELSE srv1 END,
         NULL,
@@ -199,9 +199,9 @@ BEGIN
     FROM generate_series(1, 10) AS gs
     UNION ALL
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/woi/' || gs::text || '/part'),
-        v_org,
-        uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/' || gs::text),
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/woi/' || gs::text || '/part'),
+        v_tenant,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/workshop/wo/' || gs::text),
         'part',
         NULL,
         p1,

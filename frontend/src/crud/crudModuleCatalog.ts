@@ -90,13 +90,13 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   parties: {
     group: 'commercial',
     icon: 'PT',
-    summary: 'Vista transversal de personas y organizaciones con roles y relaciones.',
+    summary: 'Vista transversal de personas y empresas con roles y relaciones.',
   },
   employees: {
     group: 'commercial',
     icon: 'EM',
     summary:
-      'Entidades (parties) con rol empleado. El alta asigna automáticamente el rol «employee». Los usuarios miembros de la organización en la consola se administran aparte.',
+      'Entidades (parties) con rol empleado. El alta asigna automáticamente el rol «employee». Los usuarios miembros del tenant en la consola se administran aparte.',
   },
   customers: {
     group: 'commercial',

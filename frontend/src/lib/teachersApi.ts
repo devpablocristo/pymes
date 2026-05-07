@@ -18,8 +18,8 @@ function translateError(message: string): string {
   switch (trimmed) {
     case '404 page not found':
       return 'La ruta no existe en el backend de profesionales.';
-    case 'organization not found':
-      return 'No se encontro la organizacion.';
+    case 'tenant not found':
+      return 'No se encontro el tenant.';
     default:
       return trimmed;
   }

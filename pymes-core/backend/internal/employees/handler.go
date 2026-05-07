@@ -134,7 +134,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -148,7 +148,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -183,7 +183,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -200,7 +200,7 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -213,7 +213,7 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -224,7 +224,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
 	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {

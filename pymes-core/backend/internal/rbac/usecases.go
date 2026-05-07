@@ -69,7 +69,7 @@ func (u *Usecases) ListRoles(ctx context.Context, tenantID string) ([]rbacdomain
 }
 
 func (u *Usecases) GetRole(ctx context.Context, tenantID, roleID string) (rbacdomain.Role, error) {
-	tenantUUID, roleUUID, err := parseOrgRoleIDs(tenantID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(tenantID, roleID)
 	if err != nil {
 		return rbacdomain.Role{}, err
 	}
@@ -118,7 +118,7 @@ func (u *Usecases) CreateRole(ctx context.Context, tenantID, actor, name, descri
 }
 
 func (u *Usecases) UpdateRole(ctx context.Context, tenantID, roleID, actor string, description *string, permissions []rbacdomain.Permission) (rbacdomain.Role, error) {
-	tenantUUID, roleUUID, err := parseOrgRoleIDs(tenantID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(tenantID, roleID)
 	if err != nil {
 		return rbacdomain.Role{}, err
 	}
@@ -169,7 +169,7 @@ func (u *Usecases) UpdateRole(ctx context.Context, tenantID, roleID, actor strin
 }
 
 func (u *Usecases) DeleteRole(ctx context.Context, tenantID, roleID, actor string) error {
-	tenantUUID, roleUUID, err := parseOrgRoleIDs(tenantID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(tenantID, roleID)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (u *Usecases) RemoveRole(ctx context.Context, tenantID, roleID, userID, act
 }
 
 func (u *Usecases) EffectivePermissions(ctx context.Context, tenantID, userID string) (map[string][]string, error) {
-	tenantUUID, userUUID, err := parseOrgUserIDs(tenantID, userID)
+	tenantUUID, userUUID, err := parseTenantUserIDs(tenantID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func permissionMapToResponse(m map[string]map[string]bool) map[string][]string {
 	return out
 }
 
-func parseOrgRoleIDs(tenantID, roleID string) (uuid.UUID, uuid.UUID, error) {
+func parseTenantRoleIDs(tenantID, roleID string) (uuid.UUID, uuid.UUID, error) {
 	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid tenant_id: %w", httperrors.ErrBadInput)
@@ -432,7 +432,7 @@ func parseOrgRoleIDs(tenantID, roleID string) (uuid.UUID, uuid.UUID, error) {
 }
 
 func parseIDs(tenantID, roleID, userID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
-	tenantUUID, roleUUID, err := parseOrgRoleIDs(tenantID, roleID)
+	tenantUUID, roleUUID, err := parseTenantRoleIDs(tenantID, roleID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, err
 	}
@@ -443,7 +443,7 @@ func parseIDs(tenantID, roleID, userID string) (uuid.UUID, uuid.UUID, uuid.UUID,
 	return tenantUUID, roleUUID, userUUID, nil
 }
 
-func parseOrgUserIDs(tenantID, userID string) (uuid.UUID, uuid.UUID, error) {
+func parseTenantUserIDs(tenantID, userID string) (uuid.UUID, uuid.UUID, error) {
 	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("invalid tenant_id: %w", httperrors.ErrBadInput)

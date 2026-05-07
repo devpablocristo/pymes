@@ -77,7 +77,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -95,7 +95,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, _, ok := parseOrgActor(c)
+	tenantID, _, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -113,7 +113,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -136,7 +136,7 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -153,7 +153,7 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) AddRole(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -185,7 +185,7 @@ func (h *Handler) AddRole(c *gin.Context) {
 }
 
 func (h *Handler) RemoveRole(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -202,7 +202,7 @@ func (h *Handler) RemoveRole(c *gin.Context) {
 }
 
 func (h *Handler) ListRelationships(c *gin.Context) {
-	tenantID, _, ok := parseOrgActor(c)
+	tenantID, _, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -220,7 +220,7 @@ func (h *Handler) ListRelationships(c *gin.Context) {
 }
 
 func (h *Handler) CreateRelationship(c *gin.Context) {
-	tenantID, actor, ok := parseOrgActor(c)
+	tenantID, actor, ok := parseTenantActor(c)
 	if !ok {
 		return
 	}
@@ -260,7 +260,7 @@ func (h *Handler) CreateRelationship(c *gin.Context) {
 	c.JSON(http.StatusCreated, out)
 }
 
-func parseOrgActor(c *gin.Context) (uuid.UUID, string, bool) {
+func parseTenantActor(c *gin.Context) (uuid.UUID, string, bool) {
 	a := handlers.GetAuthContext(c)
 	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {

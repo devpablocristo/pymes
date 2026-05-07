@@ -2,9 +2,9 @@
 
 DO $$
 DECLARE
-    v_org uuid := '__SEED_ORG_ID__';
+    v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
@@ -13,11 +13,11 @@ BEGIN
     )
     SELECT
         CASE gs
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/main')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/terrace')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/' || gs::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/main')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/terrace')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/' || gs::text)
         END,
-        v_org,
+        v_tenant,
         (ARRAY[
             'Salon principal', 'Terraza', 'Barra', 'Patio', 'VIP',
             'Vereda', 'Reservado', 'Salon alto', 'Deck', 'Eventos'
@@ -42,16 +42,16 @@ BEGIN
     )
     SELECT
         CASE gs
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/main-1')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/main-2')
-            WHEN 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/terrace-1')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/' || gs::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/main-1')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/main-2')
+            WHEN 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/terrace-1')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/' || gs::text)
         END,
-        v_org,
+        v_tenant,
         CASE (((gs - 1) % 10) + 1)
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/main')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/terrace')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/area/' || (((gs - 1) % 10) + 1)::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/main')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/terrace')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/area/' || (((gs - 1) % 10) + 1)::text)
         END,
         (ARRAY['M-01','M-02','T-01','M-04','M-05','M-06','M-07','M-08','M-09','M-10'])[gs],
         (ARRAY['Ventana','Centro','Barra norte','Patio sombra','VIP 1','Vereda 1','Reservado A','Salon alto','Deck 1','Eventos A'])[gs],
@@ -78,13 +78,13 @@ BEGIN
         id, tenant_id, table_id, guest_count, party_label, notes, opened_at, closed_at, updated_at
     )
     SELECT
-        uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/session/' || gs::text),
-        v_org,
+        uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/session/' || gs::text),
+        v_tenant,
         CASE gs
-            WHEN 1 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/main-1')
-            WHEN 2 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/main-2')
-            WHEN 3 THEN uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/terrace-1')
-            ELSE uuid_generate_v5(v_org, 'pymes-seed/v1/restaurant/table/' || gs::text)
+            WHEN 1 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/main-1')
+            WHEN 2 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/main-2')
+            WHEN 3 THEN uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/terrace-1')
+            ELSE uuid_generate_v5(v_tenant, 'pymes-seed/v1/restaurant/table/' || gs::text)
         END,
         (ARRAY[2, 4, 2, 3, 6, 2, 5, 4, 3, 8])[gs],
         (ARRAY['Mesa Lopez','Mesa Gomez','Walk-in barra','Reserva patio','Empresa Norte','Pareja vereda','Cumple pequeno','Familia Sur','After office','Evento demo'])[gs],

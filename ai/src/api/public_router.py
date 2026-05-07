@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from runtime.types import Message
 from src.api.chat_stream import stream_orchestrated_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository
-from src.api.external_chat_support import clean_phone, get_external_conversation, history_to_messages, resolve_org_id
+from src.api.external_chat_support import clean_phone, get_external_conversation, history_to_messages, resolve_tenant_id
 from src.api.quota import check_quota
 from src.api.sse import EventSourceResponse
 from src.backend_client.client import BackendClient
@@ -41,7 +41,7 @@ async def chat_external(
     llm=Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    tenant_id = await resolve_tenant_id(backend_client, tenant_slug)
     await check_quota(repo, tenant_id, mode="external")
 
     conversation = None

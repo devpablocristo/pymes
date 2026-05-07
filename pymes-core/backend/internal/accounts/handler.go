@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -49,7 +49,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Debtors(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -63,7 +63,7 @@ func (h *Handler) Debtors(c *gin.Context) {
 }
 
 func (h *Handler) Movements(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -105,10 +105,10 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, out)
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	return handlers.ParseAuthTenantID(c)
 }
 
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

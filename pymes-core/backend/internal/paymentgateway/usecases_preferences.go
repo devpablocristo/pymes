@@ -164,10 +164,10 @@ func (u *Usecases) GetPreference(
 
 func (u *Usecases) GetPublicQuotePaymentLink(
 	ctx context.Context,
-	orgRef string,
+	tenantRef string,
 	quoteID uuid.UUID,
 ) (gatewaydomain.PaymentPreference, error) {
-	tenantID, err := u.repo.ResolveTenantID(ctx, orgRef)
+	tenantID, err := u.repo.ResolveTenantID(ctx, tenantRef)
 	if err != nil {
 		return gatewaydomain.PaymentPreference{}, err
 	}

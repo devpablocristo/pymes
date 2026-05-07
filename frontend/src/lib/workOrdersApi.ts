@@ -9,10 +9,10 @@ function translateWorkOrdersError(message: string): string {
   switch (trimmed) {
     case '404 page not found':
       return 'La ruta no existe en el backend de talleres.';
-    case 'organization not found':
-      return 'No se encontró la organización.';
-    case 'invalid org':
-    case 'invalid org identifier':
+    case 'tenant not found':
+      return 'No se encontró el tenant.';
+    case 'invalid tenant':
+    case 'invalid tenant identifier':
       return 'No hay una empresa válida en la sesión para órdenes de trabajo.';
     default:
       return trimmed;

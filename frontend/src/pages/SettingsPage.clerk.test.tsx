@@ -144,7 +144,7 @@ describe('SettingsPage (modo Clerk)', () => {
     }));
   });
 
-  it('muestra nombre de organización desde Clerk en Cuenta', async () => {
+  it('muestra nombre de tenant desde Clerk en Cuenta', async () => {
     renderSettingsClerk();
 
     await waitFor(() => {
@@ -186,7 +186,7 @@ describe('SettingsPage (modo Clerk)', () => {
     expect(screen.getAllByText(/Cargando/i).length).toBeGreaterThan(0);
   });
 
-  it('muestra cambio de tenant con organizaciones disponibles', async () => {
+  it('muestra cambio de tenant disponible', async () => {
     renderSettingsClerk();
 
     await waitFor(() => {

@@ -293,7 +293,7 @@ func InitializeApp() *app.App {
 	customerMessagingHandler := customer_messaging.NewHandler(customerMessagingUC)
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
-	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
+	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrTenantNotFound })
 	var resolveTenantRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
 		resolveTenantRefFn = saasSvc.ResolveTenantRef

@@ -126,13 +126,13 @@ def create_public_client(repo: StubRepo, monkeypatch) -> TestClient:
     app.dependency_overrides[get_llm_provider] = lambda: object()
     app.dependency_overrides[get_backend_client] = lambda: object()
 
-    async def fake_resolve_org_id(*_args, **_kwargs) -> str:
+    async def fake_resolve_tenant_id(*_args, **_kwargs) -> str:
         return "org-public-123"
 
     async def fake_get_external_conversation(**_kwargs):
         return await repo.create_conversation(tenant_id="org-public-123", mode="external", title="hola")
 
-    monkeypatch.setattr(public_router_module, "resolve_org_id", fake_resolve_org_id)
+    monkeypatch.setattr(public_router_module, "resolve_tenant_id", fake_resolve_tenant_id)
     monkeypatch.setattr(public_router_module, "get_external_conversation", fake_get_external_conversation)
     return TestClient(app)
 

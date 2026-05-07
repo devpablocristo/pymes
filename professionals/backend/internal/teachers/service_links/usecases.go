@@ -14,7 +14,7 @@ import (
 type RepositoryPort interface {
 	ListByProfile(ctx context.Context, tenantID, profileID uuid.UUID) ([]domain.ServiceLink, error)
 	ReplaceForProfile(ctx context.Context, tenantID, profileID uuid.UUID, links []domain.ServiceLink) ([]domain.ServiceLink, error)
-	ListByOrg(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error)
+	ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error)
 }
 
 type AuditPort interface {
@@ -56,6 +56,6 @@ func (u *Usecases) ReplaceForProfile(ctx context.Context, tenantID, profileID uu
 	return out, nil
 }
 
-func (u *Usecases) ListByOrg(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error) {
-	return u.repo.ListByOrg(ctx, tenantID)
+func (u *Usecases) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.ServiceLink, error) {
+	return u.repo.ListByTenant(ctx, tenantID)
 }

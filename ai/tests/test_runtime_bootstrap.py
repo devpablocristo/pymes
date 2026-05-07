@@ -60,7 +60,7 @@ def test_claim_helpers_support_nested_clerk_claims() -> None:
         "admin:console:read",
         "admin:console:write",
     ]
-    assert runtime_bootstrap._clerk_compact_org_id_from_claims(claims) == "org_123"
+    assert runtime_bootstrap._clerk_compact_tenant_id_from_claims(claims) == "org_123"
 
 
 def test_split_scopes_accepts_csv_and_spaces() -> None:

@@ -67,17 +67,17 @@ class TeachersBackendClient(HTTPBackendClient):
     async def get_payment_link(self, auth: AuthContext, sale_id: str) -> dict[str, Any]:
         return await self.request("POST", f"/v1/teachers/payments/{sale_id}/link", auth=auth)
 
-    async def get_public_teachers(self, org_slug: str) -> dict[str, Any]:
-        return await self.request("GET", f"/v1/public/{org_slug}/teachers", include_internal=True)
+    async def get_public_teachers(self, tenant_slug: str) -> dict[str, Any]:
+        return await self.request("GET", f"/v1/public/{tenant_slug}/teachers", include_internal=True)
 
-    async def get_public_catalog(self, org_slug: str) -> dict[str, Any]:
-        return await self.request("GET", f"/v1/public/{org_slug}/teachers/catalog", include_internal=True)
+    async def get_public_catalog(self, tenant_slug: str) -> dict[str, Any]:
+        return await self.request("GET", f"/v1/public/{tenant_slug}/teachers/catalog", include_internal=True)
 
-    async def get_public_availability(self, org_slug: str, date: str, professional_id: str | None = None) -> dict[str, Any]:
+    async def get_public_availability(self, tenant_slug: str, date: str, professional_id: str | None = None) -> dict[str, Any]:
         params: dict[str, str] = {"date": date}
         if professional_id:
             params["professional_id"] = professional_id
-        return await self.request("GET", f"/v1/public/{org_slug}/teachers/availability", include_internal=True, params=params)
+        return await self.request("GET", f"/v1/public/{tenant_slug}/teachers/availability", include_internal=True, params=params)
 
-    async def public_book_scheduling(self, org_slug: str, data: dict[str, Any]) -> dict[str, Any]:
-        return await self.request("POST", f"/v1/public/{org_slug}/teachers/bookings", include_internal=True, json=data)
+    async def public_book_scheduling(self, tenant_slug: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self.request("POST", f"/v1/public/{tenant_slug}/teachers/bookings", include_internal=True, json=data)

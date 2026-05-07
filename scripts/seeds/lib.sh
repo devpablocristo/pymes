@@ -160,14 +160,14 @@ ensure_seed_dbs_ready() {
   ensure_governance_seed_db_ready
 }
 
-require_seed_org_external_id() {
-  if [[ -z "${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}" ]]; then
-    PYMES_SEED_DEMO_ORG_EXTERNAL_ID="org_local_demo"
-    export PYMES_SEED_DEMO_ORG_EXTERNAL_ID
+require_seed_tenant_external_id() {
+  if [[ -z "${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}" ]]; then
+    PYMES_SEED_DEMO_TENANT_EXTERNAL_ID="org_local_demo"
+    export PYMES_SEED_DEMO_TENANT_EXTERNAL_ID
   fi
 }
 
-derive_seed_org_slug() {
+derive_seed_tenant_slug() {
   local external_id="$1"
   local cleaned="${external_id#org_}"
   cleaned="$(printf '%s' "$cleaned" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//;s/-*$//')"
@@ -175,58 +175,58 @@ derive_seed_org_slug() {
   printf 'demo-%s\n' "$(printf '%s' "$cleaned" | cut -c1-40)"
 }
 
-resolve_target_org_uuid() {
-  require_seed_org_external_id
+resolve_target_tenant_uuid() {
+  require_seed_tenant_external_id
 
-  local external_id="${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}"
+  local external_id="${PYMES_SEED_DEMO_TENANT_EXTERNAL_ID:-}"
   local external_id_sql="${external_id//\'/\'\'}"
 
-  local org_uuid
-  org_uuid="$(
+  local tenant_uuid
+  tenant_uuid="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
       -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';"
   )"
-  org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
-  if [[ -n "$org_uuid" ]]; then
-    printf '%s\n' "$org_uuid"
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -n "$tenant_uuid" ]]; then
+    printf '%s\n' "$tenant_uuid"
     return 0
   fi
 
   if command -v psql >/dev/null 2>&1; then
-    org_uuid="$(
+    tenant_uuid="$(
       host_pymes_psql \
         -Atq -v ON_ERROR_STOP=1 \
         -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';" \
         2>/dev/null || true
     )"
-    org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
-    if [[ -n "$org_uuid" ]]; then
-      printf '%s\n' "$org_uuid"
+    tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+    if [[ -n "$tenant_uuid" ]]; then
+      printf '%s\n' "$tenant_uuid"
       return 0
     fi
   fi
 
-  org_uuid="$(
+  tenant_uuid="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-      -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/org/' || '$external_id_sql') as text);"
+      -c "SELECT cast(uuid_generate_v5(uuid_ns_url(), 'pymes-seed/tenant/' || '$external_id_sql') as text);"
   )"
-  org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
-  if [[ -z "$org_uuid" ]] && command -v python3 >/dev/null 2>&1; then
-    org_uuid="$(
+  tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
+  if [[ -z "$tenant_uuid" ]] && command -v python3 >/dev/null 2>&1; then
+    tenant_uuid="$(
       python3 - "$external_id" <<'PY'
 import sys
 import uuid
 
-print(uuid.uuid5(uuid.NAMESPACE_URL, "pymes-seed/org/" + sys.argv[1]))
+print(uuid.uuid5(uuid.NAMESPACE_URL, "pymes-seed/tenant/" + sys.argv[1]))
 PY
     )"
-    org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
+    tenant_uuid="$(printf '%s' "$tenant_uuid" | tr -d '[:space:]')"
   fi
-  if [[ -z "$org_uuid" ]]; then
-    echo "No se pudo resolver org uuid para external_id=$external_id" >&2
+  if [[ -z "$tenant_uuid" ]]; then
+    echo "No se pudo resolver tenant uuid para external_id=$external_id" >&2
     exit 1
   fi
-  printf '%s\n' "$org_uuid"
+  printf '%s\n' "$tenant_uuid"
 }
 
 render_seed_sql() {
@@ -237,23 +237,23 @@ render_seed_sql() {
   else
     fullpath="$ROOT_DIR/$file"
   fi
-  python3 - "$fullpath" "$TARGET_ORG_UUID" <<'PY'
+  python3 - "$fullpath" "$TARGET_TENANT_UUID" <<'PY'
 import os
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
-target_org_uuid = sys.argv[2]
+target_tenant_uuid = sys.argv[2]
 body = path.read_text()
 
 def sql_escape(value: str) -> str:
     return value.replace("'", "''")
 
 replacements = {
-    "__SEED_ORG_ID__": target_org_uuid,
-    "__SEED_ORG_EXTERNAL_ID__": sql_escape(os.environ.get("SEED_ORG_EXTERNAL_ID", "")),
-    "__SEED_ORG_NAME__": sql_escape(os.environ.get("SEED_ORG_NAME", "")),
-    "__SEED_ORG_SLUG__": sql_escape(os.environ.get("SEED_ORG_SLUG", "")),
+    "__SEED_TENANT_ID__": target_tenant_uuid,
+    "__SEED_TENANT_EXTERNAL_ID__": sql_escape(os.environ.get("SEED_TENANT_EXTERNAL_ID", "")),
+    "__SEED_TENANT_NAME__": sql_escape(os.environ.get("SEED_TENANT_NAME", "")),
+    "__SEED_TENANT_SLUG__": sql_escape(os.environ.get("SEED_TENANT_SLUG", "")),
 }
 for placeholder, value in replacements.items():
     body = body.replace(placeholder, value)

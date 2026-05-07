@@ -52,10 +52,10 @@ type fakeRepo struct {
 	processSaleIn  *ProcessSalePaymentInput
 	processSaleErr error
 
-	markApprovedOrgID   uuid.UUID
-	markApprovedRefType string
-	markApprovedRefID   uuid.UUID
-	markApprovedErr     error
+	markApprovedTenantID uuid.UUID
+	markApprovedRefType  string
+	markApprovedRefID    uuid.UUID
+	markApprovedErr      error
 
 	storedWebhookEvent gatewaydomain.WebhookEvent
 	storeWebhookErr    error
@@ -182,7 +182,7 @@ func (f *fakeRepo) MarkPreferenceApproved(ctx context.Context, tenantID uuid.UUI
 	if f.markApprovedErr != nil {
 		return f.markApprovedErr
 	}
-	f.markApprovedOrgID = tenantID
+	f.markApprovedTenantID = tenantID
 	f.markApprovedRefType = refType
 	f.markApprovedRefID = refID
 	return nil

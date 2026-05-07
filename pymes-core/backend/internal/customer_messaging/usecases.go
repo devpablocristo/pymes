@@ -473,7 +473,7 @@ func (u *Usecases) linkOutboundToConversation(ctx context.Context, msg *domain.M
 func (u *Usecases) resolvePartyForSend(ctx context.Context, tenantID, partyID uuid.UUID) (domain.Connection, string, string, string, error) {
 	conn, err := u.repo.GetConnection(ctx, tenantID)
 	if err != nil {
-		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp is not connected for this organization")
+		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp is not connected for this tenant")
 	}
 	if !conn.IsActive {
 		return domain.Connection{}, "", "", "", domainerr.BusinessRule("whatsapp connection is inactive")

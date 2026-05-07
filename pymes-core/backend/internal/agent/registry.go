@@ -38,7 +38,7 @@ func coreCapabilities() []Capability {
 	return []Capability{
 		readCapability("customers.search", "customers", "read", "Buscar clientes y contactos comerciales.", readChannels),
 		readCapability("products.search", "products", "read", "Buscar productos del catalogo.", readChannels),
-		readCapability("services.search", "services", "read", "Buscar servicios publicados por la organizacion.", readChannels),
+		readCapability("services.search", "services", "read", "Buscar servicios publicados por el tenant.", readChannels),
 		readCapability("inventory.read_stock", "inventory", "read", "Consultar stock y stock bajo.", readChannels),
 		writeCapability("quotes.create", "quotes", "create", "Crear presupuesto comercial.", RiskMedium, "quote.create", writeChannels),
 		writeCapability("sales.create", "sales", "create", "Crear una venta y sus efectos operativos asociados.", RiskHigh, "sale.create", writeChannels),

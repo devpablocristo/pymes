@@ -37,7 +37,7 @@ func InitializeApp() *app.App {
 	cpHTTP := pymescorehttp.New(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpHTTP)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpHTTP))
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreTenantRefResolver(cpHTTP))
 	auditLog := verticalaudit.NewLogger(logger)
 
 	areasRepo := areas.NewRepository(db)

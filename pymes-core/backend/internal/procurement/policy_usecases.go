@@ -16,7 +16,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/procurement/usecases/domain"
 )
 
-// PolicyCreateInput crea una política CEL por organización.
+// PolicyCreateInput crea una política CEL por tenant.
 type PolicyCreateInput struct {
 	TenantID     uuid.UUID
 	Actor        string

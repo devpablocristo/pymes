@@ -40,7 +40,7 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpClient.Client))
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreTenantRefResolver(cpClient.Client))
 	auditLog := verticalaudit.NewLogger(logger)
 
 	examsRepo := exams.NewRepository(db)

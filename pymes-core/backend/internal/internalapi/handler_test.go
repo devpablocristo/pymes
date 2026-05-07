@@ -27,16 +27,16 @@ func (s stubAPIKeys) ResolveAPIKey(string) (users.ResolvedAPIKey, bool) {
 }
 
 type stubNotificationInbox struct {
-	lastOrgID string
-	lastActor string
-	lastInput inappnotifications.CreateInput
-	lastEvent inappnotifications.ApprovalEvent
-	affected  int
-	out       coredomain.Notification
+	lastTenantID string
+	lastActor    string
+	lastInput    inappnotifications.CreateInput
+	lastEvent    inappnotifications.ApprovalEvent
+	affected     int
+	out          coredomain.Notification
 }
 
 func (s *stubNotificationInbox) CreateForActor(_ context.Context, orgIDStr, actor string, input inappnotifications.CreateInput) (coredomain.Notification, error) {
-	s.lastOrgID = orgIDStr
+	s.lastTenantID = orgIDStr
 	s.lastActor = actor
 	s.lastInput = input
 	if s.out.ID == "" {
@@ -149,8 +149,8 @@ func TestCreateInAppNotification(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d body=%s", http.StatusCreated, recorder.Code, recorder.Body.String())
 	}
-	if inbox.lastOrgID != "00000000-0000-0000-0000-000000000220" {
-		t.Fatalf("unexpected org id %q", inbox.lastOrgID)
+	if inbox.lastTenantID != "00000000-0000-0000-0000-000000000220" {
+		t.Fatalf("unexpected org id %q", inbox.lastTenantID)
 	}
 	if inbox.lastActor != "user-ext-1" {
 		t.Fatalf("unexpected actor %q", inbox.lastActor)

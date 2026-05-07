@@ -28,7 +28,7 @@ func (r *Repository) GetAvailability(ctx context.Context, tenantID uuid.UUID, qu
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("scheduling not configured for this organization")
+		return nil, fmt.Errorf("scheduling not configured for this tenant")
 	}
 	slots, err := r.scheduling.ListAvailableSlots(ctx, tenantID, schedulingdomain.SlotQuery{
 		BranchID:   selection.Branch.ID,
@@ -68,7 +68,7 @@ func (r *Repository) Book(ctx context.Context, tenantID uuid.UUID, payload map[s
 		return BookingPublic{}, err
 	}
 	if !ok {
-		return BookingPublic{}, fmt.Errorf("scheduling not configured for this organization")
+		return BookingPublic{}, fmt.Errorf("scheduling not configured for this tenant")
 	}
 	return r.bookScheduling(ctx, tenantID, selection, payload)
 }

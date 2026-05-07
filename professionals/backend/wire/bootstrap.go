@@ -48,7 +48,7 @@ func InitializeApp() *app.App {
 	// Auth middleware shared with the other Go backends.
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpClient.Client))
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreTenantRefResolver(cpClient.Client))
 
 	// Audit logger (lightweight, log-only implementation)
 	auditLog := verticalaudit.NewLogger(logger)

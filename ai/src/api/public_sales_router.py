@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from src.agents.contracts import CommercialContractEnvelope
 from src.agents.service import process_contract, run_commercial_chat
 from src.api.deps import get_backend_client, get_llm_provider, get_repository
-from src.api.external_chat_support import clean_phone, resolve_org_id
+from src.api.external_chat_support import clean_phone, resolve_tenant_id
 from src.api.quota import check_quota
 from src.backend_client.client import BackendClient
 from src.db.repository import AIRepository
@@ -41,7 +41,7 @@ async def external_sales_chat(
     llm: LLMProvider = Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    tenant_id = await resolve_tenant_id(backend_client, tenant_slug)
     await check_quota(repo, tenant_id, mode="external")
     external_contact = clean_phone(req.phone or "")
     update_request_context(tenant_id=tenant_id, user_id=external_contact or "external")
@@ -81,7 +81,7 @@ async def external_sales_contract(
     repo: AIRepository = Depends(get_repository),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    tenant_id = await resolve_tenant_id(backend_client, tenant_slug)
     update_request_context(tenant_id=tenant_id, user_id=envelope.contact_phone or envelope.contract.counterparty_id)
     payload = await process_contract(
         repo=repo,

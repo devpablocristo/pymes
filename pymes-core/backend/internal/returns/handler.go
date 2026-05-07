@@ -82,7 +82,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantID, saleID, ok := parseOrgSale(c)
+	tenantID, saleID, ok := parseTenantSale(c)
 	if !ok {
 		return
 	}
@@ -110,7 +110,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -124,7 +124,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -137,7 +137,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -151,7 +151,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -185,7 +185,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 // Delete realiza soft delete (archiva).
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -202,7 +202,7 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -215,7 +215,7 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -228,7 +228,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 }
 
 func (h *Handler) Void(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -242,7 +242,7 @@ func (h *Handler) Void(c *gin.Context) {
 }
 
 func (h *Handler) ListCreditNotes(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -256,7 +256,7 @@ func (h *Handler) ListCreditNotes(c *gin.Context) {
 }
 
 func (h *Handler) CreateCreditNote(c *gin.Context) {
-	tenantID, ok := parseOrg(c)
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return
 	}
@@ -285,7 +285,7 @@ func (h *Handler) CreateCreditNote(c *gin.Context) {
 }
 
 func (h *Handler) GetCreditNote(c *gin.Context) {
-	tenantID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -298,7 +298,7 @@ func (h *Handler) GetCreditNote(c *gin.Context) {
 }
 
 func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
-	tenantID, partyID, ok := parseOrgID(c)
+	tenantID, partyID, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -312,7 +312,7 @@ func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
 }
 
 func (h *Handler) ApplyCredit(c *gin.Context) {
-	tenantID, saleID, ok := parseOrgSale(c)
+	tenantID, saleID, ok := parseTenantSale(c)
 	if !ok {
 		return
 	}
@@ -335,16 +335,16 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-func parseOrg(c *gin.Context) (uuid.UUID, bool) {
+func parseTenant(c *gin.Context) (uuid.UUID, bool) {
 	return handlers.ParseAuthTenantID(c)
 }
 
-func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }
 
-func parseOrgSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	tenantID, ok := parseOrg(c)
+func parseTenantSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
+	tenantID, ok := parseTenant(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}

@@ -21,11 +21,11 @@ type userIDRow struct {
 	ID uuid.UUID `gorm:"column:id"`
 }
 
-type orgMemberUserIDRow struct {
+type tenantMemberUserIDRow struct {
 	UserID uuid.UUID `gorm:"column:user_id"`
 }
 
-type orgIDRow struct {
+type tenantIDRow struct {
 	TenantID uuid.UUID `gorm:"column:tenant_id"`
 }
 
@@ -49,8 +49,8 @@ func (r *Repository) GetUserIDByExternalID(externalID string) (uuid.UUID, bool) 
 	return row.ID, true
 }
 
-func (r *Repository) GetOnlyUserIDByOrg(tenantID uuid.UUID) (uuid.UUID, bool) {
-	var rows []orgMemberUserIDRow
+func (r *Repository) GetOnlyUserIDByTenant(tenantID uuid.UUID) (uuid.UUID, bool) {
+	var rows []tenantMemberUserIDRow
 	err := r.db.Table("tenant_memberships AS tm").
 		Select("tm.user_id").
 		Joins("JOIN users AS u ON u.id = tm.user_id").
@@ -67,8 +67,8 @@ func (r *Repository) GetOnlyUserIDByOrg(tenantID uuid.UUID) (uuid.UUID, bool) {
 	return rows[0].UserID, true
 }
 
-func (r *Repository) ListUserIDsByOrg(tenantID uuid.UUID) ([]uuid.UUID, error) {
-	var rows []orgMemberUserIDRow
+func (r *Repository) ListUserIDsByTenant(tenantID uuid.UUID) ([]uuid.UUID, error) {
+	var rows []tenantMemberUserIDRow
 	err := r.db.Table("tenant_memberships AS tm").
 		Select("DISTINCT tm.user_id").
 		Joins("JOIN users AS u ON u.id = tm.user_id").
@@ -85,8 +85,8 @@ func (r *Repository) ListUserIDsByOrg(tenantID uuid.UUID) ([]uuid.UUID, error) {
 	return out, nil
 }
 
-func (r *Repository) ListOrgIDsWithUsers() ([]uuid.UUID, error) {
-	var rows []orgIDRow
+func (r *Repository) ListTenantIDsWithUsers() ([]uuid.UUID, error) {
+	var rows []tenantIDRow
 	err := r.db.Table("tenant_memberships AS tm").
 		Select("DISTINCT tm.tenant_id AS tenant_id").
 		Joins("JOIN users AS u ON u.id = tm.user_id").

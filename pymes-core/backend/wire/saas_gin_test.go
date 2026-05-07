@@ -119,7 +119,7 @@ func TestGinSaaSAuthMiddlewareCopiesTenantIntoCoreOrgContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	if auth.OrgID != "00000000-0000-0000-0000-000000000001" {
-		t.Fatalf("unexpected core org id %q", auth.OrgID)
+		t.Fatalf("unexpected core tenant id %q", auth.OrgID)
 	}
 	if auth.AuthMethod != "api_key" {
 		t.Fatalf("unexpected auth method %q", auth.AuthMethod)

@@ -87,11 +87,12 @@ func InitializeApp() *app.App {
 		StripePriceGrowth:     cfg.StripePriceGrowth,
 		StripePriceEnterprise: cfg.StripePriceEnterprise,
 		FrontendURL:           cfg.FrontendURL,
+		ClerkSecretKey:        cfg.ClerkSecretKey,
 		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,
 		JWKSURL:               cfg.JWKSURL,
 		JWTIssuer:             cfg.JWTIssuer,
 		JWTAudience:           cfg.JWTAudience,
-		JWTOrgClaim:           cfg.JWTOrgClaim,
+		JWTTenantClaim:        cfg.JWTTenantClaim,
 		JWTRoleClaim:          cfg.JWTRoleClaim,
 		JWTScopesClaim:        cfg.JWTScopesClaim,
 		JWTActorClaim:         cfg.JWTActorClaim,
@@ -154,8 +155,7 @@ func InitializeApp() *app.App {
 	dashboardUC := dashboard.NewUsecases(dashboardRepo)
 	priceListsUC := pricelists.NewUsecases(priceListsRepo)
 	purchasesUC := purchases.NewUsecases(purchasesRepo, auditUC, purchases.WithTimeline(timelineUC), purchases.WithWebhooks(outwebhooksUC))
-	procurementEngine := procurement.NewGovernanceEngine()
-	procurementUC := procurement.NewUsecases(procurementRepo, procurementEngine, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
+	// procurement requiere Nexus governance: ya no hay motor local.
 	reportsUC := reports.NewUsecases(reportsRepo)
 	recurringUC := recurring.NewUsecases(recurringRepo, auditUC)
 	rbacUC := rbac.NewUsecases(rbacRepo, auditUC)
@@ -218,16 +218,16 @@ func InitializeApp() *app.App {
 
 	governanceURL := strings.TrimSpace(os.Getenv("GOVERNANCE_URL"))
 	governanceAPIKey := strings.TrimSpace(os.Getenv("GOVERNANCE_API_KEY"))
-	var governanceClient *governanceproxy.Client
-	inAppNotifUC := inappnotifications.NewUsecases(inAppNotifRepo)
-	if governanceURL != "" {
-		governanceClient = governanceproxy.NewClient(governanceURL, governanceAPIKey)
-		inAppNotifUC = inappnotifications.NewUsecases(
-			inAppNotifRepo,
-			inappnotifications.WithApprovalSource(governanceproxy.NewPendingApprovalSource(governanceClient)),
-		)
+	if governanceURL == "" {
+		logger.Fatal().Msg("GOVERNANCE_URL is required: pymes procurement now delegates all governance decisions to Nexus")
 	}
+	governanceClient := governanceproxy.NewClient(governanceURL, governanceAPIKey)
+	inAppNotifUC := inappnotifications.NewUsecases(
+		inAppNotifRepo,
+		inappnotifications.WithApprovalSource(governanceproxy.NewPendingApprovalSource(governanceClient)),
+	)
 	agentUC := agent.NewUsecases(agentRepo, governanceClient, auditUC)
+	procurementUC := procurement.NewUsecases(procurementRepo, governanceClient, purchasesUC, auditUC, timelineUC, procurement.WithWebhooks(outwebhooksUC))
 	businessInsightsUC := businessinsights.NewService(businessInsightsRepo, inAppNotifUC, businessinsights.Config{
 		FeaturedSaleThreshold:    cfg.InsightsFeaturedSaleThreshold,
 		FeaturedPaymentThreshold: cfg.InsightsFeaturedPaymentThreshold,
@@ -294,11 +294,11 @@ func InitializeApp() *app.App {
 	publicAPIRepo := publicapi.NewRepository(db, schedulingUC)
 	publicAPIHandler := publicapi.NewHandler(publicAPIRepo)
 	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrOrgNotFound })
-	var resolveOrgRefFn func(context.Context, string) (uuid.UUID, bool, error)
+	var resolveTenantRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
-		resolveOrgRefFn = saasSvc.ResolveOrgRef
+		resolveTenantRefFn = saasSvc.ResolveTenantRef
 	}
-	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveOrgRefFn)
+	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveTenantRefFn)
 
 	router := gin.New()
 	router.Use(gin.Recovery())

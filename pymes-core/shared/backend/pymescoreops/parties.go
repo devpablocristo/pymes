@@ -8,8 +8,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
 )
 
-func GetParty(ctx context.Context, client *pymescorehttp.Client, orgID, partyID string) (map[string]any, error) {
-	result, err := client.Get(ctx, fmt.Sprintf("/v1/internal/v1/parties/%s", url.PathEscape(partyID)), orgID)
+func GetParty(ctx context.Context, client *pymescorehttp.Client, tenantID, partyID string) (map[string]any, error) {
+	result, err := client.Get(ctx, fmt.Sprintf("/v1/internal/v1/parties/%s", url.PathEscape(partyID)), tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("get party: %w", err)
 	}

@@ -27,16 +27,16 @@ Si una accion requiere confirmacion, pedi confirmacion explicita."""
 
 
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
-    async def get_quotes(*, org_id: str, status_filter: str | None = None) -> dict[str, Any]:
+    async def get_quotes(*, tenant_id: str, status_filter: str | None = None) -> dict[str, Any]:
         return await quotes.get_quotes(client, auth, status=status_filter)
 
-    async def create_quote(*, org_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
+    async def create_quote(*, tenant_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
         return await quotes.create_quote(client, auth, customer_name=customer_name, items=items, notes=notes)
 
-    async def create_sale(*, org_id: str, customer_name: str, items: list[dict[str, Any]], payment_method: str = "cash", notes: str = "") -> dict[str, Any]:
+    async def create_sale(*, tenant_id: str, customer_name: str, items: list[dict[str, Any]], payment_method: str = "cash", notes: str = "") -> dict[str, Any]:
         return await sales.create_sale(client, auth, customer_name=customer_name, items=items, payment_method=payment_method, notes=notes)
 
-    async def get_recent_sales(*, org_id: str, limit: int = 10) -> dict[str, Any]:
+    async def get_recent_sales(*, tenant_id: str, limit: int = 10) -> dict[str, Any]:
         return await sales.get_recent_sales(client, auth, limit=limit)
 
     tools = [

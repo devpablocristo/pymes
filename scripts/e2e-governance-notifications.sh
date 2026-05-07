@@ -6,15 +6,13 @@ cd "$ROOT_DIR"
 
 DECISION="${1:-approve}"
 BASE_URL="${BASE_URL:-http://localhost:8100}"
-GOVERNANCE_URL="${GOVERNANCE_URL:-${REVIEW_URL:-http://localhost:18084}}"
-REVIEW_URL="$GOVERNANCE_URL"
+GOVERNANCE_URL="${GOVERNANCE_URL:-http://localhost:18084}"
 API_KEY="${API_KEY:-psk_local_admin}"
-GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-${REVIEW_API_KEY:-governance-admin-dev-key}}"
-REVIEW_API_KEY="$GOVERNANCE_API_KEY"
-ORG_ID="${ORG_ID:?ORG_ID is required (UUID interno de la org cargada por seeds)}"
-REQUESTER_ID="${REQUESTER_ID:-e2e-review-tester}"
+GOVERNANCE_API_KEY="${GOVERNANCE_API_KEY:-governance-admin-dev-key}"
+TENANT_ID="${TENANT_ID:?TENANT_ID is required (UUID interno del tenant cargado por seeds)}"
+REQUESTER_ID="${REQUESTER_ID:-e2e-governance-tester}"
 ACTION_TYPE="${ACTION_TYPE:-e2e.notification.bulk_send}"
-POLICY_NAME="${POLICY_NAME:-e2e-require-approval-review-notifications}"
+POLICY_NAME="${POLICY_NAME:-e2e-require-approval-governance-notifications}"
 CALLBACK_TIMEOUT_SECONDS="${CALLBACK_TIMEOUT_SECONDS:-12}"
 POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-1}"
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose}"
@@ -180,7 +178,7 @@ wait_for_db_notification_state() {
       break
     fi
     local row count read_at
-    row="$(db_query "SELECT COUNT(*), COALESCE(MAX(read_at)::text, '') FROM pymes_in_app_notifications WHERE entity_type = 'review_approval' AND entity_id = '${approval_id}';")"
+    row="$(db_query "SELECT COUNT(*), COALESCE(MAX(read_at)::text, '') FROM pymes_in_app_notifications WHERE entity_type = 'governance_approval' AND entity_id = '${approval_id}';")"
     row="$(printf '%s' "$row" | tr -d '\r')"
     IFS='|' read -r count read_at <<<"$row"
     if [[ "$row" == "$count" ]]; then
@@ -215,12 +213,12 @@ require_cmd python3
 require_cmd docker
 
 TARGET_RESOURCE="e2e-target-$(date +%s)"
-NOTE="E2E ${DECISION} review notification"
+NOTE="E2E ${DECISION} governance notification"
 
 echo ""
 bold "═══════════════════════════════════════════════════"
 echo ""
-bold "  Review Notifications — E2E"
+bold "  Governance Notifications — E2E"
 echo ""
 bold "  Decision: $DECISION"
 echo ""
@@ -232,65 +230,65 @@ bold "════════════════════════�
 echo ""
 
 print_section "Health"
-http_request BODY STATUS GET "$REVIEW_URL/readyz"
-assert_status "GET review /readyz" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$GOVERNANCE_URL/readyz"
+assert_status "GET governance /readyz" "$STATUS" "200" "$BODY"
 http_request BODY STATUS GET "$BASE_URL/healthz"
 assert_status "GET cp-backend /healthz" "$STATUS" "200" "$BODY"
 
 print_section "Fixtures"
-http_request BODY STATUS GET "$REVIEW_URL/v1/action-types" -H "X-API-Key: $REVIEW_API_KEY"
-assert_status "GET review action types" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$GOVERNANCE_URL/v1/action-types" -H "X-API-Key: $GOVERNANCE_API_KEY"
+assert_status "GET governance action types" "$STATUS" "200" "$BODY"
 ACTION_TYPE_ID="$(json_find_action_type_id "$BODY")"
 if [[ -z "$ACTION_TYPE_ID" ]]; then
-  http_request BODY STATUS POST "$REVIEW_URL/v1/action-types" \
-    -H "X-API-Key: $REVIEW_API_KEY" \
+  http_request BODY STATUS POST "$GOVERNANCE_URL/v1/action-types" \
+    -H "X-API-Key: $GOVERNANCE_API_KEY" \
     -H "Content-Type: application/json" \
     --data-binary "{\"name\":\"$ACTION_TYPE\",\"description\":\"E2E approval test action\",\"risk_class\":\"medium\"}"
-  assert_status "POST review action type" "$STATUS" "201" "$BODY"
+  assert_status "POST governance action type" "$STATUS" "201" "$BODY"
 else
   printf "  %-56s %s (%s)\n" "action type fixture already present" "$(green "PASS")" "$ACTION_TYPE_ID"
 fi
 
-http_request BODY STATUS GET "$REVIEW_URL/v1/delegations" -H "X-API-Key: $REVIEW_API_KEY"
-assert_status "GET review delegations" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$GOVERNANCE_URL/v1/delegations" -H "X-API-Key: $GOVERNANCE_API_KEY"
+assert_status "GET governance delegations" "$STATUS" "200" "$BODY"
 DELEGATION_ID="$(json_find_delegation_id "$BODY")"
 if [[ -z "$DELEGATION_ID" ]]; then
-  http_request BODY STATUS POST "$REVIEW_URL/v1/delegations" \
-    -H "X-API-Key: $REVIEW_API_KEY" \
+  http_request BODY STATUS POST "$GOVERNANCE_URL/v1/delegations" \
+    -H "X-API-Key: $GOVERNANCE_API_KEY" \
     -H "Content-Type: application/json" \
-    --data-binary "{\"owner_id\":\"pymes-platform\",\"owner_type\":\"service\",\"agent_id\":\"$REQUESTER_ID\",\"agent_type\":\"service\",\"allowed_action_types\":[\"$ACTION_TYPE\"],\"allowed_resources\":[],\"purpose\":\"E2E review notifications\",\"max_risk_class\":\"high\"}"
-  assert_status "POST review delegation" "$STATUS" "201" "$BODY"
+    --data-binary "{\"owner_id\":\"pymes-platform\",\"owner_type\":\"service\",\"agent_id\":\"$REQUESTER_ID\",\"agent_type\":\"service\",\"allowed_action_types\":[\"$ACTION_TYPE\"],\"allowed_resources\":[],\"purpose\":\"E2E governance notifications\",\"max_risk_class\":\"high\"}"
+  assert_status "POST governance delegation" "$STATUS" "201" "$BODY"
 else
   printf "  %-56s %s (%s)\n" "delegation fixture already present" "$(green "PASS")" "$DELEGATION_ID"
 fi
 
-http_request BODY STATUS GET "$REVIEW_URL/v1/policies" -H "X-API-Key: $REVIEW_API_KEY"
-assert_status "GET review policies" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$GOVERNANCE_URL/v1/policies" -H "X-API-Key: $GOVERNANCE_API_KEY"
+assert_status "GET governance policies" "$STATUS" "200" "$BODY"
 POLICY_INFO="$(json_find_policy_info "$BODY")"
 POLICY_ID="${POLICY_INFO%%$'\t'*}"
 POLICY_ENABLED="${POLICY_INFO#*$'\t'}"
 if [[ -z "$POLICY_ID" ]]; then
-  http_request BODY STATUS POST "$REVIEW_URL/v1/policies" \
-    -H "X-API-Key: $REVIEW_API_KEY" \
+  http_request BODY STATUS POST "$GOVERNANCE_URL/v1/policies" \
+    -H "X-API-Key: $GOVERNANCE_API_KEY" \
     -H "Content-Type: application/json" \
-    --data-binary "{\"name\":\"$POLICY_NAME\",\"description\":\"E2E review notifications\",\"action_type\":\"$ACTION_TYPE\",\"expression\":\"request.action_type == \\\"$ACTION_TYPE\\\"\",\"effect\":\"require_approval\",\"mode\":\"enforced\",\"enabled\":true}"
-  assert_status "POST review policy" "$STATUS" "201" "$BODY"
+    --data-binary "{\"name\":\"$POLICY_NAME\",\"description\":\"E2E governance notifications\",\"action_type\":\"$ACTION_TYPE\",\"expression\":\"request.action_type == \\\"$ACTION_TYPE\\\"\",\"effect\":\"require_approval\",\"mode\":\"enforced\",\"enabled\":true}"
+  assert_status "POST governance policy" "$STATUS" "201" "$BODY"
 elif [[ "$POLICY_ENABLED" != "true" ]]; then
-  http_request BODY STATUS PATCH "$REVIEW_URL/v1/policies/$POLICY_ID" \
-    -H "X-API-Key: $REVIEW_API_KEY" \
+  http_request BODY STATUS PATCH "$GOVERNANCE_URL/v1/policies/$POLICY_ID" \
+    -H "X-API-Key: $GOVERNANCE_API_KEY" \
     -H "Content-Type: application/json" \
     --data-binary '{"enabled":true}'
-  assert_status "PATCH review policy enabled=true" "$STATUS" "200" "$BODY"
+  assert_status "PATCH governance policy enabled=true" "$STATUS" "200" "$BODY"
 else
   printf "  %-56s %s (%s)\n" "policy fixture already enabled" "$(green "PASS")" "$POLICY_ID"
 fi
 
 print_section "Submit"
-http_request BODY STATUS POST "$REVIEW_URL/v1/requests" \
-  -H "X-API-Key: $REVIEW_API_KEY" \
+http_request BODY STATUS POST "$GOVERNANCE_URL/v1/requests" \
+  -H "X-API-Key: $GOVERNANCE_API_KEY" \
   -H "Content-Type: application/json" \
-  --data-binary "{\"requester_type\":\"service\",\"requester_id\":\"$REQUESTER_ID\",\"requester_name\":\"E2E Review Tester\",\"action_type\":\"$ACTION_TYPE\",\"target_system\":\"pymes\",\"target_resource\":\"$TARGET_RESOURCE\",\"params\":{\"org_id\":\"$ORG_ID\"},\"reason\":\"E2E review inbox verification\",\"context\":\"e2e-review-notifications\"}"
-assert_status "POST review request" "$STATUS" "201" "$BODY"
+  --data-binary "{\"requester_type\":\"service\",\"requester_id\":\"$REQUESTER_ID\",\"requester_name\":\"E2E Governance Tester\",\"action_type\":\"$ACTION_TYPE\",\"target_system\":\"pymes\",\"target_resource\":\"$TARGET_RESOURCE\",\"params\":{\"tenant_id\":\"$TENANT_ID\"},\"reason\":\"E2E governance inbox verification\",\"context\":\"e2e-governance-notifications\"}"
+assert_status "POST governance request" "$STATUS" "201" "$BODY"
 IFS=$'\t' read -r REQUEST_ID REQUEST_STATUS APPROVAL_ID <<<"$(json_get_submit_fields "$BODY")"
 if [[ "$REQUEST_STATUS" != "pending_approval" || -z "$APPROVAL_ID" || -z "$REQUEST_ID" ]]; then
   echo "Respuesta inesperada al crear request: $BODY" >&2
@@ -315,16 +313,16 @@ if [[ "$(json_has_inbox_approval "$BODY" "$APPROVAL_ID")" != "1" ]]; then
 fi
 printf "  %-56s %s\n" "inbox exposes approval notification" "$(green "PASS")"
 
-http_request BODY STATUS GET "$BASE_URL/v1/review/approvals/pending" -H "X-API-Key: $API_KEY"
-assert_status "GET cp-backend /v1/review/approvals/pending" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$BASE_URL/v1/governance/approvals/pending" -H "X-API-Key: $API_KEY"
+assert_status "GET cp-backend /v1/governance/approvals/pending" "$STATUS" "200" "$BODY"
 if [[ "$(json_has_pending_approval "$BODY" "$APPROVAL_ID")" != "1" ]]; then
   echo "La approval no apareció en el proxy de pending approvals" >&2
   exit 1
 fi
-printf "  %-56s %s\n" "review proxy lists the pending approval" "$(green "PASS")"
+printf "  %-56s %s\n" "governance proxy lists the pending approval" "$(green "PASS")"
 
 print_section "Resolve"
-http_request BODY STATUS POST "$BASE_URL/v1/review/approvals/$APPROVAL_ID/$DECISION" \
+http_request BODY STATUS POST "$BASE_URL/v1/governance/approvals/$APPROVAL_ID/$DECISION" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
   --data-binary "{\"note\":\"$NOTE\"}"
@@ -345,13 +343,13 @@ if [[ "$(json_has_inbox_approval "$BODY" "$APPROVAL_ID")" != "0" ]]; then
 fi
 printf "  %-56s %s\n" "resolved approval disappears from inbox" "$(green "PASS")"
 
-http_request BODY STATUS GET "$BASE_URL/v1/review/approvals/pending" -H "X-API-Key: $API_KEY"
-assert_status "GET cp-backend /v1/review/approvals/pending after resolve" "$STATUS" "200" "$BODY"
+http_request BODY STATUS GET "$BASE_URL/v1/governance/approvals/pending" -H "X-API-Key: $API_KEY"
+assert_status "GET cp-backend /v1/governance/approvals/pending after resolve" "$STATUS" "200" "$BODY"
 if [[ "$(json_has_pending_approval "$BODY" "$APPROVAL_ID")" != "0" ]]; then
-  echo "La approval resuelta sigue pendiente en Review" >&2
+  echo "La approval resuelta sigue pendiente en Governance" >&2
   exit 1
 fi
-printf "  %-56s %s\n" "review proxy no longer lists resolved approval" "$(green "PASS")"
+printf "  %-56s %s\n" "governance proxy no longer lists resolved approval" "$(green "PASS")"
 
 echo ""
 bold "Resultado: PASS"

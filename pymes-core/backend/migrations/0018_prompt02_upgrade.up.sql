@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS webhook_outbox (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     event_type text NOT NULL,
     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
     status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),

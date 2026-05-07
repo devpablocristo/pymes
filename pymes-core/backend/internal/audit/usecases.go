@@ -14,20 +14,20 @@ import (
 
 type RepositoryPort interface {
 	Add(in domain.LogInput) domain.Entry
-	List(orgID uuid.UUID, limit int) []domain.Entry
-	ExportCSV(orgID uuid.UUID) (string, error)
-	Verify(orgID uuid.UUID) domain.VerifyResult
+	List(tenantID uuid.UUID, limit int) []domain.Entry
+	ExportCSV(tenantID uuid.UUID) (string, error)
+	Verify(tenantID uuid.UUID) domain.VerifyResult
 }
 
 type Usecases struct {
 	repo RepositoryPort
 }
 
-func (u *Usecases) Verify(ctx context.Context, orgID string) (domain.VerifyResult, error) {
+func (u *Usecases) Verify(ctx context.Context, tenantID string) (domain.VerifyResult, error) {
 	_ = ctx
-	id, err := uuid.Parse(orgID)
+	id, err := uuid.Parse(tenantID)
 	if err != nil {
-		return domain.VerifyResult{}, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return domain.VerifyResult{}, fmt.Errorf("invalid tenant_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.Verify(id), nil
 }
@@ -36,14 +36,14 @@ func NewUsecases(repo RepositoryPort) *Usecases {
 	return &Usecases{repo: repo}
 }
 
-func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+func (u *Usecases) Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any) {
 	_ = ctx
-	id, err := uuid.Parse(orgID)
+	id, err := uuid.Parse(tenantID)
 	if err != nil {
 		return
 	}
 	u.repo.Add(domain.LogInput{
-		OrgID: id,
+		TenantID: id,
 		Actor: domain.ActorRef{
 			Raw:   actor,
 			Type:  "user",
@@ -58,26 +58,26 @@ func (u *Usecases) Log(ctx context.Context, orgID string, actor, action, resourc
 
 func (u *Usecases) LogWithActor(ctx context.Context, in domain.LogInput) {
 	_ = ctx
-	if in.OrgID == uuid.Nil {
+	if in.TenantID == uuid.Nil {
 		return
 	}
 	u.repo.Add(in)
 }
 
-func (u *Usecases) List(ctx context.Context, orgID string, limit int) ([]domain.Entry, error) {
+func (u *Usecases) List(ctx context.Context, tenantID string, limit int) ([]domain.Entry, error) {
 	_ = ctx
-	id, err := uuid.Parse(orgID)
+	id, err := uuid.Parse(tenantID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return nil, fmt.Errorf("invalid tenant_id: %w", httperrors.ErrBadInput)
 	}
 	return u.repo.List(id, limit), nil
 }
 
-func (u *Usecases) Export(ctx context.Context, orgID, format string) (string, string, error) {
+func (u *Usecases) Export(ctx context.Context, tenantID, format string) (string, string, error) {
 	_ = ctx
-	id, err := uuid.Parse(orgID)
+	id, err := uuid.Parse(tenantID)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid org_id: %w", httperrors.ErrBadInput)
+		return "", "", fmt.Errorf("invalid tenant_id: %w", httperrors.ErrBadInput)
 	}
 	switch strings.ToLower(format) {
 	case "", "csv":

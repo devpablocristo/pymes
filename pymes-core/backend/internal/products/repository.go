@@ -30,7 +30,7 @@ var (
 )
 
 type ListParams struct {
-	OrgID    uuid.UUID
+	TenantID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -42,7 +42,7 @@ type ListParams struct {
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("org_id = ? AND type = 'product'", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.ProductModel{}).Where("tenant_id = ? AND type = 'product'", p.TenantID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -99,7 +99,7 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 	}
 	row := models.ProductModel{
 		ID:          uuid.New(),
-		OrgID:       in.OrgID,
+		TenantID:    in.TenantID,
 		Type:        "product",
 		SKU:         strings.TrimSpace(in.SKU),
 		Name:        strings.TrimSpace(in.Name),
@@ -130,9 +130,9 @@ func (r *Repository) Create(ctx context.Context, in productdomain.Product) (prod
 
 // GetByID devuelve el producto independientemente de su estado de archivado.
 // El caller decide qué hacer con DeletedAt (Update rechaza archivados; el handler los expone con deleted_at).
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (productdomain.Product, error) {
 	var row models.ProductModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ? AND type = 'product'", tenantID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return productdomain.Product{}, ErrNotFound
@@ -168,7 +168,7 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 		"updated_at":     time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", in.OrgID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", in.TenantID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		if httperrors.IsUniqueViolation(res.Error) {
@@ -179,11 +179,11 @@ func (r *Repository) Update(ctx context.Context, in productdomain.Product) (prod
 	if res.RowsAffected == 0 {
 		return productdomain.Product{}, ErrNotFound
 	}
-	return r.GetByID(ctx, in.OrgID, in.ID)
+	return r.GetByID(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND type = 'product'", tenantID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -199,8 +199,8 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.ProductModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL AND type = 'product'", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL AND type = 'product'", tenantID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -216,28 +216,28 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	// Borrado físico solo si está archivado (deleted_at). Antes: liberar FKs que no tienen ON DELETE CASCADE.
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec(
-			"DELETE FROM stock_movements WHERE org_id = ? AND product_id = ?",
-			orgID, id,
+			"DELETE FROM stock_movements WHERE tenant_id = ? AND product_id = ?",
+			tenantID, id,
 		).Error; err != nil {
 			return err
 		}
 		updates := []string{
-			`UPDATE quote_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM quotes q WHERE q.id = quote_items.quote_id AND q.org_id = ?)`,
-			`UPDATE sale_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM sales s WHERE s.id = sale_items.sale_id AND s.org_id = ?)`,
-			`UPDATE purchase_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM purchases p WHERE p.id = purchase_items.purchase_id AND p.org_id = ?)`,
-			`UPDATE return_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM returns r WHERE r.id = return_items.return_id AND r.org_id = ?)`,
+			`UPDATE quote_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM quotes q WHERE q.id = quote_items.quote_id AND q.tenant_id = ?)`,
+			`UPDATE sale_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM sales s WHERE s.id = sale_items.sale_id AND s.tenant_id = ?)`,
+			`UPDATE purchase_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM purchases p WHERE p.id = purchase_items.purchase_id AND p.tenant_id = ?)`,
+			`UPDATE return_items SET product_id = NULL WHERE product_id = ? AND EXISTS (SELECT 1 FROM returns r WHERE r.id = return_items.return_id AND r.tenant_id = ?)`,
 		}
 		for _, stmt := range updates {
-			if err := tx.Exec(stmt, id, orgID).Error; err != nil {
+			if err := tx.Exec(stmt, id, tenantID).Error; err != nil {
 				return err
 			}
 		}
 		res := tx.Unscoped().
-			Where("org_id = ? AND id = ? AND type = 'product' AND deleted_at IS NOT NULL", orgID, id).
+			Where("tenant_id = ? AND id = ? AND type = 'product' AND deleted_at IS NOT NULL", tenantID, id).
 			Delete(&models.ProductModel{})
 		if res.Error != nil {
 			return res.Error
@@ -249,11 +249,11 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	})
 }
 
-func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.ProductModel, error) {
+func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.ProductModel, error) {
 	var row models.ProductModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("org_id = ? AND id = ? AND type = 'product'", orgID, id).
+		Where("tenant_id = ? AND id = ? AND type = 'product'", tenantID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -274,7 +274,7 @@ func toDomain(row models.ProductModel) productdomain.Product {
 	}
 	p := productdomain.Product{
 		ID:          row.ID,
-		OrgID:       row.OrgID,
+		TenantID:    row.TenantID,
 		SKU:         row.SKU,
 		Name:        row.Name,
 		Description: row.Description,

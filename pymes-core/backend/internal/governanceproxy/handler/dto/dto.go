@@ -1,4 +1,4 @@
-// Package dto contiene los tipos de request/response para el proxy de Review.
+// Package dto contiene los tipos de request/response para el proxy de Governance.
 package dto
 
 // --- Policies ---
@@ -58,7 +58,7 @@ type ActionTypeListResponse struct {
 // ApprovalResponse es la representación de una aprobación pendiente.
 type ApprovalResponse struct {
 	ID             string  `json:"id"`
-	OrgID          string  `json:"org_id,omitempty"`
+	TenantID       string  `json:"tenant_id,omitempty"`
 	RequestID      string  `json:"request_id"`
 	ActionType     string  `json:"action_type"`
 	TargetResource string  `json:"target_resource"`

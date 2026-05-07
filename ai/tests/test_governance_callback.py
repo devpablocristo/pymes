@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.api.review_callback as review_callback_module
-from src.api.review_callback import router
+import src.api.governance_callback as governance_callback_module
+from src.api.governance_callback import router
 
 
 def create_client() -> TestClient:
@@ -17,7 +17,7 @@ def create_client() -> TestClient:
     return TestClient(app)
 
 
-def test_review_callback_ignores_invalid_request_id(monkeypatch) -> None:
+def test_governance_callback_ignores_invalid_request_id(monkeypatch) -> None:
     client = create_client()
 
     class UnexpectedRepository:
@@ -28,11 +28,11 @@ def test_review_callback_ignores_invalid_request_id(monkeypatch) -> None:
     async def fake_session():
         yield object()
 
-    monkeypatch.setattr(review_callback_module, "AIRepository", UnexpectedRepository)
-    monkeypatch.setattr(review_callback_module, "get_session", fake_session)
+    monkeypatch.setattr(governance_callback_module, "AIRepository", UnexpectedRepository)
+    monkeypatch.setattr(governance_callback_module, "get_session", fake_session)
 
     response = client.post(
-        "/v1/internal/review-callback",
+        "/v1/internal/governance-callback",
         headers={"X-Internal-Service-Token": "test-token"},
         json={
             "request_id": "req-not-a-uuid",

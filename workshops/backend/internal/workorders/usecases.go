@@ -20,7 +20,7 @@ import (
 // ListParams agrupa filtros de listado.
 // AssetType opcional permite a una vertical pedir solo "vehicle" o solo "bicycle".
 type ListParams struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	BranchID  *uuid.UUID
 	Limit     int
 	After     *uuid.UUID
@@ -55,31 +55,31 @@ type UpdateInput struct {
 // RepositoryPort define el contrato del adapter de persistencia.
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error)
 	Create(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.WorkOrder, error)
 	Update(ctx context.Context, in domain.WorkOrder) (domain.WorkOrder, error)
-	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	SaveIntegrations(ctx context.Context, tenantID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error)
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
 }
 
 // AuditPort registra eventos de dominio (delegado al servicio compartido).
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 // controlPlanePort consulta el catálogo del core (productos, parties).
 type controlPlanePort interface {
-	GetCustomer(ctx context.Context, orgID, customerID string) (map[string]any, error)
-	GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error)
-	GetProduct(ctx context.Context, orgID, productID string) (map[string]any, error)
+	GetCustomer(ctx context.Context, tenantID, customerID string) (map[string]any, error)
+	GetParty(ctx context.Context, tenantID, partyID string) (map[string]any, error)
+	GetProduct(ctx context.Context, tenantID, productID string) (map[string]any, error)
 }
 
 // whatsAppNotifier envía texto vía API interna de pymes-core (opt-in y reglas en el core).
 type whatsAppNotifier interface {
-	SendInternalWhatsAppText(ctx context.Context, orgID string, partyID uuid.UUID, body string) error
+	SendInternalWhatsAppText(ctx context.Context, tenantID string, partyID uuid.UUID, body string) error
 }
 
 // Usecases es el motor base de work orders. Coordina repo, audit, core, whatsapp y hooks.
@@ -110,12 +110,12 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, 
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
-	return u.repo.ListArchived(ctx, orgID, branchID, assetType)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
+	return u.repo.ListArchived(ctx, tenantID, branchID, assetType)
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.WorkOrder, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
@@ -158,7 +158,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 		return domain.WorkOrder{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.created", "work_order", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, out.TenantID.String(), actor, "work_order.created", "work_order", out.ID.String(), map[string]any{
 			"number":     out.Number,
 			"asset_type": out.AssetType,
 		})
@@ -170,8 +170,8 @@ func (u *Usecases) Create(ctx context.Context, in domain.WorkOrder, actor string
 // Update
 // ─────────────────────────────────────────────────────────────────────────────
 
-func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.WorkOrder, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
@@ -277,9 +277,9 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 	if normalizeWorkOrderStatus(out.Status) != prevCanon {
 		hook.AfterStatusChange(ctx, &out, prevCanon)
 	}
-	u.maybeNotifyReadyForPickup(ctx, orgID, actor, prevCanon, &out, hook)
+	u.maybeNotifyReadyForPickup(ctx, tenantID, actor, prevCanon, &out, hook)
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, out.TenantID.String(), actor, "work_order.updated", "work_order", out.ID.String(), map[string]any{
 			"number":     out.Number,
 			"status":     out.Status,
 			"asset_type": out.AssetType,
@@ -292,8 +292,8 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 // Integrations (quote/sale linked from core)
 // ─────────────────────────────────────────────────────────────────────────────
 
-func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) SaveIntegrations(ctx context.Context, tenantID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
@@ -303,7 +303,7 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 	if err := archive.IfArchived(current.ArchivedAt, "work order"); err != nil {
 		return domain.WorkOrder{}, err
 	}
-	out, err := u.repo.SaveIntegrations(ctx, orgID, id, quoteID, saleID, status)
+	out, err := u.repo.SaveIntegrations(ctx, tenantID, id, quoteID, saleID, status)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
@@ -311,7 +311,7 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 		return domain.WorkOrder{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "work_order.integration_updated", "work_order", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, out.TenantID.String(), actor, "work_order.integration_updated", "work_order", out.ID.String(), map[string]any{
 			"quote_id": quoteID, "sale_id": saleID, "status": status,
 		})
 	}
@@ -322,34 +322,34 @@ func (u *Usecases) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, qu
 // Lifecycle (archive / restore / hard delete)
 // ─────────────────────────────────────────────────────────────────────────────
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "work_order.archived", "work_order", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "work_order.archived", "work_order", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "work_order.restored", "work_order", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "work_order.restored", "work_order", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("work order not found: %w", httperrors.ErrNotFound)
 		}
@@ -359,7 +359,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "work_order.hard_deleted", "work_order", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "work_order.hard_deleted", "work_order", id.String(), nil)
 	}
 	return nil
 }
@@ -373,7 +373,7 @@ func normalizeWorkOrderStatus(raw string) string {
 	return workshops.NormalizeStatus(raw)
 }
 
-func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUID, actor, prevCanon string, out *domain.WorkOrder, hook Hook) {
+func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, tenantID uuid.UUID, actor, prevCanon string, out *domain.WorkOrder, hook Hook) {
 	if u.whatsapp == nil || out == nil {
 		return
 	}
@@ -394,9 +394,9 @@ func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUI
 		// Texto genérico de fallback.
 		msg = fmt.Sprintf("Hola: su orden %s está lista para retirar. Coordiná la entrega con el taller.", strings.TrimSpace(out.Number))
 	}
-	if err := u.whatsapp.SendInternalWhatsAppText(ctx, orgID.String(), *out.CustomerID, msg); err != nil {
+	if err := u.whatsapp.SendInternalWhatsAppText(ctx, tenantID.String(), *out.CustomerID, msg); err != nil {
 		if u.audit != nil {
-			u.audit.Log(ctx, orgID.String(), actor, "work_order.ready_whatsapp_failed", "work_order", out.ID.String(), map[string]any{"error": "send_failed"})
+			u.audit.Log(ctx, tenantID.String(), actor, "work_order.ready_whatsapp_failed", "work_order", out.ID.String(), map[string]any{"error": "send_failed"})
 		}
 		return
 	}
@@ -404,7 +404,7 @@ func (u *Usecases) maybeNotifyReadyForPickup(ctx context.Context, orgID uuid.UUI
 	// Marcar idempotencia: actualizamos el campo en memoria; el repo lo persistirá en el próximo Update.
 	out.ReadyPickupNotifiedAt = &at
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "work_order.ready_whatsapp_sent", "work_order", out.ID.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "work_order.ready_whatsapp_sent", "work_order", out.ID.String(), nil)
 	}
 }
 
@@ -476,7 +476,7 @@ func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) e
 		return nil
 	}
 	if in.CustomerID != nil {
-		customer, err := u.cp.GetCustomer(ctx, in.OrgID.String(), in.CustomerID.String())
+		customer, err := u.cp.GetCustomer(ctx, in.TenantID.String(), in.CustomerID.String())
 		if err == nil {
 			if strings.TrimSpace(in.CustomerName) == "" {
 				if name, ok := customer["name"].(string); ok {
@@ -484,7 +484,7 @@ func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) e
 				}
 			}
 		} else {
-			party, partyErr := u.cp.GetParty(ctx, in.OrgID.String(), in.CustomerID.String())
+			party, partyErr := u.cp.GetParty(ctx, in.TenantID.String(), in.CustomerID.String())
 			if partyErr != nil {
 				return fmt.Errorf("customer_id is invalid: %w", httperrors.ErrBadInput)
 			}
@@ -500,7 +500,7 @@ func (u *Usecases) enrichReferences(ctx context.Context, in *domain.WorkOrder) e
 		if item.ProductID == nil {
 			continue
 		}
-		product, err := u.cp.GetProduct(ctx, in.OrgID.String(), item.ProductID.String())
+		product, err := u.cp.GetProduct(ctx, in.TenantID.String(), item.ProductID.String())
 		if err != nil {
 			return fmt.Errorf("product_id is invalid: %w", httperrors.ErrBadInput)
 		}

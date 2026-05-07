@@ -4,7 +4,7 @@ import { clearTenantProfile } from '../lib/tenantProfile';
 import { useI18n } from '../lib/i18n';
 import { mergeClerkSessionWithApiUser } from '../lib/profileDisplay';
 import type { MeProfileUser, SessionResponse } from '../lib/types';
-import { accountTypeLabel, profileOrgLabel } from './SettingsPage.data';
+import { accountTypeLabel, profileTenantLabel } from './SettingsPage.data';
 
 export function ProfileSessionRows({
   session,
@@ -13,14 +13,14 @@ export function ProfileSessionRows({
   hideOrgRow = false,
 }: {
   session: SessionResponse;
-  /** Nombre de la org activa en Clerk (solo modo Clerk); prioridad sobre org_name del API. */
+  /** Nombre del tenant activo en Clerk; prioridad sobre tenant_name del API. */
   clerkOrgName?: string | null;
   t: (key: string) => string;
   /** En modo Clerk la org se edita en un bloque aparte debajo de esta tabla. */
   hideOrgRow?: boolean;
 }) {
   const { auth } = session;
-  const orgLabel = profileOrgLabel(auth, clerkOrgName);
+  const orgLabel = profileTenantLabel(auth, clerkOrgName);
   const typeLabel = accountTypeLabel(t, auth.product_role);
   return (
     <table className="profile-session-table">

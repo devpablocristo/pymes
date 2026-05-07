@@ -8,14 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 )
 
 type governanceClient interface {
-	ListPolicies(ctx context.Context) (int, []byte, error)
-	CreatePolicy(ctx context.Context, body any) (int, []byte, error)
-	UpdatePolicy(ctx context.Context, id string, updates any) (int, []byte, error)
-	DeletePolicy(ctx context.Context, id string) (int, error)
+	ListPolicies(ctx context.Context, opts ...governanceclient.RequestOption) (int, []byte, error)
+	CreatePolicy(ctx context.Context, body any, opts ...governanceclient.RequestOption) (int, []byte, error)
+	UpdatePolicy(ctx context.Context, id string, updates any, opts ...governanceclient.RequestOption) (int, []byte, error)
+	DeletePolicy(ctx context.Context, id string, opts ...governanceclient.RequestOption) (int, error)
 	ListActionTypes(ctx context.Context) (int, []byte, error)
 	ListPendingApprovals(ctx context.Context) (int, []byte, error)
 	Approve(ctx context.Context, id string, body any) (int, []byte, error)
@@ -34,24 +35,24 @@ func NewHandler(client governanceClient) *Handler {
 
 // RegisterRoutes registra las rutas del proxy en el router group autenticado.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
-	review := rg.Group("/review")
+	governance := rg.Group("/governance")
 	{
 		// Políticas
-		review.GET("/policies", h.listPolicies)
-		review.POST("/policies", h.createPolicy)
-		review.PATCH("/policies/:id", h.updatePolicy)
-		review.DELETE("/policies/:id", h.deletePolicy)
+		governance.GET("/policies", h.listPolicies)
+		governance.POST("/policies", h.createPolicy)
+		governance.PATCH("/policies/:id", h.updatePolicy)
+		governance.DELETE("/policies/:id", h.deletePolicy)
 
 		// Action types
-		review.GET("/action-types", h.listActionTypes)
+		governance.GET("/action-types", h.listActionTypes)
 
 		// Aprobaciones
-		review.GET("/approvals/pending", h.listPendingApprovals)
-		review.POST("/approvals/:id/approve", h.approve)
-		review.POST("/approvals/:id/reject", h.reject)
+		governance.GET("/approvals/pending", h.listPendingApprovals)
+		governance.POST("/approvals/:id/approve", h.approve)
+		governance.POST("/approvals/:id/reject", h.reject)
 
 		// Templates de condición
-		review.GET("/condition-templates/:action_type", h.getConditionTemplates)
+		governance.GET("/condition-templates/:action_type", h.getConditionTemplates)
 	}
 }
 
@@ -59,7 +60,7 @@ func (h *Handler) listPolicies(c *gin.Context) {
 	status, data, err := h.client.ListPolicies(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: list policies failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)
@@ -80,7 +81,7 @@ func (h *Handler) createPolicy(c *gin.Context) {
 	expression := BuildCELExpression(req.ActionType, req.Condition)
 
 	// Armar body para Governance
-	reviewBody := map[string]string{
+	governanceBody := map[string]string{
 		"name":        req.Name,
 		"action_type": req.ActionType,
 		"expression":  expression,
@@ -88,10 +89,10 @@ func (h *Handler) createPolicy(c *gin.Context) {
 		"mode":        req.Mode,
 	}
 
-	status, data, err := h.client.CreatePolicy(c.Request.Context(), reviewBody)
+	status, data, err := h.client.CreatePolicy(c.Request.Context(), governanceBody)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: create policy failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)
@@ -128,7 +129,7 @@ func (h *Handler) updatePolicy(c *gin.Context) {
 	status, data, err := h.client.UpdatePolicy(c.Request.Context(), id, updates)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: update policy failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)
@@ -144,7 +145,7 @@ func (h *Handler) deletePolicy(c *gin.Context) {
 	status, err := h.client.DeletePolicy(c.Request.Context(), id)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: delete policy failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Status(status)
@@ -154,7 +155,7 @@ func (h *Handler) listActionTypes(c *gin.Context) {
 	status, data, err := h.client.ListActionTypes(c.Request.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: list action types failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)
@@ -164,7 +165,7 @@ func (h *Handler) listPendingApprovals(c *gin.Context) {
 	status, data, err := h.client.ListPendingApprovals(c.Request.Context())
 	if err != nil {
 		// La bandeja de notificaciones usa approvals como señal opcional.
-		// Si Review no está disponible en local o en entornos sin governance,
+		// Si Governance no está disponible en local o en entornos sin governance,
 		// devolvemos lista vacía para no degradar toda la pantalla.
 		log.Warn().Err(err).Msg("governance proxy: list pending approvals unavailable, returning empty list")
 		c.JSON(http.StatusOK, dto.ApprovalListResponse{Approvals: []dto.ApprovalResponse{}, Total: 0})
@@ -190,7 +191,7 @@ func (h *Handler) approve(c *gin.Context) {
 	status, data, err := h.client.Approve(c.Request.Context(), id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: approve failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)
@@ -213,7 +214,7 @@ func (h *Handler) reject(c *gin.Context) {
 	status, data, err := h.client.Reject(c.Request.Context(), id, body)
 	if err != nil {
 		log.Error().Err(err).Msg("governance proxy: reject failed")
-		c.JSON(http.StatusBadGateway, gin.H{"code": "review_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
+		c.JSON(http.StatusBadGateway, gin.H{"code": "governance_unavailable", "message": "No se pudo conectar con el servicio de reglas"})
 		return
 	}
 	c.Data(status, "application/json", data)

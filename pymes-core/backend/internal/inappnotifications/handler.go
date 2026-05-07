@@ -36,7 +36,7 @@ func (h *Handler) List(c *gin.Context) {
 			limit = n
 		}
 	}
-	items, unread, err := h.uc.ListForActor(c.Request.Context(), authCtx.OrgID, authCtx.Actor, limit)
+	items, unread, err := h.uc.ListForActor(c.Request.Context(), authCtx.TenantID, authCtx.Actor, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -53,7 +53,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Summary(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	unread, err := h.uc.CountUnreadForActor(c.Request.Context(), authCtx.OrgID, authCtx.Actor)
+	unread, err := h.uc.CountUnreadForActor(c.Request.Context(), authCtx.TenantID, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -83,7 +83,7 @@ func (h *Handler) Patch(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": "VALIDATION", "message": "only read=true is supported"})
 		return
 	}
-	readAt, err := h.uc.MarkReadForActor(c.Request.Context(), authCtx.OrgID, authCtx.Actor, id)
+	readAt, err := h.uc.MarkReadForActor(c.Request.Context(), authCtx.TenantID, authCtx.Actor, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

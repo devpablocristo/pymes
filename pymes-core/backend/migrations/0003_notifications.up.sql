@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 
 CREATE TABLE IF NOT EXISTS notification_log (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     notification_type text NOT NULL,
     channel text NOT NULL,
@@ -21,5 +21,5 @@ CREATE TABLE IF NOT EXISTS notification_log (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_notification_log_org_created ON notification_log(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notification_log_org_created ON notification_log(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notification_log_user_created ON notification_log(user_id, created_at DESC);

@@ -1,6 +1,6 @@
 export type RestaurantDiningArea = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   name: string;
   sort_order: number;
   is_favorite?: boolean;
@@ -12,7 +12,7 @@ export type RestaurantDiningArea = {
 
 export type RestaurantDiningTable = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   area_id: string;
   code: string;
   label: string;
@@ -28,7 +28,7 @@ export type RestaurantDiningTable = {
 
 export type RestaurantTableSession = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   table_id: string;
   table_code?: string;
   area_name?: string;

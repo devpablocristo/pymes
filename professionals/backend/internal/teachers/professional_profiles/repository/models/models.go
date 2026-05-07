@@ -9,7 +9,7 @@ import (
 
 type ProfessionalProfileModel struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID             uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID          uuid.UUID `gorm:"type:uuid;index;not null"`
 	PartyID           uuid.UUID `gorm:"type:uuid;not null"`
 	PublicSlug        string    `gorm:"not null"`
 	Bio               string
@@ -31,7 +31,7 @@ func (ProfessionalProfileModel) TableName() string {
 
 type ProfessionalSpecialtyModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;not null"`
 	ProfileID   uuid.UUID `gorm:"type:uuid;not null"`
 	SpecialtyID uuid.UUID `gorm:"type:uuid;not null"`
 	CreatedAt   time.Time

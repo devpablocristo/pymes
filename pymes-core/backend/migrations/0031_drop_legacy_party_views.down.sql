@@ -1,7 +1,7 @@
 CREATE VIEW customers AS
 SELECT
     p.id,
-    p.org_id,
+    p.tenant_id,
     CASE WHEN p.party_type = 'organization' THEN 'company' ELSE 'person' END AS type,
     p.display_name AS name,
     p.tax_id,
@@ -18,18 +18,18 @@ SELECT
 FROM parties p
 JOIN party_roles r
     ON r.party_id = p.id
-   AND r.org_id = p.org_id
+   AND r.tenant_id = p.tenant_id
    AND r.role = 'customer'
    AND r.is_active = true
 LEFT JOIN party_roles pr
     ON pr.party_id = p.id
-   AND pr.org_id = p.org_id
+   AND pr.tenant_id = p.tenant_id
    AND pr.role = 'customer';
 
 CREATE VIEW suppliers AS
 SELECT
     p.id,
-    p.org_id,
+    p.tenant_id,
     p.display_name AS name,
     p.tax_id,
     p.email,
@@ -45,6 +45,6 @@ SELECT
 FROM parties p
 JOIN party_roles r
     ON r.party_id = p.id
-   AND r.org_id = p.org_id
+   AND r.tenant_id = p.tenant_id
    AND r.role = 'supplier'
    AND r.is_active = true;

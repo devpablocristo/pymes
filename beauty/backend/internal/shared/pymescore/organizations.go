@@ -6,6 +6,6 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
-func (c *Client) GetBootstrap(ctx context.Context, orgID string) (map[string]any, error) {
-	return pymescoreops.GetBootstrap(ctx, c.Client, orgID)
+func (c *Client) GetBootstrap(ctx context.Context, tenantID string) (map[string]any, error) {
+	return pymescoreops.GetBootstrap(ctx, c.Client, tenantID)
 }

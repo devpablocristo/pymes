@@ -55,7 +55,7 @@ type SaleItemResponse struct {
 
 type SaleResponse struct {
 	ID            string             `json:"id"`
-	OrgID         string             `json:"org_id"`
+	TenantID      string             `json:"tenant_id"`
 	BranchID      string             `json:"branch_id,omitempty"`
 	Number        string             `json:"number"`
 	CustomerID    string             `json:"customer_id,omitempty"`

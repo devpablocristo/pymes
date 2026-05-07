@@ -20,4 +20,4 @@ ALTER TABLE workshops.work_orders
     ALTER COLUMN asset_label SET DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS workshops_work_orders_org_asset_idx
-    ON workshops.work_orders (org_id, asset_type, asset_id);
+    ON workshops.work_orders (tenant_id, asset_type, asset_id);

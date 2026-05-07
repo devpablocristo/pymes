@@ -33,6 +33,7 @@ pnpm-debug.log*
 .deps/
 frontend/.deps/
 .firebase/
+**/e2e-real/.auth/
 
 # Dumps de clientes y CSVs temporales de migración
 *.sql

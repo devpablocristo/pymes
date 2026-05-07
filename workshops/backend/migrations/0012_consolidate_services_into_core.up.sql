@@ -21,7 +21,7 @@ DECLARE
 BEGIN
     -- Paso 1: crear/reusar core.services para cada workshops.services.
     FOR rec IN
-        SELECT id, org_id, code, name, description, category, estimated_hours,
+        SELECT id, tenant_id, code, name, description, category, estimated_hours,
                base_price, currency, tax_rate, is_active, segment, archived_at,
                linked_service_id, created_at, updated_at
         FROM workshops.services
@@ -33,14 +33,14 @@ BEGIN
             -- Derivar id determinístico para este workshops.services row.
             new_id := uuid_generate_v5(ns_workshops, rec.id::text);
             INSERT INTO public.services (
-                id, org_id, code, name, description, category_code,
+                id, tenant_id, code, name, description, category_code,
                 sale_price, cost_price, tax_rate, currency,
                 default_duration_minutes, tags, metadata,
                 created_at, updated_at, deleted_at, is_active
             )
             VALUES (
                 new_id,
-                rec.org_id,
+                rec.tenant_id,
                 NULLIF(rec.code, ''),
                 rec.name,
                 rec.description,
@@ -58,7 +58,7 @@ BEGIN
                     'segment', rec.segment,
                     'estimated_hours', rec.estimated_hours,
                     'migrated_from', 'workshops.services',
-                    'legacy_id', rec.id::text
+                    'previous_id', rec.id::text
                 ),
                 rec.created_at,
                 rec.updated_at,
@@ -79,6 +79,6 @@ BEGIN
     END LOOP;
 END $$;
 
--- Paso 3: drop FK al linked_service_id (ya no aplica) y la tabla legacy.
+-- Paso 3: drop FK al linked_service_id (ya no aplica) y la tabla anterior.
 ALTER TABLE workshops.services DROP CONSTRAINT IF EXISTS workshops_services_linked_service_fk;
 DROP TABLE IF EXISTS workshops.services CASCADE;

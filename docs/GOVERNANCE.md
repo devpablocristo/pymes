@@ -17,7 +17,7 @@ Nexus Review es el servicio de gobernanza del ecosistema. Pymes no redefine poli
 `audit_log` usa hash v2 para filas nuevas:
 
 - `prev_hash`
-- `org_id`
+- `tenant_id`
 - `actor`
 - `actor_type`
 - `action`
@@ -26,5 +26,4 @@ Nexus Review es el servicio de gobernanza del ecosistema. Pymes no redefine poli
 - `created_at`
 - `payload_hash`
 
-La verificacion esta en `GET /v1/audit/verify`. Filas legacy se verifican por enlace de cadena; filas v2 se recalculan completo.
-
+La verificacion esta en `GET /v1/audit/verify`. Filas historicas se verifican por enlace de cadena; filas v2 se recalculan completo.

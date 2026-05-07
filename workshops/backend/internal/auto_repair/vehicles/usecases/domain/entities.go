@@ -8,7 +8,7 @@ import (
 
 type Vehicle struct {
 	ID           uuid.UUID
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
 	LicensePlate string

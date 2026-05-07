@@ -4,7 +4,7 @@
 
 La consola usa Clerk/JWT y `pymes-core` copia el principal autenticado al contexto Gin con:
 
-- `org_id`
+- `tenant_id`
 - `actor`
 - `role`
 - `scopes`

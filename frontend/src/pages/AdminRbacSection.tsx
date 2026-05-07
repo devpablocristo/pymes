@@ -2,35 +2,45 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   assignRbacRole,
+  createTenantInvite,
   getUserEffectivePermissions,
-  listOrgMembers,
+  listTenantInvites,
+  listTenantMembers,
   listRbacRoles,
   removeRbacRoleAssignment,
-  type OrgMemberRow,
+  resendTenantInvite,
+  revokeTenantInvite,
+  type TenantMemberRow,
 } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { queryKeys } from '../lib/queryKeys';
 
-function memberLabel(m: OrgMemberRow): string {
+function memberLabel(m: TenantMemberRow): string {
   const name = m.user?.name?.trim();
   const email = m.user?.email?.trim();
   if (name && email) return `${name} (${email})`;
   return name || email || m.user_id;
 }
 
-export function AdminRbacSection({ orgId }: { orgId: string }) {
+export function AdminRbacSection({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [permUserId, setPermUserId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member');
   const queryClient = useQueryClient();
   const membersQuery = useQuery({
-    queryKey: queryKeys.rbac.members(orgId),
-    queryFn: () => listOrgMembers(orgId),
+    queryKey: queryKeys.rbac.members(tenantId),
+    queryFn: () => listTenantMembers(tenantId),
   });
   const rolesQuery = useQuery({
     queryKey: queryKeys.rbac.roles,
     queryFn: listRbacRoles,
+  });
+  const invitesQuery = useQuery({
+    queryKey: queryKeys.rbac.invites(tenantId),
+    queryFn: () => listTenantInvites(tenantId),
   });
   const permissionsQuery = useQuery({
     queryKey: queryKeys.rbac.permissions(permUserId ?? ''),
@@ -40,20 +50,49 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
   const assignMutation = useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => assignRbacRole(roleId, userId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(orgId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) });
     },
   });
   const removeMutation = useMutation({
     mutationFn: ({ roleId, userId }: { roleId: string; userId: string }) => removeRbacRoleAssignment(roleId, userId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(orgId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) });
+    },
+  });
+  const inviteMutation = useMutation({
+    mutationFn: ({ email, role }: { email: string; role: string }) => createTenantInvite(tenantId, { email, role }),
+    onSuccess: async () => {
+      setInviteEmail('');
+      setInviteRole('member');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) }),
+      ]);
+    },
+  });
+  const revokeInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => revokeTenantInvite(inviteId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) });
+    },
+  });
+  const resendInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => resendTenantInvite(inviteId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) });
     },
   });
   const members = membersQuery.data?.items ?? [];
+  const invites = invitesQuery.data?.items ?? [];
   const roles = rolesQuery.data?.items ?? [];
-  const loading = membersQuery.isLoading || rolesQuery.isLoading;
-  const busy = assignMutation.isPending || removeMutation.isPending;
-  const queryError = membersQuery.error || rolesQuery.error;
+  const loading = membersQuery.isLoading || rolesQuery.isLoading || invitesQuery.isLoading;
+  const busy =
+    assignMutation.isPending ||
+    removeMutation.isPending ||
+    inviteMutation.isPending ||
+    revokeInviteMutation.isPending ||
+    resendInviteMutation.isPending;
+  const queryError = membersQuery.error || rolesQuery.error || invitesQuery.error;
   const permLines = useMemo(() => {
     const permissions = permissionsQuery.data?.permissions ?? {};
     const lines: string[] = [];
@@ -100,6 +139,20 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
     }
   }
 
+  async function handleInvite(): Promise<void> {
+    const email = inviteEmail.trim();
+    if (!email) {
+      setError('Ingresá un email para invitar.');
+      return;
+    }
+    try {
+      await inviteMutation.mutateAsync({ email, role: inviteRole });
+      setError('');
+    } catch (err) {
+      setError(formatFetchErrorForUser(err, 'No se pudo enviar la invitación.'));
+    }
+  }
+
   return (
     <section className="card admin-settings-section">
       <div className="card-header">
@@ -118,6 +171,95 @@ export function AdminRbacSection({ orgId }: { orgId: string }) {
         <p className="text-secondary">Cargando…</p>
       ) : (
         <>
+          <form
+            className="admin-settings-grid admin-rbac-assign-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleInvite();
+            }}
+          >
+            <div className="form-group">
+              <label htmlFor="tenant-invite-email">Invitar por email</label>
+              <input
+                id="tenant-invite-email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="persona@empresa.com"
+                disabled={busy}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="tenant-invite-role">Rol</label>
+              <select
+                id="tenant-invite-role"
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value === 'admin' ? 'admin' : 'member')}
+                disabled={busy}
+              >
+                <option value="member">Miembro</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="form-group admin-settings-toolbar-bottom admin-rbac-form-actions">
+              <button type="submit" className="btn-primary btn-sm" disabled={busy}>
+                Enviar invitación
+              </button>
+            </div>
+          </form>
+
+          {invites.length > 0 ? (
+            <div className="admin-settings-section admin-rbac-block-mt">
+              <h3>Invitaciones</h3>
+              <div className="admin-activity-wrap">
+                <table className="admin-activity-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Rol</th>
+                      <th>Estado</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invites.map((invite) => (
+                      <tr key={invite.id}>
+                        <td>{invite.email}</td>
+                        <td>
+                          <code className="admin-code">{invite.role}</code>
+                        </td>
+                        <td>
+                          <code className="admin-code">{invite.status}</code>
+                        </td>
+                        <td>
+                          {invite.status === 'pending' ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-sm btn-secondary"
+                                disabled={busy}
+                                onClick={() => void resendInviteMutation.mutateAsync(invite.id)}
+                              >
+                                Reenviar
+                              </button>{' '}
+                              <button
+                                type="button"
+                                className="btn-sm btn-danger"
+                                disabled={busy}
+                                onClick={() => void revokeInviteMutation.mutateAsync(invite.id)}
+                              >
+                                Revocar
+                              </button>
+                            </>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
           <div className="admin-activity-wrap">
             <table className="admin-activity-table">
               <thead>

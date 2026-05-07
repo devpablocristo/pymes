@@ -28,7 +28,7 @@ Responde siempre en espanol, claro y directo. No muestres JSON al usuario."""
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
     """Construye el sub-agente de clientes."""
 
-    async def search_customers(*, org_id: str, query: str = "", limit: int = 10) -> dict[str, Any]:
+    async def search_customers(*, tenant_id: str, query: str = "", limit: int = 10) -> dict[str, Any]:
         return await customers.search_customers(client, auth, query=query, limit=limit)
 
     tools = [

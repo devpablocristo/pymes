@@ -26,7 +26,7 @@ type orgMemberUserIDRow struct {
 }
 
 type orgIDRow struct {
-	OrgID uuid.UUID `gorm:"column:org_id"`
+	TenantID uuid.UUID `gorm:"column:tenant_id"`
 }
 
 type Repository struct {
@@ -49,13 +49,13 @@ func (r *Repository) GetUserIDByExternalID(externalID string) (uuid.UUID, bool) 
 	return row.ID, true
 }
 
-func (r *Repository) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
+func (r *Repository) GetOnlyUserIDByOrg(tenantID uuid.UUID) (uuid.UUID, bool) {
 	var rows []orgMemberUserIDRow
-	err := r.db.Table("org_members AS om").
-		Select("om.user_id").
-		Joins("JOIN users AS u ON u.id = om.user_id").
-		Where("om.org_id = ? AND u.deleted_at IS NULL", orgID).
-		Order("om.created_at ASC, om.user_id ASC").
+	err := r.db.Table("tenant_memberships AS tm").
+		Select("tm.user_id").
+		Joins("JOIN users AS u ON u.id = tm.user_id").
+		Where("tm.tenant_id = ? AND u.deleted_at IS NULL", tenantID).
+		Order("tm.created_at ASC, tm.user_id ASC").
 		Limit(2).
 		Find(&rows).Error
 	if err != nil {
@@ -67,13 +67,13 @@ func (r *Repository) GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool) {
 	return rows[0].UserID, true
 }
 
-func (r *Repository) ListUserIDsByOrg(orgID uuid.UUID) ([]uuid.UUID, error) {
+func (r *Repository) ListUserIDsByOrg(tenantID uuid.UUID) ([]uuid.UUID, error) {
 	var rows []orgMemberUserIDRow
-	err := r.db.Table("org_members AS om").
-		Select("DISTINCT om.user_id").
-		Joins("JOIN users AS u ON u.id = om.user_id").
-		Where("om.org_id = ? AND u.deleted_at IS NULL", orgID).
-		Order("om.user_id ASC").
+	err := r.db.Table("tenant_memberships AS tm").
+		Select("DISTINCT tm.user_id").
+		Joins("JOIN users AS u ON u.id = tm.user_id").
+		Where("tm.tenant_id = ? AND u.deleted_at IS NULL", tenantID).
+		Order("tm.user_id ASC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
@@ -87,24 +87,24 @@ func (r *Repository) ListUserIDsByOrg(orgID uuid.UUID) ([]uuid.UUID, error) {
 
 func (r *Repository) ListOrgIDsWithUsers() ([]uuid.UUID, error) {
 	var rows []orgIDRow
-	err := r.db.Table("org_members AS om").
-		Select("DISTINCT om.org_id").
-		Joins("JOIN users AS u ON u.id = om.user_id").
+	err := r.db.Table("tenant_memberships AS tm").
+		Select("DISTINCT tm.tenant_id AS tenant_id").
+		Joins("JOIN users AS u ON u.id = tm.user_id").
 		Where("u.deleted_at IS NULL").
-		Order("om.org_id ASC").
+		Order("tm.tenant_id ASC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
 	}
 	out := make([]uuid.UUID, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, row.OrgID)
+		out = append(out, row.TenantID)
 	}
 	return out, nil
 }
 
 func (r *Repository) ListForRecipient(ctx context.Context, tenantID, recipientID string, limit int) ([]coredomain.Notification, error) {
-	orgID, userID, err := parseRecipientScope(tenantID, recipientID)
+	tenantUUID, userID, err := parseRecipientScope(tenantID, recipientID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (r *Repository) ListForRecipient(ctx context.Context, tenantID, recipientID
 	}
 	var rows []models.InAppNotificationModel
 	err = r.db.WithContext(ctx).
-		Where("org_id = ? AND user_id = ?", orgID, userID).
+		Where("tenant_id = ? AND user_id = ?", tenantUUID, userID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows).Error
@@ -128,7 +128,7 @@ func (r *Repository) ListForRecipient(ctx context.Context, tenantID, recipientID
 		}
 		out = append(out, coredomain.Notification{
 			ID:          row.ID.String(),
-			TenantID:    row.OrgID.String(),
+			TenantID:    row.TenantID.String(),
 			RecipientID: row.UserID.String(),
 			Title:       row.Title,
 			Body:        row.Body,
@@ -144,19 +144,19 @@ func (r *Repository) ListForRecipient(ctx context.Context, tenantID, recipientID
 }
 
 func (r *Repository) CountUnread(ctx context.Context, tenantID, recipientID string) (int64, error) {
-	orgID, userID, err := parseRecipientScope(tenantID, recipientID)
+	tenantUUID, userID, err := parseRecipientScope(tenantID, recipientID)
 	if err != nil {
 		return 0, err
 	}
 	var n int64
 	err = r.db.WithContext(ctx).Model(&models.InAppNotificationModel{}).
-		Where("org_id = ? AND user_id = ? AND read_at IS NULL", orgID, userID).
+		Where("tenant_id = ? AND user_id = ? AND read_at IS NULL", tenantUUID, userID).
 		Count(&n).Error
 	return n, err
 }
 
 func (r *Repository) Append(ctx context.Context, notification coredomain.Notification) (coredomain.Notification, error) {
-	orgID, userID, err := parseRecipientScope(notification.TenantID, notification.RecipientID)
+	tenantUUID, userID, err := parseRecipientScope(notification.TenantID, notification.RecipientID)
 	if err != nil {
 		return coredomain.Notification{}, err
 	}
@@ -178,7 +178,7 @@ func (r *Repository) Append(ctx context.Context, notification coredomain.Notific
 	metadata := normalizeMetadata(notification.Metadata)
 	row := models.InAppNotificationModel{
 		ID:          id,
-		OrgID:       orgID,
+		TenantID:    tenantUUID,
 		UserID:      userID,
 		Title:       notification.Title,
 		Body:        notification.Body,
@@ -201,7 +201,7 @@ func (r *Repository) Append(ctx context.Context, notification coredomain.Notific
 
 // MarkRead marca leída si pertenece a org y usuario; devuelve el timestamp aplicado.
 func (r *Repository) MarkRead(ctx context.Context, tenantID, recipientID, notificationID string, readAt time.Time) (time.Time, error) {
-	orgID, userID, err := parseRecipientScope(tenantID, recipientID)
+	tenantUUID, userID, err := parseRecipientScope(tenantID, recipientID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -213,7 +213,7 @@ func (r *Repository) MarkRead(ctx context.Context, tenantID, recipientID, notifi
 		readAt = time.Now().UTC()
 	}
 	res := r.db.WithContext(ctx).Model(&models.InAppNotificationModel{}).
-		Where("id = ? AND org_id = ? AND user_id = ?", notifID, orgID, userID).
+		Where("id = ? AND tenant_id = ? AND user_id = ?", notifID, tenantUUID, userID).
 		Update("read_at", readAt)
 	if res.Error != nil {
 		return time.Time{}, res.Error
@@ -236,11 +236,11 @@ func (r *Repository) ResolveApprovalNotifications(ctx context.Context, tenantID,
 	query := r.db.WithContext(ctx).Model(&models.InAppNotificationModel{}).
 		Where("kind = ? AND entity_type = ? AND read_at IS NULL", approvalNotificationKind, approvalNotificationEntityType)
 	if strings.TrimSpace(tenantID) != "" {
-		orgID, err := uuid.Parse(strings.TrimSpace(tenantID))
+		tenantID, err := uuid.Parse(strings.TrimSpace(tenantID))
 		if err != nil {
 			return 0, fmt.Errorf("tenant_id: %w", err)
 		}
-		query = query.Where("org_id = ?", orgID)
+		query = query.Where("tenant_id = ?", tenantID)
 	}
 	switch {
 	case approvalID != "" && requestID != "":
@@ -258,7 +258,7 @@ func (r *Repository) ResolveApprovalNotifications(ctx context.Context, tenantID,
 }
 
 func parseRecipientScope(tenantID, recipientID string) (uuid.UUID, uuid.UUID, error) {
-	orgID, err := uuid.Parse(tenantID)
+	tenantUUID, err := uuid.Parse(tenantID)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("tenant_id: %w", err)
 	}
@@ -266,7 +266,7 @@ func parseRecipientScope(tenantID, recipientID string) (uuid.UUID, uuid.UUID, er
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("recipient_id: %w", err)
 	}
-	return orgID, userID, nil
+	return tenantUUID, userID, nil
 }
 
 func parseOrNewUUID(scope, raw string) (uuid.UUID, error) {
@@ -309,7 +309,7 @@ func rowToDomain(row models.InAppNotificationModel) coredomain.Notification {
 	}
 	return coredomain.Notification{
 		ID:          row.ID.String(),
-		TenantID:    row.OrgID.String(),
+		TenantID:    row.TenantID.String(),
 		RecipientID: row.UserID.String(),
 		Title:       row.Title,
 		Body:        row.Body,

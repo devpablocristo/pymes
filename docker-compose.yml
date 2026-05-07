@@ -52,12 +52,12 @@ services:
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
       PYMES_SEED_DEMO: "false"
-      # Tomado de .env (`PYMES_SEED_DEMO_ORG_EXTERNAL_ID`). Debe ser el `external_id` de la org en `orgs` (p. ej. org_... de Clerk).
+      # Tomado de .env (`PYMES_SEED_DEMO_ORG_EXTERNAL_ID`). Debe ser el `external_id` de la org en `tenants` (p. ej. org_... de Clerk).
       # Vacío: cp-backend no recibe org de seed explícita (útil si solo usás org local embebida en seeds).
       PYMES_SEED_DEMO_ORG_EXTERNAL_ID: ${PYMES_SEED_DEMO_ORG_EXTERNAL_ID:-}
       GOVERNANCE_URL: ${GOVERNANCE_URL:-http://host.docker.internal:18084}
-      # Coincidir con GOVERNANCE_CALLBACK_TOKEN del governance en Nexus (legacy: REVIEW_CALLBACK_* en `.env`).
-      GOVERNANCE_CALLBACK_TOKEN: ${GOVERNANCE_CALLBACK_TOKEN:-${REVIEW_CALLBACK_TOKEN:-local-review-callback-token}}
+      # Coincidir con GOVERNANCE_CALLBACK_TOKEN del governance en Nexus.
+      GOVERNANCE_CALLBACK_TOKEN: ${GOVERNANCE_CALLBACK_TOKEN:-local-governance-callback-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 5s
@@ -101,7 +101,6 @@ services:
       VITE_AI_API_URL: ${VITE_AI_API_URL:-http://localhost:8200}
       # Clerk: definir en .env junto al resto (pk_test_...). Vacío = modo consola con API key.
       VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
-      VITE_CLERK_DEFAULT_ORG_ID: ${VITE_CLERK_DEFAULT_ORG_ID:-org_3BGpccLTlKu8qo6pSNekrUDEANC}
       VITE_API_KEY: ${VITE_API_KEY:-psk_local_admin}
       VITE_API_ACTOR: ${VITE_API_ACTOR:-local-admin}
       VITE_API_ROLE: ${VITE_API_ROLE:-admin}

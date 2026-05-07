@@ -101,13 +101,13 @@ func (f *fakeScheduling) JoinWaitlist(
 func TestRepositoryGetAvailabilityUsesSchedulingWhenConfigured(t *testing.T) {
 	t.Parallel()
 
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	branchID := uuid.New()
 	serviceID := uuid.New()
 	repo := &Repository{
 		scheduling: &fakeScheduling{
-			branches: []schedulingdomain.Branch{{ID: branchID, OrgID: orgID, Name: "Central", Active: true}},
-			services: []schedulingdomain.Service{{ID: serviceID, OrgID: orgID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule}},
+			branches: []schedulingdomain.Branch{{ID: branchID, OrgID: tenantID, Name: "Central", Active: true}},
+			services: []schedulingdomain.Service{{ID: serviceID, OrgID: tenantID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule}},
 			slots: []schedulingdomain.TimeSlot{{
 				ResourceID: uuid.New(),
 				StartAt:    time.Date(2026, 4, 7, 13, 0, 0, 0, time.UTC),
@@ -117,7 +117,7 @@ func TestRepositoryGetAvailabilityUsesSchedulingWhenConfigured(t *testing.T) {
 		},
 	}
 
-	slots, err := repo.GetAvailability(context.Background(), orgID, AvailabilityQuery{
+	slots, err := repo.GetAvailability(context.Background(), tenantID, AvailabilityQuery{
 		Date: time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
@@ -134,18 +134,18 @@ func TestRepositoryGetAvailabilityUsesSchedulingWhenConfigured(t *testing.T) {
 func TestRepositoryBookUsesSchedulingCompatibilityPayload(t *testing.T) {
 	t.Parallel()
 
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	branchID := uuid.New()
 	serviceID := uuid.New()
 	resourceID := uuid.New()
 	engine := &fakeScheduling{
-		branches:  []schedulingdomain.Branch{{ID: branchID, OrgID: orgID, Name: "Central", Active: true}},
-		services:  []schedulingdomain.Service{{ID: serviceID, OrgID: orgID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule}},
-		resources: []schedulingdomain.Resource{{ID: resourceID, OrgID: orgID, BranchID: branchID, Name: "Profesional", Active: true}},
+		branches:  []schedulingdomain.Branch{{ID: branchID, OrgID: tenantID, Name: "Central", Active: true}},
+		services:  []schedulingdomain.Service{{ID: serviceID, OrgID: tenantID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule}},
+		resources: []schedulingdomain.Resource{{ID: resourceID, OrgID: tenantID, BranchID: branchID, Name: "Profesional", Active: true}},
 	}
 	repo := &Repository{scheduling: engine}
 
-	out, err := repo.Book(context.Background(), orgID, map[string]any{
+	out, err := repo.Book(context.Background(), tenantID, map[string]any{
 		"party_name":  "Ana",
 		"party_phone": "+54 381 5551234",
 		"title":       "Consulta inicial",
@@ -175,20 +175,20 @@ func TestRepositoryBookUsesSchedulingCompatibilityPayload(t *testing.T) {
 func TestRepositoryResolveSchedulingSelectionRequiresExplicitIDsWhenAmbiguous(t *testing.T) {
 	t.Parallel()
 
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	repo := &Repository{
 		scheduling: &fakeScheduling{
 			branches: []schedulingdomain.Branch{
-				{ID: uuid.New(), OrgID: orgID, Name: "Central", Active: true},
-				{ID: uuid.New(), OrgID: orgID, Name: "Norte", Active: true},
+				{ID: uuid.New(), OrgID: tenantID, Name: "Central", Active: true},
+				{ID: uuid.New(), OrgID: tenantID, Name: "Norte", Active: true},
 			},
 			services: []schedulingdomain.Service{
-				{ID: uuid.New(), OrgID: orgID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule},
+				{ID: uuid.New(), OrgID: tenantID, Name: "Consulta", Active: true, FulfillmentMode: schedulingdomain.FulfillmentModeSchedule},
 			},
 		},
 	}
 
-	_, _, err := repo.resolveSchedulingSelection(context.Background(), orgID, nil, nil, nil)
+	_, _, err := repo.resolveSchedulingSelection(context.Background(), tenantID, nil, nil, nil)
 	if err == nil {
 		t.Fatalf("expected ambiguity error")
 	}

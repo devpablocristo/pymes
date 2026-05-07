@@ -8,7 +8,7 @@ import (
 
 type AttachmentModel struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID          uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID       uuid.UUID `gorm:"type:uuid;index;not null"`
 	AttachableType string    `gorm:"not null"`
 	AttachableID   uuid.UUID `gorm:"type:uuid;not null"`
 	FileName       string    `gorm:"not null"`

@@ -2,7 +2,7 @@ package dto
 
 type VehicleItem struct {
 	ID           string   `json:"id"`
-	OrgID        string   `json:"org_id"`
+	TenantID     string   `json:"tenant_id"`
 	CustomerID   *string  `json:"customer_id,omitempty"`
 	CustomerName string   `json:"customer_name"`
 	LicensePlate string   `json:"license_plate"`

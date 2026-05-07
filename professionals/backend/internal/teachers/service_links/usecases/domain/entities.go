@@ -8,7 +8,7 @@ import (
 
 type ServiceLink struct {
 	ID                uuid.UUID
-	OrgID             uuid.UUID
+	TenantID          uuid.UUID
 	ProfileID         uuid.UUID
 	ServiceID         uuid.UUID
 	PublicDescription string

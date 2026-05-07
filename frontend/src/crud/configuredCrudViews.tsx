@@ -283,55 +283,14 @@ export function ConfiguredCrudStandalonePage({
   resourceId: string;
   baseRoute: string;
 }) {
-  const { config, error, loading } = useCrudConfig(resourceId);
-  const uiConfigVersion = useCrudUiConfigVersion();
-  const viewModes = useMemo(() => {
-    void uiConfigVersion;
-    return resolveViewModes(resourceId, config);
-  }, [config, resourceId, uiConfigVersion]);
-  const activeMode = viewModes[0]?.id ?? 'list';
-
-  if (error) {
-    return (
-      <PageLayout title="Módulo" lead="No se pudo cargar la configuración de vistas.">
-        <div className="alert alert-error">{error}</div>
-      </PageLayout>
-    );
-  }
-
-  if (loading && config == null) {
-    return (
-      <PageLayout title="Módulo" lead="Cargando vista configurada.">
-        <div className="card">
-          <p>Cargando módulo…</p>
-        </div>
-      </PageLayout>
-    );
-  }
-
-  if (viewModes.length === 0) {
-    return <NoEnabledViews resourceId={resourceId} />;
-  }
-
-  return (
-    <CrudModuleSection
-      modes={viewModes.map((mode) => ({
-        path: `${baseRoute}/${mode.path}`,
-        label: mode.label,
-      }))}
-      groupAriaLabel={viewModes[0]?.ariaLabel ?? 'Cambiar vista'}
-      actionLink={modeActionLink(resourceId)}
-    >
-      <ConfiguredCrudModePage resourceId={resourceId} modeId={activeMode} allowGenericModeFallback />
-    </CrudModuleSection>
-  );
+  return <ConfiguredCrudIndexRedirect resourceId={resourceId} baseRoute={baseRoute} />;
 }
 
 export function ConfiguredCrudRouteModePage() {
-  const { orgSlug = '', moduleId: urlModuleId = '', modePath = '' } = useParams();
+  const { tenantSlug = '', moduleId: urlModuleId = '', modePath = '' } = useParams();
   const moduleId = fromCrudResourceSlug(urlModuleId);
   const urlSlug = toCrudResourceSlug(moduleId);
-  const tenantPrefix = orgSlug ? `/${orgSlug}` : '';
+  const tenantPrefix = tenantSlug ? `/${tenantSlug}` : '';
   const { config, error, loading } = useCrudConfig(moduleId);
   const uiConfigVersion = useCrudUiConfigVersion();
   const viewModes = useMemo(() => {

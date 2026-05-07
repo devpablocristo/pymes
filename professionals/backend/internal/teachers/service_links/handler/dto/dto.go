@@ -2,7 +2,7 @@ package dto
 
 type ServiceLinkItem struct {
 	ID                string         `json:"id"`
-	OrgID             string         `json:"org_id"`
+	TenantID          string         `json:"tenant_id"`
 	ProfileID         string         `json:"profile_id"`
 	ServiceID         string         `json:"service_id"`
 	PublicDescription string         `json:"public_description"`

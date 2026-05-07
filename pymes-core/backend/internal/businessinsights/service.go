@@ -66,7 +66,7 @@ func (s *Service) NotifySaleCreated(ctx context.Context, sale saledomain.Sale) e
 		len(sale.Items),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       sale.OrgID,
+		tenantID:    sale.TenantID,
 		actor:       sale.CreatedBy,
 		fingerprint: stableID("sale.created", sale.ID.String()),
 		title:       "Venta destacada registrada",
@@ -94,7 +94,7 @@ func (s *Service) NotifySaleCreated(ctx context.Context, sale saledomain.Sale) e
 	})
 }
 
-func (s *Service) NotifyPaymentCreated(ctx context.Context, orgID, saleID uuid.UUID, payment paymentsdomain.Payment) error {
+func (s *Service) NotifyPaymentCreated(ctx context.Context, tenantID, saleID uuid.UUID, payment paymentsdomain.Payment) error {
 	if s == nil || s.inbox == nil {
 		return nil
 	}
@@ -108,7 +108,7 @@ func (s *Service) NotifyPaymentCreated(ctx context.Context, orgID, saleID uuid.U
 		humanPaymentMethod(payment.Method),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       orgID,
+		tenantID:    tenantID,
 		actor:       payment.CreatedBy,
 		fingerprint: stableID("payment.created", payment.ID.String()),
 		title:       "Cobro destacado registrado",
@@ -149,7 +149,7 @@ func (s *Service) NotifyInventoryAdjusted(ctx context.Context, level inventorydo
 		formatNumber(level.MinQuantity),
 	)
 	return s.recordAndNotify(ctx, candidateInput{
-		orgID:       level.OrgID,
+		tenantID:    level.TenantID,
 		actor:       actor,
 		fingerprint: bucketedID("inventory.low_stock", level.ProductID.String(), s.config.LowStockDedupWindow, time.Now().UTC()),
 		title:       "Stock crítico tras ajuste",
@@ -181,7 +181,7 @@ func (s *Service) NotifyInventoryAdjusted(ctx context.Context, level inventorydo
 }
 
 type candidateInput struct {
-	orgID       uuid.UUID
+	tenantID    uuid.UUID
 	actor       string
 	fingerprint string
 	title       string
@@ -199,7 +199,7 @@ func (s *Service) recordAndNotify(ctx context.Context, in candidateInput) error 
 		return nil
 	}
 	record, shouldNotify, err := s.candidates.Record(ctx, CandidateUpsert{
-		TenantID:    in.orgID.String(),
+		TenantID:    in.tenantID.String(),
 		Kind:        "insight",
 		EventType:   in.eventType,
 		EntityType:  in.entityType,

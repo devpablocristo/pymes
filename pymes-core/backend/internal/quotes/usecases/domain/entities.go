@@ -7,18 +7,18 @@ import (
 )
 
 type Quote struct {
-	ID           uuid.UUID   `json:"id"`
-	OrgID        uuid.UUID   `json:"org_id"`
-	BranchID     *uuid.UUID  `json:"branch_id,omitempty"`
-	Number       string      `json:"number"`
-	CustomerID   *uuid.UUID  `json:"customer_id,omitempty"`
-	CustomerName string      `json:"customer_name"`
-	Status       string      `json:"status"`
-	Items        []QuoteItem `json:"items"`
-	Subtotal     float64     `json:"subtotal"`
-	TaxTotal     float64     `json:"tax_total"`
-	Total        float64     `json:"total"`
-	Currency     string      `json:"currency"`
+	ID           uuid.UUID      `json:"id"`
+	TenantID     uuid.UUID      `json:"tenant_id"`
+	BranchID     *uuid.UUID     `json:"branch_id,omitempty"`
+	Number       string         `json:"number"`
+	CustomerID   *uuid.UUID     `json:"customer_id,omitempty"`
+	CustomerName string         `json:"customer_name"`
+	Status       string         `json:"status"`
+	Items        []QuoteItem    `json:"items"`
+	Subtotal     float64        `json:"subtotal"`
+	TaxTotal     float64        `json:"tax_total"`
+	Total        float64        `json:"total"`
+	Currency     string         `json:"currency"`
 	IsFavorite   bool           `json:"is_favorite"`
 	Tags         []string       `json:"tags,omitempty"`
 	Notes        string         `json:"notes"`

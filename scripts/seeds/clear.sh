@@ -8,10 +8,10 @@ source "$ROOT_DIR/scripts/seeds/lib.sh"
 ensure_seed_dbs_ready
 
 run_pymes_sql_inline "
--- Preservar bootstrap del tenant: orgs/users/members/settings/api keys.
--- Solo se limpian tablas de CRUD/demo. org_members.party_id referencia
+-- Preservar bootstrap del tenant: filas base en tenants/users/memberships/settings/api keys.
+-- Solo se limpian tablas de CRUD/demo. tenant_memberships.party_id referencia
 -- parties, por eso se desacopla antes del clear.
-UPDATE org_members
+UPDATE tenant_memberships
    SET party_id = NULL
  WHERE party_id IS NOT NULL;
 
@@ -86,7 +86,7 @@ BEGIN
     SELECT string_agg(DISTINCT fqtn, ', ' ORDER BY fqtn)
       INTO tables_to_truncate
     FROM clear_graph
-    WHERE fqtn NOT IN ('public.org_members', 'public.parties');
+    WHERE fqtn NOT IN ('public.tenant_memberships', 'public.parties');
 
     IF tables_to_truncate IS NOT NULL THEN
         EXECUTE 'TRUNCATE TABLE ' || tables_to_truncate || ' RESTART IDENTITY';
@@ -95,7 +95,7 @@ END \$\$;
 
 DELETE FROM parties;
 
-INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active, created_at, updated_at)
+INSERT INTO scheduling_branches (id, tenant_id, code, name, timezone, address, active, created_at, updated_at)
 SELECT
     uuid_generate_v5(o.id, 'pymes-bootstrap/scheduling/branch/principal'),
     o.id,
@@ -106,15 +106,15 @@ SELECT
     true,
     now(),
     now()
-FROM orgs o
+FROM tenants o
 WHERE NOT EXISTS (
     SELECT 1
     FROM scheduling_branches sb
-    WHERE sb.org_id = o.id
+    WHERE sb.tenant_id = o.id
 );
 "
 
-run_review_sql_inline "
+run_governance_sql_inline "
 BEGIN;
 
 -- request_events es append-only (migración Nexus governance); TRUNCATE dispara BEFORE TRUNCATE.

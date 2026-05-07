@@ -11,12 +11,12 @@ import (
 )
 
 type mockRepo struct {
-	getTenantSettingsFn func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error)
-	getProductFn        func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
-	getServiceFn        func(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+	getTenantSettingsFn func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error)
+	getProductFn        func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error)
+	getServiceFn        func(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error)
 	createFn            func(ctx context.Context, in CreateInput) (saledomain.Sale, error)
-	getByIDFn           func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
-	voidFn              func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	getByIDFn           func(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
+	voidFn              func(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
 }
 
 func (m *mockRepo) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
@@ -25,29 +25,29 @@ func (m *mockRepo) List(ctx context.Context, p ListParams) ([]saledomain.Sale, i
 func (m *mockRepo) Create(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
 	return m.createFn(ctx, in)
 }
-func (m *mockRepo) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
-	return m.getByIDFn(ctx, orgID, saleID)
+func (m *mockRepo) GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
+	return m.getByIDFn(ctx, tenantID, saleID)
 }
 func (m *mockRepo) Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error) {
-	return saledomain.Sale{ID: in.ID, OrgID: in.OrgID}, nil
+	return saledomain.Sale{ID: in.ID, TenantID: in.TenantID}, nil
 }
-func (m *mockRepo) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
-	return m.voidFn(ctx, orgID, saleID)
+func (m *mockRepo) Void(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
+	return m.voidFn(ctx, tenantID, saleID)
 }
 func (m *mockRepo) PatchSale(context.Context, uuid.UUID, uuid.UUID, SalePatchFields) (saledomain.Sale, error) {
 	return saledomain.Sale{}, nil
 }
-func (m *mockRepo) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
-	return m.getTenantSettingsFn(ctx, orgID)
+func (m *mockRepo) GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
+	return m.getTenantSettingsFn(ctx, tenantID)
 }
-func (m *mockRepo) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
-	return m.getProductFn(ctx, orgID, productID)
+func (m *mockRepo) GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
+	return m.getProductFn(ctx, tenantID, productID)
 }
-func (m *mockRepo) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+func (m *mockRepo) GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error) {
 	if m.getServiceFn == nil {
 		return ServiceSnapshot{}, nil
 	}
-	return m.getServiceFn(ctx, orgID, serviceID)
+	return m.getServiceFn(ctx, tenantID, serviceID)
 }
 
 type mockInventory struct {
@@ -59,13 +59,13 @@ type mockInventory struct {
 	lastReverse       []inventory.SaleItemStock
 }
 
-func (m *mockInventory) ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
+func (m *mockInventory) ApplySaleItems(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
 	m.applyCalled++
 	m.lastApplyBranch = branchID
 	m.lastApply = items
 	return nil
 }
-func (m *mockInventory) ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
+func (m *mockInventory) ReverseSaleItems(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error {
 	m.reverseCalled++
 	m.lastReverseBranch = branchID
 	m.lastReverse = items
@@ -81,13 +81,13 @@ type mockCashflow struct {
 	lastVoid         float64
 }
 
-func (m *mockCashflow) RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (m *mockCashflow) RecordSaleIncome(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	m.incomeCalled++
 	m.lastIncomeBranch = branchID
 	m.lastIncome = amount
 	return nil
 }
-func (m *mockCashflow) RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
+func (m *mockCashflow) RecordSaleVoidExpense(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error {
 	m.voidCalled++
 	m.lastVoidBranch = branchID
 	m.lastVoid = amount
@@ -96,21 +96,21 @@ func (m *mockCashflow) RecordSaleVoidExpense(ctx context.Context, orgID, saleID 
 
 type mockAudit struct{ calls int }
 
-func (m *mockAudit) Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+func (m *mockAudit) Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any) {
 	m.calls++
 }
 
 func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	branchID := uuid.New()
 	productID := uuid.New()
 	saleID := uuid.New()
 
 	repo := &mockRepo{
-		getTenantSettingsFn: func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
+		getTenantSettingsFn: func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
 			return "ARS", 21.0, "VTA", nil
 		},
-		getProductFn: func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
+		getProductFn: func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
 			return ProductSnapshot{
 				ID:         productID,
 				Name:       "Prod A",
@@ -132,7 +132,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 			}
 			return saledomain.Sale{
 				ID:            saleID,
-				OrgID:         in.OrgID,
+				TenantID:      in.TenantID,
 				BranchID:      in.BranchID,
 				Status:        "completed",
 				PaymentMethod: "cash",
@@ -146,10 +146,10 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 				},
 			}, nil
 		},
-		getByIDFn: func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
+		getByIDFn: func(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
 			return saledomain.Sale{}, nil
 		},
-		voidFn: func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
+		voidFn: func(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
 			return saledomain.Sale{}, nil
 		},
 	}
@@ -160,7 +160,7 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 	uc := NewUsecases(repo, inv, cash, audit)
 
 	_, err := uc.Create(context.Background(), CreateSaleInput{
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		BranchID:      &branchID,
 		PaymentMethod: "cash",
 		Items: []CreateSaleItemInput{
@@ -196,27 +196,27 @@ func TestCreateSale_AppliesStockAndCashflow(t *testing.T) {
 }
 
 func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	branchID := uuid.New()
 	productID := uuid.New()
 	getByIDCalls := 0
 
 	repo := &mockRepo{
-		getTenantSettingsFn: func(ctx context.Context, orgID uuid.UUID) (string, float64, string, error) {
+		getTenantSettingsFn: func(ctx context.Context, tenantID uuid.UUID) (string, float64, string, error) {
 			return "ARS", 21, "VTA", nil
 		},
-		getProductFn: func(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
+		getProductFn: func(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
 			return ProductSnapshot{}, nil
 		},
 		createFn: func(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
 			return saledomain.Sale{}, nil
 		},
-		getByIDFn: func(ctx context.Context, orgID, inSaleID uuid.UUID) (saledomain.Sale, error) {
+		getByIDFn: func(ctx context.Context, tenantID, inSaleID uuid.UUID) (saledomain.Sale, error) {
 			getByIDCalls++
 			return saledomain.Sale{
 				ID:            inSaleID,
-				OrgID:         orgID,
+				TenantID:      tenantID,
 				BranchID:      &branchID,
 				Status:        "completed",
 				PaymentMethod: "transfer",
@@ -227,10 +227,10 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 				},
 			}, nil
 		},
-		voidFn: func(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
+		voidFn: func(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
 			return saledomain.Sale{
 				ID:            saleID,
-				OrgID:         orgID,
+				TenantID:      tenantID,
 				Status:        "voided",
 				PaymentMethod: "transfer",
 				Total:         500,
@@ -243,7 +243,7 @@ func TestVoidSale_ReversesStockAndCashflow(t *testing.T) {
 	audit := &mockAudit{}
 	uc := NewUsecases(repo, inv, cash, audit)
 
-	out, err := uc.Void(context.Background(), orgID, saleID, "tester")
+	out, err := uc.Void(context.Background(), tenantID, saleID, "tester")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

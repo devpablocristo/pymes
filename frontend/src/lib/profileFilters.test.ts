@@ -109,7 +109,7 @@ describe('getVisibleModuleIds', () => {
     mockStorage.getJSON.mockReturnValue(makeProfile({ teamSize: 'medium' }));
     const ids = getVisibleModuleIds();
     expect(ids.has('parties')).toBe(true);
-    expect(ids.has('audit')).toBe(true);
+    expect(ids.has('audit')).toBe(false);
     expect(ids.has('dataIO')).toBe(true);
   });
 

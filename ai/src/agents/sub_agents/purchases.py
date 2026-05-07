@@ -27,17 +27,17 @@ Responde siempre en espanol, claro y directo. No muestres JSON al usuario."""
 
 
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
-    async def search_suppliers(*, org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+    async def search_suppliers(*, tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
         return await suppliers.search_suppliers(client, auth, query=query, limit=limit)
 
-    async def get_purchases(*, org_id: str) -> dict[str, Any]:
+    async def get_purchases(*, tenant_id: str) -> dict[str, Any]:
         return await purchases.get_purchases_summary(client, auth)
 
-    async def list_procurement_requests(*, org_id: str, limit: int = 20, archived: bool = False) -> dict[str, Any]:
+    async def list_procurement_requests(*, tenant_id: str, limit: int = 20, archived: bool = False) -> dict[str, Any]:
         return await procurement_requests.list_procurement_requests(client, auth, limit=limit, archived=archived)
 
     async def create_procurement_request(
-        *, org_id: str, title: str, description: str = "", category: str = "",
+        *, tenant_id: str, title: str, description: str = "", category: str = "",
         estimated_total: float = 0, currency: str = "ARS", lines: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         return await procurement_requests.create_procurement_request(
@@ -45,10 +45,10 @@ def build(client: BackendClient, auth: AuthContext) -> SubAgent:
             estimated_total=estimated_total, currency=currency, lines=lines,
         )
 
-    async def submit_procurement_request(*, org_id: str, request_id: str) -> dict[str, Any]:
+    async def submit_procurement_request(*, tenant_id: str, request_id: str) -> dict[str, Any]:
         return await procurement_requests.submit_procurement_request(client, auth, request_id=request_id)
 
-    async def prepare_purchase_draft(*, org_id: str, supplier_name: str | None = None, items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    async def prepare_purchase_draft(*, tenant_id: str, supplier_name: str | None = None, items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         draft_items: list[dict[str, Any]] = []
         if items:
             for item in items:

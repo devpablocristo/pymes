@@ -12,7 +12,7 @@
 -- personal access tokens.
 CREATE TABLE IF NOT EXISTS calendar_export_tokens (
     id            uuid PRIMARY KEY,
-    org_id        uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id        uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     -- created_by es el actor del request que generó el token (UUID interno o
     -- external_id de Clerk). Mismo patrón que scheduling_bookings.created_by:
     -- text libre, no FK estricto, para evitar fricción cuando el actor viene
@@ -35,5 +35,5 @@ CREATE TABLE IF NOT EXISTS calendar_export_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_calendar_export_tokens_org_creator
-    ON calendar_export_tokens (org_id, created_by)
+    ON calendar_export_tokens (tenant_id, created_by)
     WHERE revoked_at IS NULL;

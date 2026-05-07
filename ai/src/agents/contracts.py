@@ -35,7 +35,7 @@ class CommercialContractPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     request_id: str = Field(min_length=8, max_length=120)
-    org_id: str = Field(min_length=1, max_length=64)
+    tenant_id: str = Field(min_length=1, max_length=64)
     counterparty_id: str = Field(min_length=1, max_length=120)
     intent: ContractIntent
     items: list[ContractItem] = Field(default_factory=list)

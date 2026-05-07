@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	schedulingmigrations "github.com/devpablocristo/modules/scheduling/go/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	schedulingmigrations "github.com/devpablocristo/modules/scheduling/go/migrations"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 )
@@ -21,7 +21,7 @@ var sqlFiles embed.FS
 //
 //	pymes-core/0041 → scheduling_branches (creado por scheduling/0001)
 //	scheduling/0003 → services            (creado por pymes-core/0042)
-//	scheduling/0001 → orgs, parties, users (creados por pymes-core/0001..0017)
+//	scheduling/0001 → tenants, parties, users (creados por pymes-core/0001..0017)
 //
 // En una DB vacía (CI) no alcanza correr pymes-core y después scheduling, ni
 // al revés. Hay que intercalar. Para entornos que ya están por encima del
@@ -51,7 +51,7 @@ func Run(db *gorm.DB, logger zerolog.Logger) error {
 		return fmt.Errorf("scheduling migrator: %w", err)
 	}
 
-	// 1) pymes-core 0001..0040 (orgs, users, parties).
+	// 1) pymes-core 0001..0040 (tenants, users, parties).
 	if err := migrateUpTo(coreMig, preSchedulingSplit); err != nil {
 		return fmt.Errorf("pre-scheduling migrations: %w", err)
 	}

@@ -17,7 +17,7 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.step1.businessNamePlaceholder': 'Ej: Clases de inglés, Estudio López, Mi emprendimiento...',
     'onboarding.step1.teamSize': '¿Cuántas personas trabajan?',
     'onboarding.step1.verticalGroup': '¿Qué tipo de negocio es?',
-    'onboarding.step1.subVertical': '¿Qué tipo de taller?',
+    'onboarding.step1.subVertical': '¿Qué especialidad?',
 
     // Team options
     'onboarding.team.solo': 'Solo yo',
@@ -60,6 +60,10 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.vertical.barDesc': 'Barra, mesas y consumo en salón',
     'onboarding.vertical.cafe': 'Café / Cafetería',
     'onboarding.vertical.cafeDesc': 'Mesas, salón y rotación rápida',
+    'onboarding.vertical.medical': 'Medicina',
+    'onboarding.vertical.medicalDesc': 'Atención médica y gestión clínica',
+    'onboarding.vertical.occupationalHealth': 'Medicina laboral',
+    'onboarding.vertical.occupationalHealthDesc': 'Exámenes, aptos y seguimiento de trabajadores',
 
     // Step 2 — Tu actividad
     'onboarding.step2.title': 'Tu actividad',
@@ -143,7 +147,7 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.step1.businessNamePlaceholder': 'E.g.: English classes, Studio López, My startup...',
     'onboarding.step1.teamSize': 'How many people work with you?',
     'onboarding.step1.verticalGroup': 'What type of business is it?',
-    'onboarding.step1.subVertical': 'What type of workshop?',
+    'onboarding.step1.subVertical': 'What specialty?',
 
     'onboarding.team.solo': 'Just me',
     'onboarding.team.soloDesc': 'I work on my own',
@@ -184,6 +188,10 @@ export const onboardingMessages: TranslationsByLanguage = {
     'onboarding.vertical.barDesc': 'Bar counter, tables and on-site consumption',
     'onboarding.vertical.cafe': 'Cafe / Coffee shop',
     'onboarding.vertical.cafeDesc': 'Tables, seating and quick turnover',
+    'onboarding.vertical.medical': 'Medicine',
+    'onboarding.vertical.medicalDesc': 'Medical care and clinical operations',
+    'onboarding.vertical.occupationalHealth': 'Occupational health',
+    'onboarding.vertical.occupationalHealthDesc': 'Exams, clearances and worker follow-up',
 
     'onboarding.step2.title': 'Your activity',
     'onboarding.step2.sells': 'What do you offer?',

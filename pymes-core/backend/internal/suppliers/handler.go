@@ -20,12 +20,12 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]supplierdomain.Supplier, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in supplierdomain.Supplier, actor string) (supplierdomain.Supplier, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (supplierdomain.Supplier, error)
-	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (supplierdomain.Supplier, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]supplierdomain.Supplier, error)
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (supplierdomain.Supplier, error)
+	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (supplierdomain.Supplier, error)
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	ListArchived(ctx context.Context, tenantID uuid.UUID) ([]supplierdomain.Supplier, error)
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -51,9 +51,9 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -62,13 +62,13 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:  orgID,
-		Limit:  limit,
-		After:  after,
-		Search: c.Query("search"),
-		Tag:    c.Query("tag"),
-		Sort:   c.Query("sort"),
-		Order:  c.Query("order"),
+		TenantID: tenantID,
+		Limit:    limit,
+		After:    after,
+		Search:   c.Query("search"),
+		Tag:      c.Query("tag"),
+		Sort:     c.Query("sort"),
+		Order:    c.Query("order"),
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -86,9 +86,9 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateSupplierRequest
@@ -97,7 +97,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Create(c.Request.Context(), supplierdomain.Supplier{
-		OrgID:       orgID,
+		TenantID:    tenantID,
 		Name:        req.Name,
 		TaxID:       req.TaxID,
 		Email:       req.Email,
@@ -128,9 +128,9 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -138,7 +138,7 @@ func (h *Handler) Get(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -148,9 +148,9 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -168,7 +168,7 @@ func (h *Handler) Update(c *gin.Context) {
 		a := toDomainAddress(*req.Address)
 		addr = &a
 	}
-	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
+	out, err := h.uc.Update(c.Request.Context(), tenantID, id, UpdateInput{
 		Name:        req.Name,
 		TaxID:       req.TaxID,
 		Email:       req.Email,
@@ -189,9 +189,9 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -199,7 +199,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -212,12 +212,12 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -231,9 +231,9 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -241,7 +241,7 @@ func (h *Handler) Restore(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -250,9 +250,9 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -260,7 +260,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -273,12 +273,12 @@ func toSupplierItem(in supplierdomain.Supplier) dto.SupplierItem {
 		deletedAt = in.DeletedAt.UTC().Format(time.RFC3339)
 	}
 	return dto.SupplierItem{
-		ID:    in.ID.String(),
-		OrgID: in.OrgID.String(),
-		Name:  in.Name,
-		TaxID: in.TaxID,
-		Email: in.Email,
-		Phone: in.Phone,
+		ID:       in.ID.String(),
+		TenantID: in.TenantID.String(),
+		Name:     in.Name,
+		TaxID:    in.TaxID,
+		Email:    in.Email,
+		Phone:    in.Phone,
 		Address: dto.Address{
 			Street:  in.Address.Street,
 			City:    in.Address.City,

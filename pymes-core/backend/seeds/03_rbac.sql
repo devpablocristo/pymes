@@ -15,7 +15,7 @@ DECLARE
     pl_wholesale uuid;
     pl_vip uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
@@ -28,7 +28,7 @@ BEGIN
     pl_wholesale := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/wholesale');
     pl_vip := uuid_generate_v5(v_org, 'pymes-seed/v1/price-list/vip');
 
-    INSERT INTO roles (id, org_id, name, description, is_system)
+    INSERT INTO roles (id, tenant_id, name, description, is_system)
     VALUES
         (r_admin, v_org, 'admin', 'Full access', true),
         (r_seller, v_org, 'seller', 'Sales and commercial management', true),
@@ -110,20 +110,20 @@ BEGIN
     -- Asigna el rol admin a todos los miembros admin/owner del org. Funciona
     -- tanto con Clerk (admins vienen de webhooks/onboarding) como con cualquier
     -- otro provisionamiento manual.
-    INSERT INTO user_roles (user_id, org_id, role_id, assigned_by)
+    INSERT INTO user_roles (user_id, tenant_id, role_id, assigned_by)
     SELECT om.user_id, v_org, r_admin, 'seed'
-    FROM org_members om
-    WHERE om.org_id = v_org AND om.role IN ('admin', 'owner')
-    ON CONFLICT (user_id, org_id) DO UPDATE
+    FROM tenant_memberships om
+    WHERE om.tenant_id = v_org AND om.role IN ('admin', 'owner')
+    ON CONFLICT (user_id, tenant_id) DO UPDATE
         SET role_id = EXCLUDED.role_id,
             assigned_by = EXCLUDED.assigned_by,
             assigned_at = now();
 
-    INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
+    INSERT INTO price_lists (id, tenant_id, name, description, is_default, markup, is_active)
     VALUES (pl_default, v_org, 'Retail', 'Default local price list', true, 0, true)
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO price_lists (id, org_id, name, description, is_default, markup, is_active)
+    INSERT INTO price_lists (id, tenant_id, name, description, is_default, markup, is_active)
     VALUES
         (pl_wholesale, v_org, 'Mayorista', 'Lista demo mayorista', false, -5, true),
         (pl_vip, v_org, 'VIP', 'Lista demo clientes VIP', false, -10, true)

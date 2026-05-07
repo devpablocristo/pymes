@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS workshops.services (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',

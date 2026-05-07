@@ -12,7 +12,7 @@ import (
 )
 
 type RepositoryPort interface {
-	ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error)
+	ListLatest(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error)
 	Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error)
 }
 
@@ -22,8 +22,8 @@ type Usecases struct {
 
 func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
 
-func (u *Usecases) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error) {
-	return u.repo.ListLatest(ctx, orgID, strings.TrimSpace(fromCurrency), strings.TrimSpace(toCurrency), limit)
+func (u *Usecases) ListLatest(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error) {
+	return u.repo.ListLatest(ctx, tenantID, strings.TrimSpace(fromCurrency), strings.TrimSpace(toCurrency), limit)
 }
 
 func (u *Usecases) Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error) {

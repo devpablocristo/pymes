@@ -92,7 +92,7 @@ def test_build_internal_insight_evidence_collects_entity_ids() -> None:
 @pytest.mark.asyncio
 async def test_build_insight_chat_response_for_scope_handles_sales_collections(monkeypatch) -> None:
     async def fake_build_sales_collections_insight(self, *, auth, filters):  # noqa: ANN001
-        assert auth.org_id == "org-123"
+        assert auth.tenant_id == "org-123"
         assert filters.period == "month"
         return _sales_insight()
 
@@ -119,7 +119,7 @@ async def test_build_insight_chat_response_for_scope_handles_sales_collections(m
 @pytest.mark.asyncio
 async def test_build_insight_chat_response_for_scope_builds_renderable_blocks(monkeypatch) -> None:
     async def fake_build_sales_collections_insight(self, *, auth, filters):  # noqa: ANN001
-        assert auth.org_id == "org-123"
+        assert auth.tenant_id == "org-123"
         assert filters.period == "month"
         assert filters.compare is True
         assert filters.top_limit == 5

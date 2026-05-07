@@ -64,7 +64,7 @@ function applyCrudConfigContractDefaults<T extends { id: string }>(config: CrudP
     allowHardDelete: config.allowHardDelete ?? supportsArchived,
     allowCreate: config.allowCreate ?? hasFormFields,
     allowEdit: config.allowEdit ?? hasFormFields,
-    allowDelete: config.allowDelete ?? false,
+    allowDelete: config.allowDelete ?? supportsArchived,
     featureFlags: {
       searchBar: true,
       creatorFilter: true,

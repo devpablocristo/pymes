@@ -4,7 +4,7 @@
 	up down ps logs \
 	go-compile staticcheck ruff lint \
 	audit audit-baseline audit-crud audit-crud-json audit-crud-strict audit-debt frontend-typecheck ai-test \
-	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-review-notifications \
+	seed seed-clear seed-clear-verify seed-verify seed-reset modules-check cleanup-pablo e2e-governance-notifications \
 	build-docker-frontend test-docker-frontend lint-docker-frontend test-docker-core test-docker-workshops \
 	build test test-frontend-e2e
 
@@ -105,9 +105,9 @@ seed-reset:
 	bash scripts/seeds/verify.sh
 
 # E2E del notification center gobernado por Review: request -> inbox -> approve/reject -> cleanup.
-# Uso: `make e2e-review-notifications` o `make e2e-review-notifications DECISION=reject`
-e2e-review-notifications:
-	bash scripts/e2e-review-notifications.sh "$(DECISION)"
+# Uso: `make e2e-governance-notifications` o `make e2e-governance-notifications DECISION=reject`
+e2e-governance-notifications:
+	bash scripts/e2e-governance-notifications.sh "$(DECISION)"
 
 # Limpieza del árbol padre (p.ej. ~/Projects/Pablo): caches Python, vacíos, binarios Go sueltos bajo backend/cmd, dirs vacíos.
 # Simular: make cleanup-pablo DRY_RUN=1

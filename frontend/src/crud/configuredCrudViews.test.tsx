@@ -173,7 +173,10 @@ describe('configuredCrudViews', () => {
 
     render(
       <MemoryRouter initialEntries={['/modules/inventory']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ConfiguredCrudStandalonePage resourceId="inventory" baseRoute="/modules/inventory" />
+        <Routes>
+          <Route path="/modules/inventory" element={<ConfiguredCrudStandalonePage resourceId="inventory" baseRoute="/modules/inventory" />} />
+          <Route path="/modules/inventory/list" element={<ConfiguredCrudModePage resourceId="inventory" modeId="list" />} />
+        </Routes>
       </MemoryRouter>,
     );
 

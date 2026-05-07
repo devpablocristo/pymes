@@ -20,7 +20,7 @@ import (
 
 type RepositoryPort interface {
 	ListAutoFetchRateOrgs(ctx context.Context) ([]uuid.UUID, error)
-	UpsertExchangeRate(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency, rateType string, buyRate, sellRate float64, source string, rateDate time.Time) error
+	UpsertExchangeRate(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency, rateType string, buyRate, sellRate float64, source string, rateDate time.Time) error
 	ListDueRecurring(ctx context.Context, day time.Time) ([]RecurringDue, error)
 	ApplyRecurringExpense(ctx context.Context, item RecurringDue, paidAt, nextDue time.Time) error
 	ListDueSchedulingReminders(ctx context.Context, now time.Time, limit int) ([]SchedulingReminderDue, error)
@@ -38,8 +38,8 @@ type PaymentGatewayTaskPort interface {
 
 type SchedulingTaskPort interface {
 	ExpireOverdueHolds(ctx context.Context, limit int) ([]schedulingdomain.Booking, error)
-	CreateBookingActionTokens(ctx context.Context, orgID, bookingID uuid.UUID, ttl time.Duration) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error)
-	MarkBookingReminderSent(ctx context.Context, orgID, bookingID uuid.UUID, sentAt time.Time) (schedulingdomain.Booking, error)
+	CreateBookingActionTokens(ctx context.Context, tenantID, bookingID uuid.UUID, ttl time.Duration) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error)
+	MarkBookingReminderSent(ctx context.Context, tenantID, bookingID uuid.UUID, sentAt time.Time) (schedulingdomain.Booking, error)
 	ProcessWaitlistAvailability(ctx context.Context, now time.Time, limit int) ([]schedulingdomain.WaitlistEntry, error)
 }
 
@@ -60,7 +60,7 @@ type Usecases struct {
 
 type RecurringDue struct {
 	ID            uuid.UUID
-	OrgID         uuid.UUID
+	TenantID      uuid.UUID
 	Description   string
 	Amount        float64
 	Currency      string
@@ -72,8 +72,8 @@ type RecurringDue struct {
 }
 
 type SchedulingReminderDue struct {
-	OrgID         uuid.UUID
-	OrgSlug       string
+	TenantID      uuid.UUID
+	TenantSlug    string
 	BookingID     uuid.UUID
 	CustomerName  string
 	CustomerEmail string
@@ -117,8 +117,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.RatesUpdated = updated
 		if recErr := u.repo.RecordRun(ctx, "exchange_rates", "ok", "", time.Now().UTC().Add(1*time.Hour)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if task == "all" || task == "recurring_expenses" {
 		applied, err := u.applyRecurring(ctx)
@@ -130,8 +130,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.RecurringApplied = applied
 		if recErr := u.repo.RecordRun(ctx, "recurring_expenses", "ok", "", time.Now().UTC().Add(24*time.Hour)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.webhooks != nil && (task == "all" || task == "retry_webhooks") {
 		retried, err := u.webhooks.RetryPending(ctx)
@@ -143,8 +143,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["webhooks_processed"] = retried
 		if recErr := u.repo.RecordRun(ctx, "retry_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.webhooks != nil && (task == "all" || task == "cleanup_webhook_deliveries") {
 		removed, err := u.webhooks.CleanupOldDeliveries(ctx, 30)
@@ -156,8 +156,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["webhooks_deleted"] = removed
 		if recErr := u.repo.RecordRun(ctx, "cleanup_webhook_deliveries", "ok", "", time.Now().UTC().Add(24*time.Hour)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.paymentGateways != nil && (task == "all" || task == "payment_gateway_webhooks") {
 		processed, err := u.paymentGateways.ProcessPendingWebhookEvents(ctx, 100)
@@ -169,8 +169,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["payment_gateway_events_processed"] = processed
 		if recErr := u.repo.RecordRun(ctx, "payment_gateway_webhooks", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.scheduling != nil && (task == "all" || task == "scheduling_holds") {
 		expired, err := u.runSchedulingHoldExpiration(ctx)
@@ -182,8 +182,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["scheduling_holds_expired"] = expired
 		if recErr := u.repo.RecordRun(ctx, "scheduling_holds", "ok", "", time.Now().UTC().Add(5*time.Minute)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_reminders") {
 		sent, err := u.sendSchedulingReminders(ctx)
@@ -195,8 +195,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["scheduling_reminders_sent"] = sent
 		if recErr := u.repo.RecordRun(ctx, "scheduling_reminders", "ok", "", time.Now().UTC().Add(10*time.Minute)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	if u.scheduling != nil && u.emailSender != nil && (task == "all" || task == "scheduling_waitlist") {
 		notified, err := u.notifySchedulingWaitlist(ctx)
@@ -208,8 +208,8 @@ func (u *Usecases) Run(ctx context.Context, task string) (schedulerdomain.RunRes
 		}
 		result.Metadata["scheduling_waitlist_notified"] = notified
 		if recErr := u.repo.RecordRun(ctx, "scheduling_waitlist", "ok", "", time.Now().UTC().Add(10*time.Minute)); recErr != nil {
-				slog.Error("failed to record scheduler run", "error", recErr)
-			}
+			slog.Error("failed to record scheduler run", "error", recErr)
+		}
 	}
 	return result, nil
 }
@@ -233,7 +233,7 @@ func (u *Usecases) sendSchedulingReminders(ctx context.Context) (int, error) {
 		if strings.TrimSpace(item.CustomerEmail) == "" {
 			continue
 		}
-		tokens, err := u.scheduling.CreateBookingActionTokens(ctx, item.OrgID, item.BookingID, 72*time.Hour)
+		tokens, err := u.scheduling.CreateBookingActionTokens(ctx, item.TenantID, item.BookingID, 72*time.Hour)
 		if err != nil {
 			return sent, err
 		}
@@ -241,7 +241,7 @@ func (u *Usecases) sendSchedulingReminders(ctx context.Context) (int, error) {
 		if err := u.emailSender.Send(ctx, item.CustomerEmail, subject, htmlBody, textBody); err != nil {
 			return sent, err
 		}
-		if _, err := u.scheduling.MarkBookingReminderSent(ctx, item.OrgID, item.BookingID, now); err != nil {
+		if _, err := u.scheduling.MarkBookingReminderSent(ctx, item.TenantID, item.BookingID, now); err != nil {
 			return sent, err
 		}
 		sent++
@@ -295,18 +295,18 @@ func (u *Usecases) syncRates(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	orgs, err := u.repo.ListAutoFetchRateOrgs(ctx)
+	tenants, err := u.repo.ListAutoFetchRateOrgs(ctx)
 	if err != nil {
 		return 0, err
 	}
-	if len(orgs) == 0 || len(rates) == 0 {
+	if len(tenants) == 0 || len(rates) == 0 {
 		return 0, nil
 	}
 	today := time.Now().UTC()
 	updated := 0
-	for _, orgID := range orgs {
+	for _, tenantID := range tenants {
 		for _, rate := range rates {
-			if err := u.repo.UpsertExchangeRate(ctx, orgID, "USD", "ARS", rate.RateType, rate.BuyRate, rate.SellRate, "api", today); err != nil {
+			if err := u.repo.UpsertExchangeRate(ctx, tenantID, "USD", "ARS", rate.RateType, rate.BuyRate, rate.SellRate, "api", today); err != nil {
 				return updated, err
 			}
 			updated++
@@ -393,8 +393,8 @@ func buildSchedulingReminderEmail(publicBaseURL string, item SchedulingReminderD
 	if strings.EqualFold(strings.TrimSpace(item.Status), string(schedulingdomain.BookingStatusPendingConfirmation)) {
 		subject = "Please confirm your booking"
 	}
-	confirmURL := schedulingActionURL(publicBaseURL, item.OrgSlug, "confirm", tokens[schedulingdomain.BookingActionConfirm].Token)
-	cancelURL := schedulingActionURL(publicBaseURL, item.OrgSlug, "cancel", tokens[schedulingdomain.BookingActionCancel].Token)
+	confirmURL := schedulingActionURL(publicBaseURL, item.TenantSlug, "confirm", tokens[schedulingdomain.BookingActionConfirm].Token)
+	cancelURL := schedulingActionURL(publicBaseURL, item.TenantSlug, "cancel", tokens[schedulingdomain.BookingActionCancel].Token)
 	lines := []string{
 		fmt.Sprintf("Hi %s,", defaultSchedulingName(item.CustomerName)),
 		"",
@@ -414,17 +414,17 @@ func buildSchedulingReminderEmail(publicBaseURL string, item SchedulingReminderD
 	return subject, textBody, htmlBody
 }
 
-func schedulingActionURL(baseURL, orgSlug, action, token string) string {
+func schedulingActionURL(baseURL, tenantSlug, action, token string) string {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	token = strings.TrimSpace(token)
 	if baseURL == "" || token == "" {
 		return ""
 	}
-	orgSlug = strings.TrimSpace(orgSlug)
-	if orgSlug == "" {
+	tenantSlug = strings.TrimSpace(tenantSlug)
+	if tenantSlug == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s/v1/public/%s/scheduling/bookings/actions/%s?token=%s", baseURL, orgSlug, action, token)
+	return fmt.Sprintf("%s/v1/public/%s/scheduling/bookings/actions/%s?token=%s", baseURL, tenantSlug, action, token)
 }
 
 func defaultSchedulingName(name string) string {

@@ -25,20 +25,20 @@ def register_profile_tools(
     dossier: dict[str, Any],
     add_tool: AddTool,
 ) -> None:
-    async def _complete_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
-        _ = org_id
+    async def _complete_onboarding_step(tenant_id: str, step: str) -> dict[str, Any]:
+        _ = tenant_id
         complete_step(dossier, step)
         current = dossier.get("onboarding", {}).get("current_step", "")
         return {"ok": True, "current_step": current, "completed": dossier.get("onboarding", {}).get("steps_completed", [])}
 
-    async def _skip_onboarding_step(org_id: str, step: str) -> dict[str, Any]:
-        _ = org_id
+    async def _skip_onboarding_step(tenant_id: str, step: str) -> dict[str, Any]:
+        _ = tenant_id
         skip_step(dossier, step)
         current = dossier.get("onboarding", {}).get("current_step", "")
         return {"ok": True, "current_step": current, "skipped": dossier.get("onboarding", {}).get("steps_skipped", [])}
 
-    async def _apply_business_profile(org_id: str, profile: str) -> dict[str, Any]:
-        _ = org_id
+    async def _apply_business_profile(tenant_id: str, profile: str) -> dict[str, Any]:
+        _ = tenant_id
         if profile not in BUSINESS_PROFILES:
             available = list(BUSINESS_PROFILES.keys())
             return {"error": f"Perfil desconocido. Opciones: {available}"}
@@ -46,7 +46,7 @@ def register_profile_tools(
         return {"ok": True, "profile": profile, "modules_active": dossier.get("modules_active", [])}
 
     async def _update_business_info(
-        org_id: str,
+        tenant_id: str,
         business_name: str | None = None,
         business_tax_id: str | None = None,
         business_address: str | None = None,
@@ -55,7 +55,7 @@ def register_profile_tools(
         default_tax_rate: float | None = None,
         scheduling_enabled: bool | None = None,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         field_map = {
             "name": business_name,
             "tax_id": business_tax_id,
@@ -81,12 +81,12 @@ def register_profile_tools(
             scheduling_enabled=scheduling_enabled,
         )
 
-    async def _get_tenant_settings(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_tenant_settings(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await settings.get_tenant_settings(client, auth)
 
-    async def _remember_fact(org_id: str, fact: str) -> dict[str, Any]:
-        _ = org_id
+    async def _remember_fact(tenant_id: str, fact: str) -> dict[str, Any]:
+        _ = tenant_id
         add_learned_context(dossier, fact)
         return {"ok": True, "total_facts": len(dossier.get("learned_context", []))}
 

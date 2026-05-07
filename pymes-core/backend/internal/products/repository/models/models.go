@@ -9,7 +9,7 @@ import (
 
 type ProductModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Type        string    `gorm:"not null"`
 	SKU         string
 	Name        string `gorm:"not null"`

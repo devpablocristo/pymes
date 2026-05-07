@@ -18,7 +18,7 @@ type orgResolveBySlugRow struct {
 }
 
 type businessInfoRow struct {
-	OrgID             uuid.UUID
+	TenantID          uuid.UUID
 	Name              string
 	Slug              string
 	BusinessName      string
@@ -28,7 +28,7 @@ type businessInfoRow struct {
 	SchedulingEnabled bool
 }
 
-func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
+func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
 		return uuid.Nil, ErrOrgNotFound
@@ -37,7 +37,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 	if parsed, err := uuid.Parse(trimmed); err == nil {
 		var row orgResolveByIDRow
 		err = r.db.WithContext(ctx).
-			Table("orgs").
+			Table("tenants").
 			Select("id").
 			Where("id = ?", parsed).
 			Take(&row).Error
@@ -48,7 +48,7 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 
 	var row orgResolveBySlugRow
 	err := r.db.WithContext(ctx).
-		Table("orgs").
+		Table("tenants").
 		Select("id").
 		Where("slug = ?", trimmed).
 		Take(&row).Error
@@ -61,13 +61,17 @@ func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, e
 	return row.ID, nil
 }
 
-func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error) {
+func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
+	return r.ResolveTenantID(ctx, ref)
+}
+
+func (r *Repository) GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (BusinessInfo, error) {
 	var row businessInfoRow
 
 	err := r.db.WithContext(ctx).
-		Table("orgs o").
+		Table("tenants o").
 		Select(`
-			o.id as org_id,
+			o.id as tenant_id,
 			o.name,
 			o.slug,
 			COALESCE(ts.business_name, '') as business_name,
@@ -76,8 +80,8 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 			COALESCE(ts.business_email, '') as business_email,
 			COALESCE(ts.scheduling_enabled, false) as scheduling_enabled
 		`).
-		Joins("LEFT JOIN tenant_settings ts ON ts.org_id = o.id").
-		Where("o.id = ?", orgID).
+		Joins("LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id").
+		Where("o.id = ?", tenantID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -92,7 +96,7 @@ func (r *Repository) GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (Busi
 	}
 
 	return BusinessInfo{
-		OrgID:             row.OrgID,
+		TenantID:          row.TenantID,
 		Name:              row.Name,
 		Slug:              row.Slug,
 		BusinessName:      businessName,

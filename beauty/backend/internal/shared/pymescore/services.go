@@ -6,8 +6,8 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescoreops"
 )
 
-func (c *Client) GetService(ctx context.Context, orgID, serviceID string) (map[string]any, error) {
-	return pymescoreops.GetService(ctx, c.Client, orgID, serviceID)
+func (c *Client) GetService(ctx context.Context, tenantID, serviceID string) (map[string]any, error) {
+	return pymescoreops.GetService(ctx, c.Client, tenantID, serviceID)
 }
 
 type CoreService = pymescoreops.CoreService

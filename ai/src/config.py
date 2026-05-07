@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LOCAL_INTERNAL_SERVICE_TOKEN = "local-internal-token"
@@ -41,12 +41,9 @@ class Settings(BaseSettings):
     otel_service_name: str = "pymes-ai"
     otel_exporter_otlp_endpoint: str = ""
 
-    # Nexus Governance conserva variables REVIEW_* hasta completar la migración de configuración.
-    governance_url: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_URL", "REVIEW_URL"))
-    governance_api_key: str = Field(default="", validation_alias=AliasChoices("GOVERNANCE_API_KEY", "REVIEW_API_KEY"))
-    governance_callback_token: str = Field(
-        default="", validation_alias=AliasChoices("GOVERNANCE_CALLBACK_TOKEN", "REVIEW_CALLBACK_TOKEN")
-    )
+    governance_url: str = ""
+    governance_api_key: str = ""
+    governance_callback_token: str = ""
 
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 

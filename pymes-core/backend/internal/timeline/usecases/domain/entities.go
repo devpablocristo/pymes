@@ -8,7 +8,7 @@ import (
 
 type Entry struct {
 	ID          uuid.UUID      `json:"id"`
-	OrgID       uuid.UUID      `json:"org_id"`
+	TenantID    uuid.UUID      `json:"tenant_id"`
 	EntityType  string         `json:"entity_type"`
 	EntityID    uuid.UUID      `json:"entity_id"`
 	EventType   string         `json:"event_type"`

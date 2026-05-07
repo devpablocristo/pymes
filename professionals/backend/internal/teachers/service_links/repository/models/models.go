@@ -8,7 +8,7 @@ import (
 
 type ServiceLinkModel struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID             uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID          uuid.UUID `gorm:"type:uuid;index;not null"`
 	ProfileID         uuid.UUID `gorm:"type:uuid;not null"`
 	ServiceID         uuid.UUID `gorm:"type:uuid;not null"`
 	PublicDescription string

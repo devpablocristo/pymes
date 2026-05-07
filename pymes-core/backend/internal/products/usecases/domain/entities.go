@@ -8,7 +8,7 @@ import (
 
 type Product struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	TenantID    uuid.UUID
 	SKU         string
 	Name        string
 	Description string

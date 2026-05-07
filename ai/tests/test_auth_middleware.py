@@ -21,7 +21,7 @@ def create_app(*, api_key_verifier: object | None, protected: tuple[str, ...], p
     async def teachers_chat(request: Request) -> dict[str, object]:
         auth = request.state.auth
         return {
-            "org_id": auth.org_id,
+            "tenant_id": auth.tenant_id,
             "actor": auth.actor,
             "role": auth.role,
             "scopes": auth.scopes,
@@ -31,7 +31,7 @@ def create_app(*, api_key_verifier: object | None, protected: tuple[str, ...], p
     async def auto_repair_chat(request: Request) -> dict[str, object]:
         auth = request.state.auth
         return {
-            "org_id": auth.org_id,
+            "tenant_id": auth.tenant_id,
             "actor": auth.actor,
             "role": auth.role,
             "scopes": auth.scopes,
@@ -78,7 +78,7 @@ def test_professionals_chat_api_key_uses_resolved_identity() -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "org_id": "org-123",
+        "tenant_id": "org-123",
         "actor": "api_key:key-123",
         "role": "service",
         "scopes": ["customers:write"],
@@ -139,7 +139,7 @@ def test_workshops_chat_api_key_uses_resolved_identity() -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "org_id": "org-456",
+        "tenant_id": "org-456",
         "actor": "api_key:key-456",
         "role": "service",
         "scopes": ["work_orders:read"],

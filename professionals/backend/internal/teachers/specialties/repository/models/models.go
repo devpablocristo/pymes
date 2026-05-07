@@ -9,7 +9,7 @@ import (
 
 type SpecialtyModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Code        string    `gorm:"not null"`
 	Name        string    `gorm:"not null"`
 	Description string

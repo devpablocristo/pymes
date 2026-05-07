@@ -17,7 +17,7 @@ export type ProfessionalProfile = {
 };
 
 export type OrgPreviewBootstrap = {
-  org_id: string;
+  tenant_id: string;
   slug: string;
   name: string;
   business_name: string;
@@ -38,7 +38,7 @@ export type Specialty = {
 
 export type ServiceLink = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   profile_id: string;
   service_id: string;
   public_description: string;
@@ -51,7 +51,7 @@ export type ServiceLink = {
 
 export type Intake = {
   id: string;
-  org_id?: string;
+  tenant_id?: string;
   booking_id?: string;
   profile_id: string;
   customer_party_id?: string;
@@ -67,7 +67,7 @@ export type Intake = {
 
 export type Session = {
   id: string;
-  org_id?: string;
+  tenant_id?: string;
   booking_id: string;
   profile_id: string;
   customer_party_id?: string;

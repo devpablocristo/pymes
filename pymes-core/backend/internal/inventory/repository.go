@@ -21,7 +21,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListStockParams struct {
-	OrgID    uuid.UUID
+	TenantID uuid.UUID
 	BranchID *uuid.UUID
 	Limit    int
 	After    *uuid.UUID
@@ -31,7 +31,7 @@ type ListStockParams struct {
 }
 
 type ListMovementParams struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	BranchID  *uuid.UUID
 	Limit     int
 	After     *uuid.UUID
@@ -61,21 +61,21 @@ func stockLevelSelectBranchExpr(branchID *uuid.UUID) string {
 	return "NULL AS branch_id"
 }
 
-func (r *Repository) EnsureStockLevel(ctx context.Context, orgID, productID uuid.UUID) error {
+func (r *Repository) EnsureStockLevel(ctx context.Context, tenantID, productID uuid.UUID) error {
 	_ = ctx
-	_ = orgID
+	_ = tenantID
 	_ = productID
 	// El stock ya no se materializa al crear el producto: se resuelve por branch cuando hay
 	// movimientos o ajustes, y los listados sintetizan 0 si no existe fila todavía.
 	return nil
 }
 
-func (r *Repository) GetProduct(ctx context.Context, orgID, productID uuid.UUID) (productRow, error) {
+func (r *Repository) GetProduct(ctx context.Context, tenantID, productID uuid.UUID) (productRow, error) {
 	var row productRow
 	err := r.db.WithContext(ctx).
 		Table("products").
 		Select("id, name, sku, track_stock, updated_at").
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, productID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, productID).
 		Take(&row).Error
 	if err != nil {
 		return productRow{}, err
@@ -83,7 +83,7 @@ func (r *Repository) GetProduct(ctx context.Context, orgID, productID uuid.UUID)
 	return row, nil
 }
 
-func (r *Repository) getPreferredLevel(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (models.StockLevelModel, bool, error) {
+func (r *Repository) getPreferredLevel(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (models.StockLevelModel, bool, error) {
 	normalizedBranchID := normalizeBranchID(branchID)
 	if normalizedBranchID == nil {
 		type aggregateRow struct {
@@ -100,15 +100,15 @@ func (r *Repository) getPreferredLevel(ctx context.Context, orgID uuid.UUID, bra
 				COALESCE(MAX(min_quantity), 0) AS min_quantity,
 				MAX(updated_at) AS updated_at
 			FROM stock_levels
-			WHERE org_id = ? AND product_id = ?
-		`, orgID, productID).Scan(&row).Error; err != nil {
+			WHERE tenant_id = ? AND product_id = ?
+		`, tenantID, productID).Scan(&row).Error; err != nil {
 			return models.StockLevelModel{}, false, err
 		}
 		if row.RowCount == 0 {
 			return models.StockLevelModel{}, false, nil
 		}
 		level := models.StockLevelModel{
-			OrgID:       orgID,
+			TenantID:    tenantID,
 			ProductID:   productID,
 			Quantity:    row.Quantity,
 			MinQuantity: row.MinQuantity,
@@ -121,12 +121,12 @@ func (r *Repository) getPreferredLevel(ctx context.Context, orgID uuid.UUID, bra
 
 	var row models.StockLevelModel
 	result := r.db.WithContext(ctx).Raw(`
-		SELECT product_id, org_id, branch_id, quantity, min_quantity, updated_at
+		SELECT product_id, tenant_id, branch_id, quantity, min_quantity, updated_at
 		FROM stock_levels
-		WHERE org_id = ? AND product_id = ? AND (branch_id = ? OR branch_id IS NULL)
+		WHERE tenant_id = ? AND product_id = ? AND (branch_id = ? OR branch_id IS NULL)
 		ORDER BY CASE WHEN branch_id = ? THEN 0 ELSE 1 END, updated_at DESC
 		LIMIT 1
-	`, orgID, productID, *normalizedBranchID, *normalizedBranchID).Scan(&row)
+	`, tenantID, productID, *normalizedBranchID, *normalizedBranchID).Scan(&row)
 	if result.Error != nil {
 		return models.StockLevelModel{}, false, result.Error
 	}
@@ -136,8 +136,8 @@ func (r *Repository) getPreferredLevel(ctx context.Context, orgID uuid.UUID, bra
 	return row, true, nil
 }
 
-func (r *Repository) GetLevel(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error) {
-	p, err := r.GetProduct(ctx, orgID, productID)
+func (r *Repository) GetLevel(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID) (inventorydomain.StockLevel, error) {
+	p, err := r.GetProduct(ctx, tenantID, productID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return inventorydomain.StockLevel{}, gorm.ErrRecordNotFound
@@ -148,7 +148,7 @@ func (r *Repository) GetLevel(ctx context.Context, orgID uuid.UUID, branchID *uu
 	if !p.TrackStock {
 		return inventorydomain.StockLevel{
 			ProductID:   productID,
-			OrgID:       orgID,
+			TenantID:    tenantID,
 			BranchID:    normalizedBranchID,
 			ProductName: p.Name,
 			SKU:         p.SKU,
@@ -156,14 +156,14 @@ func (r *Repository) GetLevel(ctx context.Context, orgID uuid.UUID, branchID *uu
 		}, nil
 	}
 
-	row, found, err := r.getPreferredLevel(ctx, orgID, normalizedBranchID, productID)
+	row, found, err := r.getPreferredLevel(ctx, tenantID, normalizedBranchID, productID)
 	if err != nil {
 		return inventorydomain.StockLevel{}, err
 	}
 	if !found {
 		return inventorydomain.StockLevel{
 			ProductID:   productID,
-			OrgID:       orgID,
+			TenantID:    tenantID,
 			BranchID:    normalizedBranchID,
 			ProductName: p.Name,
 			SKU:         p.SKU,
@@ -178,7 +178,7 @@ func (r *Repository) GetLevel(ctx context.Context, orgID uuid.UUID, branchID *uu
 	}
 	return inventorydomain.StockLevel{
 		ProductID:   row.ProductID,
-		OrgID:       row.OrgID,
+		TenantID:    row.TenantID,
 		BranchID:    row.BranchID,
 		ProductName: p.Name,
 		SKU:         p.SKU,
@@ -200,7 +200,7 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 
 	q := r.db.WithContext(ctx).
 		Table("products p").
-		Where("p.org_id = ? AND p.track_stock = true", p.OrgID)
+		Where("p.tenant_id = ? AND p.track_stock = true", p.TenantID)
 	if p.Archived {
 		q = q.Where("p.deleted_at IS NOT NULL")
 	} else {
@@ -218,16 +218,16 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 		q = q.Joins(`
 			LEFT JOIN (
 				SELECT
-					org_id,
+					tenant_id,
 					product_id,
 					SUM(quantity) AS quantity,
 					MAX(min_quantity) AS min_quantity,
 					MAX(updated_at) AS updated_at
 				FROM stock_levels
-				WHERE org_id = ?
-				GROUP BY org_id, product_id
-			) sl ON sl.org_id = p.org_id AND sl.product_id = p.id
-		`, p.OrgID)
+				WHERE tenant_id = ?
+				GROUP BY tenant_id, product_id
+			) sl ON sl.tenant_id = p.tenant_id AND sl.product_id = p.id
+		`, p.TenantID)
 		if p.LowStock {
 			q = q.Where("COALESCE(sl.min_quantity, 0) > 0 AND COALESCE(sl.quantity, 0) <= COALESCE(sl.min_quantity, 0)")
 		}
@@ -236,13 +236,13 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 			LEFT JOIN LATERAL (
 				SELECT
 					product_id,
-					org_id,
+					tenant_id,
 					branch_id,
 					quantity,
 					min_quantity,
 					updated_at
 				FROM stock_levels sl
-				WHERE sl.org_id = p.org_id
+				WHERE sl.tenant_id = p.tenant_id
 				  AND sl.product_id = p.id
 				  AND (sl.branch_id = ? OR sl.branch_id IS NULL)
 				ORDER BY CASE WHEN sl.branch_id = ? THEN 0 ELSE 1 END, sl.updated_at DESC
@@ -261,7 +261,7 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 
 	type row struct {
 		ProductID   uuid.UUID  `gorm:"column:product_id"`
-		OrgID       uuid.UUID  `gorm:"column:org_id"`
+		TenantID    uuid.UUID  `gorm:"column:tenant_id"`
 		BranchID    *uuid.UUID `gorm:"column:branch_id"`
 		ProductName string     `gorm:"column:product_name"`
 		SKU         string     `gorm:"column:sku"`
@@ -275,7 +275,7 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 	selectBranchID := stockLevelSelectBranchExpr(normalizedBranchID)
 	if err := q.Select(`
 			p.id AS product_id,
-			p.org_id AS org_id,
+			p.tenant_id AS tenant_id,
 			` + selectBranchID + `,
 			p.name AS product_name,
 			p.sku AS sku,
@@ -303,7 +303,7 @@ func (r *Repository) ListLevels(ctx context.Context, p ListStockParams) ([]inven
 		}
 		out = append(out, inventorydomain.StockLevel{
 			ProductID:   row.ProductID,
-			OrgID:       row.OrgID,
+			TenantID:    row.TenantID,
 			BranchID:    branchID,
 			ProductName: row.ProductName,
 			SKU:         row.SKU,
@@ -330,7 +330,7 @@ func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([
 	q := r.db.WithContext(ctx).
 		Table("stock_movements sm").
 		Joins("JOIN products p ON p.id = sm.product_id").
-		Where("sm.org_id = ?", p.OrgID)
+		Where("sm.tenant_id = ?", p.TenantID)
 	if normalizedBranchID != nil {
 		q = q.Where("(sm.branch_id = ? OR sm.branch_id IS NULL)", *normalizedBranchID)
 	}
@@ -351,7 +351,7 @@ func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([
 
 	type row struct {
 		ID          uuid.UUID  `gorm:"column:id"`
-		OrgID       uuid.UUID  `gorm:"column:org_id"`
+		TenantID    uuid.UUID  `gorm:"column:tenant_id"`
 		BranchID    *uuid.UUID `gorm:"column:branch_id"`
 		ProductID   uuid.UUID  `gorm:"column:product_id"`
 		ProductName string     `gorm:"column:product_name"`
@@ -364,7 +364,7 @@ func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([
 		CreatedAt   time.Time  `gorm:"column:created_at"`
 	}
 	var rows []row
-	if err := q.Select("sm.id, sm.org_id, sm.branch_id, sm.product_id, p.name as product_name, sm.type, sm.quantity, sm.reason, sm.reference_id, sm.notes, sm.created_by, sm.created_at").
+	if err := q.Select("sm.id, sm.tenant_id, sm.branch_id, sm.product_id, p.name as product_name, sm.type, sm.quantity, sm.reason, sm.reference_id, sm.notes, sm.created_by, sm.created_at").
 		Order("sm.created_at DESC").Order("sm.id DESC").Limit(limit + 1).Scan(&rows).Error; err != nil {
 		return nil, 0, false, nil, err
 	}
@@ -382,7 +382,7 @@ func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([
 		}
 		out = append(out, inventorydomain.StockMovement{
 			ID:          row.ID,
-			OrgID:       row.OrgID,
+			TenantID:    row.TenantID,
 			BranchID:    branchID,
 			ProductID:   row.ProductID,
 			ProductName: row.ProductName,
@@ -404,7 +404,7 @@ func (r *Repository) ListMovements(ctx context.Context, p ListMovementParams) ([
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64, minQuantity *float64) error {
+func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64, minQuantity *float64) error {
 	normalizedBranchID := normalizeBranchID(branchID)
 	now := time.Now().UTC()
 
@@ -422,7 +422,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	if normalizedBranchID != nil {
 		res := tx.WithContext(ctx).
 			Model(&models.StockLevelModel{}).
-			Where("org_id = ? AND product_id = ? AND branch_id = ?", orgID, productID, *normalizedBranchID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id = ?", tenantID, productID, *normalizedBranchID).
 			Updates(makeUpdates())
 		if res.Error != nil {
 			return res.Error
@@ -435,7 +435,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 		promoteUpdates["branch_id"] = *normalizedBranchID
 		res = tx.WithContext(ctx).
 			Model(&models.StockLevelModel{}).
-			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
 			Updates(promoteUpdates)
 		if res.Error != nil {
 			return res.Error
@@ -448,7 +448,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	if normalizedBranchID == nil {
 		res := tx.WithContext(ctx).
 			Model(&models.StockLevelModel{}).
-			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
 			Updates(makeUpdates())
 		if res.Error != nil {
 			return res.Error
@@ -459,7 +459,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	}
 
 	row := models.StockLevelModel{
-		OrgID:       orgID,
+		TenantID:    tenantID,
 		BranchID:    normalizedBranchID,
 		ProductID:   productID,
 		Quantity:    delta,
@@ -472,21 +472,21 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	return tx.WithContext(ctx).Create(&row).Error
 }
 
-func (r *Repository) AdjustAndMove(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64, reason string, referenceID *uuid.UUID, notes, actor string, minQuantity *float64, movementType string) error {
+func (r *Repository) AdjustAndMove(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64, reason string, referenceID *uuid.UUID, notes, actor string, minQuantity *float64, movementType string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		p, err := r.GetProduct(ctx, orgID, productID)
+		p, err := r.GetProduct(ctx, tenantID, productID)
 		if err != nil {
 			return err
 		}
 		if !p.TrackStock {
 			return nil
 		}
-		if err := r.adjustStockLevel(ctx, tx, orgID, branchID, productID, delta, minQuantity); err != nil {
+		if err := r.adjustStockLevel(ctx, tx, tenantID, branchID, productID, delta, minQuantity); err != nil {
 			return err
 		}
 		mv := models.StockMovementModel{
 			ID:          uuid.New(),
-			OrgID:       orgID,
+			TenantID:    tenantID,
 			BranchID:    normalizeBranchID(branchID),
 			ProductID:   productID,
 			Type:        movementType,

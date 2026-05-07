@@ -8,7 +8,7 @@ import (
 
 type Account struct {
 	ID          uuid.UUID  `json:"id"`
-	OrgID       uuid.UUID  `json:"org_id"`
+	TenantID    uuid.UUID  `json:"tenant_id"`
 	Type        string     `json:"type"`
 	EntityType  string     `json:"entity_type"`
 	EntityID    uuid.UUID  `json:"entity_id"`
@@ -23,7 +23,7 @@ type Account struct {
 type Movement struct {
 	ID            uuid.UUID  `json:"id"`
 	AccountID     uuid.UUID  `json:"account_id"`
-	OrgID         uuid.UUID  `json:"org_id"`
+	TenantID      uuid.UUID  `json:"tenant_id"`
 	Type          string     `json:"type"`
 	Amount        float64    `json:"amount"`
 	Balance       float64    `json:"balance"`

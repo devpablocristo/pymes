@@ -8,7 +8,7 @@ import (
 
 type Entry struct {
 	ID           uuid.UUID      `json:"id"`
-	OrgID        uuid.UUID      `json:"org_id"`
+	TenantID     uuid.UUID      `json:"tenant_id"`
 	Actor        string         `json:"actor,omitempty"`
 	ActorType    string         `json:"actor_type,omitempty"`
 	ActorID      *uuid.UUID     `json:"actor_id,omitempty"`
@@ -32,7 +32,7 @@ type ActorRef struct {
 }
 
 type LogInput struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	Actor        ActorRef
 	Action       string
 	ResourceType string
@@ -41,7 +41,7 @@ type LogInput struct {
 }
 
 type VerifyResult struct {
-	OrgID            uuid.UUID `json:"org_id"`
+	TenantID         uuid.UUID `json:"tenant_id"`
 	Verified         bool      `json:"verified"`
 	CheckedRows      int       `json:"checked_rows"`
 	HashV1Rows       int       `json:"hash_v1_rows"`

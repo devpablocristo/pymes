@@ -4,7 +4,6 @@ package config
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -21,12 +20,13 @@ type Config struct {
 	JWKSURL                          string
 	JWTIssuer                        string
 	JWTAudience                      string
-	JWTOrgClaim                      string
+	JWTTenantClaim                   string
 	JWTRoleClaim                     string
 	JWTScopesClaim                   string
 	JWTActorClaim                    string
 	AuthEnableJWT                    bool
 	AuthAllowAPIKey                  bool
+	ClerkSecretKey                   string
 	ClerkWebhookSecret               string
 	StripeSecretKey                  string
 	StripeWebhookSecret              string
@@ -49,8 +49,8 @@ type Config struct {
 	ExchangeRateProvider             string
 	InternalServiceToken             string
 	AIServiceURL                     string
-	GovernanceCallbackToken              string
-	GovernanceSyncInterval               time.Duration
+	GovernanceCallbackToken          string
+	GovernanceSyncInterval           time.Duration
 	WhatsAppWebhookVerifyToken       string
 	WhatsAppAppSecret                string
 	WhatsAppGraphAPIBaseURL          string
@@ -77,12 +77,13 @@ func LoadFromEnv() Config {
 		JWKSURL:                          envconfig.Get("JWKS_URL", ""),
 		JWTIssuer:                        envconfig.Get("JWT_ISSUER", ""),
 		JWTAudience:                      envconfig.Get("JWT_AUDIENCE", ""),
-		JWTOrgClaim:                      envconfig.Get("JWT_ORG_CLAIM", ""),
+		JWTTenantClaim:                   envconfig.Get("JWT_TENANT_CLAIM", ""),
 		JWTRoleClaim:                     envconfig.Get("JWT_ROLE_CLAIM", ""),
 		JWTScopesClaim:                   envconfig.Get("JWT_SCOPES_CLAIM", ""),
 		JWTActorClaim:                    envconfig.Get("JWT_ACTOR_CLAIM", ""),
 		AuthEnableJWT:                    envconfig.Bool("AUTH_ENABLE_JWT", true),
 		AuthAllowAPIKey:                  envconfig.Bool("AUTH_ALLOW_API_KEY", true),
+		ClerkSecretKey:                   envconfig.Get("CLERK_SECRET_KEY", ""),
 		ClerkWebhookSecret:               envconfig.Get("CLERK_WEBHOOK_SECRET", ""),
 		StripeSecretKey:                  envconfig.Get("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:              envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
@@ -138,15 +139,4 @@ func validateInternalServiceToken(environment, token string) error {
 		return fmt.Errorf("invalid INTERNAL_SERVICE_TOKEN for %s environment", envconfig.NormalizeEnv(environment))
 	}
 	return nil
-}
-
-// EnvFirstNonEmpty devuelve el primer valor de entorno no vacío (tras trim).
-// Orden canónico: variables GOVERNANCE_* antes que REVIEW_*.
-func EnvFirstNonEmpty(keys ...string) string {
-	for _, k := range keys {
-		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
-			return v
-		}
-	}
-	return ""
 }

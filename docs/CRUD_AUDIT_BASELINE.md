@@ -20,7 +20,7 @@ Este documento resume la primera version ejecutable de la auditoria CRUD usada p
 
 - Core comercial tiene la mayoria de rutas CRUD canonicas presentes.
 - `products` y `services` ya no muestran drift de error shape en el handler principal.
-- Persisten respuestas de error legacy en gran parte de core y verticales.
+- Persisten respuestas de error no canónicas en gran parte de core y verticales.
 - `purchases`, `returns`, `recurring`, `payments`, credit notes e intakes todavia tienen listas parciales o shape no canonico detectado.
 - `inventory` es una vista operativa derivada de productos: no debe normalizarse como CRUD puro sin decidir primero su contrato.
 - Restaurants y professionals tienen recursos visibles sin archive/restore/hard delete completo.

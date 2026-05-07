@@ -10,6 +10,8 @@ type pymesSaaSStore struct {
 	db               *gorm.DB
 	logger           *slog.Logger
 	defaultKeyScopes []string
+	clerk            clerkTenantClient
+	frontendURL      string
 }
 
 func newPymesSaaSStore(db *gorm.DB, logger *slog.Logger, defaultKeyScopes []string) *pymesSaaSStore {

@@ -11,7 +11,6 @@ import {
   updateTenantSettings,
 } from '../lib/api';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
-import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import { getTheme, toggleTheme } from '../lib/theme';
 import { syncTenantProfileFromSettings } from '../lib/tenantProfile';
@@ -51,7 +50,6 @@ const ADMIN_SECTION_META: Record<AdminSection, { title: string; lead: string }> 
 };
 
 export function AdminPage({ section = 'all', embedded = false }: AdminPageProps = {}) {
-  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [uiTheme, setUiTheme] = useState(getTheme);
   const [form, setForm] = useState<TenantFormState | null>(null);
@@ -84,7 +82,7 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
   const [error, setError] = useState('');
   const loading = tenantQuery.isPending || auditQuery.isPending;
   const [saving, setSaving] = useState(false);
-  const sessionOrgId = sessionQuery.data?.auth.org_id ?? '';
+  const sessionTenantId = sessionQuery.data?.auth.tenant_id ?? '';
   const isConsoleAdmin = sessionQuery.data?.auth.product_role === 'admin';
   const [auditExportBusy, setAuditExportBusy] = useState(false);
 
@@ -215,8 +213,8 @@ export function AdminPage({ section = 'all', embedded = false }: AdminPageProps 
         </div>
       )}
 
-      {(showAll || section === 'rbac') && isConsoleAdmin && sessionOrgId ? (
-        <AdminRbacSection orgId={sessionOrgId} />
+      {(showAll || section === 'rbac') && isConsoleAdmin && sessionTenantId ? (
+        <AdminRbacSection tenantId={sessionTenantId} />
       ) : null}
 
       {(showAll || section === 'audit') && (

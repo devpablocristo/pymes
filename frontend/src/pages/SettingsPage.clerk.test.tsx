@@ -14,9 +14,6 @@ const apiMocks = vi.hoisted(() => ({
 
 const signOutMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 const setActiveMock = vi.hoisted(() => vi.fn<(args: { organization: string }) => Promise<void>>().mockResolvedValue(undefined));
-const createOrganizationMock = vi.hoisted(() =>
-  vi.fn<(args: { name: string }) => Promise<{ id: string }>>().mockResolvedValue({ id: 'org_new' }),
-);
 const sessionReloadMock = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 
 const useUserMock = vi.hoisted(() =>
@@ -53,7 +50,7 @@ vi.mock('@clerk/react', () => ({
     orgId: 'org_mock',
     orgRole: 'org:admin',
   }),
-  useClerk: () => ({ signOut: signOutMock, setActive: setActiveMock, createOrganization: createOrganizationMock }),
+  useClerk: () => ({ signOut: signOutMock, setActive: setActiveMock }),
   useSession: () => ({ session: { reload: sessionReloadMock } }),
   useOrganizationList: () => ({
     isLoaded: true,
@@ -78,7 +75,6 @@ import { SettingsPage } from './SettingsPage';
 
 const sessionJwt: SessionResponse = {
   auth: {
-    org_id: '00000000-0000-0000-0000-000000000099',
     tenant_id: '00000000-0000-0000-0000-000000000099',
     role: 'admin',
     product_role: 'admin',
@@ -90,7 +86,7 @@ const sessionJwt: SessionResponse = {
 
 /** API con placeholder típico: la UI debe priorizar nombre/email de Clerk. */
 const meWithPlaceholderUser: MeProfileResponse = {
-  org_id: '00000000-0000-0000-0000-000000000099',
+  tenant_id: '00000000-0000-0000-0000-000000000099',
   external_id: 'user_clerk_test',
   role: 'admin',
   user: {
@@ -122,12 +118,11 @@ function renderSettingsClerk() {
 describe('SettingsPage (modo Clerk)', () => {
   beforeEach(() => {
     setActiveMock.mockClear();
-    createOrganizationMock.mockClear();
     sessionReloadMock.mockClear();
     apiMocks.getSession.mockResolvedValue(sessionJwt);
     apiMocks.getMe.mockResolvedValue(meWithPlaceholderUser);
     apiMocks.getBillingStatus.mockResolvedValue({
-      org_id: sessionJwt.auth.org_id,
+      tenant_id: sessionJwt.auth.tenant_id,
       plan_code: 'starter',
       status: 'active',
       hard_limits: {},
@@ -195,13 +190,12 @@ describe('SettingsPage (modo Clerk)', () => {
     renderSettingsClerk();
 
     await waitFor(() => {
-      expect(screen.getByText('Tenants y organizaciones')).toBeInTheDocument();
+      expect(screen.getByText('Tenants / Equipo')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Tenant alternativo')).toBeInTheDocument();
     expect(screen.getAllByText('Actual').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Usar esta' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crear y usar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reabrir onboarding' })).toBeInTheDocument();
   });
 });

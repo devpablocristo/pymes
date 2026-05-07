@@ -17,15 +17,15 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	List(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -46,7 +46,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
@@ -60,7 +60,7 @@ func (h *Handler) List(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	items, err := h.uc.List(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
+	items, err := h.uc.List(c.Request.Context(), tenantID, branchID, c.Query("status"), limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -69,7 +69,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
@@ -83,7 +83,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID, c.Query("status"), limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, branchID, c.Query("status"), limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -93,9 +93,9 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreatePurchaseRequest
@@ -103,7 +103,7 @@ func (h *Handler) Create(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
+	payload, err := buildCreateInput(tenantID, req, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -117,11 +117,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -131,7 +131,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
@@ -140,12 +140,12 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	payload, err := buildCreateInput(orgID, req, authCtx.Actor)
+	payload, err := buildCreateInput(tenantID, req, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, OrgID: orgID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, IsFavorite: payload.IsFavorite, Tags: payload.Tags, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
+	out, err := h.uc.Update(c.Request.Context(), UpdateInput{ID: id, TenantID: tenantID, BranchID: payload.BranchID, SupplierID: payload.SupplierID, SupplierName: payload.SupplierName, Status: payload.Status, PaymentStatus: payload.PaymentStatus, IsFavorite: payload.IsFavorite, Tags: payload.Tags, Notes: payload.Notes, Items: payload.Items}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -155,7 +155,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
@@ -165,9 +165,9 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.UpdateStatus(c.Request.Context(), UpdateStatusInput{
-		ID:     id,
-		OrgID:  orgID,
-		Status: strings.TrimSpace(req.Status),
+		ID:       id,
+		TenantID: tenantID,
+		Status:   strings.TrimSpace(req.Status),
 	}, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -178,11 +178,11 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -195,11 +195,11 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -208,18 +208,18 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor string) (CreateInput, error) {
+func buildCreateInput(tenantID uuid.UUID, req dto.CreatePurchaseRequest, actor string) (CreateInput, error) {
 	var branchID *uuid.UUID
 	if req.BranchID != nil && strings.TrimSpace(*req.BranchID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*req.BranchID))
@@ -261,12 +261,12 @@ func buildCreateInput(orgID uuid.UUID, req dto.CreatePurchaseRequest, actor stri
 		items = append(items, purchasesdomain.PurchaseItem{ProductID: productID, ServiceID: serviceID, Description: strings.TrimSpace(item.Description), Quantity: item.Quantity, UnitCost: item.UnitCost, TaxRate: taxRate})
 	}
 	isFavorite := req.IsFavorite != nil && *req.IsFavorite
-	return CreateInput{OrgID: orgID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), IsFavorite: isFavorite, Tags: req.Tags, Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
+	return CreateInput{TenantID: tenantID, BranchID: branchID, SupplierID: supplierID, SupplierName: strings.TrimSpace(req.SupplierName), Status: strings.TrimSpace(req.Status), PaymentStatus: strings.TrimSpace(req.PaymentStatus), IsFavorite: isFavorite, Tags: req.Tags, Notes: strings.TrimSpace(req.Notes), CreatedBy: actor, Items: items}, nil
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+	return handlers.ParseAuthTenantID(c)
 }
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	return handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

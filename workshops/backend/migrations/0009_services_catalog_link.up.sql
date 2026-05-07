@@ -8,7 +8,7 @@ BEGIN
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'catalog_services'
-          AND column_name = 'org_id'
+          AND column_name = 'tenant_id'
     ) THEN
         IF NOT EXISTS (
             SELECT 1
@@ -24,14 +24,14 @@ BEGIN
         SET linked_service_id = s.id
         FROM public.catalog_services s
         WHERE ws.linked_product_id = s.id
-          AND ws.org_id = s.org_id
+          AND ws.tenant_id = s.tenant_id
           AND ws.linked_service_id IS NULL;
     ELSIF EXISTS (
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'services'
-          AND column_name = 'org_id'
+          AND column_name = 'tenant_id'
     ) THEN
         IF NOT EXISTS (
             SELECT 1
@@ -47,7 +47,7 @@ BEGIN
         SET linked_service_id = s.id
         FROM public.services s
         WHERE ws.linked_product_id = s.id
-          AND ws.org_id = s.org_id
+          AND ws.tenant_id = s.tenant_id
           AND ws.linked_service_id IS NULL;
     ELSE
         RAISE EXCEPTION 'commercial services catalog not found';
@@ -55,5 +55,5 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_workshops_services_linked_service
-    ON workshops.services(org_id, linked_service_id)
+    ON workshops.services(tenant_id, linked_service_id)
     WHERE linked_service_id IS NOT NULL;

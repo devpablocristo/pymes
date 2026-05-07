@@ -1,5 +1,5 @@
 -- Clientes, proveedores, productos, cotización, ventas, stock, caja (demo).
--- IDs determinísticos por org (uuid v5) para poder sembrar varias orgs sin colisión de PK global.
+-- IDs determinísticos por org (uuid v5) para poder sembrar varias tenants sin colisión de PK global.
 -- Requiere extensión uuid-ossp (migración base).
 
 DO $$
@@ -24,7 +24,7 @@ DECLARE
     sale2 uuid;
     sale3 uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
@@ -41,7 +41,7 @@ BEGIN
     sale2 := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/2');
     sale3 := uuid_generate_v5(v_org, 'pymes-seed/v1/sale/3');
 
-    INSERT INTO parties (id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
+    INSERT INTO parties (id, tenant_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata, created_at, updated_at, deleted_at)
     VALUES
         (c1, v_org, 'person', 'Cliente Demo Uno', 'cliente1@local.dev', '+54-11-1000-0001', '{}'::jsonb, NULL, 'seed', ARRAY['demo'], '{}'::jsonb, now(), now(), NULL),
         (c2, v_org, 'organization', 'Cliente Demo Dos', 'compras@demo2.local', '+54-11-1000-0002', '{}'::jsonb, '20111222333', 'seed', ARRAY['demo', 'vip'], '{}'::jsonb, now(), now(), NULL),
@@ -65,7 +65,7 @@ BEGIN
         (s3, 'Proveedor Demo 3', 'Proveedor Demo 3', '')
     ON CONFLICT (party_id) DO NOTHING;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     VALUES
         (gen_random_uuid(), c1, v_org, 'customer', true, NULL::uuid, '{}'::jsonb, now()),
         (gen_random_uuid(), c2, v_org, 'customer', true, NULL::uuid, '{}'::jsonb, now()),
@@ -73,52 +73,52 @@ BEGIN
         (gen_random_uuid(), s1, v_org, 'supplier', true, NULL::uuid, jsonb_build_object('contact_name', 'Lucia'), now()),
         (gen_random_uuid(), s2, v_org, 'supplier', true, NULL::uuid, jsonb_build_object('contact_name', 'Martin'), now()),
         (gen_random_uuid(), s3, v_org, 'supplier', true, NULL::uuid, jsonb_build_object('contact_name', 'Paula'), now())
-    ON CONFLICT (party_id, org_id, role) DO UPDATE SET
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE SET
         is_active = EXCLUDED.is_active,
         price_list_id = EXCLUDED.price_list_id,
         metadata = EXCLUDED.metadata;
 
-    -- Índice único (org_id, sku) es parcial → no sirve para ON CONFLICT; upsert manual.
-    SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+    -- Índice único (tenant_id, sku) es parcial → no sirve para ON CONFLICT; upsert manual.
+    SELECT id INTO p1 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
     IF p1 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        INSERT INTO products (id, tenant_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/1'), v_org, 'product', 'DEMO-PROD-001', 'Producto Demo A', 'Producto físico A', 'unit', 15000, 'ARS', 9000, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p1 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p1 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-001' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p2 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
     IF p2 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        INSERT INTO products (id, tenant_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/2'), v_org, 'product', 'DEMO-PROD-002', 'Producto Demo B', 'Producto físico B', 'unit', 9500, 'ARS', 6000, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p2 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p2 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-002' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO p3 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
     IF p3 IS NULL THEN
-        INSERT INTO products (id, org_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
+        INSERT INTO products (id, tenant_id, type, sku, name, description, unit, price, price_currency, cost_price, tax_rate, track_stock, is_active, tags)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/3'), v_org, 'product', 'DEMO-PROD-003', 'Producto Demo C', 'Producto físico C', 'unit', 7300, 'ARS', 4200, 21, true, true, ARRAY['demo']);
-        SELECT id INTO p3 FROM products WHERE org_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO p3 FROM products WHERE tenant_id = v_org AND sku = 'DEMO-PROD-003' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
     IF svc1 IS NULL THEN
-        INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
+        INSERT INTO services (id, tenant_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/4'), v_org, 'DEMO-SVC-001', 'Servicio Demo Instalación', 'Servicio de instalación', 'general', 25000, 12000, 21, 'ARS', 60, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc1 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     IF svc2 IS NULL THEN
-        INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
+        INSERT INTO services (id, tenant_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/5'), v_org, 'DEMO-SVC-002', 'Servicio Demo Mantenimiento', 'Servicio de mantenimiento', 'general', 12000, 7000, 21, 'ARS', 45, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc2 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
-    SELECT id INTO svc3 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc3 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
     IF svc3 IS NULL THEN
-        INSERT INTO services (id, org_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
+        INSERT INTO services (id, tenant_id, code, name, description, category_code, sale_price, cost_price, tax_rate, currency, default_duration_minutes, is_active, tags, metadata)
         VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/product/6'), v_org, 'DEMO-SVC-003', 'Servicio Demo Express', 'Servicio rápido demo', 'general', 8500, 4000, 21, 'ARS', 30, true, ARRAY['demo'], '{}'::jsonb);
-        SELECT id INTO svc3 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
+        SELECT id INTO svc3 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-003' AND deleted_at IS NULL LIMIT 1;
     END IF;
 
     IF p1 IS NULL OR p2 IS NULL OR p3 IS NULL OR svc1 IS NULL OR svc2 IS NULL OR svc3 IS NULL THEN
@@ -128,38 +128,38 @@ BEGIN
     UPDATE products
        SET deleted_at = COALESCE(deleted_at, now()),
            updated_at = now()
-     WHERE org_id = v_org
+     WHERE tenant_id = v_org
        AND type = 'service'
        AND sku IN ('DEMO-SVC-001', 'DEMO-SVC-002', 'DEMO-SVC-003');
 
     -- El índice único es parcial (WHERE branch_id IS NULL), por eso ON CONFLICT
-    -- necesita el mismo predicado. Sembramos el nivel legacy (sin branch).
-    INSERT INTO stock_levels (org_id, product_id, quantity, min_quantity)
+    -- necesita el mismo predicado. Sembramos el nivel global (sin branch).
+    INSERT INTO stock_levels (tenant_id, product_id, quantity, min_quantity)
     VALUES
         (v_org, p1, 50, 10),
         (v_org, p2, 30, 8),
         (v_org, p3, 20, 5)
-    ON CONFLICT (org_id, product_id) WHERE branch_id IS NULL DO UPDATE
+    ON CONFLICT (tenant_id, product_id) WHERE branch_id IS NULL DO UPDATE
         SET quantity = EXCLUDED.quantity,
             min_quantity = EXCLUDED.min_quantity,
             updated_at = now();
 
-    INSERT INTO quotes (id, org_id, number, party_id, party_name, status, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO quotes (id, tenant_id, number, party_id, party_name, status, subtotal, tax_total, total, currency, notes, created_by)
     VALUES (q1, v_org, 'PRE-00001', c1, 'Cliente Demo Uno', 'accepted', 40000, 8400, 48400, 'ARS', 'seed quote', 'seed')
-    ON CONFLICT (org_id, number) DO NOTHING;
-    SELECT id INTO q1 FROM quotes WHERE org_id = v_org AND number = 'PRE-00001' LIMIT 1;
+    ON CONFLICT (tenant_id, number) DO NOTHING;
+    SELECT id INTO q1 FROM quotes WHERE tenant_id = v_org AND number = 'PRE-00001' LIMIT 1;
 
     IF q1 IS NULL THEN
         RAISE EXCEPTION 'pymes seed: missing quote PRE-00001 for org %', v_org;
     END IF;
 
-    INSERT INTO quotes (id, org_id, number, party_id, party_name, status, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO quotes (id, tenant_id, number, party_id, party_name, status, subtotal, tax_total, total, currency, notes, created_by)
     VALUES
         (q2, v_org, 'PRE-00002', c2, 'Cliente Demo Dos', 'draft', 19000, 3990, 22990, 'ARS', 'seed quote 2', 'seed'),
         (q3, v_org, 'PRE-00003', c3, 'Cliente Demo Tres', 'sent', 8500, 1785, 10285, 'ARS', 'seed quote 3', 'seed')
-    ON CONFLICT (org_id, number) DO NOTHING;
-    SELECT id INTO q2 FROM quotes WHERE org_id = v_org AND number = 'PRE-00002' LIMIT 1;
-    SELECT id INTO q3 FROM quotes WHERE org_id = v_org AND number = 'PRE-00003' LIMIT 1;
+    ON CONFLICT (tenant_id, number) DO NOTHING;
+    SELECT id INTO q2 FROM quotes WHERE tenant_id = v_org AND number = 'PRE-00002' LIMIT 1;
+    SELECT id INTO q3 FROM quotes WHERE tenant_id = v_org AND number = 'PRE-00003' LIMIT 1;
 
     IF q2 IS NULL OR q3 IS NULL THEN
         RAISE EXCEPTION 'pymes seed: missing quote PRE-00002/PRE-00003 for org %', v_org;
@@ -193,15 +193,15 @@ BEGIN
             subtotal = EXCLUDED.subtotal,
             sort_order = EXCLUDED.sort_order;
 
-    INSERT INTO sales (id, org_id, number, party_id, party_name, quote_id, status, payment_method, subtotal, tax_total, total, currency, notes, created_by)
+    INSERT INTO sales (id, tenant_id, number, party_id, party_name, quote_id, status, payment_method, subtotal, tax_total, total, currency, notes, created_by)
     VALUES
         (sale1, v_org, 'VTA-00001', c1, 'Cliente Demo Uno', q1, 'completed', 'transfer', 40000, 8400, 48400, 'ARS', 'seed sale 1', 'seed'),
         (sale2, v_org, 'VTA-00002', c2, 'Cliente Demo Dos', NULL, 'completed', 'cash', 9500, 1995, 11495, 'ARS', 'seed sale 2', 'seed'),
         (sale3, v_org, 'VTA-00003', c3, 'Cliente Demo Tres', NULL, 'completed', 'card', 7300, 1533, 8833, 'ARS', 'seed sale 3', 'seed')
-    ON CONFLICT (org_id, number) DO NOTHING;
-    SELECT id INTO sale1 FROM sales WHERE org_id = v_org AND number = 'VTA-00001' LIMIT 1;
-    SELECT id INTO sale2 FROM sales WHERE org_id = v_org AND number = 'VTA-00002' LIMIT 1;
-    SELECT id INTO sale3 FROM sales WHERE org_id = v_org AND number = 'VTA-00003' LIMIT 1;
+    ON CONFLICT (tenant_id, number) DO NOTHING;
+    SELECT id INTO sale1 FROM sales WHERE tenant_id = v_org AND number = 'VTA-00001' LIMIT 1;
+    SELECT id INTO sale2 FROM sales WHERE tenant_id = v_org AND number = 'VTA-00002' LIMIT 1;
+    SELECT id INTO sale3 FROM sales WHERE tenant_id = v_org AND number = 'VTA-00003' LIMIT 1;
 
     IF sale1 IS NULL OR sale2 IS NULL OR sale3 IS NULL THEN
         RAISE EXCEPTION 'pymes seed: missing sale rows for org %', v_org;
@@ -224,14 +224,14 @@ BEGIN
             subtotal = EXCLUDED.subtotal,
             sort_order = EXCLUDED.sort_order;
 
-    INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by)
+    INSERT INTO stock_movements (id, tenant_id, product_id, type, quantity, reason, reference_id, notes, created_by)
     VALUES
         (uuid_generate_v5(v_org, 'pymes-seed/v1/stock-move/1'), v_org, p1, 'out', -1, 'sale', sale1, 'Seed stock movement', 'seed'),
         (uuid_generate_v5(v_org, 'pymes-seed/v1/stock-move/2'), v_org, p2, 'out', -1, 'sale', sale2, 'Seed stock movement', 'seed'),
         (uuid_generate_v5(v_org, 'pymes-seed/v1/stock-move/3'), v_org, p3, 'out', -1, 'sale', sale3, 'Seed stock movement', 'seed')
     ON CONFLICT (id) DO NOTHING;
 
-    INSERT INTO cash_movements (id, org_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by)
+    INSERT INTO cash_movements (id, tenant_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by)
     VALUES
         (uuid_generate_v5(v_org, 'pymes-seed/v1/cash-move/1'), v_org, 'income', 48400, 'ARS', 'sale', 'Seed sale income', 'transfer', 'sale', sale1, 'seed'),
         (uuid_generate_v5(v_org, 'pymes-seed/v1/cash-move/2'), v_org, 'income', 11495, 'ARS', 'sale', 'Seed sale income', 'cash', 'sale', sale2, 'seed'),
@@ -247,5 +247,5 @@ BEGIN
            next_sale_number = GREATEST(next_sale_number, 4),
            allow_negative_stock = true,
            updated_at = now()
-     WHERE org_id = v_org;
+     WHERE tenant_id = v_org;
 END $$;

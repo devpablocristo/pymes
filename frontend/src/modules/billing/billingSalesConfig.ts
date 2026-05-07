@@ -54,8 +54,11 @@ export function createSalesCrudConfig<TRecord extends SaleRecord>(opts: {
   return {
     basePath: '/v1/sales',
     allowEdit: true,
-    allowDelete: false,
     ...base.config,
+    supportsArchived: false,
+    allowDelete: false,
+    allowRestore: false,
+    allowHardDelete: false,
     stateMachine,
     editorModal: {
       blocks: [buildCommercialLineItemsBlock()],

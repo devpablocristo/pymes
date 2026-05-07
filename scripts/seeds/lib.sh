@@ -20,11 +20,9 @@ DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose --project-directory $ROOT_DIR -
 NEXUS_ROOT="${NEXUS_ROOT:-$(cd "$ROOT_DIR/.." && pwd)/nexus}"
 PYMES_DB_NAME="${PYMES_DB_NAME:-pymes}"
 PYMES_DB_USER="${PYMES_DB_USER:-postgres}"
-# DB del binario Nexus governance (legacy: REVIEW_DB_NAME=nexus_review).
-GOVERNANCE_DB_NAME="${GOVERNANCE_DB_NAME:-${REVIEW_DB_NAME:-nexus_governance}}"
-GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-${REVIEW_DB_USER:-postgres}}"
-REVIEW_DB_NAME="${REVIEW_DB_NAME:-$GOVERNANCE_DB_NAME}"
-REVIEW_DB_USER="${REVIEW_DB_USER:-$GOVERNANCE_DB_USER}"
+# DB del binario Nexus governance.
+GOVERNANCE_DB_NAME="${GOVERNANCE_DB_NAME:-nexus_governance}"
+GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-postgres}"
 
 dc() {
   (cd "$ROOT_DIR" && ${DOCKER_COMPOSE} "$@")
@@ -97,12 +95,12 @@ governance_pg_port() {
       return 0
     fi
   fi
-  printf '%s\n' "${REVIEW_POSTGRES_PORT:-15434}"
+  printf '%s\n' "${GOVERNANCE_POSTGRES_PORT:-15434}"
 }
 
 host_governance_psql() {
-  PGPASSWORD="${GOVERNANCE_DB_PASSWORD:-${REVIEW_DB_PASSWORD:-postgres}}" psql \
-    -h "${GOVERNANCE_DB_HOST:-${REVIEW_DB_HOST:-localhost}}" \
+  PGPASSWORD="${GOVERNANCE_DB_PASSWORD:-postgres}" psql \
+    -h "${GOVERNANCE_DB_HOST:-localhost}" \
     -p "$(governance_pg_port)" \
     -U "$GOVERNANCE_DB_USER" \
     -d "$GOVERNANCE_DB_NAME" \
@@ -135,8 +133,8 @@ wait_for_host_governance_pg() {
     return 1
   fi
   for ((i = 1; i <= tries; i++)); do
-    if PGPASSWORD="${GOVERNANCE_DB_PASSWORD:-${REVIEW_DB_PASSWORD:-postgres}}" pg_isready \
-      -h "${GOVERNANCE_DB_HOST:-${REVIEW_DB_HOST:-localhost}}" \
+    if PGPASSWORD="${GOVERNANCE_DB_PASSWORD:-postgres}" pg_isready \
+      -h "${GOVERNANCE_DB_HOST:-localhost}" \
       -p "$(governance_pg_port)" \
       -U "$GOVERNANCE_DB_USER" \
       -d "$GOVERNANCE_DB_NAME" >/dev/null 2>&1; then
@@ -152,14 +150,14 @@ ensure_pymes_seed_db_ready() {
   wait_for_host_pymes_pg || wait_for_pg postgres "$PYMES_DB_NAME" "$PYMES_DB_USER"
 }
 
-ensure_review_seed_db_ready() {
+ensure_governance_seed_db_ready() {
   nexus_dc up -d governance-postgres
   wait_for_host_governance_pg || wait_for_nexus_pg governance-postgres "$GOVERNANCE_DB_NAME" "$GOVERNANCE_DB_USER"
 }
 
 ensure_seed_dbs_ready() {
   ensure_pymes_seed_db_ready
-  ensure_review_seed_db_ready
+  ensure_governance_seed_db_ready
 }
 
 require_seed_org_external_id() {
@@ -186,7 +184,7 @@ resolve_target_org_uuid() {
   local org_uuid
   org_uuid="$(
     dc exec -T postgres psql -U "$PYMES_DB_USER" -d "$PYMES_DB_NAME" -Atq -v ON_ERROR_STOP=1 \
-      -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';"
+      -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';"
   )"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -n "$org_uuid" ]]; then
@@ -198,7 +196,7 @@ resolve_target_org_uuid() {
     org_uuid="$(
       host_pymes_psql \
         -Atq -v ON_ERROR_STOP=1 \
-        -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';" \
+        -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';" \
         2>/dev/null || true
     )"
     org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
@@ -295,7 +293,7 @@ run_pymes_sql_inline() {
   rm -f "$tmp_path"
 }
 
-run_review_sql_inline() {
+run_governance_sql_inline() {
   local sql="$1"
   local tmp_name tmp_path
   tmp_name="governance-seed-inline-$RANDOM.sql"
@@ -311,7 +309,7 @@ run_review_sql_inline() {
   rm -f "$tmp_path"
 }
 
-run_review_sql_file() {
+run_governance_sql_file() {
   local file="$1"
   local fullpath
   if [[ "$file" == /* ]]; then
@@ -331,4 +329,4 @@ run_review_sql_file() {
 }
 
 export ROOT_DIR LOCAL_INFRA_DIR DOCKER_COMPOSE NEXUS_ROOT PYMES_DB_NAME PYMES_DB_USER
-export GOVERNANCE_DB_NAME GOVERNANCE_DB_USER REVIEW_DB_NAME REVIEW_DB_USER
+export GOVERNANCE_DB_NAME GOVERNANCE_DB_USER 

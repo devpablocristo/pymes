@@ -33,24 +33,24 @@ class ExternalSalesChatResponse(BaseModel):
     pending_confirmations: list[str]
 
 
-@router.post("/{org_slug}/sales-agent/chat", response_model=ExternalSalesChatResponse)
+@router.post("/{tenant_slug}/sales-agent/chat", response_model=ExternalSalesChatResponse)
 async def external_sales_chat(
     req: ExternalSalesChatRequest,
-    org_slug: str = Path(..., min_length=2),
+    tenant_slug: str = Path(..., min_length=2),
     repo: AIRepository = Depends(get_repository),
     llm: LLMProvider = Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    org_id = await resolve_org_id(backend_client, org_slug)
-    await check_quota(repo, org_id, mode="external")
+    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    await check_quota(repo, tenant_id, mode="external")
     external_contact = clean_phone(req.phone or "")
-    update_request_context(org_id=org_id, user_id=external_contact or "external")
+    update_request_context(tenant_id=tenant_id, user_id=external_contact or "external")
 
     result = await run_commercial_chat(
         repo=repo,
         llm=llm,
         backend_client=backend_client,
-        org_id=org_id,
+        tenant_id=tenant_id,
         message=req.message,
         agent_mode="external_sales",
         channel=req.channel,
@@ -60,7 +60,7 @@ async def external_sales_chat(
     )
     logger.info(
         "commercial_external_completed",
-        org_id=org_id,
+        tenant_id=tenant_id,
         external_contact=external_contact,
         conversation_id=result.conversation_id,
         tool_calls=len(result.tool_calls),
@@ -74,25 +74,25 @@ async def external_sales_chat(
     )
 
 
-@router.post("/{org_slug}/sales-agent/contracts")
+@router.post("/{tenant_slug}/sales-agent/contracts")
 async def external_sales_contract(
     envelope: CommercialContractEnvelope,
-    org_slug: str = Path(..., min_length=2),
+    tenant_slug: str = Path(..., min_length=2),
     repo: AIRepository = Depends(get_repository),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    org_id = await resolve_org_id(backend_client, org_slug)
-    update_request_context(org_id=org_id, user_id=envelope.contact_phone or envelope.contract.counterparty_id)
+    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    update_request_context(tenant_id=tenant_id, user_id=envelope.contact_phone or envelope.contract.counterparty_id)
     payload = await process_contract(
         repo=repo,
         backend_client=backend_client,
-        org_id=org_id,
+        tenant_id=tenant_id,
         envelope=envelope,
         actor_id=envelope.contact_phone or envelope.contract.counterparty_id,
     )
     logger.info(
         "commercial_contract_processed",
-        org_id=org_id,
+        tenant_id=tenant_id,
         request_id=envelope.contract.request_id,
         intent=envelope.contract.intent,
     )

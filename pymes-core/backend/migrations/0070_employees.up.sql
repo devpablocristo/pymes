@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS employees (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id      uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     first_name  text NOT NULL DEFAULT '',
     last_name   text NOT NULL DEFAULT '',
     email       text NOT NULL DEFAULT '',
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS employees (
     deleted_at  timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_employees_org            ON employees(org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_employees_org_status     ON employees(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_employees_org_email      ON employees(org_id, email) WHERE email <> '';
-CREATE INDEX IF NOT EXISTS idx_employees_org_deleted_at ON employees(org_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_employees_org            ON employees(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_employees_org_status     ON employees(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_employees_org_email      ON employees(tenant_id, email) WHERE email <> '';
+CREATE INDEX IF NOT EXISTS idx_employees_org_deleted_at ON employees(tenant_id, deleted_at);

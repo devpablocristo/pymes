@@ -1,6 +1,10 @@
 import type { CrudResourceConfigMap } from '../../components/CrudPage';
 import {
   addTeacherSessionNote,
+  archiveTeacher,
+  archiveTeacherIntake,
+  archiveTeacherSession,
+  archiveTeacherSpecialty,
   completeTeacherSession,
   createTeacher,
   createTeacherIntake,
@@ -10,9 +14,18 @@ import {
   getTeachers,
   getTeacherSessions,
   getTeacherSpecialties,
+  hardDeleteTeacher,
+  hardDeleteTeacherIntake,
+  hardDeleteTeacherSession,
+  hardDeleteTeacherSpecialty,
+  restoreTeacher,
+  restoreTeacherIntake,
+  restoreTeacherSession,
+  restoreTeacherSpecialty,
   submitTeacherIntake,
   updateTeacher,
   updateTeacherIntake,
+  updateTeacherSession,
   updateTeacherSpecialty,
 } from '../../lib/teachersApi';
 import type { TeacherIntake, TeacherProfile, TeacherSession, TeacherSpecialty } from '../../lib/teachersTypes';
@@ -64,11 +77,12 @@ export function schedulingSpecialtiesToText(
 
 export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professionals'] {
   return {
-    label: 'teacher',
-    labelPlural: 'teachers',
-    labelPluralCap: 'Teachers',
+    supportsArchived: true,
+    label: 'profesional',
+    labelPlural: 'profesionales',
+    labelPluralCap: 'Profesionales',
     dataSource: {
-      list: async () => (await getTeachers()).items ?? [],
+      list: async ({ archived }) => (await getTeachers({ archived })).items ?? [],
       create: async (values) => {
         await createTeacher({
           party_id: asString(values.party_id),
@@ -96,9 +110,18 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
           metadata: mergeStandardCrudMetadataFromForm(row.metadata, values),
         });
       },
+      deleteItem: async (row: TeacherProfile) => {
+        await archiveTeacher(row.id);
+      },
+      restore: async (row: TeacherProfile) => {
+        await restoreTeacher(row.id);
+      },
+      hardDelete: async (row: TeacherProfile) => {
+        await hardDeleteTeacher(row.id);
+      },
     },
     columns: [
-      { key: 'headline', header: 'Teacher', className: 'cell-name', render: (_v, row: TeacherProfile) => row.headline || row.party_id },
+      { key: 'headline', header: 'Profesional', className: 'cell-name', render: (_v, row: TeacherProfile) => row.headline || row.party_id },
       { key: 'public_slug', header: 'Slug', render: (_v, row: TeacherProfile) => row.public_slug || '—' },
       { key: 'party_id', header: 'Party ID', render: (_v, row: TeacherProfile) => row.party_id ? row.party_id.slice(0, 8) + '…' : '—' },
       {
@@ -119,7 +142,7 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
     ],
     formFields: [
       { key: 'party_id', label: 'Party ID', required: true, placeholder: 'UUID de la entidad' },
-      { key: 'headline', label: 'Headline docente', placeholder: 'Teacher de ingles para secundaria' },
+      { key: 'headline', label: 'Título profesional', placeholder: 'Especialista en medicina laboral' },
       { key: 'public_slug', label: 'Slug publico', placeholder: 'ana-perez' },
       { key: 'is_public', label: 'Visible al publico', type: 'checkbox' },
       { key: 'is_bookable', label: 'Reservable', type: 'checkbox' },
@@ -162,18 +185,19 @@ export function createProfessionalsCrudConfig(): CrudResourceConfigMap['professi
     }),
     isValid: (values) => asString(values.party_id).trim().length > 0,
     viewModes: buildStandardCrudViewModes(() => <PymesSimpleCrudListModeContent resourceId="professionals" />, {
-      ariaLabel: 'Vistas docentes',
+      ariaLabel: 'Vistas profesionales',
     }),
   };
 }
 
 export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialties'] {
   return {
+    supportsArchived: true,
     label: 'especialidad',
     labelPlural: 'especialidades',
     labelPluralCap: 'Especialidades',
     dataSource: {
-      list: async () => (await getTeacherSpecialties()).items ?? [],
+      list: async ({ archived }) => (await getTeacherSpecialties({ archived })).items ?? [],
       create: async (values) => {
         await createTeacherSpecialty({
           code: asString(values.code),
@@ -195,6 +219,15 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
           tags: parseTagCsv(values.tags),
           metadata: mergeStandardCrudMetadataFromForm(row.metadata, values),
         });
+      },
+      deleteItem: async (row: TeacherSpecialty) => {
+        await archiveTeacherSpecialty(row.id);
+      },
+      restore: async (row: TeacherSpecialty) => {
+        await restoreTeacherSpecialty(row.id);
+      },
+      hardDelete: async (row: TeacherSpecialty) => {
+        await hardDeleteTeacherSpecialty(row.id);
       },
     },
     columns: [
@@ -242,11 +275,12 @@ export function createSpecialtiesCrudConfig(): CrudResourceConfigMap['specialtie
 
 export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
   return {
+    supportsArchived: true,
     label: 'ingreso',
     labelPlural: 'ingresos',
     labelPluralCap: 'Ingresos',
     dataSource: {
-      list: async () => (await getTeacherIntakes()).items ?? [],
+      list: async ({ archived }) => (await getTeacherIntakes({ archived })).items ?? [],
       create: async (values) => {
         await createTeacherIntake({
           profile_id: asString(values.profile_id),
@@ -262,9 +296,18 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
           tags: parseTagCsv(values.tags),
         });
       },
+      deleteItem: async (row: TeacherIntake) => {
+        await archiveTeacherIntake(row.id);
+      },
+      restore: async (row: TeacherIntake) => {
+        await restoreTeacherIntake(row.id);
+      },
+      hardDelete: async (row: TeacherIntake) => {
+        await hardDeleteTeacherIntake(row.id);
+      },
     },
     columns: [
-      { key: 'profile_id', header: 'Teacher', className: 'cell-name' },
+      { key: 'profile_id', header: 'Profesional', className: 'cell-name' },
       {
         key: 'status',
         header: 'Estado',
@@ -274,7 +317,7 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
       { key: 'notes', header: 'Notas internas', className: 'cell-notes' },
     ],
     formFields: [
-      { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
+      { key: 'profile_id', label: 'Profesional ID', required: true, placeholder: 'UUID del profesional' },
       ...buildStandardInternalFields({ tagsPlaceholder: 'seguimiento, prioridad, derivado', includeNotes: false }),
       { key: 'notes', label: 'Notas internas', type: 'textarea', fullWidth: true },
     ],
@@ -305,11 +348,12 @@ export function createIntakesCrudConfig(): CrudResourceConfigMap['intakes'] {
 
 export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
   return {
+    supportsArchived: true,
     label: 'sesion',
     labelPlural: 'sesiones',
     labelPluralCap: 'Sesiones',
     dataSource: {
-      list: async () => (await getTeacherSessions()).items ?? [],
+      list: async ({ archived }) => (await getTeacherSessions({ archived })).items ?? [],
       create: async (values) => {
         await createTeacherSession({
           booking_id: asString(values.booking_id),
@@ -321,9 +365,29 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
           metadata: mergeStandardCrudMetadataFromForm(undefined, values),
         });
       },
+      update: async (row: TeacherSession, values) => {
+        await updateTeacherSession(row.id, {
+          booking_id: asOptionalString(values.booking_id),
+          profile_id: asOptionalString(values.profile_id),
+          customer_party_id: asOptionalString(values.customer_party_id),
+          service_id: asOptionalString(values.service_id),
+          started_at: toRFC3339(values.started_at) ?? row.started_at,
+          summary: asOptionalString(values.summary),
+          metadata: mergeStandardCrudMetadataFromForm(row.metadata, values),
+        });
+      },
+      deleteItem: async (row: TeacherSession) => {
+        await archiveTeacherSession(row.id);
+      },
+      restore: async (row: TeacherSession) => {
+        await restoreTeacherSession(row.id);
+      },
+      hardDelete: async (row: TeacherSession) => {
+        await hardDeleteTeacherSession(row.id);
+      },
     },
     columns: [
-      { key: 'profile_id', header: 'Teacher', className: 'cell-name', render: (_v, row: TeacherSession) => row.profile_id ? row.profile_id.slice(0, 8) + '…' : '—' },
+      { key: 'profile_id', header: 'Profesional', className: 'cell-name', render: (_v, row: TeacherSession) => row.profile_id ? row.profile_id.slice(0, 8) + '…' : '—' },
       { key: 'booking_id', header: 'Booking', render: (_v, row: TeacherSession) => row.booking_id ? row.booking_id.slice(0, 8) + '…' : '—' },
       { key: 'summary', header: 'Resumen', render: (_v, row: TeacherSession) => row.summary || '—' },
       { key: 'status', header: 'Estado', render: (value) => renderSchedulingStatusBadge(value) },
@@ -332,7 +396,7 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
     ],
     formFields: [
       { key: 'booking_id', label: 'Booking ID', required: true, placeholder: 'UUID del turno' },
-      { key: 'profile_id', label: 'Teacher ID', required: true, placeholder: 'UUID del teacher' },
+      { key: 'profile_id', label: 'Profesional ID', required: true, placeholder: 'UUID del profesional' },
       { key: 'customer_party_id', label: 'Customer party ID' },
       { key: 'service_id', label: 'Service ID' },
       { key: 'started_at', label: 'Inicio', type: 'datetime-local', required: true },
@@ -372,13 +436,13 @@ export function createSessionsCrudConfig(): CrudResourceConfigMap['sessions'] {
       },
     ],
     searchText: (row: TeacherSession) => [row.booking_id, row.profile_id, row.status, row.summary].filter(Boolean).join(' '),
-    toFormValues: () => ({
-      booking_id: '',
-      profile_id: '',
-      customer_party_id: '',
-      service_id: '',
-      started_at: '',
-      summary: '',
+    toFormValues: (row: TeacherSession) => ({
+      booking_id: row.booking_id ?? '',
+      profile_id: row.profile_id ?? '',
+      customer_party_id: row.customer_party_id ?? '',
+      service_id: row.service_id ?? '',
+      started_at: row.started_at ?? '',
+      summary: row.summary ?? '',
     }),
     isValid: (values) =>
       asString(values.booking_id).trim().length > 0 &&

@@ -27,14 +27,14 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	orgID, err := uuid.Parse(in.TenantID)
+	tenantID, err := uuid.Parse(in.TenantID)
 	if err != nil {
 		return CandidateRecord{}, false, fmt.Errorf("parse tenant_id: %w", err)
 	}
 
 	var row models.CandidateModel
 	err = r.db.WithContext(ctx).
-		Where("org_id = ? AND fingerprint = ?", orgID, in.Fingerprint).
+		Where("tenant_id = ? AND fingerprint = ?", tenantID, in.Fingerprint).
 		First(&row).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return CandidateRecord{}, false, err
@@ -42,7 +42,7 @@ func (r *Repository) Upsert(ctx context.Context, in CandidateUpsert) (CandidateR
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		row = models.CandidateModel{
 			ID:              uuid.New(),
-			OrgID:           orgID,
+			TenantID:        tenantID,
 			Kind:            in.Kind,
 			EventType:       in.EventType,
 			EntityType:      in.EntityType,
@@ -94,13 +94,13 @@ func (r *Repository) ListByTenant(ctx context.Context, tenantID string, limit in
 	if limit <= 0 || limit > 200 {
 		limit = 100
 	}
-	orgID, err := uuid.Parse(tenantID)
+	tenantUUID, err := uuid.Parse(tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("parse tenant_id: %w", err)
 	}
 	var rows []models.CandidateModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ?", orgID).
+		Where("tenant_id = ?", tenantUUID).
 		Order("last_seen_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
@@ -117,7 +117,7 @@ func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID str
 	if notifiedAt.IsZero() {
 		notifiedAt = time.Now().UTC()
 	}
-	orgID, err := uuid.Parse(tenantID)
+	tenantUUID, err := uuid.Parse(tenantID)
 	if err != nil {
 		return fmt.Errorf("parse tenant_id: %w", err)
 	}
@@ -131,14 +131,14 @@ func (r *Repository) MarkNotified(ctx context.Context, tenantID, candidateID str
 		"updated_at":       notifiedAt.UTC(),
 	}
 	var row models.CandidateModel
-	if err := r.db.WithContext(ctx).First(&row, "id = ? AND org_id = ?", id, orgID).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&row, "id = ? AND tenant_id = ?", id, tenantUUID).Error; err != nil {
 		return err
 	}
 	if row.FirstNotifiedAt == nil {
 		updates["first_notified_at"] = notifiedAt.UTC()
 	}
 	return r.db.WithContext(ctx).Model(&models.CandidateModel{}).
-		Where("id = ? AND org_id = ?", id, orgID).
+		Where("id = ? AND tenant_id = ?", id, tenantUUID).
 		Updates(updates).Error
 }
 
@@ -160,7 +160,7 @@ func toCandidateRecord(row models.CandidateModel) CandidateRecord {
 	}
 	return CandidateRecord{
 		ID:              row.ID.String(),
-		TenantID:        row.OrgID.String(),
+		TenantID:        row.TenantID.String(),
 		Kind:            row.Kind,
 		EventType:       row.EventType,
 		EntityType:      row.EntityType,

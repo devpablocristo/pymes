@@ -18,7 +18,7 @@ async def _build_external_sales_tools(
     *,
     client: BackendClient,
     repo: AIRepository,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str | None,
     policy: CommercialPolicy,
     state: CommercialRunState,
@@ -28,8 +28,8 @@ async def _build_external_sales_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, Any] = {}
 
-    async def _get_business_info(org_id: str) -> dict[str, Any]:
-        payload = await client.request("GET", f"/v1/public/{org_id}/info", include_internal=True)
+    async def _get_business_info(tenant_id: str) -> dict[str, Any]:
+        payload = await client.request("GET", f"/v1/public/{tenant_id}/info", include_internal=True)
         return {
             "business_name": str(payload.get("business_name") or payload.get("name") or "").strip(),
             "address": str(payload.get("business_address", "")).strip(),
@@ -38,8 +38,8 @@ async def _build_external_sales_tools(
             "scheduling_enabled": bool(payload.get("scheduling_enabled", False)),
         }
 
-    async def _get_public_services(org_id: str, limit: int = 20) -> dict[str, Any]:
-        payload = await products.get_public_services(client, org_id=org_id, limit=max(1, min(limit, 100)))
+    async def _get_public_services(tenant_id: str, limit: int = 20) -> dict[str, Any]:
+        payload = await products.get_public_services(client, tenant_id=tenant_id, limit=max(1, min(limit, 100)))
         items = []
         for row in list(payload.get("items", [])):
             items.append(
@@ -55,20 +55,20 @@ async def _build_external_sales_tools(
             )
         return {"items": items}
 
-    async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
+    async def _check_availability(tenant_id: str, date: str, duration: int = 60) -> dict[str, Any]:
+        return await scheduling.check_availability(client, tenant_id=tenant_id, date=date, duration=duration)
 
-    async def _get_my_bookings(org_id: str, phone: str) -> dict[str, Any]:
-        return await scheduling.get_my_bookings(client, org_id=org_id, phone=phone)
+    async def _get_my_bookings(tenant_id: str, phone: str) -> dict[str, Any]:
+        return await scheduling.get_my_bookings(client, tenant_id=tenant_id, phone=phone)
 
-    async def _request_quote(org_id: str, items: list[dict[str, Any]], customer_name: str = "", notes: str = "") -> dict[str, Any]:
-        return await _build_quote_preview(client, org_id, items=items, customer_name=customer_name, notes=notes)
+    async def _request_quote(tenant_id: str, items: list[dict[str, Any]], customer_name: str = "", notes: str = "") -> dict[str, Any]:
+        return await _build_quote_preview(client, tenant_id, items=items, customer_name=customer_name, notes=notes)
 
-    async def _get_quote_payment_link(org_id: str, quote_id: str) -> dict[str, Any]:
-        return await payments.get_public_quote_payment_link(client, org_id=org_id, quote_id=quote_id)
+    async def _get_quote_payment_link(tenant_id: str, quote_id: str) -> dict[str, Any]:
+        return await payments.get_public_quote_payment_link(client, tenant_id=tenant_id, quote_id=quote_id)
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -77,7 +77,7 @@ async def _build_external_sales_tools(
     ) -> dict[str, Any]:
         return await scheduling.book_scheduling(
             client,
-            org_id=org_id,
+            tenant_id=tenant_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             title=title,
@@ -189,7 +189,7 @@ async def _build_external_sales_tools(
             name=declaration.name,
             handler=raw_handler,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             policy=policy,
             state=state,

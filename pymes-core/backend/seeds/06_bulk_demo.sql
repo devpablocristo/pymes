@@ -9,33 +9,33 @@ DECLARE
     v_sched_service uuid;
     v_sched_resource uuid;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
     SELECT id INTO v_branch
       FROM scheduling_branches
-     WHERE org_id = v_org
+     WHERE tenant_id = v_org
      ORDER BY created_at
      LIMIT 1;
 
     SELECT id INTO v_sched_service
       FROM scheduling_services
-     WHERE org_id = v_org
+     WHERE tenant_id = v_org
        AND active = true
      ORDER BY CASE WHEN code = 'general_consultation' THEN 0 ELSE 1 END, code
      LIMIT 1;
 
     SELECT id INTO v_sched_resource
       FROM scheduling_resources
-     WHERE org_id = v_org
+     WHERE tenant_id = v_org
        AND active = true
      ORDER BY code
      LIMIT 1;
 
     -- Clientes 4..10.
     INSERT INTO parties (
-        id, org_id, party_type, display_name, email, phone, address,
+        id, tenant_id, party_type, display_name, email, phone, address,
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
@@ -109,7 +109,7 @@ BEGIN
             trade_name = EXCLUDED.trade_name,
             tax_condition = EXCLUDED.tax_condition;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/customer-role/' || gs::text),
         uuid_generate_v5(v_org, 'pymes-seed/v2/customer/' || gs::text),
@@ -120,13 +120,13 @@ BEGIN
         jsonb_build_object('source', 'seed-bulk'),
         now()
     FROM generate_series(4, 10) AS gs
-    ON CONFLICT (party_id, org_id, role) DO UPDATE
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
 
     -- Proveedores 4..10.
     INSERT INTO parties (
-        id, org_id, party_type, display_name, email, phone, address,
+        id, tenant_id, party_type, display_name, email, phone, address,
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
@@ -187,7 +187,7 @@ BEGIN
             trade_name = EXCLUDED.trade_name,
             tax_condition = EXCLUDED.tax_condition;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/supplier-role/' || gs::text),
         uuid_generate_v5(v_org, 'pymes-seed/v2/supplier/' || gs::text),
@@ -198,13 +198,13 @@ BEGIN
         jsonb_build_object('source', 'seed-bulk'),
         now()
     FROM generate_series(4, 10) AS gs
-    ON CONFLICT (party_id, org_id, role) DO UPDATE
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
 
     -- Productos 4..10.
     INSERT INTO products (
-        id, org_id, type, sku, name, description, unit, price, cost_price,
+        id, tenant_id, type, sku, name, description, unit, price, cost_price,
         tax_rate, track_stock, tags, metadata, price_currency, is_active,
         image_url, image_urls, is_favorite, created_at, updated_at, deleted_at
     )
@@ -258,7 +258,7 @@ BEGIN
 
     -- Servicios 4..8. Workshops agrega 2 servicios publicos mas, dejando 10 visibles en total.
     INSERT INTO services (
-        id, org_id, code, name, description, category_code, sale_price,
+        id, tenant_id, code, name, description, category_code, sale_price,
         cost_price, tax_rate, currency, default_duration_minutes, tags,
         metadata, is_active, is_favorite, created_at, updated_at, deleted_at
     )
@@ -307,21 +307,21 @@ BEGIN
             updated_at = now(),
             deleted_at = NULL;
 
-    INSERT INTO stock_levels (org_id, product_id, quantity, min_quantity)
+    INSERT INTO stock_levels (tenant_id, product_id, quantity, min_quantity)
     SELECT
         v_org,
         uuid_generate_v5(v_org, 'pymes-seed/v2/product/' || gs::text),
         12 + gs * 4,
         3 + (gs % 4)
     FROM generate_series(4, 10) AS gs
-    ON CONFLICT (org_id, product_id) WHERE branch_id IS NULL DO UPDATE
+    ON CONFLICT (tenant_id, product_id) WHERE branch_id IS NULL DO UPDATE
         SET quantity = EXCLUDED.quantity,
             min_quantity = EXCLUDED.min_quantity,
             updated_at = now();
 
     -- Presupuestos 4..10 + item asociado.
     INSERT INTO quotes (
-        id, org_id, number, party_id, party_name, status, subtotal,
+        id, tenant_id, number, party_id, party_name, status, subtotal,
         tax_total, total, currency, notes, valid_until, created_by,
         discount_type, discount_value, discount_total, tags, metadata,
         is_favorite, created_at, updated_at, archived_at
@@ -350,7 +350,7 @@ BEGIN
         now(),
         NULL
     FROM generate_series(4, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             party_name = EXCLUDED.party_name,
             status = EXCLUDED.status,
@@ -395,7 +395,7 @@ BEGIN
 
     -- Ventas 4..10 + item.
     INSERT INTO sales (
-        id, org_id, number, party_id, party_name, quote_id, status, payment_method,
+        id, tenant_id, number, party_id, party_name, quote_id, status, payment_method,
         subtotal, tax_total, total, currency, notes, created_by, amount_paid,
         payment_status, discount_type, discount_value, discount_total,
         tags, metadata, is_favorite, created_at, voided_at
@@ -426,7 +426,7 @@ BEGIN
         now() - make_interval(days => 14 - gs),
         NULL
     FROM generate_series(4, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             party_name = EXCLUDED.party_name,
             quote_id = EXCLUDED.quote_id,
@@ -473,7 +473,7 @@ BEGIN
             subtotal = EXCLUDED.subtotal,
             sort_order = EXCLUDED.sort_order;
 
-    INSERT INTO stock_movements (id, org_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
+    INSERT INTO stock_movements (id, tenant_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/stock-move/' || gs::text),
         v_org,
@@ -494,7 +494,7 @@ BEGIN
             created_at = EXCLUDED.created_at;
 
     INSERT INTO cash_movements (
-        id, org_id, type, amount, currency, category, description,
+        id, tenant_id, type, amount, currency, category, description,
         payment_method, reference_type, reference_id, created_by,
         created_at, is_favorite, tags, deleted_at
     )
@@ -530,7 +530,7 @@ BEGIN
 
     -- Compras 3..10 + item.
     INSERT INTO purchases (
-        id, org_id, number, party_id, party_name, status, payment_status,
+        id, tenant_id, number, party_id, party_name, status, payment_status,
         subtotal, tax_total, total, currency, notes, received_at, created_by,
         tags, metadata, is_favorite, created_at, updated_at, deleted_at
     )
@@ -566,7 +566,7 @@ BEGIN
         now(),
         NULL
     FROM generate_series(3, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             party_name = EXCLUDED.party_name,
             status = EXCLUDED.status,
@@ -610,7 +610,7 @@ BEGIN
             sort_order = EXCLUDED.sort_order;
 
     -- Cuentas y movimientos hasta 10.
-    INSERT INTO accounts (id, org_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
+    INSERT INTO accounts (id, tenant_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/account/' || gs::text),
         v_org,
@@ -640,7 +640,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO account_movements (
-        id, account_id, org_id, type, amount, balance, description,
+        id, account_id, tenant_id, type, amount, balance, description,
         reference_type, reference_id, created_by, created_at
     )
     SELECT
@@ -666,7 +666,7 @@ BEGIN
 
     -- Pagos 4..10.
     INSERT INTO payments (
-        id, org_id, reference_type, reference_id, method, amount,
+        id, tenant_id, reference_type, reference_id, method, amount,
         notes, received_at, created_by, created_at, is_favorite, tags, deleted_at
     )
     SELECT
@@ -695,7 +695,7 @@ BEGIN
 
     -- Gastos recurrentes 3..10, sumados al seed base quedan 10 visibles.
     INSERT INTO recurring_expenses (
-        id, org_id, description, amount, currency, category, payment_method,
+        id, tenant_id, description, amount, currency, category, payment_method,
         frequency, day_of_month, party_id, is_active, next_due_date,
         last_paid_date, notes, created_by, created_at, updated_at,
         is_favorite, tags, deleted_at
@@ -741,7 +741,7 @@ BEGIN
 
     -- Procurement requests 3..10 + lineas.
     INSERT INTO procurement_requests (
-        id, org_id, requester_actor, title, description, category, status,
+        id, tenant_id, requester_actor, title, description, category, status,
         estimated_total, currency, evaluation_json, purchase_id, created_at,
         updated_at, archived_at
     )
@@ -791,7 +791,7 @@ BEGIN
 
     -- Facturas 6..10 + linea.
     INSERT INTO invoices (
-        id, org_id, number, party_id, customer_name, issued_date, due_date,
+        id, tenant_id, number, party_id, customer_name, issued_date, due_date,
         status, subtotal, discount_percent, tax_percent, total, notes,
         is_favorite, tags, created_by, created_at, updated_at, deleted_at
     )
@@ -816,7 +816,7 @@ BEGIN
         now(),
         NULL
     FROM generate_series(6, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             customer_name = EXCLUDED.customer_name,
             issued_date = EXCLUDED.issued_date,
@@ -852,7 +852,7 @@ BEGIN
 
     -- Empleados 4..10.
     INSERT INTO employees (
-        id, org_id, first_name, last_name, email, phone, position, status,
+        id, tenant_id, first_name, last_name, email, phone, position, status,
         hire_date, notes, is_favorite, tags, created_by, created_at,
         updated_at, deleted_at, metadata
     )
@@ -892,12 +892,12 @@ BEGIN
 
     -- La pantalla /employees lista parties con rol employee; espejamos los 10 employees ahi tambien.
     INSERT INTO parties (
-        id, org_id, party_type, display_name, email, phone, address,
+        id, tenant_id, party_type, display_name, email, phone, address,
         tax_id, notes, is_favorite, tags, metadata, created_at, updated_at, deleted_at
     )
     SELECT
         e.id,
-        e.org_id,
+        e.tenant_id,
         'person',
         trim(e.first_name || ' ' || e.last_name),
         e.email,
@@ -912,7 +912,7 @@ BEGIN
         now(),
         NULL
     FROM employees e
-    WHERE e.org_id = v_org
+    WHERE e.tenant_id = v_org
       AND e.id IN (
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
@@ -940,7 +940,7 @@ BEGIN
     INSERT INTO party_persons (party_id, first_name, last_name)
     SELECT e.id, e.first_name, e.last_name
     FROM employees e
-    WHERE e.org_id = v_org
+    WHERE e.tenant_id = v_org
       AND e.id IN (
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
@@ -957,18 +957,18 @@ BEGIN
         SET first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/employee-party-role/' || e.id::text),
         e.id,
-        e.org_id,
+        e.tenant_id,
         'employee',
         true,
         NULL::uuid,
         jsonb_build_object('source', 'seed-bulk', 'employee_id', e.id, 'status', e.status),
         now()
     FROM employees e
-    WHERE e.org_id = v_org
+    WHERE e.tenant_id = v_org
       AND e.id IN (
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/1'),
         uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2'),
@@ -981,13 +981,13 @@ BEGIN
         uuid_generate_v5(v_org, 'pymes-seed/v2/employee/9'),
         uuid_generate_v5(v_org, 'pymes-seed/v2/employee/10')
       )
-    ON CONFLICT (party_id, org_id, role) DO UPDATE
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = true,
             metadata = EXCLUDED.metadata;
 
     -- Devoluciones y notas de credito 2..10.
     INSERT INTO returns (
-        id, org_id, number, sale_id, reason, subtotal, tax_total, total,
+        id, tenant_id, number, sale_id, reason, subtotal, tax_total, total,
         refund_method, status, notes, created_by, created_at, is_favorite,
         tags, deleted_at
     )
@@ -1009,7 +1009,7 @@ BEGIN
         ARRAY['demo', 'return'],
         NULL
     FROM generate_series(2, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET sale_id = EXCLUDED.sale_id,
             reason = EXCLUDED.reason,
             subtotal = EXCLUDED.subtotal,
@@ -1042,7 +1042,7 @@ BEGIN
             subtotal = EXCLUDED.subtotal;
 
     INSERT INTO credit_notes (
-        id, org_id, number, party_id, return_id, amount, used_amount,
+        id, tenant_id, number, party_id, return_id, amount, used_amount,
         balance, expires_at, status, created_at
     )
     SELECT
@@ -1058,7 +1058,7 @@ BEGIN
         CASE WHEN gs % 3 = 0 THEN 'used' ELSE 'active' END,
         now() - make_interval(days => 10 - gs)
     FROM generate_series(2, 10) AS gs
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             return_id = EXCLUDED.return_id,
             amount = EXCLUDED.amount,
@@ -1069,7 +1069,7 @@ BEGIN
 
     -- Notificaciones, timeline y webhooks hasta 10.
     INSERT INTO pymes_in_app_notifications (
-        id, org_id, user_id, title, body, kind, entity_type, entity_id,
+        id, tenant_id, user_id, title, body, kind, entity_type, entity_id,
         chat_context, read_at, created_at
     )
     SELECT
@@ -1096,7 +1096,7 @@ BEGIN
             created_at = EXCLUDED.created_at;
 
     INSERT INTO timeline_entries (
-        id, org_id, entity_type, entity_id, event_type, title,
+        id, tenant_id, entity_type, entity_id, event_type, title,
         description, actor, metadata, created_at
     )
     SELECT
@@ -1119,7 +1119,7 @@ BEGIN
             metadata = EXCLUDED.metadata,
             created_at = EXCLUDED.created_at;
 
-    INSERT INTO webhook_endpoints (id, org_id, url, secret, events, is_active, created_by, created_at, updated_at)
+    INSERT INTO webhook_endpoints (id, tenant_id, url, secret, events, is_active, created_by, created_at, updated_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v2/webhook/' || gs::text),
         v_org,
@@ -1140,7 +1140,7 @@ BEGIN
 
     -- Agenda: 10 turnos por sucursal activa para que cualquier filtro tenga datos.
     IF v_sched_service IS NOT NULL THEN
-        INSERT INTO scheduling_resources (id, org_id, branch_id, code, name, kind, capacity, timezone, active)
+        INSERT INTO scheduling_resources (id, tenant_id, branch_id, code, name, kind, capacity, timezone, active)
         SELECT
             uuid_generate_v5(v_org, 'modules-scheduling/v2/resource/' || br.code || '/demo'),
             v_org,
@@ -1152,12 +1152,12 @@ BEGIN
             br.timezone,
             true
         FROM scheduling_branches br
-        WHERE br.org_id = v_org
+        WHERE br.tenant_id = v_org
           AND br.active = true
           AND NOT EXISTS (
               SELECT 1
               FROM scheduling_resources existing
-              WHERE existing.org_id = v_org
+              WHERE existing.tenant_id = v_org
                 AND existing.branch_id = br.id
                 AND existing.active = true
           )
@@ -1171,23 +1171,23 @@ BEGIN
         INSERT INTO scheduling_service_resources (service_id, resource_id)
         SELECT v_sched_service, r.id
         FROM scheduling_resources r
-        WHERE r.org_id = v_org
+        WHERE r.tenant_id = v_org
           AND r.active = true
           AND EXISTS (
               SELECT 1
               FROM scheduling_branches br
               WHERE br.id = r.branch_id
-                AND br.org_id = v_org
+                AND br.tenant_id = v_org
                 AND br.active = true
           )
         ON CONFLICT (service_id, resource_id) DO NOTHING;
 
         DELETE FROM scheduling_bookings
-         WHERE org_id = v_org
+         WHERE tenant_id = v_org
            AND created_by = 'seed';
 
         INSERT INTO scheduling_bookings (
-            id, org_id, branch_id, service_id, resource_id, party_id, reference,
+            id, tenant_id, branch_id, service_id, resource_id, party_id, reference,
             customer_name, customer_phone, customer_email, status, source,
             start_at, end_at, occupies_from, occupies_until, notes, metadata,
             created_by, confirmed_at, created_at, updated_at
@@ -1229,14 +1229,14 @@ BEGIN
         JOIN LATERAL (
             SELECT r.id
             FROM scheduling_resources r
-            WHERE r.org_id = v_org
+            WHERE r.tenant_id = v_org
               AND r.branch_id = br.id
               AND r.active = true
             ORDER BY r.code
             LIMIT 1
         ) r ON true
         CROSS JOIN generate_series(1, 10) AS gs
-        WHERE br.org_id = v_org
+        WHERE br.tenant_id = v_org
           AND br.active = true
         ON CONFLICT (id) DO UPDATE
             SET party_id = EXCLUDED.party_id,
@@ -1262,5 +1262,5 @@ BEGIN
        SET next_quote_number = GREATEST(next_quote_number, 11),
            next_sale_number = GREATEST(next_sale_number, 11),
            updated_at = now()
-     WHERE org_id = v_org;
+     WHERE tenant_id = v_org;
 END $$;

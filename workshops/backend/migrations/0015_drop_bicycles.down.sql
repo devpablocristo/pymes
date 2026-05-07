@@ -1,7 +1,7 @@
 -- Rollback de 0015: recrear la tabla vacia (los datos no se restauran).
 CREATE TABLE IF NOT EXISTS workshops.bicycles (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     customer_id UUID,
     customer_name TEXT NOT NULL DEFAULT '',
     brand TEXT NOT NULL DEFAULT '',

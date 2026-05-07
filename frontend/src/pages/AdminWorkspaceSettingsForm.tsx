@@ -233,6 +233,7 @@ export function AdminWorkspaceSettingsForm({
               <option value="workshops">Talleres</option>
               <option value="beauty">Belleza</option>
               <option value="restaurants">Restaurantes</option>
+              <option value="medical">Medicina</option>
             </select>
           </div>
         </div>

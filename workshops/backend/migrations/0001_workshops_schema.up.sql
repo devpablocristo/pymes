@@ -2,7 +2,7 @@ CREATE SCHEMA IF NOT EXISTS workshops;
 
 CREATE TABLE IF NOT EXISTS workshops.vehicles (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     customer_id UUID NULL,
     customer_name TEXT NOT NULL DEFAULT '',
     license_plate TEXT NOT NULL,
@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS workshops.vehicles (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_vehicles_org_plate_idx
-    ON workshops.vehicles (org_id, license_plate);
+    ON workshops.vehicles (tenant_id, license_plate);
 
 CREATE TABLE IF NOT EXISTS workshops.services (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
@@ -38,11 +38,11 @@ CREATE TABLE IF NOT EXISTS workshops.services (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_services_org_code_idx
-    ON workshops.services (org_id, code);
+    ON workshops.services (tenant_id, code);
 
 CREATE TABLE IF NOT EXISTS workshops.work_orders (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     number TEXT NOT NULL,
     vehicle_id UUID NOT NULL,
     vehicle_plate TEXT NOT NULL DEFAULT '',
@@ -71,14 +71,14 @@ CREATE TABLE IF NOT EXISTS workshops.work_orders (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_work_orders_org_number_idx
-    ON workshops.work_orders (org_id, number);
+    ON workshops.work_orders (tenant_id, number);
 
 CREATE INDEX IF NOT EXISTS workshops_work_orders_org_status_idx
-    ON workshops.work_orders (org_id, status);
+    ON workshops.work_orders (tenant_id, status);
 
 CREATE TABLE IF NOT EXISTS workshops.work_order_items (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     work_order_id UUID NOT NULL REFERENCES workshops.work_orders(id) ON DELETE CASCADE,
     item_type TEXT NOT NULL,
     service_id UUID NULL,

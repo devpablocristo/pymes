@@ -20,11 +20,11 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.DiningTable, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.DiningTable, actor string) (domain.DiningTable, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.DiningTable, error)
-	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.DiningTable, error)
-	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.DiningTable, error)
+	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.DiningTable, error)
+	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -57,7 +57,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) list(c *gin.Context, forceArchived bool) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -76,7 +76,7 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 		areaID = &parsed
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:    orgID,
+		TenantID: tenantID,
 		Limit:    limit,
 		After:    after,
 		Search:   c.Query("search"),
@@ -96,7 +96,7 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -123,7 +123,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.DiningTable{
-		OrgID:      orgID,
+		TenantID:   tenantID,
 		AreaID:     areaUUID,
 		Code:       req.Code,
 		Label:      req.Label,
@@ -142,11 +142,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -159,11 +159,11 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -171,11 +171,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -183,11 +183,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -195,7 +195,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -222,7 +222,7 @@ func (h *Handler) Update(c *gin.Context) {
 		}
 		in.AreaID = &parsed
 	}
-	out, err := h.uc.Update(c.Request.Context(), orgID, id, in, auth.GetAuthContext(c).Actor)
+	out, err := h.uc.Update(c.Request.Context(), tenantID, id, in, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -249,7 +249,7 @@ func toTableItem(item domain.DiningTable) dto.DiningTableItem {
 	}
 	return dto.DiningTableItem{
 		ID:         item.ID.String(),
-		OrgID:      item.OrgID.String(),
+		TenantID:   item.TenantID.String(),
 		AreaID:     item.AreaID.String(),
 		Code:       item.Code,
 		Label:      item.Label,

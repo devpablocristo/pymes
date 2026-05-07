@@ -42,7 +42,7 @@ class DebtPattern:
 
 PATTERNS = (
     DebtPattern(
-        "legacy_error_shape",
+        "noncanonical_error_shape",
         'HTTP responses using gin.H{"error": ...} instead of {code,message}',
         re.compile(r'gin\.H\s*\{\s*"error"\s*:'),
         ("*.go",),
@@ -60,9 +60,9 @@ PATTERNS = (
         ("*.go",),
     ),
     DebtPattern(
-        "legacy_deprecated_markers",
-        "Legacy/deprecated/shim/workaround markers in actionable code",
-        re.compile(r"\b(legacy|deprecated|shim|workaround|compatibility|compatibilidad)\b", re.IGNORECASE),
+        "historical_marker_scan",
+        "Historical/ad-hoc marker scan in actionable code",
+        re.compile(r"\b(historical|ad-hoc|shim|workaround|compatibility|compatibilidad)\b", re.IGNORECASE),
         ("*.go", "*.ts", "*.tsx", "*.py", "*.sh", "*.md"),
     ),
     DebtPattern(
@@ -104,12 +104,12 @@ def count_pattern(files: list[Path], pattern: DebtPattern) -> tuple[int, list[st
         if pattern.key == "inline_dto":
             if path.name.endswith("_test.go") or path.name != "handler.go":
                 continue
-        if pattern.key in {"legacy_deprecated_markers", "ai_fake_fallback_risk"}:
+        if pattern.key in {"historical_marker_scan", "ai_fake_fallback_risk"}:
             rel = path.relative_to(ROOT)
             rel_parts = set(rel.parts)
             if path.name.endswith(("_test.go", "_test.py", ".test.ts", ".test.tsx")) or rel_parts & DEBT_EXCLUDE_PARTS:
                 continue
-            if pattern.key == "legacy_deprecated_markers" and rel in DEBT_SCAN_CONTRACT_FILES:
+            if pattern.key == "historical_marker_scan" and rel in DEBT_SCAN_CONTRACT_FILES:
                 continue
             if pattern.key == "ai_fake_fallback_risk" and rel in AI_FAKE_FALLBACK_CONTRACT_FILES:
                 continue

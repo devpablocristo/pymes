@@ -17,7 +17,7 @@ import (
 )
 
 type usecasesPort interface {
-	ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error)
+	ListLatest(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error)
 	Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error)
 }
 
@@ -32,13 +32,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListLatest(c.Request.Context(), orgID, strings.TrimSpace(c.Query("from_currency")), strings.TrimSpace(c.Query("to_currency")), limit)
+	items, err := h.uc.ListLatest(c.Request.Context(), tenantID, strings.TrimSpace(c.Query("from_currency")), strings.TrimSpace(c.Query("to_currency")), limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -48,9 +48,9 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Upsert(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateExchangeRateRequest
@@ -68,7 +68,7 @@ func (h *Handler) Upsert(c *gin.Context) {
 		rateDate = parsed.UTC()
 	}
 	out, err := h.uc.Upsert(c.Request.Context(), currencydomain.ExchangeRate{
-		OrgID:        orgID,
+		TenantID:     tenantID,
 		FromCurrency: strings.ToUpper(strings.TrimSpace(req.FromCurrency)),
 		ToCurrency:   strings.ToUpper(strings.TrimSpace(req.ToCurrency)),
 		RateType:     strings.ToLower(strings.TrimSpace(req.RateType)),

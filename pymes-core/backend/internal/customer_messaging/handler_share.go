@@ -11,12 +11,12 @@ import (
 )
 
 func (h *Handler) Quote(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.QuoteLink(c.Request.Context(), orgID, id, auth.Actor)
+	out, err := h.uc.QuoteLink(c.Request.Context(), tenantID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -25,12 +25,12 @@ func (h *Handler) Quote(c *gin.Context) {
 }
 
 func (h *Handler) SaleReceipt(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.SaleReceiptLink(c.Request.Context(), orgID, id, auth.Actor)
+	out, err := h.uc.SaleReceiptLink(c.Request.Context(), tenantID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -39,11 +39,11 @@ func (h *Handler) SaleReceipt(c *gin.Context) {
 }
 
 func (h *Handler) CustomerMessage(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.CustomerMessage(c.Request.Context(), orgID, id, strings.TrimSpace(c.Query("message")))
+	out, err := h.uc.CustomerMessage(c.Request.Context(), tenantID, id, strings.TrimSpace(c.Query("message")))
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

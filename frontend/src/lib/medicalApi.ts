@@ -1,4 +1,5 @@
 import { createVerticalRequest } from './verticalApi';
+import type { OccupationalExamStatus, OccupationalExamType, OccupationalHealthExam } from './medicalTypes';
 
 function translateMedicalError(message: string): string {
   const trimmed = message.trim();
@@ -23,3 +24,48 @@ export const medicalRequest = createVerticalRequest({
   timeoutMessage:
     'El backend de medical no respondió a tiempo. Levantá medical-backend (puerto 8585), revisá VITE_MEDICAL_API_URL y que las migraciones estén aplicadas.',
 });
+
+export async function listOccupationalHealthExams(filters: {
+  search?: string;
+  status?: string;
+} = {}): Promise<{ items: OccupationalHealthExam[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters.search?.trim()) params.set('search', filters.search.trim());
+  if (filters.status?.trim()) params.set('status', filters.status.trim());
+  const query = params.toString();
+  return medicalRequest(`/v1/medical/occupational-health/exams${query ? `?${query}` : ''}`);
+}
+
+export async function createOccupationalHealthExam(data: {
+  patient_name: string;
+  patient_document?: string;
+  employer_name?: string;
+  exam_type?: OccupationalExamType;
+  status?: OccupationalExamStatus;
+  scheduled_at?: string | null;
+  result?: string;
+  notes?: string;
+}): Promise<OccupationalHealthExam> {
+  return medicalRequest('/v1/medical/occupational-health/exams', { method: 'POST', body: data });
+}
+
+export async function updateOccupationalHealthExam(
+  id: string,
+  data: Partial<{
+    patient_name: string;
+    patient_document: string;
+    employer_name: string;
+    exam_type: OccupationalExamType;
+    status: OccupationalExamStatus;
+    scheduled_at: string | null;
+    completed_at: string | null;
+    result: string;
+    notes: string;
+  }>,
+): Promise<OccupationalHealthExam> {
+  return medicalRequest(`/v1/medical/occupational-health/exams/${id}`, { method: 'PATCH', body: data });
+}
+
+export async function archiveOccupationalHealthExam(id: string): Promise<void> {
+  await medicalRequest(`/v1/medical/occupational-health/exams/${id}`, { method: 'DELETE' });
+}

@@ -4,7 +4,6 @@ import {
 } from '../modules/parties';
 import {
   createNexusRolesCrudConfig,
-  createProcurementPoliciesCrudConfig,
   createProcurementRequestsCrudConfig,
 } from '../modules/nexus-governance';
 import { defineCrudDomain } from './defineCrudDomain';
@@ -48,7 +47,6 @@ type Party = {
 
 export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = defineCrudDomain({
   procurementRequests: createProcurementRequestsCrudConfig(),
-  procurementPolicies: createProcurementPoliciesCrudConfig(),
   accounts: {
     basePath: '/v1/accounts',
     ...createAccountCrudConfig<Account>({
@@ -65,22 +63,6 @@ export const { ConfiguredCrudPage, hasCrudResource, getCrudPageConfig } = define
       labelPluralCap: 'Entidades',
       header: 'Entidad',
       render: () => <PymesSimpleCrudListModeContent resourceId="parties" />,
-    }),
-  },
-  employees: {
-    basePath: '/v1/parties',
-    listQuery: 'role=employee',
-    ...createPartyCrudConfig<Party>({
-      label: 'empleado',
-      labelPlural: 'empleados',
-      labelPluralCap: 'Empleados',
-      header: 'Empleado',
-      render: () => <PymesSimpleCrudListModeContent resourceId="employees" />,
-      createLabel: '+ Nuevo empleado',
-      searchPlaceholder: 'Buscar...',
-      emptyState:
-        'No hay entidades con rol empleado. El alta crea una party en /v1/parties con rol employee. Los usuarios con acceso a la consola (miembros de org) se administran aparte.',
-      roleEmployee: true,
     }),
   },
 });

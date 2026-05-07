@@ -5,5 +5,5 @@ ALTER TABLE workshops.vehicles
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_vehicles_org_plate_active_idx
-    ON workshops.vehicles (org_id, license_plate)
+    ON workshops.vehicles (tenant_id, license_plate)
     WHERE archived_at IS NULL;

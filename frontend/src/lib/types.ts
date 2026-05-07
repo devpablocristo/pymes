@@ -1,6 +1,6 @@
 /** Respuesta de GET/PATCH `/v1/admin/tenant-settings` (pymes-core admin). */
 export type TenantSettings = {
-  org_id: string;
+  tenant_id: string;
   plan_code: string;
   hard_limits: Record<string, unknown>;
   billing_status: string;
@@ -100,7 +100,7 @@ export type TenantSettingsUpdatePayload = {
 /** Entrada de GET `/v1/audit`. */
 export type AuditEntry = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   actor?: string;
   actor_type?: string;
   action: string;
@@ -114,11 +114,9 @@ export type AuditEntry = {
 export type ProductRole = 'admin' | 'user';
 
 export type BootstrapAuthPayload = {
-  org_id: string;
-  /** Nombre legible desde `orgs.name` (GET /session); puede faltar si no hay fila o está vacío. */
-  org_name?: string | null;
-  /** Mismo UUID que `org_id`; nombre alineado con kernel `tenant_id`. */
-  tenant_id?: string;
+  tenant_id: string;
+  /** Nombre legible desde `tenants.name` (GET /session); puede faltar si no hay fila o está vacío. */
+  tenant_name?: string | null;
   /** Rol crudo del JWT / API (p. ej. owner, admin, viewer, service). */
   role: string;
   product_role: ProductRole;
@@ -132,6 +130,18 @@ export type BootstrapAuthPayload = {
 /** Auth del tenant vía GET /v1/session. */
 export type SessionResponse = {
   auth: BootstrapAuthPayload;
+  tenant?: {
+    id: string;
+    slug?: string | null;
+    name?: string | null;
+  };
+  membership?: {
+    role: string;
+  };
+  user?: {
+    id?: string;
+    external_id?: string;
+  };
 };
 
 /** Respuesta de `GET /v1/users/me` (perfil SaaS / core). */
@@ -149,7 +159,7 @@ export type MeProfileUser = {
 };
 
 export type MeProfileResponse = {
-  org_id: string;
+  tenant_id: string;
   external_id: string;
   role: string;
   scopes?: string[];
@@ -157,7 +167,7 @@ export type MeProfileResponse = {
 };
 
 export type BillingStatus = {
-  org_id: string;
+  tenant_id: string;
   plan_code: string;
   status: string;
   hard_limits: Record<string, unknown>;

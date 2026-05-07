@@ -14,14 +14,14 @@ PLAN_LIMITS: dict[str, dict[str, int | bool]] = {
 }
 
 
-async def check_quota(repo: AIRepository, org_id: str, mode: str) -> str:
+async def check_quota(repo: AIRepository, tenant_id: str, mode: str) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
-    plan = await repo.get_plan_code(org_id)
+    plan = await repo.get_plan_code(tenant_id)
     if not settings.ai_enforce_plan_limits:
         return plan
     limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
-    usage = await repo.get_month_usage(org_id, now.year, now.month)
+    usage = await repo.get_month_usage(tenant_id, now.year, now.month)
 
     if mode == "external" and not bool(limits["external"]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="AI externo no disponible para este plan")

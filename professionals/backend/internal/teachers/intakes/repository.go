@@ -23,7 +23,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Intake, error) {
 	var rows []models.IntakeModel
-	q := r.db.WithContext(ctx).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Where("tenant_id = ?", p.TenantID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -43,7 +43,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intak
 	payload, _ := json.Marshal(in.Payload)
 	row := models.IntakeModel{
 		ID:              uuid.New(),
-		OrgID:           in.OrgID,
+		TenantID:        in.TenantID,
 		BookingID:       in.BookingID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
@@ -61,9 +61,9 @@ func (r *Repository) Create(ctx context.Context, in domain.Intake) (domain.Intak
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Intake, error) {
 	var row models.IntakeModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Intake{}, gorm.ErrRecordNotFound
@@ -86,7 +86,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intak
 		"updated_at":        time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Intake{}, res.Error
@@ -94,11 +94,11 @@ func (r *Repository) Update(ctx context.Context, in domain.Intake) (domain.Intak
 	if res.RowsAffected == 0 {
 		return domain.Intake{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.OrgID, in.ID)
+	return r.GetByID(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -106,13 +106,13 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -120,14 +120,14 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.IntakeModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Delete(&models.IntakeModel{})
 	if res.Error != nil {
 		return res.Error
@@ -138,11 +138,11 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.IntakeModel, error) {
+func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.IntakeModel, error) {
 	var row models.IntakeModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("org_id = ? AND id = ?", orgID, id).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -163,7 +163,7 @@ func toDomain(row models.IntakeModel) domain.Intake {
 	}
 	return domain.Intake{
 		ID:              row.ID,
-		OrgID:           row.OrgID,
+		TenantID:        row.TenantID,
 		BookingID:       row.BookingID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,

@@ -1,4 +1,4 @@
--- Revierte el rename de constraints privadas de Pymes si los nombres legacy siguen libres.
+-- Revierte el rename de constraints privadas de Pymes si los nombres anteriores siguen libres.
 DO $$
 BEGIN
     IF to_regclass('public.pymes_notification_preferences') IS NOT NULL THEN

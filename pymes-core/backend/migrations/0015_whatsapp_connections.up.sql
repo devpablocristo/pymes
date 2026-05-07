@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS whatsapp_connections (
-    org_id uuid PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
     phone_number_id text NOT NULL,
     waba_id text NOT NULL,
     access_token_encrypted text NOT NULL,

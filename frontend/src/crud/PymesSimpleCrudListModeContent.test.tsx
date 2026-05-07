@@ -592,7 +592,7 @@ describe('PymesSimpleCrudListModeContent', () => {
           closeLabel: 'Salir',
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
-          deleteAction: expect.objectContaining({ label: 'Eliminar' }),
+          deleteAction: expect.objectContaining({ label: 'Eliminar definitivo' }),
         }),
       ),
     );
@@ -679,7 +679,7 @@ describe('PymesSimpleCrudListModeContent', () => {
           allowEdit: true,
           archiveAction: undefined,
           restoreAction: expect.objectContaining({ label: 'Restaurar' }),
-          deleteAction: expect.objectContaining({ label: 'Eliminar' }),
+          deleteAction: expect.objectContaining({ label: 'Eliminar definitivo' }),
         }),
       ),
     );

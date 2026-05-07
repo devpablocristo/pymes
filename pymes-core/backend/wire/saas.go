@@ -8,19 +8,14 @@ import (
 	"net/http"
 	"strings"
 
-	saasjwks "github.com/devpablocristo/core/authn/go/jwks"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
-	saasclerk "github.com/devpablocristo/core/saas/go/clerkwebhook"
-	saasidentity "github.com/devpablocristo/core/saas/go/identity"
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
-	saasmigrations "github.com/devpablocristo/core/saas/go/migrations"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-// SaaSConfig wires core/saas/go from pymes-core env-backed config.
+// SaaSConfig wires the Pymes tenant access runtime from env-backed config.
 type SaaSConfig struct {
 	StripeSecretKey       string
 	StripeWebhookSecret   string
@@ -29,12 +24,13 @@ type SaaSConfig struct {
 	StripePriceEnterprise string
 	FrontendURL           string
 
+	ClerkSecretKey     string
 	ClerkWebhookSecret string
 
 	JWKSURL        string
 	JWTIssuer      string
 	JWTAudience    string
-	JWTOrgClaim    string
+	JWTTenantClaim string
 	JWTRoleClaim   string
 	JWTScopesClaim string
 	JWTActorClaim  string
@@ -43,52 +39,38 @@ type SaaSConfig struct {
 	AuthAllowAPIKey bool
 }
 
-// SaaSServices holds initialized core/saas/go HTTP handlers and auth.
+// SaaSServices holds initialized Pymes tenant HTTP handlers and auth.
 type SaaSServices struct {
 	Mux            *http.ServeMux
 	AuthMiddleware func(http.Handler) http.Handler
-	// ResolveOrgRef mapea external_id (Clerk org_...), slug o UUID a org UUID interno (misma lógica que JWT en core).
-	ResolveOrgRef func(ctx context.Context, ref string) (uuid.UUID, bool, error)
+	// ResolveTenantRef mapea Clerk org_..., slug o UUID a tenant UUID interno.
+	ResolveTenantRef func(ctx context.Context, ref string) (uuid.UUID, bool, error)
 }
 
-// SetupSaaS initializes core/saas/go on the given GORM DB (same PostgreSQL as Pymes).
+// SetupSaaS initializes Pymes tenant access on the given GORM DB.
 func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, error) {
 	if db == nil {
 		return nil, nil
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, err
-	}
-	if err := saasmigrations.MigrateUp(context.Background(), sqlDB, "core-saas"); err != nil {
-		return nil, err
 	}
 	if log == nil {
 		log = slog.Default()
 	}
 
 	store := newPymesSaaSStore(db, log, saasDefaultAPIKeyScopes())
+	store.clerk = newClerkBackendClient(strings.TrimSpace(cfg.ClerkSecretKey))
+	store.frontendURL = strings.TrimSpace(cfg.FrontendURL)
 
-	var jwtVerifier saasidentity.PrincipalVerifier
+	var jwtVerifier tenantPrincipalVerifier
 	if cfg.AuthEnableJWT && strings.TrimSpace(cfg.JWKSURL) != "" {
-		jwksVerifier := saasjwks.NewVerifier(strings.TrimSpace(cfg.JWKSURL))
-		identityUC := saasidentity.NewUsecasesWithOrgResolver(jwksVerifier, store, saasidentity.Config{
-			Issuer:      valueOrDefault(cfg.JWTIssuer, ""),
-			Audience:    valueOrDefault(cfg.JWTAudience, ""),
-			OrgClaim:    valueOrDefault(cfg.JWTOrgClaim, "org_id"),
-			RoleClaim:   valueOrDefault(cfg.JWTRoleClaim, "org_role"),
-			ScopesClaim: valueOrDefault(cfg.JWTScopesClaim, "scopes"),
-			ActorClaim:  valueOrDefault(cfg.JWTActorClaim, "sub"),
-		})
-		jwtVerifier = &jwtPrincipalVerifier{uc: identityUC}
+		jwtVerifier = &jwtPrincipalVerifier{store: store, cfg: cfg}
 	}
 
-	var apiKeyVerifier saasidentity.PrincipalVerifier
+	var apiKeyVerifier tenantPrincipalVerifier
 	if cfg.AuthAllowAPIKey {
 		apiKeyVerifier = &apiKeyPrincipalVerifier{store: store}
 	}
 
-	authMW := saasmiddleware.NewAuthMiddleware(jwtVerifier, apiKeyVerifier)
+	authMW := newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier)
 	billingRuntime := saasbilling.NewRuntime(saasbilling.RuntimeConfig{
 		StripeSecretKey:       cfg.StripeSecretKey,
 		StripeWebhookSecret:   cfg.StripeWebhookSecret,
@@ -97,21 +79,16 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 		StripePriceEnterprise: cfg.StripePriceEnterprise,
 		ConsoleBaseURL:        cfg.FrontendURL,
 	}, store, store, nil, nil, log)
-	clerkHandler := saasclerk.NewHandler(saasclerk.Config{
-		ClerkWebhookSecret: cfg.ClerkWebhookSecret,
-		ConsoleBaseURL:     cfg.FrontendURL,
-	}, store, nil, log)
 
 	mux := http.NewServeMux()
 	registerPymesSaaSRoutes(mux, store, authMW, billingRuntime, pymesSaaSHTTPAuth{
 		JWKSURL:   strings.TrimSpace(cfg.JWKSURL),
 		JWTIssuer: strings.TrimSpace(cfg.JWTIssuer),
 	})
-	clerkHandler.Register(mux)
 	saasbilling.NewWebhookHandler(billingRuntime).Register(mux)
 
-	resolveOrgRef := func(ctx context.Context, ref string) (uuid.UUID, bool, error) {
-		idStr, ok, err := store.FindOrgIDByExternalID(ctx, ref)
+	resolveTenantRef := func(ctx context.Context, ref string) (uuid.UUID, bool, error) {
+		idStr, ok, err := store.ResolveTenantIDByExternalRef(ctx, ref)
 		if err != nil {
 			return uuid.Nil, false, err
 		}
@@ -126,9 +103,9 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	}
 
 	return &SaaSServices{
-		Mux:            mux,
-		AuthMiddleware: authMW,
-		ResolveOrgRef:  resolveOrgRef,
+		Mux:              mux,
+		AuthMiddleware:   authMW,
+		ResolveTenantRef: resolveTenantRef,
 	}, nil
 }
 
@@ -136,16 +113,64 @@ type apiKeyPrincipalVerifier struct {
 	store *pymesSaaSStore
 }
 
-func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string) (kerneldomain.Principal, error) {
+type jwtPrincipalVerifier struct {
+	store *pymesSaaSStore
+	cfg   SaaSConfig
+}
+
+func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (tenantPrincipal, error) {
+	claims, err := verifyJWTClaimsMap(ctx, strings.TrimSpace(credential), v.cfg.JWKSURL, v.cfg.JWTIssuer)
+	if err != nil {
+		return tenantPrincipal{}, err
+	}
+	actor := stringClaim(claims, valueOrDefault(v.cfg.JWTActorClaim, "sub"))
+	if actor == "" {
+		actor = stringClaim(claims, "sub")
+	}
+	if actor == "" {
+		return tenantPrincipal{}, domainerr.Unauthorized("missing user claim")
+	}
+	rawTenant := firstTenantClaim(claims, valueOrDefault(v.cfg.JWTTenantClaim, "tenant_id"), "tenant_id", "o.id")
+	if rawTenant == "" {
+		return tenantPrincipal{}, domainerr.Forbidden("tenant claim is required")
+	}
+	tenantID := rawTenant
+	if _, parseErr := uuid.Parse(tenantID); parseErr != nil {
+		resolved, ok, resolveErr := v.store.ResolveTenantIDByExternalRef(ctx, rawTenant)
+		if resolveErr != nil {
+			return tenantPrincipal{}, resolveErr
+		}
+		if !ok {
+			return tenantPrincipal{}, domainerr.Forbidden("tenant is not registered in Pymes")
+		}
+		tenantID = resolved
+	}
+	role, ok, err := v.store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, actor)
+	if err != nil {
+		return tenantPrincipal{}, err
+	}
+	if !ok {
+		return tenantPrincipal{}, domainerr.Forbidden("active tenant membership required")
+	}
+	return tenantPrincipal{
+		TenantID:   tenantID,
+		Actor:      actor,
+		Role:       role,
+		Scopes:     scopesFromClaims(claims, valueOrDefault(v.cfg.JWTScopesClaim, "scopes")),
+		AuthMethod: "jwt",
+	}, nil
+}
+
+func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string) (tenantPrincipal, error) {
 	principal, keyID, err := v.store.FindPrincipalByAPIKeyHash(ctx, sha256Hex(strings.TrimSpace(credential)))
 	if err != nil {
-		return kerneldomain.Principal{}, err
+		return tenantPrincipal{}, err
 	}
 	actor := "api_key:" + principal.TenantID
 	if strings.TrimSpace(keyID) != "" {
 		actor = "api_key:" + strings.TrimSpace(keyID)
 	}
-	return kerneldomain.Principal{
+	return tenantPrincipal{
 		TenantID:   principal.TenantID,
 		Actor:      actor,
 		Role:       "service",
@@ -154,22 +179,51 @@ func (v *apiKeyPrincipalVerifier) Verify(ctx context.Context, credential string)
 	}, nil
 }
 
-type jwtPrincipalVerifier struct {
-	uc *saasidentity.UseCases
+func firstTenantClaim(claims map[string]any, names ...string) string {
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if value := nestedStringClaim(claims, name); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
-func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (kerneldomain.Principal, error) {
-	principal, err := v.uc.ResolvePrincipal(ctx, strings.TrimSpace(credential))
-	if err != nil {
-		return kerneldomain.Principal{}, err
+func nestedStringClaim(claims map[string]any, path string) string {
+	parts := strings.Split(strings.TrimSpace(path), ".")
+	var current any = claims
+	for _, part := range parts {
+		m, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current = m[part]
 	}
-	return kerneldomain.Principal{
-		TenantID:   principal.TenantID,
-		Actor:      principal.Actor,
-		Role:       principal.Role,
-		Scopes:     append([]string(nil), principal.Scopes...),
-		AuthMethod: "jwt",
-	}, nil
+	value, _ := current.(string)
+	return strings.TrimSpace(value)
+}
+
+func scopesFromClaims(claims map[string]any, claimName string) []string {
+	raw := claims[strings.TrimSpace(claimName)]
+	switch typed := raw.(type) {
+	case string:
+		return splitScopesCSV(typed)
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+		return out
+	case []string:
+		return append([]string(nil), typed...)
+	default:
+		return nil
+	}
 }
 
 func sha256Hex(raw string) string {

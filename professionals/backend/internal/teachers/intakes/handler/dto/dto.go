@@ -2,7 +2,7 @@ package dto
 
 type IntakeItem struct {
 	ID              string         `json:"id"`
-	OrgID           string         `json:"org_id"`
+	TenantID        string         `json:"tenant_id"`
 	BookingID       *string        `json:"booking_id,omitempty"`
 	ProfileID       string         `json:"profile_id"`
 	CustomerPartyID *string        `json:"customer_party_id,omitempty"`

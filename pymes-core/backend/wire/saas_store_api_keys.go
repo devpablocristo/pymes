@@ -6,44 +6,42 @@ import (
 	"strings"
 	"time"
 
-	saasorgdomain "github.com/devpablocristo/core/saas/go/org/usecases/domain"
-	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-func (s *pymesSaaSStore) FindPrincipalByAPIKeyHash(ctx context.Context, apiKeyHash string) (saasorgdomain.Principal, string, error) {
-	var key pymesAPIKeyRow
+func (s *pymesSaaSStore) FindPrincipalByAPIKeyHash(ctx context.Context, apiKeyHash string) (tenantAPIKeyPrincipal, string, error) {
+	var key pymesTenantAPIKeyRow
 	err := s.db.WithContext(ctx).
 		Where("api_key_hash = ?", strings.TrimSpace(apiKeyHash)).
 		Take(&key).Error
 	if err != nil {
-		return saasorgdomain.Principal{}, "", err
+		return tenantAPIKeyPrincipal{}, "", err
 	}
 	scopes, err := s.loadKeyScopes(ctx, key.ID)
 	if err != nil {
-		return saasorgdomain.Principal{}, "", err
+		return tenantAPIKeyPrincipal{}, "", err
 	}
-	return saasorgdomain.Principal{
-		TenantID: key.OrgID.String(),
+	return tenantAPIKeyPrincipal{
+		TenantID: key.TenantID.String(),
 		Scopes:   scopes,
 	}, key.ID.String(), nil
 }
 
-func (s *pymesSaaSStore) ListAPIKeys(ctx context.Context, orgID string) ([]saasuserdomain.APIKey, error) {
-	rows, err := s.listAPIKeyRows(ctx, orgID)
+func (s *pymesSaaSStore) ListAPIKeys(ctx context.Context, tenantID string) ([]tenantAPIKeyDTO, error) {
+	rows, err := s.listAPIKeyRows(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]saasuserdomain.APIKey, 0, len(rows))
+	items := make([]tenantAPIKeyDTO, 0, len(rows))
 	for _, row := range rows {
 		scopes, err := s.loadKeyScopes(ctx, row.ID)
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, saasuserdomain.APIKey{
+		items = append(items, tenantAPIKeyDTO{
 			ID:        row.ID.String(),
-			OrgID:     row.OrgID.String(),
+			TenantID:  row.TenantID.String(),
 			Name:      row.Name,
 			Scopes:    scopes,
 			CreatedAt: row.CreatedAt,
@@ -52,18 +50,18 @@ func (s *pymesSaaSStore) ListAPIKeys(ctx context.Context, orgID string) ([]saasu
 	return items, nil
 }
 
-func (s *pymesSaaSStore) CreateAPIKey(ctx context.Context, orgID, name string, scopes []string) (saasuserdomain.CreatedAPIKey, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func (s *pymesSaaSStore) CreateAPIKey(ctx context.Context, tenantID, name string, scopes []string) (createdTenantAPIKey, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
-		return saasuserdomain.CreatedAPIKey{}, err
+		return createdTenantAPIKey{}, err
 	}
 	rawKey, keyPrefix, keyHash, err := generateAPIKey()
 	if err != nil {
-		return saasuserdomain.CreatedAPIKey{}, err
+		return createdTenantAPIKey{}, err
 	}
-	key := pymesAPIKeyRow{
+	key := pymesTenantAPIKeyRow{
 		ID:         uuid.New(),
-		OrgID:      orgUUID,
+		TenantID:   tenantUUID,
 		Name:       strings.TrimSpace(name),
 		APIKeyHash: keyHash,
 		KeyPrefix:  keyPrefix,
@@ -78,16 +76,16 @@ func (s *pymesSaaSStore) CreateAPIKey(ctx context.Context, orgID, name string, s
 		}
 		return s.replaceKeyScopesTx(ctx, tx, key.ID, normalizeScopes(scopes, s.defaultKeyScopes))
 	}); err != nil {
-		return saasuserdomain.CreatedAPIKey{}, err
+		return createdTenantAPIKey{}, err
 	}
 	keyScopes, err := s.loadKeyScopes(ctx, key.ID)
 	if err != nil {
-		return saasuserdomain.CreatedAPIKey{}, err
+		return createdTenantAPIKey{}, err
 	}
-	return saasuserdomain.CreatedAPIKey{
-		APIKey: saasuserdomain.APIKey{
+	return createdTenantAPIKey{
+		APIKey: tenantAPIKeyDTO{
 			ID:        key.ID.String(),
-			OrgID:     key.OrgID.String(),
+			TenantID:  key.TenantID.String(),
 			Name:      key.Name,
 			Scopes:    keyScopes,
 			CreatedAt: key.CreatedAt,
@@ -96,8 +94,8 @@ func (s *pymesSaaSStore) CreateAPIKey(ctx context.Context, orgID, name string, s
 	}, nil
 }
 
-func (s *pymesSaaSStore) DeleteAPIKey(ctx context.Context, orgID, keyID string) error {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func (s *pymesSaaSStore) DeleteAPIKey(ctx context.Context, tenantID, keyID string) error {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return err
 	}
@@ -106,44 +104,44 @@ func (s *pymesSaaSStore) DeleteAPIKey(ctx context.Context, orgID, keyID string) 
 		return err
 	}
 	return s.db.WithContext(ctx).
-		Where("id = ? AND org_id = ?", keyUUID, orgUUID).
-		Delete(&pymesAPIKeyRow{}).Error
+		Where("id = ? AND tenant_id = ?", keyUUID, tenantUUID).
+		Delete(&pymesTenantAPIKeyRow{}).Error
 }
 
-func (s *pymesSaaSStore) RotateAPIKey(ctx context.Context, orgID, keyID string) (saasuserdomain.RotatedAPIKey, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func (s *pymesSaaSStore) RotateAPIKey(ctx context.Context, tenantID, keyID string) (rotatedTenantAPIKey, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
 	keyUUID, err := uuid.Parse(strings.TrimSpace(keyID))
 	if err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
 	rawKey, keyPrefix, keyHash, err := generateAPIKey()
 	if err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
-	var row pymesAPIKeyRow
+	var row pymesTenantAPIKeyRow
 	if err := s.db.WithContext(ctx).
-		Where("id = ? AND org_id = ?", keyUUID, orgUUID).
+		Where("id = ? AND tenant_id = ?", keyUUID, tenantUUID).
 		Take(&row).Error; err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
 	now := time.Now().UTC()
 	row.APIKeyHash = keyHash
 	row.KeyPrefix = keyPrefix
 	row.RotatedAt = &now
 	if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
 	scopes, err := s.loadKeyScopes(ctx, row.ID)
 	if err != nil {
-		return saasuserdomain.RotatedAPIKey{}, err
+		return rotatedTenantAPIKey{}, err
 	}
-	return saasuserdomain.RotatedAPIKey{
-		APIKey: saasuserdomain.APIKey{
+	return rotatedTenantAPIKey{
+		APIKey: tenantAPIKeyDTO{
 			ID:        row.ID.String(),
-			OrgID:     row.OrgID.String(),
+			TenantID:  row.TenantID.String(),
 			Name:      row.Name,
 			Scopes:    scopes,
 			CreatedAt: row.CreatedAt,
@@ -152,14 +150,14 @@ func (s *pymesSaaSStore) RotateAPIKey(ctx context.Context, orgID, keyID string) 
 	}, nil
 }
 
-func (s *pymesSaaSStore) listAPIKeyRows(ctx context.Context, orgID string) ([]pymesAPIKeyRow, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(orgID))
+func (s *pymesSaaSStore) listAPIKeyRows(ctx context.Context, tenantID string) ([]pymesTenantAPIKeyRow, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return nil, err
 	}
-	var rows []pymesAPIKeyRow
+	var rows []pymesTenantAPIKeyRow
 	if err := s.db.WithContext(ctx).
-		Where("org_id = ?", orgUUID).
+		Where("tenant_id = ?", tenantUUID).
 		Order("created_at DESC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -170,7 +168,7 @@ func (s *pymesSaaSStore) listAPIKeyRows(ctx context.Context, orgID string) ([]py
 func (s *pymesSaaSStore) loadKeyScopes(ctx context.Context, keyID uuid.UUID) ([]string, error) {
 	var scopes []string
 	if err := s.db.WithContext(ctx).
-		Table("org_api_key_scopes").
+		Table("tenant_api_key_scopes").
 		Where("api_key_id = ?", keyID).
 		Order("scope ASC").
 		Pluck("scope", &scopes).Error; err != nil {
@@ -181,11 +179,11 @@ func (s *pymesSaaSStore) loadKeyScopes(ctx context.Context, keyID uuid.UUID) ([]
 }
 
 func (s *pymesSaaSStore) replaceKeyScopesTx(_ context.Context, tx *gorm.DB, keyID uuid.UUID, scopes []string) error {
-	if err := tx.Where("api_key_id = ?", keyID).Delete(&pymesAPIKeyScopeRow{}).Error; err != nil {
+	if err := tx.Where("api_key_id = ?", keyID).Delete(&pymesTenantAPIKeyScopeRow{}).Error; err != nil {
 		return err
 	}
 	for _, scope := range scopes {
-		row := pymesAPIKeyScopeRow{
+		row := pymesTenantAPIKeyScopeRow{
 			ID:       uuid.New(),
 			APIKeyID: keyID,
 			Scope:    scope,

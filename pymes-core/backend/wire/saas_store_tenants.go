@@ -26,7 +26,7 @@ func (s *pymesSaaSStore) UpsertTenantBilling(ctx context.Context, item saasbilli
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return saasbillingdomain.TenantBilling{}, err
 	}
-	orgUUID, err := uuid.Parse(strings.TrimSpace(item.TenantID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(item.TenantID))
 	if err != nil {
 		return saasbillingdomain.TenantBilling{}, err
 	}
@@ -35,8 +35,8 @@ func (s *pymesSaaSStore) UpsertTenantBilling(ctx context.Context, item saasbilli
 	if err != nil {
 		return saasbillingdomain.TenantBilling{}, err
 	}
-	if row.OrgID == uuid.Nil {
-		row.OrgID = orgUUID
+	if row.TenantID == uuid.Nil {
+		row.TenantID = tenantUUID
 		row.CreatedAt = now
 	}
 	row.PlanCode = string(item.PlanCode)
@@ -57,13 +57,13 @@ func (s *pymesSaaSStore) UpsertTenantBilling(ctx context.Context, item saasbilli
 }
 
 func (s *pymesSaaSStore) GetUsageSummary(ctx context.Context, tenantID string) (saasbillingdomain.UsageSummary, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return saasbillingdomain.UsageSummary{}, err
 	}
 	var rows []pymesUsageCounterRow
 	if err := s.db.WithContext(ctx).
-		Where("org_id = ?", orgUUID).
+		Where("tenant_id = ?", tenantUUID).
 		Order("period DESC, counter_name ASC").
 		Find(&rows).Error; err != nil {
 		return saasbillingdomain.UsageSummary{}, err
@@ -96,7 +96,7 @@ func (s *pymesSaaSStore) GetUsageSummary(ctx context.Context, tenantID string) (
 }
 
 func (s *pymesSaaSStore) GetTenantName(ctx context.Context, tenantID string) (string, error) {
-	var row pymesOrgRow
+	var row pymesTenantRow
 	if err := s.db.WithContext(ctx).
 		Where("id = ?", strings.TrimSpace(tenantID)).
 		Take(&row).Error; err != nil {
@@ -132,7 +132,7 @@ func (s *pymesSaaSStore) UpsertTenantSettings(ctx context.Context, item saasadmi
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return saasadmindomain.TenantSettings{}, err
 	}
-	orgUUID, err := uuid.Parse(strings.TrimSpace(item.TenantID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(item.TenantID))
 	if err != nil {
 		return saasadmindomain.TenantSettings{}, err
 	}
@@ -141,8 +141,8 @@ func (s *pymesSaaSStore) UpsertTenantSettings(ctx context.Context, item saasadmi
 	if err != nil {
 		return saasadmindomain.TenantSettings{}, err
 	}
-	if row.OrgID == uuid.Nil {
-		row.OrgID = orgUUID
+	if row.TenantID == uuid.Nil {
+		row.TenantID = tenantUUID
 		row.CreatedAt = now
 	}
 	row.PlanCode = strings.TrimSpace(item.PlanCode)
@@ -161,11 +161,11 @@ func (s *pymesSaaSStore) UpsertTenantSettings(ctx context.Context, item saasadmi
 	return adminTenantSettingsFromRow(row), nil
 }
 
-func (s *pymesSaaSStore) ensureTenantSettings(ctx context.Context, orgID uuid.UUID) error {
+func (s *pymesSaaSStore) ensureTenantSettings(ctx context.Context, tenantID uuid.UUID) error {
 	var count int64
 	if err := s.db.WithContext(ctx).
 		Model(&pymesTenantSettingsRow{}).
-		Where("org_id = ?", orgID).
+		Where("tenant_id = ?", tenantID).
 		Count(&count).Error; err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func (s *pymesSaaSStore) ensureTenantSettings(ctx context.Context, orgID uuid.UU
 	}
 	now := time.Now().UTC()
 	row := pymesTenantSettingsRow{
-		OrgID:          orgID,
+		TenantID:       tenantID,
 		PlanCode:       "starter",
 		BillingStatus:  "trialing",
 		Status:         "active",
@@ -187,12 +187,12 @@ func (s *pymesSaaSStore) ensureTenantSettings(ctx context.Context, orgID uuid.UU
 }
 
 func (s *pymesSaaSStore) loadTenantSettings(ctx context.Context, tenantID string) (pymesTenantSettingsRow, bool, error) {
-	orgUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return pymesTenantSettingsRow{}, false, err
 	}
 	var row pymesTenantSettingsRow
-	err = s.db.WithContext(ctx).Where("org_id = ?", orgUUID).Take(&row).Error
+	err = s.db.WithContext(ctx).Where("tenant_id = ?", tenantUUID).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return pymesTenantSettingsRow{}, false, nil
 	}
@@ -213,5 +213,5 @@ func (s *pymesSaaSStore) findTenantIDByColumn(ctx context.Context, column, value
 	if err != nil {
 		return "", false, err
 	}
-	return row.OrgID.String(), true, nil
+	return row.TenantID.String(), true, nil
 }

@@ -78,7 +78,7 @@ async def evaluate_action(
     review_client: ReviewClient,
     tool_name: str,
     tool_args: dict[str, Any],
-    org_id: str,
+    tenant_id: str,
     context: str = "",
 ) -> ReviewDecision:
     """Evalúa si una acción de tool debe proceder, consultando a Review si es necesario."""
@@ -105,7 +105,7 @@ async def evaluate_action(
         params["days_from_now"] = tool_args["days_from_now"]
     if "duration" in tool_args:
         params["duration"] = tool_args["duration"]
-    params["org_id"] = org_id
+    params["tenant_id"] = tenant_id
     params["tool_name"] = tool_name
 
     reason = f"AI tool {tool_name} solicitado en conversación"

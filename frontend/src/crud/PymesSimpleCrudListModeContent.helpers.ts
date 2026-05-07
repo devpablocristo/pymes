@@ -223,32 +223,39 @@ export function buildTableColumns<T extends { id: string }>(
 ): CrudTableSurfaceColumn<T>[] {
   const tagsEnabled = crudConfig.featureFlags?.tagsColumn !== false;
   const sourceColumns = archived && crudConfig.archivedColumns?.length ? crudConfig.archivedColumns : crudConfig.columns;
+  const seenColumnIds = new Map<string, number>();
   const mappedColumns: CrudTableSurfaceColumn<T>[] = sourceColumns
     .filter((column) => tagsEnabled || column.key !== 'tags')
-    .map((column: CrudColumn<T>) => ({
-      id: column.key,
-      header: column.header,
-      className: column.className,
-      render: (row: T) => {
-        const value = row[column.key];
-        return column.render ? column.render(value, row) : String(value ?? '—');
-      },
-      sortValue: (row: T) => {
-        const raw = row[column.key];
-        if (!column.render) {
+    .map((column: CrudColumn<T>) => {
+      const baseId = String(column.key);
+      const seen = seenColumnIds.get(baseId) ?? 0;
+      seenColumnIds.set(baseId, seen + 1);
+      const columnId = seen === 0 ? baseId : `${baseId}:${seen}`;
+      return {
+        id: columnId,
+        header: column.header,
+        className: column.className,
+        render: (row: T) => {
+          const value = row[column.key];
+          return column.render ? column.render(value, row) : String(value ?? '—');
+        },
+        sortValue: (row: T) => {
+          const raw = row[column.key];
+          if (!column.render) {
+            return toSortablePrimitive(raw);
+          }
+          const rendered = column.render(raw, row);
+          if (typeof rendered === 'string' || typeof rendered === 'number' || typeof rendered === 'boolean') {
+            return rendered;
+          }
+          if (isValidElement(rendered)) {
+            const child = (rendered.props as { children?: unknown } | null)?.children;
+            return toSortablePrimitive(child);
+          }
           return toSortablePrimitive(raw);
-        }
-        const rendered = column.render(raw, row);
-        if (typeof rendered === 'string' || typeof rendered === 'number' || typeof rendered === 'boolean') {
-          return rendered;
-        }
-        if (isValidElement(rendered)) {
-          const child = (rendered.props as { children?: unknown } | null)?.children;
-          return toSortablePrimitive(child);
-        }
-        return toSortablePrimitive(raw);
-      },
-    }));
+        },
+      };
+    });
 
   if (
     tagsEnabled &&

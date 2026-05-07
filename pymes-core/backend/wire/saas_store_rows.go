@@ -6,16 +6,17 @@ import (
 	"github.com/google/uuid"
 )
 
-type pymesOrgRow struct {
+type pymesTenantRow struct {
 	ID         uuid.UUID `gorm:"column:id"`
 	ExternalID *string   `gorm:"column:external_id"`
+	ClerkOrgID *string   `gorm:"column:clerk_org_id"`
 	Name       string    `gorm:"column:name"`
 	Slug       *string   `gorm:"column:slug"`
 	CreatedAt  time.Time `gorm:"column:created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at"`
 }
 
-func (pymesOrgRow) TableName() string { return "orgs" }
+func (pymesTenantRow) TableName() string { return "tenants" }
 
 type pymesUserRow struct {
 	ID         uuid.UUID  `gorm:"column:id"`
@@ -33,21 +34,24 @@ type pymesUserRow struct {
 
 func (pymesUserRow) TableName() string { return "users" }
 
-type pymesOrgMemberRow struct {
+type pymesTenantMembershipRow struct {
 	ID        uuid.UUID    `gorm:"column:id"`
-	OrgID     uuid.UUID    `gorm:"column:org_id"`
+	TenantID  uuid.UUID    `gorm:"column:tenant_id"`
 	UserID    uuid.UUID    `gorm:"column:user_id"`
 	Role      string       `gorm:"column:role"`
+	Status    string       `gorm:"column:status"`
 	PartyID   *uuid.UUID   `gorm:"column:party_id"`
+	RemovedAt *time.Time   `gorm:"column:removed_at"`
 	CreatedAt time.Time    `gorm:"column:created_at"`
+	UpdatedAt time.Time    `gorm:"column:updated_at"`
 	User      pymesUserRow `gorm:"foreignKey:UserID;references:ID"`
 }
 
-func (pymesOrgMemberRow) TableName() string { return "org_members" }
+func (pymesTenantMembershipRow) TableName() string { return "tenant_memberships" }
 
-type pymesAPIKeyRow struct {
+type pymesTenantAPIKeyRow struct {
 	ID         uuid.UUID  `gorm:"column:id"`
-	OrgID      uuid.UUID  `gorm:"column:org_id"`
+	TenantID   uuid.UUID  `gorm:"column:tenant_id"`
 	Name       string     `gorm:"column:name"`
 	APIKeyHash string     `gorm:"column:api_key_hash"`
 	KeyPrefix  string     `gorm:"column:key_prefix"`
@@ -56,18 +60,18 @@ type pymesAPIKeyRow struct {
 	CreatedAt  time.Time  `gorm:"column:created_at"`
 }
 
-func (pymesAPIKeyRow) TableName() string { return "org_api_keys" }
+func (pymesTenantAPIKeyRow) TableName() string { return "tenant_api_keys" }
 
-type pymesAPIKeyScopeRow struct {
+type pymesTenantAPIKeyScopeRow struct {
 	ID       uuid.UUID `gorm:"column:id"`
 	APIKeyID uuid.UUID `gorm:"column:api_key_id"`
 	Scope    string    `gorm:"column:scope"`
 }
 
-func (pymesAPIKeyScopeRow) TableName() string { return "org_api_key_scopes" }
+func (pymesTenantAPIKeyScopeRow) TableName() string { return "tenant_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
-	OrgID                 uuid.UUID  `gorm:"column:org_id"`
+	TenantID              uuid.UUID  `gorm:"column:tenant_id"`
 	PlanCode              string     `gorm:"column:plan_code"`
 	HardLimits            []byte     `gorm:"column:hard_limits"`
 	HardLimitsJSON        []byte     `gorm:"column:hard_limits_json"`
@@ -92,4 +96,25 @@ type pymesUsageCounterRow struct {
 	Period      string `gorm:"column:period"`
 }
 
-func (pymesUsageCounterRow) TableName() string { return "org_usage_counters" }
+func (pymesUsageCounterRow) TableName() string { return "tenant_usage_counters" }
+
+type pymesTenantInvitationRow struct {
+	ID                uuid.UUID    `gorm:"column:id"`
+	TenantID          uuid.UUID    `gorm:"column:tenant_id"`
+	EmailNormalized   string       `gorm:"column:email_normalized"`
+	Role              string       `gorm:"column:role"`
+	Status            string       `gorm:"column:status"`
+	TokenHash         string       `gorm:"column:token_hash"`
+	ClerkInvitationID *string      `gorm:"column:clerk_invitation_id"`
+	InvitedByUserID   uuid.UUID    `gorm:"column:invited_by_user_id"`
+	AcceptedByUserID  *uuid.UUID   `gorm:"column:accepted_by_user_id"`
+	ExpiresAt         time.Time    `gorm:"column:expires_at"`
+	AcceptedAt        *time.Time   `gorm:"column:accepted_at"`
+	RevokedAt         *time.Time   `gorm:"column:revoked_at"`
+	CreatedAt         time.Time    `gorm:"column:created_at"`
+	UpdatedAt         time.Time    `gorm:"column:updated_at"`
+	InvitedByUser     pymesUserRow `gorm:"foreignKey:InvitedByUserID;references:ID"`
+	AcceptedByUser    pymesUserRow `gorm:"foreignKey:AcceptedByUserID;references:ID"`
+}
+
+func (pymesTenantInvitationRow) TableName() string { return "tenant_invitations" }

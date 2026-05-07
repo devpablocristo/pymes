@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/devpablocristo/core/governance/go/governanceclient"
-	reviewdto "github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
+	governancedto "github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/inappnotifications"
 )
 
@@ -16,8 +16,8 @@ type pendingApprovalSourceClient interface {
 }
 
 type pendingApprovalListPayload struct {
-	Data      []reviewdto.ApprovalResponse `json:"data"`
-	Approvals []reviewdto.ApprovalResponse `json:"approvals"`
+	Data      []governancedto.ApprovalResponse `json:"data"`
+	Approvals []governancedto.ApprovalResponse `json:"approvals"`
 }
 
 type PendingApprovalSource struct {
@@ -34,12 +34,12 @@ func (s *PendingApprovalSource) ListPendingApprovals(ctx context.Context) ([]ina
 		return nil, err
 	}
 	if status != http.StatusOK {
-		return nil, fmt.Errorf("review pending approvals: status %d body %s", status, governanceclient.ParseErrorBody(data))
+		return nil, fmt.Errorf("governance pending approvals: status %d body %s", status, governanceclient.ParseErrorBody(data))
 	}
 
 	var payload pendingApprovalListPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		return nil, fmt.Errorf("decode review approvals: %w", err)
+		return nil, fmt.Errorf("decode governance approvals: %w", err)
 	}
 	approvals := payload.Data
 	if len(approvals) == 0 && len(payload.Approvals) > 0 {
@@ -50,7 +50,7 @@ func (s *PendingApprovalSource) ListPendingApprovals(ctx context.Context) ([]ina
 	for _, approval := range approvals {
 		out = append(out, inappnotifications.PendingApproval{
 			ID:             approval.ID,
-			OrgID:          approval.OrgID,
+			TenantID:       approval.TenantID,
 			RequestID:      approval.RequestID,
 			ActionType:     approval.ActionType,
 			TargetResource: approval.TargetResource,

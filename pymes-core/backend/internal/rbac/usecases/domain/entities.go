@@ -13,7 +13,7 @@ type Permission struct {
 
 type Role struct {
 	ID          uuid.UUID    `json:"id"`
-	OrgID       uuid.UUID    `json:"org_id"`
+	TenantID    uuid.UUID    `json:"tenant_id"`
 	Name        string       `json:"name"`
 	Description string       `json:"description"`
 	IsSystem    bool         `json:"is_system"`
@@ -24,7 +24,7 @@ type Role struct {
 
 type UserRole struct {
 	UserID     uuid.UUID `json:"user_id"`
-	OrgID      uuid.UUID `json:"org_id"`
+	TenantID   uuid.UUID `json:"tenant_id"`
 	RoleID     uuid.UUID `json:"role_id"`
 	AssignedBy string    `json:"assigned_by"`
 	AssignedAt time.Time `json:"assigned_at"`

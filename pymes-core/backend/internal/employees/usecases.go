@@ -18,17 +18,17 @@ import (
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]empdomain.Employee, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]empdomain.Employee, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (empdomain.Employee, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]empdomain.Employee, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (empdomain.Employee, error)
 	Create(ctx context.Context, in empdomain.Employee) (empdomain.Employee, error)
 	Update(ctx context.Context, in empdomain.Employee) (empdomain.Employee, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -44,12 +44,12 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]empdomain.Employee
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]empdomain.Employee, error) {
-	return u.repo.ListArchived(ctx, orgID, limit)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]empdomain.Employee, error) {
+	return u.repo.ListArchived(ctx, tenantID, limit)
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (empdomain.Employee, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (empdomain.Employee, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return empdomain.Employee{}, domainerr.NotFoundf("employee", id.String())
@@ -60,7 +60,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (empdomain.
 }
 
 type CreateInput struct {
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	FirstName  string
 	LastName   string
 	Email      string
@@ -93,7 +93,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 		return empdomain.Employee{}, fmt.Errorf("invalid end_date: %w", httperrors.ErrBadInput)
 	}
 	out, err := u.repo.Create(ctx, empdomain.Employee{
-		OrgID:      in.OrgID,
+		TenantID:   in.TenantID,
 		FirstName:  in.FirstName,
 		LastName:   in.LastName,
 		Email:      in.Email,
@@ -112,7 +112,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 		return empdomain.Employee{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "employee.created", "employee", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "employee.created", "employee", out.ID.String(), map[string]any{
 			"name": strings.TrimSpace(out.FirstName + " " + out.LastName),
 		})
 	}
@@ -120,7 +120,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (empdomain.Employ
 }
 
 type UpdateInput struct {
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	ID         uuid.UUID
 	FirstName  *string
 	LastName   *string
@@ -138,7 +138,7 @@ type UpdateInput struct {
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateInput) (empdomain.Employee, error) {
-	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return empdomain.Employee{}, domainerr.NotFoundf("employee", in.ID.String())
@@ -204,46 +204,46 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput) (empdomain.Employ
 		return empdomain.Employee{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "employee.updated", "employee", out.ID.String(), nil)
+		u.audit.Log(ctx, in.TenantID.String(), in.Actor, "employee.updated", "employee", out.ID.String(), nil)
 	}
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("employee", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "employee.archived", "employee", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "employee.archived", "employee", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("employee", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "employee.restored", "employee", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "employee.restored", "employee", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("employee", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "employee.hard_deleted", "employee", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "employee.hard_deleted", "employee", id.String(), nil)
 	}
 	return nil
 }

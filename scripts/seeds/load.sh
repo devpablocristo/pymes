@@ -29,4 +29,4 @@ do
   run_pymes_sql_file "$sql_file"
 done
 
-run_review_sql_file "scripts/seeds/review_demo.sql"
+run_governance_sql_file "scripts/seeds/governance_demo.sql"

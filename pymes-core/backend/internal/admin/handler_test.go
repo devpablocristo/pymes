@@ -102,7 +102,7 @@ func performTenantSettingsUpdate(t *testing.T, uc usecasesPort, body string) *ht
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set(ctxkeys.CtxKeyOrgID, "00000000-0000-0000-0000-000000000001")
+		c.Set(ctxkeys.CtxKeyTenantID, "00000000-0000-0000-0000-000000000001")
 		c.Set(ctxkeys.CtxKeyActor, "owner@example.com")
 		c.Set(ctxkeys.CtxKeyRole, "owner")
 		c.Set(ctxkeys.CtxKeyScopes, []string{"admin:console:write"})
@@ -122,33 +122,33 @@ func performTenantSettingsUpdate(t *testing.T, uc usecasesPort, body string) *ht
 
 func baseTenantSettings() admindomain.TenantSettings {
 	return admindomain.TenantSettings{
-		OrgID:                    uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		PlanCode:                 "starter",
-		HardLimits:               map[string]any{},
-		BillingStatus:            "trialing",
-		Currency:                 "ARS",
-		SupportedCurrencies:      []string{"ARS"},
-		TaxRate:                  21,
-		QuotePrefix:              "PRE",
-		SalePrefix:               "VTA",
-		NextQuoteNumber:          1,
-		NextSaleNumber:           1,
-		AllowNegativeStock:       true,
-		PurchasePrefix:           "COM",
-		NextPurchaseNumber:       1,
-		ReturnPrefix:             "DEV",
-		CreditNotePrefix:         "NC",
-		NextReturnNumber:         1,
-		NextCreditNoteNumber:     1,
-		BusinessName:             "Taller Norte",
-		ClientLabel:              "clientes",
-		UsesBilling:              true,
-		PaymentMethod:            "mixed",
-		Vertical:                 "workshops",
-		SchedulingEnabled:        false,
+		TenantID:                uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		PlanCode:                "starter",
+		HardLimits:              map[string]any{},
+		BillingStatus:           "trialing",
+		Currency:                "ARS",
+		SupportedCurrencies:     []string{"ARS"},
+		TaxRate:                 21,
+		QuotePrefix:             "PRE",
+		SalePrefix:              "VTA",
+		NextQuoteNumber:         1,
+		NextSaleNumber:          1,
+		AllowNegativeStock:      true,
+		PurchasePrefix:          "COM",
+		NextPurchaseNumber:      1,
+		ReturnPrefix:            "DEV",
+		CreditNotePrefix:        "NC",
+		NextReturnNumber:        1,
+		NextCreditNoteNumber:    1,
+		BusinessName:            "Taller Norte",
+		ClientLabel:             "clientes",
+		UsesBilling:             true,
+		PaymentMethod:           "mixed",
+		Vertical:                "workshops",
+		SchedulingEnabled:       false,
 		SchedulingLabel:         "Turno",
 		SchedulingReminderHours: 24,
-		DefaultRateType:          "blue",
-		UpdatedAt:                time.Date(2026, 4, 3, 12, 0, 0, 0, time.UTC),
+		DefaultRateType:         "blue",
+		UpdatedAt:               time.Date(2026, 4, 3, 12, 0, 0, 0, time.UTC),
 	}
 }

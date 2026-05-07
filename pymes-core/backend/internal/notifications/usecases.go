@@ -20,7 +20,7 @@ type EmailSender interface {
 
 type RepositoryPort interface {
 	GetUserByExternalID(externalID string) (uuid.UUID, string, bool)
-	ListMembers(orgID uuid.UUID) []Member
+	ListMembers(tenantID uuid.UUID) []Member
 	GetPreferences(userID uuid.UUID) []domain.Preference
 	IsNotificationEnabled(userID uuid.UUID, notifType, channel string) bool
 	UpsertPreference(userID uuid.UUID, notifType, channel string, enabled bool) domain.Preference
@@ -95,14 +95,14 @@ func (u *Usecases) UpdatePreferenceByActor(ctx context.Context, actor, notifType
 	return u.repo.UpsertPreference(userID, strings.TrimSpace(notifType), strings.TrimSpace(channel), enabled), nil
 }
 
-func (u *Usecases) Notify(ctx context.Context, orgID uuid.UUID, notifType string, data map[string]string) error {
-	members := u.repo.ListMembers(orgID)
+func (u *Usecases) Notify(ctx context.Context, tenantID uuid.UUID, notifType string, data map[string]string) error {
+	members := u.repo.ListMembers(tenantID)
 	for _, m := range members {
 		if !authz.IsPrivilegedRole(m.Role) {
 			continue
 		}
-		if err := u.sendToUser(ctx, orgID, m.UserID, m.Email, notifType, data); err != nil {
-			u.logger.Error().Err(err).Str("org_id", orgID.String()).Str("notif_type", notifType).Msg("notify admin failed")
+		if err := u.sendToUser(ctx, tenantID, m.UserID, m.Email, notifType, data); err != nil {
+			u.logger.Error().Err(err).Str("tenant_id", tenantID.String()).Str("notif_type", notifType).Msg("notify admin failed")
 		}
 	}
 	return nil
@@ -116,7 +116,7 @@ func (u *Usecases) NotifyUser(ctx context.Context, userExternalID string, notifT
 	return u.sendToUser(ctx, uuid.Nil, userID, email, notifType, data)
 }
 
-func (u *Usecases) sendToUser(ctx context.Context, orgID uuid.UUID, userID uuid.UUID, email, notifType string, data map[string]string) error {
+func (u *Usecases) sendToUser(ctx context.Context, tenantID uuid.UUID, userID uuid.UUID, email, notifType string, data map[string]string) error {
 	if !u.repo.IsNotificationEnabled(userID, notifType, "email") {
 		return nil
 	}
@@ -134,7 +134,7 @@ func (u *Usecases) sendToUser(ctx context.Context, orgID uuid.UUID, userID uuid.
 
 	u.repo.CreateLog(domain.Log{
 		ID:               uuid.New(),
-		OrgID:            orgID,
+		TenantID:         tenantID,
 		UserID:           userID,
 		NotificationType: notifType,
 		Channel:          "email",

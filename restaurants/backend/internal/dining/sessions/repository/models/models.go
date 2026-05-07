@@ -8,7 +8,7 @@ import (
 
 type TableSessionModel struct {
 	ID         uuid.UUID  `gorm:"column:id;type:uuid;primaryKey"`
-	OrgID      uuid.UUID  `gorm:"column:org_id;type:uuid;not null;index"`
+	TenantID   uuid.UUID  `gorm:"column:tenant_id;type:uuid;not null;index"`
 	TableID    uuid.UUID  `gorm:"column:table_id;type:uuid;not null;index"`
 	GuestCount int        `gorm:"column:guest_count;not null;default:1"`
 	PartyLabel string     `gorm:"column:party_label;not null;default:''"`

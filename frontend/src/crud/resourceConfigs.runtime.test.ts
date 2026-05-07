@@ -117,4 +117,21 @@ describe('resourceConfigs.runtime', () => {
       tagsColumn: false,
     });
   });
+
+  it('habilita archivar por defecto cuando el recurso soporta archivados', () => {
+    const map: CrudResourceConfigMap = {
+      demo: {
+        ...buildBaseConfig(),
+        supportsArchived: true,
+      },
+    };
+
+    const config = getCrudPageConfigFromMap(map, 'demo');
+    expect(config).not.toBeNull();
+    if (!config) return;
+
+    expect(config.allowDelete).toBe(true);
+    expect(config.allowRestore).toBe(true);
+    expect(config.allowHardDelete).toBe(true);
+  });
 });

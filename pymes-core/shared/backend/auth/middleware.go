@@ -9,13 +9,20 @@ import (
 
 	authn "github.com/devpablocristo/core/authn/go"
 	ginmw "github.com/devpablocristo/core/http/gin/go"
+	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 )
 
 // AuthMiddleware re-exporta el tipo de core.
 type AuthMiddleware = ginmw.AuthMiddleware
 
-// AuthContext re-exporta el tipo de core.
-type AuthContext = ginmw.AuthContext
+// AuthContext es el contexto de autenticacion de Pymes.
+type AuthContext struct {
+	TenantID   string
+	Actor      string
+	Role       string
+	Scopes     []string
+	AuthMethod string
+}
 
 // APIKeyResolver resuelve API keys por hash.
 // Los verticales implementan esto vía verticalwire.NewAPIKeyResolver.
@@ -25,9 +32,9 @@ type APIKeyResolver interface {
 
 // ResolvedKey identidad resuelta desde una API key.
 type ResolvedKey struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Scopes []string
+	ID       uuid.UUID
+	TenantID uuid.UUID
+	Scopes   []string
 }
 
 // jwtAdapter adapta IdentityResolver a authn.Authenticator.
@@ -45,7 +52,7 @@ func (a *jwtAdapter) Authenticate(ctx context.Context, cred authn.Credential) (*
 		return nil, err
 	}
 	return &authn.Principal{
-		OrgID:      p.OrgID,
+		OrgID:      p.TenantID,
 		Actor:      p.Actor,
 		Role:       p.Role,
 		Scopes:     p.Scopes,
@@ -68,7 +75,7 @@ func (a *apiKeyAdapter) Authenticate(ctx context.Context, cred authn.Credential)
 		return nil, fmt.Errorf("authn: invalid api key")
 	}
 	return &authn.Principal{
-		OrgID:      key.OrgID.String(),
+		OrgID:      key.TenantID.String(),
 		Actor:      "api_key:" + key.ID.String(),
 		Role:       "service",
 		Scopes:     key.Scopes,
@@ -91,15 +98,30 @@ func NewAuthMiddleware(identity *IdentityResolver, keyResolver APIKeyResolver, a
 
 // GetAuthContext extrae el contexto de autenticación. Delega a core.
 func GetAuthContext(c *gin.Context) AuthContext {
-	return ginmw.GetAuthContext(c)
+	raw := ginmw.GetAuthContext(c)
+	tenantID := raw.OrgID
+	if tenantID == "" {
+		if v, ok := c.Get(ctxkeys.CtxKeyTenantID); ok {
+			if s, ok := v.(string); ok {
+				tenantID = s
+			}
+		}
+	}
+	return AuthContext{
+		TenantID:   tenantID,
+		Actor:      raw.Actor,
+		Role:       raw.Role,
+		Scopes:     raw.Scopes,
+		AuthMethod: raw.AuthMethod,
+	}
 }
 
-// ParseAuthOrgID extrae y parsea el org_id del auth context.
-func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
+// ParseAuthTenantID extrae y parsea el tenant_id del auth context.
+func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
 	auth := GetAuthContext(c)
-	orgID, err := uuid.Parse(auth.OrgID)
+	tenantID, err := uuid.Parse(auth.TenantID)
 	if err != nil {
 		return uuid.Nil, false
 	}
-	return orgID, true
+	return tenantID, true
 }

@@ -7,7 +7,7 @@ DECLARE
     v_org uuid := '__SEED_ORG_ID__';
     v_user uuid;
 BEGIN
-    INSERT INTO orgs (id, external_id, name, slug, created_at, updated_at)
+    INSERT INTO tenants (id, external_id, name, slug, created_at, updated_at)
     VALUES (
         v_org,
         '__SEED_ORG_EXTERNAL_ID__',
@@ -57,16 +57,16 @@ BEGIN
          WHERE id = v_user;
     END IF;
 
-    INSERT INTO org_members (org_id, user_id, role, created_at)
+    INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at)
     VALUES (v_org, v_user, 'admin', now())
-    ON CONFLICT (org_id, user_id) DO UPDATE
+    ON CONFLICT (tenant_id, user_id) DO UPDATE
         SET role = EXCLUDED.role;
 
-    INSERT INTO tenant_settings (org_id, plan_code)
+    INSERT INTO tenant_settings (tenant_id, plan_code)
     VALUES (v_org, 'starter')
-    ON CONFLICT (org_id) DO NOTHING;
+    ON CONFLICT (tenant_id) DO NOTHING;
 
-    INSERT INTO org_api_keys (id, org_id, name, api_key_hash, key_prefix, created_by)
+    INSERT INTO tenant_api_keys (id, tenant_id, name, api_key_hash, key_prefix, created_by)
     VALUES (
         '00000000-0000-0000-0000-000000000004',
         v_org,
@@ -76,11 +76,11 @@ BEGIN
         'seed'
     )
     ON CONFLICT (api_key_hash) DO UPDATE SET
-        org_id = EXCLUDED.org_id,
+        tenant_id = EXCLUDED.tenant_id,
         name = EXCLUDED.name,
         key_prefix = EXCLUDED.key_prefix;
 
-    INSERT INTO org_api_key_scopes (id, api_key_id, scope) VALUES
+    INSERT INTO tenant_api_key_scopes (id, api_key_id, scope) VALUES
         (gen_random_uuid(), '00000000-0000-0000-0000-000000000004', 'admin:console:read'),
         (gen_random_uuid(), '00000000-0000-0000-0000-000000000004', 'admin:console:write')
     ON CONFLICT (api_key_id, scope) DO NOTHING;

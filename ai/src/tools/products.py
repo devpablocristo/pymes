@@ -17,12 +17,12 @@ async def get_product(client: BackendClient, auth: AuthContext, product_id: str)
     return await client.request("GET", f"/v1/products/{product_id}", auth=auth)
 
 
-async def get_public_services(client: BackendClient, org_id: str, limit: int = 20) -> dict:
+async def get_public_services(client: BackendClient, tenant_id: str, limit: int = 20) -> dict:
     # Usa el catálogo rico de pymes-core y adapta el shape a lo que esperan
     # los agentes (id, name, price, currency, unit).
     raw = await client.request(
         "GET",
-        f"/v1/public/{org_id}/catalog/services",
+        f"/v1/public/{tenant_id}/catalog/services",
         include_internal=True,
         params={"limit": max(1, min(limit, 100))},
     )

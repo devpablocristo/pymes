@@ -10,7 +10,7 @@ import (
 
 type QuoteModel struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID        uuid.UUID  `gorm:"type:uuid;index;not null"`
+	TenantID     uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID     *uuid.UUID `gorm:"type:uuid;index"`
 	Number       string     `gorm:"not null"`
 	CustomerID   *uuid.UUID `gorm:"column:party_id;type:uuid"`
@@ -28,7 +28,7 @@ type QuoteModel struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	ArchivedAt   *time.Time
-	Metadata     []byte         `gorm:"type:jsonb;not null;default:'{}'"`
+	Metadata     []byte `gorm:"type:jsonb;not null;default:'{}'"`
 }
 
 func (QuoteModel) TableName() string { return "quotes" }

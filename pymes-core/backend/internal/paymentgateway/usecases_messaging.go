@@ -12,14 +12,14 @@ import (
 
 func (u *Usecases) BuildSalePaymentInfoWhatsApp(
 	ctx context.Context,
-	orgID uuid.UUID,
+	tenantID uuid.UUID,
 	saleID uuid.UUID,
 ) (WhatsAppResult, error) {
-	sale, err := u.repo.GetSaleSnapshot(ctx, orgID, saleID)
+	sale, err := u.repo.GetSaleSnapshot(ctx, tenantID, saleID)
 	if err != nil {
 		return WhatsAppResult{}, err
 	}
-	bankInfo, ok, err := u.repo.GetBankInfo(ctx, orgID)
+	bankInfo, ok, err := u.repo.GetBankInfo(ctx, tenantID)
 	if err != nil {
 		return WhatsAppResult{}, err
 	}
@@ -27,7 +27,7 @@ func (u *Usecases) BuildSalePaymentInfoWhatsApp(
 		return WhatsAppResult{}, ErrBankAliasMissing
 	}
 
-	tpl := u.repo.GetWhatsAppTransferTemplate(ctx, orgID)
+	tpl := u.repo.GetWhatsAppTransferTemplate(ctx, tenantID)
 	msg := renderTemplate(tpl, map[string]string{
 		"bank_alias":    bankInfo.Alias,
 		"bank_cbu":      bankInfo.CBU,
@@ -46,15 +46,15 @@ func (u *Usecases) BuildSalePaymentInfoWhatsApp(
 
 func (u *Usecases) BuildSalePaymentLinkWhatsApp(
 	ctx context.Context,
-	orgID uuid.UUID,
+	tenantID uuid.UUID,
 	saleID uuid.UUID,
 ) (gatewaydomain.PaymentPreference, WhatsAppResult, error) {
-	sale, err := u.repo.GetSaleSnapshot(ctx, orgID, saleID)
+	sale, err := u.repo.GetSaleSnapshot(ctx, tenantID, saleID)
 	if err != nil {
 		return gatewaydomain.PaymentPreference{}, WhatsAppResult{}, err
 	}
 
-	pref, err := u.GetOrCreatePreference(ctx, orgID, CreatePreferenceRequest{
+	pref, err := u.GetOrCreatePreference(ctx, tenantID, CreatePreferenceRequest{
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 	})
@@ -62,7 +62,7 @@ func (u *Usecases) BuildSalePaymentLinkWhatsApp(
 		return gatewaydomain.PaymentPreference{}, WhatsAppResult{}, err
 	}
 
-	tpl := u.repo.GetWhatsAppLinkTemplate(ctx, orgID)
+	tpl := u.repo.GetWhatsAppLinkTemplate(ctx, tenantID)
 	msg := renderTemplate(tpl, map[string]string{
 		"customer_name": sale.CustomerName,
 		"number":        sale.Number,
@@ -76,11 +76,11 @@ func (u *Usecases) BuildSalePaymentLinkWhatsApp(
 	}, nil
 }
 
-func (u *Usecases) GenerateStaticQR(ctx context.Context, orgID uuid.UUID, size int) ([]byte, error) {
+func (u *Usecases) GenerateStaticQR(ctx context.Context, tenantID uuid.UUID, size int) ([]byte, error) {
 	if size <= 0 {
 		size = 512
 	}
-	bankInfo, _, err := u.repo.GetBankInfo(ctx, orgID)
+	bankInfo, _, err := u.repo.GetBankInfo(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}

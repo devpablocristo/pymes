@@ -30,12 +30,13 @@ export const queryKeys = {
   me: {
     current: ['me', 'current'] as const,
   },
-  review: {
-    policies: ['review', 'policies'] as const,
-    watchers: ['review', 'watchers'] as const,
+  governance: {
+    policies: ['governance', 'policies'] as const,
+    watchers: ['governance', 'watchers'] as const,
   },
   rbac: {
-    members: (orgId: string) => ['rbac', 'members', orgId] as const,
+    members: (tenantId: string) => ['rbac', 'members', tenantId] as const,
+    invites: (tenantId: string) => ['rbac', 'invites', tenantId] as const,
     roles: ['rbac', 'roles'] as const,
     permissions: (userId: string) => ['rbac', 'permissions', userId] as const,
   },

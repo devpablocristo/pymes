@@ -9,14 +9,14 @@ import (
 	schedulingpublic "github.com/devpablocristo/modules/scheduling/go/publicapi"
 )
 
-func (r *Repository) ListPublicQueues(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]schedulingpublic.QueueSummary, error) {
+func (r *Repository) ListPublicQueues(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]schedulingpublic.QueueSummary, error) {
 	if r.scheduling == nil {
 		return nil, nil
 	}
-	return r.scheduling.ListQueues(ctx, orgID, branchID)
+	return r.scheduling.ListQueues(ctx, tenantID, branchID)
 }
 
-func (r *Repository) CreatePublicQueueTicket(ctx context.Context, orgID, queueID uuid.UUID, payload map[string]any) (schedulingpublic.QueueTicket, schedulingpublic.QueuePosition, error) {
+func (r *Repository) CreatePublicQueueTicket(ctx context.Context, tenantID, queueID uuid.UUID, payload map[string]any) (schedulingpublic.QueueTicket, schedulingpublic.QueuePosition, error) {
 	if r.scheduling == nil {
 		return schedulingpublic.QueueTicket{}, schedulingpublic.QueuePosition{}, ErrInvalidInput
 	}
@@ -24,7 +24,7 @@ func (r *Repository) CreatePublicQueueTicket(ctx context.Context, orgID, queueID
 	if err != nil {
 		return schedulingpublic.QueueTicket{}, schedulingpublic.QueuePosition{}, ErrInvalidInput
 	}
-	item, err := r.scheduling.IssueQueueTicket(ctx, orgID, "public-api", schedulingdomain.CreateQueueTicketInput{
+	item, err := r.scheduling.IssueQueueTicket(ctx, tenantID, "public-api", schedulingdomain.CreateQueueTicketInput{
 		QueueID:        queueID,
 		PartyID:        partyID,
 		CustomerName:   firstStringFromPayload(payload, "customer_name", "party_name"),
@@ -39,25 +39,25 @@ func (r *Repository) CreatePublicQueueTicket(ctx context.Context, orgID, queueID
 	if err != nil {
 		return schedulingpublic.QueueTicket{}, schedulingpublic.QueuePosition{}, mapSchedulingErr(err)
 	}
-	position, err := r.scheduling.GetQueueTicketPosition(ctx, orgID, queueID, item.ID)
+	position, err := r.scheduling.GetQueueTicketPosition(ctx, tenantID, queueID, item.ID)
 	if err != nil {
 		return schedulingpublic.QueueTicket{}, schedulingpublic.QueuePosition{}, mapSchedulingErr(err)
 	}
 	return item, position, nil
 }
 
-func (r *Repository) GetPublicQueueTicketPosition(ctx context.Context, orgID, queueID, ticketID uuid.UUID) (schedulingpublic.QueuePosition, error) {
+func (r *Repository) GetPublicQueueTicketPosition(ctx context.Context, tenantID, queueID, ticketID uuid.UUID) (schedulingpublic.QueuePosition, error) {
 	if r.scheduling == nil {
 		return schedulingpublic.QueuePosition{}, ErrInvalidInput
 	}
-	position, err := r.scheduling.GetQueueTicketPosition(ctx, orgID, queueID, ticketID)
+	position, err := r.scheduling.GetQueueTicketPosition(ctx, tenantID, queueID, ticketID)
 	if err != nil {
 		return schedulingpublic.QueuePosition{}, mapSchedulingErr(err)
 	}
 	return position, nil
 }
 
-func (r *Repository) JoinWaitlist(ctx context.Context, orgID uuid.UUID, payload map[string]any) (schedulingpublic.WaitlistEntry, error) {
+func (r *Repository) JoinWaitlist(ctx context.Context, tenantID uuid.UUID, payload map[string]any) (schedulingpublic.WaitlistEntry, error) {
 	if r.scheduling == nil {
 		return schedulingpublic.WaitlistEntry{}, ErrInvalidInput
 	}
@@ -81,7 +81,7 @@ func (r *Repository) JoinWaitlist(ctx context.Context, orgID uuid.UUID, payload 
 	if err != nil {
 		return schedulingpublic.WaitlistEntry{}, ErrInvalidInput
 	}
-	item, err := r.scheduling.JoinWaitlist(ctx, orgID, "public-api", schedulingdomain.CreateWaitlistInput{
+	item, err := r.scheduling.JoinWaitlist(ctx, tenantID, "public-api", schedulingdomain.CreateWaitlistInput{
 		BranchID:         branchID,
 		ServiceID:        serviceID,
 		ResourceID:       resourceID,

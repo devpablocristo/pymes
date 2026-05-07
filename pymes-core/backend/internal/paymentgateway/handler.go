@@ -19,19 +19,19 @@ import (
 )
 
 type gatewayUsecases interface {
-	GetConnectionStatus(ctx context.Context, orgID uuid.UUID) (gatewaydomain.ConnectionStatus, error)
-	InitOAuth(ctx context.Context, orgID uuid.UUID) (string, error)
+	GetConnectionStatus(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.ConnectionStatus, error)
+	InitOAuth(ctx context.Context, tenantID uuid.UUID) (string, error)
 	HandleOAuthCallback(ctx context.Context, state, code string) (uuid.UUID, error)
-	Disconnect(ctx context.Context, orgID uuid.UUID) error
+	Disconnect(ctx context.Context, tenantID uuid.UUID) error
 
-	CreatePreference(ctx context.Context, orgID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
-	GetPreference(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
-	GetOrCreatePreference(ctx context.Context, orgID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
+	CreatePreference(ctx context.Context, tenantID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
+	GetPreference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error)
+	GetOrCreatePreference(ctx context.Context, tenantID uuid.UUID, req CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
 	GetPublicQuotePaymentLink(ctx context.Context, orgRef string, quoteID uuid.UUID) (gatewaydomain.PaymentPreference, error)
 
-	GenerateStaticQR(ctx context.Context, orgID uuid.UUID, size int) ([]byte, error)
-	BuildSalePaymentInfoWhatsApp(ctx context.Context, orgID uuid.UUID, saleID uuid.UUID) (WhatsAppResult, error)
-	BuildSalePaymentLinkWhatsApp(ctx context.Context, orgID uuid.UUID, saleID uuid.UUID) (gatewaydomain.PaymentPreference, WhatsAppResult, error)
+	GenerateStaticQR(ctx context.Context, tenantID uuid.UUID, size int) ([]byte, error)
+	BuildSalePaymentInfoWhatsApp(ctx context.Context, tenantID uuid.UUID, saleID uuid.UUID) (WhatsAppResult, error)
+	BuildSalePaymentLinkWhatsApp(ctx context.Context, tenantID uuid.UUID, saleID uuid.UUID) (gatewaydomain.PaymentPreference, WhatsAppResult, error)
 
 	ProcessWebhook(ctx context.Context, provider string, headers http.Header, body []byte) error
 }
@@ -76,11 +76,11 @@ func (h *Handler) RegisterExternalRoutes(public *gin.RouterGroup) {
 }
 
 func (h *Handler) Connect(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	redirectURL, err := h.uc.InitOAuth(c.Request.Context(), orgID)
+	redirectURL, err := h.uc.InitOAuth(c.Request.Context(), tenantID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -92,23 +92,23 @@ func (h *Handler) Callback(c *gin.Context) {
 	code := strings.TrimSpace(c.Query("code"))
 	state := strings.TrimSpace(c.Query("state"))
 
-	orgID, err := h.uc.HandleOAuthCallback(c.Request.Context(), state, code)
+	tenantID, err := h.uc.HandleOAuthCallback(c.Request.Context(), state, code)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"ok":     true,
-		"org_id": orgID.String(),
+		"ok":        true,
+		"tenant_id": tenantID.String(),
 	})
 }
 
 func (h *Handler) Status(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	status, err := h.uc.GetConnectionStatus(c.Request.Context(), orgID)
+	status, err := h.uc.GetConnectionStatus(c.Request.Context(), tenantID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -131,11 +131,11 @@ func (h *Handler) Status(c *gin.Context) {
 }
 
 func (h *Handler) Disconnect(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Disconnect(c.Request.Context(), orgID); err != nil {
+	if err := h.uc.Disconnect(c.Request.Context(), tenantID); err != nil {
 		handleGatewayError(c, err)
 		return
 	}
@@ -143,11 +143,11 @@ func (h *Handler) Disconnect(c *gin.Context) {
 }
 
 func (h *Handler) GetStaticQR(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	png, err := h.uc.GenerateStaticQR(c.Request.Context(), orgID, 512)
+	png, err := h.uc.GenerateStaticQR(c.Request.Context(), tenantID, 512)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -156,11 +156,11 @@ func (h *Handler) GetStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) DownloadStaticQR(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
-	png, err := h.uc.GenerateStaticQR(c.Request.Context(), orgID, 1024)
+	png, err := h.uc.GenerateStaticQR(c.Request.Context(), tenantID, 1024)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -170,7 +170,7 @@ func (h *Handler) DownloadStaticQR(c *gin.Context) {
 }
 
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -180,7 +180,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 		return
 	}
 
-	pref, err := h.uc.CreatePreference(c.Request.Context(), orgID, CreatePreferenceRequest{
+	pref, err := h.uc.CreatePreference(c.Request.Context(), tenantID, CreatePreferenceRequest{
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 	})
@@ -192,7 +192,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -202,7 +202,7 @@ func (h *Handler) GetSalePaymentLink(c *gin.Context) {
 		return
 	}
 
-	pref, err := h.uc.GetPreference(c.Request.Context(), orgID, "sale", saleID)
+	pref, err := h.uc.GetPreference(c.Request.Context(), tenantID, "sale", saleID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -211,7 +211,7 @@ func (h *Handler) GetSalePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -221,7 +221,7 @@ func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
 		return
 	}
 
-	pref, err := h.uc.CreatePreference(c.Request.Context(), orgID, CreatePreferenceRequest{
+	pref, err := h.uc.CreatePreference(c.Request.Context(), tenantID, CreatePreferenceRequest{
 		ReferenceType: "quote",
 		ReferenceID:   quoteID,
 	})
@@ -233,7 +233,7 @@ func (h *Handler) CreateQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -243,7 +243,7 @@ func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
 		return
 	}
 
-	pref, err := h.uc.GetPreference(c.Request.Context(), orgID, "quote", quoteID)
+	pref, err := h.uc.GetPreference(c.Request.Context(), tenantID, "quote", quoteID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -252,7 +252,7 @@ func (h *Handler) GetQuotePaymentLink(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -262,7 +262,7 @@ func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
 		return
 	}
 
-	wa, err := h.uc.BuildSalePaymentInfoWhatsApp(c.Request.Context(), orgID, saleID)
+	wa, err := h.uc.BuildSalePaymentInfoWhatsApp(c.Request.Context(), tenantID, saleID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -271,7 +271,7 @@ func (h *Handler) GetSalePaymentInfoWhatsApp(c *gin.Context) {
 }
 
 func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
-	orgID, ok := parseAuthOrgID(c)
+	tenantID, ok := parseAuthOrgID(c)
 	if !ok {
 		return
 	}
@@ -281,7 +281,7 @@ func (h *Handler) GetSalePaymentLinkWhatsApp(c *gin.Context) {
 		return
 	}
 
-	pref, wa, err := h.uc.BuildSalePaymentLinkWhatsApp(c.Request.Context(), orgID, saleID)
+	pref, wa, err := h.uc.BuildSalePaymentLinkWhatsApp(c.Request.Context(), tenantID, saleID)
 	if err != nil {
 		handleGatewayError(c, err)
 		return
@@ -298,7 +298,7 @@ func (h *Handler) GetPublicQuotePaymentLink(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid quote id")
 		return
 	}
-	orgRef := strings.TrimSpace(c.Param("org_id"))
+	orgRef := strings.TrimSpace(c.Param("tenant_id"))
 	pref, err := h.uc.GetPublicQuotePaymentLink(c.Request.Context(), orgRef, quoteID)
 	if err != nil {
 		handleGatewayError(c, err)
@@ -325,7 +325,7 @@ func (h *Handler) MercadoPagoWebhook(c *gin.Context) {
 }
 
 func parseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+	return handlers.ParseAuthTenantID(c)
 }
 
 func toPaymentLinkResponse(in gatewaydomain.PaymentPreference) dto.PaymentLinkResponse {

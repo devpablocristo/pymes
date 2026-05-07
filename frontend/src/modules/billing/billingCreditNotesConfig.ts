@@ -23,7 +23,7 @@ export function createCreditNotesCrudConfig<TRecord extends CreditNoteRecord>(op
     allowHardDelete: false,
     allowCreate: true,
     createLabel: '+ Nueva nota de crédito',
-    allowEdit: true,
+    allowEdit: false,
     allowDelete: false,
     searchPlaceholder: 'Buscar...',
     emptyState: 'No hay notas de crédito emitidas.',

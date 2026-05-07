@@ -21,8 +21,8 @@ def build_internal_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _list_work_orders(org_id: str, status: str = "", search: str = "") -> dict[str, Any]:
-        _ = org_id
+    async def _list_work_orders(tenant_id: str, status: str = "", search: str = "") -> dict[str, Any]:
+        _ = tenant_id
         return await client.list_work_orders(auth, status=status, search=search)
 
     declarations.append(
@@ -40,8 +40,8 @@ def build_internal_tools(
     )
     handlers["list_work_orders"] = _list_work_orders
 
-    async def _get_work_order(org_id: str, work_order_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_work_order(tenant_id: str, work_order_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_work_order(auth, work_order_id=work_order_id)
 
     declarations.append(
@@ -60,7 +60,7 @@ def build_internal_tools(
     handlers["get_work_order"] = _get_work_order
 
     async def _create_booking(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -68,7 +68,7 @@ def build_internal_tools(
         duration: int = 60,
         notes: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {
             "customer_name": customer_name,
             "customer_phone": customer_phone,
@@ -100,8 +100,8 @@ def build_internal_tools(
     )
     handlers["create_booking"] = _create_booking
 
-    async def _create_quote(org_id: str, work_order_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _create_quote(tenant_id: str, work_order_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.create_quote(auth, work_order_id=work_order_id)
 
     declarations.append(
@@ -119,8 +119,8 @@ def build_internal_tools(
     )
     handlers["create_quote"] = _create_quote
 
-    async def _create_sale(org_id: str, work_order_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _create_sale(tenant_id: str, work_order_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.create_sale(auth, work_order_id=work_order_id)
 
     declarations.append(
@@ -138,8 +138,8 @@ def build_internal_tools(
     )
     handlers["create_sale"] = _create_sale
 
-    async def _create_payment_link(org_id: str, work_order_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _create_payment_link(tenant_id: str, work_order_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.create_payment_link(auth, work_order_id=work_order_id)
 
     declarations.append(
@@ -162,22 +162,22 @@ def build_internal_tools(
 
 def build_external_tools(
     client: BikeShopBackendClient,
-    org_slug: str,
+    tenant_slug: str,
 ) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
         start_at: str,
         duration: int = 60,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await client.public_book_scheduling(
-            org_slug,
+            tenant_slug,
             data={
                 "party_name": customer_name,
                 "party_phone": customer_phone,

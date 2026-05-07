@@ -16,10 +16,6 @@ vi.mock('../components/AuthTokenBridge', () => ({
   AuthTokenBridge: () => null,
 }));
 
-vi.mock('../components/ClerkSessionOrgSync', () => ({
-  ClerkSessionOrgSync: () => null,
-}));
-
 vi.mock('../components/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -37,6 +33,7 @@ vi.mock('../lib/api', () => ({
 vi.mock('./lazyRoutes', () => ({
   LoginPage: () => <div>login</div>,
   SignupPage: () => <div>signup</div>,
+  InviteAcceptPage: () => <div>invite accept</div>,
   OnboardingPage: () => <div>onboarding</div>,
   Shell: ({ children }: { children: React.ReactNode }) => <div>shell{children}</div>,
 }));
@@ -68,7 +65,7 @@ function renderApp(initialEntries = ['/dashboard']) {
 
 function buildTenantSettings(overrides?: Partial<TenantSettings>): TenantSettings {
   return {
-    org_id: '00000000-0000-0000-0000-000000000001',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
     plan_code: 'starter',
     hard_limits: {},
     billing_status: 'trialing',
@@ -128,9 +125,8 @@ describe('App onboarding gating', () => {
     apiMocks.apiRequest.mockReset();
     apiMocks.getSession.mockResolvedValue({
       auth: {
-        org_id: '00000000-0000-0000-0000-000000000001',
-        org_name: 'Org Demo',
         tenant_id: '00000000-0000-0000-0000-000000000001',
+        tenant_name: 'Tenant Demo',
         role: 'admin',
         product_role: 'admin',
         scopes: [],

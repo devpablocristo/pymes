@@ -90,8 +90,8 @@ for check in "${SEED_DB_CHECKS[@]}"; do
 done
 
 if (( CLEAR_MODE == 1 )); then
-  check_min "bootstrapOrg" 1 "$(query_count "SELECT count(*) FROM orgs WHERE id = '__ORG_ID__'::uuid")" "db"
-  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM org_members WHERE org_id = '__ORG_ID__'::uuid")" "db"
+  check_min "bootstrapOrg" 1 "$(query_count "SELECT count(*) FROM tenants WHERE id = '__ORG_ID__'::uuid")" "db"
+  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM tenant_memberships WHERE tenant_id = '__ORG_ID__'::uuid")" "db"
   printf 'SKIP API checks (--cleared)\n'
 elif [[ "${SEED_VERIFY_SKIP_API:-}" == "1" ]]; then
   printf 'SKIP API checks (SEED_VERIFY_SKIP_API=1)\n'

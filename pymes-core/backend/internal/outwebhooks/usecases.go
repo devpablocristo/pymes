@@ -26,16 +26,16 @@ import (
 )
 
 type RepositoryPort interface {
-	ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webhookdomain.Endpoint, error)
+	ListEndpoints(ctx context.Context, tenantID uuid.UUID) ([]webhookdomain.Endpoint, error)
 	CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error)
-	GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error)
+	GetEndpoint(ctx context.Context, tenantID, id uuid.UUID) (webhookdomain.Endpoint, error)
 	UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error)
-	DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error
-	ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error)
-	CreateOutbox(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+	DeleteEndpoint(ctx context.Context, tenantID, id uuid.UUID) error
+	ListDeliveries(ctx context.Context, tenantID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error)
+	CreateOutbox(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error
 	ListPendingOutbox(ctx context.Context, limit int) ([]webhookmodels.OutboxModel, error)
 	MarkOutbox(ctx context.Context, id uuid.UUID, status, lastError string) error
-	ListEndpointsForEvent(ctx context.Context, orgID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error)
+	ListEndpointsForEvent(ctx context.Context, tenantID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error)
 	CreateDelivery(ctx context.Context, endpointID uuid.UUID, eventType string, payload map[string]any, statusCode *int, responseBody string, attempts int, nextRetry, deliveredAt *time.Time) (webhookdomain.Delivery, error)
 	ListRetryableDeliveries(ctx context.Context, limit int) ([]webhookmodels.DeliveryModel, error)
 	GetDelivery(ctx context.Context, id uuid.UUID) (webhookdomain.Delivery, error)
@@ -65,16 +65,16 @@ func NewUsecases(repo RepositoryPort) *Usecases {
 	}
 }
 
-func (u *Usecases) ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webhookdomain.Endpoint, error) {
-	return u.repo.ListEndpoints(ctx, orgID)
+func (u *Usecases) ListEndpoints(ctx context.Context, tenantID uuid.UUID) ([]webhookdomain.Endpoint, error) {
+	return u.repo.ListEndpoints(ctx, tenantID)
 }
 
 func (u *Usecases) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error) {
 	if err := u.validateURL(ctx, in.URL); err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
-	if in.OrgID == uuid.Nil {
-		return webhookdomain.Endpoint{}, domainerr.Validation("org_id is required")
+	if in.TenantID == uuid.Nil {
+		return webhookdomain.Endpoint{}, domainerr.Validation("tenant_id is required")
 	}
 	if len(in.Events) == 0 {
 		in.Events = []string{"*"}
@@ -92,8 +92,8 @@ func (u *Usecases) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	return u.repo.CreateEndpoint(ctx, normalizeEndpoint(in))
 }
 
-func (u *Usecases) GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error) {
-	out, err := u.repo.GetEndpoint(ctx, orgID, id)
+func (u *Usecases) GetEndpoint(ctx context.Context, tenantID, id uuid.UUID) (webhookdomain.Endpoint, error) {
+	out, err := u.repo.GetEndpoint(ctx, tenantID, id)
 	if err != nil && gorm.ErrRecordNotFound == err {
 		return webhookdomain.Endpoint{}, domainerr.NotFoundf("webhook_endpoint", id.String())
 	}
@@ -104,10 +104,10 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	if err := u.validateURL(ctx, in.URL); err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
-	if in.OrgID == uuid.Nil || in.ID == uuid.Nil {
-		return webhookdomain.Endpoint{}, domainerr.Validation("org_id and id are required")
+	if in.TenantID == uuid.Nil || in.ID == uuid.Nil {
+		return webhookdomain.Endpoint{}, domainerr.Validation("tenant_id and id are required")
 	}
-	current, err := u.repo.GetEndpoint(ctx, in.OrgID, in.ID)
+	current, err := u.repo.GetEndpoint(ctx, in.TenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return webhookdomain.Endpoint{}, domainerr.NotFoundf("webhook_endpoint", in.ID.String())
@@ -126,8 +126,8 @@ func (u *Usecases) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint
 	return u.repo.UpdateEndpoint(ctx, normalizeEndpoint(in))
 }
 
-func (u *Usecases) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error {
-	if err := u.repo.DeleteEndpoint(ctx, orgID, id); err != nil {
+func (u *Usecases) DeleteEndpoint(ctx context.Context, tenantID, id uuid.UUID) error {
+	if err := u.repo.DeleteEndpoint(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("webhook_endpoint", id.String())
 		}
@@ -136,19 +136,19 @@ func (u *Usecases) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) erro
 	return nil
 }
 
-func (u *Usecases) ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
-	return u.repo.ListDeliveries(ctx, orgID, endpointID, limit)
+func (u *Usecases) ListDeliveries(ctx context.Context, tenantID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
+	return u.repo.ListDeliveries(ctx, tenantID, endpointID, limit)
 }
 
-func (u *Usecases) Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error {
-	if orgID == uuid.Nil || strings.TrimSpace(eventType) == "" {
-		return domainerr.Validation("org_id and event_type are required")
+func (u *Usecases) Enqueue(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error {
+	if tenantID == uuid.Nil || strings.TrimSpace(eventType) == "" {
+		return domainerr.Validation("tenant_id and event_type are required")
 	}
-	return u.repo.CreateOutbox(ctx, orgID, strings.TrimSpace(eventType), payload)
+	return u.repo.CreateOutbox(ctx, tenantID, strings.TrimSpace(eventType), payload)
 }
 
-func (u *Usecases) SendTest(ctx context.Context, orgID, endpointID uuid.UUID, actor string) error {
-	endpoint, err := u.repo.GetEndpoint(ctx, orgID, endpointID)
+func (u *Usecases) SendTest(ctx context.Context, tenantID, endpointID uuid.UUID, actor string) error {
+	endpoint, err := u.repo.GetEndpoint(ctx, tenantID, endpointID)
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func (u *Usecases) RetryPending(ctx context.Context) (int, error) {
 	for _, item := range outboxItems {
 		payload := map[string]any{}
 		_ = json.Unmarshal(item.Payload, &payload)
-		endpoints, err := u.repo.ListEndpointsForEvent(ctx, item.OrgID, item.EventType)
+		endpoints, err := u.repo.ListEndpointsForEvent(ctx, item.TenantID, item.EventType)
 		if err != nil {
 			return processed, err
 		}

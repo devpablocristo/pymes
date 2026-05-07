@@ -1,7 +1,7 @@
 -- Conversaciones WhatsApp (thread por contacto + asignación de operador)
 CREATE TABLE IF NOT EXISTS whatsapp_conversations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id          UUID NOT NULL,
+    tenant_id          UUID NOT NULL,
     party_id        UUID NOT NULL,
     phone           TEXT NOT NULL DEFAULT '',
     party_name      TEXT NOT NULL DEFAULT '',
@@ -12,14 +12,14 @@ CREATE TABLE IF NOT EXISTS whatsapp_conversations (
     unread_count    INT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(org_id, party_id)
+    UNIQUE(tenant_id, party_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_conversations_org_status
-    ON whatsapp_conversations (org_id, status);
+    ON whatsapp_conversations (tenant_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_conversations_assigned
-    ON whatsapp_conversations (org_id, assigned_to) WHERE assigned_to != '';
+    ON whatsapp_conversations (tenant_id, assigned_to) WHERE assigned_to != '';
 
 -- Agregar campos de operador a mensajes existentes
 ALTER TABLE whatsapp_messages

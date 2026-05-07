@@ -10,13 +10,13 @@ import (
 	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
-func ParseAuthOrgID(c *gin.Context) (uuid.UUID, bool) {
-	orgID, ok := sharedauth.ParseAuthOrgID(c)
+func ParseAuthTenantID(c *gin.Context) (uuid.UUID, bool) {
+	tenantID, ok := sharedauth.ParseAuthTenantID(c)
 	if !ok {
-		WriteValidation(c, "invalid org")
+		WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
-	return orgID, true
+	return tenantID, true
 }
 
 func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool) {
@@ -29,8 +29,8 @@ func ParseUUIDParam(c *gin.Context, param string, field string) (uuid.UUID, bool
 	return id, true
 }
 
-func ParseAuthOrgAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := ParseAuthOrgID(c)
+func ParseAuthTenantAndParamID(c *gin.Context, param string, field string) (uuid.UUID, uuid.UUID, bool) {
+	tenantID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -38,11 +38,11 @@ func ParseAuthOrgAndParamID(c *gin.Context, param string, field string) (uuid.UU
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, id, true
+	return tenantID, id, true
 }
 
 func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UUID, string, uuid.UUID, bool) {
-	orgID, ok := ParseAuthOrgID(c)
+	tenantID, ok := ParseAuthTenantID(c)
 	if !ok {
 		return uuid.Nil, "", uuid.Nil, false
 	}
@@ -55,7 +55,7 @@ func ParseEntityRef(c *gin.Context, entityParam string, idParam string) (uuid.UU
 	if !ok {
 		return uuid.Nil, "", uuid.Nil, false
 	}
-	return orgID, entity, id, true
+	return tenantID, entity, id, true
 }
 
 func WriteValidation(c *gin.Context, message string) {

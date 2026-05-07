@@ -9,7 +9,7 @@ import (
 
 type InvoiceModel struct {
 	ID              uuid.UUID      `gorm:"column:id;primaryKey"`
-	OrgID           uuid.UUID      `gorm:"column:org_id"`
+	TenantID        uuid.UUID      `gorm:"column:tenant_id"`
 	Number          string         `gorm:"column:number"`
 	PartyID         *uuid.UUID     `gorm:"column:party_id"`
 	CustomerName    string         `gorm:"column:customer_name"`

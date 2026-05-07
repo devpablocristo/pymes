@@ -45,18 +45,18 @@ DECLARE
     emp2 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/2');
     emp3 uuid := uuid_generate_v5(v_org, 'pymes-seed/v1/employee/3');
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
-    SELECT id INTO svc1 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
-    SELECT id INTO svc2 FROM services WHERE org_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc1 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
+    SELECT id INTO svc2 FROM services WHERE tenant_id = v_org AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     IF svc1 IS NULL OR svc2 IS NULL THEN
         RAISE EXCEPTION 'pymes full seed: expected demo services for org %', v_org;
     END IF;
 
     INSERT INTO parties (
-        id, org_id, party_type, display_name, email, phone, address,
+        id, tenant_id, party_type, display_name, email, phone, address,
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at
     )
     VALUES (
@@ -80,16 +80,16 @@ BEGIN
         SET first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     VALUES (uuid_generate_v5(v_org, 'pymes-seed/v1/employee/role/1'), emp_party, v_org, 'employee', true, NULL::uuid, '{}'::jsonb, now())
-    ON CONFLICT (party_id, org_id, role) DO UPDATE
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
 
-    UPDATE org_members
+    UPDATE tenant_memberships
        SET party_id = emp_party,
            role = 'admin'
-     WHERE org_id = v_org
+     WHERE tenant_id = v_org
        AND user_id = local_user;
 
     INSERT INTO price_list_items (price_list_id, product_id, price)
@@ -101,13 +101,13 @@ BEGIN
         SET price = EXCLUDED.price;
 
     INSERT INTO purchases (
-        id, org_id, number, party_id, party_name, status, payment_status,
+        id, tenant_id, number, party_id, party_name, status, payment_status,
         subtotal, tax_total, total, currency, notes, received_at, created_by
     )
     VALUES
         (pur1, v_org, 'COMP-00001', s1, 'Proveedor Demo 1', 'received', 'partial', 22000, 4620, 26620, 'ARS', 'Compra demo recibida', now() - interval '3 days', 'seed'),
         (pur2, v_org, 'COMP-00002', s2, 'Proveedor Demo 2', 'draft', 'pending', 12000, 2520, 14520, 'ARS', 'Compra demo borrador', NULL, 'seed')
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET party_id = EXCLUDED.party_id,
             party_name = EXCLUDED.party_name,
             status = EXCLUDED.status,
@@ -133,7 +133,7 @@ BEGIN
             subtotal = EXCLUDED.subtotal,
             sort_order = EXCLUDED.sort_order;
 
-    INSERT INTO accounts (id, org_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
+    INSERT INTO accounts (id, tenant_id, type, party_id, party_name, balance, currency, credit_limit, updated_at)
     VALUES
         (acc_receivable, v_org, 'receivable', c1, 'Cliente Demo Uno', 18400, 'ARS', 0, now()),
         (acc_payable, v_org, 'payable', s1, 'Proveedor Demo 1', 26620, 'ARS', 100000, now())
@@ -144,7 +144,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO account_movements (
-        id, account_id, org_id, type, amount, balance, description,
+        id, account_id, tenant_id, type, amount, balance, description,
         reference_type, reference_id, created_by, created_at
     )
     VALUES
@@ -158,7 +158,7 @@ BEGIN
             created_at = EXCLUDED.created_at;
 
     INSERT INTO recurring_expenses (
-        id, org_id, description, amount, currency, category, payment_method,
+        id, tenant_id, description, amount, currency, category, payment_method,
         frequency, day_of_month, party_id, is_active, next_due_date, last_paid_date,
         notes, created_by, created_at, updated_at
     )
@@ -180,7 +180,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO procurement_policies (
-        id, org_id, name, expression, effect, priority, mode, enabled,
+        id, tenant_id, name, expression, effect, priority, mode, enabled,
         action_filter, system_filter, created_at, updated_at
     )
     VALUES
@@ -224,7 +224,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO procurement_requests (
-        id, org_id, requester_actor, title, description, category, status,
+        id, tenant_id, requester_actor, title, description, category, status,
         estimated_total, currency, evaluation_json, purchase_id, created_at, updated_at, archived_at
     )
     VALUES
@@ -268,7 +268,7 @@ BEGIN
             sort_order = EXCLUDED.sort_order;
 
     INSERT INTO payments (
-        id, org_id, reference_type, reference_id, method, amount,
+        id, tenant_id, reference_type, reference_id, method, amount,
         notes, received_at, created_by, created_at
     )
     VALUES
@@ -283,14 +283,14 @@ BEGIN
             created_at = EXCLUDED.created_at;
 
     INSERT INTO returns (
-        id, org_id, number, sale_id, reason, subtotal, tax_total, total,
+        id, tenant_id, number, sale_id, reason, subtotal, tax_total, total,
         refund_method, status, notes, created_by, created_at
     )
     VALUES (
         ret1, v_org, 'DEV-00001', sale1, 'defective', 15000, 3150, 18150,
         'credit_note', 'completed', 'Devolución demo por defecto', 'seed', now() - interval '2 days'
     )
-    ON CONFLICT (org_id, number) DO UPDATE
+    ON CONFLICT (tenant_id, number) DO UPDATE
         SET sale_id = EXCLUDED.sale_id,
             reason = EXCLUDED.reason,
             subtotal = EXCLUDED.subtotal,
@@ -314,7 +314,7 @@ BEGIN
             subtotal = EXCLUDED.subtotal;
 
     INSERT INTO credit_notes (
-        id, org_id, number, party_id, return_id, amount, used_amount,
+        id, tenant_id, number, party_id, return_id, amount, used_amount,
         balance, expires_at, status, created_at
     )
     VALUES (
@@ -329,7 +329,7 @@ BEGIN
             status = EXCLUDED.status;
 
     INSERT INTO audit_log (
-        id, org_id, actor, action, resource_type, resource_id, payload,
+        id, tenant_id, actor, action, resource_type, resource_id, payload,
         prev_hash, hash, created_at, actor_type, actor_id, actor_label
     )
     VALUES
@@ -362,7 +362,7 @@ BEGIN
             actor_label = EXCLUDED.actor_label;
 
     INSERT INTO timeline_entries (
-        id, org_id, entity_type, entity_id, event_type, title,
+        id, tenant_id, entity_type, entity_id, event_type, title,
         description, actor, metadata, created_at
     )
     VALUES
@@ -386,7 +386,7 @@ BEGIN
             created_at = EXCLUDED.created_at;
 
     INSERT INTO webhook_endpoints (
-        id, org_id, url, secret, events, is_active, created_by, created_at, updated_at
+        id, tenant_id, url, secret, events, is_active, created_by, created_at, updated_at
     )
     VALUES (
         wh1, v_org, 'https://example.invalid/hooks/pymes', 'seed-secret',
@@ -400,7 +400,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO pymes_in_app_notifications (
-        id, org_id, user_id, title, body, kind, entity_type, entity_id, chat_context, created_at
+        id, tenant_id, user_id, title, body, kind, entity_type, entity_id, chat_context, created_at
     )
     VALUES
         (
@@ -424,7 +424,7 @@ BEGIN
 
     -- Invoices demo (F1): 5 facturas con line items, cubren los 3 estados (paid/pending/overdue).
     INSERT INTO invoices (
-        id, org_id, number, customer_name, issued_date, due_date, status,
+        id, tenant_id, number, customer_name, issued_date, due_date, status,
         subtotal, discount_percent, tax_percent, total, notes, is_favorite, tags, created_by
     ) VALUES
         (inv1, v_org, 'INV-4001', 'Distribuidora Norte',   DATE '2026-04-05', DATE '2026-04-15', 'paid',    107500, 5,  21, 123661.125, '', true,  ARRAY['mayorista','recurrente']::text[], 'seed'),
@@ -460,7 +460,7 @@ BEGIN
 
     -- Employees demo (F1): 3 empleados cubriendo estados active / inactive.
     INSERT INTO employees (
-        id, org_id, first_name, last_name, email, phone, position, status,
+        id, tenant_id, first_name, last_name, email, phone, position, status,
         hire_date, notes, is_favorite, tags, created_by
     ) VALUES
         (emp1, v_org, 'María',    'Gómez',    'maria.gomez@demo.pymes',    '+54 9 11 2345 6789', 'Administración',     'active',   DATE '2024-03-01', '',  true,  ARRAY['administracion']::text[], 'seed'),

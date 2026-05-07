@@ -25,7 +25,7 @@ src/api/internal_router.py
 src/api/notifications_router.py
 src/api/public_router.py
 src/api/public_sales_router.py
-src/api/review_callback.py
+src/api/governance_callback.py
 src/api/router.py
 src/api/sse.py
 src/api/state_deps.py

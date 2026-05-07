@@ -27,13 +27,13 @@ Responde siempre en espanol, claro y directo. No muestres JSON al usuario."""
 
 
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
-    async def search_products(*, org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+    async def search_products(*, tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
         return await products.search_products(client, auth, query=query, limit=limit)
 
-    async def get_stock_level(*, org_id: str, product_id: str) -> dict[str, Any]:
+    async def get_stock_level(*, tenant_id: str, product_id: str) -> dict[str, Any]:
         return await inventory.get_stock_level(client, auth, product_id=product_id)
 
-    async def get_low_stock(*, org_id: str) -> dict[str, Any]:
+    async def get_low_stock(*, tenant_id: str) -> dict[str, Any]:
         return await inventory.get_low_stock(client, auth)
 
     tools = [

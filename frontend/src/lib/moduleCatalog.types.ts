@@ -1,5 +1,5 @@
 export type ModuleRuntimeContext = {
-  orgId: string;
+  tenantId: string;
   today: string;
   monthStart: string;
 };

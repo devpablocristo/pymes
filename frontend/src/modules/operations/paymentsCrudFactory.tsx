@@ -1,6 +1,7 @@
 import type { CrudFormValues, CrudPageConfig } from '../../components/CrudPage';
 import {
   createSalePayment,
+  apiRequest,
   listSalePayments,
   type SalePaymentRow,
 } from '../../lib/api';
@@ -25,14 +26,18 @@ export function createPaymentsCrudConfig(): CrudPageConfig<SalePaymentRow> {
     labelPlural: 'pagos',
     labelPluralCap: 'Pagos',
     allowEdit: true,
-    allowDelete: false,
+    allowDelete: true,
     allowCreate: true,
     supportsArchived: true,
     createLabel: '+ Registrar pago',
     searchPlaceholder: 'Buscar...',
     emptyState: 'Sin venta en contexto. Agregá ?sale_id=<UUID> a la URL o registrá cobros desde el listado de ventas.',
     dataSource: {
-      list: async () => {
+      list: async ({ archived }) => {
+        if (archived) {
+          const { items } = await apiRequest<{ items?: SalePaymentRow[] }>('/v1/payments/archived');
+          return items ?? [];
+        }
         const sid = getCrudSearchParam('sale_id');
         if (!sid) return [];
         const { items } = await listSalePayments(sid);
@@ -55,6 +60,22 @@ export function createPaymentsCrudConfig(): CrudPageConfig<SalePaymentRow> {
           notes: asOptionalString(values.notes),
           ...(receivedRaw ? { received_at: toRFC3339(values.received_at) } : {}),
         });
+      },
+      update: async (row, values) => {
+        await apiRequest(`/v1/payments/${row.id}`, { method: 'PATCH', body: {
+          notes: asOptionalString(values.notes) ?? '',
+          is_favorite: Boolean(values.is_favorite),
+          tags: parseTagCsv(values.tags),
+        } });
+      },
+      deleteItem: async (row) => {
+        await apiRequest(`/v1/payments/${row.id}`, { method: 'DELETE' });
+      },
+      restore: async (row) => {
+        await apiRequest(`/v1/payments/${row.id}/restore`, { method: 'POST', body: {} });
+      },
+      hardDelete: async (row) => {
+        await apiRequest(`/v1/payments/${row.id}/hard`, { method: 'DELETE' });
       },
     },
     columns: [

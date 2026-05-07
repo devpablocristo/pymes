@@ -9,7 +9,7 @@ import (
 
 type EmployeeModel struct {
 	ID         uuid.UUID      `gorm:"column:id;primaryKey"`
-	OrgID      uuid.UUID      `gorm:"column:org_id"`
+	TenantID   uuid.UUID      `gorm:"column:tenant_id"`
 	FirstName  string         `gorm:"column:first_name"`
 	LastName   string         `gorm:"column:last_name"`
 	Email      string         `gorm:"column:email"`

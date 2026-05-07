@@ -26,7 +26,7 @@ const (
 // los expone como string opaco para que el usecase decida cuándo desencriptar.
 type Connection struct {
 	ID                    uuid.UUID
-	OrgID                 uuid.UUID
+	TenantID              uuid.UUID
 	CreatedBy             string
 	Provider              Provider
 	ProviderAccountEmail  string
@@ -48,7 +48,7 @@ type Connection struct {
 // recibir el callback (consumido) o al expirar (TTL ~15 min).
 type OAuthState struct {
 	State     string
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	CreatedBy string
 	Provider  Provider
 	ExpiresAt time.Time

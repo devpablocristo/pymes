@@ -10,7 +10,7 @@ ALTER TABLE whatsapp_connections
 -- Historial de mensajes enviados y recibidos
 CREATE TABLE IF NOT EXISTS whatsapp_messages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     phone_number_id text NOT NULL,
     direction text NOT NULL CHECK (direction IN ('inbound', 'outbound')),
     wa_message_id text NOT NULL DEFAULT '',
@@ -34,18 +34,18 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wa_messages_org_created
-    ON whatsapp_messages(org_id, created_at DESC);
+    ON whatsapp_messages(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wa_messages_party
     ON whatsapp_messages(party_id) WHERE party_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_wa_messages_wa_msg_id
     ON whatsapp_messages(wa_message_id) WHERE wa_message_id != '';
 CREATE INDEX IF NOT EXISTS idx_wa_messages_status
-    ON whatsapp_messages(org_id, status) WHERE status NOT IN ('delivered', 'read');
+    ON whatsapp_messages(tenant_id, status) WHERE status NOT IN ('delivered', 'read');
 
 -- Templates de WhatsApp (sincronizados con Meta)
 CREATE TABLE IF NOT EXISTS whatsapp_templates (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     meta_template_id text NOT NULL DEFAULT '',
     name text NOT NULL,
     language text NOT NULL DEFAULT 'es',
@@ -63,12 +63,12 @@ CREATE TABLE IF NOT EXISTS whatsapp_templates (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wa_templates_org_name_lang
-    ON whatsapp_templates(org_id, name, language);
+    ON whatsapp_templates(tenant_id, name, language);
 
 -- Opt-in de contactos para WhatsApp
 CREATE TABLE IF NOT EXISTS whatsapp_opt_ins (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
     phone text NOT NULL,
     status text NOT NULL DEFAULT 'opted_in' CHECK (status IN ('opted_in', 'opted_out')),
@@ -79,6 +79,6 @@ CREATE TABLE IF NOT EXISTS whatsapp_opt_ins (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wa_opt_ins_org_party
-    ON whatsapp_opt_ins(org_id, party_id) WHERE status = 'opted_in';
+    ON whatsapp_opt_ins(tenant_id, party_id) WHERE status = 'opted_in';
 CREATE INDEX IF NOT EXISTS idx_wa_opt_ins_phone
-    ON whatsapp_opt_ins(org_id, phone);
+    ON whatsapp_opt_ins(tenant_id, phone);

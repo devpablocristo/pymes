@@ -8,7 +8,7 @@ import (
 
 type ExchangeRate struct {
 	ID           uuid.UUID `json:"id"`
-	OrgID        uuid.UUID `json:"org_id"`
+	TenantID     uuid.UUID `json:"tenant_id"`
 	FromCurrency string    `json:"from_currency"`
 	ToCurrency   string    `json:"to_currency"`
 	RateType     string    `json:"rate_type"`

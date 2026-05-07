@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS payment_gateway_connections (
-    org_id uuid PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
     provider text NOT NULL DEFAULT 'mercadopago'
         CHECK (provider IN ('mercadopago')),
     external_user_id text NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS payment_gateway_connections (
 
 CREATE TABLE IF NOT EXISTS payment_preferences (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     provider text NOT NULL DEFAULT 'mercadopago',
     external_id text NOT NULL DEFAULT '',
     reference_type text NOT NULL CHECK (reference_type IN ('sale', 'quote')),
@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS payment_preferences (
 );
 
 CREATE INDEX IF NOT EXISTS idx_payment_prefs_org
-    ON payment_preferences(org_id, created_at DESC);
+    ON payment_preferences(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payment_prefs_reference
-    ON payment_preferences(org_id, reference_type, reference_id);
+    ON payment_preferences(tenant_id, reference_type, reference_id);
 CREATE INDEX IF NOT EXISTS idx_payment_prefs_external
     ON payment_preferences(provider, external_id)
     WHERE external_id != '';

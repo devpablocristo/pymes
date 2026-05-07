@@ -70,30 +70,30 @@ type fakeRepo struct {
 	markEventErr error
 }
 
-func (f *fakeRepo) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
+func (f *fakeRepo) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error) {
 	return uuid.Parse(ref)
 }
 
-func (f *fakeRepo) GetPlanCode(ctx context.Context, orgID uuid.UUID) string {
+func (f *fakeRepo) GetPlanCode(ctx context.Context, tenantID uuid.UUID) string {
 	if f.planCode == "" {
 		return "starter"
 	}
 	return f.planCode
 }
 
-func (f *fakeRepo) GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
+func (f *fakeRepo) GetBankInfo(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
 	return gatewaydomain.BankInfo{Alias: "mi.alias.pyme"}, true, nil
 }
 
-func (f *fakeRepo) GetWhatsAppTransferTemplate(ctx context.Context, orgID uuid.UUID) string {
+func (f *fakeRepo) GetWhatsAppTransferTemplate(ctx context.Context, tenantID uuid.UUID) string {
 	return "Alias: {bank_alias} Monto: {total}"
 }
 
-func (f *fakeRepo) GetWhatsAppLinkTemplate(ctx context.Context, orgID uuid.UUID) string {
+func (f *fakeRepo) GetWhatsAppLinkTemplate(ctx context.Context, tenantID uuid.UUID) string {
 	return "Paga {total} en {payment_url}"
 }
 
-func (f *fakeRepo) GetConnection(ctx context.Context, orgID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error) {
+func (f *fakeRepo) GetConnection(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error) {
 	if f.connectionErr != nil {
 		return gatewaydomain.PaymentGatewayConnection{}, f.connectionErr
 	}
@@ -123,9 +123,9 @@ func (f *fakeRepo) SaveConnection(ctx context.Context, in gatewaydomain.PaymentG
 	return nil
 }
 
-func (f *fakeRepo) Disconnect(ctx context.Context, orgID uuid.UUID) error { return nil }
+func (f *fakeRepo) Disconnect(ctx context.Context, tenantID uuid.UUID) error { return nil }
 
-func (f *fakeRepo) CountMonthlyPreferences(ctx context.Context, orgID uuid.UUID, since time.Time) (int64, error) {
+func (f *fakeRepo) CountMonthlyPreferences(ctx context.Context, tenantID uuid.UUID, since time.Time) (int64, error) {
 	return f.countMonthly, f.countErr
 }
 
@@ -142,7 +142,7 @@ func (f *fakeRepo) SavePreference(ctx context.Context, in gatewaydomain.PaymentP
 	return f.savedPreference, nil
 }
 
-func (f *fakeRepo) GetLatestPreference(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error) {
+func (f *fakeRepo) GetLatestPreference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error) {
 	if f.getLatestErr != nil {
 		return gatewaydomain.PaymentPreference{}, f.getLatestErr
 	}
@@ -156,14 +156,14 @@ func (f *fakeRepo) GetPreferenceByExternalID(ctx context.Context, provider, exte
 	return f.getByExternalPreference, nil
 }
 
-func (f *fakeRepo) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error) {
+func (f *fakeRepo) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error) {
 	if f.saleErr != nil {
 		return gatewaydomain.SaleSnapshot{}, f.saleErr
 	}
 	return f.saleSnapshot, nil
 }
 
-func (f *fakeRepo) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error) {
+func (f *fakeRepo) GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error) {
 	if f.quoteErr != nil {
 		return gatewaydomain.QuoteSnapshot{}, f.quoteErr
 	}
@@ -178,11 +178,11 @@ func (f *fakeRepo) ProcessApprovedSalePayment(ctx context.Context, in ProcessSal
 	return nil
 }
 
-func (f *fakeRepo) MarkPreferenceApproved(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID, payerID string, paidAt time.Time) error {
+func (f *fakeRepo) MarkPreferenceApproved(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID, payerID string, paidAt time.Time) error {
 	if f.markApprovedErr != nil {
 		return f.markApprovedErr
 	}
-	f.markApprovedOrgID = orgID
+	f.markApprovedOrgID = tenantID
 	f.markApprovedRefType = refType
 	f.markApprovedRefID = refID
 	return nil
@@ -305,7 +305,7 @@ func TestCreatePreference_StarterPlanDenied(t *testing.T) {
 }
 
 func TestCreatePreference_SaleGrowth(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 
 	crypto, err := NewCrypto(testEncryptionKey)
@@ -319,7 +319,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 		planCode:     "growth",
 		countMonthly: 0,
 		connection: gatewaydomain.PaymentGatewayConnection{
-			OrgID:          orgID,
+			TenantID:       tenantID,
 			Provider:       providerMercadoPago,
 			ExternalUserID: "123",
 			AccessToken:    encAccess,
@@ -358,7 +358,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 		return time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC)
 	}
 
-	pref, err := uc.CreatePreference(context.Background(), orgID, CreatePreferenceRequest{
+	pref, err := uc.CreatePreference(context.Background(), tenantID, CreatePreferenceRequest{
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 	})
@@ -377,7 +377,7 @@ func TestCreatePreference_SaleGrowth(t *testing.T) {
 }
 
 func TestCreatePreference_DemoMode(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	repo := &fakeRepo{
 		planCode: "starter",
@@ -406,7 +406,7 @@ func TestCreatePreference_DemoMode(t *testing.T) {
 		return time.Date(2026, 3, 5, 10, 0, 0, 0, time.UTC)
 	}
 
-	pref, err := uc.CreatePreference(context.Background(), orgID, CreatePreferenceRequest{
+	pref, err := uc.CreatePreference(context.Background(), tenantID, CreatePreferenceRequest{
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 	})
@@ -425,7 +425,7 @@ func TestCreatePreference_DemoMode(t *testing.T) {
 }
 
 func TestProcessWebhookStoresPaymentEvent(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	repo := &fakeRepo{}
 	mp := &fakeMP{}
 	uc := newTestUsecases(t, repo, mp)
@@ -448,13 +448,13 @@ func TestProcessWebhookStoresPaymentEvent(t *testing.T) {
 	if repo.storedWebhookEvent.EventType != "payment" {
 		t.Fatalf("stored event type = %q", repo.storedWebhookEvent.EventType)
 	}
-	if repo.processSaleIn != nil || repo.markApprovedRefID != uuid.Nil || orgID == uuid.Nil {
+	if repo.processSaleIn != nil || repo.markApprovedRefID != uuid.Nil || tenantID == uuid.Nil {
 		t.Fatalf("webhook should only store event, not process inline")
 	}
 }
 
 func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	serviceID := uuid.New()
 	crypto, err := NewCrypto(testEncryptionKey)
@@ -469,7 +469,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 		getByExternalErr: ErrNotFound,
 		listConnections: []gatewaydomain.PaymentGatewayConnection{
 			{
-				OrgID:          orgID,
+				TenantID:       tenantID,
 				Provider:       providerMercadoPago,
 				ExternalUserID: "123",
 				AccessToken:    encAccess,
@@ -491,7 +491,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 			ID:                "pay-789",
 			Status:            "approved",
 			TransactionAmount: 12000,
-			ExternalReference: orgID.String() + ":sale:" + saleID.String(),
+			ExternalReference: tenantID.String() + ":sale:" + saleID.String(),
 			PayerEmail:        "payer@example.com",
 		},
 	}
@@ -522,7 +522,7 @@ func TestProcessPendingWebhookEventsApprovedSale(t *testing.T) {
 	if repo.processSaleIn == nil {
 		t.Fatalf("expected ProcessApprovedSalePayment call")
 	}
-	if repo.processSaleIn.OrgID != orgID || repo.processSaleIn.SaleID != saleID {
+	if repo.processSaleIn.TenantID != tenantID || repo.processSaleIn.SaleID != saleID {
 		t.Fatalf("unexpected sale input: %+v", *repo.processSaleIn)
 	}
 	if len(repo.markProcessedIDs) != 1 {

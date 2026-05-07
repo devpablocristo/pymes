@@ -11,7 +11,7 @@ export function currentRuntimeContext(): ModuleRuntimeContext {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
-  return { orgId: '', today, monthStart };
+  return { tenantId: '', today, monthStart };
 }
 
 export function buildInitialValues(fields: ModuleField[] | undefined, ctx: ModuleRuntimeContext): Record<string, string> {

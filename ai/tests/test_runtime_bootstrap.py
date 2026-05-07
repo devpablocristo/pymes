@@ -54,7 +54,7 @@ def test_claim_helpers_support_nested_clerk_claims() -> None:
     }
 
     assert runtime_bootstrap._first_string_claim(claims, "sub") == "user_123"
-    assert runtime_bootstrap._first_string_claim(claims, "tenant_id", "org_id", "o.id") == "org_123"
+    assert runtime_bootstrap._first_string_claim(claims, "tenant_id", "tenant_id", "o.id") == "org_123"
     assert runtime_bootstrap._first_string_claim(claims, "role", "org_role", "o.rol") == "org:admin"
     assert runtime_bootstrap._first_scopes_claim(claims, "scopes", "org_permissions", "o.per") == [
         "admin:console:read",

@@ -19,13 +19,13 @@ def build_system_prompt(mode: str, context: dict) -> str:
     prompt = [BASE_PROMPT]
 
     teacher_name = context.get("teacher_name", "")
-    org_name = context.get("org_name", "la institucion")
+    tenant_name = context.get("tenant_name", "la institucion")
     specialties = context.get("specialties", [])
 
     if mode == "internal":
         actor = context.get("actor", "")
         role = context.get("role", "member")
-        prompt.append(f'El usuario es {actor}, rol "{role}" en {org_name}. ')
+        prompt.append(f'El usuario es {actor}, rol "{role}" en {tenant_name}. ')
         if teacher_name:
             prompt.append(f"Docente: {teacher_name}.")
         if specialties:
@@ -36,7 +36,7 @@ def build_system_prompt(mode: str, context: dict) -> str:
         )
     else:
         prompt.append(
-            f"Sos el asistente publico de {org_name}. Estas hablando con un potencial alumno o cliente. "
+            f"Sos el asistente publico de {tenant_name}. Estas hablando con un potencial alumno o cliente. "
             "Nunca reveles informacion interna, financiera ni de otros alumnos/clientes. "
             "Solo podes mostrar informacion publica: docentes, catalogo de servicios, "
             "disponibilidad y agendar turnos."

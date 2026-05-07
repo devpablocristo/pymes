@@ -11,28 +11,28 @@ import (
 )
 
 type Principal struct {
-	OrgID  string   `json:"org_id"`
-	Actor  string   `json:"actor"`
-	Role   string   `json:"role"`
-	Scopes []string `json:"scopes"`
+	TenantID string   `json:"tenant_id"`
+	Actor    string   `json:"actor"`
+	Role     string   `json:"role"`
+	Scopes   []string `json:"scopes"`
 }
 
 type TokenVerifier interface {
 	VerifyToken(ctx context.Context, tokenString string) (*jwt.Token, error)
 }
 
-// OrgRefResolver traduce un identificador de tenant del JWT (p. ej. org_... de Clerk) al UUID interno de orgs.
-type OrgRefResolver interface {
-	ResolveOrgID(ctx context.Context, ref string) (string, error)
+// TenantRefResolver traduce un identificador de tenant del JWT (p. ej. org_... de Clerk) al UUID interno de tenants.
+type TenantRefResolver interface {
+	ResolveTenantID(ctx context.Context, ref string) (string, error)
 }
 
 // IdentityConfig alinea verticales con core/saas: claims configurables + resolución de org externa.
 type IdentityConfig struct {
-	Issuer         string
-	Audience       string
-	OrgClaim       string
-	RoleClaim      string
-	OrgRefResolver OrgRefResolver
+	Issuer            string
+	Audience          string
+	OrgClaim          string
+	RoleClaim         string
+	TenantRefResolver TenantRefResolver
 }
 
 type IdentityResolver struct {
@@ -76,7 +76,7 @@ func (r *IdentityResolver) ResolvePrincipal(ctx context.Context, token string) (
 	if c := strings.TrimSpace(r.cfg.OrgClaim); c != "" {
 		orgNames = append(orgNames, c)
 	}
-	orgNames = append(orgNames, "tenant_id", "org_id", "o.id")
+	orgNames = append(orgNames, "tenant_id", "tenant_id", "o.id")
 
 	rawOrg := firstStringClaim(claims, orgNames...)
 	if strings.TrimSpace(rawOrg) == "" {
@@ -105,9 +105,9 @@ func (r *IdentityResolver) ResolvePrincipal(ctx context.Context, token string) (
 	orgIDStr := strings.TrimSpace(rawOrg)
 	if orgIDStr != "" {
 		if _, err := uuid.Parse(orgIDStr); err == nil {
-			principal.OrgID = orgIDStr
-		} else if r.cfg.OrgRefResolver != nil {
-			resolved, resErr := r.cfg.OrgRefResolver.ResolveOrgID(ctx, orgIDStr)
+			principal.TenantID = orgIDStr
+		} else if r.cfg.TenantRefResolver != nil {
+			resolved, resErr := r.cfg.TenantRefResolver.ResolveTenantID(ctx, orgIDStr)
 			if resErr != nil {
 				return Principal{}, fmt.Errorf("resolve org: %w", resErr)
 			}
@@ -115,9 +115,9 @@ func (r *IdentityResolver) ResolvePrincipal(ctx context.Context, token string) (
 			if _, err := uuid.Parse(resolved); err != nil {
 				return Principal{}, errors.New("resolved org is not a valid uuid")
 			}
-			principal.OrgID = resolved
+			principal.TenantID = resolved
 		} else {
-			principal.OrgID = orgIDStr
+			principal.TenantID = orgIDStr
 		}
 	}
 

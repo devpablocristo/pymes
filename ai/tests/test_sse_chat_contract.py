@@ -18,15 +18,15 @@ import src.api.router as router_module
 
 class StubAuthContext:
     def __init__(self, tenant_id: str, actor: str, role: str, scopes: list[str], mode: str) -> None:
-        self.tenant_id = tenant_id
+        self._tenant_id = tenant_id
         self.actor = actor
         self.role = role
         self.scopes = scopes
         self.mode = mode
 
     @property
-    def org_id(self) -> str:
-        return self.tenant_id
+    def tenant_id(self) -> str:
+        return self._tenant_id
 
 
 class StubRepo:
@@ -69,11 +69,11 @@ class StubRepo:
         self.append_calls.append(kwargs)
         return self.created_conversation
 
-    async def track_usage(self, org_id: str, tokens_in: int, tokens_out: int) -> None:
-        self.track_calls.append({"org_id": org_id, "tokens_in": tokens_in, "tokens_out": tokens_out})
+    async def track_usage(self, tenant_id: str, tokens_in: int, tokens_out: int) -> None:
+        self.track_calls.append({"tenant_id": tenant_id, "tokens_in": tokens_in, "tokens_out": tokens_out})
 
-    async def update_dossier(self, org_id: str, patch: dict[str, object]) -> dict[str, object]:
-        self.update_calls.append({"org_id": org_id, "patch": patch})
+    async def update_dossier(self, tenant_id: str, patch: dict[str, object]) -> dict[str, object]:
+        self.update_calls.append({"tenant_id": tenant_id, "patch": patch})
         return patch
 
 
@@ -130,7 +130,7 @@ def create_public_client(repo: StubRepo, monkeypatch) -> TestClient:
         return "org-public-123"
 
     async def fake_get_external_conversation(**_kwargs):
-        return await repo.create_conversation(org_id="org-public-123", mode="external", title="hola")
+        return await repo.create_conversation(tenant_id="org-public-123", mode="external", title="hola")
 
     monkeypatch.setattr(public_router_module, "resolve_org_id", fake_resolve_org_id)
     monkeypatch.setattr(public_router_module, "get_external_conversation", fake_get_external_conversation)
@@ -652,6 +652,6 @@ def test_public_chat_success_persists_and_finishes(monkeypatch) -> None:
     assert int(events[-1][1]["tokens_used"]) > 0
     assert repo.append_calls and repo.append_calls[0]["conversation_id"] == "conv-1"
     assert len(repo.track_calls) == 1
-    assert repo.track_calls[0]["org_id"] == "org-public-123"
+    assert repo.track_calls[0]["tenant_id"] == "org-public-123"
     assert repo.track_calls[0]["tokens_in"] > 0
     assert repo.track_calls[0]["tokens_out"] > 0

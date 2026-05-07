@@ -32,7 +32,7 @@ export function createCashflowCrudConfig(): CrudPageConfig<CashMovementRow> {
     labelPluralCap: 'Movimientos de caja',
     // Tipo/importe/fecha son inmutables (log contable), pero favorito/tags/categoría/descripción/medio sí son editables.
     allowEdit: true,
-    allowDelete: false,
+    allowDelete: true,
     supportsArchived: true,
     createLabel: '+ Registrar movimiento',
     searchPlaceholder: 'Buscar...',

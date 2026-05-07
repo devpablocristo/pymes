@@ -399,10 +399,10 @@ internal/customer_messaging/
 
 ### 12.5 Multi-tenant
 
-- Cada org tiene máximo 1 conexión (`whatsapp_connections.org_id` es PK)
+- Cada org tiene máximo 1 conexión (`whatsapp_connections.tenant_id` es PK)
 - Cada conexión tiene su propio `phone_number_id` + `access_token`
 - El flujo de conexión futuro será via Embedded Signup (popup Meta OAuth)
-- Los mensajes se registran con `org_id` para aislamiento total
+- Los mensajes se registran con `tenant_id` para aislamiento total
 
 ### 12.6 Compliance LATAM
 

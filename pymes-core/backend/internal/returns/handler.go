@@ -17,17 +17,17 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error)
+	List(ctx context.Context, tenantID uuid.UUID, limit int) ([]returndomain.Return, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]returndomain.Return, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (returndomain.Return, error)
 	Create(ctx context.Context, in CreateReturnInput) (returndomain.Return, *returndomain.CreditNote, error)
 	Update(ctx context.Context, in returndomain.Return, actor string) (returndomain.Return, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	RestoreArchived(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Void(ctx context.Context, orgID, id uuid.UUID, actor string) (returndomain.Return, error)
-	ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error)
-	GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (returndomain.CreditNote, error)
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	RestoreArchived(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Void(ctx context.Context, tenantID, id uuid.UUID, actor string) (returndomain.Return, error)
+	ListCreditNotes(ctx context.Context, tenantID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error)
+	GetCreditNote(ctx context.Context, tenantID, id uuid.UUID) (returndomain.CreditNote, error)
 	ApplyCredit(ctx context.Context, in ApplyCreditInput) (returndomain.CreditNote, error)
 	CreateManualCreditNote(ctx context.Context, in CreateManualCreditNoteInput) (returndomain.CreditNote, error)
 }
@@ -82,7 +82,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	orgID, saleID, ok := parseOrgSale(c)
+	tenantID, saleID, ok := parseOrgSale(c)
 	if !ok {
 		return
 	}
@@ -101,7 +101,7 @@ func (h *Handler) Create(c *gin.Context) {
 		}
 		items = append(items, CreateReturnItemInput{SaleItemID: saleItemID, Quantity: item.Quantity})
 	}
-	out, credit, err := h.uc.Create(c.Request.Context(), CreateReturnInput{OrgID: orgID, SaleID: saleID, Reason: req.Reason, RefundMethod: strings.TrimSpace(req.RefundMethod), Notes: strings.TrimSpace(req.Notes), CreatedBy: auth.Actor, Items: items})
+	out, credit, err := h.uc.Create(c.Request.Context(), CreateReturnInput{TenantID: tenantID, SaleID: saleID, Reason: req.Reason, RefundMethod: strings.TrimSpace(req.RefundMethod), Notes: strings.TrimSpace(req.Notes), CreatedBy: auth.Actor, Items: items})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -110,12 +110,12 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.List(c.Request.Context(), orgID, limit)
+	items, err := h.uc.List(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -124,11 +124,11 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -137,12 +137,12 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -151,7 +151,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
@@ -160,7 +160,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	current, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -185,12 +185,12 @@ func (h *Handler) Update(c *gin.Context) {
 
 // Delete realiza soft delete (archiva).
 func (h *Handler) Delete(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, auth.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -202,12 +202,12 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.RestoreArchived(c.Request.Context(), orgID, id, auth.Actor); err != nil {
+	if err := h.uc.RestoreArchived(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -215,12 +215,12 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, auth.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, auth.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -228,12 +228,12 @@ func (h *Handler) HardDelete(c *gin.Context) {
 }
 
 func (h *Handler) Void(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.Void(c.Request.Context(), orgID, id, auth.Actor)
+	out, err := h.uc.Void(c.Request.Context(), tenantID, id, auth.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -242,12 +242,12 @@ func (h *Handler) Void(c *gin.Context) {
 }
 
 func (h *Handler) ListCreditNotes(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListCreditNotes(c.Request.Context(), orgID, nil, limit)
+	items, err := h.uc.ListCreditNotes(c.Request.Context(), tenantID, nil, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -256,7 +256,7 @@ func (h *Handler) ListCreditNotes(c *gin.Context) {
 }
 
 func (h *Handler) CreateCreditNote(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
@@ -272,10 +272,10 @@ func (h *Handler) CreateCreditNote(c *gin.Context) {
 	}
 	auth := handlers.GetAuthContext(c)
 	out, err := h.uc.CreateManualCreditNote(c.Request.Context(), CreateManualCreditNoteInput{
-		OrgID:   orgID,
-		PartyID: partyID,
-		Amount:  req.Amount,
-		Actor:   auth.Actor,
+		TenantID: tenantID,
+		PartyID:  partyID,
+		Amount:   req.Amount,
+		Actor:    auth.Actor,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -285,11 +285,11 @@ func (h *Handler) CreateCreditNote(c *gin.Context) {
 }
 
 func (h *Handler) GetCreditNote(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetCreditNote(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetCreditNote(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -298,12 +298,12 @@ func (h *Handler) GetCreditNote(c *gin.Context) {
 }
 
 func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
-	orgID, partyID, ok := parseOrgID(c)
+	tenantID, partyID, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListCreditNotes(c.Request.Context(), orgID, &partyID, limit)
+	items, err := h.uc.ListCreditNotes(c.Request.Context(), tenantID, &partyID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -312,7 +312,7 @@ func (h *Handler) ListPartyCreditNotes(c *gin.Context) {
 }
 
 func (h *Handler) ApplyCredit(c *gin.Context) {
-	orgID, saleID, ok := parseOrgSale(c)
+	tenantID, saleID, ok := parseOrgSale(c)
 	if !ok {
 		return
 	}
@@ -327,7 +327,7 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 		return
 	}
 	auth := handlers.GetAuthContext(c)
-	out, err := h.uc.ApplyCredit(c.Request.Context(), ApplyCreditInput{OrgID: orgID, SaleID: saleID, CreditNoteID: creditNoteID, Amount: req.Amount, Actor: auth.Actor})
+	out, err := h.uc.ApplyCredit(c.Request.Context(), ApplyCreditInput{TenantID: tenantID, SaleID: saleID, CreditNoteID: creditNoteID, Amount: req.Amount, Actor: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -336,15 +336,15 @@ func (h *Handler) ApplyCredit(c *gin.Context) {
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+	return handlers.ParseAuthTenantID(c)
 }
 
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	return handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }
 
 func parseOrgSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -353,5 +353,5 @@ func parseOrgSale(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid sale id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, saleID, true
+	return tenantID, saleID, true
 }

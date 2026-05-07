@@ -14,12 +14,8 @@ type CrudModuleId =
   | 'cashflow'
   | 'inventory'
   | 'payments'
-  | 'attachments'
-  | 'audit'
-  | 'timeline'
   | 'purchases'
   | 'procurementRequests'
-  | 'procurementPolicies'
   | 'accounts'
   | 'roles'
   | 'parties'
@@ -59,19 +55,11 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   cashflow: { title: 'Caja', navLabel: 'Caja', labelPlural: 'movimientos de caja' },
   inventory: { title: 'Inventario', navLabel: 'Inventario', labelPlural: 'productos en el inventario' },
   payments: { title: 'Pagos', navLabel: 'Pagos', labelPlural: 'pagos' },
-  attachments: { title: 'Adjuntos', navLabel: 'Adjuntos', labelPlural: 'adjuntos' },
-  audit: { title: 'Auditoría', navLabel: 'Auditoría', labelPlural: 'eventos de auditoría' },
-  timeline: { title: 'Historial', navLabel: 'Historial', labelPlural: 'entradas de timeline' },
   purchases: { title: 'Compras', navLabel: 'Compras', labelPlural: 'compras' },
   procurementRequests: {
     title: 'Solicitudes de compra internas',
     navLabel: 'Solicitudes compra',
     labelPlural: 'solicitudes de compra internas',
-  },
-  procurementPolicies: {
-    title: 'Políticas de compras (Nexus Governance)',
-    navLabel: 'Políticas compras',
-    labelPlural: 'políticas de compras',
   },
   accounts: { title: 'Cuentas corrientes', navLabel: 'Cuentas corrientes', labelPlural: 'cuentas corrientes' },
   roles: { title: 'Roles', navLabel: 'Roles', labelPlural: 'roles' },
@@ -79,12 +67,12 @@ const crudModuleDefaults: Record<CrudModuleId, CrudModuleDefaults> = {
   employees: { title: 'Empleados', navLabel: 'Empleados', labelPlural: 'empleados' },
   recurring: { title: 'Gastos recurrentes', navLabel: 'Gastos recurrentes', labelPlural: 'gastos recurrentes' },
   webhooks: { title: 'Webhooks', navLabel: 'Webhooks', labelPlural: 'endpoints webhook' },
-  professionals: { title: 'Teachers', navLabel: 'Teachers', labelPlural: 'teachers' },
+  professionals: { title: 'Profesionales', navLabel: 'Profesionales', labelPlural: 'profesionales' },
   specialties: { title: 'Especialidades', navLabel: 'Especialidades', labelPlural: 'especialidades' },
   intakes: { title: 'Ingresos', navLabel: 'Ingresos', labelPlural: 'ingresos' },
   sessions: { title: 'Sesiones', navLabel: 'Sesiones', labelPlural: 'sesiones' },
   workshopVehicles: { title: 'Vehículos', navLabel: 'Vehículos', labelPlural: 'vehículos' },
-  carWorkOrders: { title: 'Órdenes de trabajo (auto)', navLabel: 'OT auto', labelPlural: 'órdenes de trabajo' },
+  carWorkOrders: { title: 'Órdenes de trabajo', navLabel: 'OT auto', labelPlural: 'órdenes de trabajo' },
   bikeWorkOrders: {
     title: 'Órdenes de trabajo',
     navLabel: 'Órdenes de trabajo',
@@ -177,22 +165,6 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
     summary: 'Cobros de una venta. Usá ?sale_id=<UUID> en la URL o registrá cobros desde el listado de ventas.',
     notes: ['No existe listado global de pagos en el API; cada listado es GET /v1/sales/:id/payments.'],
   },
-  attachments: {
-    group: 'integrations',
-    icon: 'AD',
-    summary:
-      'Archivos por entidad. Query: ?entity=sales|quotes|purchases|…&entity_id=<UUID> (mismo contrato que GET /v1/:entity/:id/attachments).',
-  },
-  audit: {
-    group: 'control',
-    icon: 'AU',
-    summary: 'Trazabilidad de actividad en la organización; exportación CSV desde la barra de herramientas.',
-  },
-  timeline: {
-    group: 'control',
-    icon: 'TL',
-    summary: 'Historial y notas manuales por entidad. Query: ?entity=sales|quotes|…&entity_id=<UUID>.',
-  },
   purchases: {
     group: 'operations',
     icon: 'CP',
@@ -279,32 +251,6 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
       },
     ],
   },
-  procurementPolicies: {
-    group: 'control',
-    icon: 'GP',
-    title: 'Políticas de compras',
-    navLabel: 'Políticas compras',
-    summary: 'Políticas CEL por organización; este frontend solo adapta la frontera HTTP/UI hacia Nexus Governance.',
-    datasets: [
-      {
-        id: 'procurement-policies-list',
-        title: 'Políticas CEL',
-        description: 'Reglas por org; se evalúan al enviar una solicitud (submit).',
-        path: '/v1/procurement-policies',
-        autoLoad: true,
-      },
-    ],
-    actions: [
-      {
-        id: 'procurement-policy-detail',
-        title: 'Detalle de política',
-        description: 'GET por ID.',
-        path: '/v1/procurement-policies/:policyId',
-        method: 'GET',
-        fields: [{ name: 'policyId', label: 'ID de política', location: 'path', required: true }],
-      },
-    ],
-  },
   accounts: {
     group: 'commercial',
     icon: 'CC',
@@ -318,8 +264,8 @@ const crudModuleMeta: Partial<Record<CrudModuleId, CrudModuleMeta>> = {
   roles: {
     group: 'control',
     icon: 'RB',
-    title: 'RBAC',
-    navLabel: 'RBAC',
+    title: 'Roles',
+    navLabel: 'Roles',
     summary: 'Roles, permisos efectivos y asignación operativa como adaptador fino de la frontera Nexus/RBAC.',
   },
   webhooks: {

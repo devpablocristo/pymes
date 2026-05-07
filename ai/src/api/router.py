@@ -65,7 +65,7 @@ async def list_conversations(
 ):
     """Lista conversaciones internas del usuario autenticado."""
     rows = await repo.list_conversations(
-        auth.org_id,
+        auth.tenant_id,
         mode="internal",
         user_id=get_internal_conversation_user_id(auth),
         limit=limit,
@@ -91,7 +91,7 @@ async def get_conversation(
     auth: AuthContext = Depends(get_auth_context),
 ):
     """Devuelve una conversación con su historial de mensajes."""
-    row = await repo.get_conversation(auth.org_id, conversation_id)
+    row = await repo.get_conversation(auth.tenant_id, conversation_id)
     if row is None or row.mode != "internal" or not can_access_internal_conversation(auth, row.user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
     return ConversationDetail(
@@ -125,11 +125,11 @@ async def chat_internal(
         req.preferred_language,
         accept_language=request.headers.get("Accept-Language"),
     )
-    await check_quota(repo, auth.org_id, mode="internal")
+    await check_quota(repo, auth.tenant_id, mode="internal")
     logger.info(
         "chat_internal_started",
         request_id=request_id,
-        org_id=auth.org_id,
+        tenant_id=auth.tenant_id,
         user_id=auth.actor,
         conversation_id=req.chat_id or "",
         endpoint_kind="chat_json",
@@ -141,7 +141,7 @@ async def chat_internal(
             repo=repo,
             llm=llm,
             backend_client=backend_client,
-            org_id=auth.org_id,
+            tenant_id=auth.tenant_id,
             message=req.message,
             conversation_id=req.chat_id,
             auth=auth,
@@ -154,7 +154,7 @@ async def chat_internal(
         logger.warning(
             "chat_internal_visible_error",
             request_id=request_id,
-            org_id=auth.org_id,
+            tenant_id=auth.tenant_id,
             user_id=auth.actor,
             code=exc.code,
             error=exc.message,
@@ -173,13 +173,13 @@ async def chat_internal(
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
-        logger.exception("chat_internal_failed", org_id=auth.org_id, user_id=auth.actor, error=str(exc))
+        logger.exception("chat_internal_failed", tenant_id=auth.tenant_id, user_id=auth.actor, error=str(exc))
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
 
     logger.info(
         "chat_internal_completed",
         request_id=request_id,
-        org_id=auth.org_id,
+        tenant_id=auth.tenant_id,
         user_id=auth.actor,
         conversation_id=result.conversation_id,
         routed_agent=normalize_routed_agent(result.routed_agent),

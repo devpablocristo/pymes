@@ -19,7 +19,7 @@ async def _build_internal_sales_tools(
     client: BackendClient,
     auth: AuthContext,
     repo: AIRepository,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str | None,
     policy: CommercialPolicy,
     state: CommercialRunState,
@@ -28,42 +28,42 @@ async def _build_internal_sales_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, Any] = {}
 
-    async def _search_customers(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_customers(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await customers.search_customers(client, auth, query=query, limit=limit)
 
-    async def _search_products(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_products(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await products.search_products(client, auth, query=query, limit=limit)
 
-    async def _get_low_stock(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_low_stock(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_low_stock(client, auth)
 
-    async def _get_stock_level(org_id: str, product_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_stock_level(tenant_id: str, product_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_stock_level(client, auth, product_id=product_id)
 
-    async def _get_quotes(org_id: str, status_filter: str | None = None) -> dict[str, Any]:
-        _ = org_id
+    async def _get_quotes(tenant_id: str, status_filter: str | None = None) -> dict[str, Any]:
+        _ = tenant_id
         return await quotes.get_quotes(client, auth, status=status_filter)
 
-    async def _create_quote(org_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
-        _ = org_id
+    async def _create_quote(tenant_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
+        _ = tenant_id
         return await quotes.create_quote(client, auth, customer_name=customer_name, items=items, notes=notes)
 
     async def _create_sale(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         items: list[dict[str, Any]],
         payment_method: str = "cash",
         notes: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await sales.create_sale(client, auth, customer_name=customer_name, items=items, payment_method=payment_method, notes=notes)
 
-    async def _generate_payment_link(org_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _generate_payment_link(tenant_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
+        _ = tenant_id
         kind = reference_type.strip().lower()
         if kind == "sale":
             return await client.request("POST", f"/v1/sales/{reference_id}/payment-link", auth=auth)
@@ -71,8 +71,8 @@ async def _build_internal_sales_tools(
             return await client.request("POST", f"/v1/quotes/{reference_id}/payment-link", auth=auth)
         return {"code": "invalid_reference_type", "message": "reference_type debe ser sale o quote"}
 
-    async def _get_payment_status(org_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_payment_status(tenant_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
+        _ = tenant_id
         kind = reference_type.strip().lower()
         if kind == "sale":
             return await payments.get_payment_status(client, auth, sale_id=reference_id)
@@ -80,16 +80,16 @@ async def _build_internal_sales_tools(
             return await client.request("GET", f"/v1/quotes/{reference_id}/payment-link", auth=auth)
         return {"code": "invalid_reference_type", "message": "reference_type debe ser sale o quote"}
 
-    async def _send_payment_info(org_id: str, sale_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _send_payment_info(tenant_id: str, sale_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await payments.send_payment_info(client, auth, sale_id=sale_id)
 
-    async def _get_account_balances(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_account_balances(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await accounts.get_account_balances(client, auth)
 
-    async def _get_recent_sales(org_id: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _get_recent_sales(tenant_id: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await sales.get_recent_sales(client, auth, limit=limit)
 
     specs = [
@@ -115,7 +115,7 @@ async def _build_internal_sales_tools(
             name=declaration.name,
             handler=raw_handler,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             policy=policy,
             state=state,

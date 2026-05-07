@@ -15,7 +15,7 @@ import (
 )
 
 type PermissionChecker interface {
-	HasPermission(ctx context.Context, orgID, actor, role string, scopes []string, authMethod, resource, action string) bool
+	HasPermission(ctx context.Context, tenantID, actor, role string, scopes []string, authMethod, resource, action string) bool
 }
 
 type Handler struct {
@@ -213,13 +213,13 @@ func (h *Handler) allowed(ctx context.Context, auth ActorContext, cap Capability
 	if h.checker == nil {
 		return false
 	}
-	return h.checker.HasPermission(ctx, auth.OrgID, auth.Actor, auth.Role, auth.Scopes, auth.AuthMethod, cap.RBACResource, cap.RBACAction)
+	return h.checker.HasPermission(ctx, auth.TenantID, auth.Actor, auth.Role, auth.Scopes, auth.AuthMethod, cap.RBACResource, cap.RBACAction)
 }
 
 func authContext(c *gin.Context) ActorContext {
 	auth := handlers.GetAuthContext(c)
 	return ActorContext{
-		OrgID:      auth.OrgID,
+		TenantID:   auth.TenantID,
 		Actor:      auth.Actor,
 		Role:       auth.Role,
 		Scopes:     auth.Scopes,

@@ -5,26 +5,26 @@ function normalizeBranchId(branchId: string | null | undefined): string | null {
   return branchId?.trim() || null;
 }
 
-export function storageKeyForOrg(orgId: string): string {
-  return `${BRANCH_STORAGE_PREFIX}${orgId}`;
+export function storageKeyForTenant(tenantId: string): string {
+  return `${BRANCH_STORAGE_PREFIX}${tenantId}`;
 }
 
-export function readStoredBranchId(orgId: string): string | null {
+export function readStoredBranchId(tenantId: string): string | null {
   try {
-    return normalizeBranchId(window.localStorage.getItem(storageKeyForOrg(orgId)));
+    return normalizeBranchId(window.localStorage.getItem(storageKeyForTenant(tenantId)));
   } catch {
     return null;
   }
 }
 
-export function writeStoredBranchId(orgId: string, branchId: string | null) {
+export function writeStoredBranchId(tenantId: string, branchId: string | null) {
   try {
     const normalized = normalizeBranchId(branchId);
     if (normalized) {
-      window.localStorage.setItem(storageKeyForOrg(orgId), normalized);
+      window.localStorage.setItem(storageKeyForTenant(tenantId), normalized);
       return;
     }
-    window.localStorage.removeItem(storageKeyForOrg(orgId));
+    window.localStorage.removeItem(storageKeyForTenant(tenantId));
   } catch {
     // localStorage puede no estar disponible; no bloquear la UI.
   }

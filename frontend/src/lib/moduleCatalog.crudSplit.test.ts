@@ -37,8 +37,10 @@ describe('moduleCatalog CRUD split', () => {
     expect(lazyCrudSrc).toContain("import('./resourceConfigs.operations')");
     expect(lazyCrudSrc).toContain("'procurementRequests'");
     expect(lazyCrudSrc).toContain("import('./resourceConfigs.governance')");
-    expect(lazyCrudSrc).toContain("'attachments'");
-    expect(lazyCrudSrc).toContain("'audit'");
+    expect(lazyCrudSrc).not.toContain("'procurementPolicies'");
+    expect(lazyCrudSrc).not.toContain("'attachments'");
+    expect(lazyCrudSrc).not.toContain("'audit'");
+    expect(lazyCrudSrc).not.toContain("'timeline'");
     expect(lazyCrudSrc).toContain("import('./resourceConfigs.control')");
   });
 

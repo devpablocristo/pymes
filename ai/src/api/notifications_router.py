@@ -150,7 +150,7 @@ async def _persist_notification_items(
                 include_internal=True,
                 json={
                     "id": item.id,
-                    "org_id": auth.org_id,
+                    "tenant_id": auth.tenant_id,
                     "actor": auth.actor,
                     "title": item.title,
                     "body": item.body,
@@ -163,7 +163,7 @@ async def _persist_notification_items(
         except Exception as exc:  # pragma: no cover - best effort path, covered by request assertions
             logger.warning(
                 "notifications_in_app_persist_failed",
-                org_id=auth.org_id,
+                tenant_id=auth.tenant_id,
                 actor=auth.actor,
                 notification_scope=item.entity_id,
                 error=str(exc),
@@ -194,7 +194,7 @@ async def create_notifications(
     # Diseño listo para i18n end-to-end: aceptamos preferencia ahora,
     # pero hasta que exista catálogo `en` el contenido efectivo sigue en español.
     effective_content_language: LanguageCode = "es"
-    await check_quota(repo, auth.org_id, mode="internal")
+    await check_quota(repo, auth.tenant_id, mode="internal")
     filters = InsightFilters(period=req.period, compare=req.compare, top_limit=req.top_limit)
     sales, inventory, customers = await asyncio.gather(
         service.build_sales_collections_insight(auth=auth, filters=filters),
@@ -229,11 +229,11 @@ async def create_notifications(
         ),
     ]
     items = await _persist_notification_items(backend_client, auth, items)
-    await repo.track_usage(auth.org_id, tokens_in=0, tokens_out=0)
+    await repo.track_usage(auth.tenant_id, tokens_in=0, tokens_out=0)
     logger.info(
         "notifications_insights_completed",
         request_id=request_id,
-        org_id=auth.org_id,
+        tenant_id=auth.tenant_id,
         actor=auth.actor,
         notifications=len(items),
         period=req.period,

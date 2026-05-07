@@ -1,5 +1,4 @@
 import type { CrudPageConfig } from '../components/CrudPage';
-import { hasCrudModule } from './crudModuleCatalog';
 
 type CrudModule =
   | typeof import('./resourceConfigs')
@@ -41,20 +40,19 @@ const OPERATIONS_CRUD_IDS = new Set<string>([
   'cashflow',
   'payments',
   'recurring',
+  'employees',
 ]);
 
 const GOVERNANCE_CRUD_IDS = new Set<string>([
   'procurementRequests',
-  'procurementPolicies',
   'accounts',
   'roles',
   'parties',
-  'employees',
 ]);
 
-const CONTROL_CRUD_IDS = new Set<string>(['attachments', 'audit', 'timeline', 'webhooks']);
+const CONTROL_CRUD_IDS = new Set<string>(['webhooks']);
 
-const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'teachers', 'specialties', 'intakes', 'sessions']);
+const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'specialties', 'intakes', 'sessions']);
 
 const WORKSHOPS_CRUD_IDS = new Set<string>(['workshopVehicles', 'carWorkOrders', 'bikeWorkOrders']);
 
@@ -122,5 +120,5 @@ export async function loadLazyCrudPageConfig<TRecord extends { id: string } = { 
 }
 
 export async function hasLazyCrudResource(resourceId: string): Promise<boolean> {
-  return hasCrudModule(resourceId);
+  return (await loadLazyCrudPageConfig(resourceId)) != null;
 }

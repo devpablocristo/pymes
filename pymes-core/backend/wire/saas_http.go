@@ -9,14 +9,10 @@ import (
 	"strings"
 
 	authn "github.com/devpablocristo/core/authn/go"
+	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
 	billingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
-	kerneldomain "github.com/devpablocristo/core/saas/go/kernel/usecases/domain"
-	saasmiddleware "github.com/devpablocristo/core/saas/go/middleware"
-	saasusers "github.com/devpablocristo/core/saas/go/users"
-	"github.com/devpablocristo/core/saas/go/users/handler/dto"
-	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
 
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/authz"
 )
@@ -34,11 +30,17 @@ func registerPymesSaaSRoutes(
 	billingRuntime *saasbilling.Runtime,
 	httpAuth pymesSaaSHTTPAuth,
 ) {
-	registerPublic(mux, "POST /orgs", func(w http.ResponseWriter, r *http.Request) {
-		handleCreateOrg(w, r, store)
+	registerPublic(mux, "GET /tenants", func(w http.ResponseWriter, r *http.Request) {
+		handleListMyTenants(w, r, store, httpAuth)
+	})
+	registerPublic(mux, "POST /tenants", func(w http.ResponseWriter, r *http.Request) {
+		handleCreateTenant(w, r, store, httpAuth)
+	})
+	registerPublic(mux, "POST /tenant-invites/accept", func(w http.ResponseWriter, r *http.Request) {
+		handleAcceptTenantInvite(w, r, store, httpAuth)
 	})
 
-	// Sesión de producto: envuelve el Principal del kernel (core/saas/go/session) con org_id + product_role (+ org_name si hay fila en orgs).
+	// Sesión de producto: envuelve el Principal del kernel con tenant_id + product_role.
 	registerProtected(mux, authMW, "GET /session", func(w http.ResponseWriter, r *http.Request) {
 		handleSessionEnriched(w, r, store)
 	})
@@ -49,19 +51,40 @@ func registerPymesSaaSRoutes(
 	registerProtected(mux, authMW, "PATCH /users/me/profile", func(w http.ResponseWriter, r *http.Request) {
 		handlePatchMeProfile(w, r, store, httpAuth)
 	})
-	registerProtected(mux, authMW, "GET /orgs/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
 	})
-	registerProtected(mux, authMW, "GET /orgs/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "PATCH /tenants/{tenant_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+		handleUpdateTenantMember(w, r, store)
+	})
+	registerProtected(mux, authMW, "DELETE /tenants/{tenant_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+		handleRemoveTenantMember(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/ownership/transfer", func(w http.ResponseWriter, r *http.Request) {
+		handleTransferTenantOwnership(w, r, store)
+	})
+	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+		handleListTenantInvites(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+		handleCreateTenantInvite(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/revoke", func(w http.ResponseWriter, r *http.Request) {
+		handleRevokeTenantInvite(w, r, store)
+	})
+	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/resend", func(w http.ResponseWriter, r *http.Request) {
+		handleResendTenantInvite(w, r, store)
+	})
+	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleListAPIKeys(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /orgs/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "DELETE /orgs/{org_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "DELETE /tenants/{tenant_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleDeleteAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /orgs/{org_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
 		handleRotateAPIKey(w, r, store)
 	})
 	registerProtected(mux, authMW, "GET /billing/status", func(w http.ResponseWriter, r *http.Request) {
@@ -87,10 +110,9 @@ func registerPublic(mux *http.ServeMux, pattern string, next http.HandlerFunc) {
 	mux.HandleFunc(pattern, next)
 }
 
-type createOrgRequest struct {
-	Name  string `json:"name"`
-	Slug  string `json:"slug"`
-	Actor string `json:"actor"`
+type createTenantRequest struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 type createAPIKeyRequest struct {
@@ -108,20 +130,66 @@ type billingPortalRequest struct {
 	ReturnURL string `json:"return_url"`
 }
 
-func handleCreateOrg(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	var req createOrgRequest
+type tenantInviteRequest struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+type tenantMemberUpdateRequest struct {
+	Role string `json:"role"`
+}
+
+type tenantOwnershipTransferRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type tenantInviteAcceptRequest struct {
+	Token string `json:"token"`
+}
+
+func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	user, err := authenticatedClerkUser(r.Context(), r.Header.Get("Authorization"), httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	var req createTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
 		return
 	}
-	orgID, rawKey, key, scopes, err := store.CreateOrgWithDefaultKey(r.Context(), req.Name, req.Slug, req.Actor)
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		httperr.BadRequest(w, "name is required")
+		return
+	}
+	slug := strings.TrimSpace(req.Slug)
+	if slug == "" {
+		slug = slugifyTenantName(name)
+	}
+	if store.clerk == nil {
+		httperr.WriteFrom(w, domainerr.Unavailable("clerk backend client is not configured"))
+		return
+	}
+	clerkOrg, err := store.clerk.CreateOrganization(r.Context(), clerkCreateOrganizationInput{
+		Name:      name,
+		Slug:      slug,
+		CreatedBy: user.ExternalID,
+	})
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, clerkOrg.ID, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
 	httperr.WriteJSON(w, http.StatusCreated, map[string]any{
-		"org_id":  orgID,
-		"raw_key": rawKey,
+		"tenant_id":    tenantID,
+		"clerk_org_id": clerkOrg.ID,
+		"slug":         slug,
+		"raw_key":      rawKey,
 		"key": map[string]any{
 			"id":         key.ID.String(),
 			"name":       key.Name,
@@ -132,14 +200,27 @@ func handleCreateOrg(w http.ResponseWriter, r *http.Request, store *pymesSaaSSto
 	})
 }
 
+func handleListMyTenants(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	user, err := authenticatedClerkUser(r.Context(), r.Header.Get("Authorization"), httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	items, err := store.ListTenantsForUser(r.Context(), user.ExternalID)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
 	}
 	auth := map[string]any{
-		"org_id":       principal.TenantID,
 		"tenant_id":    principal.TenantID,
 		"role":         principal.Role,
 		"product_role": authz.ProductRole(principal.Role, principal.Scopes),
@@ -147,15 +228,25 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 		"actor":        principal.Actor,
 		"auth_method":  principal.AuthMethod,
 	}
+	tenant := map[string]any{
+		"id": principal.TenantID,
+	}
+	membership := map[string]any{
+		"role": principal.Role,
+	}
+	user := map[string]any{
+		"external_id": principal.Actor,
+	}
 	if store != nil {
-		name, okName, err := store.GetOrgNameByOrgUUID(r.Context(), principal.TenantID)
+		name, okName, err := store.GetTenantNameByID(r.Context(), principal.TenantID)
 		if err != nil {
-			slog.Warn("session org name lookup", "err", err, "org_id", principal.TenantID)
+			slog.Warn("session tenant name lookup", "err", err, "tenant_id", principal.TenantID)
 		} else if okName && strings.TrimSpace(name) != "" {
-			auth["org_name"] = strings.TrimSpace(name)
+			auth["tenant_name"] = strings.TrimSpace(name)
+			tenant["name"] = strings.TrimSpace(name)
 		}
 		if settings, okSettings, err := store.loadTenantSettings(r.Context(), principal.TenantID); err != nil {
-			slog.Warn("session tenant settings lookup", "err", err, "org_id", principal.TenantID)
+			slog.Warn("session tenant settings lookup", "err", err, "tenant_id", principal.TenantID)
 		} else if okSettings {
 			if vertical := strings.TrimSpace(settings.Vertical); vertical != "" {
 				auth["vertical"] = vertical
@@ -165,18 +256,15 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 			}
 		}
 	}
-	httperr.WriteJSON(w, http.StatusOK, map[string]any{"auth": auth})
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{
+		"auth":       auth,
+		"tenant":     tenant,
+		"membership": membership,
+		"user":       user,
+	})
 }
 
-func enrichMeProfileWithUserExtras(ctx context.Context, store *pymesSaaSStore, profile saasuserdomain.MeProfile) (map[string]any, error) {
-	raw, err := json.Marshal(profile)
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
+func enrichMeProfileWithUserExtras(ctx context.Context, store *pymesSaaSStore, out map[string]any) (map[string]any, error) {
 	if store == nil {
 		return out, nil
 	}
@@ -198,7 +286,7 @@ func enrichMeProfileWithUserExtras(ctx context.Context, store *pymesSaaSStore, p
 	return out, nil
 }
 
-func writeEnrichedMeProfile(w http.ResponseWriter, ctx context.Context, store *pymesSaaSStore, profile saasuserdomain.MeProfile) {
+func writeEnrichedMeProfile(w http.ResponseWriter, ctx context.Context, store *pymesSaaSStore, profile map[string]any) {
 	out, err := enrichMeProfileWithUserExtras(ctx, store, profile)
 	if err != nil {
 		slog.Warn("enrich me profile", "err", err)
@@ -208,22 +296,12 @@ func writeEnrichedMeProfile(w http.ResponseWriter, ctx context.Context, store *p
 	httperr.WriteJSON(w, http.StatusOK, out)
 }
 
-func loadMeProfile(ctx context.Context, r *http.Request, principal kerneldomain.Principal, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) (saasuserdomain.MeProfile, error) {
-	usersUC := saasusers.NewUseCases(store)
-	handler := saasusers.NewHandler(usersUC)
-	req := dto.GetMeRequest{
-		OrgID:      principal.TenantID,
-		ExternalID: principal.Actor,
-		Role:       principal.Role,
-		Scopes:     principal.Scopes,
-	}
-	resp, err := handler.GetMe(ctx, req)
+func loadMeProfile(ctx context.Context, r *http.Request, principal tenantPrincipal, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) (map[string]any, error) {
+	user, ok, err := store.FindUserByExternalID(ctx, principal.Actor)
 	if err != nil {
-		return saasuserdomain.MeProfile{}, err
+		return nil, err
 	}
-
-	// Sin webhook de Clerk: el JWT ya está verificado en el middleware; creamos usuario + membresía desde claims.
-	if principal.AuthMethod == "jwt" && resp.Profile.User == nil && strings.TrimSpace(httpAuth.JWKSURL) != "" {
+	if principal.AuthMethod == "jwt" && !ok && strings.TrimSpace(httpAuth.JWKSURL) != "" {
 		raw, bearerOK := authn.BearerToken(r.Header.Get("Authorization"))
 		if bearerOK && strings.TrimSpace(raw) != "" {
 			if claims, vErr := verifyJWTClaimsMap(ctx, raw, httpAuth.JWKSURL, httpAuth.JWTIssuer); vErr == nil {
@@ -236,22 +314,28 @@ func loadMeProfile(ctx context.Context, r *http.Request, principal kerneldomain.
 					if name == "" {
 						name = "User"
 					}
-					if _, upErr := store.UpsertUser(ctx, principal.Actor, email, name, nil); upErr == nil {
-						_, _ = store.SyncMembership(ctx, principal.TenantID, principal.Actor, email, name, nil, principal.Role)
-						if resp2, gErr := handler.GetMe(ctx, req); gErr == nil {
-							resp = resp2
-						}
-					}
+					user, err = store.UpsertUser(ctx, principal.Actor, email, name, nil)
+					ok = err == nil
 				}
 			}
 		}
 	}
-
-	return resp.Profile, nil
+	var userPayload any
+	if ok {
+		userPayload = user
+	}
+	return map[string]any{
+		"user": userPayload,
+		"membership": map[string]any{
+			"tenant_id": principal.TenantID,
+			"role":      principal.Role,
+			"scopes":    principal.Scopes,
+		},
+	}, nil
 }
 
 func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
@@ -265,7 +349,7 @@ func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, 
 }
 
 func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
@@ -309,11 +393,11 @@ func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSa
 }
 
 func handleListMembers(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgID(w, r)
+	tenantID, ok := authorizedTenantID(w, r)
 	if !ok {
 		return
 	}
-	items, err := store.ListOrgMembers(r.Context(), orgID)
+	items, err := store.ListTenantMembers(r.Context(), tenantID)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
@@ -321,12 +405,154 @@ func handleListMembers(w http.ResponseWriter, r *http.Request, store *pymesSaaSS
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func handleListAPIKeys(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
+func handleListTenantInvites(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantOwner(w, r, store)
 	if !ok {
 		return
 	}
-	rows, err := store.listAPIKeyRows(r.Context(), orgID)
+	items, err := store.ListTenantInvitations(r.Context(), tenantID)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func handleCreateTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantOwner(w, r, store)
+	if !ok {
+		return
+	}
+	principal, _ := tenantPrincipalFromContext(r.Context())
+	var req tenantInviteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	item, err := store.CreateTenantInvitation(r.Context(), tenantID, principal.Actor, req.Email, req.Role)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusCreated, map[string]any{"invite": item})
+}
+
+func handleAcceptTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	user, err := authenticatedClerkUser(r.Context(), r.Header.Get("Authorization"), httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	var req tenantInviteAcceptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	item, clerkTenantID, err := store.AcceptTenantInvitation(r.Context(), req.Token, user)
+	if err != nil {
+		var de domainerr.Error
+		if errors.As(err, &de) && de.Message() == "invite_expired" {
+			httperr.Write(w, http.StatusGone, "invite_expired", "invite_expired")
+			return
+		}
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item, "clerk_org_id": clerkTenantID})
+}
+
+func handleRevokeTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	principal, okPrincipal := tenantPrincipalFromContext(r.Context())
+	if !okPrincipal {
+		httperr.Unauthorized(w, "principal not found")
+		return
+	}
+	tenantID := principal.TenantID
+	if _, err := store.requireTenantOwner(r.Context(), tenantID, principal.Actor); err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	item, err := store.RevokeTenantInvitation(r.Context(), tenantID, strings.TrimSpace(r.PathValue("invite_id")), principal.Actor)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item})
+}
+
+func handleResendTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	principal, okPrincipal := tenantPrincipalFromContext(r.Context())
+	if !okPrincipal {
+		httperr.Unauthorized(w, "principal not found")
+		return
+	}
+	tenantID := principal.TenantID
+	if _, err := store.requireTenantOwner(r.Context(), tenantID, principal.Actor); err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	item, err := store.ResendTenantInvitation(r.Context(), tenantID, strings.TrimSpace(r.PathValue("invite_id")), principal.Actor)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item})
+}
+
+func handleUpdateTenantMember(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantOwner(w, r, store)
+	if !ok {
+		return
+	}
+	var req tenantMemberUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	item, err := store.UpdateTenantMemberRole(r.Context(), tenantID, strings.TrimSpace(r.PathValue("user_id")), req.Role)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"member": item})
+}
+
+func handleRemoveTenantMember(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantOwner(w, r, store)
+	if !ok {
+		return
+	}
+	if err := store.RemoveTenantMember(r.Context(), tenantID, strings.TrimSpace(r.PathValue("user_id"))); err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func handleTransferTenantOwnership(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantOwner(w, r, store)
+	if !ok {
+		return
+	}
+	principal, _ := tenantPrincipalFromContext(r.Context())
+	var req tenantOwnershipTransferRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	if err := store.TransferTenantOwnership(r.Context(), tenantID, principal.Actor, req.UserID); err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func handleListAPIKeys(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	tenantID, ok := authorizedTenantIDForAPIKeyManagement(w, r)
+	if !ok {
+		return
+	}
+	rows, err := store.listAPIKeyRows(r.Context(), tenantID)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
@@ -350,7 +576,7 @@ func handleListAPIKeys(w http.ResponseWriter, r *http.Request, store *pymesSaaSS
 }
 
 func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
+	tenantID, ok := authorizedTenantIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
@@ -359,7 +585,7 @@ func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		httperr.BadRequest(w, "invalid request body")
 		return
 	}
-	created, err := store.CreateAPIKey(r.Context(), orgID, req.Name, req.Scopes)
+	created, err := store.CreateAPIKey(r.Context(), tenantID, req.Name, req.Scopes)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
@@ -377,11 +603,11 @@ func handleCreateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 }
 
 func handleRotateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
+	tenantID, ok := authorizedTenantIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
-	rotated, err := store.RotateAPIKey(r.Context(), orgID, strings.TrimSpace(r.PathValue("key_id")))
+	rotated, err := store.RotateAPIKey(r.Context(), tenantID, strings.TrimSpace(r.PathValue("key_id")))
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
@@ -399,11 +625,11 @@ func handleRotateAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 }
 
 func handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
-	orgID, ok := authorizedOrgIDForAPIKeyManagement(w, r)
+	tenantID, ok := authorizedTenantIDForAPIKeyManagement(w, r)
 	if !ok {
 		return
 	}
-	if err := store.DeleteAPIKey(r.Context(), orgID, strings.TrimSpace(r.PathValue("key_id"))); err != nil {
+	if err := store.DeleteAPIKey(r.Context(), tenantID, strings.TrimSpace(r.PathValue("key_id"))); err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
@@ -411,7 +637,7 @@ func handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 }
 
 func handleBillingStatus(w http.ResponseWriter, r *http.Request, runtime *saasbilling.Runtime) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
@@ -422,7 +648,7 @@ func handleBillingStatus(w http.ResponseWriter, r *http.Request, runtime *saasbi
 		return
 	}
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{
-		"org_id":             principal.TenantID,
+		"tenant_id":          principal.TenantID,
 		"plan_code":          status.PlanCode,
 		"status":             status.BillingStatus,
 		"hard_limits":        status.HardLimits,
@@ -432,7 +658,7 @@ func handleBillingStatus(w http.ResponseWriter, r *http.Request, runtime *saasbi
 }
 
 func handleBillingCheckout(w http.ResponseWriter, r *http.Request, runtime *saasbilling.Runtime) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
@@ -457,7 +683,7 @@ func handleBillingCheckout(w http.ResponseWriter, r *http.Request, runtime *saas
 }
 
 func handleBillingPortal(w http.ResponseWriter, r *http.Request, runtime *saasbilling.Runtime) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return
@@ -479,32 +705,32 @@ func handleBillingPortal(w http.ResponseWriter, r *http.Request, runtime *saasbi
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{"portal_url": url})
 }
 
-func authorizedOrgID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+func authorizedTenantID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return "", false
 	}
-	orgID := strings.TrimSpace(r.PathValue("org_id"))
-	if orgID == "" {
-		httperr.BadRequest(w, "org_id is required")
+	tenantID := strings.TrimSpace(r.PathValue("tenant_id"))
+	if tenantID == "" {
+		httperr.BadRequest(w, "tenant_id is required")
 		return "", false
 	}
-	if principal.TenantID != orgID {
-		httperr.Write(w, http.StatusForbidden, httperr.CodeUnauthorized, "cross-org access denied")
+	if principal.TenantID != tenantID {
+		httperr.Write(w, http.StatusForbidden, "FORBIDDEN", "cross-tenant access denied")
 		return "", false
 	}
-	return orgID, true
+	return tenantID, true
 }
 
 // apiKeyManagementAllowed alinea con la consola: solo privilegiados o scopes admin de consola.
-func apiKeyManagementAllowed(principal kerneldomain.Principal) bool {
+func apiKeyManagementAllowed(principal tenantPrincipal) bool {
 	return authz.CanManageAPIKeys(principal.Role, principal.Scopes, principal.AuthMethod)
 }
 
-// authorizedOrgIDForAPIKeyManagement exige además de coincidencia de tenant, permisos de admin de producto.
-func authorizedOrgIDForAPIKeyManagement(w http.ResponseWriter, r *http.Request) (string, bool) {
-	principal, ok := saasmiddleware.PrincipalFromContext(r.Context())
+// authorizedTenantIDForAPIKeyManagement exige además de coincidencia de tenant, permisos de admin de producto.
+func authorizedTenantIDForAPIKeyManagement(w http.ResponseWriter, r *http.Request) (string, bool) {
+	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
 		httperr.Unauthorized(w, "principal not found")
 		return "", false
@@ -513,16 +739,29 @@ func authorizedOrgIDForAPIKeyManagement(w http.ResponseWriter, r *http.Request) 
 		httperr.Write(w, http.StatusForbidden, "FORBIDDEN", "api key management requires admin privileges")
 		return "", false
 	}
-	orgID := strings.TrimSpace(r.PathValue("org_id"))
-	if orgID == "" {
-		httperr.BadRequest(w, "org_id is required")
+	tenantID := strings.TrimSpace(r.PathValue("tenant_id"))
+	if tenantID == "" {
+		httperr.BadRequest(w, "tenant_id is required")
 		return "", false
 	}
-	if principal.TenantID != orgID {
-		httperr.Write(w, http.StatusForbidden, httperr.CodeUnauthorized, "cross-org access denied")
+	if principal.TenantID != tenantID {
+		httperr.Write(w, http.StatusForbidden, "FORBIDDEN", "cross-tenant access denied")
 		return "", false
 	}
-	return orgID, true
+	return tenantID, true
+}
+
+func authorizedTenantOwner(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) (string, bool) {
+	tenantID, ok := authorizedTenantID(w, r)
+	if !ok {
+		return "", false
+	}
+	principal, _ := tenantPrincipalFromContext(r.Context())
+	if _, err := store.requireTenantOwner(r.Context(), tenantID, principal.Actor); err != nil {
+		httperr.WriteFrom(w, err)
+		return "", false
+	}
+	return tenantID, true
 }
 
 func prefixFromSecret(secret string) string {

@@ -5,12 +5,12 @@ DO $$
 DECLARE
     v_org uuid := '__SEED_ORG_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
     INSERT INTO workshops.customer_assets (
-        id, org_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
+        id, tenant_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
         color, notes, metadata, is_favorite, tags, updated_at
     )
     SELECT
@@ -58,7 +58,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO workshops.work_orders (
-        id, org_id, number, asset_type, asset_id, asset_label, customer_id, customer_name, status,
+        id, tenant_id, number, asset_type, asset_id, asset_label, customer_id, customer_name, status,
         requested_work, diagnosis, notes, internal_notes, currency, metadata,
         subtotal_services, subtotal_parts, tax_total, total, opened_at, promised_at, ready_at, delivered_at,
         is_favorite, tags, created_by, updated_at
@@ -118,7 +118,7 @@ BEGIN
         'seed',
         now()
     FROM generate_series(1, 10) AS gs
-    ON CONFLICT (org_id, number) WHERE archived_at IS NULL DO UPDATE
+    ON CONFLICT (tenant_id, number) WHERE archived_at IS NULL DO UPDATE
         SET asset_type = EXCLUDED.asset_type,
             asset_id = EXCLUDED.asset_id,
             asset_label = EXCLUDED.asset_label,
@@ -145,14 +145,14 @@ BEGIN
             updated_at = now();
 
     DELETE FROM workshops.work_order_items
-    WHERE org_id = v_org
+    WHERE tenant_id = v_org
       AND work_order_id IN (
         SELECT uuid_generate_v5(v_org, 'pymes-seed/v1/workshop/wo/bike/' || gs::text)
         FROM generate_series(1, 10) AS gs
       );
 
     INSERT INTO workshops.work_order_items (
-        id, org_id, work_order_id, item_type, service_id, product_id,
+        id, tenant_id, work_order_id, item_type, service_id, product_id,
         description, quantity, unit_price, tax_rate, sort_order, metadata
     )
     SELECT

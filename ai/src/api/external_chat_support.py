@@ -39,19 +39,19 @@ def clean_phone(raw: str) -> str:
     return "".join(ch for ch in raw if ch.isdigit() or ch == "+")
 
 
-async def resolve_org_id(backend_client: BackendClient, org_slug: str) -> str:
+async def resolve_org_id(backend_client: BackendClient, tenant_slug: str) -> str:
     try:
-        payload = await backend_client.request("GET", f"/v1/public/{org_slug}/info", include_internal=True)
+        payload = await backend_client.request("GET", f"/v1/public/{tenant_slug}/info", include_internal=True)
     except Exception as exc:
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         if status_code == status.HTTP_404_NOT_FOUND:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found") from exc
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="backend unavailable") from exc
 
-    org_id = str(payload.get("org_id", "")).strip()
-    if not org_id:
+    tenant_id = str(payload.get("tenant_id", "")).strip()
+    if not tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="organization not found")
-    return org_id
+    return tenant_id
 
 
 def history_to_messages(history: list[dict[str, Any]]) -> list[Message]:
@@ -143,38 +143,38 @@ def compact_insight_evidence_for_prompt(evidence: dict[str, Any]) -> str:
 
 async def get_external_conversation(
     repo: AIRepository,
-    org_id: str,
+    tenant_id: str,
     external_contact: str,
     message: str,
     conversation_id: str | None = None,
     reuse_latest: bool = False,
 ):
     if conversation_id:
-        conversation = await repo.get_conversation(org_id, conversation_id)
+        conversation = await repo.get_conversation(tenant_id, conversation_id)
         if conversation is None or conversation.mode != "external":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
         return conversation
 
     if reuse_latest and external_contact:
-        conversation = await repo.get_latest_external_conversation(org_id, external_contact)
+        conversation = await repo.get_latest_external_conversation(tenant_id, external_contact)
         if conversation is not None:
             return conversation
 
-    await enforce_external_conversation_limit(repo, org_id)
+    await enforce_external_conversation_limit(repo, tenant_id)
     return await repo.create_conversation(
-        org_id=org_id,
+        tenant_id=tenant_id,
         mode="external",
         external_contact=external_contact,
         title=message.strip()[:60],
     )
 
 
-async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -> None:
+async def enforce_external_conversation_limit(repo: AIRepository, tenant_id: str) -> None:
     from src.api.router import PLAN_LIMITS  # local import to avoid router cycle at import time
 
     settings = get_settings()
     now = datetime.now(UTC)
-    plan = await repo.get_plan_code(org_id)
+    plan = await repo.get_plan_code(tenant_id)
     if not settings.ai_enforce_plan_limits:
         return
     limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["starter"])
@@ -182,7 +182,7 @@ async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -
     if external_limit == -1:
         return
 
-    used = await repo.count_external_conversations_in_month(org_id, now.year, now.month)
+    used = await repo.count_external_conversations_in_month(tenant_id, now.year, now.month)
     if used >= external_limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -193,7 +193,7 @@ async def enforce_external_conversation_limit(repo: AIRepository, org_id: str) -
 def _wrap_handlers_with_review_gate(
     handlers: dict[str, Any],
     review_client: ReviewClient | None,
-    org_id: str,
+    tenant_id: str,
 ) -> dict[str, Any]:
     """Envuelve los tool handlers con el gate de Review.
 
@@ -217,7 +217,7 @@ def _wrap_handlers_with_review_gate(
                 review_client=review_client,
                 tool_name=_name,
                 tool_args=tool_args,
-                org_id=org_id,
+                tenant_id=tenant_id,
             )
             if decision.allowed:
                 return await _fn(**tool_args)
@@ -242,7 +242,7 @@ async def run_external_chat(
     repo: AIRepository,
     llm: LLMProvider,
     backend_client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     message: str,
     external_contact: str,
     conversation_id: str | None = None,
@@ -253,17 +253,17 @@ async def run_external_chat(
 ) -> ExternalChatResult:
     conversation = await get_external_conversation(
         repo=repo,
-        org_id=org_id,
+        tenant_id=tenant_id,
         external_contact=external_contact,
         message=message,
         conversation_id=conversation_id,
         reuse_latest=reuse_latest,
     )
-    dossier = await repo.get_or_create_dossier(org_id)
+    dossier = await repo.get_or_create_dossier(tenant_id)
     declarations, handlers = build_external_tools(backend_client)
 
     # Integrar gate de Review: envuelve handlers con evaluación de gobernanza
-    handlers = _wrap_handlers_with_review_gate(handlers, review_client, org_id)
+    handlers = _wrap_handlers_with_review_gate(handlers, review_client, tenant_id)
 
     llm_messages: list[Message] = [
         Message(role="system", content=build_system_prompt("external", None, dossier)),
@@ -283,7 +283,7 @@ async def run_external_chat(
             messages=llm_messages,
             tools=declarations,
             tool_handlers=handlers,
-            context={"org_id": org_id},
+            context={"tenant_id": tenant_id},
         ):
             if chunk.type == "text" and chunk.text:
                 assistant_parts.append(chunk.text)
@@ -298,7 +298,7 @@ async def run_external_chat(
                 if isinstance(result, dict) and result.get("pending_approval"):
                     pending_review = result
     except Exception as exc:
-        logger.exception("chat_external_failed", org_id=org_id, external_contact=external_contact, error=str(exc))
+        logger.exception("chat_external_failed", tenant_id=tenant_id, external_contact=external_contact, error=str(exc))
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
 
     assistant_text = "".join(assistant_parts).strip() or "No pude generar una respuesta en este momento."
@@ -334,14 +334,14 @@ async def run_external_chat(
         }
 
     await repo.append_messages(
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         new_messages=[user_message, assistant_message],
         tool_calls_count=len(tool_calls),
         tokens_input=tokens_in,
         tokens_output=tokens_out,
     )
-    await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+    await repo.track_usage(tenant_id, tokens_in=tokens_in, tokens_out=tokens_out)
 
     # Persistir estado de review pendiente si aplica
     if pending_action:

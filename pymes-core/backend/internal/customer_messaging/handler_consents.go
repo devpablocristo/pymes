@@ -13,11 +13,11 @@ import (
 )
 
 func (h *Handler) ListOptIns(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	tenantID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	optIns, err := h.uc.ListOptIns(c.Request.Context(), orgID)
+	optIns, err := h.uc.ListOptIns(c.Request.Context(), tenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -30,7 +30,7 @@ func (h *Handler) ListOptIns(c *gin.Context) {
 }
 
 func (h *Handler) RegisterOptIn(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	tenantID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -48,7 +48,7 @@ func (h *Handler) RegisterOptIn(c *gin.Context) {
 	if body.Source != "" {
 		source = domain.OptInSource(body.Source)
 	}
-	optIn, err := h.uc.RegisterOptIn(c.Request.Context(), orgID, partyID, body.Phone, source)
+	optIn, err := h.uc.RegisterOptIn(c.Request.Context(), tenantID, partyID, body.Phone, source)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *Handler) RegisterOptIn(c *gin.Context) {
 }
 
 func (h *Handler) RegisterOptOut(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	tenantID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -66,7 +66,7 @@ func (h *Handler) RegisterOptOut(c *gin.Context) {
 		writeBadRequest(c, "invalid party_id")
 		return
 	}
-	if err := h.uc.RegisterOptOut(c.Request.Context(), orgID, partyID); err != nil {
+	if err := h.uc.RegisterOptOut(c.Request.Context(), tenantID, partyID); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -74,7 +74,7 @@ func (h *Handler) RegisterOptOut(c *gin.Context) {
 }
 
 func (h *Handler) CheckOptIn(c *gin.Context) {
-	orgID, ok := handlers.ParseAuthOrgID(c)
+	tenantID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -83,7 +83,7 @@ func (h *Handler) CheckOptIn(c *gin.Context) {
 		writeBadRequest(c, "invalid party_id")
 		return
 	}
-	optedIn, err := h.uc.IsOptedIn(c.Request.Context(), orgID, partyID)
+	optedIn, err := h.uc.IsOptedIn(c.Request.Context(), tenantID, partyID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

@@ -11,28 +11,28 @@ import (
 	"gorm.io/gorm"
 
 	utils "github.com/devpablocristo/core/validate/go/stringutil"
+	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	quotedomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/quotes/usecases/domain"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/sales"
 	salesdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/sales/usecases/domain"
-	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
 	Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error)
-	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
+	GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	UpdateDraft(ctx context.Context, in UpdateInput) (quotedomain.Quote, error)
-	PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error)
-	DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error
-	Archive(ctx context.Context, orgID, quoteID uuid.UUID) error
-	Restore(ctx context.Context, orgID, quoteID uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error
-	SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
-	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error)
-	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
-	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+	PatchAnnotations(ctx context.Context, tenantID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error)
+	DeleteDraft(ctx context.Context, tenantID, quoteID uuid.UUID) error
+	Archive(ctx context.Context, tenantID, quoteID uuid.UUID) error
+	Restore(ctx context.Context, tenantID, quoteID uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID) error
+	SetStatus(ctx context.Context, tenantID, quoteID uuid.UUID, status string) (quotedomain.Quote, error)
+	GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error)
+	GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error)
+	GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error)
 }
 
 // QuotePatchFields actualización parcial fuera del borrador (CRUD unificado).
@@ -48,7 +48,7 @@ type SalesPort interface {
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -72,7 +72,7 @@ type QuoteItemInput struct {
 }
 
 type CreateQuoteInput struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -89,24 +89,24 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]quotedomain.Quote,
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
-	return u.repo.ListArchived(ctx, orgID, branchID)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
+	return u.repo.ListArchived(ctx, tenantID, branchID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error) {
 	if len(in.Items) == 0 {
 		return quotedomain.Quote{}, fmt.Errorf("at least one item is required: %w", httperrors.ErrBadInput)
 	}
-	currency, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.OrgID)
+	currency, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.TenantID)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
-	items, subtotal, taxTotal, err := u.buildItems(ctx, in.OrgID, defaultTaxRate, in.Items)
+	items, subtotal, taxTotal, err := u.buildItems(ctx, in.TenantID, defaultTaxRate, in.Items)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	out, err := u.repo.Create(ctx, CreateInput{
-		OrgID:        in.OrgID,
+		TenantID:     in.TenantID,
 		BranchID:     in.BranchID,
 		CustomerID:   in.CustomerID,
 		CustomerName: in.CustomerName,
@@ -126,7 +126,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "quote.created", "quote", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "quote.created", "quote", out.ID.String(), map[string]any{
 			"number": out.Number,
 			"total":  out.Total,
 		})
@@ -135,7 +135,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateQuoteInput) (quotedomain
 }
 
 type UpdateQuoteInput struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	ID           uuid.UUID
 	CustomerID   **uuid.UUID
 	CustomerName *string
@@ -149,7 +149,7 @@ type UpdateQuoteInput struct {
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error) {
-	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -206,11 +206,11 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		}
 	}
 
-	_, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.OrgID)
+	_, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.TenantID)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
-	items, subtotal, taxTotal, err := u.buildItems(ctx, in.OrgID, defaultTaxRate, itemInputs)
+	items, subtotal, taxTotal, err := u.buildItems(ctx, in.TenantID, defaultTaxRate, itemInputs)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
@@ -232,7 +232,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 	}
 
 	out, err := u.repo.UpdateDraft(ctx, UpdateInput{
-		OrgID:        in.OrgID,
+		TenantID:     in.TenantID,
 		ID:           in.ID,
 		CustomerID:   customerID,
 		CustomerName: customerName,
@@ -257,7 +257,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateQuoteInput) (quotedomain
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "quote.updated", "quote", in.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.TenantID.String(), in.Actor, "quote.updated", "quote", in.ID.String(), map[string]any{
 			"status": out.Status,
 			"total":  out.Total,
 		})
@@ -281,17 +281,17 @@ func isTruthyQuoteMeta(v any) bool {
 	}
 }
 
-func (u *Usecases) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields, actor string) (quotedomain.Quote, error) {
+func (u *Usecases) PatchAnnotations(ctx context.Context, tenantID, id uuid.UUID, patch QuotePatchFields, actor string) (quotedomain.Quote, error) {
 	if patch.Tags == nil && patch.Metadata == nil && patch.Notes == nil && patch.CustomerName == nil {
 		return quotedomain.Quote{}, fmt.Errorf("no patch fields: %w", httperrors.ErrBadInput)
 	}
-	if _, err := u.repo.GetByID(ctx, orgID, id); err != nil {
+	if _, err := u.repo.GetByID(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
 		return quotedomain.Quote{}, err
 	}
-	out, err := u.repo.PatchAnnotations(ctx, orgID, id, patch)
+	out, err := u.repo.PatchAnnotations(ctx, tenantID, id, patch)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -299,13 +299,13 @@ func (u *Usecases) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, pa
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.annotations_updated", "quote", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.annotations_updated", "quote", id.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
-	out, err := u.repo.GetByID(ctx, orgID, quoteID)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
@@ -315,101 +315,101 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quote
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, orgID, quoteID); err != nil {
+func (u *Usecases) Archive(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, tenantID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.archived", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.archived", "quote", quoteID.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, quoteID); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.restored", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.restored", "quote", quoteID.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, quoteID); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, quoteID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("quote not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.hard_deleted", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.hard_deleted", "quote", quoteID.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Send(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
+func (u *Usecases) Send(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
+	current, err := u.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if current.Status != "draft" {
 		return quotedomain.Quote{}, fmt.Errorf("only draft quotes can be sent: %w", httperrors.ErrNotDraft)
 	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "sent")
+	out, err := u.repo.SetStatus(ctx, tenantID, quoteID, "sent")
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.sent", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.sent", "quote", quoteID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Accept(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
+func (u *Usecases) Accept(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
+	current, err := u.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if current.Status == "rejected" || current.Status == "expired" {
 		return quotedomain.Quote{}, fmt.Errorf("quote cannot be accepted from current status: %w", httperrors.ErrConflict)
 	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "accepted")
+	out, err := u.repo.SetStatus(ctx, tenantID, quoteID, "accepted")
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.accepted", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.accepted", "quote", quoteID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Reject(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
-	current, err := u.GetByID(ctx, orgID, quoteID)
+func (u *Usecases) Reject(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error) {
+	current, err := u.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if current.Status == "accepted" {
 		return quotedomain.Quote{}, fmt.Errorf("accepted quote cannot be rejected: %w", httperrors.ErrConflict)
 	}
-	out, err := u.repo.SetStatus(ctx, orgID, quoteID, "rejected")
+	out, err := u.repo.SetStatus(ctx, tenantID, quoteID, "rejected")
 	if err != nil {
 		return quotedomain.Quote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.rejected", "quote", quoteID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.rejected", "quote", quoteID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, paymentMethod, notes, actor string) (salesdomain.Sale, error) {
-	q, err := u.GetByID(ctx, orgID, quoteID)
+func (u *Usecases) ToSale(ctx context.Context, tenantID, quoteID uuid.UUID, paymentMethod, notes, actor string) (salesdomain.Sale, error) {
+	q, err := u.GetByID(ctx, tenantID, quoteID)
 	if err != nil {
 		return salesdomain.Sale{}, err
 	}
@@ -435,7 +435,7 @@ func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, payment
 	}
 
 	saleOut, err := u.sales.Create(ctx, sales.CreateSaleInput{
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		BranchID:      q.BranchID,
 		CustomerID:    q.CustomerID,
 		CustomerName:  q.CustomerName,
@@ -448,18 +448,18 @@ func (u *Usecases) ToSale(ctx context.Context, orgID, quoteID uuid.UUID, payment
 	if err != nil {
 		return salesdomain.Sale{}, err
 	}
-	if _, err := u.repo.SetStatus(ctx, orgID, quoteID, "accepted"); err != nil {
+	if _, err := u.repo.SetStatus(ctx, tenantID, quoteID, "accepted"); err != nil {
 		return salesdomain.Sale{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "quote.to_sale", "quote", quoteID.String(), map[string]any{
+		u.audit.Log(ctx, tenantID.String(), actor, "quote.to_sale", "quote", quoteID.String(), map[string]any{
 			"sale_id": saleOut.ID.String(),
 		})
 	}
 	return saleOut, nil
 }
 
-func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRate float64, in []QuoteItemInput) ([]CreateItemInput, float64, float64, error) {
+func (u *Usecases) buildItems(ctx context.Context, tenantID uuid.UUID, defaultTaxRate float64, in []QuoteItemInput) ([]CreateItemInput, float64, float64, error) {
 	items := make([]CreateItemInput, 0, len(in))
 	subtotal := 0.0
 	taxTotal := 0.0
@@ -474,7 +474,7 @@ func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRa
 		var serviceID *uuid.UUID
 
 		if item.ProductID != nil && *item.ProductID != uuid.Nil {
-			snapshot, err := u.repo.GetProductSnapshot(ctx, orgID, *item.ProductID)
+			snapshot, err := u.repo.GetProductSnapshot(ctx, tenantID, *item.ProductID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil, 0, 0, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
@@ -493,7 +493,7 @@ func (u *Usecases) buildItems(ctx context.Context, orgID uuid.UUID, defaultTaxRa
 				taxRate = *snapshot.TaxRate
 			}
 		} else if item.ServiceID != nil && *item.ServiceID != uuid.Nil {
-			snapshot, err := u.repo.GetServiceSnapshot(ctx, orgID, *item.ServiceID)
+			snapshot, err := u.repo.GetServiceSnapshot(ctx, tenantID, *item.ServiceID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil, 0, 0, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)

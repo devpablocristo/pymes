@@ -10,25 +10,25 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
 	archive "github.com/devpablocristo/modules/crud/archive/go/archive"
+	customerdomain "github.com/devpablocristo/pymes/pymes-core/backend/internal/customers/usecases/domain"
 	httperrors "github.com/devpablocristo/pymes/pymes-core/shared/backend/httperrors"
 )
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID) ([]customerdomain.Customer, error)
 	Create(ctx context.Context, in customerdomain.Customer) (customerdomain.Customer, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (customerdomain.Customer, error)
 	Update(ctx context.Context, in customerdomain.Customer) (customerdomain.Customer, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
-	ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error)
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	ListSales(ctx context.Context, tenantID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error)
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -84,26 +84,26 @@ func (u *Usecases) Create(ctx context.Context, in customerdomain.Customer, actor
 		return customerdomain.Customer{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "customer.created", "customer", out.ID.String(), map[string]any{"name": out.Name})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "customer.created", "customer", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
 
 type UpdateInput struct {
-	Type     *string
-	Name     *string
-	TaxID    *string
-	Email    *string
-	Phone    *string
-	Address  *customerdomain.Address
-	Notes    *string
+	Type       *string
+	Name       *string
+	TaxID      *string
+	Email      *string
+	Phone      *string
+	Address    *customerdomain.Address
+	Notes      *string
 	IsFavorite *bool
-	Tags     *[]string
-	Metadata *map[string]any
+	Tags       *[]string
+	Metadata   *map[string]any
 }
 
-func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (customerdomain.Customer, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (customerdomain.Customer, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return customerdomain.Customer{}, fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
@@ -159,13 +159,13 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		return customerdomain.Customer{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "customer.updated", "customer", out.ID.String(), map[string]any{"name": out.Name})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "customer.updated", "customer", out.ID.String(), map[string]any{"name": out.Name})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (customerdomain.Customer, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return customerdomain.Customer{}, fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
@@ -175,49 +175,49 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdo
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "customer.deleted", "customer", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "customer.deleted", "customer", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]customerdomain.Customer, error) {
-	return u.repo.ListArchived(ctx, orgID)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]customerdomain.Customer, error) {
+	return u.repo.ListArchived(ctx, tenantID)
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "customer.restored", "customer", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "customer.restored", "customer", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("customer not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "customer.hard_deleted", "customer", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "customer.hard_deleted", "customer", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) ListSales(ctx context.Context, orgID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error) {
-	return u.repo.ListSales(ctx, orgID, customerID)
+func (u *Usecases) ListSales(ctx context.Context, tenantID, customerID uuid.UUID) ([]customerdomain.SaleHistoryItem, error) {
+	return u.repo.ListSales(ctx, tenantID, customerID)
 }

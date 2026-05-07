@@ -48,7 +48,7 @@ type Capability struct {
 
 type Confirmation struct {
 	ID           uuid.UUID
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	Actor        string
 	CapabilityID string
 	PayloadHash  string
@@ -62,7 +62,7 @@ type Confirmation struct {
 
 type IdempotencyRecord struct {
 	ID             uuid.UUID
-	OrgID          uuid.UUID
+	TenantID       uuid.UUID
 	Actor          string
 	CapabilityID   string
 	IdempotencyKey string
@@ -75,7 +75,7 @@ type IdempotencyRecord struct {
 
 type AgentEvent struct {
 	ID              string         `json:"id"`
-	OrgID           string         `json:"org_id"`
+	TenantID        string         `json:"tenant_id"`
 	ConversationID  *string        `json:"conversation_id,omitempty"`
 	RequestID       *string        `json:"request_id,omitempty"`
 	CapabilityID    *string        `json:"capability_id,omitempty"`
@@ -99,7 +99,7 @@ type AgentEvent struct {
 }
 
 type ActorContext struct {
-	OrgID      string
+	TenantID   string
 	Actor      string
 	Role       string
 	Scopes     []string

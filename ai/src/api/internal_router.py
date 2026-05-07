@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 
 class CustomerMessagingInboundRequest(BaseModel):
-    org_id: str = Field(min_length=36, max_length=36)
+    tenant_id: str = Field(min_length=36, max_length=36)
     phone_number_id: str = Field(min_length=3, max_length=120)
     from_phone: str = Field(min_length=6, max_length=32)
     message: str = Field(min_length=1, max_length=4000)
@@ -58,16 +58,16 @@ async def customer_messaging_inbound(
     llm: LLMProvider = Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    org_id = req.org_id.strip()
+    tenant_id = req.tenant_id.strip()
     external_contact = clean_phone(req.from_phone)
-    await check_quota(repo, org_id, mode="external")
-    update_request_context(org_id=org_id, user_id=external_contact or "whatsapp")
+    await check_quota(repo, tenant_id, mode="external")
+    update_request_context(tenant_id=tenant_id, user_id=external_contact or "whatsapp")
 
     result = await run_commercial_chat(
         repo=repo,
         llm=llm,
         backend_client=backend_client,
-        org_id=org_id,
+        tenant_id=tenant_id,
         message=req.message,
         agent_mode="external_sales",
         channel="whatsapp",
@@ -84,7 +84,7 @@ async def customer_messaging_inbound(
     )
     logger.info(
         "chat_customer_messaging_completed",
-        org_id=org_id,
+        tenant_id=tenant_id,
         external_contact=external_contact,
         conversation_id=result.conversation_id,
         tool_calls=len(result.tool_calls),

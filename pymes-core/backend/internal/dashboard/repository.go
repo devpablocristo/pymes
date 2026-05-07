@@ -41,13 +41,13 @@ func applyCashflowBranchFilter(q *gorm.DB, alias string, branchID *uuid.UUID) *g
 		CASE
 			WHEN ` + alias + `.reference_type = 'sale' THEN (
 				SELECT s.branch_id FROM sales s
-				WHERE s.org_id = ` + alias + `.org_id AND s.id = ` + alias + `.reference_id
+				WHERE s.tenant_id = ` + alias + `.tenant_id AND s.id = ` + alias + `.reference_id
 			)
 			WHEN ` + alias + `.reference_type = 'return' THEN (
 				SELECT s.branch_id
 				FROM returns r
-				JOIN sales s ON s.id = r.sale_id AND s.org_id = r.org_id
-				WHERE r.org_id = ` + alias + `.org_id AND r.id = ` + alias + `.reference_id
+				JOIN sales s ON s.id = r.sale_id AND s.tenant_id = r.tenant_id
+				WHERE r.tenant_id = ` + alias + `.tenant_id AND r.id = ` + alias + `.reference_id
 			)
 			ELSE NULL
 		END
@@ -63,7 +63,7 @@ func (r *Repository) ListWidgets(ctx context.Context) ([]dashboarddomain.WidgetD
 	return out, nil
 }
 
-func (r *Repository) LoadSalesSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
+func (r *Repository) LoadSalesSummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.SalesSummaryData, error) {
 	period := currentPeriodLabel()
 	var out dashboarddomain.SalesSummaryData
 	out.Period = period
@@ -74,12 +74,12 @@ func (r *Repository) LoadSalesSummary(ctx context.Context, orgID uuid.UUID, bran
 			COUNT(*) AS count_sales,
 			COALESCE(AVG(s.total), 0) AS average_ticket
 		`).
-		Where("s.org_id = ? AND s.status = 'completed' AND s.created_at >= ?", orgID, currentMonthStart()).
+		Where("s.tenant_id = ? AND s.status = 'completed' AND s.created_at >= ?", tenantID, currentMonthStart()).
 		Scan(&out)
 	return out, result.Error
 }
 
-func (r *Repository) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
+func (r *Repository) LoadCashflowSummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.CashflowSummaryData, error) {
 	period := currentPeriodLabel()
 	var out dashboarddomain.CashflowSummaryData
 	out.Period = period
@@ -90,7 +90,7 @@ func (r *Repository) LoadCashflowSummary(ctx context.Context, orgID uuid.UUID, b
 			COALESCE(SUM(CASE WHEN cm.type = 'expense' THEN cm.amount ELSE 0 END), 0) AS total_expense,
 			COALESCE(SUM(CASE WHEN cm.type = 'income' THEN cm.amount ELSE -cm.amount END), 0) AS balance
 		`).
-		Where("cm.org_id = ? AND cm.created_at >= ?", orgID, currentMonthStart()).
+		Where("cm.tenant_id = ? AND cm.created_at >= ?", tenantID, currentMonthStart()).
 		Scan(&out)
 	return out, result.Error
 }
@@ -100,12 +100,12 @@ type quotesPipelineRow struct {
 	Count  int64  `gorm:"column:count"`
 }
 
-func (r *Repository) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
+func (r *Repository) LoadQuotesPipeline(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.QuotesPipelineData, error) {
 	var rows []quotesPipelineRow
 	q := r.db.WithContext(ctx).Table("quotes q")
 	q = applyEntityBranchFilter(q, "q", branchID)
 	if err := q.Select("q.status AS status, COUNT(*) AS count").
-		Where("q.org_id = ?", orgID).
+		Where("q.tenant_id = ?", tenantID).
 		Group("q.status").
 		Scan(&rows).Error; err != nil {
 		return dashboarddomain.QuotesPipelineData{}, err
@@ -127,7 +127,7 @@ func (r *Repository) LoadQuotesPipeline(ctx context.Context, orgID uuid.UUID, br
 	return out, nil
 }
 
-func (r *Repository) LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error) {
+func (r *Repository) LoadLowStock(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.LowStockData, error) {
 	out := dashboarddomain.LowStockData{}
 	base := r.db.WithContext(ctx).Table("stock_levels sl")
 	if normalized := normalizeBranchID(branchID); normalized != nil {
@@ -138,7 +138,7 @@ func (r *Repository) LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID
 			COALESCE(SUM(sl.quantity), 0) AS quantity,
 			COALESCE(MAX(sl.min_quantity), 0) AS min_quantity
 		`).
-		Where("sl.org_id = ?", orgID).
+		Where("sl.tenant_id = ?", tenantID).
 		Group("sl.product_id")
 	if err := r.db.WithContext(ctx).Table("(?) aggregated", subquery).
 		Where("aggregated.min_quantity > 0 AND aggregated.quantity <= aggregated.min_quantity").
@@ -163,7 +163,7 @@ func (r *Repository) LoadLowStock(ctx context.Context, orgID uuid.UUID, branchID
 	return out, nil
 }
 
-func (r *Repository) LoadRecentSales(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error) {
+func (r *Repository) LoadRecentSales(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.RecentSalesData, error) {
 	out := dashboarddomain.RecentSalesData{}
 	q := r.db.WithContext(ctx).Table("sales s")
 	q = applyEntityBranchFilter(q, "s", branchID)
@@ -175,14 +175,14 @@ func (r *Repository) LoadRecentSales(ctx context.Context, orgID uuid.UUID, branc
 			s.currency,
 			to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
 		`).
-		Where("s.org_id = ?", orgID).
+		Where("s.tenant_id = ?", tenantID).
 		Order("s.created_at DESC").
 		Limit(6).
 		Scan(&out.Items).Error
 	return out, err
 }
 
-func (r *Repository) LoadTopProducts(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error) {
+func (r *Repository) LoadTopProducts(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopProductsData, error) {
 	out := dashboarddomain.TopProductsData{Period: currentPeriodLabel()}
 	q := r.db.WithContext(ctx).Table("sale_items si").Joins("JOIN sales s ON s.id = si.sale_id")
 	q = applyEntityBranchFilter(q, "s", branchID)
@@ -192,7 +192,7 @@ func (r *Repository) LoadTopProducts(ctx context.Context, orgID uuid.UUID, branc
 			SUM(si.quantity) AS quantity,
 			SUM(si.subtotal) AS total
 		`).
-		Where("s.org_id = ? AND s.created_at >= ? AND s.status = 'completed'", orgID, currentMonthStart()).
+		Where("s.tenant_id = ? AND s.created_at >= ? AND s.status = 'completed'", tenantID, currentMonthStart()).
 		Group("si.product_id, si.description").
 		Order("SUM(si.subtotal) DESC").
 		Limit(5).
@@ -200,7 +200,7 @@ func (r *Repository) LoadTopProducts(ctx context.Context, orgID uuid.UUID, branc
 	return out, err
 }
 
-func (r *Repository) LoadTopServices(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error) {
+func (r *Repository) LoadTopServices(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) (dashboarddomain.TopServicesData, error) {
 	out := dashboarddomain.TopServicesData{Period: currentPeriodLabel()}
 	q := r.db.WithContext(ctx).Table("sale_items si").
 		Joins("JOIN sales s ON s.id = si.sale_id").
@@ -212,7 +212,7 @@ func (r *Repository) LoadTopServices(ctx context.Context, orgID uuid.UUID, branc
 			SUM(si.quantity) AS quantity,
 			SUM(si.subtotal) AS total
 		`).
-		Where("s.org_id = ? AND s.created_at >= ? AND s.status = 'completed' AND si.service_id IS NOT NULL", orgID, currentMonthStart()).
+		Where("s.tenant_id = ? AND s.created_at >= ? AND s.status = 'completed' AND si.service_id IS NOT NULL", tenantID, currentMonthStart()).
 		Group("si.service_id, COALESCE(sv.name, si.description)").
 		Order("SUM(si.subtotal) DESC").
 		Limit(5).
@@ -227,9 +227,9 @@ type billingStatusRow struct {
 	UpdatedAt  time.Time `gorm:"column:updated_at"`
 }
 
-func (r *Repository) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
+func (r *Repository) LoadBillingStatus(ctx context.Context, tenantID uuid.UUID) (dashboarddomain.BillingStatusData, error) {
 	var row billingStatusRow
-	if err := r.db.WithContext(ctx).Table("tenant_settings").Where("org_id = ?", orgID).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table("tenant_settings").Where("tenant_id = ?", tenantID).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dashboarddomain.BillingStatusData{PlanCode: "starter", Status: "trialing", HardLimits: map[string]any{}}, nil
 		}
@@ -244,7 +244,7 @@ func (r *Repository) LoadBillingStatus(ctx context.Context, orgID uuid.UUID) (da
 	}, nil
 }
 
-func (r *Repository) LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (dashboarddomain.AuditActivityData, error) {
+func (r *Repository) LoadAuditActivity(ctx context.Context, tenantID uuid.UUID) (dashboarddomain.AuditActivityData, error) {
 	out := dashboarddomain.AuditActivityData{}
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
@@ -255,10 +255,10 @@ func (r *Repository) LoadAuditActivity(ctx context.Context, orgID uuid.UUID) (da
 			COALESCE(resource_id, '') AS resource_id,
 			to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
 		FROM audit_log
-		WHERE org_id = ?
+		WHERE tenant_id = ?
 		ORDER BY created_at DESC
 		LIMIT 6
-	`, orgID).Scan(&out.Items).Error
+	`, tenantID).Scan(&out.Items).Error
 	return out, err
 }
 

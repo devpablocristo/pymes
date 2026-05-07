@@ -13,10 +13,10 @@ async def get_bookings(client: BackendClient, auth: AuthContext, from_date: str 
     return await client.request("GET", "/v1/scheduling/bookings", auth=auth, params=params)
 
 
-async def check_availability(client: BackendClient, org_id: str, date: str, duration: int = 60) -> dict:
+async def check_availability(client: BackendClient, tenant_id: str, date: str, duration: int = 60) -> dict:
     return await client.request(
         "GET",
-        f"/v1/public/{org_id}/availability",
+        f"/v1/public/{tenant_id}/availability",
         include_internal=True,
         params={"date": date, "duration": duration},
     )
@@ -24,7 +24,7 @@ async def check_availability(client: BackendClient, org_id: str, date: str, dura
 
 async def book_scheduling(
     client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     customer_name: str,
     customer_phone: str,
     title: str,
@@ -38,13 +38,13 @@ async def book_scheduling(
         "start_at": start_at,
         "duration": duration,
     }
-    return await client.request("POST", f"/v1/public/{org_id}/book", include_internal=True, json=payload)
+    return await client.request("POST", f"/v1/public/{tenant_id}/book", include_internal=True, json=payload)
 
 
-async def get_my_bookings(client: BackendClient, org_id: str, phone: str) -> dict:
+async def get_my_bookings(client: BackendClient, tenant_id: str, phone: str) -> dict:
     return await client.request(
         "GET",
-        f"/v1/public/{org_id}/my-bookings",
+        f"/v1/public/{tenant_id}/my-bookings",
         include_internal=True,
         params={"phone": phone},
     )

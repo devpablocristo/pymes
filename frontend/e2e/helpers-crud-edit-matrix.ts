@@ -78,8 +78,8 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
         contentType: 'application/json',
         body: JSON.stringify({
           auth: {
-            org_id: 'e2e-org-001',
-            org_name: 'E2E Org',
+            tenant_id: 'e2e-org-001',
+            tenant_name: 'E2E Tenant',
             product_role: 'admin',
             auth_method: 'api_key',
           },
@@ -384,7 +384,7 @@ export async function installCrudEditMatrixMocks(page: Page): Promise<void> {
         paginated([
           {
             id: 'wo-e2e-1',
-            org_id: 'e2e-org-001',
+            tenant_id: 'e2e-org-001',
             branch_id: 'br-e2e',
             number: 'OT-E2E-1',
             asset_type: path.includes('bike-shop') ? 'bicycle' : 'vehicle',

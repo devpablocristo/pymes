@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
-import { createSchedulingBranch, listSchedulingBranches, updateTenantSettings } from '../lib/api';
+import { createSchedulingBranch, createTenant, listSchedulingBranches, updateTenantSettings } from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
@@ -18,7 +18,7 @@ import {
   type VerticalType,
 } from '../lib/tenantProfile';
 
-type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants';
+type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants' | 'medical';
 type OnboardingSubVerticalOption = {
   value: string;
   vertical: VerticalType;
@@ -39,6 +39,11 @@ const VERTICAL_GROUP_KEYS: { value: VerticalGroup; labelKey: string; descKey: st
     value: 'restaurants',
     labelKey: 'onboarding.vertical.restaurants',
     descKey: 'onboarding.vertical.restaurantsDesc',
+  },
+  {
+    value: 'medical',
+    labelKey: 'onboarding.vertical.medical',
+    descKey: 'onboarding.vertical.medicalDesc',
   },
 ];
 
@@ -111,6 +116,14 @@ const SUB_VERTICAL_KEYS: Partial<Record<VerticalGroup, OnboardingSubVerticalOpti
       descKey: 'onboarding.vertical.cafeDesc',
     },
   ],
+  medical: [
+    {
+      value: 'occupational_health',
+      vertical: 'medical',
+      labelKey: 'onboarding.vertical.occupationalHealth',
+      descKey: 'onboarding.vertical.occupationalHealthDesc',
+    },
+  ],
 };
 
 const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
@@ -119,6 +132,7 @@ const GROUP_TO_VERTICAL: Partial<Record<VerticalGroup, VerticalType>> = {
   workshops: 'workshops',
   beauty: 'beauty',
   restaurants: 'restaurants',
+  medical: 'medical',
 };
 
 const ALL_VERTICAL_LABEL_KEYS: Record<VerticalType, string> = {
@@ -186,7 +200,6 @@ const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
 
 type ClerkOnboardingBridges = {
   loaded: boolean;
-  createOrganization: (params: { name: string }) => Promise<{ id: string }>;
   setActive: (params: { organization: string }) => Promise<void>;
   organization: { id: string } | null;
   orgLoaded: boolean;
@@ -200,7 +213,6 @@ function OnboardingPageClerkBridge() {
 
   const bridges: ClerkOnboardingBridges = {
     loaded: clerk.loaded,
-    createOrganization: (params) => clerk.createOrganization(params),
     setActive: (params) => clerk.setActive(params),
     organization: organization ? { id: organization.id } : null,
     orgLoaded,
@@ -306,8 +318,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
       try {
         const name = profile.businessName.trim();
         if (!clerkBridges.organization) {
-          const created = await clerkBridges.createOrganization({ name });
-          await clerkBridges.setActive({ organization: created.id });
+          const created = await createTenant({ name });
+          await clerkBridges.setActive({ organization: created.clerk_org_id });
           await clerkBridges.afterSetActiveOrg?.();
         }
       } catch (err) {

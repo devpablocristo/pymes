@@ -1,7 +1,6 @@
 import { type CrudFieldValue, type CrudFormValues } from '../components/CrudPage';
 import { formatCrudMoney } from '../modules/crud';
 import {
-  asBoolean,
   asNumber,
   asOptionalString,
   asString,
@@ -48,19 +47,6 @@ export function toProcurementRequestCrudBody(values: CrudFormValues): Record<str
     estimated_total: asNumber(values.estimated_total),
     currency: asOptionalString(values.currency) ?? 'ARS',
     lines: parseProcurementRequestLines(values.lines_json),
-  };
-}
-
-export function toProcurementPolicyCrudBody(values: CrudFormValues): Record<string, unknown> {
-  return {
-    name: asString(values.name),
-    expression: asString(values.expression),
-    effect: asString(values.effect),
-    priority: asNumber(values.priority),
-    mode: asString(values.mode),
-    enabled: asBoolean(values.enabled),
-    action_filter: asOptionalString(values.action_filter) ?? '',
-    system_filter: asOptionalString(values.system_filter) ?? '',
   };
 }
 

@@ -116,7 +116,7 @@ def _build_cel_expression(action_type: str, condition: str | None) -> str:
 async def handle_manage_review_policy(
     review_client: ReviewClient,
     *,
-    org_id: str,
+    tenant_id: str,
     action: str,
     action_type: str = "",
     effect: str = "",

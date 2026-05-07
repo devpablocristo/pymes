@@ -19,9 +19,9 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error) {
+func (r *Repository) ListLatest(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency string, limit int) ([]currencydomain.ExchangeRate, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ExchangeRateModel{}).Where("org_id = ?", orgID)
+	q := r.db.WithContext(ctx).Model(&models.ExchangeRateModel{}).Where("tenant_id = ?", tenantID)
 	if fromCurrency != "" {
 		q = q.Where("from_currency = ?", fromCurrency)
 	}
@@ -42,7 +42,7 @@ func (r *Repository) ListLatest(ctx context.Context, orgID uuid.UUID, fromCurren
 func (r *Repository) Upsert(ctx context.Context, in currencydomain.ExchangeRate) (currencydomain.ExchangeRate, error) {
 	row := models.ExchangeRateModel{
 		ID:           in.ID,
-		OrgID:        in.OrgID,
+		TenantID:     in.TenantID,
 		FromCurrency: in.FromCurrency,
 		ToCurrency:   in.ToCurrency,
 		RateType:     in.RateType,
@@ -53,7 +53,7 @@ func (r *Repository) Upsert(ctx context.Context, in currencydomain.ExchangeRate)
 		CreatedAt:    time.Now().UTC(),
 	}
 	if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "org_id"}, {Name: "from_currency"}, {Name: "to_currency"}, {Name: "rate_type"}, {Name: "rate_date"}},
+		Columns: []clause.Column{{Name: "tenant_id"}, {Name: "from_currency"}, {Name: "to_currency"}, {Name: "rate_type"}, {Name: "rate_date"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"buy_rate":   row.BuyRate,
 			"sell_rate":  row.SellRate,
@@ -69,7 +69,7 @@ func (r *Repository) Upsert(ctx context.Context, in currencydomain.ExchangeRate)
 func toDomain(row models.ExchangeRateModel) currencydomain.ExchangeRate {
 	return currencydomain.ExchangeRate{
 		ID:           row.ID,
-		OrgID:        row.OrgID,
+		TenantID:     row.TenantID,
 		FromCurrency: row.FromCurrency,
 		ToCurrency:   row.ToCurrency,
 		RateType:     row.RateType,

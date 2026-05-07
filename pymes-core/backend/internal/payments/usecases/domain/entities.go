@@ -8,7 +8,7 @@ import (
 
 type Payment struct {
 	ID            uuid.UUID  `json:"id"`
-	OrgID         uuid.UUID  `json:"org_id"`
+	TenantID      uuid.UUID  `json:"tenant_id"`
 	ReferenceType string     `json:"reference_type"`
 	ReferenceID   uuid.UUID  `json:"reference_id"`
 	Method        string     `json:"method"`

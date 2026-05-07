@@ -20,12 +20,12 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Specialty, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.Specialty, actor string) (domain.Specialty, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Specialty, error)
-	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error)
-	AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error
-	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Specialty, error)
+	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Specialty, error)
+	AssignProfessionals(ctx context.Context, tenantID, specialtyID uuid.UUID, profileIDs []uuid.UUID, actor string) error
+	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -59,7 +59,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) list(c *gin.Context, forceArchived bool) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:    orgID,
+		TenantID: tenantID,
 		Limit:    limit,
 		After:    after,
 		Search:   c.Query("search"),
@@ -90,11 +90,11 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -104,7 +104,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -122,7 +122,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Specialty{
-		OrgID:       orgID,
+		TenantID:    tenantID,
 		Code:        req.Code,
 		Name:        req.Name,
 		Description: req.Description,
@@ -140,7 +140,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -149,7 +149,7 @@ func (h *Handler) Update(c *gin.Context) {
 		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
+	out, err := h.uc.Update(c.Request.Context(), tenantID, id, UpdateInput{
 		Code:        req.Code,
 		Name:        req.Name,
 		Description: req.Description,
@@ -170,11 +170,11 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -182,11 +182,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -194,11 +194,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -207,7 +207,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func (h *Handler) AssignProfessionals(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, specialtyID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, specialtyID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -225,7 +225,7 @@ func (h *Handler) AssignProfessionals(c *gin.Context) {
 		}
 		profileIDs = append(profileIDs, pid)
 	}
-	if err := h.uc.AssignProfessionals(c.Request.Context(), orgID, specialtyID, profileIDs, a.Actor); err != nil {
+	if err := h.uc.AssignProfessionals(c.Request.Context(), tenantID, specialtyID, profileIDs, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -243,7 +243,7 @@ func toSpecialtyItem(in domain.Specialty) dto.SpecialtyItem {
 	}
 	return dto.SpecialtyItem{
 		ID:          in.ID.String(),
-		OrgID:       in.OrgID.String(),
+		TenantID:    in.TenantID.String(),
 		Code:        in.Code,
 		Name:        in.Name,
 		Description: in.Description,

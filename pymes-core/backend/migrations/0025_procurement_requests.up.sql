@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS procurement_requests (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     requester_actor text NOT NULL,
     title text NOT NULL,
     description text NOT NULL DEFAULT '',
@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS procurement_requests (
     archived_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_procurement_requests_org ON procurement_requests(org_id);
-CREATE INDEX IF NOT EXISTS idx_procurement_requests_status ON procurement_requests(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_procurement_requests_archived ON procurement_requests(org_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_org ON procurement_requests(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_status ON procurement_requests(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_archived ON procurement_requests(tenant_id, archived_at);
 
 CREATE TABLE IF NOT EXISTS procurement_request_lines (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_procurement_request_lines_request ON procurement_
 
 CREATE TABLE IF NOT EXISTS procurement_policies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name text NOT NULL,
     expression text NOT NULL,
     effect text NOT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS procurement_policies (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_procurement_policies_org ON procurement_policies(org_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_policies_org ON procurement_policies(tenant_id);
 
 -- Permisos para roles de demo (solo si existen: el seed RBAC vive en seeds/03_rbac.sql)
 DO $$

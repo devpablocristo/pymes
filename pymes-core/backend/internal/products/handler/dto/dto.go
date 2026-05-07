@@ -2,7 +2,7 @@ package dto
 
 type ProductItem struct {
 	ID          string         `json:"id"`
-	OrgID       string         `json:"org_id"`
+	TenantID    string         `json:"tenant_id"`
 	SKU         string         `json:"sku,omitempty"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`

@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS roles (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name text NOT NULL,
     description text NOT NULL DEFAULT '',
     is_system boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, name)
+    UNIQUE(tenant_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS role_permissions (
@@ -21,18 +21,18 @@ CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id
 
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     role_id uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     assigned_by text,
     assigned_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (user_id, org_id)
+    PRIMARY KEY (user_id, tenant_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_roles_org ON user_roles(org_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_org ON user_roles(tenant_id);
 
 CREATE TABLE IF NOT EXISTS attachments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     attachable_type text NOT NULL,
     attachable_id uuid NOT NULL,
     file_name text NOT NULL,
@@ -43,12 +43,12 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(org_id, attachable_type, attachable_id);
-CREATE INDEX IF NOT EXISTS idx_attachments_org ON attachments(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(tenant_id, attachable_type, attachable_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_org ON attachments(tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS timeline_entries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     entity_type text NOT NULL,
     entity_id uuid NOT NULL,
     event_type text NOT NULL,
@@ -59,12 +59,12 @@ CREATE TABLE IF NOT EXISTS timeline_entries (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_timeline_entity ON timeline_entries(org_id, entity_type, entity_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_timeline_org ON timeline_entries(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_timeline_entity ON timeline_entries(tenant_id, entity_type, entity_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_timeline_org ON timeline_entries(tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS webhook_endpoints (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     url text NOT NULL,
     secret text NOT NULL,
     events text[] NOT NULL DEFAULT '{}',
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS webhook_endpoints (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_org ON webhook_endpoints(org_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_org ON webhook_endpoints(tenant_id) WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_retry ON webhook_deliveries(ne
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     from_currency text NOT NULL,
     to_currency text NOT NULL,
     rate_type text NOT NULL CHECK (rate_type IN ('official', 'blue', 'mep', 'ccl', 'crypto', 'custom')),
@@ -103,14 +103,14 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
     source text NOT NULL DEFAULT 'manual' CHECK (source IN ('api', 'manual')),
     rate_date date NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, from_currency, to_currency, rate_type, rate_date)
+    UNIQUE(tenant_id, from_currency, to_currency, rate_type, rate_date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_exchange_rates_org_date ON exchange_rates(org_id, rate_date DESC);
-CREATE INDEX IF NOT EXISTS idx_exchange_rates_latest ON exchange_rates(org_id, from_currency, to_currency, rate_type, rate_date DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_org_date ON exchange_rates(tenant_id, rate_date DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_latest ON exchange_rates(tenant_id, from_currency, to_currency, rate_type, rate_date DESC);
 
 CREATE TABLE IF NOT EXISTS dashboard_configs (
-    org_id uuid PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
     widgets jsonb NOT NULL DEFAULT '["sales_today","sales_month","cashflow_balance","pending_quotes","low_stock_products","top_products_month","recent_sales"]'::jsonb,
     updated_at timestamptz NOT NULL DEFAULT now()
 );

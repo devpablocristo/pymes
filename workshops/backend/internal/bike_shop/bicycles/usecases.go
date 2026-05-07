@@ -16,10 +16,10 @@ import (
 )
 
 type ListParams struct {
-	OrgID  uuid.UUID
-	Limit  int
-	After  *uuid.UUID
-	Search string
+	TenantID uuid.UUID
+	Limit    int
+	After    *uuid.UUID
+	Search   string
 }
 
 type UpdateInput struct {
@@ -40,22 +40,22 @@ type UpdateInput struct {
 
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Bicycle, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Bicycle, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID) ([]domain.Bicycle, error)
 	Create(ctx context.Context, in domain.Bicycle) (domain.Bicycle, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Bicycle, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Bicycle, error)
 	Update(ctx context.Context, in domain.Bicycle) (domain.Bicycle, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type controlPlanePort interface {
-	GetCustomer(ctx context.Context, orgID, customerID string) (map[string]any, error)
-	GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error)
+	GetCustomer(ctx context.Context, tenantID, customerID string) (map[string]any, error)
+	GetParty(ctx context.Context, tenantID, partyID string) (map[string]any, error)
 }
 
 type Usecases struct {
@@ -72,8 +72,8 @@ func (u *Usecases) List(ctx context.Context, p ListParams) ([]domain.Bicycle, in
 	return u.repo.List(ctx, p)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Bicycle, error) {
-	return u.repo.ListArchived(ctx, orgID)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]domain.Bicycle, error) {
+	return u.repo.ListArchived(ctx, tenantID)
 }
 
 func (u *Usecases) Create(ctx context.Context, in domain.Bicycle, actor string) (domain.Bicycle, error) {
@@ -88,13 +88,13 @@ func (u *Usecases) Create(ctx context.Context, in domain.Bicycle, actor string) 
 		return domain.Bicycle{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "bicycle.created", "bicycle", out.ID.String(), map[string]any{"frame_number": out.FrameNumber})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "bicycle.created", "bicycle", out.ID.String(), map[string]any{"frame_number": out.FrameNumber})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Bicycle, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Bicycle, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Bicycle{}, fmt.Errorf("bicycle not found: %w", httperrors.ErrNotFound)
@@ -104,8 +104,8 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Bic
 	return out, nil
 }
 
-func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Bicycle, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Bicycle, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Bicycle{}, fmt.Errorf("bicycle not found: %w", httperrors.ErrNotFound)
@@ -168,39 +168,39 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		return domain.Bicycle{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "bicycle.updated", "bicycle", out.ID.String(), map[string]any{"frame_number": out.FrameNumber})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "bicycle.updated", "bicycle", out.ID.String(), map[string]any{"frame_number": out.FrameNumber})
 	}
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("bicycle not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "bicycle.archived", "bicycle", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "bicycle.archived", "bicycle", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("bicycle not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "bicycle.restored", "bicycle", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "bicycle.restored", "bicycle", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("bicycle not found: %w", httperrors.ErrNotFound)
 		}
@@ -210,7 +210,7 @@ func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor st
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "bicycle.hard_deleted", "bicycle", id.String(), nil)
+		u.audit.Log(ctx, tenantID.String(), actor, "bicycle.hard_deleted", "bicycle", id.String(), nil)
 	}
 	return nil
 }
@@ -219,7 +219,7 @@ func (u *Usecases) enrichCustomer(ctx context.Context, in *domain.Bicycle) error
 	if in.CustomerID == nil || u.cp == nil {
 		return nil
 	}
-	customer, err := u.cp.GetCustomer(ctx, in.OrgID.String(), in.CustomerID.String())
+	customer, err := u.cp.GetCustomer(ctx, in.TenantID.String(), in.CustomerID.String())
 	if err == nil {
 		if strings.TrimSpace(in.CustomerName) == "" {
 			if name, ok := customer["name"].(string); ok {
@@ -228,7 +228,7 @@ func (u *Usecases) enrichCustomer(ctx context.Context, in *domain.Bicycle) error
 		}
 		return nil
 	}
-	party, err := u.cp.GetParty(ctx, in.OrgID.String(), in.CustomerID.String())
+	party, err := u.cp.GetParty(ctx, in.TenantID.String(), in.CustomerID.String())
 	if err != nil {
 		return fmt.Errorf("customer_id is invalid: %w", httperrors.ErrBadInput)
 	}

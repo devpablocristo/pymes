@@ -1,0 +1,1 @@
+export { createOccupationalHealthExamsCrudConfig } from './occupationalHealthExamCrudConfig';

@@ -42,7 +42,7 @@ async def run_commercial_chat(
     repo: AIRepository,
     llm: LLMProvider,
     backend_client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     message: str,
     agent_mode: str,
     channel: str,
@@ -61,7 +61,7 @@ async def run_commercial_chat(
         policy = build_external_sales_policy(channel=channel)  # type: ignore[arg-type]
         conversation = await get_external_conversation(
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             external_contact=external_contact,
             message=sanitized_message,
             conversation_id=conversation_id,
@@ -75,7 +75,7 @@ async def run_commercial_chat(
         dossier, _ = await _hydrate_dossier_from_backend_settings(
             repo=repo,
             backend_client=backend_client,
-            org_id=org_id,
+            tenant_id=tenant_id,
             auth=auth,
         )
         modules_active = dossier.get("modules_active", []) if isinstance(dossier, dict) else []
@@ -92,7 +92,7 @@ async def run_commercial_chat(
     dossier, dossier_snapshot = await _hydrate_dossier_from_backend_settings(
         repo=repo,
         backend_client=backend_client,
-        org_id=org_id,
+        tenant_id=tenant_id,
         auth=auth,
     )
 
@@ -100,7 +100,7 @@ async def run_commercial_chat(
         declarations, handlers = await _build_external_sales_tools(
             client=backend_client,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             policy=policy,
             state=state,
@@ -112,7 +112,7 @@ async def run_commercial_chat(
             client=backend_client,
             auth=auth,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             policy=policy,
             state=state,
@@ -123,7 +123,7 @@ async def run_commercial_chat(
             client=backend_client,
             auth=auth,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             policy=policy,
             state=state,
@@ -153,7 +153,7 @@ async def run_commercial_chat(
             messages=llm_messages,
             tools=declarations,
             tool_handlers=handlers,
-            context={"org_id": org_id},
+            context={"tenant_id": tenant_id},
             limits=limits,
         ):
             if chunk.type == "text" and chunk.text:
@@ -166,7 +166,7 @@ async def run_commercial_chat(
                         state.add_guardrail(f"La accion {tool_name} no esta habilitada para este agente.")
                         await record_agent_event(
                             repo,
-                            org_id=org_id,
+                            tenant_id=tenant_id,
                             conversation_id=conversation.id,
                             agent_mode=agent_mode,
                             channel=channel,
@@ -179,7 +179,7 @@ async def run_commercial_chat(
                             metadata={"reason": "tool_not_declared"},
                         )
     except Exception as exc:  # noqa: BLE001
-        logger.exception("commercial_chat_failed", org_id=org_id, agent_mode=agent_mode, error=str(exc))
+        logger.exception("commercial_chat_failed", tenant_id=tenant_id, agent_mode=agent_mode, error=str(exc))
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ai unavailable") from exc
 
     assistant_text = "".join(assistant_parts).strip()
@@ -218,14 +218,14 @@ async def run_commercial_chat(
     if assistant_metadata:
         assistant_message.update(assistant_metadata)
     await repo.append_messages(
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         new_messages=[user_message, assistant_message],
         tool_calls_count=len(tool_calls),
         tokens_input=tokens_in,
         tokens_output=tokens_out,
     )
-    await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+    await repo.track_usage(tenant_id, tokens_in=tokens_in, tokens_out=tokens_out)
     capture_turn_memory(
         dossier,
         user_id=actor_id if actor_type == "internal_user" else None,
@@ -236,11 +236,11 @@ async def run_commercial_chat(
         pending_confirmations=list(state.pending_confirmations),
         confirmed_actions=confirmed,
     )
-    await _persist_dossier_if_changed(repo, org_id, dossier_snapshot, dossier)
+    await _persist_dossier_if_changed(repo, tenant_id, dossier_snapshot, dossier)
 
     await record_agent_event(
         repo,
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         agent_mode=agent_mode,
         channel=channel,
@@ -269,16 +269,16 @@ async def process_contract(
     *,
     repo: AIRepository,
     backend_client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     envelope: CommercialContractEnvelope,
     actor_id: str,
 ) -> dict[str, Any]:
     contract = envelope.contract
-    if contract.org_id.strip() != org_id:
+    if contract.tenant_id.strip() != tenant_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="org mismatch")
     if contract.channel not in {"api", "embedded", "web_public", "whatsapp"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid channel")
-    if await has_processed_request(repo, org_id, contract.request_id):
+    if await has_processed_request(repo, tenant_id, contract.request_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="request_id already processed")
 
     response_payload: dict[str, Any]
@@ -290,12 +290,12 @@ async def process_contract(
         response_payload = {
             "intent": "availability_response",
             "request_id": contract.request_id,
-            "availability": await scheduling.check_availability(backend_client, org_id=org_id, date=date_value, duration=duration),
+            "availability": await scheduling.check_availability(backend_client, tenant_id=tenant_id, date=date_value, duration=duration),
         }
     elif contract.intent == "request_quote":
         preview = await _build_quote_preview(
             backend_client,
-            org_id,
+            tenant_id,
             items=[item.model_dump() for item in contract.items],
             customer_name=envelope.contact_name or str(contract.metadata.get("customer_name", "")),
             notes=str(contract.metadata.get("notes", "")),
@@ -312,7 +312,7 @@ async def process_contract(
         response_payload = {
             "intent": "payment_request",
             "request_id": contract.request_id,
-            "payment": await payments.get_public_quote_payment_link(backend_client, org_id=org_id, quote_id=quote_id),
+            "payment": await payments.get_public_quote_payment_link(backend_client, tenant_id=tenant_id, quote_id=quote_id),
         }
     elif contract.intent == "reservation_request":
         if "book_scheduling" not in envelope.confirmed_actions:
@@ -330,7 +330,7 @@ async def process_contract(
                 "request_id": contract.request_id,
                 "reservation": await scheduling.book_scheduling(
                     backend_client,
-                    org_id=org_id,
+                    tenant_id=tenant_id,
                     customer_name=envelope.contact_name or str(contract.metadata.get("customer_name", "")),
                     customer_phone=envelope.contact_phone or str(contract.metadata.get("customer_phone", "")),
                     title=str(contract.metadata.get("title", "Reserva")),
@@ -349,7 +349,7 @@ async def process_contract(
 
     await record_agent_event(
         repo,
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=None,
         agent_mode="external_sales",
         channel=contract.channel,

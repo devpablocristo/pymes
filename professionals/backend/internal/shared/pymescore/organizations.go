@@ -7,11 +7,11 @@ import (
 )
 
 // GetBootstrap fetches the organization bootstrap payload from pymes-core.
-func (c *Client) GetBootstrap(ctx context.Context, orgID string) (map[string]any, error) {
-	return pymescoreops.GetBootstrap(ctx, c.Client, orgID)
+func (c *Client) GetBootstrap(ctx context.Context, tenantID string) (map[string]any, error) {
+	return pymescoreops.GetBootstrap(ctx, c.Client, tenantID)
 }
 
 // GetSettings fetches the tenant settings from pymes-core.
-func (c *Client) GetSettings(ctx context.Context, orgID string) (map[string]any, error) {
-	return pymescoreops.GetSettings(ctx, c.Client, orgID)
+func (c *Client) GetSettings(ctx context.Context, tenantID string) (map[string]any, error) {
+	return pymescoreops.GetSettings(ctx, c.Client, tenantID)
 }

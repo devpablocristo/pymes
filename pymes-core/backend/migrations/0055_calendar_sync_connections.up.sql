@@ -9,7 +9,7 @@
 -- para hacer pulls incrementales. Si están vacíos, el próximo pull es full.
 CREATE TABLE IF NOT EXISTS calendar_sync_connections (
     id                       uuid PRIMARY KEY,
-    org_id                   uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id                   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     -- created_by sigue el patrón text del resto del sistema (ver
     -- scheduling_bookings, calendar_export_tokens). UUID interno o external_id.
     created_by               text NOT NULL DEFAULT '',
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS calendar_sync_connections (
 -- Una conexión activa por (org, creator, provider). Un mismo usuario no puede
 -- conectar dos cuentas Google a la vez; debe revocar la anterior primero.
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_calendar_sync_connections_active
-    ON calendar_sync_connections (org_id, created_by, provider)
+    ON calendar_sync_connections (tenant_id, created_by, provider)
     WHERE revoked_at IS NULL;
 
 -- Estado del flujo OAuth: cada `state` random emitido por StartConnect se
@@ -42,7 +42,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uidx_calendar_sync_connections_active
 -- expirados al iniciar un nuevo flow.
 CREATE TABLE IF NOT EXISTS calendar_sync_oauth_states (
     state       text PRIMARY KEY,
-    org_id      uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     created_by  text NOT NULL DEFAULT '',
     provider    text NOT NULL,
     expires_at  timestamptz NOT NULL,

@@ -16,6 +16,7 @@ import {
   SettingsHubPage,
   ConfiguredCrudModePage,
   ConfiguredCrudRouteModePage,
+  ConfiguredCrudNestedRouteModePage,
   UnifiedChatPage,
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
@@ -58,6 +59,25 @@ function InventorySectionLayout({ slug }: { slug: string }) {
   );
 }
 
+function MedicalOccupationalHealthExamsSectionLayout({ slug }: { slug: string }) {
+  const baseRoute = `/${slug}/medical/occupational-health/exams`;
+  return (
+    <ConfiguredCrudSectionPage
+      resourceId="occupationalHealthExams"
+      baseRoute={baseRoute}
+      actionLink={{
+        to: `${baseRoute}/configure`,
+        label: 'Configurar',
+        hideWhenActivePattern: `${baseRoute}/configure`,
+        activeReplacement: {
+          to: `${baseRoute}/list`,
+          label: 'Volver a medicina laboral',
+        },
+      }}
+    />
+  );
+}
+
 /** Raíz: resuelve el slug del tenant activo y redirige al dashboard; si no hay profile, a /onboarding. */
 function RootTenantRedirect() {
   const slug = useTenantSlug();
@@ -65,20 +85,20 @@ function RootTenantRedirect() {
   return <Navigate to={`/${slug}/dashboard`} replace />;
 }
 
-/** Valida que el :orgSlug de la URL coincida con el profile. Si no hay profile, manda a /onboarding. */
+/** Valida que el :tenantSlug de la URL coincida con el profile. Si no hay profile, manda a /onboarding. */
 function TenantSlugGate({ children }: { children: ReactNode }) {
-  const { orgSlug = '' } = useParams();
+  const { tenantSlug = '' } = useParams();
   const slug = useTenantSlug();
   if (!slug) return <Navigate to="/onboarding" replace />;
-  // Dev: aceptamos cualquier slug en la URL. En prod con backend esto se valida contra orgs.slug.
-  void orgSlug;
+  // Dev: aceptamos cualquier slug en la URL. En prod con backend esto se valida contra tenants.slug.
+  void tenantSlug;
   return <>{children}</>;
 }
 
 function TenantScopedRoutes() {
-  const { orgSlug = '' } = useParams();
+  const { tenantSlug = '' } = useParams();
   const profileSlug = useTenantSlug();
-  const slug = profileSlug ?? orgSlug;
+  const slug = profileSlug ?? tenantSlug;
   return (
     <Routes>
       <Route index element={<Navigate to="dashboard" replace />} />
@@ -92,6 +112,17 @@ function TenantScopedRoutes() {
       <Route path="customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
       <Route path="watcher-config" element={<WatcherConfigPage />} />
       <Route path="restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
+      <Route path="medical/occupational-health/exams" element={<MedicalOccupationalHealthExamsSectionLayout slug={slug} />}>
+        <Route
+          index
+          element={<ConfiguredCrudIndexRedirect resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route
+          path=":modePath"
+          element={<ConfiguredCrudNestedRouteModePage resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+      </Route>
 
       {/* inventory: sección con sus propios routes */}
       <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>
@@ -124,7 +155,7 @@ export function ShellRoutes() {
 
       {/* Rutas autenticadas bajo tenant slug */}
       <Route
-        path="/:orgSlug/*"
+        path="/:tenantSlug/*"
         element={
           <TenantSlugGate>
             <TenantScopedRoutes />

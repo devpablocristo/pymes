@@ -26,7 +26,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) Create(ctx context.Context, req domain.ProcurementRequest) (domain.ProcurementRequest, error) {
 	m := models.ProcurementRequest{
 		ID:             req.ID,
-		OrgID:          req.OrgID,
+		TenantID:       req.TenantID,
 		RequesterActor: req.RequesterActor,
 		Title:          req.Title,
 		Description:    req.Description,
@@ -60,12 +60,12 @@ func (r *Repository) Create(ctx context.Context, req domain.ProcurementRequest) 
 			return domain.ProcurementRequest{}, err
 		}
 	}
-	return r.GetByID(ctx, req.OrgID, m.ID)
+	return r.GetByID(ctx, req.TenantID, m.ID)
 }
 
 func (r *Repository) Update(ctx context.Context, req domain.ProcurementRequest) (domain.ProcurementRequest, error) {
 	var cur models.ProcurementRequest
-	if err := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", req.ID, req.OrgID).First(&cur).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND tenant_id = ?", req.ID, req.TenantID).First(&cur).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProcurementRequest{}, ErrNotFound
 		}
@@ -107,12 +107,12 @@ func (r *Repository) Update(ctx context.Context, req domain.ProcurementRequest) 
 			return domain.ProcurementRequest{}, err
 		}
 	}
-	return r.GetByID(ctx, req.OrgID, req.ID)
+	return r.GetByID(ctx, req.TenantID, req.ID)
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementRequest, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.ProcurementRequest, error) {
 	var m models.ProcurementRequest
-	if err := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(&m).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id = ? AND tenant_id = ?", id, tenantID).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.ProcurementRequest{}, ErrNotFound
 		}
@@ -125,9 +125,9 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.P
 	return toDomain(m, lines), nil
 }
 
-func (r *Repository) List(ctx context.Context, orgID uuid.UUID, includeArchived bool, limit int) ([]domain.ProcurementRequest, error) {
+func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, includeArchived bool, limit int) ([]domain.ProcurementRequest, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ProcurementRequest{}).Where("org_id = ?", orgID)
+	q := r.db.WithContext(ctx).Model(&models.ProcurementRequest{}).Where("tenant_id = ?", tenantID)
 	if !includeArchived {
 		q = q.Where("archived_at IS NULL")
 	}
@@ -146,8 +146,8 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, includeArchived 
 	return out, nil
 }
 
-func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Where("id = ? AND org_id = ? AND archived_at IS NULL", id, orgID).Delete(&models.ProcurementRequest{})
+func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Where("id = ? AND tenant_id = ? AND archived_at IS NULL", id, tenantID).Delete(&models.ProcurementRequest{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -157,10 +157,10 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
 	now := time.Now()
 	res := r.db.WithContext(ctx).Model(&models.ProcurementRequest{}).
-		Where("id = ? AND org_id = ? AND archived_at IS NULL", id, orgID).
+		Where("id = ? AND tenant_id = ? AND archived_at IS NULL", id, tenantID).
 		Updates(map[string]any{"archived_at": now, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -171,9 +171,9 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.ProcurementRequest{}).
-		Where("id = ? AND org_id = ? AND archived_at IS NOT NULL", id, orgID).
+		Where("id = ? AND tenant_id = ? AND archived_at IS NOT NULL", id, tenantID).
 		Updates(map[string]any{"archived_at": nil, "updated_at": time.Now()})
 	if res.Error != nil {
 		return res.Error
@@ -182,86 +182,6 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return ErrNotFound
 	}
 	return nil
-}
-
-func (r *Repository) ListPolicies(ctx context.Context, orgID uuid.UUID) ([]models.ProcurementPolicy, error) {
-	var rows []models.ProcurementPolicy
-	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("priority ASC, id ASC").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	return rows, nil
-}
-
-func (r *Repository) GetPolicyByID(ctx context.Context, orgID, id uuid.UUID) (domain.ProcurementPolicy, error) {
-	var m models.ProcurementPolicy
-	if err := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.ProcurementPolicy{}, ErrNotFound
-		}
-		return domain.ProcurementPolicy{}, err
-	}
-	return policyModelToDomain(m), nil
-}
-
-func (r *Repository) SavePolicy(ctx context.Context, p domain.ProcurementPolicy) (domain.ProcurementPolicy, error) {
-	m := policyDomainToModel(p)
-	if m.ID == uuid.Nil {
-		m.ID = uuid.New()
-	}
-	now := time.Now()
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	m.UpdatedAt = now
-	if err := r.db.WithContext(ctx).Save(&m).Error; err != nil {
-		return domain.ProcurementPolicy{}, err
-	}
-	return policyModelToDomain(m), nil
-}
-
-func (r *Repository) DeletePolicy(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Where("id = ? AND org_id = ?", id, orgID).Delete(&models.ProcurementPolicy{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
-
-func policyModelToDomain(m models.ProcurementPolicy) domain.ProcurementPolicy {
-	return domain.ProcurementPolicy{
-		ID:           m.ID,
-		OrgID:        m.OrgID,
-		Name:         m.Name,
-		Expression:   m.Expression,
-		Effect:       m.Effect,
-		Priority:     m.Priority,
-		Mode:         m.Mode,
-		Enabled:      m.Enabled,
-		ActionFilter: m.ActionFilter,
-		SystemFilter: m.SystemFilter,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
-	}
-}
-
-func policyDomainToModel(p domain.ProcurementPolicy) models.ProcurementPolicy {
-	return models.ProcurementPolicy{
-		ID:           p.ID,
-		OrgID:        p.OrgID,
-		Name:         p.Name,
-		Expression:   p.Expression,
-		Effect:       p.Effect,
-		Priority:     p.Priority,
-		Mode:         p.Mode,
-		Enabled:      p.Enabled,
-		ActionFilter: p.ActionFilter,
-		SystemFilter: p.SystemFilter,
-		CreatedAt:    p.CreatedAt,
-		UpdatedAt:    p.UpdatedAt,
-	}
 }
 
 func toDomain(m models.ProcurementRequest, lines []models.ProcurementRequestLine) domain.ProcurementRequest {
@@ -283,7 +203,7 @@ func toDomain(m models.ProcurementRequest, lines []models.ProcurementRequestLine
 	}
 	return domain.ProcurementRequest{
 		ID:             m.ID,
-		OrgID:          m.OrgID,
+		TenantID:       m.TenantID,
 		RequesterActor: m.RequesterActor,
 		Title:          m.Title,
 		Description:    m.Description,

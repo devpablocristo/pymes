@@ -24,9 +24,10 @@ for sql_file in \
   "workshops/backend/seeds/auto_repair_demo.sql" \
   "workshops/backend/seeds/bike_shop_demo.sql" \
   "professionals/backend/seeds/demo.sql" \
-  "restaurants/backend/seeds/demo.sql"
+  "restaurants/backend/seeds/demo.sql" \
+  "medical/backend/seeds/occupational_health_demo.sql"
 do
   run_pymes_sql_file "$sql_file"
 done
 
-run_review_sql_file "scripts/seeds/review_demo.sql"
+run_governance_sql_file "scripts/seeds/governance_demo.sql"

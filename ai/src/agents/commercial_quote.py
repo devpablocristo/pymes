@@ -5,8 +5,8 @@ from typing import Any
 from src.backend_client.client import BackendClient
 from src.tools import products
 
-async def _match_quote_items(client: BackendClient, org_id: str, items: list[dict[str, Any]]) -> dict[str, Any]:
-    catalog = await products.get_public_services(client, org_id=org_id, limit=100)
+async def _match_quote_items(client: BackendClient, tenant_id: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+    catalog = await products.get_public_services(client, tenant_id=tenant_id, limit=100)
     rows = list(catalog.get("items", [])) if isinstance(catalog, dict) else []
     by_id = {str(row.get("id", "")).strip(): row for row in rows if str(row.get("id", "")).strip()}
     by_name = {str(row.get("name", "")).strip().lower(): row for row in rows if str(row.get("name", "")).strip()}
@@ -49,8 +49,8 @@ async def _match_quote_items(client: BackendClient, org_id: str, items: list[dic
     return {"items": matched, "missing": missing, "currency": currency, "total": total}
 
 
-async def _build_quote_preview(client: BackendClient, org_id: str, items: list[dict[str, Any]], customer_name: str = "", notes: str = "") -> dict[str, Any]:
-    matched = await _match_quote_items(client, org_id, items)
+async def _build_quote_preview(client: BackendClient, tenant_id: str, items: list[dict[str, Any]], customer_name: str = "", notes: str = "") -> dict[str, Any]:
+    matched = await _match_quote_items(client, tenant_id, items)
     if not matched["items"]:
         return {
             "status": "needs_human_review",

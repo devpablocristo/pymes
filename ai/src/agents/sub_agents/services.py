@@ -26,10 +26,10 @@ Responde siempre en espanol, claro y directo. No muestres JSON al usuario."""
 
 
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
-    async def search_services_handler(*, org_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
+    async def search_services_handler(*, tenant_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
         return await services.search_services(client, auth, query=query, limit=limit)
 
-    async def get_service_handler(*, org_id: str, service_id: str) -> dict[str, Any]:
+    async def get_service_handler(*, tenant_id: str, service_id: str) -> dict[str, Any]:
         return await services.get_service(client, auth, service_id=service_id)
 
     tools = [

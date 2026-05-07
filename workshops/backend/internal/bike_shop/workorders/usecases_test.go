@@ -16,7 +16,7 @@ func TestListForcesBicycleAssetType(t *testing.T) {
 	base := &fakeBasePort{}
 	uc := NewUsecases(base)
 
-	_, _, _, _, err := uc.List(context.Background(), ListParams{OrgID: uuid.New(), AssetType: "vehicle"})
+	_, _, _, _, err := uc.List(context.Background(), ListParams{TenantID: uuid.New(), AssetType: "vehicle"})
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -28,7 +28,7 @@ func TestListForcesBicycleAssetType(t *testing.T) {
 func TestGetByIDRejectsOtherSubvertical(t *testing.T) {
 	t.Parallel()
 
-	base := &fakeBasePort{getByIDResult: WorkOrder{ID: uuid.New(), OrgID: uuid.New(), AssetType: "vehicle"}}
+	base := &fakeBasePort{getByIDResult: WorkOrder{ID: uuid.New(), TenantID: uuid.New(), AssetType: "vehicle"}}
 	uc := NewUsecases(base)
 
 	_, err := uc.GetByID(context.Background(), uuid.New(), uuid.New())
@@ -43,7 +43,7 @@ func TestCreateForcesBicycleAssetType(t *testing.T) {
 	base := &fakeBasePort{}
 	uc := NewUsecases(base)
 
-	_, err := uc.Create(context.Background(), WorkOrder{OrgID: uuid.New(), AssetType: "vehicle"}, "tester")
+	_, err := uc.Create(context.Background(), WorkOrder{TenantID: uuid.New(), AssetType: "vehicle"}, "tester")
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}

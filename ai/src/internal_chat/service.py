@@ -64,7 +64,7 @@ async def run_internal_orchestrated_chat(
     repo: AIRepository,
     llm: LLMProvider,
     backend_client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     message: str,
     conversation_id: str | None,
     auth: AuthContext,
@@ -90,7 +90,7 @@ async def run_internal_orchestrated_chat(
     except EvidenceUnavailable as exc:
         logger.warning(
             "internal_chat_evidence_unavailable",
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             tool_name=exc.tool_name,
             error=str(exc),
@@ -122,7 +122,7 @@ async def run_internal_orchestrated_chat(
         dossier, _snapshot = await hydrate_dossier_from_backend_settings(
             repo=repo,
             backend_client=backend_client,
-            org_id=org_id,
+            tenant_id=tenant_id,
             auth=auth,
         )
         user_prompt = build_internal_chat_user_prompt(
@@ -135,7 +135,7 @@ async def run_internal_orchestrated_chat(
         tokens_in = estimate_tokens(INTERNAL_CHAT_SYSTEM_PROMPT) + estimate_tokens(user_prompt)
         reply = await _complete_with_gemini(
             llm=llm,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             user_prompt=user_prompt,
         )
@@ -176,17 +176,17 @@ async def run_internal_orchestrated_chat(
         "evidence": copy.deepcopy(evidence_metadata),
     }
     await repo.append_messages(
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         new_messages=[user_message, assistant_message],
         tool_calls_count=len(evidence.tools),
         tokens_input=tokens_in,
         tokens_output=tokens_out,
     )
-    await repo.track_usage(org_id, tokens_in=tokens_in, tokens_out=tokens_out)
+    await repo.track_usage(tenant_id, tokens_in=tokens_in, tokens_out=tokens_out)
     await record_agent_event(
         repo,
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         agent_mode=decision.routed_agent,
         channel=_INTERNAL_ASSISTANT_CHANNEL,
@@ -208,7 +208,7 @@ async def run_internal_orchestrated_chat(
     )
     logger.info(
         "internal_chat_completed",
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation.id,
         routed_agent=decision.routed_agent,
         analysis_scope=decision.scope,
@@ -240,7 +240,7 @@ async def run_internal_orchestrated_chat(
 async def _complete_with_gemini(
     *,
     llm: LLMProvider,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str,
     user_prompt: str,
 ) -> str:
@@ -269,7 +269,7 @@ async def _complete_with_gemini(
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "internal_chat_llm_unavailable",
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             error=str(exc),
         )

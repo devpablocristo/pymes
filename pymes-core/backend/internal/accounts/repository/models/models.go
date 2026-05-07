@@ -8,7 +8,7 @@ import (
 
 type AccountModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	Type        string
 	PartyID     uuid.UUID
 	PartyName   string
@@ -23,7 +23,7 @@ func (AccountModel) TableName() string { return "accounts" }
 type MovementModel struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
 	AccountID     uuid.UUID `gorm:"type:uuid;index;not null"`
-	OrgID         uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID      uuid.UUID `gorm:"type:uuid;index;not null"`
 	Type          string
 	Amount        float64
 	Balance       float64

@@ -37,7 +37,7 @@ jobs:
           AUTH_ALLOW_API_KEY=true
           GOVERNANCE_ADMIN_API_KEY=governance-admin-dev-key
           GOVERNANCE_API_KEY=governance-admin-dev-key
-          GOVERNANCE_CALLBACK_TOKEN=local-review-callback-token
+          GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
           GOVERNANCE_URL=http://host.docker.internal:18084
           EOF
 
@@ -45,8 +45,8 @@ jobs:
         working-directory: nexus
         run: |
           export GOVERNANCE_APPROVAL_PENDING_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback
-          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/review-callback
-          export GOVERNANCE_CALLBACK_TOKEN=local-review-callback-token
+          export GOVERNANCE_APPROVAL_RESOLVED_CALLBACK_URLS=http://host.docker.internal:8100/v1/internal/v1/governance-callback,http://host.docker.internal:8200/v1/internal/governance-callback
+          export GOVERNANCE_CALLBACK_TOKEN=local-governance-callback-token
           docker compose up -d --build governance governance-postgres
 
       - name: Build and start stack
@@ -83,11 +83,11 @@ jobs:
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8181/v1/teachers/professionals
           curl -fsS -H 'X-API-KEY: psk_local_admin' -H 'X-USER-ID: 123' http://127.0.0.1:8282/v1/auto-repair/vehicles
 
-      - name: Run review notifications E2E
+      - name: Run governance notifications E2E
         working-directory: pymes
         env:
           CALLBACK_TIMEOUT_SECONDS: "20"
-        run: make e2e-review-notifications
+        run: make e2e-governance-notifications
 
       - name: Print container logs on failure
         if: failure()

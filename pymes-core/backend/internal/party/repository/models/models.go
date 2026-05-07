@@ -9,7 +9,7 @@ import (
 
 type PartyModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	PartyType   string    `gorm:"column:party_type;not null"`
 	DisplayName string    `gorm:"column:display_name;not null"`
 	Email       string
@@ -57,7 +57,7 @@ func (PartyAgentModel) TableName() string { return "party_agents" }
 type PartyRoleModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
 	PartyID     uuid.UUID `gorm:"column:party_id;type:uuid;index;not null"`
-	OrgID       uuid.UUID `gorm:"column:org_id;type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"column:tenant_id;type:uuid;index;not null"`
 	Role        string
 	IsActive    bool       `gorm:"column:is_active"`
 	PriceListID *uuid.UUID `gorm:"column:price_list_id;type:uuid"`
@@ -69,7 +69,7 @@ func (PartyRoleModel) TableName() string { return "party_roles" }
 
 type PartyRelationshipModel struct {
 	ID               uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID            uuid.UUID  `gorm:"column:org_id;type:uuid;index;not null"`
+	TenantID         uuid.UUID  `gorm:"column:tenant_id;type:uuid;index;not null"`
 	FromPartyID      uuid.UUID  `gorm:"column:from_party_id;type:uuid;index;not null"`
 	ToPartyID        uuid.UUID  `gorm:"column:to_party_id;type:uuid;index;not null"`
 	RelationshipType string     `gorm:"column:relationship_type"`

@@ -78,7 +78,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/public/{org_slug}/chat": {
+    "/v1/public/{tenant_slug}/chat": {
         parameters: {
             query?: never;
             header?: never;
@@ -95,7 +95,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/public/{org_slug}/chat/identify": {
+    "/v1/public/{tenant_slug}/chat/identify": {
         parameters: {
             query?: never;
             header?: never;
@@ -112,7 +112,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/public/{org_slug}/sales-agent/chat": {
+    "/v1/public/{tenant_slug}/sales-agent/chat": {
         parameters: {
             query?: never;
             header?: never;
@@ -129,7 +129,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/public/{org_slug}/sales-agent/contracts": {
+    "/v1/public/{tenant_slug}/sales-agent/contracts": {
         parameters: {
             query?: never;
             header?: never;
@@ -180,7 +180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/professionals/teachers/public/{org_slug}/chat": {
+    "/v1/professionals/teachers/public/{tenant_slug}/chat": {
         parameters: {
             query?: never;
             header?: never;
@@ -214,7 +214,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/workshops/auto-repair/public/{org_slug}/chat": {
+    "/v1/workshops/auto-repair/public/{tenant_slug}/chat": {
         parameters: {
             query?: never;
             header?: never;
@@ -231,7 +231,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/internal/review-callback": {
+    "/v1/internal/governance-callback": {
         parameters: {
             query?: never;
             header?: never;
@@ -241,10 +241,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Review Callback
+         * Governance Callback
          * @description Recibe notificación de governance cuando una aprobación se resuelve.
          */
-        post: operations["review_callback_v1_internal_review_callback_post"];
+        post: operations["governance_callback_v1_internal_governance_callback_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -617,7 +617,7 @@ export interface components {
             /** Request Id */
             request_id: string;
             /** Org Id */
-            org_id: string;
+            tenant_id: string;
             /** Counterparty Id */
             counterparty_id: string;
             /**
@@ -725,7 +725,7 @@ export interface components {
         /** CustomerMessagingInboundRequest */
         CustomerMessagingInboundRequest: {
             /** Org Id */
-            org_id: string;
+            tenant_id: string;
             /** Phone Number Id */
             phone_number_id: string;
             /** From Phone */
@@ -778,6 +778,23 @@ export interface components {
             tool_calls: string[];
             /** Pending Confirmations */
             pending_confirmations: string[];
+        };
+        /** GovernanceCallbackPayload */
+        GovernanceCallbackPayload: {
+            /** Request Id */
+            request_id: string;
+            /** Decision */
+            decision: string;
+            /**
+             * Decided By
+             * @default
+             */
+            decided_by: string;
+            /**
+             * Decision Note
+             * @default
+             */
+            decision_note: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -904,23 +921,6 @@ export interface components {
             content_language: "es" | "en";
             /** Items */
             items?: components["schemas"]["NotificationItem"][];
-        };
-        /** ReviewCallbackPayload */
-        ReviewCallbackPayload: {
-            /** Request Id */
-            request_id: string;
-            /** Decision */
-            decision: string;
-            /**
-             * Decided By
-             * @default
-             */
-            decided_by: string;
-            /**
-             * Decision Note
-             * @default
-             */
-            decision_note: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1131,7 +1131,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1166,7 +1166,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1201,7 +1201,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1236,7 +1236,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1339,7 +1339,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1407,7 +1407,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                org_slug: string;
+                tenant_slug: string;
             };
             cookie?: never;
         };
@@ -1437,7 +1437,7 @@ export interface operations {
             };
         };
     };
-    review_callback_v1_internal_review_callback_post: {
+    governance_callback_v1_internal_governance_callback_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1446,7 +1446,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReviewCallbackPayload"];
+                "application/json": components["schemas"]["GovernanceCallbackPayload"];
             };
         };
         responses: {

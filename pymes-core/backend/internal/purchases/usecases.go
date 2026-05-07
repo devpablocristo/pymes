@@ -15,30 +15,30 @@ import (
 )
 
 type RepositoryPort interface {
-	List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	List(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error)
 	Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
-	GetSupplierName(ctx context.Context, orgID, supplierID uuid.UUID) (string, error)
-	GetCurrency(ctx context.Context, orgID uuid.UUID) string
-	GetTaxRate(ctx context.Context, orgID uuid.UUID) float64
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
+	GetSupplierName(ctx context.Context, tenantID, supplierID uuid.UUID) (string, error)
+	GetCurrency(ctx context.Context, tenantID uuid.UUID) string
+	GetTaxRate(ctx context.Context, tenantID uuid.UUID) float64
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type TimelinePort interface {
-	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
+	RecordEvent(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
 }
 
 type WebhookPort interface {
-	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+	Enqueue(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error
 }
 
 type Usecases struct {
@@ -62,7 +62,7 @@ func NewUsecases(repo RepositoryPort, audit AuditPort, opts ...Option) *Usecases
 }
 
 type CreateInput struct {
-	OrgID         uuid.UUID
+	TenantID      uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
@@ -77,7 +77,7 @@ type CreateInput struct {
 
 type UpdateInput struct {
 	ID            uuid.UUID
-	OrgID         uuid.UUID
+	TenantID      uuid.UUID
 	BranchID      *uuid.UUID
 	SupplierID    *uuid.UUID
 	SupplierName  string
@@ -90,17 +90,17 @@ type UpdateInput struct {
 }
 
 type UpdateStatusInput struct {
-	ID     uuid.UUID
-	OrgID  uuid.UUID
-	Status string
+	ID       uuid.UUID
+	TenantID uuid.UUID
+	Status   string
 }
 
-func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
-	return u.repo.List(ctx, orgID, branchID, strings.TrimSpace(status), limit)
+func (u *Usecases) List(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	return u.repo.List(ctx, tenantID, branchID, strings.TrimSpace(status), limit)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
-	return u.repo.ListArchived(ctx, orgID, branchID, strings.TrimSpace(status), limit)
+func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, status string, limit int) ([]purchasesdomain.Purchase, error) {
+	return u.repo.ListArchived(ctx, tenantID, branchID, strings.TrimSpace(status), limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -113,19 +113,19 @@ func (u *Usecases) Create(ctx context.Context, in CreateInput) (purchasesdomain.
 		return purchasesdomain.Purchase{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "purchase.created", "purchase", out.ID.String(), map[string]any{"number": out.Number, "total": out.Total})
+		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "purchase.created", "purchase", out.ID.String(), map[string]any{"number": out.Number, "total": out.Total})
 	}
 	if u.timeline != nil && out.SupplierID != nil {
-		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.SupplierID, "purchase.created", "Compra registrada", out.Number, in.CreatedBy, map[string]any{"purchase_id": out.ID.String(), "total": out.Total})
+		_ = u.timeline.RecordEvent(ctx, in.TenantID, "parties", *out.SupplierID, "purchase.created", "Compra registrada", out.Number, in.CreatedBy, map[string]any{"purchase_id": out.ID.String(), "total": out.Total})
 	}
 	if u.webhooks != nil {
-		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.created", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "total": out.Total, "status": out.Status})
+		_ = u.webhooks.Enqueue(ctx, in.TenantID, "purchase.created", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "total": out.Total, "status": out.Status})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", id.String())
@@ -136,7 +136,7 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesd
 }
 
 func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (purchasesdomain.Purchase, error) {
-	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
@@ -147,7 +147,7 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 		return purchasesdomain.Purchase{}, err
 	}
 	prepared, err := u.prepareCreate(ctx, CreateInput{
-		OrgID:         in.OrgID,
+		TenantID:      in.TenantID,
 		BranchID:      in.BranchID,
 		SupplierID:    in.SupplierID,
 		SupplierName:  in.SupplierName,
@@ -162,24 +162,24 @@ func (u *Usecases) Update(ctx context.Context, in UpdateInput, actor string) (pu
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
-	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, OrgID: in.OrgID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, IsFavorite: prepared.IsFavorite, Tags: prepared.Tags, Notes: prepared.Notes, Items: prepared.Items})
+	out, err := u.repo.Update(ctx, UpdateInput{ID: in.ID, TenantID: in.TenantID, BranchID: prepared.BranchID, SupplierID: prepared.SupplierID, SupplierName: prepared.SupplierName, Status: prepared.Status, PaymentStatus: prepared.PaymentStatus, IsFavorite: prepared.IsFavorite, Tags: prepared.Tags, Notes: prepared.Notes, Items: prepared.Items})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), actor, "purchase.updated", "purchase", out.ID.String(), map[string]any{"status": out.Status, "total": out.Total})
+		u.audit.Log(ctx, in.TenantID.String(), actor, "purchase.updated", "purchase", out.ID.String(), map[string]any{"status": out.Status, "total": out.Total})
 	}
 	if u.timeline != nil && out.SupplierID != nil {
-		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.SupplierID, "purchase.updated", "Compra actualizada", out.Number, actor, map[string]any{"purchase_id": out.ID.String(), "status": out.Status})
+		_ = u.timeline.RecordEvent(ctx, in.TenantID, "parties", *out.SupplierID, "purchase.updated", "Compra actualizada", out.Number, actor, map[string]any{"purchase_id": out.ID.String(), "status": out.Status})
 	}
 	if u.webhooks != nil {
-		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
+		_ = u.webhooks.Enqueue(ctx, in.TenantID, "purchase.updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
 	return out, nil
 }
 
 func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor string) (purchasesdomain.Purchase, error) {
-	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return purchasesdomain.Purchase{}, domainerr.NotFoundf("purchase", in.ID.String())
@@ -197,73 +197,73 @@ func (u *Usecases) UpdateStatus(ctx context.Context, in UpdateStatusInput, actor
 		return purchasesdomain.Purchase{}, domainerr.BusinessRule("purchase status transition is not allowed")
 	}
 	out, err := u.repo.UpdateStatus(ctx, UpdateStatusInput{
-		ID:     in.ID,
-		OrgID:  in.OrgID,
-		Status: nextStatus,
+		ID:       in.ID,
+		TenantID: in.TenantID,
+		Status:   nextStatus,
 	})
 	if err != nil {
 		return purchasesdomain.Purchase{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), actor, "purchase.status_updated", "purchase", out.ID.String(), map[string]any{"status": out.Status})
+		u.audit.Log(ctx, in.TenantID.String(), actor, "purchase.status_updated", "purchase", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	if u.timeline != nil && out.SupplierID != nil {
-		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.SupplierID, "purchase.status_updated", "Estado de compra actualizado", out.Number, actor, map[string]any{"purchase_id": out.ID.String(), "status": out.Status})
+		_ = u.timeline.RecordEvent(ctx, in.TenantID, "parties", *out.SupplierID, "purchase.status_updated", "Estado de compra actualizado", out.Number, actor, map[string]any{"purchase_id": out.ID.String(), "status": out.Status})
 	}
 	if u.webhooks != nil {
-		_ = u.webhooks.Enqueue(ctx, in.OrgID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
+		_ = u.webhooks.Enqueue(ctx, in.TenantID, "purchase.status_updated", map[string]any{"purchase_id": out.ID.String(), "supplier_id": nullableUUID(out.SupplierID), "status": out.Status})
 	}
 	return out, nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "purchase.archived", "purchase", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "purchase.archived", "purchase", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "purchase.restored", "purchase", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "purchase.restored", "purchase", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("purchase", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "purchase.deleted", "purchase", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "purchase.deleted", "purchase", id.String(), map[string]any{})
 	}
 	return nil
 }
 
 func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInput, error) {
-	if in.OrgID == uuid.Nil {
-		return CreateInput{}, domainerr.Validation("org_id is required")
+	if in.TenantID == uuid.Nil {
+		return CreateInput{}, domainerr.Validation("tenant_id is required")
 	}
 	if len(in.Items) == 0 {
 		return CreateInput{}, domainerr.Validation("items are required")
 	}
 	if in.SupplierID != nil && *in.SupplierID != uuid.Nil && strings.TrimSpace(in.SupplierName) == "" {
-		if name, err := u.repo.GetSupplierName(ctx, in.OrgID, *in.SupplierID); err == nil && strings.TrimSpace(name) != "" {
+		if name, err := u.repo.GetSupplierName(ctx, in.TenantID, *in.SupplierID); err == nil && strings.TrimSpace(name) != "" {
 			in.SupplierName = name
 		}
 	}
@@ -276,8 +276,8 @@ func (u *Usecases) prepareCreate(ctx context.Context, in CreateInput) (CreateInp
 	}
 	in.Status = status
 	in.PaymentStatus = defaultString(strings.ToLower(in.PaymentStatus), "pending")
-	currency := u.repo.GetCurrency(ctx, in.OrgID)
-	defaultTax := u.repo.GetTaxRate(ctx, in.OrgID)
+	currency := u.repo.GetCurrency(ctx, in.TenantID)
+	defaultTax := u.repo.GetTaxRate(ctx, in.TenantID)
 	items := make([]purchasesdomain.PurchaseItem, 0, len(in.Items))
 	for idx, item := range in.Items {
 		if item.Quantity <= 0 || item.UnitCost < 0 {

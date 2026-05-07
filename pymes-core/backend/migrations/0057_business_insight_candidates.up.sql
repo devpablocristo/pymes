@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS pymes_business_insight_candidates (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     kind text NOT NULL,
     event_type text NOT NULL,
     entity_type text NOT NULL,
@@ -20,11 +20,11 @@ CREATE TABLE IF NOT EXISTS pymes_business_insight_candidates (
     last_actor text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT pymes_business_insight_candidates_fingerprint_uniq UNIQUE (org_id, fingerprint)
+    CONSTRAINT pymes_business_insight_candidates_fingerprint_uniq UNIQUE (tenant_id, fingerprint)
 );
 
 CREATE INDEX IF NOT EXISTS idx_pymes_business_insight_candidates_org_status
-    ON pymes_business_insight_candidates (org_id, status, last_seen_at DESC);
+    ON pymes_business_insight_candidates (tenant_id, status, last_seen_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_pymes_business_insight_candidates_org_entity
-    ON pymes_business_insight_candidates (org_id, entity_type, entity_id);
+    ON pymes_business_insight_candidates (tenant_id, entity_type, entity_id);

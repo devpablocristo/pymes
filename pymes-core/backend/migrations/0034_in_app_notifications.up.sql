@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS in_app_notifications CASCADE;
 
 CREATE TABLE in_app_notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title text NOT NULL,
     body text NOT NULL,
@@ -20,4 +20,4 @@ CREATE INDEX idx_in_app_notifications_user_created
     ON in_app_notifications (user_id, created_at DESC);
 
 CREATE INDEX idx_in_app_notifications_org_created
-    ON in_app_notifications (org_id, created_at DESC);
+    ON in_app_notifications (tenant_id, created_at DESC);

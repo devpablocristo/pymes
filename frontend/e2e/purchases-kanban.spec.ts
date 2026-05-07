@@ -75,8 +75,8 @@ async function installPurchasesApiMocks(page: Page) {
         contentType: 'application/json',
         body: JSON.stringify({
           auth: {
-            org_id: 'e2e-org-001',
-            org_name: 'E2E Test Org',
+            tenant_id: 'e2e-org-001',
+            tenant_name: 'E2E Test Tenant',
             product_role: 'admin',
             auth_method: 'api_key',
           },

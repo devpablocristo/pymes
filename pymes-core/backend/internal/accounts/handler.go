@@ -16,9 +16,9 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error)
-	Debtors(ctx context.Context, orgID uuid.UUID, limit int) ([]accountsdomain.Account, error)
-	Movements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
+	List(ctx context.Context, tenantID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error)
+	Debtors(ctx context.Context, tenantID uuid.UUID, limit int) ([]accountsdomain.Account, error)
+	Movements(ctx context.Context, tenantID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
 	CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error)
 }
 
@@ -34,13 +34,13 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	onlyNonZero := strings.ToLower(c.DefaultQuery("non_zero", "false")) == "true"
-	items, err := h.uc.List(c.Request.Context(), orgID, c.Query("type"), c.Query("entity_type"), onlyNonZero, limit)
+	items, err := h.uc.List(c.Request.Context(), tenantID, c.Query("type"), c.Query("entity_type"), onlyNonZero, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -49,12 +49,12 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Debtors(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.Debtors(c.Request.Context(), orgID, limit)
+	items, err := h.uc.Debtors(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -63,12 +63,12 @@ func (h *Handler) Debtors(c *gin.Context) {
 }
 
 func (h *Handler) Movements(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.Movements(c.Request.Context(), orgID, id, limit)
+	items, err := h.uc.Movements(c.Request.Context(), tenantID, id, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -78,9 +78,9 @@ func (h *Handler) Movements(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateAccountRequest
@@ -97,7 +97,7 @@ func (h *Handler) Create(c *gin.Context) {
 	if req.CreditLimit != nil {
 		creditLimit = *req.CreditLimit
 	}
-	out, err := h.uc.CreateOrAdjust(c.Request.Context(), accountsdomain.Account{OrgID: orgID, Type: strings.TrimSpace(req.Type), EntityType: strings.TrimSpace(req.EntityType), EntityID: entityID, EntityName: strings.TrimSpace(req.EntityName), Currency: strings.TrimSpace(req.Currency), CreditLimit: creditLimit}, req.Amount, req.Description, authCtx.Actor)
+	out, err := h.uc.CreateOrAdjust(c.Request.Context(), accountsdomain.Account{TenantID: tenantID, Type: strings.TrimSpace(req.Type), EntityType: strings.TrimSpace(req.EntityType), EntityID: entityID, EntityName: strings.TrimSpace(req.EntityName), Currency: strings.TrimSpace(req.Currency), CreditLimit: creditLimit}, req.Amount, req.Description, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -106,9 +106,9 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
-	return handlers.ParseAuthOrgID(c)
+	return handlers.ParseAuthTenantID(c)
 }
 
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	return handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	return handlers.ParseAuthTenantAndParamID(c, "id", "id")
 }

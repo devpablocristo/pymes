@@ -53,7 +53,7 @@ export function AccountPlanSection({ session }: { session: SessionResponse }) {
 
   useEffect(() => {
     void load();
-  }, [load, session.auth.org_id]);
+  }, [load, session.auth.tenant_id]);
 
   const returnUrl = `${window.location.origin}${settingsReturnPath}`;
 

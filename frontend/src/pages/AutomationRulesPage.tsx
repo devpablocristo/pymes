@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
 import { useSearch } from '@devpablocristo/modules-search';
-import { listPolicies, createPolicy, deletePolicy, type PolicyResponse } from '../lib/reviewApi';
+import { listPolicies, createPolicy, deletePolicy, type PolicyResponse } from '../lib/governanceApi';
 import { queryKeys } from '../lib/queryKeys';
 import './AutomationRulesPage.css';
 
@@ -114,7 +114,7 @@ export default function AutomationRulesPage() {
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const queryClient = useQueryClient();
   const policiesQuery = useQuery({
-    queryKey: queryKeys.review.policies,
+    queryKey: queryKeys.governance.policies,
     queryFn: listPolicies,
     retry: false,
   });
@@ -177,7 +177,7 @@ export default function AutomationRulesPage() {
     },
     onSuccess: async () => {
       setStatusMsg({ text: 'Reglas guardadas', type: 'success' });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.review.policies });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.governance.policies });
     },
     onError: () => {
       setStatusMsg({ text: 'Error al guardar las reglas', type: 'error' });

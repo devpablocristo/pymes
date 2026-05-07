@@ -517,8 +517,8 @@ function Debtors() {
       ) : items.length === 0 ? (
         <p className="dash__empty-hint">{t('dashboard.visual.noDebts')}</p>
       ) : (
-        items.slice(0, 6).map((d) => (
-          <div key={d.party_id} className="dash__performer">
+        items.slice(0, 6).map((d, index) => (
+          <div key={`${d.party_id || d.party_name}:${index}`} className="dash__performer">
             <div className="dash__performer-info">
               <div className="dash__performer-name">{d.party_name}</div>
               {d.oldest_date && (

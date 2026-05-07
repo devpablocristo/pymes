@@ -22,15 +22,15 @@ type handlerUsecases struct {
 	payload     []byte
 }
 
-func (u *handlerUsecases) QuoteLink(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (Result, error) {
+func (u *handlerUsecases) QuoteLink(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (Result, error) {
 	return Result{}, nil
 }
 
-func (u *handlerUsecases) SaleReceiptLink(ctx context.Context, orgID, saleID uuid.UUID, actor string) (Result, error) {
+func (u *handlerUsecases) SaleReceiptLink(ctx context.Context, tenantID, saleID uuid.UUID, actor string) (Result, error) {
 	return Result{}, nil
 }
 
-func (u *handlerUsecases) CustomerMessage(ctx context.Context, orgID, partyID uuid.UUID, message string) (Result, error) {
+func (u *handlerUsecases) CustomerMessage(ctx context.Context, tenantID, partyID uuid.UUID, message string) (Result, error) {
 	return Result{}, nil
 }
 
@@ -54,19 +54,19 @@ func (u *handlerUsecases) HandleStatusUpdate(ctx context.Context, update domain.
 	return nil
 }
 
-func (u *handlerUsecases) Connect(ctx context.Context, orgID uuid.UUID, phoneNumberID, wabaID, accessToken, displayPhone, verifiedName string) (domain.Connection, error) {
+func (u *handlerUsecases) Connect(ctx context.Context, tenantID uuid.UUID, phoneNumberID, wabaID, accessToken, displayPhone, verifiedName string) (domain.Connection, error) {
 	return domain.Connection{}, nil
 }
 
-func (u *handlerUsecases) Disconnect(ctx context.Context, orgID uuid.UUID) error {
+func (u *handlerUsecases) Disconnect(ctx context.Context, tenantID uuid.UUID) error {
 	return nil
 }
 
-func (u *handlerUsecases) GetConnection(ctx context.Context, orgID uuid.UUID) (domain.Connection, error) {
+func (u *handlerUsecases) GetConnection(ctx context.Context, tenantID uuid.UUID) (domain.Connection, error) {
 	return domain.Connection{}, nil
 }
 
-func (u *handlerUsecases) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (domain.ConnectionStats, error) {
+func (u *handlerUsecases) GetConnectionStats(ctx context.Context, tenantID uuid.UUID) (domain.ConnectionStats, error) {
 	return domain.ConnectionStats{}, nil
 }
 
@@ -90,35 +90,35 @@ func (u *handlerUsecases) ListMessages(ctx context.Context, filter domain.Messag
 	return nil, 0, nil
 }
 
-func (u *handlerUsecases) CreateTemplate(ctx context.Context, orgID uuid.UUID, tpl domain.Template) (domain.Template, error) {
+func (u *handlerUsecases) CreateTemplate(ctx context.Context, tenantID uuid.UUID, tpl domain.Template) (domain.Template, error) {
 	return domain.Template{}, nil
 }
 
-func (u *handlerUsecases) GetTemplate(ctx context.Context, orgID, templateID uuid.UUID) (domain.Template, error) {
+func (u *handlerUsecases) GetTemplate(ctx context.Context, tenantID, templateID uuid.UUID) (domain.Template, error) {
 	return domain.Template{}, nil
 }
 
-func (u *handlerUsecases) ListTemplates(ctx context.Context, orgID uuid.UUID) ([]domain.Template, error) {
+func (u *handlerUsecases) ListTemplates(ctx context.Context, tenantID uuid.UUID) ([]domain.Template, error) {
 	return nil, nil
 }
 
-func (u *handlerUsecases) DeleteTemplate(ctx context.Context, orgID, templateID uuid.UUID) error {
+func (u *handlerUsecases) DeleteTemplate(ctx context.Context, tenantID, templateID uuid.UUID) error {
 	return nil
 }
 
-func (u *handlerUsecases) RegisterOptIn(ctx context.Context, orgID, partyID uuid.UUID, phone string, source domain.OptInSource) (domain.OptIn, error) {
+func (u *handlerUsecases) RegisterOptIn(ctx context.Context, tenantID, partyID uuid.UUID, phone string, source domain.OptInSource) (domain.OptIn, error) {
 	return domain.OptIn{}, nil
 }
 
-func (u *handlerUsecases) RegisterOptOut(ctx context.Context, orgID, partyID uuid.UUID) error {
+func (u *handlerUsecases) RegisterOptOut(ctx context.Context, tenantID, partyID uuid.UUID) error {
 	return nil
 }
 
-func (u *handlerUsecases) ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.OptIn, error) {
+func (u *handlerUsecases) ListOptIns(ctx context.Context, tenantID uuid.UUID) ([]domain.OptIn, error) {
 	return nil, nil
 }
 
-func (u *handlerUsecases) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error) {
+func (u *handlerUsecases) IsOptedIn(ctx context.Context, tenantID, partyID uuid.UUID) (bool, error) {
 	return false, nil
 }
 

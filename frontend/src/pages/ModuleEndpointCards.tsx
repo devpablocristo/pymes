@@ -95,7 +95,7 @@ type EndpointCardProps = {
 export function EndpointCard({ definition, runtime, kind }: EndpointCardProps) {
   const { t, localizeText, localizeUiText, sentenceCase } = useI18n();
   const fields = definition.fields ?? [];
-  const runtimeKey = `${runtime.orgId}:${runtime.today}:${runtime.monthStart}`;
+  const runtimeKey = `${runtime.tenantId}:${runtime.today}:${runtime.monthStart}`;
   const defId = definition.id ?? definition.path;
   const [values, setValues] = useState<Record<string, string>>(() => buildInitialValues(fields, runtime));
   const [loading, setLoading] = useState(false);

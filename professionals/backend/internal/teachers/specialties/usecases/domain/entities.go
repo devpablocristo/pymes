@@ -8,7 +8,7 @@ import (
 
 type Specialty struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	TenantID    uuid.UUID
 	Code        string
 	Name        string
 	Description string

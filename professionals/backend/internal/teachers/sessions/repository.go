@@ -22,7 +22,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	ProfileID *uuid.UUID
 	Status    string
 	From      *time.Time
@@ -35,7 +35,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Session, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.db.WithContext(ctx).Model(&models.SessionModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.SessionModel{}).Where("tenant_id = ?", p.TenantID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -91,7 +91,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Session) (domain.Sess
 	meta, _ := json.Marshal(in.Metadata)
 	row := models.SessionModel{
 		ID:              uuid.New(),
-		OrgID:           in.OrgID,
+		TenantID:        in.TenantID,
 		BookingID:       in.BookingID,
 		ProfileID:       in.ProfileID,
 		CustomerPartyID: in.CustomerPartyID,
@@ -110,9 +110,9 @@ func (r *Repository) Create(ctx context.Context, in domain.Session) (domain.Sess
 	return toSessionDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Session, error) {
 	var row models.SessionModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, gorm.ErrRecordNotFound
@@ -133,7 +133,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Session) (domain.Sess
 		"updated_at": time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.SessionModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Session{}, res.Error
@@ -141,11 +141,11 @@ func (r *Repository) Update(ctx context.Context, in domain.Session) (domain.Sess
 	if res.RowsAffected == 0 {
 		return domain.Session{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.OrgID, in.ID)
+	return r.GetByID(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -153,13 +153,13 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.SessionModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -167,14 +167,14 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.SessionModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Delete(&models.SessionModel{})
 	if res.Error != nil {
 		return res.Error
@@ -185,11 +185,11 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.SessionModel, error) {
+func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.SessionModel, error) {
 	var row models.SessionModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("org_id = ? AND id = ?", orgID, id).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -200,10 +200,10 @@ func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (mode
 	return row, nil
 }
 
-func (r *Repository) BookingSessionExists(ctx context.Context, orgID, bookingID uuid.UUID) (bool, error) {
+func (r *Repository) BookingSessionExists(ctx context.Context, tenantID, bookingID uuid.UUID) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&models.SessionModel{}).
-		Where("org_id = ? AND booking_id = ?", orgID, bookingID).
+		Where("tenant_id = ? AND booking_id = ?", tenantID, bookingID).
 		Count(&count).Error
 	return count > 0, err
 }
@@ -211,7 +211,7 @@ func (r *Repository) BookingSessionExists(ctx context.Context, orgID, bookingID 
 func (r *Repository) CreateNote(ctx context.Context, in domain.SessionNote) (domain.SessionNote, error) {
 	row := models.SessionNoteModel{
 		ID:        uuid.New(),
-		OrgID:     in.OrgID,
+		TenantID:  in.TenantID,
 		SessionID: in.SessionID,
 		NoteType:  in.NoteType,
 		Title:     in.Title,
@@ -224,7 +224,7 @@ func (r *Repository) CreateNote(ctx context.Context, in domain.SessionNote) (dom
 	}
 	return domain.SessionNote{
 		ID:        row.ID,
-		OrgID:     row.OrgID,
+		TenantID:  row.TenantID,
 		SessionID: row.SessionID,
 		NoteType:  row.NoteType,
 		Title:     row.Title,
@@ -244,7 +244,7 @@ func toSessionDomain(row models.SessionModel) domain.Session {
 	}
 	return domain.Session{
 		ID:              row.ID,
-		OrgID:           row.OrgID,
+		TenantID:        row.TenantID,
 		BookingID:       row.BookingID,
 		ProfileID:       row.ProfileID,
 		CustomerPartyID: row.CustomerPartyID,

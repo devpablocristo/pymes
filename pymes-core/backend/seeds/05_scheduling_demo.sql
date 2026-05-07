@@ -18,7 +18,7 @@ DECLARE
     v_today date := CURRENT_DATE;
     v_rule_base text := 'modules-scheduling/v1/rule/';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 

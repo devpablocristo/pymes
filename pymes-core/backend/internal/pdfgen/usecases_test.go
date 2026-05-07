@@ -41,14 +41,14 @@ func (f *fakeAdmin) GetTenantSettings(_ context.Context, _ string) (admindomain.
 
 func TestRenderQuotePDFHappyPath(t *testing.T) {
 	t.Parallel()
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	quoteID := uuid.New()
 	validUntil := time.Date(2026, 4, 15, 0, 0, 0, 0, time.UTC)
 
 	uc := NewUsecases(
 		&fakeQuotes{quote: quotedomain.Quote{
 			ID:           quoteID,
-			OrgID:        orgID,
+			TenantID:     tenantID,
 			Number:       "P-001",
 			CustomerName: "Test Customer",
 			Status:       "draft",
@@ -71,7 +71,7 @@ func TestRenderQuotePDFHappyPath(t *testing.T) {
 		}},
 	)
 
-	pdf, filename, err := uc.RenderQuotePDF(context.Background(), orgID, quoteID)
+	pdf, filename, err := uc.RenderQuotePDF(context.Background(), tenantID, quoteID)
 	if err != nil {
 		t.Fatalf("RenderQuotePDF() error = %v", err)
 	}
@@ -88,14 +88,14 @@ func TestRenderQuotePDFHappyPath(t *testing.T) {
 
 func TestRenderSaleReceiptHappyPath(t *testing.T) {
 	t.Parallel()
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 
 	uc := NewUsecases(
 		&fakeQuotes{},
 		&fakeSales{sale: saledomain.Sale{
 			ID:            saleID,
-			OrgID:         orgID,
+			TenantID:      tenantID,
 			Number:        "V-042",
 			CustomerName:  "Buyer",
 			PaymentMethod: "transfer",
@@ -113,7 +113,7 @@ func TestRenderSaleReceiptHappyPath(t *testing.T) {
 		}},
 	)
 
-	pdf, filename, err := uc.RenderSaleReceipt(context.Background(), orgID, saleID)
+	pdf, filename, err := uc.RenderSaleReceipt(context.Background(), tenantID, saleID)
 	if err != nil {
 		t.Fatalf("RenderSaleReceipt() error = %v", err)
 	}

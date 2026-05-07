@@ -115,14 +115,14 @@ type cpOrgResolver struct {
 	client *pymescore.Client
 }
 
-func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, orgSlug string) (uuid.UUID, error) {
-	result, err := r.client.GetBusinessInfo(ctx, orgSlug)
+func (r *cpOrgResolver) ResolveTenantID(ctx context.Context, tenantSlug string) (uuid.UUID, error) {
+	result, err := r.client.GetBusinessInfo(ctx, tenantSlug)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	orgIDStr, ok := result["org_id"].(string)
+	orgIDStr, ok := result["tenant_id"].(string)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("org_id not found in business info response")
+		return uuid.Nil, fmt.Errorf("tenant_id not found in business info response")
 	}
 	return uuid.Parse(orgIDStr)
 }

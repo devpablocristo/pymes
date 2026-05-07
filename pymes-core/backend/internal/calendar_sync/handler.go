@@ -17,10 +17,10 @@ import (
 )
 
 type usecasesPort interface {
-	StartGoogleConnect(ctx context.Context, orgID uuid.UUID, actor string) (string, error)
+	StartGoogleConnect(ctx context.Context, tenantID uuid.UUID, actor string) (string, error)
 	HandleGoogleCallback(ctx context.Context, state, code string) (domain.Connection, error)
-	ListMyConnections(ctx context.Context, orgID uuid.UUID, actor string) ([]domain.Connection, error)
-	RevokeConnection(ctx context.Context, orgID uuid.UUID, actor string, id uuid.UUID) error
+	ListMyConnections(ctx context.Context, tenantID uuid.UUID, actor string) ([]domain.Connection, error)
+	RevokeConnection(ctx context.Context, tenantID uuid.UUID, actor string, id uuid.UUID) error
 }
 
 type Handler struct {
@@ -55,12 +55,12 @@ func (h *Handler) RegisterPublicRoutes(v1 *gin.RouterGroup) {
 
 func (h *Handler) StartGoogleConnect(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
-	if err != nil || orgID == uuid.Nil {
-		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
+	tenantID, err := uuid.Parse(authCtx.TenantID)
+	if err != nil || tenantID == uuid.Nil {
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
-	authURL, err := h.uc.StartGoogleConnect(c.Request.Context(), orgID, authCtx.Actor)
+	authURL, err := h.uc.StartGoogleConnect(c.Request.Context(), tenantID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_sync: start google connect failed")
 		// Mensaje genérico al cliente; detalle queda en el log.
@@ -106,12 +106,12 @@ func (h *Handler) GoogleCallback(c *gin.Context) {
 
 func (h *Handler) ListConnections(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
-	if err != nil || orgID == uuid.Nil {
-		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
+	tenantID, err := uuid.Parse(authCtx.TenantID)
+	if err != nil || tenantID == uuid.Nil {
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
-	conns, err := h.uc.ListMyConnections(c.Request.Context(), orgID, authCtx.Actor)
+	conns, err := h.uc.ListMyConnections(c.Request.Context(), tenantID, authCtx.Actor)
 	if err != nil {
 		log.Error().Err(err).Msg("calendar_sync: list connections failed")
 		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "could not list connections")
@@ -126,9 +126,9 @@ func (h *Handler) ListConnections(c *gin.Context) {
 
 func (h *Handler) RevokeConnection(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
-	if err != nil || orgID == uuid.Nil {
-		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid org context")
+	tenantID, err := uuid.Parse(authCtx.TenantID)
+	if err != nil || tenantID == uuid.Nil {
+		httperrors.Write(c, http.StatusUnauthorized, "UNAUTHORIZED", "invalid tenant context")
 		return
 	}
 	id, err := uuid.Parse(c.Param("id"))
@@ -136,7 +136,7 @@ func (h *Handler) RevokeConnection(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.RevokeConnection(c.Request.Context(), orgID, authCtx.Actor, id); err != nil {
+	if err := h.uc.RevokeConnection(c.Request.Context(), tenantID, authCtx.Actor, id); err != nil {
 		if errors.Is(err, ErrConnectionNotFound) {
 			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "connection not found")
 			return

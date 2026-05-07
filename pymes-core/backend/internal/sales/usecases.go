@@ -18,12 +18,12 @@ type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateInput) (saledomain.Sale, error)
 	Update(ctx context.Context, in UpdateInput) (saledomain.Sale, error)
-	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
-	Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
-	PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error)
-	GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
-	GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error)
-	GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error)
+	GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
+	Void(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
+	PatchSale(ctx context.Context, tenantID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error)
+	GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error)
+	GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error)
+	GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error)
 }
 
 // SalePatchFields actualización parcial permitida desde el CRUD unificado.
@@ -37,25 +37,25 @@ type SalePatchFields struct {
 }
 
 type InventoryPort interface {
-	ApplySaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
-	ReverseSaleItems(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
+	ApplySaleItems(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
+	ReverseSaleItems(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, actor string, items []inventory.SaleItemStock) error
 }
 
 type CashflowPort interface {
-	RecordSaleIncome(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
-	RecordSaleVoidExpense(ctx context.Context, orgID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
+	RecordSaleIncome(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
+	RecordSaleVoidExpense(ctx context.Context, tenantID, saleID uuid.UUID, branchID *uuid.UUID, amount float64, currency, paymentMethod, actor string) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type TimelinePort interface {
-	RecordEvent(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
+	RecordEvent(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, eventType, title, description, actor string, metadata map[string]any) error
 }
 
 type WebhookPort interface {
-	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+	Enqueue(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error
 }
 
 type NotificationPort interface {
@@ -99,7 +99,7 @@ type CreateSaleItemInput struct {
 }
 
 type CreateSaleInput struct {
-	OrgID         uuid.UUID
+	TenantID      uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
@@ -114,7 +114,7 @@ type CreateSaleInput struct {
 }
 
 type UpdateSaleInput struct {
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	ID         uuid.UUID
 	IsFavorite *bool
 	Tags       *[]string
@@ -134,7 +134,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		return saledomain.Sale{}, fmt.Errorf("invalid payment_method: %w", httperrors.ErrBadInput)
 	}
 
-	currency, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.OrgID)
+	currency, defaultTaxRate, _, err := u.repo.GetTenantSettings(ctx, in.TenantID)
 	if err != nil {
 		return saledomain.Sale{}, err
 	}
@@ -157,7 +157,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 		var sid *uuid.UUID
 
 		if item.ProductID != nil && *item.ProductID != uuid.Nil {
-			snapshot, err := u.repo.GetProductSnapshot(ctx, in.OrgID, *item.ProductID)
+			snapshot, err := u.repo.GetProductSnapshot(ctx, in.TenantID, *item.ProductID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return saledomain.Sale{}, fmt.Errorf("product not found: %w", httperrors.ErrNotFound)
@@ -177,7 +177,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 				taxRate = *snapshot.TaxRate
 			}
 		} else if item.ServiceID != nil && *item.ServiceID != uuid.Nil {
-			snapshot, err := u.repo.GetServiceSnapshot(ctx, in.OrgID, *item.ServiceID)
+			snapshot, err := u.repo.GetServiceSnapshot(ctx, in.TenantID, *item.ServiceID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return saledomain.Sale{}, fmt.Errorf("service not found: %w", httperrors.ErrNotFound)
@@ -236,7 +236,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 
 	total := subtotal + taxTotal
 	out, err := u.repo.Create(ctx, CreateInput{
-		OrgID:         in.OrgID,
+		TenantID:      in.TenantID,
 		BranchID:      in.BranchID,
 		CustomerID:    in.CustomerID,
 		CustomerName:  strings.TrimSpace(in.CustomerName),
@@ -258,26 +258,26 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 	}
 
 	if u.inventory != nil {
-		if err := u.inventory.ApplySaleItems(ctx, in.OrgID, out.ID, in.BranchID, in.CreatedBy, stockItems); err != nil {
+		if err := u.inventory.ApplySaleItems(ctx, in.TenantID, out.ID, in.BranchID, in.CreatedBy, stockItems); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.cashflow != nil {
-		if err := u.cashflow.RecordSaleIncome(ctx, in.OrgID, out.ID, out.BranchID, out.Total, out.Currency, out.PaymentMethod, in.CreatedBy); err != nil {
+		if err := u.cashflow.RecordSaleIncome(ctx, in.TenantID, out.ID, out.BranchID, out.Total, out.Currency, out.PaymentMethod, in.CreatedBy); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "sale.created", "sale", out.ID.String(), map[string]any{
+		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "sale.created", "sale", out.ID.String(), map[string]any{
 			"number": out.Number,
 			"total":  out.Total,
 		})
 	}
 	if u.timeline != nil && out.CustomerID != nil {
-		_ = u.timeline.RecordEvent(ctx, in.OrgID, "parties", *out.CustomerID, "sale.created", "Venta registrada", out.Number, in.CreatedBy, map[string]any{"sale_id": out.ID.String(), "total": out.Total})
+		_ = u.timeline.RecordEvent(ctx, in.TenantID, "parties", *out.CustomerID, "sale.created", "Venta registrada", out.Number, in.CreatedBy, map[string]any{"sale_id": out.ID.String(), "total": out.Total})
 	}
 	if u.webhooks != nil {
-		_ = u.webhooks.Enqueue(ctx, in.OrgID, "sale.created", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "total": out.Total, "payment_method": out.PaymentMethod})
+		_ = u.webhooks.Enqueue(ctx, in.TenantID, "sale.created", map[string]any{"sale_id": out.ID.String(), "customer_id": nullableUUID(out.CustomerID), "total": out.Total, "payment_method": out.PaymentMethod})
 	}
 	if u.notifier != nil {
 		_ = u.notifier.NotifySaleCreated(ctx, out)
@@ -287,7 +287,7 @@ func (u *Usecases) Create(ctx context.Context, in CreateSaleInput) (saledomain.S
 
 func (u *Usecases) Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error) {
 	out, err := u.repo.Update(ctx, UpdateInput{
-		OrgID:      in.OrgID,
+		TenantID:   in.TenantID,
 		ID:         in.ID,
 		IsFavorite: in.IsFavorite,
 		Tags:       in.Tags,
@@ -300,13 +300,13 @@ func (u *Usecases) Update(ctx context.Context, in UpdateSaleInput) (saledomain.S
 		return saledomain.Sale{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.OrgID.String(), in.Actor, "sale.updated", "sale", in.ID.String(), map[string]any{})
+		u.audit.Log(ctx, in.TenantID.String(), in.Actor, "sale.updated", "sale", in.ID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
-	out, err := u.repo.GetByID(ctx, orgID, saleID)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, saleID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
@@ -316,8 +316,8 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledo
 	return out, nil
 }
 
-func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields, actor string) (saledomain.Sale, error) {
-	current, err := u.repo.GetByID(ctx, orgID, saleID)
+func (u *Usecases) PatchSale(ctx context.Context, tenantID, saleID uuid.UUID, in SalePatchFields, actor string) (saledomain.Sale, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, saleID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
@@ -339,7 +339,7 @@ func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in Sa
 		return saledomain.Sale{}, fmt.Errorf("no fields to patch: %w", httperrors.ErrBadInput)
 	}
 
-	out, err := u.repo.PatchSale(ctx, orgID, saleID, in)
+	out, err := u.repo.PatchSale(ctx, tenantID, saleID, in)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
@@ -347,13 +347,13 @@ func (u *Usecases) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in Sa
 		return saledomain.Sale{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "sale.patched", "sale", saleID.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "sale.patched", "sale", saleID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error) {
-	current, err := u.repo.GetByID(ctx, orgID, saleID)
+func (u *Usecases) Void(ctx context.Context, tenantID, saleID uuid.UUID, actor string) (saledomain.Sale, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, saleID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
@@ -364,7 +364,7 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 		return current, nil
 	}
 
-	out, err := u.repo.Void(ctx, orgID, saleID)
+	out, err := u.repo.Void(ctx, tenantID, saleID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, fmt.Errorf("sale not found: %w", httperrors.ErrNotFound)
@@ -381,26 +381,26 @@ func (u *Usecases) Void(ctx context.Context, orgID, saleID uuid.UUID, actor stri
 	}
 
 	if u.inventory != nil {
-		if err := u.inventory.ReverseSaleItems(ctx, orgID, saleID, current.BranchID, actor, stockItems); err != nil {
+		if err := u.inventory.ReverseSaleItems(ctx, tenantID, saleID, current.BranchID, actor, stockItems); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.cashflow != nil {
-		if err := u.cashflow.RecordSaleVoidExpense(ctx, orgID, saleID, current.BranchID, current.Total, current.Currency, current.PaymentMethod, actor); err != nil {
+		if err := u.cashflow.RecordSaleVoidExpense(ctx, tenantID, saleID, current.BranchID, current.Total, current.Currency, current.PaymentMethod, actor); err != nil {
 			return saledomain.Sale{}, err
 		}
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "sale.voided", "sale", saleID.String(), map[string]any{
+		u.audit.Log(ctx, tenantID.String(), actor, "sale.voided", "sale", saleID.String(), map[string]any{
 			"number": current.Number,
 			"total":  current.Total,
 		})
 	}
 	if u.timeline != nil && current.CustomerID != nil {
-		_ = u.timeline.RecordEvent(ctx, orgID, "parties", *current.CustomerID, "sale.voided", "Venta anulada", current.Number, actor, map[string]any{"sale_id": saleID.String(), "total": current.Total})
+		_ = u.timeline.RecordEvent(ctx, tenantID, "parties", *current.CustomerID, "sale.voided", "Venta anulada", current.Number, actor, map[string]any{"sale_id": saleID.String(), "total": current.Total})
 	}
 	if u.webhooks != nil {
-		_ = u.webhooks.Enqueue(ctx, orgID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
+		_ = u.webhooks.Enqueue(ctx, tenantID, "sale.voided", map[string]any{"sale_id": saleID.String(), "customer_id": nullableUUID(current.CustomerID), "total": current.Total})
 	}
 	return out, nil
 }

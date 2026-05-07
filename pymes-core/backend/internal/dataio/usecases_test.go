@@ -17,53 +17,53 @@ type fakeRepo struct {
 	mode       string
 }
 
-func (f *fakeRepo) ImportCustomers(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
+func (f *fakeRepo) ImportCustomers(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
 	_ = ctx
-	_ = orgID
+	_ = tenantID
 	f.importRows = rows
 	f.mode = mode
 	return ImportResult{TotalRows: len(rows), Created: len(rows)}, nil
 }
 
-func (f *fakeRepo) ImportProducts(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
-	return f.ImportCustomers(ctx, orgID, rows, mode)
+func (f *fakeRepo) ImportProducts(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
+	return f.ImportCustomers(ctx, tenantID, rows, mode)
 }
 
-func (f *fakeRepo) ImportSuppliers(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
-	return f.ImportCustomers(ctx, orgID, rows, mode)
+func (f *fakeRepo) ImportSuppliers(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error) {
+	return f.ImportCustomers(ctx, tenantID, rows, mode)
 }
 
-func (f *fakeRepo) ExportCustomers(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error) {
+func (f *fakeRepo) ExportCustomers(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error) {
 	_ = ctx
-	_ = orgID
+	_ = tenantID
 	return []string{"name", "type"}, [][]string{{"Juan", "person"}}, nil
 }
 
-func (f *fakeRepo) ExportProducts(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error) {
-	return f.ExportCustomers(ctx, orgID)
+func (f *fakeRepo) ExportProducts(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error) {
+	return f.ExportCustomers(ctx, tenantID)
 }
 
-func (f *fakeRepo) ExportSuppliers(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error) {
-	return f.ExportCustomers(ctx, orgID)
+func (f *fakeRepo) ExportSuppliers(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error) {
+	return f.ExportCustomers(ctx, tenantID)
 }
 
-func (f *fakeRepo) ExportSales(ctx context.Context, orgID uuid.UUID, from, to *time.Time) ([]string, [][]string, error) {
+func (f *fakeRepo) ExportSales(ctx context.Context, tenantID uuid.UUID, from, to *time.Time) ([]string, [][]string, error) {
 	_ = from
 	_ = to
-	return f.ExportCustomers(ctx, orgID)
+	return f.ExportCustomers(ctx, tenantID)
 }
 
-func (f *fakeRepo) ExportCashflow(ctx context.Context, orgID uuid.UUID, from, to *time.Time) ([]string, [][]string, error) {
+func (f *fakeRepo) ExportCashflow(ctx context.Context, tenantID uuid.UUID, from, to *time.Time) ([]string, [][]string, error) {
 	_ = from
 	_ = to
-	return f.ExportCustomers(ctx, orgID)
+	return f.ExportCustomers(ctx, tenantID)
 }
 
 type fakeAudit struct{ called bool }
 
-func (f *fakeAudit) Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+func (f *fakeAudit) Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any) {
 	_ = ctx
-	_ = orgID
+	_ = tenantID
 	_ = actor
 	_ = action
 	_ = resourceType

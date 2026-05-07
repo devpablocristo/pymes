@@ -18,14 +18,14 @@ import (
 )
 
 type usecasesPort interface {
-	ListSalePayments(ctx context.Context, orgID, saleID uuid.UUID) ([]paymentsdomain.Payment, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]paymentsdomain.Payment, error)
-	CreateSalePayment(ctx context.Context, orgID, saleID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (paymentsdomain.Payment, error)
+	ListSalePayments(ctx context.Context, tenantID, saleID uuid.UUID) ([]paymentsdomain.Payment, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]paymentsdomain.Payment, error)
+	CreateSalePayment(ctx context.Context, tenantID, saleID uuid.UUID, in paymentsdomain.Payment) (paymentsdomain.Payment, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (paymentsdomain.Payment, error)
 	Update(ctx context.Context, in paymentsdomain.Payment, actor string) (paymentsdomain.Payment, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -51,11 +51,11 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) ListSalePayments(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, saleID, ok := parseOrgSale(c, authCtx.OrgID)
+	tenantID, saleID, ok := parseOrgSale(c, authCtx.TenantID)
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListSalePayments(c.Request.Context(), orgID, saleID)
+	items, err := h.uc.ListSalePayments(c.Request.Context(), tenantID, saleID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -65,7 +65,7 @@ func (h *Handler) ListSalePayments(c *gin.Context) {
 
 func (h *Handler) CreateSalePayment(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, saleID, ok := parseOrgSale(c, authCtx.OrgID)
+	tenantID, saleID, ok := parseOrgSale(c, authCtx.TenantID)
 	if !ok {
 		return
 	}
@@ -87,7 +87,7 @@ func (h *Handler) CreateSalePayment(c *gin.Context) {
 	if req.IsFavorite != nil {
 		isFavorite = *req.IsFavorite
 	}
-	out, err := h.uc.CreateSalePayment(c.Request.Context(), orgID, saleID, paymentsdomain.Payment{Method: req.Method, Amount: req.Amount, Notes: strings.TrimSpace(req.Notes), ReceivedAt: receivedAt, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: authCtx.Actor})
+	out, err := h.uc.CreateSalePayment(c.Request.Context(), tenantID, saleID, paymentsdomain.Payment{Method: req.Method, Amount: req.Amount, Notes: strings.TrimSpace(req.Notes), ReceivedAt: receivedAt, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: authCtx.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -98,9 +98,9 @@ func (h *Handler) CreateSalePayment(c *gin.Context) {
 // List devuelve pagos scoped por saleID vía ?sale_id=; no hay listado global.
 func (h *Handler) List(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	saleIDRaw := strings.TrimSpace(c.Query("sale_id"))
@@ -115,7 +115,7 @@ func (h *Handler) List(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid sale_id")
 		return
 	}
-	items, err := h.uc.ListSalePayments(c.Request.Context(), orgID, saleID)
+	items, err := h.uc.ListSalePayments(c.Request.Context(), tenantID, saleID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -129,13 +129,13 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -148,11 +148,11 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentOrgID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -162,7 +162,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentOrgID(c)
 	if !ok {
 		return
 	}
@@ -171,7 +171,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	current, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -196,11 +196,11 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete realiza soft delete (archiva).
 func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -213,11 +213,11 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -226,11 +226,11 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parsePaymentOrgID(c)
+	tenantID, id, ok := parsePaymentOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -239,9 +239,9 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func parsePaymentOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -249,13 +249,13 @@ func parsePaymentOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, id, true
+	return tenantID, id, true
 }
 
 func toPaymentItem(in paymentsdomain.Payment) dto.PaymentItem {
 	out := dto.PaymentItem{
 		ID:            in.ID.String(),
-		OrgID:         in.OrgID.String(),
+		TenantID:      in.TenantID.String(),
 		ReferenceType: in.ReferenceType,
 		ReferenceID:   in.ReferenceID.String(),
 		Method:        in.Method,
@@ -274,9 +274,9 @@ func toPaymentItem(in paymentsdomain.Payment) dto.PaymentItem {
 }
 
 func parseOrgSale(c *gin.Context, rawOrgID string) (uuid.UUID, uuid.UUID, bool) {
-	orgID, err := uuid.Parse(rawOrgID)
+	tenantID, err := uuid.Parse(rawOrgID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, uuid.Nil, false
 	}
 	saleID, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -284,5 +284,5 @@ func parseOrgSale(c *gin.Context, rawOrgID string) (uuid.UUID, uuid.UUID, bool) 
 		handlers.WriteValidation(c, "invalid sale id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, saleID, true
+	return tenantID, saleID, true
 }

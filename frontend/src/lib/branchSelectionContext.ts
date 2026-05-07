@@ -2,7 +2,7 @@ import { createContext } from 'react';
 import type { Branch } from '@devpablocristo/modules-scheduling/next';
 
 export type BranchContextValue = {
-  orgId: string | null;
+  tenantId: string | null;
   branches: Branch[];
   availableBranches: Branch[];
   selectedBranchId: string | null;

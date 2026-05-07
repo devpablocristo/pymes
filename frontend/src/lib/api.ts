@@ -58,27 +58,46 @@ export async function getBillingStatus(): Promise<BillingStatus> {
   return request('/v1/billing/status');
 }
 
+export type TenantSummary = {
+  id: string;
+  slug?: string;
+  name: string;
+  clerk_org_id?: string;
+  role: 'owner' | 'admin' | 'member' | string;
+};
+
+export async function listTenants(): Promise<{ items: TenantSummary[] }> {
+  return request('/v1/tenants');
+}
+
+export async function createTenant(payload: {
+  name: string;
+  slug?: string;
+}): Promise<{ tenant_id: string; clerk_org_id: string; slug?: string; raw_key?: string; key?: APIKeyItem }> {
+  return request('/v1/tenants', { method: 'POST', body: payload });
+}
+
 export async function createPortal(payload: { return_url: string }): Promise<{ portal_url: string }> {
   return request('/v1/billing/portal', { method: 'POST', body: payload });
 }
 
-export async function getAPIKeys(orgID: string): Promise<{ items: APIKeyItem[] }> {
-  return request(`/v1/orgs/${orgID}/api-keys`);
+export async function getAPIKeys(tenantID: string): Promise<{ items: APIKeyItem[] }> {
+  return request(`/v1/tenants/${tenantID}/api-keys`);
 }
 
 export async function createAPIKey(
-  orgID: string,
+  tenantID: string,
   payload: { name: string; scopes: string[] },
 ): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/orgs/${orgID}/api-keys`, { method: 'POST', body: payload });
+  return request(`/v1/tenants/${tenantID}/api-keys`, { method: 'POST', body: payload });
 }
 
-export async function rotateAPIKey(orgID: string, keyID: string): Promise<{ key: APIKeyItem; raw_key: string }> {
-  return request(`/v1/orgs/${orgID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
+export async function rotateAPIKey(tenantID: string, keyID: string): Promise<{ key: APIKeyItem; raw_key: string }> {
+  return request(`/v1/tenants/${tenantID}/api-keys/${keyID}/rotate`, { method: 'POST', body: {} });
 }
 
-export async function deleteAPIKey(orgID: string, keyID: string): Promise<void> {
-  await request(`/v1/orgs/${orgID}/api-keys/${keyID}`, { method: 'DELETE' });
+export async function deleteAPIKey(tenantID: string, keyID: string): Promise<void> {
+  await request(`/v1/tenants/${tenantID}/api-keys/${keyID}`, { method: 'DELETE' });
 }
 
 export type InAppNotificationItem = {
@@ -128,17 +147,57 @@ export async function downloadAuditExportCsv(): Promise<string> {
   return downloadAPIFile('/v1/audit/export?format=csv');
 }
 
-export type OrgMemberRow = {
+export type TenantMemberRow = {
   id: string;
-  org_id?: string;
+  tenant_id?: string;
   user_id: string;
   role?: string;
+  status?: string;
   joined_at?: string;
   user?: { id?: string; email?: string; name?: string };
 };
 
-export async function listOrgMembers(orgId: string): Promise<{ items: OrgMemberRow[] }> {
-  return request(`/v1/orgs/${orgId}/members`);
+export async function listTenantMembers(tenantId: string): Promise<{ items: TenantMemberRow[] }> {
+  return request(`/v1/tenants/${tenantId}/members`);
+}
+
+export type TenantInvitation = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  role: string;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  clerk_invitation_id?: string;
+  invited_by_user_id: string;
+  accepted_by_user_id?: string;
+  expires_at: string;
+  accepted_at?: string;
+  revoked_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listTenantInvites(tenantId: string): Promise<{ items: TenantInvitation[] }> {
+  return request(`/v1/tenants/${tenantId}/invites`);
+}
+
+export async function createTenantInvite(
+  tenantId: string,
+  payload: { email: string; role: string },
+): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenants/${tenantId}/invites`, { method: 'POST', body: payload });
+}
+
+export async function revokeTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenant-invites/${inviteId}/revoke`, { method: 'POST', body: {} });
+}
+
+export async function resendTenantInvite(inviteId: string): Promise<{ invite: TenantInvitation }> {
+  return request(`/v1/tenant-invites/${inviteId}/resend`, { method: 'POST', body: {} });
+}
+
+export async function acceptTenantInvite(token: string): Promise<{ invite: TenantInvitation; clerk_org_id: string }> {
+  return request('/v1/tenant-invites/accept', { method: 'POST', body: { token } });
 }
 
 export type RbacRoleSummary = {
@@ -165,7 +224,7 @@ export async function getUserEffectivePermissions(userId: string): Promise<{ per
 
 export type SalePaymentRow = {
   id: string;
-  org_id?: string;
+  tenant_id?: string;
   reference_type?: string;
   reference_id?: string;
   method: string;

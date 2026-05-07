@@ -8,9 +8,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SectionHubPage } from '@devpablocristo/modules-ui-section-hub';
 import '@devpablocristo/modules-ui-section-hub/styles.css';
+import { HeaderMenu } from '../components/HeaderMenu';
 import { usePageSearch } from '../components/PageSearch';
 import { getSession } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { tenantLink, useActiveTenantSlug } from '../lib/tenantSlug';
 import {
   NON_ADMIN_SECTIONS,
   SETTING_SECTIONS,
@@ -23,6 +25,7 @@ import './SettingsHubPage.css';
 
 export function SettingsHubPage() {
   const navigate = useNavigate();
+  const tenantSlug = useActiveTenantSlug();
   const settingsSearch = usePageSearch();
   const sectionTextFn = useCallback((s: SettingsSectionCard) => `${s.label} ${s.desc}`, []);
   const sessionQuery = useQuery({
@@ -50,9 +53,9 @@ export function SettingsHubPage() {
 
   useEffect(() => {
     if (requestedSection === 'crudUi') {
-      navigate('/modules/inventory/configure', { replace: true });
+      navigate(tenantLink('/inventory/configure', tenantSlug), { replace: true });
     }
-  }, [navigate, requestedSection]);
+  }, [navigate, requestedSection, tenantSlug]);
 
   useEffect(() => {
     if (waitingForAdminSection) {
@@ -81,24 +84,33 @@ export function SettingsHubPage() {
   const activeSectionCard = availableSections.find((item) => item.id === section) ?? null;
 
   return (
-    <SectionHubPage
-      className="stg"
-      pageTitle="Ajustes"
-      pageLead=""
-      sections={availableSections}
-      visibleSections={filteredSections}
-      emptyState={
-        <div className="card">
-          <p className="text-secondary u-m-0">No hay secciones de ajustes que coincidan con la búsqueda actual.</p>
-        </div>
-      }
-      activeSectionId={section}
-      onOpenSection={openSection}
-      onBack={goBackToGrid}
-      backLabel={activeSectionCard ? '← Volver a Ajustes' : 'Volver'}
-    >
-      <SettingsHubSectionContent section={section} isAccountAdmin={isAccountAdmin} />
-    </SectionHubPage>
+    <div className="page-stack stg">
+      <div className="page-layout__header-top-row">
+        <HeaderMenu />
+      </div>
+      <SectionHubPage
+        pageTitle="Ajustes"
+        pageLead=""
+        sections={availableSections}
+        visibleSections={filteredSections}
+        emptyState={
+          <div className="card">
+            <p className="text-secondary u-m-0">No hay secciones de ajustes que coincidan con la búsqueda actual.</p>
+          </div>
+        }
+        activeSectionId={section}
+        onOpenSection={openSection}
+        onBack={goBackToGrid}
+        backLabel={activeSectionCard ? '← Volver a Ajustes' : 'Volver'}
+      >
+        <SettingsHubSectionContent
+          section={section}
+          isAccountAdmin={isAccountAdmin}
+          tenantId={sessionQuery.data?.auth.tenant_id}
+          membershipRole={sessionQuery.data?.membership?.role}
+        />
+      </SectionHubPage>
+    </div>
   );
 }
 

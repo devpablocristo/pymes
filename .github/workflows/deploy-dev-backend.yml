@@ -39,7 +39,7 @@ jobs:
       CLOUDSQL_INSTANCE: new-nexus-dev:us-central1:nexus-db-dev
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      GOVERNANCE_URL: https://nexus-review-396554427884.us-central1.run.app
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL }}
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
       SECRET_GOVERNANCE_API_KEY_NAME: GOVERNANCE_API_KEY

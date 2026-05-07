@@ -9,20 +9,20 @@ type Address struct {
 }
 
 type CustomerItem struct {
-	ID        string         `json:"id"`
-	OrgID     string         `json:"org_id"`
-	Type      string         `json:"type"`
-	Name      string         `json:"name"`
-	TaxID     string         `json:"tax_id,omitempty"`
-	Email     string         `json:"email,omitempty"`
-	Phone     string         `json:"phone,omitempty"`
-	Address   Address        `json:"address"`
-	Notes     string         `json:"notes"`
-	IsFavorite bool          `json:"is_favorite"`
-	Tags      []string       `json:"tags"`
-	Metadata  map[string]any `json:"metadata"`
-	CreatedAt string         `json:"created_at"`
-	UpdatedAt string         `json:"updated_at"`
+	ID         string         `json:"id"`
+	TenantID   string         `json:"tenant_id"`
+	Type       string         `json:"type"`
+	Name       string         `json:"name"`
+	TaxID      string         `json:"tax_id,omitempty"`
+	Email      string         `json:"email,omitempty"`
+	Phone      string         `json:"phone,omitempty"`
+	Address    Address        `json:"address"`
+	Notes      string         `json:"notes"`
+	IsFavorite bool           `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
 }
 
 type ListCustomersResponse struct {
@@ -33,29 +33,29 @@ type ListCustomersResponse struct {
 }
 
 type CreateCustomerRequest struct {
-	Type     string         `json:"type"`
-	Name     string         `json:"name" binding:"required"`
-	TaxID    string         `json:"tax_id"`
-	Email    string         `json:"email"`
-	Phone    string         `json:"phone"`
-	Address  Address        `json:"address"`
-	Notes    string         `json:"notes"`
-	IsFavorite *bool        `json:"is_favorite"`
-	Tags     []string       `json:"tags"`
-	Metadata map[string]any `json:"metadata"`
+	Type       string         `json:"type"`
+	Name       string         `json:"name" binding:"required"`
+	TaxID      string         `json:"tax_id"`
+	Email      string         `json:"email"`
+	Phone      string         `json:"phone"`
+	Address    Address        `json:"address"`
+	Notes      string         `json:"notes"`
+	IsFavorite *bool          `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
 }
 
 type UpdateCustomerRequest struct {
-	Type     *string         `json:"type"`
-	Name     *string         `json:"name"`
-	TaxID    *string         `json:"tax_id"`
-	Email    *string         `json:"email"`
-	Phone    *string         `json:"phone"`
-	Address  *Address        `json:"address"`
-	Notes    *string         `json:"notes"`
-	IsFavorite *bool         `json:"is_favorite"`
-	Tags     *[]string       `json:"tags"`
-	Metadata *map[string]any `json:"metadata"`
+	Type       *string         `json:"type"`
+	Name       *string         `json:"name"`
+	TaxID      *string         `json:"tax_id"`
+	Email      *string         `json:"email"`
+	Phone      *string         `json:"phone"`
+	Address    *Address        `json:"address"`
+	Notes      *string         `json:"notes"`
+	IsFavorite *bool           `json:"is_favorite"`
+	Tags       *[]string       `json:"tags"`
+	Metadata   *map[string]any `json:"metadata"`
 }
 
 type SaleHistoryItem struct {

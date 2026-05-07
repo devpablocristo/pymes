@@ -12,8 +12,8 @@ import (
 )
 
 type usecasesPort interface {
-	RenderQuotePDF(ctx context.Context, orgID, quoteID uuid.UUID) ([]byte, string, error)
-	RenderSaleReceipt(ctx context.Context, orgID, saleID uuid.UUID) ([]byte, string, error)
+	RenderQuotePDF(ctx context.Context, tenantID, quoteID uuid.UUID) ([]byte, string, error)
+	RenderSaleReceipt(ctx context.Context, tenantID, saleID uuid.UUID) ([]byte, string, error)
 }
 
 type Handler struct{ uc usecasesPort }
@@ -26,11 +26,11 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) QuotePDF(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	pdfBytes, filename, err := h.uc.RenderQuotePDF(c.Request.Context(), orgID, id)
+	pdfBytes, filename, err := h.uc.RenderQuotePDF(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -41,11 +41,11 @@ func (h *Handler) QuotePDF(c *gin.Context) {
 }
 
 func (h *Handler) SaleReceipt(c *gin.Context) {
-	orgID, id, ok := handlers.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	pdfBytes, filename, err := h.uc.RenderSaleReceipt(c.Request.Context(), orgID, id)
+	pdfBytes, filename, err := h.uc.RenderSaleReceipt(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

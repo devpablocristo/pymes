@@ -250,7 +250,7 @@ def test_sales_collections_router_returns_response() -> None:
     assert backend_client.calls[0][2] is True
     assert backend_client.calls[0][3]["id"] == "insight:sales_collections:month"
     assert backend_client.calls[0][3]["actor"] == "user-1"
-    assert backend_client.calls[0][3]["org_id"] == "org-123"
+    assert backend_client.calls[0][3]["tenant_id"] == "org-123"
 
 
 def test_notifications_router_validates_top_limit() -> None:

@@ -15,12 +15,12 @@ func NewLogger(logger zerolog.Logger) *Logger {
 	return &Logger{logger: logger}
 }
 
-func (a *Logger) Log(_ context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any) {
+func (a *Logger) Log(_ context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any) {
 	if a == nil {
 		return
 	}
 	a.logger.Info().
-		Str("org_id", orgID).
+		Str("tenant_id", tenantID).
 		Str("actor", actor).
 		Str("action", action).
 		Str("resource_type", resourceType).

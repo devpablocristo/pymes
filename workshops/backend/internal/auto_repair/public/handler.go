@@ -13,11 +13,11 @@ import (
 
 // coreServicesPort expone el catálogo público de servicios servido por pymes-core.
 type coreServicesPort interface {
-	ListPublicServices(ctx context.Context, orgRef, vertical, segment, search string) ([]pymescore.CoreService, error)
+	ListPublicServices(ctx context.Context, tenantRef, vertical, segment, search string) ([]pymescore.CoreService, error)
 }
 
 type bookingPort interface {
-	BookScheduling(ctx context.Context, orgRef string, payload map[string]any) (map[string]any, error)
+	BookScheduling(ctx context.Context, tenantRef string, payload map[string]any) (map[string]any, error)
 }
 
 type Handler struct {
@@ -33,24 +33,24 @@ func NewHandler(coreServices coreServicesPort, bookings bookingPort) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.GET("/public/:org_slug/auto-repair/services", h.ListServices)
-	group.POST("/public/:org_slug/auto-repair/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/auto-repair/services", h.ListServices)
+	group.POST("/public/:tenant_slug/auto-repair/bookings", h.BookScheduling)
 
-	group.GET("/public/:org_slug/workshops/services", h.ListServices)
-	group.POST("/public/:org_slug/workshops/bookings", h.BookScheduling)
+	group.GET("/public/:tenant_slug/workshops/services", h.ListServices)
+	group.POST("/public/:tenant_slug/workshops/bookings", h.BookScheduling)
 }
 
-func (h *Handler) resolveOrgRef(c *gin.Context) (string, bool) {
-	orgSlug := strings.TrimSpace(c.Param("org_slug"))
-	if orgSlug == "" {
-		verticalgin.WriteValidation(c, "org_slug is required")
+func (h *Handler) resolveTenantRef(c *gin.Context) (string, bool) {
+	tenantSlug := strings.TrimSpace(c.Param("tenant_slug"))
+	if tenantSlug == "" {
+		verticalgin.WriteValidation(c, "tenant_slug is required")
 		return "", false
 	}
-	return orgSlug, true
+	return tenantSlug, true
 }
 
 func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
-	orgRef, ok := h.resolveOrgRef(c)
+	tenantRef, ok := h.resolveTenantRef(c)
 	if !ok {
 		return
 	}
@@ -60,7 +60,7 @@ func (h *Handler) listSegmentServices(c *gin.Context, segment string) {
 	}
 	items, err := h.coreServices.ListPublicServices(
 		c.Request.Context(),
-		orgRef,
+		tenantRef,
 		"workshops",
 		segment,
 		strings.TrimSpace(c.Query("search")),
@@ -109,7 +109,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 		verticalgin.WriteError(c, http.StatusNotImplemented, "UPSTREAM_UNAVAILABLE", "booking not configured")
 		return
 	}
-	orgSlug, ok := h.resolveOrgRef(c)
+	tenantRef, ok := h.resolveTenantRef(c)
 	if !ok {
 		return
 	}
@@ -121,7 +121,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	out, err := h.bookings.BookScheduling(c.Request.Context(), orgSlug, payload)
+	out, err := h.bookings.BookScheduling(c.Request.Context(), tenantRef, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

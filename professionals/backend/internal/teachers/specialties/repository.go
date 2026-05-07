@@ -25,7 +25,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID    uuid.UUID
+	TenantID uuid.UUID
 	Limit    int
 	After    *uuid.UUID
 	Search   string
@@ -35,7 +35,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Specialty, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).Where("org_id = ?", p.OrgID)
+	q := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).Where("tenant_id = ?", p.TenantID)
 	if p.Archived {
 		q = q.Where("deleted_at IS NOT NULL")
 	} else {
@@ -87,7 +87,7 @@ func (r *Repository) Create(ctx context.Context, in domain.Specialty) (domain.Sp
 	meta, _ := json.Marshal(md)
 	row := models.SpecialtyModel{
 		ID:          uuid.New(),
-		OrgID:       in.OrgID,
+		TenantID:    in.TenantID,
 		Code:        strings.TrimSpace(in.Code),
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
@@ -104,9 +104,9 @@ func (r *Repository) Create(ctx context.Context, in domain.Specialty) (domain.Sp
 	return toDomain(row), nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Specialty, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Specialty, error) {
 	var row models.SpecialtyModel
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Specialty{}, gorm.ErrRecordNotFound
@@ -133,7 +133,7 @@ func (r *Repository) Update(ctx context.Context, in domain.Specialty) (domain.Sp
 		"updated_at":  time.Now().UTC(),
 	}
 	res := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return domain.Specialty{}, res.Error
@@ -141,11 +141,11 @@ func (r *Repository) Update(ctx context.Context, in domain.Specialty) (domain.Sp
 	if res.RowsAffected == 0 {
 		return domain.Specialty{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.OrgID, in.ID)
+	return r.GetByID(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -153,13 +153,13 @@ func (r *Repository) Archive(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
-	state, err := r.lookupState(ctx, orgID, id)
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+	state, err := r.lookupState(ctx, tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -167,14 +167,14 @@ func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 		return nil
 	}
 	res := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": nil, "updated_at": gorm.Expr("now()")})
 	return res.Error
 }
 
-func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Unscoped().
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Delete(&models.SpecialtyModel{})
 	if res.Error != nil {
 		return res.Error
@@ -185,11 +185,11 @@ func (r *Repository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (models.SpecialtyModel, error) {
+func (r *Repository) lookupState(ctx context.Context, tenantID, id uuid.UUID) (models.SpecialtyModel, error) {
 	var row models.SpecialtyModel
 	err := r.db.WithContext(ctx).
 		Select("id, deleted_at").
-		Where("org_id = ? AND id = ?", orgID, id).
+		Where("tenant_id = ? AND id = ?", tenantID, id).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -200,8 +200,8 @@ func (r *Repository) lookupState(ctx context.Context, orgID, id uuid.UUID) (mode
 	return row, nil
 }
 
-func (r *Repository) CodeExists(ctx context.Context, orgID uuid.UUID, code string, excludeID *uuid.UUID) (bool, error) {
-	q := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).Where("org_id = ? AND code = ?", orgID, code)
+func (r *Repository) CodeExists(ctx context.Context, tenantID uuid.UUID, code string, excludeID *uuid.UUID) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&models.SpecialtyModel{}).Where("tenant_id = ? AND code = ?", tenantID, code)
 	if excludeID != nil {
 		q = q.Where("id != ?", *excludeID)
 	}
@@ -212,16 +212,16 @@ func (r *Repository) CodeExists(ctx context.Context, orgID uuid.UUID, code strin
 	return count > 0, nil
 }
 
-func (r *Repository) AssignProfessionals(ctx context.Context, orgID, specialtyID uuid.UUID, profileIDs []uuid.UUID) error {
+func (r *Repository) AssignProfessionals(ctx context.Context, tenantID, specialtyID uuid.UUID, profileIDs []uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("org_id = ? AND specialty_id = ?", orgID, specialtyID).
+		if err := tx.Where("tenant_id = ? AND specialty_id = ?", tenantID, specialtyID).
 			Delete(&profmodels.ProfessionalSpecialtyModel{}).Error; err != nil {
 			return err
 		}
 		for _, pid := range profileIDs {
 			join := profmodels.ProfessionalSpecialtyModel{
 				ID:          uuid.New(),
-				OrgID:       orgID,
+				TenantID:    tenantID,
 				ProfileID:   pid,
 				SpecialtyID: specialtyID,
 				CreatedAt:   time.Now().UTC(),
@@ -244,7 +244,7 @@ func toDomain(row models.SpecialtyModel) domain.Specialty {
 	}
 	return domain.Specialty{
 		ID:          row.ID,
-		OrgID:       row.OrgID,
+		TenantID:    row.TenantID,
 		Code:        row.Code,
 		Name:        row.Name,
 		Description: row.Description,

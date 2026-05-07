@@ -10,7 +10,7 @@ Las escrituras gobernadas requieren `Idempotency-Key`.
 
 La clave se guarda por:
 
-- `org_id`
+- `tenant_id`
 - `actor`
 - `capability_id`
 - `idempotency_key`

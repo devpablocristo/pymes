@@ -59,9 +59,9 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (QuoteSnapshot, error) {
+func (r *Repository) GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uuid.UUID) (QuoteSnapshot, error) {
 	var row quoteSnapshotRow
-	err := r.db.WithContext(ctx).Table("quotes").Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").Where("org_id = ? AND id = ?", orgID, quoteID).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("quotes").Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").Where("tenant_id = ? AND id = ?", tenantID, quoteID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return QuoteSnapshot{}, ErrNotFound
@@ -71,9 +71,9 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.U
 	return QuoteSnapshot(row), nil
 }
 
-func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (SaleSnapshot, error) {
+func (r *Repository) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.UUID) (SaleSnapshot, error) {
 	var row saleSnapshotRow
-	err := r.db.WithContext(ctx).Table("sales").Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").Where("org_id = ? AND id = ?", orgID, saleID).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("sales").Select("id, number, party_id, COALESCE(party_name, '') as customer_name, total").Where("tenant_id = ? AND id = ?", tenantID, saleID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return SaleSnapshot{}, ErrNotFound
@@ -83,9 +83,9 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUI
 	return SaleSnapshot(row), nil
 }
 
-func (r *Repository) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID) (string, string, error) {
+func (r *Repository) GetPartyPhone(ctx context.Context, tenantID, partyID uuid.UUID) (string, string, error) {
 	var row partyPhoneRow
-	err := r.db.WithContext(ctx).Table("parties").Select("COALESCE(phone,'') as phone, COALESCE(display_name,'') as name").Where("org_id = ? AND id = ?", orgID, partyID).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("parties").Select("COALESCE(phone,'') as phone, COALESCE(display_name,'') as name").Where("tenant_id = ? AND id = ?", tenantID, partyID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", "", ErrNotFound
@@ -95,13 +95,13 @@ func (r *Repository) GetPartyPhone(ctx context.Context, orgID, partyID uuid.UUID
 	return strings.TrimSpace(row.Phone), strings.TrimSpace(row.Name), nil
 }
 
-func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone string) (uuid.UUID, string, error) {
+func (r *Repository) GetPartyByPhone(ctx context.Context, tenantID uuid.UUID, phone string) (uuid.UUID, string, error) {
 	phone = strings.TrimSpace(phone)
 	if phone == "" {
 		return uuid.Nil, "", ErrNotFound
 	}
 	var row partyByPhoneRow
-	err := r.db.WithContext(ctx).Table("parties").Select("id, COALESCE(display_name,'') as name").Where("org_id = ? AND REPLACE(REPLACE(phone,' ',''),'+','') = REPLACE(REPLACE(?,' ',''),'+','')", orgID, phone).Order("created_at ASC").Limit(1).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("parties").Select("id, COALESCE(display_name,'') as name").Where("tenant_id = ? AND REPLACE(REPLACE(phone,' ',''),'+','') = REPLACE(REPLACE(?,' ',''),'+','')", tenantID, phone).Order("created_at ASC").Limit(1).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return uuid.Nil, "", ErrNotFound
@@ -111,9 +111,9 @@ func (r *Repository) GetPartyByPhone(ctx context.Context, orgID uuid.UUID, phone
 	return row.ID, strings.TrimSpace(row.Name), nil
 }
 
-func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templates, error) {
+func (r *Repository) GetTemplates(ctx context.Context, tenantID uuid.UUID) (Templates, error) {
 	var row waTemplatesRow
-	err := r.db.WithContext(ctx).Table("tenant_settings").Select("wa_quote_template, wa_receipt_template, wa_default_country_code").Where("org_id = ?", orgID).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("tenant_settings").Select("wa_quote_template, wa_receipt_template, wa_default_country_code").Where("tenant_id = ?", tenantID).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return Templates{DefaultCountryCode: "54"}, nil
@@ -123,9 +123,9 @@ func (r *Repository) GetTemplates(ctx context.Context, orgID uuid.UUID) (Templat
 	return Templates(row), nil
 }
 
-func (r *Repository) GetConnection(ctx context.Context, orgID uuid.UUID) (domain.Connection, error) {
+func (r *Repository) GetConnection(ctx context.Context, tenantID uuid.UUID) (domain.Connection, error) {
 	var m whmodels.WhatsAppConnection
-	err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Take(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Connection{}, ErrNotConnected
@@ -144,27 +144,27 @@ func (r *Repository) GetConnectionByPhoneNumberID(ctx context.Context, phoneNumb
 		}
 		return Connection{}, err
 	}
-	return Connection{OrgID: m.OrgID, PhoneNumberID: m.PhoneNumberID, WABAID: m.WABAID, AccessToken: m.AccessTokenEncrypt, IsActive: m.IsActive}, nil
+	return Connection{TenantID: m.TenantID, PhoneNumberID: m.PhoneNumberID, WABAID: m.WABAID, AccessToken: m.AccessTokenEncrypt, IsActive: m.IsActive}, nil
 }
 
 func (r *Repository) SaveConnection(ctx context.Context, conn domain.Connection, encryptedToken string) error {
-	m := whmodels.WhatsAppConnection{OrgID: conn.OrgID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, AccessTokenEncrypt: encryptedToken, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: true, ConnectedAt: time.Now(), CreatedAt: time.Now()}
+	m := whmodels.WhatsAppConnection{TenantID: conn.TenantID, PhoneNumberID: conn.PhoneNumberID, WABAID: conn.WABAID, AccessTokenEncrypt: encryptedToken, DisplayPhoneNumber: conn.DisplayPhoneNumber, VerifiedName: conn.VerifiedName, QualityRating: conn.QualityRating, MessagingLimit: conn.MessagingLimit, IsActive: true, ConnectedAt: time.Now(), CreatedAt: time.Now()}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "org_id"}},
+		Columns: []clause.Column{{Name: "tenant_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"phone_number_id", "waba_id", "access_token_encrypted", "display_phone_number", "verified_name", "quality_rating", "messaging_limit", "is_active", "connected_at", "disconnected_at",
 		}),
 	}).Create(&m).Error
 }
 
-func (r *Repository) DisconnectConnection(ctx context.Context, orgID uuid.UUID) error {
+func (r *Repository) DisconnectConnection(ctx context.Context, tenantID uuid.UUID) error {
 	now := time.Now()
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConnection{}).Where("org_id = ?", orgID).Updates(map[string]any{"is_active": false, "disconnected_at": &now}).Error
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConnection{}).Where("tenant_id = ?", tenantID).Updates(map[string]any{"is_active": false, "disconnected_at": &now}).Error
 }
 
-func (r *Repository) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (domain.ConnectionStats, error) {
+func (r *Repository) GetConnectionStats(ctx context.Context, tenantID uuid.UUID) (domain.ConnectionStats, error) {
 	var stats domain.ConnectionStats
-	rows, err := r.db.WithContext(ctx).Table("whatsapp_messages").Select("direction, status, COUNT(*) as cnt").Where("org_id = ?", orgID).Group("direction, status").Rows()
+	rows, err := r.db.WithContext(ctx).Table("whatsapp_messages").Select("direction, status, COUNT(*) as cnt").Where("tenant_id = ?", tenantID).Group("direction, status").Rows()
 	if err != nil {
 		return stats, err
 	}
@@ -196,7 +196,7 @@ func (r *Repository) GetConnectionStats(ctx context.Context, orgID uuid.UUID) (d
 func (r *Repository) SaveMessage(ctx context.Context, msg domain.Message) error {
 	params, _ := json.Marshal(msg.TemplateParams)
 	meta, _ := json.Marshal(msg.Metadata)
-	m := whmodels.WhatsAppMessage{ID: msg.ID, OrgID: msg.OrgID, PhoneNumberID: msg.PhoneNumberID, Direction: string(msg.Direction), WAMessageID: msg.WAMessageID, ToPhone: msg.ToPhone, FromPhone: msg.FromPhone, MessageType: string(msg.MessageType), Body: msg.Body, TemplateName: msg.TemplateName, TemplateLanguage: msg.TemplateLanguage, TemplateParams: datatypes.JSON(params), MediaURL: msg.MediaURL, MediaMimeType: msg.MediaMimeType, MediaCaption: msg.MediaCaption, Status: string(msg.Status), ErrorCode: msg.ErrorCode, ErrorMessage: msg.ErrorMessage, PartyID: msg.PartyID, ConversationID: msg.ConversationID, CreatedBy: msg.CreatedBy, Metadata: datatypes.JSON(meta), CreatedAt: msg.CreatedAt, UpdatedAt: msg.UpdatedAt}
+	m := whmodels.WhatsAppMessage{ID: msg.ID, TenantID: msg.TenantID, PhoneNumberID: msg.PhoneNumberID, Direction: string(msg.Direction), WAMessageID: msg.WAMessageID, ToPhone: msg.ToPhone, FromPhone: msg.FromPhone, MessageType: string(msg.MessageType), Body: msg.Body, TemplateName: msg.TemplateName, TemplateLanguage: msg.TemplateLanguage, TemplateParams: datatypes.JSON(params), MediaURL: msg.MediaURL, MediaMimeType: msg.MediaMimeType, MediaCaption: msg.MediaCaption, Status: string(msg.Status), ErrorCode: msg.ErrorCode, ErrorMessage: msg.ErrorMessage, PartyID: msg.PartyID, ConversationID: msg.ConversationID, CreatedBy: msg.CreatedBy, Metadata: datatypes.JSON(meta), CreatedAt: msg.CreatedAt, UpdatedAt: msg.UpdatedAt}
 	return r.db.WithContext(ctx).Create(&m).Error
 }
 
@@ -217,7 +217,7 @@ func (r *Repository) UpdateMessageStatus(ctx context.Context, waMessageID string
 }
 
 func (r *Repository) ListMessages(ctx context.Context, filter domain.MessageFilter) ([]domain.Message, int, error) {
-	q := r.db.WithContext(ctx).Model(&whmodels.WhatsAppMessage{}).Where("org_id = ?", filter.OrgID)
+	q := r.db.WithContext(ctx).Model(&whmodels.WhatsAppMessage{}).Where("tenant_id = ?", filter.TenantID)
 	if filter.PartyID != nil {
 		q = q.Where("party_id = ?", *filter.PartyID)
 	}
@@ -249,13 +249,13 @@ func (r *Repository) ListMessages(ctx context.Context, filter domain.MessageFilt
 func (r *Repository) SaveTemplate(ctx context.Context, tpl domain.Template) error {
 	buttons, _ := json.Marshal(tpl.Buttons)
 	exParams, _ := json.Marshal(tpl.ExampleParams)
-	m := whmodels.WhatsAppTemplate{ID: tpl.ID, OrgID: tpl.OrgID, MetaTemplateID: tpl.MetaTemplateID, Name: tpl.Name, Language: tpl.Language, Category: string(tpl.Category), Status: string(tpl.Status), HeaderType: tpl.HeaderType, HeaderText: tpl.HeaderText, BodyText: tpl.BodyText, FooterText: tpl.FooterText, Buttons: datatypes.JSON(buttons), ExampleParams: datatypes.JSON(exParams), RejectionReason: tpl.RejectionReason, CreatedAt: tpl.CreatedAt, UpdatedAt: tpl.UpdatedAt}
+	m := whmodels.WhatsAppTemplate{ID: tpl.ID, TenantID: tpl.TenantID, MetaTemplateID: tpl.MetaTemplateID, Name: tpl.Name, Language: tpl.Language, Category: string(tpl.Category), Status: string(tpl.Status), HeaderType: tpl.HeaderType, HeaderText: tpl.HeaderText, BodyText: tpl.BodyText, FooterText: tpl.FooterText, Buttons: datatypes.JSON(buttons), ExampleParams: datatypes.JSON(exParams), RejectionReason: tpl.RejectionReason, CreatedAt: tpl.CreatedAt, UpdatedAt: tpl.UpdatedAt}
 	return r.db.WithContext(ctx).Create(&m).Error
 }
 
-func (r *Repository) GetTemplate(ctx context.Context, orgID, templateID uuid.UUID) (domain.Template, error) {
+func (r *Repository) GetTemplate(ctx context.Context, tenantID, templateID uuid.UUID) (domain.Template, error) {
 	var m whmodels.WhatsAppTemplate
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, templateID).Take(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, templateID).Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Template{}, ErrNotFound
@@ -265,9 +265,9 @@ func (r *Repository) GetTemplate(ctx context.Context, orgID, templateID uuid.UUI
 	return templateToDomain(m), nil
 }
 
-func (r *Repository) GetTemplateByName(ctx context.Context, orgID uuid.UUID, name, language string) (domain.Template, error) {
+func (r *Repository) GetTemplateByName(ctx context.Context, tenantID uuid.UUID, name, language string) (domain.Template, error) {
 	var m whmodels.WhatsAppTemplate
-	err := r.db.WithContext(ctx).Where("org_id = ? AND name = ? AND language = ?", orgID, name, language).Take(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND name = ? AND language = ?", tenantID, name, language).Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Template{}, ErrNotFound
@@ -277,9 +277,9 @@ func (r *Repository) GetTemplateByName(ctx context.Context, orgID uuid.UUID, nam
 	return templateToDomain(m), nil
 }
 
-func (r *Repository) ListTemplates(ctx context.Context, orgID uuid.UUID) ([]domain.Template, error) {
+func (r *Repository) ListTemplates(ctx context.Context, tenantID uuid.UUID) ([]domain.Template, error) {
 	var rows []whmodels.WhatsAppTemplate
-	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("name ASC").Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("name ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]domain.Template, 0, len(rows))
@@ -289,7 +289,7 @@ func (r *Repository) ListTemplates(ctx context.Context, orgID uuid.UUID) ([]doma
 	return out, nil
 }
 
-func (r *Repository) UpdateTemplateStatus(ctx context.Context, orgID, templateID uuid.UUID, status domain.TemplateStatus, metaTemplateID, rejectionReason string) error {
+func (r *Repository) UpdateTemplateStatus(ctx context.Context, tenantID, templateID uuid.UUID, status domain.TemplateStatus, metaTemplateID, rejectionReason string) error {
 	updates := map[string]any{"status": string(status), "updated_at": time.Now()}
 	if metaTemplateID != "" {
 		updates["meta_template_id"] = metaTemplateID
@@ -297,11 +297,11 @@ func (r *Repository) UpdateTemplateStatus(ctx context.Context, orgID, templateID
 	if rejectionReason != "" {
 		updates["rejection_reason"] = rejectionReason
 	}
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppTemplate{}).Where("org_id = ? AND id = ?", orgID, templateID).Updates(updates).Error
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppTemplate{}).Where("tenant_id = ? AND id = ?", tenantID, templateID).Updates(updates).Error
 }
 
-func (r *Repository) DeleteTemplate(ctx context.Context, orgID, templateID uuid.UUID) error {
-	result := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, templateID).Delete(&whmodels.WhatsAppTemplate{})
+func (r *Repository) DeleteTemplate(ctx context.Context, tenantID, templateID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, templateID).Delete(&whmodels.WhatsAppTemplate{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -312,7 +312,7 @@ func (r *Repository) DeleteTemplate(ctx context.Context, orgID, templateID uuid.
 }
 
 func (r *Repository) SaveOptIn(ctx context.Context, optIn domain.OptIn) error {
-	m := whmodels.WhatsAppOptIn{ID: optIn.ID, OrgID: optIn.OrgID, PartyID: optIn.PartyID, Phone: optIn.Phone, Status: string(optIn.Status), Source: string(optIn.Source), OptedInAt: optIn.OptedInAt, CreatedAt: optIn.CreatedAt}
+	m := whmodels.WhatsAppOptIn{ID: optIn.ID, TenantID: optIn.TenantID, PartyID: optIn.PartyID, Phone: optIn.Phone, Status: string(optIn.Status), Source: string(optIn.Source), OptedInAt: optIn.OptedInAt, CreatedAt: optIn.CreatedAt}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
@@ -321,9 +321,9 @@ func (r *Repository) SaveOptIn(ctx context.Context, optIn domain.OptIn) error {
 	}).Create(&m).Error
 }
 
-func (r *Repository) GetOptIn(ctx context.Context, orgID, partyID uuid.UUID) (domain.OptIn, error) {
+func (r *Repository) GetOptIn(ctx context.Context, tenantID, partyID uuid.UUID) (domain.OptIn, error) {
 	var m whmodels.WhatsAppOptIn
-	err := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ? AND status = 'opted_in'", orgID, partyID).Take(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND party_id = ? AND status = 'opted_in'", tenantID, partyID).Take(&m).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.OptIn{}, ErrNotFound
@@ -333,14 +333,14 @@ func (r *Repository) GetOptIn(ctx context.Context, orgID, partyID uuid.UUID) (do
 	return optInToDomain(m), nil
 }
 
-func (r *Repository) OptOut(ctx context.Context, orgID, partyID uuid.UUID) error {
+func (r *Repository) OptOut(ctx context.Context, tenantID, partyID uuid.UUID) error {
 	now := time.Now()
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppOptIn{}).Where("org_id = ? AND party_id = ? AND status = 'opted_in'", orgID, partyID).Updates(map[string]any{"status": "opted_out", "opted_out_at": &now}).Error
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppOptIn{}).Where("tenant_id = ? AND party_id = ? AND status = 'opted_in'", tenantID, partyID).Updates(map[string]any{"status": "opted_out", "opted_out_at": &now}).Error
 }
 
-func (r *Repository) ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.OptIn, error) {
+func (r *Repository) ListOptIns(ctx context.Context, tenantID uuid.UUID) ([]domain.OptIn, error) {
 	var rows []whmodels.WhatsAppOptIn
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND status = 'opted_in'", orgID).Order("opted_in_at DESC").Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND status = 'opted_in'", tenantID).Order("opted_in_at DESC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]domain.OptIn, 0, len(rows))
@@ -350,14 +350,14 @@ func (r *Repository) ListOptIns(ctx context.Context, orgID uuid.UUID) ([]domain.
 	return out, nil
 }
 
-func (r *Repository) IsOptedIn(ctx context.Context, orgID, partyID uuid.UUID) (bool, error) {
+func (r *Repository) IsOptedIn(ctx context.Context, tenantID, partyID uuid.UUID) (bool, error) {
 	var count int64
-	err := r.db.WithContext(ctx).Model(&whmodels.WhatsAppOptIn{}).Where("org_id = ? AND party_id = ? AND status = 'opted_in'", orgID, partyID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&whmodels.WhatsAppOptIn{}).Where("tenant_id = ? AND party_id = ? AND status = 'opted_in'", tenantID, partyID).Count(&count).Error
 	return count > 0, err
 }
 
 func connectionToDomain(m whmodels.WhatsAppConnection) domain.Connection {
-	return domain.Connection{OrgID: m.OrgID, PhoneNumberID: m.PhoneNumberID, WABAID: m.WABAID, AccessToken: m.AccessTokenEncrypt, DisplayPhoneNumber: m.DisplayPhoneNumber, VerifiedName: m.VerifiedName, QualityRating: m.QualityRating, MessagingLimit: m.MessagingLimit, IsActive: m.IsActive, ConnectedAt: m.ConnectedAt, DisconnectedAt: m.DisconnectedAt, CreatedAt: m.CreatedAt}
+	return domain.Connection{TenantID: m.TenantID, PhoneNumberID: m.PhoneNumberID, WABAID: m.WABAID, AccessToken: m.AccessTokenEncrypt, DisplayPhoneNumber: m.DisplayPhoneNumber, VerifiedName: m.VerifiedName, QualityRating: m.QualityRating, MessagingLimit: m.MessagingLimit, IsActive: m.IsActive, ConnectedAt: m.ConnectedAt, DisconnectedAt: m.DisconnectedAt, CreatedAt: m.CreatedAt}
 }
 
 func messageToDomain(m whmodels.WhatsAppMessage) domain.Message {
@@ -365,7 +365,7 @@ func messageToDomain(m whmodels.WhatsAppMessage) domain.Message {
 	_ = json.Unmarshal(m.TemplateParams, &params)
 	var meta map[string]any
 	_ = json.Unmarshal(m.Metadata, &meta)
-	return domain.Message{ID: m.ID, OrgID: m.OrgID, PhoneNumberID: m.PhoneNumberID, Direction: domain.MessageDirection(m.Direction), WAMessageID: m.WAMessageID, ToPhone: m.ToPhone, FromPhone: m.FromPhone, MessageType: domain.MessageType(m.MessageType), Body: m.Body, TemplateName: m.TemplateName, TemplateLanguage: m.TemplateLanguage, TemplateParams: params, MediaURL: m.MediaURL, MediaMimeType: m.MediaMimeType, MediaCaption: m.MediaCaption, Status: domain.MessageStatus(m.Status), ErrorCode: m.ErrorCode, ErrorMessage: m.ErrorMessage, PartyID: m.PartyID, ConversationID: m.ConversationID, CreatedBy: m.CreatedBy, Metadata: meta, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
+	return domain.Message{ID: m.ID, TenantID: m.TenantID, PhoneNumberID: m.PhoneNumberID, Direction: domain.MessageDirection(m.Direction), WAMessageID: m.WAMessageID, ToPhone: m.ToPhone, FromPhone: m.FromPhone, MessageType: domain.MessageType(m.MessageType), Body: m.Body, TemplateName: m.TemplateName, TemplateLanguage: m.TemplateLanguage, TemplateParams: params, MediaURL: m.MediaURL, MediaMimeType: m.MediaMimeType, MediaCaption: m.MediaCaption, Status: domain.MessageStatus(m.Status), ErrorCode: m.ErrorCode, ErrorMessage: m.ErrorMessage, PartyID: m.PartyID, ConversationID: m.ConversationID, CreatedBy: m.CreatedBy, Metadata: meta, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 }
 
 func templateToDomain(m whmodels.WhatsAppTemplate) domain.Template {
@@ -373,22 +373,22 @@ func templateToDomain(m whmodels.WhatsAppTemplate) domain.Template {
 	_ = json.Unmarshal(m.Buttons, &buttons)
 	var exParams []string
 	_ = json.Unmarshal(m.ExampleParams, &exParams)
-	return domain.Template{ID: m.ID, OrgID: m.OrgID, MetaTemplateID: m.MetaTemplateID, Name: m.Name, Language: m.Language, Category: domain.TemplateCategory(m.Category), Status: domain.TemplateStatus(m.Status), HeaderType: m.HeaderType, HeaderText: m.HeaderText, BodyText: m.BodyText, FooterText: m.FooterText, Buttons: buttons, ExampleParams: exParams, RejectionReason: m.RejectionReason, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
+	return domain.Template{ID: m.ID, TenantID: m.TenantID, MetaTemplateID: m.MetaTemplateID, Name: m.Name, Language: m.Language, Category: domain.TemplateCategory(m.Category), Status: domain.TemplateStatus(m.Status), HeaderType: m.HeaderType, HeaderText: m.HeaderText, BodyText: m.BodyText, FooterText: m.FooterText, Buttons: buttons, ExampleParams: exParams, RejectionReason: m.RejectionReason, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 }
 
 func optInToDomain(m whmodels.WhatsAppOptIn) domain.OptIn {
-	return domain.OptIn{ID: m.ID, OrgID: m.OrgID, PartyID: m.PartyID, Phone: m.Phone, Status: domain.OptInStatus(m.Status), Source: domain.OptInSource(m.Source), OptedInAt: m.OptedInAt, OptedOutAt: m.OptedOutAt, CreatedAt: m.CreatedAt}
+	return domain.OptIn{ID: m.ID, TenantID: m.TenantID, PartyID: m.PartyID, Phone: m.Phone, Status: domain.OptInStatus(m.Status), Source: domain.OptInSource(m.Source), OptedInAt: m.OptedInAt, OptedOutAt: m.OptedOutAt, CreatedAt: m.CreatedAt}
 }
 
 func (r *Repository) CreateCampaign(ctx context.Context, c *domain.Campaign) error {
 	params, _ := json.Marshal(c.TemplateParams)
-	m := whmodels.WhatsAppCampaign{ID: c.ID, OrgID: c.OrgID, Name: c.Name, TemplateName: c.TemplateName, TemplateLanguage: c.TemplateLanguage, TemplateParams: datatypes.JSON(params), TagFilter: c.TagFilter, Status: string(c.Status), TotalRecipients: c.TotalRecipients, CreatedBy: c.CreatedBy, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
+	m := whmodels.WhatsAppCampaign{ID: c.ID, TenantID: c.TenantID, Name: c.Name, TemplateName: c.TemplateName, TemplateLanguage: c.TemplateLanguage, TemplateParams: datatypes.JSON(params), TagFilter: c.TagFilter, Status: string(c.Status), TotalRecipients: c.TotalRecipients, CreatedBy: c.CreatedBy, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
 	return r.db.WithContext(ctx).Create(&m).Error
 }
 
-func (r *Repository) GetCampaign(ctx context.Context, orgID, campaignID uuid.UUID) (*domain.Campaign, error) {
+func (r *Repository) GetCampaign(ctx context.Context, tenantID, campaignID uuid.UUID) (*domain.Campaign, error) {
 	var m whmodels.WhatsAppCampaign
-	err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, campaignID).First(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, campaignID).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
 	}
@@ -398,9 +398,9 @@ func (r *Repository) GetCampaign(ctx context.Context, orgID, campaignID uuid.UUI
 	return campaignToDomain(m), nil
 }
 
-func (r *Repository) ListCampaigns(ctx context.Context, orgID uuid.UUID, limit int) ([]domain.Campaign, error) {
+func (r *Repository) ListCampaigns(ctx context.Context, tenantID uuid.UUID, limit int) ([]domain.Campaign, error) {
 	var rows []whmodels.WhatsAppCampaign
-	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := make([]domain.Campaign, 0, len(rows))
@@ -410,10 +410,10 @@ func (r *Repository) ListCampaigns(ctx context.Context, orgID uuid.UUID, limit i
 	return result, nil
 }
 
-func (r *Repository) UpdateCampaignStatus(ctx context.Context, orgID, campaignID uuid.UUID, status domain.CampaignStatus, updates map[string]any) error {
+func (r *Repository) UpdateCampaignStatus(ctx context.Context, tenantID, campaignID uuid.UUID, status domain.CampaignStatus, updates map[string]any) error {
 	updates["status"] = string(status)
 	updates["updated_at"] = time.Now()
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppCampaign{}).Where("org_id = ? AND id = ?", orgID, campaignID).Updates(updates).Error
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppCampaign{}).Where("tenant_id = ? AND id = ?", tenantID, campaignID).Updates(updates).Error
 }
 
 func (r *Repository) SaveCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error {
@@ -422,7 +422,7 @@ func (r *Repository) SaveCampaignRecipients(ctx context.Context, recipients []do
 	}
 	rows := make([]whmodels.WhatsAppCampaignRecipient, 0, len(recipients))
 	for _, rec := range recipients {
-		rows = append(rows, whmodels.WhatsAppCampaignRecipient{ID: rec.ID, CampaignID: rec.CampaignID, OrgID: rec.OrgID, PartyID: rec.PartyID, Phone: rec.Phone, PartyName: rec.PartyName, Status: string(rec.Status), CreatedAt: rec.CreatedAt})
+		rows = append(rows, whmodels.WhatsAppCampaignRecipient{ID: rec.ID, CampaignID: rec.CampaignID, TenantID: rec.TenantID, PartyID: rec.PartyID, Phone: rec.Phone, PartyName: rec.PartyName, Status: string(rec.Status), CreatedAt: rec.CreatedAt})
 	}
 	return r.db.WithContext(ctx).CreateInBatches(rows, 100).Error
 }
@@ -454,12 +454,12 @@ func (r *Repository) ListCampaignRecipients(ctx context.Context, campaignID uuid
 	}
 	result := make([]domain.CampaignRecipient, 0, len(rows))
 	for _, m := range rows {
-		result = append(result, domain.CampaignRecipient{ID: m.ID, CampaignID: m.CampaignID, OrgID: m.OrgID, PartyID: m.PartyID, Phone: m.Phone, PartyName: m.PartyName, Status: domain.RecipientStatus(m.Status), WAMessageID: m.WAMessageID, ErrorMessage: m.ErrorMessage, SentAt: m.SentAt, DeliveredAt: m.DeliveredAt, ReadAt: m.ReadAt, CreatedAt: m.CreatedAt})
+		result = append(result, domain.CampaignRecipient{ID: m.ID, CampaignID: m.CampaignID, TenantID: m.TenantID, PartyID: m.PartyID, Phone: m.Phone, PartyName: m.PartyName, Status: domain.RecipientStatus(m.Status), WAMessageID: m.WAMessageID, ErrorMessage: m.ErrorMessage, SentAt: m.SentAt, DeliveredAt: m.DeliveredAt, ReadAt: m.ReadAt, CreatedAt: m.CreatedAt})
 	}
 	return result, nil
 }
 
-func (r *Repository) GetOptedInPartiesByTag(ctx context.Context, orgID uuid.UUID, tag string) ([]struct {
+func (r *Repository) GetOptedInPartiesByTag(ctx context.Context, tenantID uuid.UUID, tag string) ([]struct {
 	PartyID   uuid.UUID
 	Phone     string
 	PartyName string
@@ -470,7 +470,7 @@ func (r *Repository) GetOptedInPartiesByTag(ctx context.Context, orgID uuid.UUID
 		PartyName string    `gorm:"column:display_name"`
 	}
 	var rows []row
-	query := r.db.WithContext(ctx).Table("whatsapp_opt_ins o").Select("o.party_id, o.phone, COALESCE(p.display_name, '') AS display_name").Joins("LEFT JOIN parties p ON p.id = o.party_id AND p.org_id = o.org_id").Where("o.org_id = ? AND o.status = 'opted_in'", orgID)
+	query := r.db.WithContext(ctx).Table("whatsapp_opt_ins o").Select("o.party_id, o.phone, COALESCE(p.display_name, '') AS display_name").Joins("LEFT JOIN parties p ON p.id = o.party_id AND p.tenant_id = o.tenant_id").Where("o.tenant_id = ? AND o.status = 'opted_in'", tenantID)
 	if strings.TrimSpace(tag) != "" {
 		query = query.Where("p.tags @> ?", datatypes.JSON([]byte(`["`+strings.TrimSpace(tag)+`"]`)))
 	}
@@ -492,9 +492,9 @@ func (r *Repository) GetOptedInPartiesByTag(ctx context.Context, orgID uuid.UUID
 	return result, nil
 }
 
-func (r *Repository) GetOrCreateConversation(ctx context.Context, orgID, partyID uuid.UUID, phone, partyName string) (*domain.Conversation, error) {
+func (r *Repository) GetOrCreateConversation(ctx context.Context, tenantID, partyID uuid.UUID, phone, partyName string) (*domain.Conversation, error) {
 	var m whmodels.WhatsAppConversation
-	err := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ?", orgID, partyID).First(&m).Error
+	err := r.db.WithContext(ctx).Where("tenant_id = ? AND party_id = ?", tenantID, partyID).First(&m).Error
 	if err == nil {
 		return conversationToDomain(m), nil
 	}
@@ -502,18 +502,18 @@ func (r *Repository) GetOrCreateConversation(ctx context.Context, orgID, partyID
 		return nil, err
 	}
 	now := time.Now()
-	m = whmodels.WhatsAppConversation{ID: uuid.New(), OrgID: orgID, PartyID: partyID, Phone: phone, PartyName: partyName, Status: string(domain.ConversationOpen), CreatedAt: now, UpdatedAt: now}
+	m = whmodels.WhatsAppConversation{ID: uuid.New(), TenantID: tenantID, PartyID: partyID, Phone: phone, PartyName: partyName, Status: string(domain.ConversationOpen), CreatedAt: now, UpdatedAt: now}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		if err2 := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ?", orgID, partyID).First(&m).Error; err2 != nil {
+		if err2 := r.db.WithContext(ctx).Where("tenant_id = ? AND party_id = ?", tenantID, partyID).First(&m).Error; err2 != nil {
 			return nil, err
 		}
 	}
 	return conversationToDomain(m), nil
 }
 
-func (r *Repository) ListConversations(ctx context.Context, orgID uuid.UUID, assignedTo, status string, limit int) ([]domain.Conversation, error) {
+func (r *Repository) ListConversations(ctx context.Context, tenantID uuid.UUID, assignedTo, status string, limit int) ([]domain.Conversation, error) {
 	var rows []whmodels.WhatsAppConversation
-	q := r.db.WithContext(ctx).Where("org_id = ?", orgID)
+	q := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID)
 	if assignedTo == "__unassigned__" {
 		q = q.Where("assigned_to = ''")
 	} else if assignedTo != "" {
@@ -532,8 +532,8 @@ func (r *Repository) ListConversations(ctx context.Context, orgID uuid.UUID, ass
 	return result, nil
 }
 
-func (r *Repository) AssignConversation(ctx context.Context, orgID, conversationID uuid.UUID, assignedTo string) error {
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("org_id = ? AND id = ?", orgID, conversationID).Updates(map[string]any{"assigned_to": assignedTo, "updated_at": time.Now()}).Error
+func (r *Repository) AssignConversation(ctx context.Context, tenantID, conversationID uuid.UUID, assignedTo string) error {
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("tenant_id = ? AND id = ?", tenantID, conversationID).Updates(map[string]any{"assigned_to": assignedTo, "updated_at": time.Now()}).Error
 }
 
 func (r *Repository) UpdateConversationLastMessage(ctx context.Context, conversationID uuid.UUID, preview string, inbound bool) error {
@@ -546,20 +546,20 @@ func (r *Repository) UpdateConversationLastMessage(ctx context.Context, conversa
 	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("id = ?", conversationID).Updates(updates).Error
 }
 
-func (r *Repository) MarkConversationRead(ctx context.Context, orgID, conversationID uuid.UUID) error {
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("org_id = ? AND id = ?", orgID, conversationID).Updates(map[string]any{"unread_count": 0, "updated_at": time.Now()}).Error
+func (r *Repository) MarkConversationRead(ctx context.Context, tenantID, conversationID uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("tenant_id = ? AND id = ?", tenantID, conversationID).Updates(map[string]any{"unread_count": 0, "updated_at": time.Now()}).Error
 }
 
-func (r *Repository) ResolveConversation(ctx context.Context, orgID, conversationID uuid.UUID) error {
-	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("org_id = ? AND id = ?", orgID, conversationID).Updates(map[string]any{"status": string(domain.ConversationResolved), "unread_count": 0, "updated_at": time.Now()}).Error
+func (r *Repository) ResolveConversation(ctx context.Context, tenantID, conversationID uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&whmodels.WhatsAppConversation{}).Where("tenant_id = ? AND id = ?", tenantID, conversationID).Updates(map[string]any{"status": string(domain.ConversationResolved), "unread_count": 0, "updated_at": time.Now()}).Error
 }
 
 func conversationToDomain(m whmodels.WhatsAppConversation) *domain.Conversation {
-	return &domain.Conversation{ID: m.ID, OrgID: m.OrgID, PartyID: m.PartyID, Phone: m.Phone, PartyName: m.PartyName, AssignedTo: m.AssignedTo, Status: domain.ConversationStatus(m.Status), LastMessageAt: m.LastMessageAt, LastMessagePreview: m.LastMessagePreview, UnreadCount: m.UnreadCount, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
+	return &domain.Conversation{ID: m.ID, TenantID: m.TenantID, PartyID: m.PartyID, Phone: m.Phone, PartyName: m.PartyName, AssignedTo: m.AssignedTo, Status: domain.ConversationStatus(m.Status), LastMessageAt: m.LastMessageAt, LastMessagePreview: m.LastMessagePreview, UnreadCount: m.UnreadCount, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 }
 
 func campaignToDomain(m whmodels.WhatsAppCampaign) *domain.Campaign {
 	var params []string
 	_ = json.Unmarshal(m.TemplateParams, &params)
-	return &domain.Campaign{ID: m.ID, OrgID: m.OrgID, Name: m.Name, TemplateName: m.TemplateName, TemplateLanguage: m.TemplateLanguage, TemplateParams: params, TagFilter: m.TagFilter, Status: domain.CampaignStatus(m.Status), TotalRecipients: m.TotalRecipients, SentCount: m.SentCount, DeliveredCount: m.DeliveredCount, ReadCount: m.ReadCount, FailedCount: m.FailedCount, ScheduledAt: m.ScheduledAt, StartedAt: m.StartedAt, CompletedAt: m.CompletedAt, CreatedBy: m.CreatedBy, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
+	return &domain.Campaign{ID: m.ID, TenantID: m.TenantID, Name: m.Name, TemplateName: m.TemplateName, TemplateLanguage: m.TemplateLanguage, TemplateParams: params, TagFilter: m.TagFilter, Status: domain.CampaignStatus(m.Status), TotalRecipients: m.TotalRecipients, SentCount: m.SentCount, DeliveredCount: m.DeliveredCount, ReadCount: m.ReadCount, FailedCount: m.FailedCount, ScheduledAt: m.ScheduledAt, StartedAt: m.StartedAt, CompletedAt: m.CompletedAt, CreatedBy: m.CreatedBy, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 }

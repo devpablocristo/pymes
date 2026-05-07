@@ -347,7 +347,7 @@ async def build_insight_chat_response_for_scope(
                 notification_id=notification_id,
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("insight_chat_failed", org_id=auth.org_id, error=str(exc))
+        logger.warning("insight_chat_failed", tenant_id=auth.tenant_id, error=str(exc))
         return None
 
     return None

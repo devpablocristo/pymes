@@ -50,7 +50,7 @@ func TestCreateOrAdjustDerivesEntityTypeFromType(t *testing.T) {
 	uc := NewUsecases(repo)
 
 	_, err := uc.CreateOrAdjust(context.Background(), accountsdomain.Account{
-		OrgID:      uuid.New(),
+		TenantID:   uuid.New(),
 		Type:       "receivable",
 		EntityID:   uuid.New(),
 		EntityName: "Cliente Demo",

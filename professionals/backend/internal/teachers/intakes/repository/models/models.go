@@ -9,7 +9,7 @@ import (
 
 type IntakeModel struct {
 	ID              uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	OrgID           uuid.UUID      `gorm:"type:uuid;index;not null"`
+	TenantID        uuid.UUID      `gorm:"type:uuid;index;not null"`
 	BookingID       *uuid.UUID     `gorm:"type:uuid;column:booking_id"`
 	ProfileID       uuid.UUID      `gorm:"type:uuid;not null"`
 	CustomerPartyID *uuid.UUID     `gorm:"type:uuid"`

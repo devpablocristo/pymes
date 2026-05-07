@@ -89,7 +89,7 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 		return nil
 	}
 
-	orgID, refType, refID, err := parseExternalReference(detail.ExternalReference)
+	tenantID, refType, refID, err := parseExternalReference(detail.ExternalReference)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 	switch refType {
 	case "sale":
 		err := u.repo.ProcessApprovedSalePayment(ctx, ProcessSalePaymentInput{
-			OrgID:         orgID,
+			TenantID:      tenantID,
 			SaleID:        refID,
 			Amount:        detail.TransactionAmount,
 			ExternalPayID: detail.ID,
@@ -107,12 +107,12 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 		if err != nil {
 			return err
 		}
-		u.logWebhookApproval(ctx, orgID, "sale", refID, evt.ExternalEventID, detail)
+		u.logWebhookApproval(ctx, tenantID, "sale", refID, evt.ExternalEventID, detail)
 		return nil
 	case "quote":
 		err := u.repo.MarkPreferenceApproved(
 			ctx,
-			orgID,
+			tenantID,
 			refType,
 			refID,
 			detail.PayerEmail,
@@ -121,7 +121,7 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 		if err != nil {
 			return err
 		}
-		u.logWebhookApproval(ctx, orgID, "quote", refID, evt.ExternalEventID, detail)
+		u.logWebhookApproval(ctx, tenantID, "quote", refID, evt.ExternalEventID, detail)
 		return nil
 	default:
 		return nil
@@ -130,7 +130,7 @@ func (u *Usecases) processStoredWebhookEvent(ctx context.Context, evt gatewaydom
 
 func (u *Usecases) logWebhookApproval(
 	ctx context.Context,
-	orgID uuid.UUID,
+	tenantID uuid.UUID,
 	refType string,
 	refID uuid.UUID,
 	eventID string,
@@ -150,7 +150,7 @@ func (u *Usecases) logWebhookApproval(
 	}
 
 	u.audit.LogWithActor(ctx, auditdomain.LogInput{
-		OrgID:        orgID,
+		TenantID:     tenantID,
 		Actor:        actor,
 		Action:       "payment_gateway.payment.approved",
 		ResourceType: refType,
@@ -171,7 +171,7 @@ func (u *Usecases) logWebhookApproval(
 func (u *Usecases) fetchPaymentDetailAcrossConnections(ctx context.Context, paymentID string) (gateway.PaymentDetail, error) {
 	// Fast path: if we already stored external preference, use org connection directly.
 	if pref, err := u.repo.GetPreferenceByExternalID(ctx, providerMercadoPago, paymentID); err == nil {
-		if conn, accessToken, err := u.ensureConnectionAccessToken(ctx, pref.OrgID); err == nil {
+		if conn, accessToken, err := u.ensureConnectionAccessToken(ctx, pref.TenantID); err == nil {
 			_ = conn
 			if detail, err := u.mp.GetPaymentDetail(ctx, accessToken, paymentID); err == nil {
 				return detail, nil

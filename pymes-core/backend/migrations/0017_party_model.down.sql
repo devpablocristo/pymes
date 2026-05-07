@@ -1,7 +1,7 @@
 DROP VIEW IF EXISTS suppliers;
 DROP VIEW IF EXISTS customers;
 ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS user_roles_party_id_fkey;
-ALTER TABLE org_members DROP CONSTRAINT IF EXISTS org_members_party_id_fkey;
+ALTER TABLE tenant_memberships DROP CONSTRAINT IF EXISTS org_members_party_id_fkey;
 ALTER TABLE ai_conversations DROP CONSTRAINT IF EXISTS ai_conversations_agent_party_id_fkey;
 ALTER TABLE payment_preferences DROP CONSTRAINT IF EXISTS payment_preferences_party_id_fkey;
 ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_party_id_fkey;
@@ -12,7 +12,7 @@ ALTER TABLE purchases DROP CONSTRAINT IF EXISTS purchases_party_id_fkey;
 ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_party_id_fkey;
 ALTER TABLE quotes DROP CONSTRAINT IF EXISTS quotes_party_id_fkey;
 ALTER TABLE user_roles DROP COLUMN IF EXISTS party_id;
-ALTER TABLE org_members DROP COLUMN IF EXISTS party_id;
+ALTER TABLE tenant_memberships DROP COLUMN IF EXISTS party_id;
 ALTER TABLE ai_conversations DROP COLUMN IF EXISTS agent_party_id;
 ALTER TABLE payment_preferences DROP COLUMN IF EXISTS party_id;
 ALTER TABLE audit_log DROP COLUMN IF EXISTS actor_label;

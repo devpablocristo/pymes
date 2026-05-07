@@ -60,12 +60,12 @@ func (u *Usecases) verifyMPSignature(headers http.Header, body []byte) bool {
 	return false
 }
 
-func (u *Usecases) signOAuthState(orgID uuid.UUID) (string, error) {
-	if orgID == uuid.Nil || strings.TrimSpace(u.mpClientSecret) == "" {
+func (u *Usecases) signOAuthState(tenantID uuid.UUID) (string, error) {
+	if tenantID == uuid.Nil || strings.TrimSpace(u.mpClientSecret) == "" {
 		return "", ErrInvalidOAuthState
 	}
 	ts := strconv.FormatInt(u.now().Unix(), 10)
-	payload := orgID.String() + ":" + ts
+	payload := tenantID.String() + ":" + ts
 	sum := hmac.New(sha256.New, []byte(u.mpClientSecret))
 	sum.Write([]byte(payload))
 	sig := hex.EncodeToString(sum.Sum(nil))
@@ -82,7 +82,7 @@ func (u *Usecases) verifyOAuthState(state string) (uuid.UUID, error) {
 	if len(parts) != 3 {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
-	orgID, err := uuid.Parse(parts[0])
+	tenantID, err := uuid.Parse(parts[0])
 	if err != nil {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
@@ -101,7 +101,7 @@ func (u *Usecases) verifyOAuthState(state string) (uuid.UUID, error) {
 	if subtle.ConstantTimeCompare([]byte(strings.ToLower(parts[2])), []byte(expected)) != 1 {
 		return uuid.Nil, ErrInvalidOAuthState
 	}
-	return orgID, nil
+	return tenantID, nil
 }
 
 func (u *Usecases) buildWebhookURL(path string) string {
@@ -154,7 +154,7 @@ func parseExternalReference(in string) (uuid.UUID, string, uuid.UUID, error) {
 	if len(parts) != 3 {
 		return uuid.Nil, "", uuid.Nil, ErrInvalidReference
 	}
-	orgID, err := uuid.Parse(strings.TrimSpace(parts[0]))
+	tenantID, err := uuid.Parse(strings.TrimSpace(parts[0]))
 	if err != nil {
 		return uuid.Nil, "", uuid.Nil, ErrInvalidReference
 	}
@@ -166,7 +166,7 @@ func parseExternalReference(in string) (uuid.UUID, string, uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, "", uuid.Nil, ErrInvalidReference
 	}
-	return orgID, refType, refID, nil
+	return tenantID, refType, refID, nil
 }
 
 func normalizeProvider(v string) string {

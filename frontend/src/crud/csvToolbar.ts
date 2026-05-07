@@ -98,6 +98,28 @@ async function createFromValues<T extends { id: string }>(
   });
 }
 
+function dedupeToolbarActions<T extends { id: string }>(
+  config: CrudPageConfig<T>,
+): CrudPageConfig<T> {
+  const actions = config.toolbarActions;
+  if (!actions?.length) {
+    return config;
+  }
+
+  const byId = new Map<string, (typeof actions)[number]>();
+  for (const action of actions) {
+    byId.set(action.id, action);
+  }
+  if (byId.size === actions.length) {
+    return config;
+  }
+
+  return {
+    ...config,
+    toolbarActions: Array.from(byId.values()),
+  };
+}
+
 export function withCSVToolbar<T extends { id: string }>(
   resourceId: string,
   config: CrudPageConfig<T>,
@@ -115,7 +137,7 @@ export function withCSVToolbar<T extends { id: string }>(
   const serverExport =
     options.serverExport ?? (mode === 'server' ? createCoreDataioServerExportPort() : undefined);
 
-  return mergeCsvToolbarConfig({
+  return dedupeToolbarActions(mergeCsvToolbarConfig({
     config,
     entity,
     mode,
@@ -131,5 +153,5 @@ export function withCSVToolbar<T extends { id: string }>(
     ui: pymesCsvUi,
     importClientRow: (values) => createFromValues(config, values),
     messages: spanishCsvMessages,
-  });
+  }));
 }

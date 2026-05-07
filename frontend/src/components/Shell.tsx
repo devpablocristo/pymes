@@ -148,6 +148,13 @@ export function Shell({ children }: { children: ReactNode }) {
     [link, t],
   );
 
+  const medicalNav = useMemo<AppShellNavItem[]>(
+    () => [
+      { to: link('/medical/occupational-health/exams'), label: t('shell.nav.occupationalHealthExams'), icon: dotIcon },
+    ],
+    [link, t],
+  );
+
   const sections = useMemo(() => {
     const visibleIds = getVisibleModuleIds();
     const profile = getTenantProfile();
@@ -216,7 +223,7 @@ export function Shell({ children }: { children: ReactNode }) {
       result.push({ label: sentenceCase(t('shell.sections.restaurants')), items: restaurantsNav });
     }
     if (vertical === 'medical') {
-      result.push({ label: 'Medicina laboral', items: [] });
+      result.push({ label: sentenceCase(t('shell.sections.occupationalHealth')), items: medicalNav });
     }
     result.push(...moduleNav);
     return result;
@@ -230,6 +237,7 @@ export function Shell({ children }: { children: ReactNode }) {
     homeNav,
     link,
     localizeUiText,
+    medicalNav,
     professionalsNav,
     restaurantsNav,
     sentenceCase,

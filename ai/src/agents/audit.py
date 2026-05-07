@@ -6,7 +6,7 @@ from typing import Any
 async def record_agent_event(
     repo: Any,
     *,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str | None,
     agent_mode: str,
     channel: str,
@@ -30,7 +30,7 @@ async def record_agent_event(
     if handler is None:
         return
     await handler(
-        org_id=org_id,
+        tenant_id=tenant_id,
         conversation_id=conversation_id,
         agent_mode=agent_mode,
         channel=channel,
@@ -52,8 +52,8 @@ async def record_agent_event(
     )
 
 
-async def has_processed_request(repo: Any, org_id: str, request_id: str) -> bool:
+async def has_processed_request(repo: Any, tenant_id: str, request_id: str) -> bool:
     checker = getattr(repo, "has_agent_request", None)
     if checker is None:
         return False
-    return bool(await checker(org_id, request_id))
+    return bool(await checker(tenant_id, request_id))

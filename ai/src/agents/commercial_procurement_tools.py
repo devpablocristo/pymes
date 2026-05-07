@@ -19,7 +19,7 @@ async def _build_procurement_tools(
     client: BackendClient,
     auth: AuthContext,
     repo: AIRepository,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str | None,
     policy: CommercialPolicy,
     state: CommercialRunState,
@@ -28,32 +28,32 @@ async def _build_procurement_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, Any] = {}
 
-    async def _search_suppliers(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_suppliers(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await suppliers.search_suppliers(client, auth, query=query, limit=limit)
 
-    async def _search_products(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_products(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await products.search_products(client, auth, query=query, limit=limit)
 
-    async def _get_low_stock(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_low_stock(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_low_stock(client, auth)
 
-    async def _get_stock_level(org_id: str, product_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_stock_level(tenant_id: str, product_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_stock_level(client, auth, product_id=product_id)
 
-    async def _get_purchases(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_purchases(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await purchases.get_purchases_summary(client, auth)
 
-    async def _list_procurement_requests(org_id: str, limit: int = 20, archived: bool = False) -> dict[str, Any]:
-        _ = org_id
+    async def _list_procurement_requests(tenant_id: str, limit: int = 20, archived: bool = False) -> dict[str, Any]:
+        _ = tenant_id
         return await procurement_requests.list_procurement_requests(client, auth, limit=limit, archived=archived)
 
     async def _create_procurement_request(
-        org_id: str,
+        tenant_id: str,
         title: str,
         description: str = "",
         category: str = "",
@@ -61,7 +61,7 @@ async def _build_procurement_tools(
         currency: str = "ARS",
         lines: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await procurement_requests.create_procurement_request(
             client,
             auth,
@@ -73,20 +73,20 @@ async def _build_procurement_tools(
             lines=lines,
         )
 
-    async def _get_procurement_request(org_id: str, request_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_procurement_request(tenant_id: str, request_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await procurement_requests.get_procurement_request(client, auth, request_id=request_id)
 
-    async def _submit_procurement_request(org_id: str, request_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _submit_procurement_request(tenant_id: str, request_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await procurement_requests.submit_procurement_request(client, auth, request_id=request_id)
 
     async def _prepare_purchase_draft(
-        org_id: str,
+        tenant_id: str,
         supplier_name: str | None = None,
         items: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         draft_items: list[dict[str, Any]] = []
         if items:
             for item in items:
@@ -187,7 +187,7 @@ async def _build_procurement_tools(
             name=declaration.name,
             handler=raw_handler,
             repo=repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             policy=policy,
             state=state,

@@ -12,5 +12,5 @@ CREATE INDEX IF NOT EXISTS idx_ai_conversations_review_request
     WHERE review_request_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_ai_conversations_contact_phone
-    ON ai_conversations (org_id, contact_phone)
+    ON ai_conversations (tenant_id, contact_phone)
     WHERE contact_phone IS NOT NULL;

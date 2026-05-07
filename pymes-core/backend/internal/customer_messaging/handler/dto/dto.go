@@ -3,7 +3,7 @@ package dto
 import "github.com/google/uuid"
 
 type ConnectionResponse struct {
-	OrgID              uuid.UUID `json:"org_id"`
+	TenantID           uuid.UUID `json:"tenant_id"`
 	PhoneNumberID      string    `json:"phone_number_id"`
 	WABAID             string    `json:"waba_id"`
 	DisplayPhoneNumber string    `json:"display_phone_number"`

@@ -47,8 +47,8 @@ class StubRepo:
         self.append_calls.append(kwargs)
         return self.created_conversation
 
-    async def track_usage(self, org_id: str, tokens_in: int, tokens_out: int) -> None:
-        self.track_calls.append({"org_id": org_id, "tokens_in": tokens_in, "tokens_out": tokens_out})
+    async def track_usage(self, tenant_id: str, tokens_in: int, tokens_out: int) -> None:
+        self.track_calls.append({"tenant_id": tenant_id, "tokens_in": tokens_in, "tokens_out": tokens_out})
 
     async def record_agent_event(self, **kwargs) -> None:
         self.agent_events.append(kwargs)
@@ -236,7 +236,7 @@ async def test_internal_chat_reads_evidence_before_gemini_and_marks_llm_used() -
         repo=repo,  # type: ignore[arg-type]
         llm=llm,  # type: ignore[arg-type]
         backend_client=backend,  # type: ignore[arg-type]
-        org_id="org-123",
+        tenant_id="org-123",
         message="¿Qué clientes tuvieron ventas esta semana y cuál debería priorizar para cobrar?",
         conversation_id=None,
         auth=_auth(),
@@ -267,7 +267,7 @@ async def test_internal_chat_facts_only_uses_fact_pack_without_gemini() -> None:
         repo=repo,  # type: ignore[arg-type]
         llm=UnexpectedGemini(),  # type: ignore[arg-type]
         backend_client=backend,  # type: ignore[arg-type]
-        org_id="org-123",
+        tenant_id="org-123",
         message="¿Cuánto vendí hoy?",
         conversation_id=None,
         auth=_auth(),
@@ -298,7 +298,7 @@ async def test_internal_chat_employee_question_ignores_sticky_sales_hint() -> No
         repo=repo,  # type: ignore[arg-type]
         llm=UnexpectedGemini(),  # type: ignore[arg-type]
         backend_client=backend,  # type: ignore[arg-type]
-        org_id="org-123",
+        tenant_id="org-123",
         message="cuantos y cuales empleados tengo?",
         conversation_id=None,
         auth=_auth(),
@@ -325,7 +325,7 @@ async def test_internal_chat_returns_visible_error_when_gemini_fails() -> None:
             repo=repo,  # type: ignore[arg-type]
             llm=FailingGemini(),  # type: ignore[arg-type]
             backend_client=FakeBackend(),  # type: ignore[arg-type]
-            org_id="org-123",
+            tenant_id="org-123",
             message="¿Qué clientes tuvieron ventas esta semana y cuál debería priorizar para cobrar?",
             conversation_id=None,
             auth=_auth(),

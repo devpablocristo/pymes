@@ -29,9 +29,9 @@ func TestClerkCompactOrgIDFromClaims(t *testing.T) {
 		{
 			name: "o map interface id",
 			c: jwt.MapClaims{
-				"o": map[string]interface{}{"id": "org_legacy"},
+				"o": map[string]interface{}{"id": "org_clerk"},
 			},
-			want: "org_legacy",
+			want: "org_clerk",
 		},
 		{
 			name: "o not a map",

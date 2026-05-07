@@ -35,9 +35,8 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('priceLists');
     visible.add('suppliers');
     visible.add('purchases');
-    // Solicitudes internas + políticas (governance / CEL); backend: /v1/procurement-*
+    // Solicitudes internas; las políticas de governance son configuración externa, no CRUD operativo local.
     visible.add('procurementRequests');
-    visible.add('procurementPolicies');
     visible.add('quotes');
   }
 
@@ -65,13 +64,6 @@ export function getVisibleModuleIds(): Set<string> {
     visible.add('paymentGateway');
   }
 
-  // Documents & timeline: show if billing or products (operational tools)
-  if (profile.usesBilling || sellsProducts || exploring) {
-    visible.add('timeline');
-    visible.add('documents');
-    visible.add('attachments');
-  }
-
   // Parties: show if medium+ team (advanced entity model)
   if (profile.teamSize === 'medium' || profile.teamSize === 'large' || exploring) {
     visible.add('parties');
@@ -79,7 +71,6 @@ export function getVisibleModuleIds(): Set<string> {
 
   // Advanced/admin: only if medium+ team or exploring
   if (profile.teamSize === 'medium' || profile.teamSize === 'large' || exploring) {
-    visible.add('audit');
     visible.add('reports');
     visible.add('dataIO');
     visible.add('webhooks');

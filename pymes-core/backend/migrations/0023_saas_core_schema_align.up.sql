@@ -1,9 +1,9 @@
 -- Align org API key columns with core/saas/go GORM models (api_key_hash, api_key_id).
 -- Run before using github.com/devpablocristo/core/saas/go org/users repositories on this DB.
 
-ALTER TABLE org_api_keys RENAME COLUMN key_hash TO api_key_hash;
+ALTER TABLE tenant_api_keys RENAME COLUMN key_hash TO api_key_hash;
 
-ALTER TABLE org_api_key_scopes RENAME COLUMN key_id TO api_key_id;
+ALTER TABLE tenant_api_key_scopes RENAME COLUMN key_id TO api_key_id;
 
 -- core/saas/go admin/billing use hard_limits_json; keep hard_limits for Pymes ERP reads.
 ALTER TABLE tenant_settings ADD COLUMN IF NOT EXISTS hard_limits_json jsonb NOT NULL DEFAULT '{}'::jsonb;

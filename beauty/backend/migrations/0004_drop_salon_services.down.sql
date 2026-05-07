@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS beauty.salon_services (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS beauty.salon_services (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS beauty_salon_services_org_code_idx
-    ON beauty.salon_services (org_id, code);
+    ON beauty.salon_services (tenant_id, code);
 
 ALTER TABLE beauty.salon_services
     ADD CONSTRAINT beauty_salon_services_linked_service_fk

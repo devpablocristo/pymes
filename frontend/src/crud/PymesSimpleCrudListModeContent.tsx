@@ -202,8 +202,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
           return;
         }
       }
-      // Si no hay formFields declarados (p. ej. inventory, audit, timeline,
-      // attachments, cashflow), generamos fields read-only desde columns para
+      // Si no hay formFields declarados (p. ej. vistas derivadas puntuales),
+      // generamos fields read-only desde columns para
       // que todos los CRUDs abran el mismo Editor modal. En create no aplica.
       const declaredFields = crudConfig.formFields ?? [];
       const effectiveFields: CrudFormField[] =
@@ -221,8 +221,8 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         ...buildEmptyFormValues(fields),
         ...createDefaults,
       };
-      // Cuando el CRUD no declara formFields (inventory, audit, timeline), los
-      // campos se generan read-only desde columns. En ese caso preferimos
+      // Cuando el CRUD no declara formFields, los campos se generan read-only
+      // desde columns. En ese caso preferimos
       // readValue para que los valores mostrados pasen por column.render
       // (ej. "is_low_stock=false" → "Normal") en vez de exponer el bool crudo.
       const useColumnFallback = declaredFields.length === 0;
@@ -329,12 +329,12 @@ export function PymesSimpleCrudListModeContent<T extends { id: string }>({
         deleteAction:
           editing && editorRow && archived
             ? {
-                label: 'Eliminar',
-                busyLabel: 'Eliminando…',
+                label: 'Eliminar definitivo',
+                busyLabel: 'Eliminando definitivamente…',
                 confirm: {
                   title: `Eliminar ${crudConfig.label}`,
                   description: `Esta acción elimina definitivamente ${crudConfig.label} y no se puede deshacer.`,
-                  confirmLabel: 'Eliminar',
+                  confirmLabel: 'Eliminar definitivo',
                   cancelLabel: 'Cancelar',
                 },
                 onDelete: async () => {

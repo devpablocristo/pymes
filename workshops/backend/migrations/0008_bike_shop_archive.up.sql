@@ -7,7 +7,7 @@ ALTER TABLE workshops.bicycles
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_bicycles_org_frame_active_idx
-    ON workshops.bicycles (org_id, frame_number)
+    ON workshops.bicycles (tenant_id, frame_number)
     WHERE archived_at IS NULL;
 
 -- Órdenes de trabajo bike shop
@@ -17,5 +17,5 @@ ALTER TABLE workshops.bike_work_orders
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_bike_work_orders_org_number_active_idx
-    ON workshops.bike_work_orders (org_id, number)
+    ON workshops.bike_work_orders (tenant_id, number)
     WHERE archived_at IS NULL;

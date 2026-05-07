@@ -12,11 +12,11 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
+    async def _check_availability(tenant_id: str, date: str, duration: int = 60) -> dict[str, Any]:
+        return await scheduling.check_availability(client, tenant_id=tenant_id, date=date, duration=duration)
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -25,7 +25,7 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
     ) -> dict[str, Any]:
         return await scheduling.book_scheduling(
             client,
-            org_id=org_id,
+            tenant_id=tenant_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             title=title,
@@ -33,17 +33,17 @@ def build_external_tools(client: BackendClient) -> tuple[list[ToolDeclaration], 
             duration=duration,
         )
 
-    async def _get_public_services(org_id: str, limit: int = 20) -> dict[str, Any]:
-        return await products.get_public_services(client, org_id=org_id, limit=limit)
+    async def _get_public_services(tenant_id: str, limit: int = 20) -> dict[str, Any]:
+        return await products.get_public_services(client, tenant_id=tenant_id, limit=limit)
 
-    async def _get_business_info(org_id: str) -> dict[str, Any]:
-        return await client.request("GET", f"/v1/public/{org_id}/info", include_internal=True)
+    async def _get_business_info(tenant_id: str) -> dict[str, Any]:
+        return await client.request("GET", f"/v1/public/{tenant_id}/info", include_internal=True)
 
-    async def _get_my_bookings(org_id: str, phone: str) -> dict[str, Any]:
-        return await scheduling.get_my_bookings(client, org_id=org_id, phone=phone)
+    async def _get_my_bookings(tenant_id: str, phone: str) -> dict[str, Any]:
+        return await scheduling.get_my_bookings(client, tenant_id=tenant_id, phone=phone)
 
-    async def _get_payment_link(org_id: str, quote_id: str) -> dict[str, Any]:
-        return await payments.get_public_quote_payment_link(client, org_id=org_id, quote_id=quote_id)
+    async def _get_payment_link(tenant_id: str, quote_id: str) -> dict[str, Any]:
+        return await payments.get_public_quote_payment_link(client, tenant_id=tenant_id, quote_id=quote_id)
 
     declarations.append(
         tool(

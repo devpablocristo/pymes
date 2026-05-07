@@ -1,7 +1,7 @@
 -- 0017: restaurar el bounded context bike_shop/bicycles como módulo propio.
 CREATE TABLE IF NOT EXISTS workshops.bicycles (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     customer_id UUID NULL,
     customer_name TEXT NOT NULL DEFAULT '',
     frame_number TEXT NOT NULL DEFAULT '',
@@ -35,8 +35,8 @@ ALTER TABLE workshops.bicycles
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_bicycles_org_frame_active_idx
-    ON workshops.bicycles (org_id, frame_number)
+    ON workshops.bicycles (tenant_id, frame_number)
     WHERE archived_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS workshops_bicycles_org_customer_idx
-    ON workshops.bicycles (org_id, customer_id);
+    ON workshops.bicycles (tenant_id, customer_id);

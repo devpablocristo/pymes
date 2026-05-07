@@ -8,7 +8,7 @@ type ResolveAPIKeyRequest struct {
 
 type CreateInAppNotificationRequest struct {
 	ID          string          `json:"id"`
-	OrgID       string          `json:"org_id" binding:"required"`
+	TenantID    string          `json:"tenant_id" binding:"required"`
 	Actor       string          `json:"actor" binding:"required"`
 	Title       string          `json:"title" binding:"required"`
 	Body        string          `json:"body" binding:"required"`
@@ -19,10 +19,10 @@ type CreateInAppNotificationRequest struct {
 }
 
 type ResolveCustomerRequest struct {
-	OrgID string `json:"org_id" binding:"required"`
-	Name  string `json:"name" binding:"required"`
-	Phone string `json:"phone"`
-	Email string `json:"email"`
+	TenantID string `json:"tenant_id" binding:"required"`
+	Name     string `json:"name" binding:"required"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
 }
 
 type InternalAPILineItem struct {
@@ -34,7 +34,7 @@ type InternalAPILineItem struct {
 }
 
 type CreateQuoteRequest struct {
-	OrgID        string                `json:"org_id" binding:"required"`
+	TenantID     string                `json:"tenant_id" binding:"required"`
 	CustomerID   string                `json:"customer_id"`
 	CustomerName string                `json:"customer_name"`
 	Items        []InternalAPILineItem `json:"items" binding:"required"`
@@ -43,7 +43,7 @@ type CreateQuoteRequest struct {
 }
 
 type CreateSaleRequest struct {
-	OrgID         string                `json:"org_id" binding:"required"`
+	TenantID      string                `json:"tenant_id" binding:"required"`
 	CustomerID    string                `json:"customer_id"`
 	CustomerName  string                `json:"customer_name"`
 	QuoteID       string                `json:"quote_id"`

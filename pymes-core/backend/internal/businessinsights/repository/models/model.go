@@ -8,7 +8,7 @@ import (
 
 type CandidateModel struct {
 	ID              uuid.UUID  `gorm:"column:id;type:uuid;primaryKey"`
-	OrgID           uuid.UUID  `gorm:"column:org_id;type:uuid;not null"`
+	TenantID        uuid.UUID  `gorm:"column:tenant_id;type:uuid;not null"`
 	Kind            string     `gorm:"column:kind;not null"`
 	EventType       string     `gorm:"column:event_type;not null"`
 	EntityType      string     `gorm:"column:entity_type;not null"`

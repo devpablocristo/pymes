@@ -12,6 +12,7 @@ SEED_VERIFY_CORE_URL="${SEED_VERIFY_CORE_URL:-${VITE_API_URL:-http://localhost:8
 SEED_VERIFY_WORKSHOPS_URL="${SEED_VERIFY_WORKSHOPS_URL:-${VITE_WORKSHOPS_API_URL:-http://localhost:8282}}"
 SEED_VERIFY_PROFESSIONALS_URL="${SEED_VERIFY_PROFESSIONALS_URL:-${VITE_PROFESSIONALS_API_URL:-http://localhost:8181}}"
 SEED_VERIFY_RESTAURANTS_URL="${SEED_VERIFY_RESTAURANTS_URL:-${VITE_RESTAURANTS_API_URL:-http://localhost:8484}}"
+SEED_VERIFY_MEDICAL_URL="${SEED_VERIFY_MEDICAL_URL:-${VITE_MEDICAL_API_URL:-http://localhost:8585}}"
 CLEAR_MODE=0
 if [[ "${1:-}" == "--cleared" ]]; then
   CLEAR_MODE=1
@@ -90,8 +91,8 @@ for check in "${SEED_DB_CHECKS[@]}"; do
 done
 
 if (( CLEAR_MODE == 1 )); then
-  check_min "bootstrapOrg" 1 "$(query_count "SELECT count(*) FROM orgs WHERE id = '__ORG_ID__'::uuid")" "db"
-  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM org_members WHERE org_id = '__ORG_ID__'::uuid")" "db"
+  check_min "bootstrapOrg" 1 "$(query_count "SELECT count(*) FROM tenants WHERE id = '__ORG_ID__'::uuid")" "db"
+  check_min "bootstrapMembers" 1 "$(query_count "SELECT count(*) FROM tenant_memberships WHERE tenant_id = '__ORG_ID__'::uuid")" "db"
   printf 'SKIP API checks (--cleared)\n'
 elif [[ "${SEED_VERIFY_SKIP_API:-}" == "1" ]]; then
   printf 'SKIP API checks (SEED_VERIFY_SKIP_API=1)\n'

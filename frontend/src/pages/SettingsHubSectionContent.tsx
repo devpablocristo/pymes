@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AdminSkinSelector } from '../components/AdminSkinSelector';
 import { LanguageSelector } from '../components/LanguageSelector';
 import type { SettingsSection } from './SettingsHubPage.model';
+import { SettingsTeamSection } from './SettingsTeamSection';
 import {
   AlertChannelsTab,
   AutomationHubTab,
@@ -25,13 +26,20 @@ const NotificationPreferencesPage = lazy(() =>
 type SettingsHubSectionContentProps = {
   section: SettingsSection;
   isAccountAdmin: boolean;
+  tenantId?: string;
+  membershipRole?: string;
 };
 
 function SettingsSpinner() {
   return <div className="spinner" />;
 }
 
-export function SettingsHubSectionContent({ section, isAccountAdmin }: SettingsHubSectionContentProps) {
+export function SettingsHubSectionContent({
+  section,
+  isAccountAdmin,
+  tenantId,
+  membershipRole,
+}: SettingsHubSectionContentProps) {
   return (
     <>
       {section === 'profile' && (
@@ -40,6 +48,7 @@ export function SettingsHubSectionContent({ section, isAccountAdmin }: SettingsH
         </Suspense>
       )}
       {section === 'branches' && <BranchesTab />}
+      {section === 'team' && tenantId ? <SettingsTeamSection tenantId={tenantId} membershipRole={membershipRole} /> : null}
       {section === 'notifications' && (
         <>
           <div className="card stg__card-mb">

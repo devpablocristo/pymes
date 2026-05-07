@@ -8,7 +8,7 @@ import (
 
 type TableSession struct {
 	ID         uuid.UUID
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	TableID    uuid.UUID
 	GuestCount int
 	PartyLabel string

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 
 import { CrudEntityMediaCarousel } from './CrudEntityMediaCarousel';
 import { isDisplayableCrudImageSrc } from './crudLinkedEntityImageUrls';
@@ -55,6 +55,12 @@ const cardStyle: CSSProperties = {
   fontSize: 'var(--crud-ui-font-size)',
   color: 'inherit',
 };
+
+function handleCardKeyDown(event: KeyboardEvent<HTMLDivElement>, onActivate: () => void) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  onActivate();
+}
 
 const imageWrapStyle: CSSProperties = {
   width: '100%',
@@ -139,13 +145,14 @@ export function CrudGallerySurface<T extends { id: string }>({
           fromList.length > 0 ? fromList : singleImage && isDisplayableCrudImageSrc(singleImage) ? [singleImage] : [];
         const imageAlt = card.imageAlt?.(item) ?? title;
         return (
-          <button
-            type="button"
+          <div
             key={item.id}
             style={cardStyle}
             onClick={() => onSelect(item)}
             role="listitem"
+            tabIndex={0}
             aria-label={title}
+            onKeyDown={(event) => handleCardKeyDown(event, () => onSelect(item))}
           >
             <span style={imageWrapStyle}>
               {displayUrls.length > 0 ? (
@@ -167,7 +174,7 @@ export function CrudGallerySurface<T extends { id: string }>({
               {subtitle ? <span style={subtitleStyle}>{compactText(subtitle, 24)}</span> : null}
               {meta ? <span style={metaStyle}>{compactText(meta, 18)}</span> : null}
             </span>
-          </button>
+          </div>
         );
       })}
     </div>

@@ -19,5 +19,5 @@ ALTER TABLE workshops.work_orders
     ALTER COLUMN target_label SET DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS workshops_work_orders_org_target_idx
-    ON workshops.work_orders (org_id, target_type)
+    ON workshops.work_orders (tenant_id, target_type)
     WHERE archived_at IS NULL;

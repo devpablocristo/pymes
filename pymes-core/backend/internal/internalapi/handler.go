@@ -36,27 +36,27 @@ import (
 )
 
 type adminPort interface {
-	GetBootstrap(ctx context.Context, orgID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
-	GetTenantSettings(ctx context.Context, orgID string) (admindomain.TenantSettings, error)
+	GetBootstrap(ctx context.Context, tenantID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
+	GetTenantSettings(ctx context.Context, tenantID string) (admindomain.TenantSettings, error)
 }
 
 type partyPort interface {
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (partydomain.Party, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (partydomain.Party, error)
 }
 
 type customerPort interface {
 	List(ctx context.Context, p customers.ListParams) ([]customerdomain.Customer, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in customerdomain.Customer, actor string) (customerdomain.Customer, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (customerdomain.Customer, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (customerdomain.Customer, error)
 }
 
 type productPort interface {
 	List(ctx context.Context, p products.ListParams) ([]productdomain.Product, int64, bool, *uuid.UUID, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (productdomain.Product, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (productdomain.Product, error)
 }
 
 type servicePort interface {
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (servicedomain.Service, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (servicedomain.Service, error)
 }
 
 type quotePort interface {
@@ -68,7 +68,7 @@ type salePort interface {
 }
 
 type paymentGatewayPort interface {
-	GetOrCreatePreference(ctx context.Context, orgID uuid.UUID, req paymentgateway.CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
+	GetOrCreatePreference(ctx context.Context, tenantID uuid.UUID, req paymentgateway.CreatePreferenceRequest) (gatewaydomain.PaymentPreference, error)
 }
 
 type apiKeyResolverPort interface {
@@ -96,8 +96,8 @@ type Handler struct {
 	apiKeys           apiKeyResolverPort
 	notificationInbox notificationInboxPort
 	customerMessaging customerMessagingSendPort
-	// resolveOrgRef traduce Clerk org_... / slug / UUID (opcional; nil = ruta no registrada).
-	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error)
+	// resolveTenantRef traduce Clerk org_... / slug / UUID a tenant_id local (opcional; nil = ruta no registrada).
+	resolveTenantRef func(context.Context, string) (uuid.UUID, bool, error)
 }
 
 func NewHandler(
@@ -112,7 +112,7 @@ func NewHandler(
 	apiKeys apiKeyResolverPort,
 	notificationInbox notificationInboxPort,
 	customerMessaging customerMessagingSendPort,
-	resolveOrgRef func(context.Context, string) (uuid.UUID, bool, error),
+	resolveTenantRef func(context.Context, string) (uuid.UUID, bool, error),
 ) *Handler {
 	return &Handler{
 		admin:             admin,
@@ -126,15 +126,15 @@ func NewHandler(
 		apiKeys:           apiKeys,
 		notificationInbox: notificationInbox,
 		customerMessaging: customerMessaging,
-		resolveOrgRef:     resolveOrgRef,
+		resolveTenantRef:  resolveTenantRef,
 	}
 }
 
 func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
-	internal.GET("/orgs/:org_id/bootstrap", h.GetBootstrap)
-	internal.GET("/orgs/:org_id/settings", h.GetSettings)
-	if h.resolveOrgRef != nil {
-		internal.GET("/orgs/resolve-ref", h.ResolveOrgRef)
+	internal.GET("/tenants/:tenant_id/bootstrap", h.GetBootstrap)
+	internal.GET("/tenants/:tenant_id/settings", h.GetSettings)
+	if h.resolveTenantRef != nil {
+		internal.GET("/tenants/resolve-ref", h.ResolveTenantRef)
 	}
 	internal.POST("/api-keys/resolve", h.ResolveAPIKey)
 	internal.GET("/parties/:party_id", h.GetParty)
@@ -152,16 +152,16 @@ func (h *Handler) RegisterRoutes(internal *gin.RouterGroup) {
 }
 
 func (h *Handler) RegisterGovernanceCallbackRoutes(internal *gin.RouterGroup) {
-	internal.POST("/governance-callback", h.ReviewCallback)
+	internal.POST("/governance-callback", h.GovernanceCallback)
 }
 
 func (h *Handler) GetBootstrap(c *gin.Context) {
-	orgID := strings.TrimSpace(c.Param("org_id"))
-	if orgID == "" {
-		handlers.WriteValidation(c, "org_id required")
+	tenantID := strings.TrimSpace(c.Param("tenant_id"))
+	if tenantID == "" {
+		handlers.WriteValidation(c, "tenant_id required")
 		return
 	}
-	result, err := h.admin.GetBootstrap(c.Request.Context(), orgID, "service", nil, "internal-service", "service_token")
+	result, err := h.admin.GetBootstrap(c.Request.Context(), tenantID, "service", nil, "internal-service", "service_token")
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -170,12 +170,12 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 }
 
 func (h *Handler) GetSettings(c *gin.Context) {
-	orgID := strings.TrimSpace(c.Param("org_id"))
-	if orgID == "" {
-		handlers.WriteValidation(c, "org_id required")
+	tenantID := strings.TrimSpace(c.Param("tenant_id"))
+	if tenantID == "" {
+		handlers.WriteValidation(c, "tenant_id required")
 		return
 	}
-	result, err := h.admin.GetTenantSettings(c.Request.Context(), orgID)
+	result, err := h.admin.GetTenantSettings(c.Request.Context(), tenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -183,9 +183,9 @@ func (h *Handler) GetSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func (h *Handler) ResolveOrgRef(c *gin.Context) {
-	if h.resolveOrgRef == nil {
-		httperrors.Write(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "org resolve unavailable")
+func (h *Handler) ResolveTenantRef(c *gin.Context) {
+	if h.resolveTenantRef == nil {
+		httperrors.Write(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "tenant resolve unavailable")
 		return
 	}
 	ref := strings.TrimSpace(c.Query("ref"))
@@ -193,16 +193,16 @@ func (h *Handler) ResolveOrgRef(c *gin.Context) {
 		handlers.WriteValidation(c, "ref query param required")
 		return
 	}
-	id, ok, err := h.resolveOrgRef(c.Request.Context(), ref)
+	id, ok, err := h.resolveTenantRef(c.Request.Context(), ref)
 	if err != nil {
-		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve organization")
+		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve tenant")
 		return
 	}
 	if !ok {
-		httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "organization not found")
+		httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"org_id": id.String()})
+	c.JSON(http.StatusOK, gin.H{"tenant_id": id.String()})
 }
 
 func (h *Handler) ResolveAPIKey(c *gin.Context) {
@@ -221,9 +221,9 @@ func (h *Handler) ResolveAPIKey(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":     key.ID.String(),
-		"org_id": key.OrgID.String(),
-		"scopes": key.Scopes,
+		"id":        key.ID.String(),
+		"tenant_id": key.TenantID.String(),
+		"scopes":    key.Scopes,
 	})
 }
 
@@ -237,7 +237,7 @@ func (h *Handler) CreateInAppNotification(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	created, err := h.notificationInbox.CreateForActor(c.Request.Context(), req.OrgID, req.Actor, inappnotifications.CreateInput{
+	created, err := h.notificationInbox.CreateForActor(c.Request.Context(), req.TenantID, req.Actor, inappnotifications.CreateInput{
 		ID:          req.ID,
 		Title:       req.Title,
 		Body:        req.Body,
@@ -266,7 +266,7 @@ func (h *Handler) CreateInAppNotification(c *gin.Context) {
 	})
 }
 
-func (h *Handler) ReviewCallback(c *gin.Context) {
+func (h *Handler) GovernanceCallback(c *gin.Context) {
 	if h.notificationInbox == nil {
 		httperrors.Write(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "notification inbox unavailable")
 		return
@@ -294,12 +294,12 @@ func (h *Handler) GetParty(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid party_id")
 		return
 	}
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
 	}
-	result, err := h.parties.GetByID(c.Request.Context(), orgID, partyID)
+	result, err := h.parties.GetByID(c.Request.Context(), tenantID, partyID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -313,15 +313,15 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	orgID, err := uuid.Parse(req.OrgID)
+	tenantID, err := uuid.Parse(req.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org_id")
+		handlers.WriteValidation(c, "invalid tenant_id")
 		return
 	}
 	results, _, _, _, err := h.customers.List(c.Request.Context(), customers.ListParams{
-		OrgID:  orgID,
-		Search: strings.TrimSpace(req.Name),
-		Limit:  1,
+		TenantID: tenantID,
+		Search:   strings.TrimSpace(req.Name),
+		Limit:    1,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -332,10 +332,10 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 		return
 	}
 	created, err := h.customers.Create(c.Request.Context(), customerdomain.Customer{
-		OrgID: orgID,
-		Name:  strings.TrimSpace(req.Name),
-		Phone: strings.TrimSpace(req.Phone),
-		Email: strings.TrimSpace(req.Email),
+		TenantID: tenantID,
+		Name:     strings.TrimSpace(req.Name),
+		Phone:    strings.TrimSpace(req.Phone),
+		Email:    strings.TrimSpace(req.Email),
 	}, "internal-service")
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -345,7 +345,7 @@ func (h *Handler) ResolveCustomer(c *gin.Context) {
 }
 
 func (h *Handler) GetCustomer(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -355,19 +355,19 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	item, err := h.customers.GetByID(c.Request.Context(), orgID, customerID)
+	item, err := h.customers.GetByID(c.Request.Context(), tenantID, customerID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":     item.ID.String(),
-		"org_id": item.OrgID.String(),
-		"type":   item.Type,
-		"name":   item.Name,
-		"tax_id": item.TaxID,
-		"email":  item.Email,
-		"phone":  item.Phone,
+		"id":        item.ID.String(),
+		"tenant_id": item.TenantID.String(),
+		"type":      item.Type,
+		"name":      item.Name,
+		"tax_id":    item.TaxID,
+		"email":     item.Email,
+		"phone":     item.Phone,
 		"address": gin.H{
 			"street":   item.Address.Street,
 			"city":     item.Address.City,
@@ -384,7 +384,7 @@ func (h *Handler) GetCustomer(c *gin.Context) {
 }
 
 func (h *Handler) ListProducts(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -392,9 +392,9 @@ func (h *Handler) ListProducts(c *gin.Context) {
 	query := c.Query("q")
 	limit := handlers.ParseLimitQuery(c, "limit", "50", pagination.Config{DefaultLimit: 50, MaxLimit: 100})
 	items, total, hasMore, next, err := h.products.List(c.Request.Context(), products.ListParams{
-		OrgID:  orgID,
-		Search: query,
-		Limit:  limit,
+		TenantID: tenantID,
+		Search:   query,
+		Limit:    limit,
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -408,7 +408,7 @@ func (h *Handler) ListProducts(c *gin.Context) {
 }
 
 func (h *Handler) GetProduct(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -418,14 +418,14 @@ func (h *Handler) GetProduct(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	item, err := h.products.GetByID(c.Request.Context(), orgID, productID)
+	item, err := h.products.GetByID(c.Request.Context(), tenantID, productID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":          item.ID.String(),
-		"org_id":      item.OrgID.String(),
+		"tenant_id":   item.TenantID.String(),
 		"sku":         item.SKU,
 		"name":        item.Name,
 		"description": item.Description,
@@ -444,7 +444,7 @@ func (h *Handler) GetProduct(c *gin.Context) {
 }
 
 func (h *Handler) GetService(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -454,14 +454,14 @@ func (h *Handler) GetService(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	item, err := h.services.GetByID(c.Request.Context(), orgID, serviceID)
+	item, err := h.services.GetByID(c.Request.Context(), tenantID, serviceID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":                       item.ID.String(),
-		"org_id":                   item.OrgID.String(),
+		"tenant_id":                item.TenantID.String(),
 		"code":                     item.Code,
 		"name":                     item.Name,
 		"description":              item.Description,
@@ -485,9 +485,9 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	orgID, err := uuid.Parse(req.OrgID)
+	tenantID, err := uuid.Parse(req.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org_id")
+		handlers.WriteValidation(c, "invalid tenant_id")
 		return
 	}
 	var customerID *uuid.UUID
@@ -528,7 +528,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 		validUntil = &t
 	}
 	out, err := h.quotes.Create(c.Request.Context(), quotes.CreateQuoteInput{
-		OrgID:        orgID,
+		TenantID:     tenantID,
 		CustomerID:   customerID,
 		CustomerName: strings.TrimSpace(req.CustomerName),
 		Items:        items,
@@ -549,9 +549,9 @@ func (h *Handler) CreateSale(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	orgID, err := uuid.Parse(req.OrgID)
+	tenantID, err := uuid.Parse(req.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org_id")
+		handlers.WriteValidation(c, "invalid tenant_id")
 		return
 	}
 	var customerID *uuid.UUID
@@ -592,7 +592,7 @@ func (h *Handler) CreateSale(c *gin.Context) {
 		})
 	}
 	out, err := h.sales.Create(c.Request.Context(), sales.CreateSaleInput{
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		CustomerID:    customerID,
 		CustomerName:  strings.TrimSpace(req.CustomerName),
 		QuoteID:       quoteID,
@@ -609,7 +609,7 @@ func (h *Handler) CreateSale(c *gin.Context) {
 }
 
 func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -619,7 +619,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	pref, err := h.gateway.GetOrCreatePreference(c.Request.Context(), orgID, paymentgateway.CreatePreferenceRequest{
+	pref, err := h.gateway.GetOrCreatePreference(c.Request.Context(), tenantID, paymentgateway.CreatePreferenceRequest{
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 	})
@@ -647,7 +647,7 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		httperrors.Write(c, http.StatusServiceUnavailable, "UPSTREAM_UNAVAILABLE", "customer messaging send unavailable")
 		return
 	}
-	orgID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
+	tenantID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Org-ID")))
 	if err != nil {
 		handlers.WriteValidation(c, "X-Org-ID header required")
 		return
@@ -663,10 +663,10 @@ func (h *Handler) InternalSendWhatsAppText(c *gin.Context) {
 		return
 	}
 	_, err = h.customerMessaging.SendText(c.Request.Context(), domain.SendTextRequest{
-		OrgID:   orgID,
-		PartyID: partyID,
-		Body:    strings.TrimSpace(req.Body),
-		Actor:   "internal-service:workshops",
+		TenantID: tenantID,
+		PartyID:  partyID,
+		Body:     strings.TrimSpace(req.Body),
+		Actor:    "internal-service:workshops",
 	})
 	if err != nil {
 		httperrors.Respond(c, err)

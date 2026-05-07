@@ -16,7 +16,7 @@ const (
 
 // Connection representa la conexión WhatsApp Business de un tenant.
 type Connection struct {
-	OrgID              uuid.UUID
+	TenantID           uuid.UUID
 	PhoneNumberID      string
 	WABAID             string
 	AccessToken        string
@@ -33,7 +33,7 @@ type Connection struct {
 // Message representa un mensaje enviado o recibido por WhatsApp.
 type Message struct {
 	ID               uuid.UUID
-	OrgID            uuid.UUID
+	TenantID         uuid.UUID
 	PhoneNumberID    string
 	Direction        MessageDirection
 	WAMessageID      string
@@ -90,7 +90,7 @@ const (
 // Template representa un template de mensaje aprobado por Meta.
 type Template struct {
 	ID              uuid.UUID
-	OrgID           uuid.UUID
+	TenantID        uuid.UUID
 	MetaTemplateID  string
 	Name            string
 	Language        string
@@ -137,7 +137,7 @@ type TemplateButton struct {
 // OptIn representa el consentimiento de un contacto para recibir mensajes.
 type OptIn struct {
 	ID         uuid.UUID
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	PartyID    uuid.UUID
 	Phone      string
 	Status     OptInStatus
@@ -165,15 +165,15 @@ const (
 
 // SendTextRequest es el input para enviar un mensaje de texto directo.
 type SendTextRequest struct {
-	OrgID   uuid.UUID
-	PartyID uuid.UUID
-	Body    string
-	Actor   string
+	TenantID uuid.UUID
+	PartyID  uuid.UUID
+	Body     string
+	Actor    string
 }
 
 // SendTemplateRequest es el input para enviar un template message.
 type SendTemplateRequest struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	PartyID      uuid.UUID
 	TemplateName string
 	Language     string
@@ -183,7 +183,7 @@ type SendTemplateRequest struct {
 
 // SendMediaRequest es el input para enviar un mensaje con media.
 type SendMediaRequest struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	PartyID   uuid.UUID
 	MediaType MessageType
 	MediaURL  string
@@ -199,11 +199,11 @@ type InteractiveButton struct {
 
 // SendInteractiveRequest es el input para enviar mensaje con botones.
 type SendInteractiveRequest struct {
-	OrgID   uuid.UUID
-	PartyID uuid.UUID
-	Body    string
-	Buttons []InteractiveButton
-	Actor   string
+	TenantID uuid.UUID
+	PartyID  uuid.UUID
+	Body     string
+	Buttons  []InteractiveButton
+	Actor    string
 }
 
 // StatusUpdate representa una actualización de estado desde Meta webhook.
@@ -217,7 +217,7 @@ type StatusUpdate struct {
 
 // MessageFilter para listar mensajes con filtros.
 type MessageFilter struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	PartyID   *uuid.UUID
 	Direction *MessageDirection
 	Status    *MessageStatus
@@ -244,7 +244,7 @@ const (
 
 type Conversation struct {
 	ID                 uuid.UUID          `json:"id"`
-	OrgID              uuid.UUID          `json:"org_id"`
+	TenantID           uuid.UUID          `json:"tenant_id"`
 	PartyID            uuid.UUID          `json:"party_id"`
 	Phone              string             `json:"phone"`
 	PartyName          string             `json:"party_name"`
@@ -269,7 +269,7 @@ const (
 
 type Campaign struct {
 	ID               uuid.UUID      `json:"id"`
-	OrgID            uuid.UUID      `json:"org_id"`
+	TenantID         uuid.UUID      `json:"tenant_id"`
 	Name             string         `json:"name"`
 	TemplateName     string         `json:"template_name"`
 	TemplateLanguage string         `json:"template_language"`
@@ -302,7 +302,7 @@ const (
 type CampaignRecipient struct {
 	ID           uuid.UUID       `json:"id"`
 	CampaignID   uuid.UUID       `json:"campaign_id"`
-	OrgID        uuid.UUID       `json:"org_id"`
+	TenantID     uuid.UUID       `json:"tenant_id"`
 	PartyID      uuid.UUID       `json:"party_id"`
 	Phone        string          `json:"phone"`
 	PartyName    string          `json:"party_name"`

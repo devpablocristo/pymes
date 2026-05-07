@@ -59,21 +59,21 @@ class AIRepository:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def get_or_create_dossier(self, org_id: str) -> dict[str, Any]:
-        row = await self.db.get(AIDossier, org_id)
+    async def get_or_create_dossier(self, tenant_id: str) -> dict[str, Any]:
+        row = await self.db.get(AIDossier, tenant_id)
         if row:
             return row.dossier
         now = datetime.now(UTC)
-        row = AIDossier(org_id=org_id, dossier=copy.deepcopy(DEFAULT_DOSSIER), version=1, created_at=now, updated_at=now)
+        row = AIDossier(tenant_id=tenant_id, dossier=copy.deepcopy(DEFAULT_DOSSIER), version=1, created_at=now, updated_at=now)
         self.db.add(row)
         await self.db.commit()
         return row.dossier
 
-    async def update_dossier(self, org_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        row = await self.db.get(AIDossier, org_id)
+    async def update_dossier(self, tenant_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        row = await self.db.get(AIDossier, tenant_id)
         now = datetime.now(UTC)
         if row is None:
-            row = AIDossier(org_id=org_id, dossier=copy.deepcopy(DEFAULT_DOSSIER), version=1, created_at=now, updated_at=now)
+            row = AIDossier(tenant_id=tenant_id, dossier=copy.deepcopy(DEFAULT_DOSSIER), version=1, created_at=now, updated_at=now)
             self.db.add(row)
         row.dossier = _deep_merge(row.dossier, patch)
         row.version = int(row.version) + 1
@@ -83,17 +83,17 @@ class AIRepository:
 
     async def create_conversation(
         self,
-        org_id: str,
+        tenant_id: str,
         mode: str,
         user_id: str | None = None,
         external_contact: str = "",
         title: str = "",
     ) -> AIConversation:
         now = datetime.now(UTC)
-        agent_party_id = await self.get_agent_party_id(org_id)
+        agent_party_id = await self.get_agent_party_id(tenant_id)
         row = AIConversation(
             id=str(uuid4()),
-            org_id=org_id,
+            tenant_id=tenant_id,
             user_id=user_id,
             agent_party_id=agent_party_id,
             mode=mode,
@@ -111,37 +111,37 @@ class AIRepository:
         await self.db.refresh(row)
         return row
 
-    async def get_agent_party_id(self, org_id: str) -> str | None:
+    async def get_agent_party_id(self, tenant_id: str) -> str | None:
         query = text(
             """
             SELECT p.id
             FROM parties p
             JOIN party_agents pa ON pa.party_id = p.id
-            WHERE p.org_id = :org_id
+            WHERE p.tenant_id = :tenant_id
               AND p.party_type = 'automated_agent'
               AND pa.agent_kind = 'ai'
             ORDER BY p.created_at ASC
             LIMIT 1
             """
         )
-        row = await self.db.execute(query, {"org_id": org_id})
+        row = await self.db.execute(query, {"tenant_id": tenant_id})
         party_id = row.scalar_one_or_none()
         if party_id is None:
             return None
         return str(party_id)
 
-    async def get_conversation(self, org_id: str, conversation_id: str) -> AIConversation | None:
+    async def get_conversation(self, tenant_id: str, conversation_id: str) -> AIConversation | None:
         query = select(AIConversation).where(
-            and_(AIConversation.org_id == org_id, AIConversation.id == conversation_id)
+            and_(AIConversation.tenant_id == tenant_id, AIConversation.id == conversation_id)
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_latest_external_conversation(self, org_id: str, external_contact: str) -> AIConversation | None:
+    async def get_latest_external_conversation(self, tenant_id: str, external_contact: str) -> AIConversation | None:
         query = (
             select(AIConversation)
             .where(
-                AIConversation.org_id == org_id,
+                AIConversation.tenant_id == tenant_id,
                 AIConversation.mode == "external",
                 AIConversation.external_contact == external_contact,
             )
@@ -151,8 +151,8 @@ class AIRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def list_conversations(self, org_id: str, mode: str, user_id: str | None, limit: int = 50) -> list[AIConversation]:
-        query = select(AIConversation).where(AIConversation.org_id == org_id, AIConversation.mode == mode)
+    async def list_conversations(self, tenant_id: str, mode: str, user_id: str | None, limit: int = 50) -> list[AIConversation]:
+        query = select(AIConversation).where(AIConversation.tenant_id == tenant_id, AIConversation.mode == mode)
         if mode == "internal":
             if user_id is None:
                 query = query.where(AIConversation.user_id.is_(None))
@@ -164,14 +164,14 @@ class AIRepository:
 
     async def append_messages(
         self,
-        org_id: str,
+        tenant_id: str,
         conversation_id: str,
         new_messages: list[dict[str, Any]],
         tool_calls_count: int,
         tokens_input: int,
         tokens_output: int,
     ) -> AIConversation | None:
-        row = await self.get_conversation(org_id, conversation_id)
+        row = await self.get_conversation(tenant_id, conversation_id)
         if row is None:
             return None
         row.messages = [*row.messages, *new_messages]
@@ -186,22 +186,22 @@ class AIRepository:
         await self.db.refresh(row)
         return row
 
-    async def delete_conversation(self, org_id: str, conversation_id: str) -> bool:
+    async def delete_conversation(self, tenant_id: str, conversation_id: str) -> bool:
         result = await self.db.execute(
-            delete(AIConversation).where(AIConversation.org_id == org_id, AIConversation.id == conversation_id)
+            delete(AIConversation).where(AIConversation.tenant_id == tenant_id, AIConversation.id == conversation_id)
         )
         await self.db.commit()
         return bool(result.rowcount)
 
-    async def track_usage(self, org_id: str, tokens_in: int, tokens_out: int) -> None:
+    async def track_usage(self, tenant_id: str, tokens_in: int, tokens_out: int) -> None:
         today = date.today()
         existing = await self.db.execute(
-            select(AIUsageDaily).where(AIUsageDaily.org_id == org_id, AIUsageDaily.usage_date == today)
+            select(AIUsageDaily).where(AIUsageDaily.tenant_id == tenant_id, AIUsageDaily.usage_date == today)
         )
         row = existing.scalar_one_or_none()
         if row is None:
             row = AIUsageDaily(
-                org_id=org_id,
+                tenant_id=tenant_id,
                 usage_date=today,
                 queries=1,
                 tokens_input=tokens_in,
@@ -214,14 +214,14 @@ class AIRepository:
             row.tokens_output += tokens_out
         await self.db.commit()
 
-    async def get_month_usage(self, org_id: str, year: int, month: int) -> dict[str, int]:
+    async def get_month_usage(self, tenant_id: str, year: int, month: int) -> dict[str, int]:
         start = date(year, month, 1)
         if month == 12:
             end = date(year + 1, 1, 1)
         else:
             end = date(year, month + 1, 1)
         query = select(AIUsageDaily).where(
-            AIUsageDaily.org_id == org_id,
+            AIUsageDaily.tenant_id == tenant_id,
             AIUsageDaily.usage_date >= start,
             AIUsageDaily.usage_date < end,
         )
@@ -232,7 +232,7 @@ class AIRepository:
             "tokens_output": sum(r.tokens_output for r in rows),
         }
 
-    async def count_external_conversations_in_month(self, org_id: str, year: int, month: int) -> int:
+    async def count_external_conversations_in_month(self, tenant_id: str, year: int, month: int) -> int:
         start = datetime(year, month, 1, tzinfo=UTC)
         if month == 12:
             end = datetime(year + 1, 1, 1, tzinfo=UTC)
@@ -242,19 +242,19 @@ class AIRepository:
             """
             SELECT COUNT(*)
             FROM ai_conversations
-            WHERE org_id = :org_id
+            WHERE tenant_id = :tenant_id
               AND mode = 'external'
               AND created_at >= :start
               AND created_at < :end
             """
         )
-        row = await self.db.execute(query, {"org_id": org_id, "start": start, "end": end})
+        row = await self.db.execute(query, {"tenant_id": tenant_id, "start": start, "end": end})
         return int(row.scalar_one() or 0)
 
-    async def get_plan_code(self, org_id: str) -> str:
+    async def get_plan_code(self, tenant_id: str) -> str:
         row = await self.db.execute(
-            text("SELECT plan_code FROM tenant_settings WHERE org_id = :org_id LIMIT 1"),
-            {"org_id": org_id},
+            text("SELECT plan_code FROM tenant_settings WHERE tenant_id = :tenant_id LIMIT 1"),
+            {"tenant_id": tenant_id},
         )
         plan = row.scalar_one_or_none()
         if not plan:
@@ -296,12 +296,12 @@ class AIRepository:
             row.updated_at = datetime.now(UTC)
             await self.db.commit()
 
-    async def has_agent_request(self, org_id: str, request_id: str) -> bool:
+    async def has_agent_request(self, tenant_id: str, request_id: str) -> bool:
         normalized = str(request_id).strip()
         if not normalized:
             return False
         query = select(AIAgentEvent.id).where(
-            AIAgentEvent.org_id == org_id,
+            AIAgentEvent.tenant_id == tenant_id,
             AIAgentEvent.external_request_id == normalized,
         ).limit(1)
         row = await self.db.execute(query)
@@ -310,7 +310,7 @@ class AIRepository:
     async def record_agent_event(
         self,
         *,
-        org_id: str,
+        tenant_id: str,
         conversation_id: str | None,
         agent_mode: str,
         channel: str,
@@ -333,7 +333,7 @@ class AIRepository:
         now = datetime.now(UTC)
         row = AIAgentEvent(
             id=str(uuid4()),
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             external_request_id=(external_request_id or "").strip() or None,
             request_id=(external_request_id or "").strip() or None,

@@ -9,19 +9,19 @@ import (
 
 func (u *Usecases) resolveReference(
 	ctx context.Context,
-	orgID uuid.UUID,
+	tenantID uuid.UUID,
 	refType string,
 	refID uuid.UUID,
 ) (amount float64, currency string, description string, err error) {
 	switch refType {
 	case "sale":
-		sale, e := u.repo.GetSaleSnapshot(ctx, orgID, refID)
+		sale, e := u.repo.GetSaleSnapshot(ctx, tenantID, refID)
 		if e != nil {
 			return 0, "", "", e
 		}
 		return sale.Total, coalesce(sale.Currency, "ARS"), fmt.Sprintf("Venta %s - %s", sale.Number, coalesce(sale.CustomerName, "Cliente")), nil
 	case "quote":
-		quote, e := u.repo.GetQuoteSnapshot(ctx, orgID, refID)
+		quote, e := u.repo.GetQuoteSnapshot(ctx, tenantID, refID)
 		if e != nil {
 			return 0, "", "", e
 		}

@@ -24,13 +24,13 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	keyID := uuid.MustParse("00000000-0000-0000-0000-000000000010")
-	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000020")
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000020")
 	middleware := NewAuthMiddleware(nil, stubAPIKeyResolver{
 		ok: true,
 		key: ResolvedKey{
-			ID:     keyID,
-			OrgID:  orgID,
-			Scopes: []string{"customers:read", "customers:write"},
+			ID:       keyID,
+			TenantID: tenantID,
+			Scopes:   []string{"customers:read", "customers:write"},
 		},
 	}, false, true)
 
@@ -64,8 +64,8 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	if got.Role != "service" {
 		t.Fatalf("expected service role, got %q", got.Role)
 	}
-	if got.OrgID != orgID.String() {
-		t.Fatalf("expected org %q, got %q", orgID.String(), got.OrgID)
+	if got.TenantID != tenantID.String() {
+		t.Fatalf("expected org %q, got %q", tenantID.String(), got.TenantID)
 	}
 	if got.AuthMethod != "api_key" {
 		t.Fatalf("expected auth method api_key, got %q", got.AuthMethod)

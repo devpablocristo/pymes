@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/devpablocristo/core/governance/go/governanceclient"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/governanceproxy/handler/dto"
 )
 
@@ -17,19 +18,19 @@ type stubGovernanceClient struct {
 	listPendingApprovals func(ctx context.Context) (int, []byte, error)
 }
 
-func (s stubGovernanceClient) ListPolicies(context.Context) (int, []byte, error) {
+func (s stubGovernanceClient) ListPolicies(context.Context, ...governanceclient.RequestOption) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) CreatePolicy(context.Context, any) (int, []byte, error) {
+func (s stubGovernanceClient) CreatePolicy(context.Context, any, ...governanceclient.RequestOption) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) UpdatePolicy(context.Context, string, any) (int, []byte, error) {
+func (s stubGovernanceClient) UpdatePolicy(context.Context, string, any, ...governanceclient.RequestOption) (int, []byte, error) {
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func (s stubGovernanceClient) DeletePolicy(context.Context, string) (int, error) {
+func (s stubGovernanceClient) DeletePolicy(context.Context, string, ...governanceclient.RequestOption) (int, error) {
 	return http.StatusNotImplemented, errors.New("not implemented")
 }
 
@@ -49,7 +50,7 @@ func (s stubGovernanceClient) Reject(context.Context, string, any) (int, []byte,
 	return http.StatusNotImplemented, nil, errors.New("not implemented")
 }
 
-func TestListPendingApprovalsReturnsEmptyListWhenReviewUnavailable(t *testing.T) {
+func TestListPendingApprovalsReturnsEmptyListWhenGovernanceUnavailable(t *testing.T) {
 	t.Parallel()
 
 	gin.SetMode(gin.TestMode)
@@ -59,9 +60,9 @@ func TestListPendingApprovalsReturnsEmptyListWhenReviewUnavailable(t *testing.T)
 			return 0, nil, errors.New("dial tcp: connection refused")
 		},
 	})
-	router.GET("/v1/review/approvals/pending", handler.listPendingApprovals)
+	router.GET("/v1/governance/approvals/pending", handler.listPendingApprovals)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/review/approvals/pending", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/governance/approvals/pending", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -77,7 +78,7 @@ func TestListPendingApprovalsReturnsEmptyListWhenReviewUnavailable(t *testing.T)
 	}
 }
 
-func TestListPendingApprovalsPassesThroughReviewResponse(t *testing.T) {
+func TestListPendingApprovalsPassesThroughGovernanceResponse(t *testing.T) {
 	t.Parallel()
 
 	gin.SetMode(gin.TestMode)
@@ -88,9 +89,9 @@ func TestListPendingApprovalsPassesThroughReviewResponse(t *testing.T) {
 			return http.StatusOK, payload, nil
 		},
 	})
-	router.GET("/v1/review/approvals/pending", handler.listPendingApprovals)
+	router.GET("/v1/governance/approvals/pending", handler.listPendingApprovals)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/review/approvals/pending", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/governance/approvals/pending", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

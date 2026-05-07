@@ -5,12 +5,12 @@ DO $$
 DECLARE
     v_org uuid := '__SEED_ORG_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_org) THEN
+    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_org) THEN
         RETURN;
     END IF;
 
     INSERT INTO parties (
-        id, org_id, party_type, display_name, email, phone, address,
+        id, tenant_id, party_type, display_name, email, phone, address,
         tax_id, notes, tags, metadata, created_at, updated_at, deleted_at, is_favorite
     )
     SELECT
@@ -62,7 +62,7 @@ BEGIN
         SET first_name = EXCLUDED.first_name,
             last_name = EXCLUDED.last_name;
 
-    INSERT INTO party_roles (id, party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+    INSERT INTO party_roles (id, party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v1/professional/role/' || gs::text),
         uuid_generate_v5(v_org, 'pymes-seed/v1/professional/party/' || gs::text),
@@ -73,12 +73,12 @@ BEGIN
         jsonb_build_object('source', 'seed'),
         now()
     FROM generate_series(1, 10) AS gs
-    ON CONFLICT (party_id, org_id, role) DO UPDATE
+    ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
 
     INSERT INTO professionals.professional_profiles (
-        id, org_id, party_id, public_slug, bio, headline,
+        id, tenant_id, party_id, public_slug, bio, headline,
         is_public, is_bookable, accepts_new_clients, is_favorite, tags, metadata, updated_at
     )
     SELECT
@@ -114,7 +114,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO professionals.specialties (
-        id, org_id, code, name, description, is_active, is_favorite, tags, metadata, updated_at
+        id, tenant_id, code, name, description, is_active, is_favorite, tags, metadata, updated_at
     )
     SELECT
         CASE gs
@@ -135,7 +135,7 @@ BEGIN
         jsonb_build_object('source', 'seed'),
         now()
     FROM generate_series(1, 10) AS gs
-    ON CONFLICT (org_id, code) DO UPDATE
+    ON CONFLICT (tenant_id, code) DO UPDATE
         SET name = EXCLUDED.name,
             description = EXCLUDED.description,
             is_active = EXCLUDED.is_active,
@@ -144,7 +144,7 @@ BEGIN
             metadata = EXCLUDED.metadata,
             updated_at = now();
 
-    INSERT INTO professionals.professional_specialties (id, org_id, profile_id, specialty_id)
+    INSERT INTO professionals.professional_specialties (id, tenant_id, profile_id, specialty_id)
     SELECT
         uuid_generate_v5(v_org, 'pymes-seed/v1/professional/profile-specialty/' || gs::text),
         v_org,
@@ -156,12 +156,12 @@ BEGIN
         END
     FROM generate_series(1, 10) AS gs
     ON CONFLICT (id) DO UPDATE
-        SET org_id = EXCLUDED.org_id,
+        SET tenant_id = EXCLUDED.tenant_id,
             profile_id = EXCLUDED.profile_id,
             specialty_id = EXCLUDED.specialty_id;
 
     INSERT INTO professionals.intakes (
-        id, org_id, booking_id, profile_id, customer_party_id, service_id,
+        id, tenant_id, booking_id, profile_id, customer_party_id, service_id,
         status, payload, is_favorite, tags, updated_at
     )
     SELECT
@@ -191,7 +191,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO professionals.sessions (
-        id, org_id, booking_id, profile_id, customer_party_id, service_id,
+        id, tenant_id, booking_id, profile_id, customer_party_id, service_id,
         status, started_at, ended_at, summary, metadata, updated_at
     )
     SELECT
@@ -211,7 +211,7 @@ BEGIN
         jsonb_build_object('source', 'seed'),
         now()
     FROM generate_series(1, 10) AS gs
-    ON CONFLICT (org_id, booking_id) DO UPDATE
+    ON CONFLICT (tenant_id, booking_id) DO UPDATE
         SET profile_id = EXCLUDED.profile_id,
             customer_party_id = EXCLUDED.customer_party_id,
             service_id = EXCLUDED.service_id,

@@ -16,7 +16,7 @@ type Address struct {
 
 type Supplier struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	TenantID    uuid.UUID
 	Name        string
 	TaxID       string
 	Email       string

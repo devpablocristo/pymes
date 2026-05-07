@@ -2,7 +2,7 @@ package dto
 
 type SessionItem struct {
 	ID              string         `json:"id"`
-	OrgID           string         `json:"org_id"`
+	TenantID        string         `json:"tenant_id"`
 	BookingID       string         `json:"booking_id"`
 	ProfileID       string         `json:"profile_id"`
 	CustomerPartyID *string        `json:"customer_party_id,omitempty"`

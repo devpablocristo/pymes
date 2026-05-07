@@ -14,10 +14,10 @@ import (
 )
 
 type usecasesPort interface {
-	CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
-	CreateQuote(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error)
-	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
-	GetPublicPreviewBootstrap(ctx context.Context, orgID string) (map[string]any, error)
+	CreateBooking(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error)
+	CreateQuote(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error)
+	CreateSalePaymentLink(ctx context.Context, tenantID, saleID string) (map[string]any, error)
+	GetPublicPreviewBootstrap(ctx context.Context, tenantID string) (map[string]any, error)
 }
 
 type Handler struct {
@@ -36,7 +36,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) GetPublicPreviewBootstrap(c *gin.Context) {
-	out, err := h.uc.GetPublicPreviewBootstrap(c.Request.Context(), auth.GetAuthContext(c).OrgID)
+	out, err := h.uc.GetPublicPreviewBootstrap(c.Request.Context(), auth.GetAuthContext(c).TenantID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -49,7 +49,7 @@ func (h *Handler) CreateBooking(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
+	out, err := h.uc.CreateBooking(c.Request.Context(), auth.GetAuthContext(c).TenantID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *Handler) CreateQuote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	out, err := h.uc.CreateQuote(c.Request.Context(), auth.GetAuthContext(c).OrgID, payload)
+	out, err := h.uc.CreateQuote(c.Request.Context(), auth.GetAuthContext(c).TenantID, payload)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -76,7 +76,7 @@ func (h *Handler) CreateSalePaymentLink(c *gin.Context) {
 		verticalgin.WriteValidation(c, "sale_id is required")
 		return
 	}
-	out, err := h.uc.CreateSalePaymentLink(c.Request.Context(), auth.GetAuthContext(c).OrgID, saleID)
+	out, err := h.uc.CreateSalePaymentLink(c.Request.Context(), auth.GetAuthContext(c).TenantID, saleID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

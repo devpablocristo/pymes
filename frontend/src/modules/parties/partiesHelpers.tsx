@@ -66,6 +66,8 @@ export type SupplierRecord = {
   notes?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  metadata_category?: string;
+  metadata_website?: string;
 };
 
 export type AccountRecord = {
@@ -258,11 +260,11 @@ export function createSupplierColumns<T extends SupplierRecord>(): CrudColumn<T>
   return [
     { key: 'name', header: 'Nombre', className: 'cell-name' },
     { key: 'contact_name', header: 'Contacto', render: (_v, row) => row.contact_name || '' },
-    { key: 'metadata', header: 'Categoría', render: (_v, row) => (typeof row.metadata?.category === 'string' ? row.metadata.category : '') },
+    { key: 'metadata_category', header: 'Categoría', render: (_v, row) => (typeof row.metadata?.category === 'string' ? row.metadata.category : '') },
     { key: 'tax_id', header: 'CUIT', render: (_v, row) => row.tax_id || '' },
     { key: 'phone', header: 'Teléfono', render: (_v, row) => row.phone || '' },
     { key: 'address', header: 'Ubicación', render: (_v, row) => formatPartyAddress(row.address) || '' },
-    { key: 'metadata', header: 'Sitio web', render: (_v, row) => (typeof row.metadata?.website === 'string' ? row.metadata.website : '') },
+    { key: 'metadata_website', header: 'Sitio web', render: (_v, row) => (typeof row.metadata?.website === 'string' ? row.metadata.website : '') },
     { key: 'email', header: 'Email', render: (_v, row) => row.email || '' },
   ];
 }

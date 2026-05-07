@@ -18,7 +18,7 @@ import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n, type LanguageCode } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import { NOTIFICATION_CHAT_HANDOFF_KEY, type NotificationChatHandoff } from '../lib/notificationChatHandoff';
-import { approveRequest, rejectRequest } from '../lib/reviewApi';
+import { approveRequest, rejectRequest } from '../lib/governanceApi';
 import {
   buildApprovalShareText,
   buildInAppNotificationShareText,
@@ -83,7 +83,7 @@ function relativeTime(
 function getApprovalNotification(data: unknown): ApprovalNotification | null {
   if (!data || typeof data !== 'object') return null;
   const record = data as Record<string, unknown>;
-  if (record.source !== 'review_approval') return null;
+  if (record.source !== 'governance_approval') return null;
   const approval = record.approval;
   if (!approval || typeof approval !== 'object') return null;
   const raw = approval as Record<string, unknown>;

@@ -28,7 +28,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) CreateToken(ctx context.Context, t domain.Token) (domain.Token, error) {
 	row := models.CalendarExportTokenModel{
 		ID:        t.ID,
-		OrgID:     t.OrgID,
+		TenantID:  t.TenantID,
 		CreatedBy: t.CreatedBy,
 		Name:      t.Name,
 		TokenHash: t.TokenHash,
@@ -43,10 +43,10 @@ func (r *Repository) CreateToken(ctx context.Context, t domain.Token) (domain.To
 
 // ListByCreator devuelve los tokens activos y revocados de un creador en una
 // org. El caller decide si los quiere todos o filtrar revocados afuera.
-func (r *Repository) ListByCreator(ctx context.Context, orgID uuid.UUID, createdBy string) ([]domain.Token, error) {
+func (r *Repository) ListByCreator(ctx context.Context, tenantID uuid.UUID, createdBy string) ([]domain.Token, error) {
 	var rows []models.CalendarExportTokenModel
 	err := r.db.WithContext(ctx).
-		Where("org_id = ? AND created_by = ?", orgID, createdBy).
+		Where("tenant_id = ? AND created_by = ?", tenantID, createdBy).
 		Order("created_at DESC").
 		Find(&rows).Error
 	if err != nil {
@@ -61,11 +61,11 @@ func (r *Repository) ListByCreator(ctx context.Context, orgID uuid.UUID, created
 
 // RevokeToken marca un token como revocado. Devuelve ErrTokenNotFound si el
 // id/creador no matchean (defensa contra "revocar el token de otro usuario").
-func (r *Repository) RevokeToken(ctx context.Context, orgID uuid.UUID, createdBy string, id uuid.UUID) error {
+func (r *Repository) RevokeToken(ctx context.Context, tenantID uuid.UUID, createdBy string, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).
 		Model(&models.CalendarExportTokenModel{}).
-		Where("org_id = ? AND created_by = ? AND id = ? AND revoked_at IS NULL", orgID, createdBy, id).
+		Where("tenant_id = ? AND created_by = ? AND id = ? AND revoked_at IS NULL", tenantID, createdBy, id).
 		Updates(map[string]any{"revoked_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -107,7 +107,7 @@ func (r *Repository) TouchLastUsed(ctx context.Context, id uuid.UUID, at time.Ti
 func toDomainToken(row models.CalendarExportTokenModel) domain.Token {
 	return domain.Token{
 		ID:         row.ID,
-		OrgID:      row.OrgID,
+		TenantID:   row.TenantID,
 		CreatedBy:  row.CreatedBy,
 		Name:       row.Name,
 		TokenHash:  row.TokenHash,

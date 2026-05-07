@@ -22,13 +22,13 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Session, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.Session, actor string) (domain.Session, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error)
-	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Session, error)
-	Complete(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Session, error)
-	CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error)
-	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Session, error)
+	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Session, error)
+	Complete(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.Session, error)
+	CreateNote(ctx context.Context, tenantID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error)
+	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -63,7 +63,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) list(c *gin.Context, forceArchived bool) {
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -99,7 +99,7 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 		to = &t
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		OrgID:     orgID,
+		TenantID:  tenantID,
 		ProfileID: profileID,
 		Status:    c.Query("status"),
 		From:      from,
@@ -124,7 +124,7 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, ok := verticalgin.ParseAuthOrgID(c)
+	tenantID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -144,7 +144,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	session := domain.Session{
-		OrgID:     orgID,
+		TenantID:  tenantID,
 		BookingID: bookingID,
 		ProfileID: profileID,
 		Summary:   strings.TrimSpace(req.Summary),
@@ -184,11 +184,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -198,7 +198,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -242,7 +242,7 @@ func (h *Handler) Update(c *gin.Context) {
 		}
 		input.EndedAt = t
 	}
-	out, err := h.uc.Update(c.Request.Context(), orgID, id, input, a.Actor)
+	out, err := h.uc.Update(c.Request.Context(), tenantID, id, input, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -252,11 +252,11 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Complete(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.Complete(c.Request.Context(), orgID, id, a.Actor)
+	out, err := h.uc.Complete(c.Request.Context(), tenantID, id, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -269,11 +269,11 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -281,11 +281,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -293,11 +293,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	orgID, id, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -306,7 +306,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func (h *Handler) CreateNote(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	orgID, sessionID, ok := verticalgin.ParseAuthOrgAndParamID(c, "id", "id")
+	tenantID, sessionID, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -315,7 +315,7 @@ func (h *Handler) CreateNote(c *gin.Context) {
 		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.CreateNote(c.Request.Context(), orgID, sessionID, req.NoteType, req.Title, req.Body, a.Actor)
+	out, err := h.uc.CreateNote(c.Request.Context(), tenantID, sessionID, req.NoteType, req.Title, req.Body, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -334,7 +334,7 @@ func (h *Handler) CreateNote(c *gin.Context) {
 func toSessionItem(in domain.Session) dto.SessionItem {
 	item := dto.SessionItem{
 		ID:        in.ID.String(),
-		OrgID:     in.OrgID.String(),
+		TenantID:  in.TenantID.String(),
 		BookingID: in.BookingID.String(),
 		ProfileID: in.ProfileID.String(),
 		Status:    in.Status,

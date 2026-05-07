@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS invoices (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id           uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     number           text NOT NULL,
     party_id         uuid REFERENCES parties(id),
     customer_name    text NOT NULL DEFAULT '',
@@ -23,12 +23,12 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at       timestamptz NOT NULL DEFAULT now(),
     updated_at       timestamptz NOT NULL DEFAULT now(),
     deleted_at       timestamptz,
-    UNIQUE (org_id, number)
+    UNIQUE (tenant_id, number)
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoices_org             ON invoices(org_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_invoices_org_status      ON invoices(org_id, status);
-CREATE INDEX IF NOT EXISTS idx_invoices_org_deleted_at  ON invoices(org_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_org             ON invoices(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_org_status      ON invoices(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_invoices_org_deleted_at  ON invoices(tenant_id, deleted_at);
 
 CREATE TABLE IF NOT EXISTS invoice_line_items (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

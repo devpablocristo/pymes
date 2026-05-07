@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS parties (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     party_type text NOT NULL CHECK (party_type IN ('person', 'organization', 'automated_agent')),
     display_name text NOT NULL,
     email text,
@@ -15,11 +15,11 @@ CREATE TABLE IF NOT EXISTS parties (
     deleted_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_parties_org ON parties(org_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_parties_org_type ON parties(org_id, party_type) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_parties_org_name ON parties(org_id, display_name) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_parties_org_email ON parties(org_id, email) WHERE deleted_at IS NULL AND email IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_parties_org_tax ON parties(org_id, tax_id) WHERE deleted_at IS NULL AND tax_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_parties_org ON parties(tenant_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_parties_org_type ON parties(tenant_id, party_type) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_parties_org_name ON parties(tenant_id, display_name) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_parties_org_email ON parties(tenant_id, email) WHERE deleted_at IS NULL AND email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_parties_org_tax ON parties(tenant_id, tax_id) WHERE deleted_at IS NULL AND tax_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_parties_tags ON parties USING GIN(tags) WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS party_persons (
@@ -46,21 +46,21 @@ CREATE TABLE IF NOT EXISTS party_agents (
 CREATE TABLE IF NOT EXISTS party_roles (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     role text NOT NULL,
     is_active boolean NOT NULL DEFAULT true,
     price_list_id uuid REFERENCES price_lists(id),
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(party_id, org_id, role)
+    UNIQUE(party_id, tenant_id, role)
 );
 
-CREATE INDEX IF NOT EXISTS idx_party_roles_org_role ON party_roles(org_id, role) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_party_roles_org_role ON party_roles(tenant_id, role) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_party_roles_party ON party_roles(party_id);
 
 CREATE TABLE IF NOT EXISTS party_relationships (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     from_party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
     to_party_id uuid NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
     relationship_type text NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS party_relationships (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_party_rels_org ON party_relationships(org_id);
+CREATE INDEX IF NOT EXISTS idx_party_rels_org ON party_relationships(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_party_rels_from ON party_relationships(from_party_id);
 CREATE INDEX IF NOT EXISTS idx_party_rels_to ON party_relationships(to_party_id);
 
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS services (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE org_members ADD COLUMN IF NOT EXISTS party_id uuid;
+ALTER TABLE tenant_memberships ADD COLUMN IF NOT EXISTS party_id uuid;
 
 ALTER TABLE audit_log
     ADD COLUMN IF NOT EXISTS actor_type text NOT NULL DEFAULT 'user' CHECK (actor_type IN ('user', 'party', 'service', 'system')),
@@ -97,7 +97,7 @@ UPDATE audit_log
 SET actor_label = COALESCE(NULLIF(actor_label, ''), COALESCE(actor, ''))
 WHERE actor_label = '' OR actor_label IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(org_id, actor_type, actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(tenant_id, actor_type, actor_id);
 
 CREATE TEMP TABLE customer_party_map (
     customer_id uuid PRIMARY KEY,
@@ -119,7 +119,7 @@ SELECT
         (
             SELECT c.id
             FROM customers c
-            WHERE c.org_id = s.org_id
+            WHERE c.tenant_id = s.tenant_id
               AND c.deleted_at IS NULL
               AND s.deleted_at IS NULL
               AND COALESCE(NULLIF(TRIM(c.tax_id), ''), '') <> ''
@@ -130,7 +130,7 @@ SELECT
         (
             SELECT c.id
             FROM customers c
-            WHERE c.org_id = s.org_id
+            WHERE c.tenant_id = s.tenant_id
               AND c.deleted_at IS NULL
               AND s.deleted_at IS NULL
               AND LOWER(TRIM(c.name)) = LOWER(TRIM(s.name))
@@ -143,12 +143,12 @@ SELECT
 FROM suppliers s;
 
 INSERT INTO parties (
-    id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata,
+    id, tenant_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata,
     created_at, updated_at, deleted_at
 )
 SELECT
     c.id,
-    c.org_id,
+    c.tenant_id,
     CASE WHEN c.type = 'company' THEN 'organization' ELSE 'person' END,
     c.name,
     NULLIF(c.email, ''),
@@ -184,12 +184,12 @@ WHERE c.type = 'company'
 ON CONFLICT (party_id) DO NOTHING;
 
 INSERT INTO parties (
-    id, org_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata,
+    id, tenant_id, party_type, display_name, email, phone, address, tax_id, notes, tags, metadata,
     created_at, updated_at, deleted_at
 )
 SELECT
     spm.party_id,
-    s.org_id,
+    s.tenant_id,
     'organization',
     s.name,
     NULLIF(s.email, ''),
@@ -232,15 +232,15 @@ FROM suppliers s
 JOIN supplier_party_map spm ON spm.supplier_id = s.id
 WHERE p.id = spm.party_id;
 
-INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT c.id, c.org_id, 'customer', true, c.price_list_id, '{}'::jsonb, c.created_at
+INSERT INTO party_roles (party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
+SELECT c.id, c.tenant_id, 'customer', true, c.price_list_id, '{}'::jsonb, c.created_at
 FROM customers c
-ON CONFLICT (party_id, org_id, role) DO NOTHING;
+ON CONFLICT (party_id, tenant_id, role) DO NOTHING;
 
-INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
+INSERT INTO party_roles (party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
 SELECT DISTINCT
     spm.party_id,
-    s.org_id,
+    s.tenant_id,
     'supplier',
     true,
     NULL::uuid,
@@ -248,27 +248,27 @@ SELECT DISTINCT
     s.created_at
 FROM suppliers s
 JOIN supplier_party_map spm ON spm.supplier_id = s.id
-ON CONFLICT (party_id, org_id, role) DO NOTHING;
+ON CONFLICT (party_id, tenant_id, role) DO NOTHING;
 
 WITH members AS (
     SELECT
         om.id AS org_member_id,
-        om.org_id,
+        om.tenant_id,
         u.id AS user_id,
         u.external_id,
         COALESCE(NULLIF(TRIM(u.name), ''), u.email) AS display_name,
         u.email,
         gen_random_uuid() AS generated_party_id
-    FROM org_members om
+    FROM tenant_memberships om
     JOIN users u ON u.id = om.user_id
     WHERE om.party_id IS NULL
 )
 INSERT INTO parties (
-    id, org_id, party_type, display_name, email, metadata, created_at, updated_at
+    id, tenant_id, party_type, display_name, email, metadata, created_at, updated_at
 )
 SELECT
     generated_party_id,
-    org_id,
+    tenant_id,
     'person',
     display_name,
     email,
@@ -281,11 +281,11 @@ ON CONFLICT (id) DO NOTHING;
 WITH members AS (
     SELECT
         om.id AS org_member_id,
-        om.org_id,
+        om.tenant_id,
         om.party_id,
         u.external_id,
         COALESCE(NULLIF(TRIM(u.name), ''), u.email) AS display_name
-    FROM org_members om
+    FROM tenant_memberships om
     JOIN users u ON u.id = om.user_id
     WHERE om.party_id IS NOT NULL
 )
@@ -300,35 +300,35 @@ ON CONFLICT (party_id) DO NOTHING;
 WITH members AS (
     SELECT
         om.id AS org_member_id,
-        om.org_id,
+        om.tenant_id,
         p.id AS generated_party_id
-    FROM org_members om
+    FROM tenant_memberships om
     JOIN users u ON u.id = om.user_id
     JOIN parties p
-      ON p.org_id = om.org_id
+      ON p.tenant_id = om.tenant_id
      AND p.metadata->>'system_key' = 'org_member'
      AND p.metadata->>'user_external_id' = u.external_id
     WHERE om.party_id IS NULL
 ), updated AS (
-    UPDATE org_members om
+    UPDATE tenant_memberships om
     SET party_id = m.generated_party_id
     FROM members m
     WHERE om.id = m.org_member_id
-    RETURNING om.org_id, om.party_id
+    RETURNING om.tenant_id, om.party_id
 )
-INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT party_id, org_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
+INSERT INTO party_roles (party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
+SELECT party_id, tenant_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
 FROM updated
-ON CONFLICT (party_id, org_id, role) DO NOTHING;
+ON CONFLICT (party_id, tenant_id, role) DO NOTHING;
 
-INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT om.party_id, om.org_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
-FROM org_members om
+INSERT INTO party_roles (party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
+SELECT om.party_id, om.tenant_id, 'employee', true, NULL::uuid, '{}'::jsonb, now()
+FROM tenant_memberships om
 WHERE om.party_id IS NOT NULL
-ON CONFLICT (party_id, org_id, role) DO NOTHING;
+ON CONFLICT (party_id, tenant_id, role) DO NOTHING;
 
 INSERT INTO parties (
-    id, org_id, party_type, display_name, metadata, created_at, updated_at
+    id, tenant_id, party_type, display_name, metadata, created_at, updated_at
 )
 SELECT
     gen_random_uuid(),
@@ -338,10 +338,10 @@ SELECT
     jsonb_build_object('system_key', 'assistant_ai'),
     now(),
     now()
-FROM orgs o
+FROM tenants o
 WHERE NOT EXISTS (
     SELECT 1 FROM parties p
-    WHERE p.org_id = o.id
+    WHERE p.tenant_id = o.id
       AND p.party_type = 'automated_agent'
       AND p.metadata->>'system_key' = 'assistant_ai'
 )
@@ -354,12 +354,12 @@ WHERE p.party_type = 'automated_agent'
   AND p.metadata->>'system_key' = 'assistant_ai'
 ON CONFLICT (party_id) DO NOTHING;
 
-INSERT INTO party_roles (party_id, org_id, role, is_active, price_list_id, metadata, created_at)
-SELECT p.id, p.org_id, 'assistant', true, NULL::uuid, '{}'::jsonb, p.created_at
+INSERT INTO party_roles (party_id, tenant_id, role, is_active, price_list_id, metadata, created_at)
+SELECT p.id, p.tenant_id, 'assistant', true, NULL::uuid, '{}'::jsonb, p.created_at
 FROM parties p
 WHERE p.party_type = 'automated_agent'
   AND p.metadata->>'system_key' = 'assistant_ai'
-ON CONFLICT (party_id, org_id, role) DO NOTHING;
+ON CONFLICT (party_id, tenant_id, role) DO NOTHING;
 
 INSERT INTO services (name, direction, kind, description)
 VALUES
@@ -376,8 +376,8 @@ ON CONFLICT (name) DO NOTHING;
 ALTER TABLE user_roles ADD COLUMN IF NOT EXISTS party_id uuid;
 UPDATE user_roles ur
 SET party_id = om.party_id
-FROM org_members om
-WHERE ur.org_id = om.org_id
+FROM tenant_memberships om
+WHERE ur.tenant_id = om.tenant_id
   AND ur.user_id = om.user_id
   AND ur.party_id IS NULL;
 
@@ -385,7 +385,7 @@ ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS agent_party_id uuid;
 UPDATE ai_conversations ac
 SET agent_party_id = p.id
 FROM parties p
-WHERE p.org_id = ac.org_id
+WHERE p.tenant_id = ac.tenant_id
   AND p.party_type = 'automated_agent'
   AND p.metadata->>'system_key' = 'assistant_ai'
   AND ac.agent_party_id IS NULL;
@@ -556,7 +556,7 @@ ALTER TABLE credit_notes DROP CONSTRAINT IF EXISTS credit_notes_customer_id_fkey
 ALTER TABLE accounts DROP CONSTRAINT IF EXISTS accounts_party_id_fkey;
 ALTER TABLE payment_preferences DROP CONSTRAINT IF EXISTS payment_preferences_party_id_fkey;
 ALTER TABLE ai_conversations DROP CONSTRAINT IF EXISTS ai_conversations_agent_party_id_fkey;
-ALTER TABLE org_members DROP CONSTRAINT IF EXISTS org_members_party_id_fkey;
+ALTER TABLE tenant_memberships DROP CONSTRAINT IF EXISTS org_members_party_id_fkey;
 ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS user_roles_party_id_fkey;
 
 ALTER TABLE quotes ADD CONSTRAINT quotes_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id);
@@ -568,7 +568,7 @@ ALTER TABLE credit_notes ADD CONSTRAINT credit_notes_party_id_fkey FOREIGN KEY (
 ALTER TABLE accounts ADD CONSTRAINT accounts_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE;
 ALTER TABLE payment_preferences ADD CONSTRAINT payment_preferences_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id);
 ALTER TABLE ai_conversations ADD CONSTRAINT ai_conversations_agent_party_id_fkey FOREIGN KEY (agent_party_id) REFERENCES parties(id);
-ALTER TABLE org_members ADD CONSTRAINT org_members_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id);
+ALTER TABLE tenant_memberships ADD CONSTRAINT org_members_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id);
 ALTER TABLE user_roles ADD CONSTRAINT user_roles_party_id_fkey FOREIGN KEY (party_id) REFERENCES parties(id);
 
 DROP INDEX IF EXISTS idx_quotes_customer;
@@ -591,10 +591,10 @@ DROP INDEX IF EXISTS idx_suppliers_org_tax;
 CREATE INDEX IF NOT EXISTS idx_quotes_party ON quotes(party_id) WHERE party_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sales_party ON sales(party_id) WHERE party_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_purchases_party ON purchases(party_id) WHERE party_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_credit_notes_party ON credit_notes(org_id, party_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_credit_notes_party ON credit_notes(tenant_id, party_id) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_appointments_party ON appointments(party_id) WHERE party_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_accounts_party ON accounts(org_id, party_id);
-CREATE INDEX IF NOT EXISTS idx_payment_preferences_party ON payment_preferences(org_id, party_id) WHERE party_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_accounts_party ON accounts(tenant_id, party_id);
+CREATE INDEX IF NOT EXISTS idx_payment_preferences_party ON payment_preferences(tenant_id, party_id) WHERE party_id IS NOT NULL;
 
 DROP TABLE IF EXISTS customers;
 DROP TABLE IF EXISTS suppliers;
@@ -602,7 +602,7 @@ DROP TABLE IF EXISTS suppliers;
 CREATE VIEW customers AS
 SELECT
     p.id,
-    p.org_id,
+    p.tenant_id,
     CASE WHEN p.party_type = 'organization' THEN 'company' ELSE 'person' END AS type,
     p.display_name AS name,
     p.tax_id,
@@ -619,18 +619,18 @@ SELECT
 FROM parties p
 JOIN party_roles r
     ON r.party_id = p.id
-   AND r.org_id = p.org_id
+   AND r.tenant_id = p.tenant_id
    AND r.role = 'customer'
    AND r.is_active = true
 LEFT JOIN party_roles pr
     ON pr.party_id = p.id
-   AND pr.org_id = p.org_id
+   AND pr.tenant_id = p.tenant_id
    AND pr.role = 'customer';
 
 CREATE VIEW suppliers AS
 SELECT
     p.id,
-    p.org_id,
+    p.tenant_id,
     p.display_name AS name,
     p.tax_id,
     p.email,
@@ -646,6 +646,6 @@ SELECT
 FROM parties p
 JOIN party_roles r
     ON r.party_id = p.id
-   AND r.org_id = p.org_id
+   AND r.tenant_id = p.tenant_id
    AND r.role = 'supplier'
    AND r.is_active = true;

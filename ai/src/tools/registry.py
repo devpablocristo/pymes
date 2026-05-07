@@ -53,89 +53,89 @@ def build_internal_tools(
     role = auth.role
     modules_active = dossier.get("modules_active", []) if isinstance(dossier, dict) else []
 
-    async def _get_sales_summary(org_id: str, period: str = "today") -> dict[str, Any]:
-        _ = org_id
+    async def _get_sales_summary(tenant_id: str, period: str = "today") -> dict[str, Any]:
+        _ = tenant_id
         return await sales.get_sales_summary(client, auth, period=period)
 
-    async def _get_recent_sales(org_id: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _get_recent_sales(tenant_id: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await sales.get_recent_sales(client, auth, limit=limit)
 
-    async def _get_top_customers(org_id: str, from_date: str, to_date: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_top_customers(tenant_id: str, from_date: str, to_date: str) -> dict[str, Any]:
+        _ = tenant_id
         return await customers.get_top_customers(client, auth, from_date=from_date, to_date=to_date)
 
-    async def _search_customers(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_customers(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await customers.search_customers(client, auth, query=query, limit=limit)
 
-    async def _search_products(org_id: str, query: str, limit: int = 10) -> dict[str, Any]:
-        _ = org_id
+    async def _search_products(tenant_id: str, query: str, limit: int = 10) -> dict[str, Any]:
+        _ = tenant_id
         return await products.search_products(client, auth, query=query, limit=limit)
 
-    async def _search_services(org_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
-        _ = org_id
+    async def _search_services(tenant_id: str, query: str = "", limit: int = 20) -> dict[str, Any]:
+        _ = tenant_id
         return await services.search_services(client, auth, query=query, limit=limit)
 
-    async def _get_service(org_id: str, service_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_service(tenant_id: str, service_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await services.get_service(client, auth, service_id=service_id)
 
-    async def _get_low_stock(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_low_stock(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_low_stock(client, auth)
 
-    async def _get_stock_level(org_id: str, product_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_stock_level(tenant_id: str, product_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await inventory.get_stock_level(client, auth, product_id=product_id)
 
-    async def _get_cashflow_summary(org_id: str, from_date: str, to_date: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_cashflow_summary(tenant_id: str, from_date: str, to_date: str) -> dict[str, Any]:
+        _ = tenant_id
         return await cashflow.get_cashflow_summary(client, auth, from_date=from_date, to_date=to_date)
 
-    async def _get_account_balances(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_account_balances(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await accounts.get_account_balances(client, auth)
 
-    async def _get_debtors(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_debtors(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await accounts.get_debtors(client, auth)
 
-    async def _get_bookings(org_id: str, from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
-        _ = org_id
+    async def _get_bookings(tenant_id: str, from_date: str | None = None, to_date: str | None = None) -> dict[str, Any]:
+        _ = tenant_id
         return await scheduling.get_bookings(client, auth, from_date=from_date, to_date=to_date)
 
-    async def _check_availability(org_id: str, date: str, duration: int = 60) -> dict[str, Any]:
-        return await scheduling.check_availability(client, org_id=org_id, date=date, duration=duration)
+    async def _check_availability(tenant_id: str, date: str, duration: int = 60) -> dict[str, Any]:
+        return await scheduling.check_availability(client, tenant_id=tenant_id, date=date, duration=duration)
 
-    async def _get_quotes(org_id: str, status: str | None = None) -> dict[str, Any]:
-        _ = org_id
+    async def _get_quotes(tenant_id: str, status: str | None = None) -> dict[str, Any]:
+        _ = tenant_id
         return await quotes.get_quotes(client, auth, status=status)
 
-    async def _get_purchases(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_purchases(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await purchases.get_purchases_summary(client, auth)
 
-    async def _get_recurring_expenses(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_recurring_expenses(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await recurring.get_recurring_expenses(client, auth)
 
-    async def _get_exchange_rates(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_exchange_rates(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await currency.get_exchange_rates(client, auth)
 
-    async def _create_quote(org_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
-        _ = org_id
+    async def _create_quote(tenant_id: str, customer_name: str, items: list[dict[str, Any]], notes: str = "") -> dict[str, Any]:
+        _ = tenant_id
         return await quotes.create_quote(client, auth, customer_name=customer_name, items=items, notes=notes)
 
     async def _create_sale(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         items: list[dict[str, Any]],
         payment_method: str = "cash",
         notes: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await sales.create_sale(
             client,
             auth,
@@ -145,20 +145,20 @@ def build_internal_tools(
             notes=notes,
         )
 
-    async def _generate_payment_link(org_id: str, sale_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _generate_payment_link(tenant_id: str, sale_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await payments.generate_payment_link(client, auth, sale_id=sale_id)
 
-    async def _get_payment_status(org_id: str, sale_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_payment_status(tenant_id: str, sale_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await payments.get_payment_status(client, auth, sale_id=sale_id)
 
-    async def _send_payment_info(org_id: str, sale_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _send_payment_info(tenant_id: str, sale_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await payments.send_payment_info(client, auth, sale_id=sale_id)
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -167,7 +167,7 @@ def build_internal_tools(
     ) -> dict[str, Any]:
         return await scheduling.book_scheduling(
             client,
-            org_id=org_id,
+            tenant_id=tenant_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             title=title,
@@ -176,13 +176,13 @@ def build_internal_tools(
         )
 
     async def _create_cash_movement(
-        org_id: str,
+        tenant_id: str,
         movement_type: str,
         amount: float,
         category: str = "other",
         description: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await cashflow.create_cash_movement(
             client,
             auth,
@@ -192,8 +192,8 @@ def build_internal_tools(
             description=description,
         )
 
-    async def _search_help(org_id: str, query: str) -> dict[str, Any]:
-        _ = org_id
+    async def _search_help(tenant_id: str, query: str) -> dict[str, Any]:
+        _ = tenant_id
         return await help.search_help_docs(query)
 
     register_profile_tools(

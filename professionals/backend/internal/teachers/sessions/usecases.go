@@ -18,17 +18,17 @@ import (
 type RepositoryPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Session, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in domain.Session) (domain.Session, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Session, error)
 	Update(ctx context.Context, in domain.Session) (domain.Session, error)
-	BookingSessionExists(ctx context.Context, orgID, bookingID uuid.UUID) (bool, error)
+	BookingSessionExists(ctx context.Context, tenantID, bookingID uuid.UUID) (bool, error)
 	CreateNote(ctx context.Context, in domain.SessionNote) (domain.SessionNote, error)
-	Archive(ctx context.Context, orgID, id uuid.UUID) error
-	Restore(ctx context.Context, orgID, id uuid.UUID) error
-	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	Archive(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	Delete(ctx context.Context, tenantID, id uuid.UUID) error
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -52,7 +52,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 		return domain.Session{}, fmt.Errorf("profile_id is required: %w", httperrors.ErrBadInput)
 	}
 
-	exists, err := u.repo.BookingSessionExists(ctx, in.OrgID, in.BookingID)
+	exists, err := u.repo.BookingSessionExists(ctx, in.TenantID, in.BookingID)
 	if err != nil {
 		return domain.Session{}, err
 	}
@@ -73,7 +73,7 @@ func (u *Usecases) Create(ctx context.Context, in domain.Session, actor string) 
 		return domain.Session{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "session.created", "session", out.ID.String(), map[string]any{"booking_id": out.BookingID.String()})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "session.created", "session", out.ID.String(), map[string]any{"booking_id": out.BookingID.String()})
 	}
 	return out, nil
 }
@@ -96,8 +96,8 @@ type UpdateInput struct {
 	Metadata        *map[string]any
 }
 
-func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Session, error) {
-	out, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Session, error) {
+	out, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
@@ -110,8 +110,8 @@ func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Ses
 	return out, nil
 }
 
-func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Session, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Session, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
@@ -154,13 +154,13 @@ func (u *Usecases) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInp
 		return domain.Session{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "session.updated", "session", out.ID.String(), map[string]any{"status": out.Status})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "session.updated", "session", out.ID.String(), map[string]any{"status": out.Status})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Session, error) {
-	current, err := u.repo.GetByID(ctx, orgID, id)
+func (u *Usecases) Complete(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.Session, error) {
+	current, err := u.repo.GetByID(ctx, tenantID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.Session{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
@@ -188,13 +188,13 @@ func (u *Usecases) Complete(ctx context.Context, orgID, id uuid.UUID, actor stri
 		return domain.Session{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, out.OrgID.String(), actor, "session.completed", "session", out.ID.String(), map[string]any{})
+		u.audit.Log(ctx, out.TenantID.String(), actor, "session.completed", "session", out.ID.String(), map[string]any{})
 	}
 	return out, nil
 }
 
-func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error) {
-	session, err := u.repo.GetByID(ctx, orgID, sessionID)
+func (u *Usecases) CreateNote(ctx context.Context, tenantID, sessionID uuid.UUID, noteType, title, body, actor string) (domain.SessionNote, error) {
+	session, err := u.repo.GetByID(ctx, tenantID, sessionID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.SessionNote{}, fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
@@ -214,7 +214,7 @@ func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, n
 	}
 
 	note := domain.SessionNote{
-		OrgID:     orgID,
+		TenantID:  tenantID,
 		SessionID: sessionID,
 		NoteType:  noteType,
 		Title:     strings.TrimSpace(title),
@@ -226,46 +226,46 @@ func (u *Usecases) CreateNote(ctx context.Context, orgID, sessionID uuid.UUID, n
 		return domain.SessionNote{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "session_note.created", "session_note", out.ID.String(), map[string]any{"session_id": sessionID.String()})
+		u.audit.Log(ctx, tenantID.String(), actor, "session_note.created", "session_note", out.ID.String(), map[string]any{"session_id": sessionID.String()})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Archive(ctx, orgID, id); err != nil {
+func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Archive(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "session.archived", "session", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "session.archived", "session", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, orgID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "session.restored", "session", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "session.restored", "session", id.String(), map[string]any{})
 	}
 	return nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
-	if err := u.repo.Delete(ctx, orgID, id); err != nil {
+func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Delete(ctx, tenantID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("session not found: %w", httperrors.ErrNotFound)
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "session.deleted", "session", id.String(), map[string]any{})
+		u.audit.Log(ctx, tenantID.String(), actor, "session.deleted", "session", id.String(), map[string]any{})
 	}
 	return nil
 }

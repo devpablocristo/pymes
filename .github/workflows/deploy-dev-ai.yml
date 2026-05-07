@@ -46,7 +46,7 @@ jobs:
       GEMINI_VERTEX_LOCATION: us-central1
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      GOVERNANCE_URL: https://nexus-review-396554427884.us-central1.run.app
+      GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL }}
       AUTH_ALLOW_API_KEY: "true"
 
     steps:

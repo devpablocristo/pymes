@@ -33,30 +33,30 @@ class IdentifyRequest(BaseModel):
     phone: str = Field(min_length=6, max_length=32)
 
 
-@router.post("/{org_slug}/chat")
+@router.post("/{tenant_slug}/chat")
 async def chat_external(
     req: PublicChatRequest,
-    org_slug: str = Path(..., min_length=2),
+    tenant_slug: str = Path(..., min_length=2),
     repo: AIRepository = Depends(get_repository),
     llm=Depends(get_llm_provider),
     backend_client: BackendClient = Depends(get_backend_client),
 ):
-    org_id = await resolve_org_id(backend_client, org_slug)
-    await check_quota(repo, org_id, mode="external")
+    tenant_id = await resolve_org_id(backend_client, tenant_slug)
+    await check_quota(repo, tenant_id, mode="external")
 
     conversation = None
     external_contact = clean_phone(req.phone or "")
-    update_request_context(org_id=org_id, user_id=external_contact or "external")
-    logger.info("chat_external_started", org_id=org_id, external_contact=external_contact, conversation_id=req.conversation_id or "")
+    update_request_context(tenant_id=tenant_id, user_id=external_contact or "external")
+    logger.info("chat_external_started", tenant_id=tenant_id, external_contact=external_contact, conversation_id=req.conversation_id or "")
     conversation = await get_external_conversation(
         repo=repo,
-        org_id=org_id,
+        tenant_id=tenant_id,
         external_contact=external_contact,
         message=req.message,
         conversation_id=req.conversation_id,
     )
 
-    dossier = await repo.get_or_create_dossier(org_id)
+    dossier = await repo.get_or_create_dossier(tenant_id)
     declarations, handlers = build_external_tools(backend_client)
 
     history_messages = list(conversation.messages)
@@ -70,7 +70,7 @@ async def chat_external(
     async def on_success(result) -> dict[str, str]:
         now = datetime.now(UTC).isoformat()
         await repo.append_messages(
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation.id,
             new_messages=[
                 {"role": "user", "content": req.message.strip(), "ts": now},
@@ -85,10 +85,10 @@ async def chat_external(
             tokens_input=result.tokens_input,
             tokens_output=result.tokens_output,
         )
-        await repo.track_usage(org_id, tokens_in=result.tokens_input, tokens_out=result.tokens_output)
+        await repo.track_usage(tenant_id, tokens_in=result.tokens_input, tokens_out=result.tokens_output)
         logger.info(
             "chat_external_completed",
-            org_id=org_id,
+            tenant_id=tenant_id,
             external_contact=external_contact,
             conversation_id=conversation.id,
             tool_calls=len(result.tool_calls),
@@ -103,17 +103,17 @@ async def chat_external(
             llm_messages=llm_messages,
             declarations=declarations,
             handlers=handlers,
-            org_id=org_id,
+            tenant_id=tenant_id,
             failure_event="chat_external_failed",
-            failure_context={"org_id": org_id, "external_contact": external_contact},
+            failure_context={"tenant_id": tenant_id, "external_contact": external_contact},
             on_success=on_success,
         )
     )
 
 
-@router.post("/{org_slug}/chat/identify")
-async def identify_external(req: IdentifyRequest, org_slug: str = Path(..., min_length=2)):
-    _ = org_slug
+@router.post("/{tenant_slug}/chat/identify")
+async def identify_external(req: IdentifyRequest, tenant_slug: str = Path(..., min_length=2)):
+    _ = tenant_slug
     return {
         "name": req.name.strip(),
         "phone": clean_phone(req.phone),

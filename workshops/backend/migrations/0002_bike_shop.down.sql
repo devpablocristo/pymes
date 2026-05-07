@@ -11,4 +11,4 @@ DROP INDEX IF EXISTS workshops.workshops_services_org_segment_code_idx;
 ALTER TABLE workshops.services DROP COLUMN IF EXISTS segment;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_services_org_code_idx
-    ON workshops.services (org_id, code);
+    ON workshops.services (tenant_id, code);

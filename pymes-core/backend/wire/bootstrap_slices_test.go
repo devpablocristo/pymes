@@ -50,7 +50,7 @@ func TestRegisterTenantPublicRoutesUsesOrgScopedGroup(t *testing.T) {
 		paymentGateway: fakeExternalRoutesRegistrar{path: "/quote/:id/payment-link"},
 	})
 
-	assertRoutePaths(t, router, "GET /v1/public/:org_id/catalog", "GET /v1/public/:org_id/scheduling/services", "GET /v1/public/:org_id/quote/:id/payment-link")
+	assertRoutePaths(t, router, "GET /v1/public/:tenant_id/catalog", "GET /v1/public/:tenant_id/scheduling/services", "GET /v1/public/:tenant_id/quote/:id/payment-link")
 }
 
 func TestRegisterAuthenticatedV1RoutesUsesExpectedGroup(t *testing.T) {

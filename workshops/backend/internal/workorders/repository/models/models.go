@@ -10,7 +10,7 @@ import (
 // WorkOrderModel mapea workshops.work_orders.
 type WorkOrderModel struct {
 	ID       uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID    uuid.UUID  `gorm:"type:uuid;index;not null"`
+	TenantID uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID *uuid.UUID `gorm:"type:uuid;index"`
 	Number   string     `gorm:"not null"`
 
@@ -57,7 +57,7 @@ func (WorkOrderModel) TableName() string { return "workshops.work_orders" }
 // WorkOrderItemModel mapea workshops.work_order_items.
 type WorkOrderItemModel struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID  `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID  `gorm:"type:uuid;index;not null"`
 	WorkOrderID uuid.UUID  `gorm:"type:uuid;index;not null"`
 	ItemType    string     `gorm:"not null"`
 	ServiceID   *uuid.UUID `gorm:"type:uuid"`

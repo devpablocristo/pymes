@@ -64,8 +64,8 @@ func (g *googleClientAdapter) Refresh(ctx context.Context, refreshToken string) 
 // RepositoryPort abstrae el adapter de DB. Sirve también para tests.
 type RepositoryPort interface {
 	UpsertConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error)
-	ListByCreator(ctx context.Context, orgID uuid.UUID, createdBy string) ([]domain.Connection, error)
-	RevokeConnection(ctx context.Context, orgID uuid.UUID, createdBy string, id uuid.UUID) error
+	ListByCreator(ctx context.Context, tenantID uuid.UUID, createdBy string) ([]domain.Connection, error)
+	RevokeConnection(ctx context.Context, tenantID uuid.UUID, createdBy string, id uuid.UUID) error
 	CreateOAuthState(ctx context.Context, st domain.OAuthState) error
 	ConsumeOAuthState(ctx context.Context, state string) (domain.OAuthState, error)
 	PurgeExpiredOAuthStates(ctx context.Context) error
@@ -101,12 +101,12 @@ func NewUsecases(repo RepositoryPort, cipher Cipher, google GoogleOAuthClient, c
 // StartGoogleConnect inicia el flow OAuth con Google. Genera un state random
 // (CSRF + handoff org/user al callback), lo persiste con TTL, y devuelve la
 // auth URL a la que el frontend debe redirigir el browser.
-func (u *Usecases) StartGoogleConnect(ctx context.Context, orgID uuid.UUID, actor string) (string, error) {
+func (u *Usecases) StartGoogleConnect(ctx context.Context, tenantID uuid.UUID, actor string) (string, error) {
 	if u.google == nil {
 		return "", errors.New("calendar_sync: google client not configured")
 	}
-	if orgID == uuid.Nil {
-		return "", errors.New("calendar_sync: org_id is required")
+	if tenantID == uuid.Nil {
+		return "", errors.New("calendar_sync: tenant_id is required")
 	}
 	// Limpieza fire-and-forget de states caducos antes de crear uno nuevo.
 	// Si falla, no bloquea — sólo dejaría filas viejas en la tabla.
@@ -118,7 +118,7 @@ func (u *Usecases) StartGoogleConnect(ctx context.Context, orgID uuid.UUID, acto
 	}
 	if err := u.repo.CreateOAuthState(ctx, domain.OAuthState{
 		State:     state,
-		OrgID:     orgID,
+		TenantID:  tenantID,
 		CreatedBy: strings.TrimSpace(actor),
 		Provider:  domain.ProviderGoogle,
 		ExpiresAt: time.Now().UTC().Add(u.cfg.stateTTL()),
@@ -178,7 +178,7 @@ func (u *Usecases) HandleGoogleCallback(ctx context.Context, state, code string)
 	}
 	conn := domain.Connection{
 		ID:                    uuid.New(),
-		OrgID:                 st.OrgID,
+		TenantID:              st.TenantID,
 		CreatedBy:             st.CreatedBy,
 		Provider:              domain.ProviderGoogle,
 		Scopes:                tok.Scope,
@@ -190,16 +190,16 @@ func (u *Usecases) HandleGoogleCallback(ctx context.Context, state, code string)
 }
 
 // ListMyConnections devuelve las conexiones del actor en su org.
-func (u *Usecases) ListMyConnections(ctx context.Context, orgID uuid.UUID, actor string) ([]domain.Connection, error) {
-	return u.repo.ListByCreator(ctx, orgID, strings.TrimSpace(actor))
+func (u *Usecases) ListMyConnections(ctx context.Context, tenantID uuid.UUID, actor string) ([]domain.Connection, error) {
+	return u.repo.ListByCreator(ctx, tenantID, strings.TrimSpace(actor))
 }
 
 // RevokeConnection marca como revocada. Sólo el creador.
-func (u *Usecases) RevokeConnection(ctx context.Context, orgID uuid.UUID, actor string, id uuid.UUID) error {
+func (u *Usecases) RevokeConnection(ctx context.Context, tenantID uuid.UUID, actor string, id uuid.UUID) error {
 	if id == uuid.Nil {
 		return errors.New("calendar_sync: id is required")
 	}
-	return u.repo.RevokeConnection(ctx, orgID, strings.TrimSpace(actor), id)
+	return u.repo.RevokeConnection(ctx, tenantID, strings.TrimSpace(actor), id)
 }
 
 // generateState produce 32 bytes random codificados en hex (64 chars).

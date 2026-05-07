@@ -20,19 +20,19 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) GetTenantSettings(orgID uuid.UUID) domain.TenantSettings {
+func (r *Repository) GetTenantSettings(tenantID uuid.UUID) domain.TenantSettings {
 	var m models.TenantSettingsModel
-	if err := r.db.Where("org_id = ?", orgID).First(&m).Error; err != nil {
-		return tenantSettingsToDomain(defaultTenantSettingsModel(orgID))
+	if err := r.db.Where("tenant_id = ?", tenantID).First(&m).Error; err != nil {
+		return tenantSettingsToDomain(defaultTenantSettingsModel(tenantID))
 	}
 	return tenantSettingsToDomain(normalizeTenantSettingsModel(m))
 }
 
-func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings {
+func (r *Repository) UpdateTenantSettings(tenantID uuid.UUID, patch domain.TenantSettingsPatch, actor *string) domain.TenantSettings {
 	var m models.TenantSettingsModel
-	result := r.db.Where("org_id = ?", orgID).First(&m)
+	result := r.db.Where("tenant_id = ?", tenantID).First(&m)
 	if result.Error != nil {
-		m = defaultTenantSettingsModel(orgID)
+		m = defaultTenantSettingsModel(tenantID)
 	} else {
 		m = normalizeTenantSettingsModel(m)
 	}
@@ -115,12 +115,12 @@ func (r *Repository) UpdateTenantSettings(orgID uuid.UUID, patch domain.TenantSe
 	return tenantSettingsToDomain(m)
 }
 
-func (r *Repository) ListActivity(orgID uuid.UUID, limit int) []domain.ActivityEvent {
+func (r *Repository) ListActivity(tenantID uuid.UUID, limit int) []domain.ActivityEvent {
 	if limit <= 0 {
 		limit = 200
 	}
 	var rows []models.AdminActivityEventModel
-	r.db.Where("org_id = ?", orgID).
+	r.db.Where("tenant_id = ?", tenantID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows)
@@ -154,57 +154,57 @@ func tenantSettingsToDomain(m models.TenantSettingsModel) domain.TenantSettings 
 	}
 
 	return domain.TenantSettings{
-		OrgID:                    m.OrgID,
-		PlanCode:                 m.PlanCode,
-		HardLimits:               limits,
-		BillingStatus:            m.BillingStatus,
-		StripeCustomerID:         stripeCustomerID,
-		StripeSubscriptionID:     stripeSubscriptionID,
-		Currency:                 supportedList[0],
-		SupportedCurrencies:      supportedList,
-		TaxRate:                  m.TaxRate,
-		QuotePrefix:              m.QuotePrefix,
-		SalePrefix:               m.SalePrefix,
-		NextQuoteNumber:          m.NextQuoteNumber,
-		NextSaleNumber:           m.NextSaleNumber,
-		AllowNegativeStock:       m.AllowNegativeStock,
-		PurchasePrefix:           m.PurchasePrefix,
-		NextPurchaseNumber:       m.NextPurchaseNumber,
-		ReturnPrefix:             m.ReturnPrefix,
-		CreditNotePrefix:         m.CreditNotePrefix,
-		NextReturnNumber:         m.NextReturnNumber,
-		NextCreditNoteNumber:     m.NextCreditNoteNumber,
-		BusinessName:             m.BusinessName,
-		BusinessTaxID:            m.BusinessTaxID,
-		BusinessAddress:          m.BusinessAddress,
-		BusinessPhone:            m.BusinessPhone,
-		BusinessEmail:            m.BusinessEmail,
-		TeamSize:                 m.TeamSize,
-		Sells:                    m.Sells,
-		ClientLabel:              m.ClientLabel,
-		UsesBilling:              m.UsesBilling,
-		PaymentMethod:            m.PaymentMethod,
-		Vertical:                 m.Vertical,
-		OnboardingCompletedAt:    m.OnboardingCompletedAt,
-		WAQuoteTemplate:          m.WAQuoteTemplate,
-		WAReceiptTemplate:        m.WAReceiptTemplate,
-		WADefaultCountryCode:     m.WADefaultCountryCode,
-		SchedulingEnabled:        m.SchedulingEnabled,
+		TenantID:                m.TenantID,
+		PlanCode:                m.PlanCode,
+		HardLimits:              limits,
+		BillingStatus:           m.BillingStatus,
+		StripeCustomerID:        stripeCustomerID,
+		StripeSubscriptionID:    stripeSubscriptionID,
+		Currency:                supportedList[0],
+		SupportedCurrencies:     supportedList,
+		TaxRate:                 m.TaxRate,
+		QuotePrefix:             m.QuotePrefix,
+		SalePrefix:              m.SalePrefix,
+		NextQuoteNumber:         m.NextQuoteNumber,
+		NextSaleNumber:          m.NextSaleNumber,
+		AllowNegativeStock:      m.AllowNegativeStock,
+		PurchasePrefix:          m.PurchasePrefix,
+		NextPurchaseNumber:      m.NextPurchaseNumber,
+		ReturnPrefix:            m.ReturnPrefix,
+		CreditNotePrefix:        m.CreditNotePrefix,
+		NextReturnNumber:        m.NextReturnNumber,
+		NextCreditNoteNumber:    m.NextCreditNoteNumber,
+		BusinessName:            m.BusinessName,
+		BusinessTaxID:           m.BusinessTaxID,
+		BusinessAddress:         m.BusinessAddress,
+		BusinessPhone:           m.BusinessPhone,
+		BusinessEmail:           m.BusinessEmail,
+		TeamSize:                m.TeamSize,
+		Sells:                   m.Sells,
+		ClientLabel:             m.ClientLabel,
+		UsesBilling:             m.UsesBilling,
+		PaymentMethod:           m.PaymentMethod,
+		Vertical:                m.Vertical,
+		OnboardingCompletedAt:   m.OnboardingCompletedAt,
+		WAQuoteTemplate:         m.WAQuoteTemplate,
+		WAReceiptTemplate:       m.WAReceiptTemplate,
+		WADefaultCountryCode:    m.WADefaultCountryCode,
+		SchedulingEnabled:       m.SchedulingEnabled,
 		SchedulingLabel:         m.SchedulingLabel,
 		SchedulingReminderHours: m.SchedulingReminderHours,
-		SecondaryCurrency:        secondaryCurrencyFromSupportedList(supportedList),
-		DefaultRateType:          m.DefaultRateType,
-		AutoFetchRates:           m.AutoFetchRates,
-		ShowDualPrices:           m.ShowDualPrices,
-		BankHolder:               m.BankHolder,
-		BankCBU:                  m.BankCBU,
-		BankAlias:                m.BankAlias,
-		BankName:                 m.BankName,
-		ShowQRInPDF:              m.ShowQRInPDF,
-		WAPaymentTemplate:        m.WAPaymentTemplate,
-		WAPaymentLinkTemplate:    m.WAPaymentLinkTemplate,
-		UpdatedBy:                m.UpdatedBy,
-		UpdatedAt:                m.UpdatedAt,
+		SecondaryCurrency:       secondaryCurrencyFromSupportedList(supportedList),
+		DefaultRateType:         m.DefaultRateType,
+		AutoFetchRates:          m.AutoFetchRates,
+		ShowDualPrices:          m.ShowDualPrices,
+		BankHolder:              m.BankHolder,
+		BankCBU:                 m.BankCBU,
+		BankAlias:               m.BankAlias,
+		BankName:                m.BankName,
+		ShowQRInPDF:             m.ShowQRInPDF,
+		WAPaymentTemplate:       m.WAPaymentTemplate,
+		WAPaymentLinkTemplate:   m.WAPaymentLinkTemplate,
+		UpdatedBy:               m.UpdatedBy,
+		UpdatedAt:               m.UpdatedAt,
 	}
 }
 
@@ -215,7 +215,7 @@ func activityToDomain(m models.AdminActivityEventModel) domain.ActivityEvent {
 	}
 	return domain.ActivityEvent{
 		ID:           m.ID,
-		OrgID:        m.OrgID,
+		TenantID:     m.TenantID,
 		Actor:        m.Actor,
 		Action:       m.Action,
 		ResourceType: m.ResourceType,
@@ -236,9 +236,9 @@ func DefaultHardLimits(plan string) map[string]any {
 	}
 }
 
-func defaultTenantSettingsModel(orgID uuid.UUID) models.TenantSettingsModel {
+func defaultTenantSettingsModel(tenantID uuid.UUID) models.TenantSettingsModel {
 	return normalizeTenantSettingsModel(models.TenantSettingsModel{
-		OrgID:               orgID,
+		TenantID:            tenantID,
 		HardLimits:          mustJSON(DefaultHardLimits("starter")),
 		SupportedCurrencies: mustJSON([]string{"ARS"}),
 	})

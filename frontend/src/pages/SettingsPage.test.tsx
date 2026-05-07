@@ -26,7 +26,6 @@ vi.mock('../lib/api', () => ({
 
 const sessionFixture: SessionResponse = {
   auth: {
-    org_id: '00000000-0000-0000-0000-000000000001',
     tenant_id: '00000000-0000-0000-0000-000000000001',
     role: 'service',
     product_role: 'admin',
@@ -37,7 +36,7 @@ const sessionFixture: SessionResponse = {
 };
 
 const meWithoutUser: MeProfileResponse = {
-  org_id: '00000000-0000-0000-0000-000000000001',
+  tenant_id: '00000000-0000-0000-0000-000000000001',
   external_id: 'ext',
   role: 'admin',
   user: null,
@@ -66,7 +65,7 @@ describe('SettingsPage (modo clave API)', () => {
     apiMocks.getSession.mockResolvedValue(sessionFixture);
     apiMocks.getMe.mockResolvedValue(meWithoutUser);
     apiMocks.getBillingStatus.mockResolvedValue({
-      org_id: sessionFixture.auth.org_id,
+      tenant_id: sessionFixture.auth.tenant_id,
       plan_code: 'starter',
       status: 'active',
       hard_limits: {},
@@ -102,11 +101,11 @@ describe('SettingsPage (modo clave API)', () => {
     expect(screen.getByText('00000000-0000-0000-0000-000000000001')).toBeInTheDocument();
   });
 
-  it('muestra org_name del API cuando viene en la sesión', async () => {
+  it('muestra tenant_name del API cuando viene en la sesión', async () => {
     apiMocks.getSession.mockResolvedValue({
       auth: {
         ...sessionFixture.auth,
-        org_name: 'Fábrica Norte',
+        tenant_name: 'Fábrica Norte',
       },
     });
 

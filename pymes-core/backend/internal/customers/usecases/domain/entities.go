@@ -15,21 +15,21 @@ type Address struct {
 }
 
 type Customer struct {
-	ID        uuid.UUID
-	OrgID     uuid.UUID
-	Type      string
-	Name      string
-	TaxID     string
-	Email     string
-	Phone     string
-	Address   Address
-	Notes     string
+	ID         uuid.UUID
+	TenantID   uuid.UUID
+	Type       string
+	Name       string
+	TaxID      string
+	Email      string
+	Phone      string
+	Address    Address
+	Notes      string
 	IsFavorite bool
-	Tags      []string
-	Metadata  map[string]any
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	Tags       []string
+	Metadata   map[string]any
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
 }
 
 type SaleHistoryItem struct {

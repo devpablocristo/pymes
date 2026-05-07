@@ -11,7 +11,7 @@ import (
 
 type mockPurchasesRepo struct {
 	createFn       func(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error)
-	getByIDFn      func(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error)
+	getByIDFn      func(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error)
 	updateFn       func(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error)
 	updateStatusFn func(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error)
 }
@@ -28,8 +28,8 @@ func (m *mockPurchasesRepo) Create(ctx context.Context, in CreateInput) (purchas
 	}
 	return m.createFn(ctx, in)
 }
-func (m *mockPurchasesRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
-	return m.getByIDFn(ctx, orgID, id)
+func (m *mockPurchasesRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+	return m.getByIDFn(ctx, tenantID, id)
 }
 func (m *mockPurchasesRepo) Update(ctx context.Context, in UpdateInput) (purchasesdomain.Purchase, error) {
 	if m.updateFn == nil {
@@ -57,16 +57,16 @@ func (m *mockPurchasesAudit) Log(context.Context, string, string, string, string
 }
 
 func TestUpdateStatus_AllowsAnyConfiguredTransition(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	purchaseID := uuid.New()
 	repo := &mockPurchasesRepo{
-		getByIDFn: func(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+		getByIDFn: func(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 			return purchasesdomain.Purchase{
 				ID:           id,
-				OrgID:        orgID,
+				TenantID:     tenantID,
 				Number:       "CPA-00001",
 				Status:       "received",
-				SupplierID:   &orgID,
+				SupplierID:   &tenantID,
 				SupplierName: "Proveedor",
 			}, nil
 		},
@@ -76,10 +76,10 @@ func TestUpdateStatus_AllowsAnyConfiguredTransition(t *testing.T) {
 			}
 			return purchasesdomain.Purchase{
 				ID:           in.ID,
-				OrgID:        in.OrgID,
+				TenantID:     in.TenantID,
 				Number:       "CPA-00001",
 				Status:       in.Status,
-				SupplierID:   &orgID,
+				SupplierID:   &tenantID,
 				SupplierName: "Proveedor",
 			}, nil
 		},
@@ -88,9 +88,9 @@ func TestUpdateStatus_AllowsAnyConfiguredTransition(t *testing.T) {
 	uc := NewUsecases(repo, audit)
 
 	out, err := uc.UpdateStatus(context.Background(), UpdateStatusInput{
-		ID:     purchaseID,
-		OrgID:  orgID,
-		Status: "voided",
+		ID:       purchaseID,
+		TenantID: tenantID,
+		Status:   "voided",
 	}, "tester")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -104,15 +104,15 @@ func TestUpdateStatus_AllowsAnyConfiguredTransition(t *testing.T) {
 }
 
 func TestUpdateStatus_RejectsInvalidStatus(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	purchaseID := uuid.New()
 	repo := &mockPurchasesRepo{
-		getByIDFn: func(ctx context.Context, orgID, id uuid.UUID) (purchasesdomain.Purchase, error) {
+		getByIDFn: func(ctx context.Context, tenantID, id uuid.UUID) (purchasesdomain.Purchase, error) {
 			return purchasesdomain.Purchase{
-				ID:     id,
-				OrgID:  orgID,
-				Number: "CPA-00002",
-				Status: "received",
+				ID:       id,
+				TenantID: tenantID,
+				Number:   "CPA-00002",
+				Status:   "received",
 			}, nil
 		},
 		updateStatusFn: func(ctx context.Context, in UpdateStatusInput) (purchasesdomain.Purchase, error) {
@@ -123,9 +123,9 @@ func TestUpdateStatus_RejectsInvalidStatus(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	_, err := uc.UpdateStatus(context.Background(), UpdateStatusInput{
-		ID:     purchaseID,
-		OrgID:  orgID,
-		Status: "invalid",
+		ID:       purchaseID,
+		TenantID: tenantID,
+		Status:   "invalid",
 	}, "tester")
 	if err == nil {
 		t.Fatalf("expected business rule error")
@@ -133,7 +133,7 @@ func TestUpdateStatus_RejectsInvalidStatus(t *testing.T) {
 }
 
 func TestCreate_PreservesSelectedBranch(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	branchID := uuid.New()
 	repo := &mockPurchasesRepo{
 		createFn: func(ctx context.Context, in CreateInput) (purchasesdomain.Purchase, error) {
@@ -142,7 +142,7 @@ func TestCreate_PreservesSelectedBranch(t *testing.T) {
 			}
 			return purchasesdomain.Purchase{
 				ID:           uuid.New(),
-				OrgID:        in.OrgID,
+				TenantID:     in.TenantID,
 				BranchID:     in.BranchID,
 				Number:       "CPA-00003",
 				Status:       in.Status,
@@ -153,7 +153,7 @@ func TestCreate_PreservesSelectedBranch(t *testing.T) {
 
 	uc := NewUsecases(repo, nil)
 	out, err := uc.Create(context.Background(), CreateInput{
-		OrgID:        orgID,
+		TenantID:     tenantID,
 		BranchID:     &branchID,
 		SupplierName: "Proveedor Demo",
 		Items: []purchasesdomain.PurchaseItem{
@@ -170,13 +170,13 @@ func TestCreate_PreservesSelectedBranch(t *testing.T) {
 }
 
 func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	purchaseID := uuid.New()
 	repo := &mockPurchasesRepo{
 		getByIDFn: func(ctx context.Context, gotOrgID, gotID uuid.UUID) (purchasesdomain.Purchase, error) {
 			return purchasesdomain.Purchase{
 				ID:            gotID,
-				OrgID:         gotOrgID,
+				TenantID:      gotOrgID,
 				Number:        "CPA-00004",
 				Status:        "received",
 				PaymentStatus: "pending",
@@ -196,7 +196,7 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 			}
 			return purchasesdomain.Purchase{
 				ID:            in.ID,
-				OrgID:         in.OrgID,
+				TenantID:      in.TenantID,
 				Number:        "CPA-00004",
 				Status:        in.Status,
 				PaymentStatus: in.PaymentStatus,
@@ -210,7 +210,7 @@ func TestUpdate_AllowsReceivedPurchase(t *testing.T) {
 
 	out, err := uc.Update(context.Background(), UpdateInput{
 		ID:            purchaseID,
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		SupplierName:  "Proveedor actualizado",
 		Status:        "received",
 		PaymentStatus: "paid",

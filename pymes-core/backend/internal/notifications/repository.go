@@ -35,7 +35,7 @@ func (r *Repository) GetUserByExternalID(externalID string) (uuid.UUID, string, 
 	return row.ID, row.Email, true
 }
 
-func (r *Repository) ListMembers(orgID uuid.UUID) []Member {
+func (r *Repository) ListMembers(tenantID uuid.UUID) []Member {
 	type memberRow struct {
 		UserID uuid.UUID `gorm:"column:user_id"`
 		Email  string    `gorm:"column:email"`
@@ -43,10 +43,10 @@ func (r *Repository) ListMembers(orgID uuid.UUID) []Member {
 	}
 
 	var rows []memberRow
-	r.db.Table("org_members").
-		Select("org_members.user_id, users.email, org_members.role").
-		Joins("JOIN users ON users.id = org_members.user_id").
-		Where("org_members.org_id = ? AND users.deleted_at IS NULL", orgID).
+	r.db.Table("tenant_memberships").
+		Select("tenant_memberships.user_id, users.email, tenant_memberships.role").
+		Joins("JOIN users ON users.id = tenant_memberships.user_id").
+		Where("tenant_memberships.tenant_id = ? AND users.deleted_at IS NULL", tenantID).
 		Find(&rows)
 
 	result := make([]Member, 0, len(rows))
@@ -130,7 +130,7 @@ func (r *Repository) HasLogByDedupKey(key string) bool {
 func (r *Repository) CreateLog(entry domain.Log) {
 	m := models.NotificationLogModel{
 		ID:                entry.ID,
-		OrgID:             entry.OrgID,
+		TenantID:          entry.TenantID,
 		UserID:            entry.UserID,
 		NotificationType:  entry.NotificationType,
 		Channel:           entry.Channel,

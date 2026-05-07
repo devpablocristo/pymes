@@ -32,18 +32,18 @@ async def chat_auto_repair(
     llm=Depends(get_llm_provider),
     backend_client: AutoRepairBackendClient = Depends(get_auto_repair_backend_client),
 ):
-    logger.info("auto_repair_chat_started", org_id=auth.org_id, user_id=auth.actor)
+    logger.info("auto_repair_chat_started", tenant_id=auth.tenant_id, user_id=auth.actor)
 
     declarations, handlers = build_internal_tools(backend_client, auth)
     llm_messages: list[Message] = [
-        Message(role="system", content=build_system_prompt("internal", {"actor": auth.actor, "role": auth.role, "org_name": "el taller"})),
+        Message(role="system", content=build_system_prompt("internal", {"actor": auth.actor, "role": auth.role, "tenant_name": "el taller"})),
         Message(role="user", content=req.message.strip()),
     ]
 
     async def on_success(result):
         logger.info(
             "auto_repair_chat_completed",
-            org_id=auth.org_id,
+            tenant_id=auth.tenant_id,
             user_id=auth.actor,
             tool_calls=len(result.tool_calls),
             tokens_input=result.tokens_input,
@@ -57,9 +57,9 @@ async def chat_auto_repair(
             llm_messages=llm_messages,
             declarations=declarations,
             handlers=handlers,
-            org_id=auth.org_id,
+            tenant_id=auth.tenant_id,
             failure_event="auto_repair_chat_failed",
-            failure_context={"org_id": auth.org_id, "user_id": auth.actor},
+            failure_context={"tenant_id": auth.tenant_id, "user_id": auth.actor},
             on_success=on_success,
         )
     )

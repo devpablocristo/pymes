@@ -1,4 +1,4 @@
--- Rollback de 0014: rename de vuelta a _v2. Las tablas legacy NO se restauran (se perdieron).
+-- Rollback de 0014: rename de vuelta a _v2. Las tablas anteriores NO se restauran.
 ALTER INDEX IF EXISTS workshops.workshops_work_order_items_order_idx
     RENAME TO workshops_work_order_items_v2_order_idx;
 ALTER INDEX IF EXISTS workshops.workshops_work_orders_org_status_idx

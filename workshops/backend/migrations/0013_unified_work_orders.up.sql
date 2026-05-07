@@ -9,7 +9,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS workshops.work_orders_v2 (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     number TEXT NOT NULL,
 
     -- Polimorfismo: a qué asset apunta esta OT.
@@ -48,18 +48,18 @@ CREATE TABLE IF NOT EXISTS workshops.work_orders_v2 (
     archived_at TIMESTAMPTZ NULL
 );
 
--- Único activo por (org, number) — mismo patrón que las tablas legacy.
+-- Único activo por (tenant, number) — mismo patrón que las tablas anteriores.
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_work_orders_v2_org_number_active_idx
-    ON workshops.work_orders_v2 (org_id, number)
+    ON workshops.work_orders_v2 (tenant_id, number)
     WHERE archived_at IS NULL;
 
 -- Índices de búsqueda comunes.
 CREATE INDEX IF NOT EXISTS workshops_work_orders_v2_org_target_idx
-    ON workshops.work_orders_v2 (org_id, target_type)
+    ON workshops.work_orders_v2 (tenant_id, target_type)
     WHERE archived_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS workshops_work_orders_v2_org_status_idx
-    ON workshops.work_orders_v2 (org_id, status)
+    ON workshops.work_orders_v2 (tenant_id, status)
     WHERE archived_at IS NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS workshops_work_orders_v2_org_status_idx
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS workshops.work_order_items_v2 (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     work_order_id UUID NOT NULL REFERENCES workshops.work_orders_v2(id) ON DELETE CASCADE,
     item_type TEXT NOT NULL,             -- 'service' | 'part'
     service_id UUID NULL,                -- → public.services
@@ -89,7 +89,7 @@ CREATE INDEX IF NOT EXISTS workshops_work_order_items_v2_order_idx
 -- Copia de datos: auto_repair → work_orders_v2 (target_type='vehicle')
 -- ─────────────────────────────────────────────────────────────────────────────
 INSERT INTO workshops.work_orders_v2 (
-    id, org_id, number,
+    id, tenant_id, number,
     target_type, target_id, target_label,
     customer_id, customer_name,
     booking_id, quote_id, sale_id,
@@ -100,7 +100,7 @@ INSERT INTO workshops.work_orders_v2 (
     created_by, created_at, updated_at, archived_at
 )
 SELECT
-    id, org_id, number,
+    id, tenant_id, number,
     'vehicle', vehicle_id, vehicle_plate,
     customer_id, customer_name,
     booking_id, quote_id, sale_id,
@@ -113,12 +113,12 @@ FROM workshops.work_orders
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO workshops.work_order_items_v2 (
-    id, org_id, work_order_id, item_type, service_id, product_id,
+    id, tenant_id, work_order_id, item_type, service_id, product_id,
     description, quantity, unit_price, tax_rate, sort_order, metadata,
     created_at, updated_at
 )
 SELECT
-    id, org_id, work_order_id, item_type, service_id, product_id,
+    id, tenant_id, work_order_id, item_type, service_id, product_id,
     description, quantity, unit_price, tax_rate, sort_order, metadata,
     created_at, updated_at
 FROM workshops.work_order_items
@@ -128,7 +128,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Copia de datos: bike_shop → work_orders_v2 (target_type='bicycle')
 -- ─────────────────────────────────────────────────────────────────────────────
 INSERT INTO workshops.work_orders_v2 (
-    id, org_id, number,
+    id, tenant_id, number,
     target_type, target_id, target_label,
     customer_id, customer_name,
     booking_id, quote_id, sale_id,
@@ -139,7 +139,7 @@ INSERT INTO workshops.work_orders_v2 (
     created_by, created_at, updated_at, archived_at
 )
 SELECT
-    id, org_id, number,
+    id, tenant_id, number,
     'bicycle', bicycle_id, bicycle_label,
     customer_id, customer_name,
     booking_id, quote_id, sale_id,
@@ -152,12 +152,12 @@ FROM workshops.bike_work_orders
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO workshops.work_order_items_v2 (
-    id, org_id, work_order_id, item_type, service_id, product_id,
+    id, tenant_id, work_order_id, item_type, service_id, product_id,
     description, quantity, unit_price, tax_rate, sort_order, metadata,
     created_at, updated_at
 )
 SELECT
-    id, org_id, work_order_id, item_type, service_id, product_id,
+    id, tenant_id, work_order_id, item_type, service_id, product_id,
     description, quantity, unit_price, tax_rate, sort_order, metadata,
     created_at, updated_at
 FROM workshops.bike_work_order_items

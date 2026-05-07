@@ -18,7 +18,7 @@ type Config struct {
 	JWKSURL              string
 	JWTIssuer            string
 	JWTAudience          string
-	JWTOrgClaim          string
+	JWTTenantClaim       string
 	JWTRoleClaim         string
 	JWTActorClaim        string
 	AuthEnableJWT        bool
@@ -40,7 +40,7 @@ func Load(opts Options) Config {
 		JWKSURL:              envconfig.Get("JWKS_URL", ""),
 		JWTIssuer:            envconfig.Get("JWT_ISSUER", ""),
 		JWTAudience:          envconfig.Get("JWT_AUDIENCE", ""),
-		JWTOrgClaim:          envconfig.Get("JWT_ORG_CLAIM", ""),
+		JWTTenantClaim:       envconfig.Get("JWT_TENANT_CLAIM", ""),
 		JWTRoleClaim:         envconfig.Get("JWT_ROLE_CLAIM", ""),
 		JWTActorClaim:        envconfig.Get("JWT_ACTOR_CLAIM", ""),
 		AuthEnableJWT:        envconfig.Bool("AUTH_ENABLE_JWT", true),

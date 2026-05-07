@@ -28,7 +28,7 @@ vi.mock('@devpablocristo/modules-search', () => ({
 
 function buildTenantSettings(overrides: Partial<TenantSettings> = {}): TenantSettings {
   return {
-    org_id: '00000000-0000-0000-0000-000000000001',
+    tenant_id: '00000000-0000-0000-0000-000000000001',
     plan_code: 'starter',
     hard_limits: {},
     billing_status: 'trialing',
@@ -124,7 +124,6 @@ describe('AdminPage scheduling settings', () => {
     apiMocks.getAuditEntries.mockResolvedValue({ items: [] });
     apiMocks.getSession.mockResolvedValue({
       auth: {
-        org_id: '00000000-0000-0000-0000-000000000001',
         tenant_id: '00000000-0000-0000-0000-000000000001',
         role: 'owner',
         product_role: 'admin',

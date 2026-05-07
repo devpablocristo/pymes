@@ -85,18 +85,18 @@ class ClerkBearerVerifier:
         if not actor:
             return None
 
-        raw_org = _first_string_claim(claims, "tenant_id", "org_id", "o.id")
+        raw_org = _first_string_claim(claims, "tenant_id", "tenant_id", "o.id")
         if not raw_org:
             raw_org = _clerk_compact_org_id_from_claims(claims)
-        org_id = await self._resolve_org_id(raw_org)
-        if not org_id:
+        tenant_id = await self._resolve_org_id(raw_org)
+        if not tenant_id:
             return None
 
         role = _normalize_role(_first_string_claim(claims, "role", "org_role", "o.rol")) or "member"
         scopes = _first_scopes_claim(claims, "scopes", "org_permissions", "o.per")
 
         return AuthContext(
-            tenant_id=org_id,
+            tenant_id=tenant_id,
             actor=actor,
             role=role,
             scopes=scopes,
@@ -159,7 +159,7 @@ class ClerkBearerVerifier:
 
         async with httpx.AsyncClient(base_url=self._backend_url, timeout=10.0) as client:
             response = await client.get(
-                "/v1/internal/v1/orgs/resolve-ref",
+                "/v1/internal/v1/tenants/resolve-ref",
                 headers={"X-Internal-Service-Token": self._internal_token},
                 params={"ref": normalized},
             )
@@ -168,12 +168,12 @@ class ClerkBearerVerifier:
         payload = response.json()
         if not isinstance(payload, dict):
             return ""
-        org_id = str(payload.get("org_id", "")).strip()
+        tenant_id = str(payload.get("tenant_id", "")).strip()
         try:
-            UUID(org_id)
+            UUID(tenant_id)
         except ValueError:
             return ""
-        return org_id
+        return tenant_id
 
 
 def _normalize_issuer(raw: str) -> str:

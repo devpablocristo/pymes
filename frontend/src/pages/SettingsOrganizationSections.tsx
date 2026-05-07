@@ -143,7 +143,6 @@ export function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => st
     userMemberships: { pageSize: 50 },
   });
 
-  const [newOrgName, setNewOrgName] = useState('');
   const [switchingOrgID, setSwitchingOrgID] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState('');
   const [reopeningOnboarding, setReopeningOnboarding] = useState(false);
@@ -171,24 +170,6 @@ export function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => st
     } catch (err) {
       setSwitchError(formatClerkAPIUserMessage(err, t('profile.org.switchError')));
     } finally {
-      setSwitchingOrgID(null);
-    }
-  }
-
-  async function handleCreateOrganization(): Promise<void> {
-    const name = newOrgName.trim();
-    if (name.length < 2) {
-      setSwitchError(t('profile.org.validationMin'));
-      return;
-    }
-    setSwitchError('');
-    setSwitchingOrgID('__new__');
-    try {
-      const created = await clerk.createOrganization({ name });
-      setNewOrgName('');
-      await activateOrganization(created.id);
-    } catch (err) {
-      setSwitchError(formatClerkAPIUserMessage(err, t('profile.org.switchError')));
       setSwitchingOrgID(null);
     }
   }
@@ -248,29 +229,6 @@ export function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => st
           );
         })}
         {memberships.length === 0 ? <p className="text-muted">{t('profile.org.switchEmpty')}</p> : null}
-      </div>
-      <div className="profile-org-switcher__create">
-        <label className="profile-field-label" htmlFor="profile-org-create">
-          {t('profile.org.switchCreateLabel')}
-        </label>
-        <input
-          id="profile-org-create"
-          className="input profile-input"
-          value={newOrgName}
-          onChange={(e) => setNewOrgName(e.target.value)}
-          placeholder={t('profile.org.switchCreatePlaceholder')}
-          maxLength={100}
-        />
-        <p className="profile-form-actions">
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={switchingOrgID != null}
-            onClick={() => void handleCreateOrganization()}
-          >
-            {switchingOrgID === '__new__' ? t('profile.org.switchLoading') : t('profile.org.switchCreateAction')}
-          </button>
-        </p>
       </div>
       <div className="profile-org-switcher__reset">
         <p className="text-muted profile-field-hint">{t('profile.org.reopenOnboardingHint')}</p>

@@ -64,8 +64,8 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	if got.Role != "service" {
 		t.Fatalf("expected service role, got %q", got.Role)
 	}
-	if got.OrgID != "00000000-0000-0000-0000-000000000120" {
-		t.Fatalf("expected org, got %q", got.OrgID)
+	if got.TenantID != "00000000-0000-0000-0000-000000000120" {
+		t.Fatalf("expected tenant, got %q", got.TenantID)
 	}
 	if got.AuthMethod != "api_key" {
 		t.Fatalf("expected auth method api_key, got %q", got.AuthMethod)

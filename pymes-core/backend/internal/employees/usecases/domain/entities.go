@@ -16,7 +16,7 @@ const (
 
 type Employee struct {
 	ID         uuid.UUID      `json:"id"`
-	OrgID      uuid.UUID      `json:"org_id"`
+	TenantID   uuid.UUID      `json:"tenant_id"`
 	FirstName  string         `json:"first_name"`
 	LastName   string         `json:"last_name"`
 	Email      string         `json:"email"`

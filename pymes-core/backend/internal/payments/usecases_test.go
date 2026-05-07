@@ -63,13 +63,13 @@ func (f *fakeAudit) Log(_ context.Context, _ string, _ string, action, _ string,
 
 func TestCreateSalePayment_AuditLogOnSuccess(t *testing.T) {
 	t.Parallel()
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	paymentID := uuid.New()
 	created := time.Date(2025, 3, 21, 12, 0, 0, 0, time.UTC)
 	out := paymentsdomain.Payment{
 		ID:            paymentID,
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 		Method:        "cash",
@@ -81,7 +81,7 @@ func TestCreateSalePayment_AuditLogOnSuccess(t *testing.T) {
 	}
 	audit := &fakeAudit{}
 	uc := NewUsecases(&fakePaymentsRepo{out: out}, audit, nil)
-	got, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
+	got, err := uc.CreateSalePayment(context.Background(), tenantID, saleID, paymentsdomain.Payment{
 		Method:     "cash",
 		Amount:     100.5,
 		Notes:      "partial",
@@ -101,13 +101,13 @@ func TestCreateSalePayment_AuditLogOnSuccess(t *testing.T) {
 
 func TestCreateSalePayment_NilAuditNoPanic(t *testing.T) {
 	t.Parallel()
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	paymentID := uuid.New()
 	created := time.Date(2025, 3, 21, 12, 0, 0, 0, time.UTC)
 	out := paymentsdomain.Payment{
 		ID:            paymentID,
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		ReferenceType: "sale",
 		ReferenceID:   saleID,
 		Method:        "transfer",
@@ -117,7 +117,7 @@ func TestCreateSalePayment_NilAuditNoPanic(t *testing.T) {
 		CreatedAt:     created,
 	}
 	uc := NewUsecases(&fakePaymentsRepo{out: out}, nil, nil)
-	_, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
+	_, err := uc.CreateSalePayment(context.Background(), tenantID, saleID, paymentsdomain.Payment{
 		Method:     "transfer",
 		Amount:     50,
 		ReceivedAt: created,
@@ -130,11 +130,11 @@ func TestCreateSalePayment_NilAuditNoPanic(t *testing.T) {
 
 func TestCreateSalePayment_NoAuditWhenRepoFails(t *testing.T) {
 	t.Parallel()
-	orgID := uuid.New()
+	tenantID := uuid.New()
 	saleID := uuid.New()
 	audit := &fakeAudit{}
 	uc := NewUsecases(&fakePaymentsRepo{err: errors.New("repo failed")}, audit, nil)
-	_, err := uc.CreateSalePayment(context.Background(), orgID, saleID, paymentsdomain.Payment{
+	_, err := uc.CreateSalePayment(context.Background(), tenantID, saleID, paymentsdomain.Payment{
 		Method:    "cash",
 		Amount:    10,
 		CreatedBy: "user:x",

@@ -16,18 +16,18 @@ type apiKeyResolver struct {
 }
 
 type apiKeyModel struct {
-	ID    uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID uuid.UUID `gorm:"type:uuid;index;not null"`
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID uuid.UUID `gorm:"type:uuid;index;not null"`
 }
 
-func (apiKeyModel) TableName() string { return "org_api_keys" }
+func (apiKeyModel) TableName() string { return "tenant_api_keys" }
 
 type apiKeyScopeModel struct {
 	KeyID uuid.UUID `gorm:"type:uuid;index;not null;column:api_key_id"`
 	Scope string    `gorm:"not null"`
 }
 
-func (apiKeyScopeModel) TableName() string { return "org_api_key_scopes" }
+func (apiKeyScopeModel) TableName() string { return "tenant_api_key_scopes" }
 
 // NewAPIKeyResolver resuelve claves API contra las tablas compartidas con pymes-core.
 func NewAPIKeyResolver(db *gorm.DB) auth.APIKeyResolver {
@@ -50,8 +50,8 @@ func (r *apiKeyResolver) ResolveAPIKey(raw string) (auth.ResolvedKey, bool) {
 	sort.Strings(scopes)
 
 	return auth.ResolvedKey{
-		ID:     key.ID,
-		OrgID:  key.OrgID,
-		Scopes: scopes,
+		ID:       key.ID,
+		TenantID: key.TenantID,
+		Scopes:   scopes,
 	}, true
 }

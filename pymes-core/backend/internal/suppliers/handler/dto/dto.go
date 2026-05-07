@@ -10,7 +10,7 @@ type Address struct {
 
 type SupplierItem struct {
 	ID          string         `json:"id"`
-	OrgID       string         `json:"org_id"`
+	TenantID    string         `json:"tenant_id"`
 	Name        string         `json:"name"`
 	TaxID       string         `json:"tax_id,omitempty"`
 	Email       string         `json:"email,omitempty"`

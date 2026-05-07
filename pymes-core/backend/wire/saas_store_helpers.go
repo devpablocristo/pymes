@@ -9,17 +9,16 @@ import (
 
 	saasadmindomain "github.com/devpablocristo/core/saas/go/admin/usecases/domain"
 	saasbillingdomain "github.com/devpablocristo/core/saas/go/billing/usecases/domain"
-	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
 	utils "github.com/devpablocristo/core/security/go/hashutil"
 )
 
-func userDomainFromRow(row pymesUserRow) saasuserdomain.User {
+func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 	var avatarURL *string
 	if strings.TrimSpace(row.AvatarURL) != "" {
 		value := strings.TrimSpace(row.AvatarURL)
 		avatarURL = &value
 	}
-	return saasuserdomain.User{
+	return tenantUserDTO{
 		ID:         row.ID.String(),
 		ExternalID: row.ExternalID,
 		Email:      row.Email,
@@ -31,20 +30,21 @@ func userDomainFromRow(row pymesUserRow) saasuserdomain.User {
 	}
 }
 
-func memberDomainFromRow(row pymesOrgMemberRow) saasuserdomain.OrgMember {
-	return saasuserdomain.OrgMember{
+func memberDTOFromRow(row pymesTenantMembershipRow) tenantMemberDTO {
+	return tenantMemberDTO{
 		ID:       row.ID.String(),
-		OrgID:    row.OrgID.String(),
+		TenantID: row.TenantID.String(),
 		UserID:   row.UserID.String(),
 		Role:     row.Role,
+		Status:   row.Status,
 		JoinedAt: row.CreatedAt,
-		User:     userDomainFromRow(row.User),
+		User:     userDTOFromRow(row.User),
 	}
 }
 
 func tenantBillingFromRow(row pymesTenantSettingsRow) saasbillingdomain.TenantBilling {
 	return saasbillingdomain.TenantBilling{
-		TenantID:           row.OrgID.String(),
+		TenantID:           row.TenantID.String(),
 		PlanCode:           saasbillingdomain.PlanCode(strings.TrimSpace(row.PlanCode)),
 		HardLimits:         parseHardLimits(row.HardLimitsJSON, row.HardLimits),
 		BillingStatus:      saasbillingdomain.BillingStatus(strings.TrimSpace(row.BillingStatus)),
@@ -58,7 +58,7 @@ func tenantBillingFromRow(row pymesTenantSettingsRow) saasbillingdomain.TenantBi
 
 func adminTenantSettingsFromRow(row pymesTenantSettingsRow) saasadmindomain.TenantSettings {
 	return saasadmindomain.TenantSettings{
-		TenantID:   row.OrgID.String(),
+		TenantID:   row.TenantID.String(),
 		PlanCode:   row.PlanCode,
 		Status:     saasadmindomain.TenantStatus(strings.TrimSpace(row.Status)),
 		DeletedAt:  row.DeletedAt,

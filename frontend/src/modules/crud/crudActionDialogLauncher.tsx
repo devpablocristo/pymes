@@ -94,7 +94,7 @@ function withCrudActionDialog<T>(render: (finish: (result: T) => void) => import
 
 export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Record<string, CrudFieldValue> | null> {
   function CrudFormDialogController({ finish }: { finish: (result: Record<string, CrudFieldValue> | null) => void }) {
-    const [initialValues, setInitialValues] = useState<Record<string, CrudFieldValue> | undefined>(options.initialValues);
+    const [initialValues] = useState<Record<string, CrudFieldValue> | undefined>(options.initialValues);
     const [loading, setLoading] = useState(Boolean(options.loading));
     const [error, setError] = useState<string | undefined>(options.error);
 
@@ -167,7 +167,7 @@ export function openCrudFormDialog(options: CrudFormDialogOptions): Promise<Reco
           setError(undefined);
           try {
             await options.onSubmit(values);
-            setInitialValues(values);
+            finish(values);
           } catch (submitError) {
             setError(submitError instanceof Error ? submitError.message : 'No se pudo guardar.');
             throw submitError;

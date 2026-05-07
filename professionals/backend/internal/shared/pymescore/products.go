@@ -8,7 +8,7 @@ import (
 )
 
 // ListProducts queries the pymes-core product catalog.
-func (c *Client) ListProducts(ctx context.Context, orgID string, query string, limit int) (map[string]any, error) {
+func (c *Client) ListProducts(ctx context.Context, tenantID string, query string, limit int) (map[string]any, error) {
 	params := url.Values{}
 	if query != "" {
 		params.Set("q", query)
@@ -21,7 +21,7 @@ func (c *Client) ListProducts(ctx context.Context, orgID string, query string, l
 	if encoded := params.Encode(); encoded != "" {
 		path += "?" + encoded
 	}
-	result, err := c.Get(ctx, path, orgID)
+	result, err := c.Get(ctx, path, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}

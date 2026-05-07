@@ -7,7 +7,7 @@ import (
 )
 
 type webhookPort interface {
-	Enqueue(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error
+	Enqueue(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error
 }
 
 // Option configura usecases (webhooks, etc.).

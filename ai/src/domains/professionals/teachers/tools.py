@@ -21,8 +21,8 @@ def build_internal_tools(
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _get_teacher_profiles(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_teacher_profiles(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_teachers(auth)
 
     declarations.append(
@@ -34,8 +34,8 @@ def build_internal_tools(
     )
     handlers["get_teacher_profiles"] = _get_teacher_profiles
 
-    async def _get_specialties(org_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_specialties(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_specialties(auth)
 
     declarations.append(
@@ -47,8 +47,8 @@ def build_internal_tools(
     )
     handlers["get_specialties"] = _get_specialties
 
-    async def _get_teacher_catalog(org_id: str, profile_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_teacher_catalog(tenant_id: str, profile_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_teacher_services(auth, profile_id=profile_id)
 
     declarations.append(
@@ -66,8 +66,8 @@ def build_internal_tools(
     )
     handlers["get_teacher_catalog"] = _get_teacher_catalog
 
-    async def _get_today_schedule(org_id: str, date: str = "today") -> dict[str, Any]:
-        _ = org_id
+    async def _get_today_schedule(tenant_id: str, date: str = "today") -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_sessions(auth, filters={"date": date})
 
     declarations.append(
@@ -85,14 +85,14 @@ def build_internal_tools(
     handlers["get_today_schedule"] = _get_today_schedule
 
     async def _create_intake(
-        org_id: str,
+        tenant_id: str,
         profile_id: str,
         notes: str = "",
         booking_id: str = "",
         customer_party_id: str = "",
         service_id: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data = {"profile_id": profile_id, "payload": {"notes": notes}}
         if booking_id:
             data["booking_id"] = booking_id
@@ -122,11 +122,11 @@ def build_internal_tools(
     handlers["create_intake"] = _create_intake
 
     async def _update_intake(
-        org_id: str,
+        tenant_id: str,
         intake_id: str,
         notes: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {}
         if notes:
             data["payload"] = {"notes": notes}
@@ -149,13 +149,13 @@ def build_internal_tools(
     handlers["update_intake"] = _update_intake
 
     async def _update_professional_profile(
-        org_id: str,
+        tenant_id: str,
         profile_id: str,
         headline: str = "",
         bio: str = "",
         accept_new_clients: bool | None = None,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {}
         if headline:
             data["headline"] = headline
@@ -184,9 +184,9 @@ def build_internal_tools(
     handlers["update_professional_profile"] = _update_professional_profile
 
     async def _assign_specialty_to_professional(
-        org_id: str, profile_id: str, specialty_id: str
+        tenant_id: str, profile_id: str, specialty_id: str
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await client.assign_specialty_professionals(
             auth, specialty_id=specialty_id, profile_ids=[profile_id]
         )
@@ -208,9 +208,9 @@ def build_internal_tools(
     handlers["assign_specialty_to_professional"] = _assign_specialty_to_professional
 
     async def _list_intakes(
-        org_id: str, profile_id: str = "", search: str = ""
+        tenant_id: str, profile_id: str = "", search: str = ""
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         result = await client.list_intakes(auth)
         items = result.get("items", []) if isinstance(result, dict) else []
         if profile_id:
@@ -240,12 +240,12 @@ def build_internal_tools(
     handlers["list_intakes"] = _list_intakes
 
     async def _add_session_note(
-        org_id: str,
+        tenant_id: str,
         session_id: str,
         note: str,
         note_type: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {"body": note}
         if note_type:
             data["note_type"] = note_type
@@ -268,8 +268,8 @@ def build_internal_tools(
     )
     handlers["add_session_note"] = _add_session_note
 
-    async def _get_session_summary(org_id: str, session_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_session_summary(tenant_id: str, session_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_session(auth, session_id=session_id)
 
     declarations.append(
@@ -288,7 +288,7 @@ def build_internal_tools(
     handlers["get_session_summary"] = _get_session_summary
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -296,7 +296,7 @@ def build_internal_tools(
         professional_id: str = "",
         duration: int = 60,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {
             "customer_name": customer_name,
             "customer_phone": customer_phone,
@@ -329,12 +329,12 @@ def build_internal_tools(
     handlers["book_scheduling"] = _book_scheduling
 
     async def _prepare_quote(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         items: list[dict[str, Any]],
         notes: str = "",
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         return await client.prepare_quote(auth, data={"customer_name": customer_name, "items": items, "notes": notes})
 
     declarations.append(
@@ -358,8 +358,8 @@ def build_internal_tools(
     )
     handlers["prepare_quote"] = _prepare_quote
 
-    async def _get_payment_link(org_id: str, sale_id: str) -> dict[str, Any]:
-        _ = org_id
+    async def _get_payment_link(tenant_id: str, sale_id: str) -> dict[str, Any]:
+        _ = tenant_id
         return await client.get_payment_link(auth, sale_id=sale_id)
 
     declarations.append(
@@ -382,14 +382,14 @@ def build_internal_tools(
 
 def build_external_tools(
     client: TeachersBackendClient,
-    org_slug: str,
+    tenant_slug: str,
 ) -> tuple[list[ToolDeclaration], dict[str, ToolHandler]]:
     declarations: list[ToolDeclaration] = []
     handlers: dict[str, ToolHandler] = {}
 
-    async def _get_public_teachers(org_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await client.get_public_teachers(org_slug)
+    async def _get_public_teachers(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
+        return await client.get_public_teachers(tenant_slug)
 
     declarations.append(
         _tool(
@@ -400,9 +400,9 @@ def build_external_tools(
     )
     handlers["get_public_teachers"] = _get_public_teachers
 
-    async def _get_public_catalog(org_id: str) -> dict[str, Any]:
-        _ = org_id
-        return await client.get_public_catalog(org_slug)
+    async def _get_public_catalog(tenant_id: str) -> dict[str, Any]:
+        _ = tenant_id
+        return await client.get_public_catalog(tenant_slug)
 
     declarations.append(
         _tool(
@@ -413,9 +413,9 @@ def build_external_tools(
     )
     handlers["get_public_catalog"] = _get_public_catalog
 
-    async def _check_availability(org_id: str, date: str, professional_id: str = "") -> dict[str, Any]:
-        _ = org_id
-        return await client.get_public_availability(org_slug, date=date, professional_id=professional_id or None)
+    async def _check_availability(tenant_id: str, date: str, professional_id: str = "") -> dict[str, Any]:
+        _ = tenant_id
+        return await client.get_public_availability(tenant_slug, date=date, professional_id=professional_id or None)
 
     declarations.append(
         _tool(
@@ -434,7 +434,7 @@ def build_external_tools(
     handlers["check_availability"] = _check_availability
 
     async def _book_scheduling(
-        org_id: str,
+        tenant_id: str,
         customer_name: str,
         customer_phone: str,
         title: str,
@@ -442,7 +442,7 @@ def build_external_tools(
         professional_id: str = "",
         duration: int = 60,
     ) -> dict[str, Any]:
-        _ = org_id
+        _ = tenant_id
         data: dict[str, Any] = {
             "customer_name": customer_name,
             "customer_phone": customer_phone,
@@ -452,7 +452,7 @@ def build_external_tools(
         }
         if professional_id:
             data["professional_id"] = professional_id
-        return await client.public_book_scheduling(org_slug, data=data)
+        return await client.public_book_scheduling(tenant_slug, data=data)
 
     declarations.append(
         _tool(

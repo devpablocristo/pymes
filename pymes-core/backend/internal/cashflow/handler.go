@@ -20,15 +20,15 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]cashdomain.CashMovement, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]cashdomain.CashMovement, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]cashdomain.CashMovement, error)
 	CreateManual(ctx context.Context, in cashdomain.CashMovement) (cashdomain.CashMovement, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (cashdomain.CashMovement, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (cashdomain.CashMovement, error)
 	Update(ctx context.Context, in cashdomain.CashMovement, actor string) (cashdomain.CashMovement, error)
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Summary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
-	DailySummary(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Summary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, from, to time.Time) (cashdomain.CashSummary, error)
+	DailySummary(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, days int) ([]cashdomain.CashSummary, error)
 }
 
 type Handler struct {
@@ -56,9 +56,9 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
@@ -81,7 +81,7 @@ func (h *Handler) List(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
-	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{OrgID: orgID, BranchID: branchID, Limit: limit, After: after, Type: c.Query("type"), Category: c.Query("category"), From: from, To: to})
+	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{TenantID: tenantID, BranchID: branchID, Limit: limit, After: after, Type: c.Query("type"), Category: c.Query("category"), From: from, To: to})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -98,9 +98,9 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateCashMovementRequest
@@ -131,7 +131,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.CreateManual(c.Request.Context(), cashdomain.CashMovement{
-		OrgID:         orgID,
+		TenantID:      tenantID,
 		BranchID:      branchID,
 		Type:          req.Type,
 		Amount:        req.Amount,
@@ -154,13 +154,13 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -173,11 +173,11 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseOrgAndID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -187,7 +187,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseOrgAndID(c)
 	if !ok {
 		return
 	}
@@ -196,7 +196,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	current, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	current, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -227,11 +227,11 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete realiza soft delete (archiva).
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseOrgAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -244,11 +244,11 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseOrgAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -257,11 +257,11 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgAndID(c)
+	tenantID, id, ok := parseOrgAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -270,9 +270,9 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, uuid.Nil, false
 	}
 	id, err := uuid.Parse(strings.TrimSpace(c.Param("id")))
@@ -280,14 +280,14 @@ func parseOrgAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, id, true
+	return tenantID, id, true
 }
 
 func (h *Handler) Summary(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	from, err := parseDate(c.Query("from"), time.Now().UTC().AddDate(0, 0, -30))
@@ -305,19 +305,19 @@ func (h *Handler) Summary(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
-	sum, err := h.uc.Summary(c.Request.Context(), orgID, branchID, from, to)
+	sum, err := h.uc.Summary(c.Request.Context(), tenantID, branchID, from, to)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.CashSummaryResponse{OrgID: sum.OrgID.String(), PeriodStart: sum.PeriodStart.UTC().Format(time.RFC3339), PeriodEnd: sum.PeriodEnd.UTC().Format(time.RFC3339), TotalIncome: sum.TotalIncome, TotalExpense: sum.TotalExpense, Balance: sum.Balance, Currency: sum.Currency})
+	c.JSON(http.StatusOK, dto.CashSummaryResponse{TenantID: sum.TenantID.String(), PeriodStart: sum.PeriodStart.UTC().Format(time.RFC3339), PeriodEnd: sum.PeriodEnd.UTC().Format(time.RFC3339), TotalIncome: sum.TotalIncome, TotalExpense: sum.TotalExpense, Balance: sum.Balance, Currency: sum.Currency})
 }
 
 func (h *Handler) DailySummary(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(a.OrgID)
+	tenantID, err := uuid.Parse(a.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
@@ -326,7 +326,7 @@ func (h *Handler) DailySummary(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid branch_id")
 		return
 	}
-	items, err := h.uc.DailySummary(c.Request.Context(), orgID, branchID, days)
+	items, err := h.uc.DailySummary(c.Request.Context(), tenantID, branchID, days)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -339,7 +339,7 @@ func (h *Handler) DailySummary(c *gin.Context) {
 }
 
 func toCashMovementItem(in cashdomain.CashMovement) dto.CashMovementItem {
-	out := dto.CashMovementItem{ID: in.ID.String(), OrgID: in.OrgID.String(), Type: in.Type, Amount: in.Amount, Currency: in.Currency, Category: in.Category, Description: in.Description, PaymentMethod: in.PaymentMethod, ReferenceType: in.ReferenceType, IsFavorite: in.IsFavorite, Tags: append([]string(nil), in.Tags...), CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339)}
+	out := dto.CashMovementItem{ID: in.ID.String(), TenantID: in.TenantID.String(), Type: in.Type, Amount: in.Amount, Currency: in.Currency, Category: in.Category, Description: in.Description, PaymentMethod: in.PaymentMethod, ReferenceType: in.ReferenceType, IsFavorite: in.IsFavorite, Tags: append([]string(nil), in.Tags...), CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt.UTC().Format(time.RFC3339)}
 	if in.BranchID != nil {
 		out.BranchID = in.BranchID.String()
 	}

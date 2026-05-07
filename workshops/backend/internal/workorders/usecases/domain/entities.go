@@ -10,7 +10,7 @@ import (
 // La OT apunta a un asset del cliente (asset_type + asset_id).
 type WorkOrder struct {
 	ID       uuid.UUID
-	OrgID    uuid.UUID
+	TenantID uuid.UUID
 	BranchID *uuid.UUID
 	Number   string
 
@@ -59,7 +59,7 @@ type WorkOrder struct {
 // WorkOrderItem es una línea de la OT (servicio o parte).
 type WorkOrderItem struct {
 	ID          uuid.UUID
-	OrgID       uuid.UUID
+	TenantID    uuid.UUID
 	WorkOrderID uuid.UUID
 	ItemType    string // 'service' | 'part'
 	ServiceID   *uuid.UUID

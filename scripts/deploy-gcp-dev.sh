@@ -166,63 +166,15 @@ BACKEND_URL=$(gcloud run services describe pymes-core --region="$REGION" --proje
 AI_VERTEX_PROJECT_EFFECTIVE="${AI_GEMINI_VERTEX_PROJECT_VALUE:-$PROJECT_ID}"
 AI_VERTEX_LOCATION_EFFECTIVE="${AI_GEMINI_VERTEX_LOCATION_VALUE:-$REGION}"
 
-validate_frontend_api_key() {
-  local api_key="$1"
-  [[ -n "$api_key" ]] || return 1
-  local http_code
-  http_code="$(curl -sS -o /dev/null -w '%{http_code}' -H "X-API-KEY: ${api_key}" "${BACKEND_URL}/v1/admin/tenant-settings" || true)"
-  [[ "$http_code" == "200" ]]
-}
-
-BOOTSTRAP_ORG_NAME="${BOOTSTRAP_ORG_NAME:-Pymes Dev}"
-BOOTSTRAP_ORG_SLUG_BASE="${BOOTSTRAP_ORG_SLUG:-${PROJECT_ID}}"
-FRONTEND_API_KEY="${FRONTEND_API_KEY:-}"
 CLERK_ENABLED=false
 
-if [[ -n "$FRONTEND_CLERK_PUBLISHABLE_KEY" && -n "$CLERK_JWT_ISSUER_VALUE" && -n "$CLERK_JWKS_URL_VALUE" ]]; then
+if [[ -n "$FRONTEND_CLERK_PUBLISHABLE_KEY" && -n "$CLERK_SECRET_KEY_VALUE" && -n "$CLERK_JWT_ISSUER_VALUE" && -n "$CLERK_JWKS_URL_VALUE" ]]; then
   CLERK_ENABLED=true
-  FRONTEND_API_KEY=""
-fi
-
-if [[ "$CLERK_ENABLED" != true && -z "$FRONTEND_API_KEY" ]]; then
-  FRONTEND_API_KEY="$(gcloud secrets versions access latest --secret=FRONTEND_API_KEY --project="$PROJECT_ID" 2>/dev/null || true)"
 fi
 
 if [[ "$CLERK_ENABLED" != true ]]; then
-  if ! validate_frontend_api_key "$FRONTEND_API_KEY"; then
-    log "bootstrap org + api key para frontend"
-    BOOTSTRAP_ORG_SLUG="${BOOTSTRAP_ORG_SLUG_BASE}-$(date +%s)"
-    BOOTSTRAP_RESP="$(mktemp)"
-    HTTP_CODE="$(curl -sS -o "$BOOTSTRAP_RESP" -w '%{http_code}' \
-      -X POST \
-      -H 'Content-Type: application/json' \
-      -d "{\"name\":\"${BOOTSTRAP_ORG_NAME}\",\"slug\":\"${BOOTSTRAP_ORG_SLUG}\",\"actor\":\"bootstrap\"}" \
-      "${BACKEND_URL}/v1/orgs")"
-    if [[ "$HTTP_CODE" != "201" ]]; then
-      echo "No se pudo bootstrapear la org dev (HTTP ${HTTP_CODE})" >&2
-      cat "$BOOTSTRAP_RESP" >&2
-      exit 1
-    fi
-    FRONTEND_API_KEY="$(
-      python3 - "$BOOTSTRAP_RESP" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-
-raw_key = str(payload.get("raw_key", "")).strip()
-if not raw_key:
-    raise SystemExit("bootstrap response missing raw_key")
-print(raw_key)
-PY
-    )"
-    if gcloud secrets describe FRONTEND_API_KEY --project="$PROJECT_ID" >/dev/null 2>&1; then
-      printf '%s' "$FRONTEND_API_KEY" | gcloud secrets versions add FRONTEND_API_KEY --data-file=- --project="$PROJECT_ID" >/dev/null
-    else
-      printf '%s' "$FRONTEND_API_KEY" | gcloud secrets create FRONTEND_API_KEY --data-file=- --project="$PROJECT_ID" >/dev/null
-    fi
-  fi
+  echo "El deploy DEV requiere Clerk: seteá FRONTEND_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY_VALUE, CLERK_JWT_ISSUER_VALUE y CLERK_JWKS_URL_VALUE." >&2
+  exit 1
 fi
 
 # AI
@@ -274,7 +226,6 @@ log "building frontend static bundle"
   export VITE_API_URL="/"
   export VITE_AI_API_URL="/"
   export VITE_CLERK_PUBLISHABLE_KEY="$FRONTEND_CLERK_PUBLISHABLE_KEY"
-  export VITE_API_KEY="$FRONTEND_API_KEY"
   npm ci
   npm run build
 )

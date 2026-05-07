@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS workshops.customer_assets (
     id uuid PRIMARY KEY,
-    org_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
     asset_type text NOT NULL,
     customer_id uuid,
     customer_name text NOT NULL DEFAULT '',
@@ -20,18 +20,18 @@ CREATE TABLE IF NOT EXISTS workshops.customer_assets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_customer_assets_org_type_active
-    ON workshops.customer_assets (org_id, asset_type, archived_at);
+    ON workshops.customer_assets (tenant_id, asset_type, archived_at);
 
 CREATE INDEX IF NOT EXISTS idx_customer_assets_org_type_id
-    ON workshops.customer_assets (org_id, asset_type, id DESC);
+    ON workshops.customer_assets (tenant_id, asset_type, id DESC);
 
 INSERT INTO workshops.customer_assets (
-    id, org_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
+    id, tenant_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
     year, color, notes, metadata, is_favorite, tags, archived_at, created_at, updated_at
 )
 SELECT
     id,
-    org_id,
+    tenant_id,
     'vehicle',
     customer_id,
     customer_name,
@@ -54,7 +54,7 @@ SELECT
     updated_at
 FROM workshops.vehicles
 ON CONFLICT (id) DO UPDATE
-    SET org_id = EXCLUDED.org_id,
+    SET tenant_id = EXCLUDED.tenant_id,
         asset_type = EXCLUDED.asset_type,
         customer_id = EXCLUDED.customer_id,
         customer_name = EXCLUDED.customer_name,
@@ -72,12 +72,12 @@ ON CONFLICT (id) DO UPDATE
         updated_at = EXCLUDED.updated_at;
 
 INSERT INTO workshops.customer_assets (
-    id, org_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
+    id, tenant_id, asset_type, customer_id, customer_name, label, brand, model, serial_number,
     year, color, notes, metadata, is_favorite, tags, archived_at, created_at, updated_at
 )
 SELECT
     id,
-    org_id,
+    tenant_id,
     'bicycle',
     customer_id,
     customer_name,
@@ -102,7 +102,7 @@ SELECT
     updated_at
 FROM workshops.bicycles
 ON CONFLICT (id) DO UPDATE
-    SET org_id = EXCLUDED.org_id,
+    SET tenant_id = EXCLUDED.tenant_id,
         asset_type = EXCLUDED.asset_type,
         customer_id = EXCLUDED.customer_id,
         customer_name = EXCLUDED.customer_name,

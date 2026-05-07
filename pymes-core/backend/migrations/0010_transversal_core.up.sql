@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS purchases (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     number text NOT NULL,
     supplier_id uuid REFERENCES suppliers(id),
     supplier_name text NOT NULL DEFAULT '',
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, number)
+    UNIQUE(tenant_id, number)
 );
 
 CREATE TABLE IF NOT EXISTS purchase_items (
@@ -30,13 +30,13 @@ CREATE TABLE IF NOT EXISTS purchase_items (
     sort_order int NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_purchases_org ON purchases(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchases_org ON purchases(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchases_supplier ON purchases(supplier_id) WHERE supplier_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_purchases_org_status ON purchases(org_id, status);
+CREATE INDEX IF NOT EXISTS idx_purchases_org_status ON purchases(tenant_id, status);
 
 CREATE TABLE IF NOT EXISTS accounts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     type text NOT NULL CHECK (type IN ('receivable', 'payable')),
     entity_type text NOT NULL CHECK (entity_type IN ('customer', 'supplier')),
     entity_id uuid NOT NULL,
@@ -45,17 +45,17 @@ CREATE TABLE IF NOT EXISTS accounts (
     currency text NOT NULL DEFAULT 'ARS',
     credit_limit numeric(15,2) NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, entity_type, entity_id)
+    UNIQUE(tenant_id, entity_type, entity_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(org_id, type);
-CREATE INDEX IF NOT EXISTS idx_accounts_entity ON accounts(org_id, entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(org_id) WHERE balance != 0;
+CREATE INDEX IF NOT EXISTS idx_accounts_org ON accounts(tenant_id, type);
+CREATE INDEX IF NOT EXISTS idx_accounts_entity ON accounts(tenant_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_balance ON accounts(tenant_id) WHERE balance != 0;
 
 CREATE TABLE IF NOT EXISTS account_movements (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     type text NOT NULL CHECK (type IN ('charge', 'payment', 'adjustment', 'void')),
     amount numeric(15,2) NOT NULL,
     balance numeric(15,2) NOT NULL,
@@ -67,11 +67,11 @@ CREATE TABLE IF NOT EXISTS account_movements (
 );
 
 CREATE INDEX IF NOT EXISTS idx_account_movements_account ON account_movements(account_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_account_movements_org ON account_movements(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_account_movements_org ON account_movements(tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS payments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     reference_type text NOT NULL CHECK (reference_type IN ('sale', 'purchase')),
     reference_id uuid NOT NULL,
     method text NOT NULL DEFAULT 'cash' CHECK (method IN ('cash', 'card', 'transfer', 'check', 'other', 'credit_note')),
@@ -82,12 +82,12 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(org_id, reference_type, reference_id);
-CREATE INDEX IF NOT EXISTS idx_payments_org ON payments(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(tenant_id, reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_payments_org ON payments(tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS returns (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     number text NOT NULL,
     sale_id uuid NOT NULL REFERENCES sales(id),
     reason text NOT NULL DEFAULT 'other' CHECK (reason IN ('defective', 'wrong_item', 'changed_mind', 'other')),
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS returns (
     notes text NOT NULL DEFAULT '',
     created_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, number)
+    UNIQUE(tenant_id, number)
 );
 
 CREATE TABLE IF NOT EXISTS return_items (
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS return_items (
 
 CREATE TABLE IF NOT EXISTS credit_notes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     number text NOT NULL,
     customer_id uuid NOT NULL REFERENCES customers(id),
     return_id uuid NOT NULL REFERENCES returns(id),
@@ -126,16 +126,16 @@ CREATE TABLE IF NOT EXISTS credit_notes (
     expires_at timestamptz,
     status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'used', 'expired', 'voided')),
     created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, number)
+    UNIQUE(tenant_id, number)
 );
 
-CREATE INDEX IF NOT EXISTS idx_returns_org ON returns(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_returns_org ON returns(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_returns_sale ON returns(sale_id);
-CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(org_id, customer_id) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(tenant_id, customer_id) WHERE status = 'active';
 
 CREATE TABLE IF NOT EXISTS price_lists (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name text NOT NULL,
     description text NOT NULL DEFAULT '',
     is_default boolean NOT NULL DEFAULT false,
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS price_lists (
     is_active boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE(org_id, name)
+    UNIQUE(tenant_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS price_list_items (
@@ -153,11 +153,11 @@ CREATE TABLE IF NOT EXISTS price_list_items (
     PRIMARY KEY (price_list_id, product_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_price_lists_org ON price_lists(org_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_price_lists_org ON price_lists(tenant_id) WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS recurring_expenses (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     description text NOT NULL,
     amount numeric(15,2) NOT NULL,
     currency text NOT NULL DEFAULT 'ARS',
@@ -177,12 +177,12 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_recurring_expenses_org ON recurring_expenses(org_id) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_recurring_expenses_org ON recurring_expenses(tenant_id) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_recurring_expenses_due ON recurring_expenses(next_due_date) WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS appointments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     customer_id uuid REFERENCES customers(id),
     customer_name text NOT NULL DEFAULT '',
     customer_phone text NOT NULL DEFAULT '',
@@ -204,20 +204,20 @@ CREATE TABLE IF NOT EXISTS appointments (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_appointments_org_date ON appointments(org_id, start_at);
-CREATE INDEX IF NOT EXISTS idx_appointments_org_status ON appointments(org_id, status, start_at);
+CREATE INDEX IF NOT EXISTS idx_appointments_org_date ON appointments(tenant_id, start_at);
+CREATE INDEX IF NOT EXISTS idx_appointments_org_status ON appointments(tenant_id, status, start_at);
 CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id) WHERE customer_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_appointments_assigned ON appointments(org_id, assigned_to, start_at) WHERE assigned_to != '';
+CREATE INDEX IF NOT EXISTS idx_appointments_assigned ON appointments(tenant_id, assigned_to, start_at) WHERE assigned_to != '';
 
 CREATE TABLE IF NOT EXISTS appointment_slots (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     day_of_week int NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     start_time time NOT NULL,
     end_time time NOT NULL,
     slot_minutes int NOT NULL DEFAULT 60,
     max_per_slot int NOT NULL DEFAULT 1,
-    UNIQUE(org_id, day_of_week, start_time)
+    UNIQUE(tenant_id, day_of_week, start_time)
 );
 
 ALTER TABLE sales

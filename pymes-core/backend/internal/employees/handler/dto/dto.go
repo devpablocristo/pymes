@@ -1,55 +1,55 @@
 package dto
 
 type CreateEmployeeRequest struct {
-	FirstName  string   `json:"first_name"`
-	LastName   string   `json:"last_name"`
-	Email      string   `json:"email"`
-	Phone      string   `json:"phone"`
-	Position   string   `json:"position"`
-	Status     string   `json:"status"`
-	HireDate   string   `json:"hire_date"`
-	EndDate    string   `json:"end_date"`
-	Notes      string   `json:"notes"`
-	IsFavorite *bool    `json:"is_favorite"`
-	Tags       []string `json:"tags"`
+	FirstName  string         `json:"first_name"`
+	LastName   string         `json:"last_name"`
+	Email      string         `json:"email"`
+	Phone      string         `json:"phone"`
+	Position   string         `json:"position"`
+	Status     string         `json:"status"`
+	HireDate   string         `json:"hire_date"`
+	EndDate    string         `json:"end_date"`
+	Notes      string         `json:"notes"`
+	IsFavorite *bool          `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
 	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 type UpdateEmployeeRequest struct {
-	FirstName  *string   `json:"first_name"`
-	LastName   *string   `json:"last_name"`
-	Email      *string   `json:"email"`
-	Phone      *string   `json:"phone"`
-	Position   *string   `json:"position"`
-	Status     *string   `json:"status"`
-	HireDate   *string   `json:"hire_date"`
-	EndDate    *string   `json:"end_date"`
-	Notes      *string   `json:"notes"`
-	IsFavorite *bool     `json:"is_favorite"`
-	Tags       *[]string `json:"tags"`
+	FirstName  *string         `json:"first_name"`
+	LastName   *string         `json:"last_name"`
+	Email      *string         `json:"email"`
+	Phone      *string         `json:"phone"`
+	Position   *string         `json:"position"`
+	Status     *string         `json:"status"`
+	HireDate   *string         `json:"hire_date"`
+	EndDate    *string         `json:"end_date"`
+	Notes      *string         `json:"notes"`
+	IsFavorite *bool           `json:"is_favorite"`
+	Tags       *[]string       `json:"tags"`
 	Metadata   *map[string]any `json:"metadata"`
 }
 
 type EmployeeResponse struct {
-	ID         string   `json:"id"`
-	OrgID      string   `json:"org_id"`
-	FirstName  string   `json:"first_name"`
-	LastName   string   `json:"last_name"`
-	Email      string   `json:"email"`
-	Phone      string   `json:"phone"`
-	Position   string   `json:"position"`
-	Status     string   `json:"status"`
-	HireDate   string   `json:"hire_date,omitempty"`
-	EndDate    string   `json:"end_date,omitempty"`
-	UserID     string   `json:"user_id,omitempty"`
-	Notes      string           `json:"notes"`
-	IsFavorite bool             `json:"is_favorite"`
-	Tags       []string         `json:"tags"`
-	Metadata   map[string]any   `json:"metadata"`
-	CreatedBy  string           `json:"created_by"`
-	CreatedAt  string   `json:"created_at"`
-	UpdatedAt  string   `json:"updated_at"`
-	ArchivedAt string   `json:"archived_at,omitempty"`
+	ID         string         `json:"id"`
+	TenantID   string         `json:"tenant_id"`
+	FirstName  string         `json:"first_name"`
+	LastName   string         `json:"last_name"`
+	Email      string         `json:"email"`
+	Phone      string         `json:"phone"`
+	Position   string         `json:"position"`
+	Status     string         `json:"status"`
+	HireDate   string         `json:"hire_date,omitempty"`
+	EndDate    string         `json:"end_date,omitempty"`
+	UserID     string         `json:"user_id,omitempty"`
+	Notes      string         `json:"notes"`
+	IsFavorite bool           `json:"is_favorite"`
+	Tags       []string       `json:"tags"`
+	Metadata   map[string]any `json:"metadata"`
+	CreatedBy  string         `json:"created_by"`
+	CreatedAt  string         `json:"created_at"`
+	UpdatedAt  string         `json:"updated_at"`
+	ArchivedAt string         `json:"archived_at,omitempty"`
 }
 
 type ListEmployeesResponse struct {

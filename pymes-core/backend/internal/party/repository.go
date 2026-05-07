@@ -24,7 +24,7 @@ type Repository struct {
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
 type ListParams struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	Limit     int
 	After     *uuid.UUID
 	Search    string
@@ -37,7 +37,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]partydomain.Part
 
 	q := r.db.WithContext(ctx).
 		Model(&models.PartyModel{}).
-		Where("org_id = ? AND deleted_at IS NULL", p.OrgID)
+		Where("tenant_id = ? AND deleted_at IS NULL", p.TenantID)
 
 	if v := strings.TrimSpace(p.PartyType); v != "" {
 		q = q.Where("party_type = ?", v)
@@ -49,7 +49,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]partydomain.Part
 	if v := strings.TrimSpace(p.Role); v != "" {
 		q = q.Where(`EXISTS (
 			SELECT 1 FROM party_roles pr
-			WHERE pr.party_id = parties.id AND pr.org_id = parties.org_id AND pr.role = ? AND pr.is_active = true
+			WHERE pr.party_id = parties.id AND pr.tenant_id = parties.tenant_id AND pr.role = ? AND pr.is_active = true
 		)`, v)
 	}
 	if p.After != nil && *p.After != uuid.Nil {
@@ -91,7 +91,7 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 		meta, _ := json.Marshal(defaultMap(in.Metadata))
 		row := models.PartyModel{
 			ID:          uuid.New(),
-			OrgID:       in.OrgID,
+			TenantID:    in.TenantID,
 			PartyType:   strings.TrimSpace(in.PartyType),
 			DisplayName: strings.TrimSpace(in.DisplayName),
 			Email:       strings.TrimSpace(in.Email),
@@ -115,12 +115,12 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 			if strings.TrimSpace(role.Role) == "" {
 				continue
 			}
-			if err := createRoleWithTx(ctx, tx, row.OrgID, row.ID, role); err != nil {
+			if err := createRoleWithTx(ctx, tx, row.TenantID, row.ID, role); err != nil {
 				return err
 			}
 		}
 		var err error
-		out, err = getByIDWithTx(ctx, tx, row.OrgID, row.ID)
+		out, err = getByIDWithTx(ctx, tx, row.TenantID, row.ID)
 		return err
 	})
 	if err != nil {
@@ -129,8 +129,8 @@ func (r *Repository) Create(ctx context.Context, in partydomain.Party) (partydom
 	return out, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (partydomain.Party, error) {
-	return getByIDWithTx(ctx, r.db.WithContext(ctx), orgID, id)
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (partydomain.Party, error) {
+	return getByIDWithTx(ctx, r.db.WithContext(ctx), tenantID, id)
 }
 
 func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydomain.Party, error) {
@@ -139,7 +139,7 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 		addr, _ := json.Marshal(in.Address)
 		meta, _ := json.Marshal(defaultMap(in.Metadata))
 		res := tx.Model(&models.PartyModel{}).
-			Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+			Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
 			Updates(map[string]any{
 				"party_type":   strings.TrimSpace(in.PartyType),
 				"display_name": strings.TrimSpace(in.DisplayName),
@@ -163,7 +163,7 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 			return err
 		}
 		var err error
-		out, err = getByIDWithTx(ctx, tx, in.OrgID, in.ID)
+		out, err = getByIDWithTx(ctx, tx, in.TenantID, in.ID)
 		return err
 	})
 	if err != nil {
@@ -172,9 +172,9 @@ func (r *Repository) Update(ctx context.Context, in partydomain.Party) (partydom
 	return out, nil
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.PartyModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -185,13 +185,13 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) AddRole(ctx context.Context, orgID, partyID uuid.UUID, in partydomain.PartyRole) (partydomain.PartyRole, error) {
+func (r *Repository) AddRole(ctx context.Context, tenantID, partyID uuid.UUID, in partydomain.PartyRole) (partydomain.PartyRole, error) {
 	var out partydomain.PartyRole
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := createRoleWithTx(ctx, tx, orgID, partyID, in); err != nil {
+		if err := createRoleWithTx(ctx, tx, tenantID, partyID, in); err != nil {
 			return err
 		}
-		roles, err := loadRoles(ctx, tx, orgID, []uuid.UUID{partyID})
+		roles, err := loadRoles(ctx, tx, tenantID, []uuid.UUID{partyID})
 		if err != nil {
 			return err
 		}
@@ -209,8 +209,8 @@ func (r *Repository) AddRole(ctx context.Context, orgID, partyID uuid.UUID, in p
 	return out, nil
 }
 
-func (r *Repository) RemoveRole(ctx context.Context, orgID, partyID uuid.UUID, role string) error {
-	res := r.db.WithContext(ctx).Where("org_id = ? AND party_id = ? AND role = ?", orgID, partyID, strings.TrimSpace(role)).Delete(&models.PartyRoleModel{})
+func (r *Repository) RemoveRole(ctx context.Context, tenantID, partyID uuid.UUID, role string) error {
+	res := r.db.WithContext(ctx).Where("tenant_id = ? AND party_id = ? AND role = ?", tenantID, partyID, strings.TrimSpace(role)).Delete(&models.PartyRoleModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -220,10 +220,10 @@ func (r *Repository) RemoveRole(ctx context.Context, orgID, partyID uuid.UUID, r
 	return nil
 }
 
-func (r *Repository) ListRelationships(ctx context.Context, orgID, partyID uuid.UUID) ([]partydomain.PartyRelationship, error) {
+func (r *Repository) ListRelationships(ctx context.Context, tenantID, partyID uuid.UUID) ([]partydomain.PartyRelationship, error) {
 	var rows []models.PartyRelationshipModel
 	if err := r.db.WithContext(ctx).
-		Where("org_id = ? AND (from_party_id = ? OR to_party_id = ?)", orgID, partyID, partyID).
+		Where("tenant_id = ? AND (from_party_id = ? OR to_party_id = ?)", tenantID, partyID, partyID).
 		Order("created_at DESC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -235,7 +235,7 @@ func (r *Repository) CreateRelationship(ctx context.Context, in partydomain.Part
 	meta, _ := json.Marshal(defaultMap(in.Metadata))
 	row := models.PartyRelationshipModel{
 		ID:               uuid.New(),
-		OrgID:            in.OrgID,
+		TenantID:         in.TenantID,
 		FromPartyID:      in.FromPartyID,
 		ToPartyID:        in.ToPartyID,
 		RelationshipType: strings.TrimSpace(in.RelationshipType),
@@ -253,9 +253,9 @@ func (r *Repository) CreateRelationship(ctx context.Context, in partydomain.Part
 	return relationshipRowsToDomain([]models.PartyRelationshipModel{row})[0], nil
 }
 
-func getByIDWithTx(ctx context.Context, tx *gorm.DB, orgID, id uuid.UUID) (partydomain.Party, error) {
+func getByIDWithTx(ctx context.Context, tx *gorm.DB, tenantID, id uuid.UUID) (partydomain.Party, error) {
 	var row models.PartyModel
-	if err := tx.WithContext(ctx).Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).Take(&row).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).Take(&row).Error; err != nil {
 		return partydomain.Party{}, err
 	}
 	parties, err := hydrateWithTx(ctx, tx, []models.PartyModel{row})
@@ -277,11 +277,11 @@ func hydrateWithTx(ctx context.Context, tx *gorm.DB, rows []models.PartyModel) (
 		return nil, nil
 	}
 	ids := make([]uuid.UUID, 0, len(rows))
-	orgID := rows[0].OrgID
+	tenantID := rows[0].TenantID
 	for _, row := range rows {
 		ids = append(ids, row.ID)
 	}
-	roles, err := loadRoles(ctx, tx, orgID, ids)
+	roles, err := loadRoles(ctx, tx, tenantID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func hydrateWithTx(ctx context.Context, tx *gorm.DB, rows []models.PartyModel) (
 	if err != nil {
 		return nil, err
 	}
-	orgs, err := loadOrganizations(ctx, tx, ids)
+	tenants, err := loadOrganizations(ctx, tx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -299,14 +299,14 @@ func hydrateWithTx(ctx context.Context, tx *gorm.DB, rows []models.PartyModel) (
 	}
 	out := make([]partydomain.Party, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toDomain(row, roles[row.ID], persons[row.ID], orgs[row.ID], agents[row.ID]))
+		out = append(out, toDomain(row, roles[row.ID], persons[row.ID], tenants[row.ID], agents[row.ID]))
 	}
 	return out, nil
 }
 
-func loadRoles(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID][]partydomain.PartyRole, error) {
+func loadRoles(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID][]partydomain.PartyRole, error) {
 	var rows []models.PartyRoleModel
-	if err := tx.WithContext(ctx).Where("org_id = ? AND party_id IN ?", orgID, ids).Order("created_at ASC").Find(&rows).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("tenant_id = ? AND party_id IN ?", tenantID, ids).Order("created_at ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make(map[uuid.UUID][]partydomain.PartyRole, len(ids))
@@ -318,7 +318,7 @@ func loadRoles(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, ids []uuid.UUI
 		out[row.PartyID] = append(out[row.PartyID], partydomain.PartyRole{
 			ID:          row.ID,
 			PartyID:     row.PartyID,
-			OrgID:       row.OrgID,
+			TenantID:    row.TenantID,
 			Role:        row.Role,
 			IsActive:    row.IsActive,
 			PriceListID: row.PriceListID,
@@ -416,12 +416,12 @@ func upsertExtension(ctx context.Context, tx *gorm.DB, partyID uuid.UUID, partyT
 	}
 }
 
-func createRoleWithTx(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID, in partydomain.PartyRole) error {
+func createRoleWithTx(ctx context.Context, tx *gorm.DB, tenantID, partyID uuid.UUID, in partydomain.PartyRole) error {
 	meta, _ := json.Marshal(defaultMap(in.Metadata))
 	row := models.PartyRoleModel{
 		ID:          uuid.New(),
 		PartyID:     partyID,
-		OrgID:       orgID,
+		TenantID:    tenantID,
 		Role:        strings.TrimSpace(in.Role),
 		IsActive:    true,
 		PriceListID: in.PriceListID,
@@ -431,7 +431,7 @@ func createRoleWithTx(ctx context.Context, tx *gorm.DB, orgID, partyID uuid.UUID
 	if row.Role == "" {
 		return errors.New("role is required")
 	}
-	return tx.WithContext(ctx).Where("party_id = ? AND org_id = ? AND role = ?", partyID, orgID, row.Role).
+	return tx.WithContext(ctx).Where("party_id = ? AND tenant_id = ? AND role = ?", partyID, tenantID, row.Role).
 		Assign(models.PartyRoleModel{IsActive: true, PriceListID: in.PriceListID, Metadata: meta}).
 		FirstOrCreate(&row).Error
 }
@@ -445,7 +445,7 @@ func relationshipRowsToDomain(rows []models.PartyRelationshipModel) []partydomai
 		}
 		out = append(out, partydomain.PartyRelationship{
 			ID:               row.ID,
-			OrgID:            row.OrgID,
+			TenantID:         row.TenantID,
 			FromPartyID:      row.FromPartyID,
 			ToPartyID:        row.ToPartyID,
 			RelationshipType: row.RelationshipType,
@@ -470,7 +470,7 @@ func toDomain(row models.PartyModel, roles []partydomain.PartyRole, person *part
 	}
 	return partydomain.Party{
 		ID:           row.ID,
-		OrgID:        row.OrgID,
+		TenantID:     row.TenantID,
 		PartyType:    row.PartyType,
 		DisplayName:  row.DisplayName,
 		Email:        row.Email,

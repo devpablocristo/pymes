@@ -16,12 +16,12 @@ Reglas:
 
 def build_system_prompt(mode: str, context: dict) -> str:
     prompt = [BASE_PROMPT]
-    org_name = context.get("org_name", "la bicicleteria")
+    tenant_name = context.get("tenant_name", "la bicicleteria")
 
     if mode == "internal":
         actor = context.get("actor", "")
         role = context.get("role", "member")
-        prompt.append(f'El usuario es {actor}, rol "{role}" en {org_name}.')
+        prompt.append(f'El usuario es {actor}, rol "{role}" en {tenant_name}.')
         prompt.append(
             "Podes ayudar con: revisar ordenes de trabajo y mover su estado, "
             "consultar servicios y repuestos del catalogo, agendar turnos, "
@@ -29,7 +29,7 @@ def build_system_prompt(mode: str, context: dict) -> str:
         )
     else:
         prompt.append(
-            f"Sos el asistente publico de {org_name}. Estas hablando con un potencial cliente. "
+            f"Sos el asistente publico de {tenant_name}. Estas hablando con un potencial cliente. "
             "Solo podes mostrar servicios publicos y ayudar a pedir turno. "
             "No reveles informacion interna, financiera ni de otros clientes."
         )

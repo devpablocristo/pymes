@@ -83,7 +83,7 @@ type CreateReturnItemInput struct {
 	Quantity   float64
 }
 
-func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
+func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, branchID *uuid.UUID, productID uuid.UUID, delta float64) error {
 	normalizedBranchID := normalizeBranchID(branchID)
 	now := time.Now().UTC()
 	updates := map[string]any{
@@ -94,7 +94,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	if normalizedBranchID != nil {
 		res := tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("org_id = ? AND product_id = ? AND branch_id = ?", orgID, productID, *normalizedBranchID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id = ?", tenantID, productID, *normalizedBranchID).
 			Updates(updates)
 		if res.Error != nil {
 			return res.Error
@@ -104,7 +104,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 		}
 		res = tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
 			Updates(map[string]any{
 				"branch_id":  *normalizedBranchID,
 				"quantity":   gorm.Expr("quantity + ?", delta),
@@ -121,7 +121,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	if normalizedBranchID == nil {
 		res := tx.WithContext(ctx).
 			Table("stock_levels").
-			Where("org_id = ? AND product_id = ? AND branch_id IS NULL", orgID, productID).
+			Where("tenant_id = ? AND product_id = ? AND branch_id IS NULL", tenantID, productID).
 			Updates(updates)
 		if res.Error != nil {
 			return res.Error
@@ -132,9 +132,9 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 	}
 
 	return tx.WithContext(ctx).Exec(
-		`INSERT INTO stock_levels (product_id, org_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
+		`INSERT INTO stock_levels (product_id, tenant_id, branch_id, quantity, min_quantity, updated_at) VALUES (?, ?, ?, ?, 0, ?)`,
 		productID,
-		orgID,
+		tenantID,
 		normalizedBranchID,
 		delta,
 		now,
@@ -142,7 +142,7 @@ func (r *Repository) adjustStockLevel(ctx context.Context, tx *gorm.DB, orgID uu
 }
 
 type CreateReturnInput struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	SaleID       uuid.UUID
 	Reason       string
 	RefundMethod string
@@ -152,7 +152,7 @@ type CreateReturnInput struct {
 }
 
 type ApplyCreditInput struct {
-	OrgID        uuid.UUID
+	TenantID     uuid.UUID
 	SaleID       uuid.UUID
 	CreditNoteID uuid.UUID
 	Amount       float64
@@ -161,14 +161,14 @@ type ApplyCreditInput struct {
 
 // CreateManualCreditNoteInput registra una nota de crédito sin devolución (party + monto).
 type CreateManualCreditNoteInput struct {
-	OrgID     uuid.UUID
+	TenantID  uuid.UUID
 	PartyID   uuid.UUID
 	Amount    float64
 	Actor     string
 	ExpiresAt *time.Time
 }
 
-func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
+func (r *Repository) List(ctx context.Context, tenantID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
 	if err != nil {
@@ -182,7 +182,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.deleted_at IS NULL", orgID).
+		Where("r.tenant_id = ? AND r.deleted_at IS NULL", tenantID).
 		Order("r.created_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -196,7 +196,7 @@ func (r *Repository) List(ctx context.Context, orgID uuid.UUID, limit int) ([]re
 	return out, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]returndomain.Return, error) {
+func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]returndomain.Return, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
 	if err != nil {
@@ -210,7 +210,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.deleted_at IS NOT NULL", orgID).
+		Where("r.tenant_id = ? AND r.deleted_at IS NOT NULL", tenantID).
 		Order("r.deleted_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
@@ -226,7 +226,7 @@ func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, limit in
 
 func (r *Repository) Update(ctx context.Context, in returndomain.Return) (returndomain.Return, error) {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", in.OrgID, in.ID).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", in.TenantID, in.ID).
 		Updates(map[string]any{
 			"notes":       strings.TrimSpace(in.Notes),
 			"is_favorite": in.IsFavorite,
@@ -238,12 +238,12 @@ func (r *Repository) Update(ctx context.Context, in returndomain.Return) (return
 	if res.RowsAffected == 0 {
 		return returndomain.Return{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.OrgID, in.ID)
+	return r.GetByID(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Update("deleted_at", time.Now().UTC())
 	if res.Error != nil {
 		return res.Error
@@ -254,9 +254,9 @@ func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) RestoreArchived(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) RestoreArchived(ctx context.Context, tenantID, id uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&returnmodels.ReturnModel{}).
-		Where("org_id = ? AND id = ? AND deleted_at IS NOT NULL", orgID, id).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
 		Update("deleted_at", nil)
 	if res.Error != nil {
 		return res.Error
@@ -267,12 +267,12 @@ func (r *Repository) RestoreArchived(ctx context.Context, orgID, id uuid.UUID) e
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("return_id = ?", id).Delete(&returnmodels.ReturnItemModel{}).Error; err != nil {
 			return err
 		}
-		res := tx.Where("org_id = ? AND id = ?", orgID, id).Delete(&returnmodels.ReturnModel{})
+		res := tx.Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&returnmodels.ReturnModel{})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -284,7 +284,7 @@ func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error 
 	return err
 }
 
-func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndomain.Return, error) {
+func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (returndomain.Return, error) {
 	salePartyIDExpr, err := r.salesPartyIDSelectExpr(ctx, "s")
 	if err != nil {
 		return returndomain.Return{}, err
@@ -297,7 +297,7 @@ func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (returndo
 	err = r.db.WithContext(ctx).Table("returns r").
 		Select(fmt.Sprintf("r.*, %s, %s", salePartyIDExpr, salePartyNameExpr)).
 		Joins("JOIN sales s ON s.id = r.sale_id").
-		Where("r.org_id = ? AND r.id = ? AND r.deleted_at IS NULL", orgID, id).
+		Where("r.tenant_id = ? AND r.id = ? AND r.deleted_at IS NULL", tenantID, id).
 		Take(&row).Error
 	if err != nil {
 		return returndomain.Return{}, err
@@ -322,7 +322,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			return err
 		}
 		var sale saleForReturnRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("branch_id, number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("branch_id, number, %s, %s, amount_paid, total, currency, payment_method", salePartyIDExpr, salePartyNameExpr)).Where("tenant_id = ? AND id = ?", in.TenantID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if len(in.Items) == 0 {
@@ -330,12 +330,12 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 		}
 
 		var settings tenantReturnSettingsRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("return_prefix, next_return_number, credit_note_prefix, next_credit_note_number").Where("tenant_id = ?", in.TenantID).Take(&settings).Error; err != nil {
 			return err
 		}
 
 		returnNumber := fmt.Sprintf("%s-%05d", defaultString(settings.ReturnPrefix, "DEV"), maxInt(settings.NextReturn, 1))
-		if err := tx.Exec("UPDATE tenant_settings SET next_return_number = ? WHERE org_id = ?", maxInt(settings.NextReturn, 1)+1, in.OrgID).Error; err != nil {
+		if err := tx.Exec("UPDATE tenant_settings SET next_return_number = ? WHERE tenant_id = ?", maxInt(settings.NextReturn, 1)+1, in.TenantID).Error; err != nil {
 			return err
 		}
 
@@ -361,7 +361,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			itemModels = append(itemModels, returnmodels.ReturnItemModel{ID: uuid.New(), ReturnID: returnID, SaleItemID: saleItem.ID, ProductID: saleItem.ProductID, Description: saleItem.Description, Quantity: item.Quantity, UnitPrice: saleItem.UnitPrice, TaxRate: saleItem.TaxRate, Subtotal: lineSubtotal})
 		}
 		total := subtotal + taxTotal
-		returnRow := returnmodels.ReturnModel{ID: returnID, OrgID: in.OrgID, Number: returnNumber, SaleID: in.SaleID, Reason: in.Reason, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, RefundMethod: in.RefundMethod, Status: "completed", Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC()}
+		returnRow := returnmodels.ReturnModel{ID: returnID, TenantID: in.TenantID, Number: returnNumber, SaleID: in.SaleID, Reason: in.Reason, Subtotal: subtotal, TaxTotal: taxTotal, Total: total, RefundMethod: in.RefundMethod, Status: "completed", Notes: in.Notes, CreatedBy: in.CreatedBy, CreatedAt: time.Now().UTC()}
 		if err := tx.Create(&returnRow).Error; err != nil {
 			return err
 		}
@@ -371,11 +371,11 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 
 		if in.RefundMethod == "credit_note" && sale.PartyID != nil && *sale.PartyID != uuid.Nil {
 			creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
-			if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+			if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE tenant_id = ?", maxInt(settings.NextCredit, 1)+1, in.TenantID).Error; err != nil {
 				return err
 			}
 			rid := returnID
-			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), OrgID: in.OrgID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: &rid, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
+			creditRow := returnmodels.CreditNoteModel{ID: uuid.New(), TenantID: in.TenantID, Number: creditNumber, PartyID: *sale.PartyID, ReturnID: &rid, Amount: total, UsedAmount: 0, Balance: total, Status: "active", CreatedAt: time.Now().UTC()}
 			if err := tx.Create(&creditRow).Error; err != nil {
 				return err
 			}
@@ -386,7 +386,7 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if method == "original_method" {
 				method = defaultString(sale.PaymentMethod, "other")
 			}
-			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'expense', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, in.OrgID, normalizeBranchID(sale.BranchID), total, defaultString(sale.Currency, "ARS"), defaultString(in.Notes, "sale return refund"), method, returnID, in.CreatedBy).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO cash_movements (id, tenant_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'expense', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, in.TenantID, normalizeBranchID(sale.BranchID), total, defaultString(sale.Currency, "ARS"), defaultString(in.Notes, "sale return refund"), method, returnID, in.CreatedBy).Error; err != nil {
 				return err
 			}
 			newAmountPaid := sale.AmountPaid - total
@@ -394,12 +394,12 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 				newAmountPaid = 0
 			}
 			var returnedTotal float64
-			if err := tx.Table("returns").Select("COALESCE(SUM(total),0)").Where("org_id = ? AND sale_id = ? AND status <> 'voided'", in.OrgID, in.SaleID).Take(&returnedTotal).Error; err != nil {
+			if err := tx.Table("returns").Select("COALESCE(SUM(total),0)").Where("tenant_id = ? AND sale_id = ? AND status <> 'voided'", in.TenantID, in.SaleID).Take(&returnedTotal).Error; err != nil {
 				return err
 			}
 			effectiveTotal := sale.Total - returnedTotal
 			status := paymentStatus(newAmountPaid, effectiveTotal)
-			if err := tx.Exec("UPDATE sales SET amount_paid = ?, payment_status = ? WHERE org_id = ? AND id = ?", newAmountPaid, status, in.OrgID, in.SaleID).Error; err != nil {
+			if err := tx.Exec("UPDATE sales SET amount_paid = ?, payment_status = ? WHERE tenant_id = ? AND id = ?", newAmountPaid, status, in.TenantID, in.SaleID).Error; err != nil {
 				return err
 			}
 		}
@@ -408,10 +408,10 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 			if item.ProductID == nil || *item.ProductID == uuid.Nil {
 				continue
 			}
-			if err := r.adjustStockLevel(ctx, tx, in.OrgID, sale.BranchID, *item.ProductID, item.Quantity); err != nil {
+			if err := r.adjustStockLevel(ctx, tx, in.TenantID, sale.BranchID, *item.ProductID, item.Quantity); err != nil {
 				return err
 			}
-			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'in', ?, 'return', ?, ?, ?, now())`, in.OrgID, normalizeBranchID(sale.BranchID), *item.ProductID, item.Quantity, returnID, "sale return restock", in.CreatedBy).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO stock_movements (id, tenant_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'in', ?, 'return', ?, ?, ?, now())`, in.TenantID, normalizeBranchID(sale.BranchID), *item.ProductID, item.Quantity, returnID, "sale return restock", in.CreatedBy).Error; err != nil {
 				return err
 			}
 		}
@@ -425,10 +425,10 @@ func (r *Repository) Create(ctx context.Context, in CreateReturnInput) (returndo
 	return out, credit, nil
 }
 
-func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string) (returndomain.Return, error) {
+func (r *Repository) Void(ctx context.Context, tenantID, id uuid.UUID, actor string) (returndomain.Return, error) {
 	var out returndomain.Return
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		item, err := r.GetByID(ctx, orgID, id)
+		item, err := r.GetByID(ctx, tenantID, id)
 		if err != nil {
 			return err
 		}
@@ -437,14 +437,14 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			return nil
 		}
 		var sale saleForVoidRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("branch_id, amount_paid, total, currency, payment_method").Where("org_id = ? AND id = ?", orgID, item.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select("branch_id, amount_paid, total, currency, payment_method").Where("tenant_id = ? AND id = ?", tenantID, item.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&returnmodels.ReturnModel{}).Where("org_id = ? AND id = ?", orgID, id).Update("status", "voided").Error; err != nil {
+		if err := tx.Model(&returnmodels.ReturnModel{}).Where("tenant_id = ? AND id = ?", tenantID, id).Update("status", "voided").Error; err != nil {
 			return err
 		}
 		if item.RefundMethod == "credit_note" {
-			if err := tx.Model(&returnmodels.CreditNoteModel{}).Where("org_id = ? AND return_id = ? AND status = 'active'", orgID, id).Updates(map[string]any{"status": "voided", "balance": 0}).Error; err != nil {
+			if err := tx.Model(&returnmodels.CreditNoteModel{}).Where("tenant_id = ? AND return_id = ? AND status = 'active'", tenantID, id).Updates(map[string]any{"status": "voided", "balance": 0}).Error; err != nil {
 				return err
 			}
 		} else {
@@ -452,17 +452,17 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			if method == "original_method" {
 				method = defaultString(sale.PaymentMethod, "other")
 			}
-			if err := tx.Exec(`INSERT INTO cash_movements (id, org_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'income', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, orgID, normalizeBranchID(sale.BranchID), item.Total, defaultString(sale.Currency, "ARS"), "return void reversal", method, id, actor).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO cash_movements (id, tenant_id, branch_id, type, amount, currency, category, description, payment_method, reference_type, reference_id, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, 'income', ?, ?, 'return', ?, ?, 'return', ?, ?, now())`, tenantID, normalizeBranchID(sale.BranchID), item.Total, defaultString(sale.Currency, "ARS"), "return void reversal", method, id, actor).Error; err != nil {
 				return err
 			}
 			newAmountPaid := sale.AmountPaid + item.Total
 			var returnedTotal float64
-			if err := tx.Table("returns").Select("COALESCE(SUM(total),0)").Where("org_id = ? AND sale_id = ? AND status <> 'voided'", orgID, item.SaleID).Take(&returnedTotal).Error; err != nil {
+			if err := tx.Table("returns").Select("COALESCE(SUM(total),0)").Where("tenant_id = ? AND sale_id = ? AND status <> 'voided'", tenantID, item.SaleID).Take(&returnedTotal).Error; err != nil {
 				return err
 			}
 			effectiveTotal := sale.Total - returnedTotal
 			status := paymentStatus(newAmountPaid, effectiveTotal)
-			if err := tx.Exec("UPDATE sales SET amount_paid = ?, payment_status = ? WHERE org_id = ? AND id = ?", newAmountPaid, status, orgID, item.SaleID).Error; err != nil {
+			if err := tx.Exec("UPDATE sales SET amount_paid = ?, payment_status = ? WHERE tenant_id = ? AND id = ?", newAmountPaid, status, tenantID, item.SaleID).Error; err != nil {
 				return err
 			}
 		}
@@ -470,14 +470,14 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 			if ri.ProductID == nil || *ri.ProductID == uuid.Nil {
 				continue
 			}
-			if err := r.adjustStockLevel(ctx, tx, orgID, sale.BranchID, *ri.ProductID, -ri.Quantity); err != nil {
+			if err := r.adjustStockLevel(ctx, tx, tenantID, sale.BranchID, *ri.ProductID, -ri.Quantity); err != nil {
 				return err
 			}
-			if err := tx.Exec(`INSERT INTO stock_movements (id, org_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'out', ?, 'return_void', ?, ?, ?, now())`, orgID, normalizeBranchID(sale.BranchID), *ri.ProductID, ri.Quantity, id, "return void stock reversal", actor).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO stock_movements (id, tenant_id, branch_id, product_id, type, quantity, reason, reference_id, notes, created_by, created_at) VALUES (gen_random_uuid(), ?, ?, ?, 'out', ?, 'return_void', ?, ?, ?, now())`, tenantID, normalizeBranchID(sale.BranchID), *ri.ProductID, ri.Quantity, id, "return void stock reversal", actor).Error; err != nil {
 				return err
 			}
 		}
-		out, err = r.GetByID(ctx, orgID, id)
+		out, err = r.GetByID(ctx, tenantID, id)
 		return err
 	})
 	if err != nil {
@@ -486,9 +486,9 @@ func (r *Repository) Void(ctx context.Context, orgID, id uuid.UUID, actor string
 	return out, nil
 }
 
-func (r *Repository) ListCreditNotes(ctx context.Context, orgID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error) {
+func (r *Repository) ListCreditNotes(ctx context.Context, tenantID uuid.UUID, partyID *uuid.UUID, limit int) ([]returndomain.CreditNote, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&returnmodels.CreditNoteModel{}).Where("org_id = ?", orgID)
+	q := r.db.WithContext(ctx).Model(&returnmodels.CreditNoteModel{}).Where("tenant_id = ?", tenantID)
 	if partyID != nil && *partyID != uuid.Nil {
 		q = q.Where("party_id = ?", *partyID)
 	}
@@ -503,9 +503,9 @@ func (r *Repository) ListCreditNotes(ctx context.Context, orgID uuid.UUID, party
 	return out, nil
 }
 
-func (r *Repository) GetCreditNote(ctx context.Context, orgID, id uuid.UUID) (returndomain.CreditNote, error) {
+func (r *Repository) GetCreditNote(ctx context.Context, tenantID, id uuid.UUID) (returndomain.CreditNote, error) {
 	var row returnmodels.CreditNoteModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
 		return returndomain.CreditNote{}, err
 	}
 	return toCreditDomain(row), nil
@@ -519,14 +519,14 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 			return err
 		}
 		var note returnmodels.CreditNoteModel
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("org_id = ? AND id = ?", in.OrgID, in.CreditNoteID).Take(&note).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ? AND id = ?", in.TenantID, in.CreditNoteID).Take(&note).Error; err != nil {
 			return err
 		}
 		if note.Status != "active" {
 			return domainerr.BusinessRule("credit note is not active")
 		}
 		var sale saleForCreditRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("total, amount_paid, %s", salePartyIDExpr)).Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).Take(&sale).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("sales").Select(fmt.Sprintf("total, amount_paid, %s", salePartyIDExpr)).Where("tenant_id = ? AND id = ?", in.TenantID, in.SaleID).Take(&sale).Error; err != nil {
 			return err
 		}
 		if sale.PartyID == nil || *sale.PartyID != note.PartyID {
@@ -540,11 +540,11 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 		if amount <= 0 {
 			return domainerr.BusinessRule("no pending balance to apply")
 		}
-		if err := tx.Exec(`INSERT INTO payments (id, org_id, reference_type, reference_id, method, amount, notes, received_at, created_by, created_at) VALUES (?, ?, 'sale', ?, 'credit_note', ?, ?, now(), ?, now())`, uuid.New(), in.OrgID, in.SaleID, amount, "credit note applied", in.Actor).Error; err != nil {
+		if err := tx.Exec(`INSERT INTO payments (id, tenant_id, reference_type, reference_id, method, amount, notes, received_at, created_by, created_at) VALUES (?, ?, 'sale', ?, 'credit_note', ?, ?, now(), ?, now())`, uuid.New(), in.TenantID, in.SaleID, amount, "credit note applied", in.Actor).Error; err != nil {
 			return err
 		}
 		newAmountPaid := sale.AmountPaid + amount
-		if err := tx.Exec(`UPDATE sales SET amount_paid = ?, payment_status = ? WHERE org_id = ? AND id = ?`, newAmountPaid, paymentStatus(newAmountPaid, sale.Total), in.OrgID, in.SaleID).Error; err != nil {
+		if err := tx.Exec(`UPDATE sales SET amount_paid = ?, payment_status = ? WHERE tenant_id = ? AND id = ?`, newAmountPaid, paymentStatus(newAmountPaid, sale.Total), in.TenantID, in.SaleID).Error; err != nil {
 			return err
 		}
 		usedAmount := note.UsedAmount + amount
@@ -557,7 +557,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 		if err := tx.Model(&returnmodels.CreditNoteModel{}).Where("id = ?", note.ID).Updates(map[string]any{"used_amount": usedAmount, "balance": balance, "status": status}).Error; err != nil {
 			return err
 		}
-		out = toCreditDomain(returnmodels.CreditNoteModel{ID: note.ID, OrgID: note.OrgID, Number: note.Number, PartyID: note.PartyID, ReturnID: note.ReturnID, Amount: note.Amount, UsedAmount: usedAmount, Balance: balance, ExpiresAt: note.ExpiresAt, Status: status, CreatedAt: note.CreatedAt})
+		out = toCreditDomain(returnmodels.CreditNoteModel{ID: note.ID, TenantID: note.TenantID, Number: note.Number, PartyID: note.PartyID, ReturnID: note.ReturnID, Amount: note.Amount, UsedAmount: usedAmount, Balance: balance, ExpiresAt: note.ExpiresAt, Status: status, CreatedAt: note.CreatedAt})
 		return nil
 	})
 	if err != nil {
@@ -567,7 +567,7 @@ func (r *Repository) ApplyCredit(ctx context.Context, in ApplyCreditInput) (retu
 }
 
 func toReturnDomain(row returnmodels.ReturnModel, items []returnmodels.ReturnItemModel, partyID *uuid.UUID, partyName string) returndomain.Return {
-	out := returndomain.Return{ID: row.ID, OrgID: row.OrgID, Number: row.Number, SaleID: row.SaleID, PartyID: partyID, PartyName: partyName, Reason: row.Reason, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, RefundMethod: row.RefundMethod, Status: row.Status, Notes: row.Notes, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), ArchivedAt: row.DeletedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
+	out := returndomain.Return{ID: row.ID, TenantID: row.TenantID, Number: row.Number, SaleID: row.SaleID, PartyID: partyID, PartyName: partyName, Reason: row.Reason, Subtotal: row.Subtotal, TaxTotal: row.TaxTotal, Total: row.Total, RefundMethod: row.RefundMethod, Status: row.Status, Notes: row.Notes, IsFavorite: row.IsFavorite, Tags: append([]string(nil), row.Tags...), ArchivedAt: row.DeletedAt, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt}
 	for _, item := range items {
 		out.Items = append(out.Items, returndomain.ReturnItem{ID: item.ID, ReturnID: item.ReturnID, SaleItemID: item.SaleItemID, ProductID: item.ProductID, Description: item.Description, Quantity: item.Quantity, UnitPrice: item.UnitPrice, TaxRate: item.TaxRate, Subtotal: item.Subtotal})
 	}
@@ -583,7 +583,7 @@ func creditNoteReturnID(row returnmodels.CreditNoteModel) uuid.UUID {
 
 func toCreditDomain(row returnmodels.CreditNoteModel) returndomain.CreditNote {
 	return returndomain.CreditNote{
-		ID: row.ID, OrgID: row.OrgID, Number: row.Number, PartyID: row.PartyID, ReturnID: creditNoteReturnID(row),
+		ID: row.ID, TenantID: row.TenantID, Number: row.Number, PartyID: row.PartyID, ReturnID: creditNoteReturnID(row),
 		Amount: row.Amount, UsedAmount: row.UsedAmount, Balance: row.Balance, ExpiresAt: row.ExpiresAt, Status: row.Status, CreatedAt: row.CreatedAt,
 	}
 }
@@ -595,23 +595,23 @@ func (r *Repository) CreateManualCreditNote(ctx context.Context, in CreateManual
 	var out returndomain.CreditNote
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var partyCount int64
-		if err := tx.Table("parties").Where("id = ? AND org_id = ?", in.PartyID, in.OrgID).Count(&partyCount).Error; err != nil {
+		if err := tx.Table("parties").Where("id = ? AND tenant_id = ?", in.PartyID, in.TenantID).Count(&partyCount).Error; err != nil {
 			return err
 		}
 		if partyCount == 0 {
 			return domainerr.NotFoundf("party", in.PartyID.String())
 		}
 		var settings tenantReturnSettingsRow
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("credit_note_prefix, next_credit_note_number").Where("org_id = ?", in.OrgID).Take(&settings).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Table("tenant_settings").Select("credit_note_prefix, next_credit_note_number").Where("tenant_id = ?", in.TenantID).Take(&settings).Error; err != nil {
 			return err
 		}
 		noteID := uuid.New()
 		creditNumber := fmt.Sprintf("%s-%05d", defaultString(settings.CreditPrefix, "NC"), maxInt(settings.NextCredit, 1))
-		if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE org_id = ?", maxInt(settings.NextCredit, 1)+1, in.OrgID).Error; err != nil {
+		if err := tx.Exec("UPDATE tenant_settings SET next_credit_note_number = ? WHERE tenant_id = ?", maxInt(settings.NextCredit, 1)+1, in.TenantID).Error; err != nil {
 			return err
 		}
 		row := returnmodels.CreditNoteModel{
-			ID: noteID, OrgID: in.OrgID, Number: creditNumber, PartyID: in.PartyID, ReturnID: nil,
+			ID: noteID, TenantID: in.TenantID, Number: creditNumber, PartyID: in.PartyID, ReturnID: nil,
 			Amount: in.Amount, UsedAmount: 0, Balance: in.Amount, ExpiresAt: in.ExpiresAt, Status: "active", CreatedAt: time.Now().UTC(),
 		}
 		if err := tx.Create(&row).Error; err != nil {

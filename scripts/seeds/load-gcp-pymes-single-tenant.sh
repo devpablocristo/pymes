@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Carga seeds del monorepo contra SOLO la base PostgreSQL `pymes` en GCP (proyecto Pymes).
-# No toca Review/Nexus ni bases de otros proyectos.
+# No toca Governance/Nexus ni bases de otros proyectos.
 #
 # Requisitos:
 #   - gcloud autenticado con acceso al proyecto y Secret Manager.
@@ -127,7 +127,7 @@ resolve_target_org_uuid() {
   local external_id_sql="${external_id//\'/\'\'}"
   local org_uuid
   org_uuid="$(psql "$PYMES_SEED_DATABASE_URI" -Atq -v ON_ERROR_STOP=1 \
-    -c "SELECT cast(id as text) FROM orgs WHERE external_id = '$external_id_sql';")"
+    -c "SELECT cast(id as text) FROM tenants WHERE external_id = '$external_id_sql';")"
   org_uuid="$(printf '%s' "$org_uuid" | tr -d '[:space:]')"
   if [[ -n "$org_uuid" ]]; then
     printf '%s\n' "$org_uuid"
@@ -183,4 +183,4 @@ for sql_file in "${files[@]}"; do
   run_pymes_sql_file "$sql_file"
 done
 
-echo "OK — seeds aplicados en una sola org. Review/Nexus no fue tocado."
+echo "OK — seeds aplicados en una sola tenant. Governance/Nexus no fue tocado."

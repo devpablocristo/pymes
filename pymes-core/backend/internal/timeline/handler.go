@@ -15,7 +15,7 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error)
+	List(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]timelinedomain.Entry, error)
 	Record(ctx context.Context, in timelinedomain.Entry) (timelinedomain.Entry, error)
 }
 
@@ -34,12 +34,12 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
+	tenantID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.List(c.Request.Context(), orgID, entity, entityID, limit)
+	items, err := h.uc.List(c.Request.Context(), tenantID, entity, entityID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -48,7 +48,7 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) AddNote(c *gin.Context) {
-	orgID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
+	tenantID, entity, entityID, ok := handlers.ParseEntityRef(c, "entity", "id")
 	if !ok {
 		return
 	}
@@ -63,7 +63,7 @@ func (h *Handler) AddNote(c *gin.Context) {
 		title = "Nota manual"
 	}
 	entry, err := h.uc.Record(c.Request.Context(), timelinedomain.Entry{
-		OrgID:       orgID,
+		TenantID:    tenantID,
 		EntityType:  entity,
 		EntityID:    entityID,
 		EventType:   "note.added",

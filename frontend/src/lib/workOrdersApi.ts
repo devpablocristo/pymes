@@ -84,7 +84,7 @@ export type WorkOrderLineItem = {
 
 export type WorkOrder = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   branch_id?: string;
   number: string;
 

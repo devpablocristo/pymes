@@ -15,7 +15,7 @@ describe('schedulingHelpers', () => {
 
   it('builds professionals config with list mode', () => {
     const config = createProfessionalsCrudConfig();
-    expect(config.label).toBe('teacher');
+    expect(config.label).toBe('profesional');
     expect(config.viewModes?.[0]?.id).toBe('list');
     expect(config.columns).toHaveLength(6);
   });

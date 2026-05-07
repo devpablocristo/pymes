@@ -5,11 +5,11 @@ ALTER TABLE workshops.services
     ADD COLUMN IF NOT EXISTS segment TEXT NOT NULL DEFAULT 'auto_repair';
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_services_org_segment_code_idx
-    ON workshops.services (org_id, segment, code);
+    ON workshops.services (tenant_id, segment, code);
 
 CREATE TABLE IF NOT EXISTS workshops.bicycles (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     customer_id UUID NULL,
     customer_name TEXT NOT NULL DEFAULT '',
     frame_number TEXT NOT NULL,
@@ -26,11 +26,11 @@ CREATE TABLE IF NOT EXISTS workshops.bicycles (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_bicycles_org_frame_idx
-    ON workshops.bicycles (org_id, frame_number);
+    ON workshops.bicycles (tenant_id, frame_number);
 
 CREATE TABLE IF NOT EXISTS workshops.bike_work_orders (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     number TEXT NOT NULL,
     bicycle_id UUID NOT NULL REFERENCES workshops.bicycles(id),
     bicycle_label TEXT NOT NULL DEFAULT '',
@@ -59,14 +59,14 @@ CREATE TABLE IF NOT EXISTS workshops.bike_work_orders (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_bike_work_orders_org_number_idx
-    ON workshops.bike_work_orders (org_id, number);
+    ON workshops.bike_work_orders (tenant_id, number);
 
 CREATE INDEX IF NOT EXISTS workshops_bike_work_orders_org_status_idx
-    ON workshops.bike_work_orders (org_id, status);
+    ON workshops.bike_work_orders (tenant_id, status);
 
 CREATE TABLE IF NOT EXISTS workshops.bike_work_order_items (
     id UUID PRIMARY KEY,
-    org_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
     work_order_id UUID NOT NULL REFERENCES workshops.bike_work_orders(id) ON DELETE CASCADE,
     item_type TEXT NOT NULL,
     service_id UUID NULL,

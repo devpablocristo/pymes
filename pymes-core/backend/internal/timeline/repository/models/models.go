@@ -8,7 +8,7 @@ import (
 
 type TimelineEntryModel struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrgID       uuid.UUID `gorm:"type:uuid;index;not null"`
+	TenantID    uuid.UUID `gorm:"type:uuid;index;not null"`
 	EntityType  string    `gorm:"not null;index:idx_timeline_entity,priority:2"`
 	EntityID    uuid.UUID `gorm:"type:uuid;not null;index:idx_timeline_entity,priority:3"`
 	EventType   string    `gorm:"not null"`

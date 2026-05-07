@@ -1,6 +1,5 @@
 import type { RefObject } from 'react';
 import type { PymesAssistantAction, PymesAssistantChatBlock } from '../types/aiChat';
-import type { LanguageCode } from '../lib/i18n';
 import type { Msg } from './UnifiedChatPage.model';
 import { badgeClassName, buttonClassName, kpiTrendClassName } from './UnifiedChatPage.helpers';
 import { AssistantMarkdown } from './UnifiedChatMarkdown';

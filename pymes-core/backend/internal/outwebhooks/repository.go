@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/core/http/go/pagination"
@@ -17,9 +18,9 @@ type Repository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webhookdomain.Endpoint, error) {
+func (r *Repository) ListEndpoints(ctx context.Context, tenantID uuid.UUID) ([]webhookdomain.Endpoint, error) {
 	var rows []models.EndpointModel
-	if err := r.db.WithContext(ctx).Where("org_id = ?", orgID).Order("created_at DESC").Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Order("created_at DESC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]webhookdomain.Endpoint, 0, len(rows))
@@ -30,31 +31,31 @@ func (r *Repository) ListEndpoints(ctx context.Context, orgID uuid.UUID) ([]webh
 }
 
 func (r *Repository) CreateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error) {
-	row := models.EndpointModel{ID: in.ID, OrgID: in.OrgID, URL: in.URL, Secret: in.Secret, Events: in.Events, IsActive: in.IsActive, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt}
+	row := models.EndpointModel{ID: in.ID, TenantID: in.TenantID, URL: in.URL, Secret: in.Secret, Events: pq.StringArray(in.Events), IsActive: in.IsActive, CreatedBy: in.CreatedBy, CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt}
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
 	return toEndpointDomain(row), nil
 }
 
-func (r *Repository) GetEndpoint(ctx context.Context, orgID, id uuid.UUID) (webhookdomain.Endpoint, error) {
+func (r *Repository) GetEndpoint(ctx context.Context, tenantID, id uuid.UUID) (webhookdomain.Endpoint, error) {
 	var row models.EndpointModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
 	return toEndpointDomain(row), nil
 }
 
 func (r *Repository) UpdateEndpoint(ctx context.Context, in webhookdomain.Endpoint) (webhookdomain.Endpoint, error) {
-	updates := map[string]any{"url": in.URL, "secret": in.Secret, "events": in.Events, "is_active": in.IsActive, "updated_at": in.UpdatedAt}
-	if err := r.db.WithContext(ctx).Model(&models.EndpointModel{}).Where("org_id = ? AND id = ?", in.OrgID, in.ID).Updates(updates).Error; err != nil {
+	updates := map[string]any{"url": in.URL, "secret": in.Secret, "events": pq.StringArray(in.Events), "is_active": in.IsActive, "updated_at": in.UpdatedAt}
+	if err := r.db.WithContext(ctx).Model(&models.EndpointModel{}).Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Updates(updates).Error; err != nil {
 		return webhookdomain.Endpoint{}, err
 	}
-	return r.GetEndpoint(ctx, in.OrgID, in.ID)
+	return r.GetEndpoint(ctx, in.TenantID, in.ID)
 }
 
-func (r *Repository) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) error {
-	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.EndpointModel{})
+func (r *Repository) DeleteEndpoint(ctx context.Context, tenantID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&models.EndpointModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -64,10 +65,10 @@ func (r *Repository) DeleteEndpoint(ctx context.Context, orgID, id uuid.UUID) er
 	return nil
 }
 
-func (r *Repository) ListDeliveries(ctx context.Context, orgID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
+func (r *Repository) ListDeliveries(ctx context.Context, tenantID, endpointID uuid.UUID, limit int) ([]webhookdomain.Delivery, error) {
 	limit = pagination.NormalizeLimit(limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 	var endpoint models.EndpointModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, endpointID).Take(&endpoint).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, endpointID).Take(&endpoint).Error; err != nil {
 		return nil, err
 	}
 	var rows []models.DeliveryModel
@@ -81,9 +82,9 @@ func (r *Repository) ListDeliveries(ctx context.Context, orgID, endpointID uuid.
 	return out, nil
 }
 
-func (r *Repository) CreateOutbox(ctx context.Context, orgID uuid.UUID, eventType string, payload map[string]any) error {
+func (r *Repository) CreateOutbox(ctx context.Context, tenantID uuid.UUID, eventType string, payload map[string]any) error {
 	body, _ := json.Marshal(payload)
-	row := models.OutboxModel{ID: uuid.New(), OrgID: orgID, EventType: eventType, Payload: body, Status: "pending", CreatedAt: time.Now().UTC()}
+	row := models.OutboxModel{ID: uuid.New(), TenantID: tenantID, EventType: eventType, Payload: body, Status: "pending", CreatedAt: time.Now().UTC()}
 	return r.db.WithContext(ctx).Create(&row).Error
 }
 
@@ -101,9 +102,9 @@ func (r *Repository) MarkOutbox(ctx context.Context, id uuid.UUID, status, lastE
 	return r.db.WithContext(ctx).Model(&models.OutboxModel{}).Where("id = ?", id).Updates(updates).Error
 }
 
-func (r *Repository) ListEndpointsForEvent(ctx context.Context, orgID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error) {
+func (r *Repository) ListEndpointsForEvent(ctx context.Context, tenantID uuid.UUID, eventType string) ([]webhookdomain.Endpoint, error) {
 	var rows []models.EndpointModel
-	if err := r.db.WithContext(ctx).Where("org_id = ? AND is_active = true", orgID).Find(&rows).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND is_active = true", tenantID).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]webhookdomain.Endpoint, 0, len(rows))
@@ -162,7 +163,7 @@ func (r *Repository) DeleteOldDeliveries(ctx context.Context, olderThan time.Tim
 }
 
 func toEndpointDomain(row models.EndpointModel) webhookdomain.Endpoint {
-	return webhookdomain.Endpoint{ID: row.ID, OrgID: row.OrgID, URL: row.URL, Secret: row.Secret, Events: row.Events, IsActive: row.IsActive, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return webhookdomain.Endpoint{ID: row.ID, TenantID: row.TenantID, URL: row.URL, Secret: row.Secret, Events: []string(row.Events), IsActive: row.IsActive, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func toDeliveryDomain(row models.DeliveryModel) webhookdomain.Delivery {

@@ -7,7 +7,7 @@ import (
 )
 
 type PaymentGatewayConnection struct {
-	OrgID          uuid.UUID
+	TenantID       uuid.UUID
 	Provider       string
 	ExternalUserID string
 	AccessToken    string
@@ -20,7 +20,7 @@ type PaymentGatewayConnection struct {
 
 type PaymentPreference struct {
 	ID              uuid.UUID
-	OrgID           uuid.UUID
+	TenantID        uuid.UUID
 	Provider        string
 	ExternalID      string
 	ReferenceType   string

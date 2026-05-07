@@ -27,7 +27,7 @@ from src.domains.workshops.auto_repair.public_router import router as auto_repai
 from runtime.auth import AuthMiddleware, AuthSettings, AuthContext
 from runtime.rate_limit import RateLimitMiddleware, RateLimitSettings
 from runtime.logging import bind_request_context, clear_request_context, configure_logging, get_logger
-from src.api.review_callback import router as review_callback_router
+from src.api.governance_callback import router as governance_callback_router
 from src.observability.otel import configure_opentelemetry
 from runtime.clients.review import ReviewClient, ReviewRequester
 from src.runtime_bootstrap import ClerkBearerVerifier, build_llm_provider
@@ -65,7 +65,7 @@ class LocalAPIKeyVerifier:
         payload = await self._resolve_api_key(key)
         if payload is None:
             return None
-        tenant = str(payload.get("org_id", "")).strip()
+        tenant = str(payload.get("tenant_id", "")).strip()
         key_id = str(payload.get("id", "")).strip()
         raw_scopes = payload.get("scopes", [])
         scopes = [str(item).strip() for item in raw_scopes if str(item).strip()] if isinstance(raw_scopes, list) else []
@@ -179,7 +179,7 @@ app.include_router(teachers_chat_router)
 app.include_router(teachers_public_router)
 app.include_router(auto_repair_chat_router)
 app.include_router(auto_repair_public_router)
-app.include_router(review_callback_router)
+app.include_router(governance_callback_router)
 register_common_exception_handlers(app, logger)
 
 

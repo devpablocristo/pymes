@@ -32,6 +32,6 @@ func (c *Client) BookScheduling(ctx context.Context, orgRef string, payload map[
 	return pymescoreops.BookScheduling(ctx, c.Client, orgRef, payload)
 }
 
-func (c *Client) CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error) {
-	return pymescoreops.CreateSalePaymentLink(ctx, c.Client, orgID, saleID)
+func (c *Client) CreateSalePaymentLink(ctx context.Context, tenantID, saleID string) (map[string]any, error) {
+	return pymescoreops.CreateSalePaymentLink(ctx, c.Client, tenantID, saleID)
 }

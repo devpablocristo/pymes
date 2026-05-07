@@ -8,7 +8,7 @@ import (
 
 type CashMovement struct {
 	ID            uuid.UUID  `json:"id"`
-	OrgID         uuid.UUID  `json:"org_id"`
+	TenantID      uuid.UUID  `json:"tenant_id"`
 	BranchID      *uuid.UUID `json:"branch_id,omitempty"`
 	Type          string     `json:"type"`
 	Amount        float64    `json:"amount"`
@@ -26,7 +26,7 @@ type CashMovement struct {
 }
 
 type CashSummary struct {
-	OrgID        uuid.UUID `json:"org_id"`
+	TenantID     uuid.UUID `json:"tenant_id"`
 	PeriodStart  time.Time `json:"period_start"`
 	PeriodEnd    time.Time `json:"period_end"`
 	TotalIncome  float64   `json:"total_income"`

@@ -16,9 +16,9 @@ async def send_payment_info(client: BackendClient, auth: AuthContext, sale_id: s
     return await client.request("GET", f"/v1/whatsapp/sale/{sale_id}/payment-info", auth=auth)
 
 
-async def get_public_quote_payment_link(client: BackendClient, org_id: str, quote_id: str) -> dict:
+async def get_public_quote_payment_link(client: BackendClient, tenant_id: str, quote_id: str) -> dict:
     return await client.request(
         "GET",
-        f"/v1/public/{org_id}/quote/{quote_id}/payment-link",
+        f"/v1/public/{tenant_id}/quote/{quote_id}/payment-link",
         include_internal=True,
     )

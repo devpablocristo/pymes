@@ -4,4 +4,4 @@ ALTER TABLE workshops.vehicles
     DROP COLUMN IF EXISTS archived_at;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workshops_vehicles_org_plate_idx
-    ON workshops.vehicles (org_id, license_plate);
+    ON workshops.vehicles (tenant_id, license_plate);

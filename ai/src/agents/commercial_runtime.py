@@ -126,7 +126,7 @@ async def _wrap_tool(
     name: str,
     handler,
     repo: AIRepository,
-    org_id: str,
+    tenant_id: str,
     conversation_id: str | None,
     policy: CommercialPolicy,
     state: CommercialRunState,
@@ -135,13 +135,13 @@ async def _wrap_tool(
     channel: str,
     confirmed_actions: set[str],
 ):
-    async def wrapped(*, org_id: str, **kwargs: Any) -> dict[str, Any]:
+    async def wrapped(*, tenant_id: str, **kwargs: Any) -> dict[str, Any]:
         if not policy.allows(name):
             message = f"La accion {name} no esta permitida en este canal."
             state.add_guardrail(message)
             await record_agent_event(
                 repo,
-                org_id=org_id,
+                tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 agent_mode=policy.agent_mode,
                 channel=channel,
@@ -159,7 +159,7 @@ async def _wrap_tool(
             state.require_confirmation(name)
             await record_agent_event(
                 repo,
-                org_id=org_id,
+                tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 agent_mode=policy.agent_mode,
                 channel=channel,
@@ -178,12 +178,12 @@ async def _wrap_tool(
             }
 
         try:
-            result = await handler(org_id=org_id, **kwargs)
+            result = await handler(tenant_id=tenant_id, **kwargs)
         except httpx.HTTPStatusError as exc:
             logger.warning("commercial_tool_backend_error", tool=name, status_code=exc.response.status_code)
             await record_agent_event(
                 repo,
-                org_id=org_id,
+                tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 agent_mode=policy.agent_mode,
                 channel=channel,
@@ -199,7 +199,7 @@ async def _wrap_tool(
         except Exception as exc:  # noqa: BLE001
             await record_agent_event(
                 repo,
-                org_id=org_id,
+                tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 agent_mode=policy.agent_mode,
                 channel=channel,
@@ -216,7 +216,7 @@ async def _wrap_tool(
         entity_type, entity_id = _entity_from_result(result)
         await record_agent_event(
             repo,
-            org_id=org_id,
+            tenant_id=tenant_id,
             conversation_id=conversation_id,
             agent_mode=policy.agent_mode,
             channel=channel,
@@ -237,47 +237,47 @@ async def _wrap_tool(
 
 async def _load_internal_conversation(repo: AIRepository, auth: AuthContext, conversation_id: str | None, message: str):
     if conversation_id:
-        conversation = await repo.get_conversation(auth.org_id, conversation_id)
+        conversation = await repo.get_conversation(auth.tenant_id, conversation_id)
         if conversation is None or conversation.mode != "internal":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
         if not can_access_internal_conversation(auth, conversation.user_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
         return conversation
     return await repo.create_conversation(
-        org_id=auth.org_id,
+        tenant_id=auth.tenant_id,
         mode="internal",
         user_id=get_internal_conversation_user_id(auth),
         title=message[:60],
     )
 
 
-async def _get_runtime_dossier(repo: AIRepository, org_id: str) -> dict[str, Any]:
+async def _get_runtime_dossier(repo: AIRepository, tenant_id: str) -> dict[str, Any]:
     getter = getattr(repo, "get_or_create_dossier", None)
     if getter is None:
         return copy.deepcopy(DEFAULT_DOSSIER)
-    dossier = await getter(org_id)
+    dossier = await getter(tenant_id)
     if isinstance(dossier, dict):
         return dossier
     return copy.deepcopy(DEFAULT_DOSSIER)
 
 
-async def _persist_dossier_if_changed(repo: AIRepository, org_id: str, before: dict[str, Any], after: dict[str, Any]) -> None:
+async def _persist_dossier_if_changed(repo: AIRepository, tenant_id: str, before: dict[str, Any], after: dict[str, Any]) -> None:
     if after == before:
         return
     updater = getattr(repo, "update_dossier", None)
     if updater is None:
         return
-    await updater(org_id, after)
+    await updater(tenant_id, after)
 
 
 async def hydrate_dossier_from_backend_settings(
     *,
     repo: AIRepository,
     backend_client: BackendClient,
-    org_id: str,
+    tenant_id: str,
     auth: AuthContext | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    dossier = await _get_runtime_dossier(repo, org_id)
+    dossier = await _get_runtime_dossier(repo, tenant_id)
     snapshot = copy.deepcopy(dossier)
     if auth is None:
         return dossier, snapshot
@@ -287,10 +287,10 @@ async def hydrate_dossier_from_backend_settings(
     try:
         tenant_settings = await settings_tools.get_tenant_settings(backend_client, auth)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("assistant_dossier_hydration_failed", org_id=org_id, error=str(exc))
+        logger.warning("assistant_dossier_hydration_failed", tenant_id=tenant_id, error=str(exc))
         return dossier, snapshot
     if isinstance(tenant_settings, dict) and tenant_settings:
         sync_business_from_settings(dossier, tenant_settings)
-        await _persist_dossier_if_changed(repo, org_id, snapshot, dossier)
+        await _persist_dossier_if_changed(repo, tenant_id, snapshot, dossier)
         snapshot = copy.deepcopy(dossier)
     return dossier, snapshot

@@ -15,7 +15,7 @@ type Preference struct {
 
 type Log struct {
 	ID                uuid.UUID `json:"id"`
-	OrgID             uuid.UUID `json:"org_id"`
+	TenantID          uuid.UUID `json:"tenant_id"`
 	UserID            uuid.UUID `json:"user_id"`
 	NotificationType  string    `json:"notification_type"`
 	Channel           string    `json:"channel"`

@@ -13,18 +13,18 @@ from src.db.repository import AIRepository
 from src.db.engine import get_session
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/v1/internal", tags=["review-callback"])
+router = APIRouter(prefix="/v1/internal", tags=["governance-callback"])
 
 
-class ReviewCallbackPayload(BaseModel):
+class GovernanceCallbackPayload(BaseModel):
     request_id: str
     decision: str  # approved | rejected | denied
     decided_by: str = ""
     decision_note: str = ""
 
 
-@router.post("/review-callback", status_code=status.HTTP_200_OK)
-async def review_callback(payload: ReviewCallbackPayload, request: Request) -> dict[str, str]:
+@router.post("/governance-callback", status_code=status.HTTP_200_OK)
+async def governance_callback(payload: GovernanceCallbackPayload, request: Request) -> dict[str, str]:
     """Recibe notificación de governance cuando una aprobación se resuelve."""
     settings = request.app.state.settings
 
@@ -37,7 +37,7 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
         UUID(payload.request_id)
     except ValueError:
         logger.warning(
-            "review_callback_invalid_request_id",
+            "governance_callback_invalid_request_id",
             extra={"request_id": payload.request_id},
         )
         return {"status": "ignored", "reason": "invalid request_id"}
@@ -45,11 +45,11 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
     async with get_session() as session:
         repo = AIRepository(session)
 
-        # Buscar conversación con este review_request_id pendiente
+        # Buscar conversación con este request de governance pendiente.
         conversation = await repo.find_conversation_by_review_request(payload.request_id)
         if conversation is None:
             logger.warning(
-                "review_callback_no_conversation",
+                "governance_callback_no_conversation",
                 extra={"request_id": payload.request_id},
             )
             return {"status": "ignored", "reason": "no matching conversation"}
@@ -57,7 +57,7 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
         pending_action = conversation.pending_action
         if not pending_action:
             logger.warning(
-                "review_callback_no_pending_action",
+                "governance_callback_no_pending_action",
                 extra={"request_id": payload.request_id, "conversation_id": conversation.id},
             )
             return {"status": "ignored", "reason": "no pending action"}
@@ -79,14 +79,14 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
         elif is_rejected:
             reply = "Tu solicitud fue revisada y no pudo ser aprobada en este momento. Por favor, comunicate directamente con el local para más información."
         else:
-            logger.warning("review_callback_unknown_decision", extra={"decision": payload.decision})
+            logger.warning("governance_callback_unknown_decision", extra={"decision": payload.decision})
             return {"status": "ignored", "reason": "unknown decision"}
 
         # Enviar respuesta por WhatsApp si hay teléfono de contacto
         if conversation.contact_phone and reply:
             await _send_whatsapp_reply(
                 request=request,
-                org_id=conversation.org_id,
+                tenant_id=conversation.tenant_id,
                 contact_phone=conversation.contact_phone,
                 party_id=conversation.party_id,
                 reply=reply,
@@ -98,11 +98,11 @@ async def review_callback(payload: ReviewCallbackPayload, request: Request) -> d
             "role": "assistant",
             "content": reply,
             "ts": now,
-            "review_decision": payload.decision,
+            "governance_decision": payload.decision,
             "decided_by": payload.decided_by,
         }
         await repo.append_messages(
-            org_id=conversation.org_id,
+            tenant_id=conversation.tenant_id,
             conversation_id=conversation.id,
             new_messages=[assistant_message],
             tool_calls_count=0,
@@ -128,7 +128,7 @@ async def _execute_pending_action(
     tool_args = dict(pending_action.get("tool_args", {}))
 
     logger.info(
-        "review_callback_executing",
+        "governance_callback_executing",
         extra={
             "action_type": action_type,
             "tool_name": tool_name,
@@ -142,17 +142,17 @@ async def _execute_pending_action(
     try:
         if tool_name == "book_scheduling":
             from src.tools import scheduling
-            result = await scheduling.book_scheduling(backend_client, org_id=conversation.org_id, **tool_args)
+            result = await scheduling.book_scheduling(backend_client, tenant_id=conversation.tenant_id, **tool_args)
             return f"Tu turno fue confirmado. {result.get('message', 'Te esperamos!')}"
 
         if tool_name == "cancel_booking":
             from src.tools import scheduling
-            result = await scheduling.cancel_booking(backend_client, org_id=conversation.org_id, **tool_args)
+            result = await scheduling.cancel_booking(backend_client, tenant_id=conversation.tenant_id, **tool_args)
             return "Tu turno fue cancelado exitosamente."
 
         if tool_name == "create_sale":
             from src.tools import sales
-            auth_stub = type("Auth", (), {"org_id": conversation.org_id, "actor": decided_by, "role": "admin"})()
+            auth_stub = type("Auth", (), {"tenant_id": conversation.tenant_id, "actor": decided_by, "role": "admin"})()
             result = await sales.create_sale(backend_client, auth_stub, **tool_args)
             return f"La venta fue registrada. {result.get('message', '')}"
 
@@ -169,14 +169,14 @@ async def _execute_pending_action(
         return "Tu solicitud fue aprobada y procesada."
 
     except Exception:
-        logger.exception("review_callback_execution_failed", extra={"tool_name": tool_name})
+        logger.exception("governance_callback_execution_failed", extra={"tool_name": tool_name})
         return "Tu solicitud fue aprobada pero hubo un problema al procesarla. El equipo fue notificado."
 
 
 async def _send_whatsapp_reply(
     *,
     request: Request,
-    org_id: str,
+    tenant_id: str,
     contact_phone: str,
     party_id: str | None,
     reply: str,
@@ -198,6 +198,6 @@ async def _send_whatsapp_reply(
         )
     except Exception:
         logger.exception(
-            "review_callback_whatsapp_send_failed",
-            extra={"org_id": org_id, "contact_phone": contact_phone},
+            "governance_callback_whatsapp_send_failed",
+            extra={"tenant_id": tenant_id, "contact_phone": contact_phone},
         )

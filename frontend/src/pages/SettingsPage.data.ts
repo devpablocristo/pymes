@@ -18,10 +18,10 @@ export async function getMeWithTimeout(): Promise<MeProfileResponse> {
   return Promise.race([getMe(), rejectAfterMs(PROFILE_LOAD_TIMEOUT_MS, 'profile_fetch_timeout')]);
 }
 
-export function profileOrgLabel(auth: SessionResponse['auth'], clerkOrgName: string | null | undefined): string {
-  const clerk = clerkOrgName?.trim() || '';
-  const apiName = typeof auth.org_name === 'string' ? auth.org_name.trim() : '';
-  const id = auth.org_id?.trim() || '';
+export function profileTenantLabel(auth: SessionResponse['auth'], clerkTenantName: string | null | undefined): string {
+  const clerk = clerkTenantName?.trim() || '';
+  const apiName = typeof auth.tenant_name === 'string' ? auth.tenant_name.trim() : '';
+  const id = auth.tenant_id?.trim() || '';
   return clerk || apiName || id || '—';
 }
 

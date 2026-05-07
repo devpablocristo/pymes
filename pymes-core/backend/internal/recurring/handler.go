@@ -18,15 +18,15 @@ import (
 )
 
 type usecasesPort interface {
-	List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error)
-	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error)
+	List(ctx context.Context, tenantID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error)
+	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error)
 	Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error)
-	GetByID(ctx context.Context, orgID, id uuid.UUID) (recurringdomain.RecurringExpense, error)
+	GetByID(ctx context.Context, tenantID, id uuid.UUID) (recurringdomain.RecurringExpense, error)
 	Update(ctx context.Context, in recurringdomain.RecurringExpense, actor string) (recurringdomain.RecurringExpense, error)
-	Deactivate(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Deactivate(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -49,7 +49,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 }
 
 func (h *Handler) List(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
@@ -57,7 +57,7 @@ func (h *Handler) List(c *gin.Context) {
 	activeOnly := strings.ToLower(c.DefaultQuery("active", "true")) != "false"
 	archived := strings.EqualFold(strings.TrimSpace(c.Query("archived")), "true")
 	if archived {
-		items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+		items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
 		if err != nil {
 			httperrors.Respond(c, err)
 			return
@@ -65,7 +65,7 @@ func (h *Handler) List(c *gin.Context) {
 		handlers.WriteOffsetListResponse(c, items, limit, len(items))
 		return
 	}
-	items, err := h.uc.List(c.Request.Context(), orgID, activeOnly, limit)
+	items, err := h.uc.List(c.Request.Context(), tenantID, activeOnly, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -74,12 +74,12 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -89,9 +89,9 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	var req dto.CreateRecurringExpenseRequest
@@ -99,7 +99,7 @@ func (h *Handler) Create(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	payload, err := createRecurringPayload(orgID, req, authCtx.Actor)
+	payload, err := createRecurringPayload(tenantID, req, authCtx.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -113,11 +113,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -127,7 +127,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
@@ -136,7 +136,7 @@ func (h *Handler) Update(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	payload, err := updateRecurringPayload(orgID, id, req)
+	payload, err := updateRecurringPayload(tenantID, id, req)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -152,11 +152,11 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete realiza soft delete (archiva). Es la semántica canónica CRUD.
 func (h *Handler) Delete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -169,11 +169,11 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -182,18 +182,18 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, id, ok := parseOrgID(c)
+	tenantID, id, ok := parseOrgID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, authCtx.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, authCtx.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func createRecurringPayload(orgID uuid.UUID, req dto.CreateRecurringExpenseRequest, actor string) (recurringdomain.RecurringExpense, error) {
+func createRecurringPayload(tenantID uuid.UUID, req dto.CreateRecurringExpenseRequest, actor string) (recurringdomain.RecurringExpense, error) {
 	var supplierID *uuid.UUID
 	if req.SupplierID != nil && strings.TrimSpace(*req.SupplierID) != "" {
 		parsed, err := uuid.Parse(strings.TrimSpace(*req.SupplierID))
@@ -214,11 +214,11 @@ func createRecurringPayload(orgID uuid.UUID, req dto.CreateRecurringExpenseReque
 	if req.IsFavorite != nil {
 		isFavorite = *req.IsFavorite
 	}
-	return recurringdomain.RecurringExpense{OrgID: orgID, Description: req.Description, Amount: req.Amount, Currency: req.Currency, Category: req.Category, PaymentMethod: req.PaymentMethod, Frequency: req.Frequency, DayOfMonth: req.DayOfMonth, SupplierID: supplierID, NextDueDate: nextDueDate, Notes: req.Notes, IsActive: true, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: actor}, nil
+	return recurringdomain.RecurringExpense{TenantID: tenantID, Description: req.Description, Amount: req.Amount, Currency: req.Currency, Category: req.Category, PaymentMethod: req.PaymentMethod, Frequency: req.Frequency, DayOfMonth: req.DayOfMonth, SupplierID: supplierID, NextDueDate: nextDueDate, Notes: req.Notes, IsActive: true, IsFavorite: isFavorite, Tags: req.Tags, CreatedBy: actor}, nil
 }
 
-func updateRecurringPayload(orgID, id uuid.UUID, req dto.UpdateRecurringExpenseRequest) (recurringdomain.RecurringExpense, error) {
-	payload := recurringdomain.RecurringExpense{OrgID: orgID, ID: id}
+func updateRecurringPayload(tenantID, id uuid.UUID, req dto.UpdateRecurringExpenseRequest) (recurringdomain.RecurringExpense, error) {
+	payload := recurringdomain.RecurringExpense{TenantID: tenantID, ID: id}
 	if req.Description != nil {
 		payload.Description = strings.TrimSpace(*req.Description)
 	}
@@ -271,16 +271,16 @@ func updateRecurringPayload(orgID, id uuid.UUID, req dto.UpdateRecurringExpenseR
 
 func parseOrg(c *gin.Context) (uuid.UUID, bool) {
 	authCtx := handlers.GetAuthContext(c)
-	orgID, err := uuid.Parse(authCtx.OrgID)
+	tenantID, err := uuid.Parse(authCtx.TenantID)
 	if err != nil {
-		handlers.WriteValidation(c, "invalid org")
+		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, false
 	}
-	return orgID, true
+	return tenantID, true
 }
 
 func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
-	orgID, ok := parseOrg(c)
+	tenantID, ok := parseOrg(c)
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
@@ -289,5 +289,5 @@ func parseOrgID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return orgID, id, true
+	return tenantID, id, true
 }

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS catalog_services (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     code text,
     name text NOT NULL,
     description text NOT NULL DEFAULT '',
@@ -18,10 +18,10 @@ CREATE TABLE IF NOT EXISTS catalog_services (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_catalog_services_org_code
-    ON catalog_services(org_id, code)
+    ON catalog_services(tenant_id, code)
     WHERE deleted_at IS NULL AND code IS NOT NULL AND code != '';
-CREATE INDEX IF NOT EXISTS idx_catalog_services_org ON catalog_services(org_id) WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_catalog_services_org_name ON catalog_services(org_id, name) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_catalog_services_org ON catalog_services(tenant_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_catalog_services_org_name ON catalog_services(tenant_id, name) WHERE deleted_at IS NULL;
 
 ALTER TABLE sale_items
     ADD COLUMN IF NOT EXISTS service_id uuid REFERENCES catalog_services(id) ON DELETE SET NULL;
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS service_price_list_items (
 
 INSERT INTO catalog_services (
     id,
-    org_id,
+    tenant_id,
     code,
     name,
     description,
@@ -62,7 +62,7 @@ INSERT INTO catalog_services (
 )
 SELECT
     p.id,
-    p.org_id,
+    p.tenant_id,
     NULLIF(p.sku, ''),
     p.name,
     p.description,

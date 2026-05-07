@@ -21,26 +21,26 @@ class PublicChatRequest(BaseModel):
     phone: str | None = None
 
 
-@router.post("/v1/workshops/bike-shop/public/{org_slug}/chat")
+@router.post("/v1/workshops/bike-shop/public/{tenant_slug}/chat")
 async def chat_bike_shop_public(
     req: PublicChatRequest,
-    org_slug: str = Path(..., min_length=2),
+    tenant_slug: str = Path(..., min_length=2),
     llm=Depends(get_llm_provider),
     backend_client: BikeShopBackendClient = Depends(get_bike_shop_backend_client),
 ):
-    update_request_context(org_id=org_slug, user_id=req.phone or "external")
-    logger.info("bike_shop_public_chat_started", org_slug=org_slug, phone=req.phone or "")
+    update_request_context(tenant_id=tenant_slug, user_id=req.phone or "external")
+    logger.info("bike_shop_public_chat_started", tenant_slug=tenant_slug, phone=req.phone or "")
 
-    declarations, handlers = build_external_tools(backend_client, org_slug=org_slug)
+    declarations, handlers = build_external_tools(backend_client, tenant_slug=tenant_slug)
     llm_messages: list[Message] = [
-        Message(role="system", content=build_system_prompt("external", {"org_name": org_slug})),
+        Message(role="system", content=build_system_prompt("external", {"tenant_name": tenant_slug})),
         Message(role="user", content=req.message.strip()),
     ]
 
     async def on_success(result):
         logger.info(
             "bike_shop_public_chat_completed",
-            org_slug=org_slug,
+            tenant_slug=tenant_slug,
             tool_calls=len(result.tool_calls),
             tokens_input=result.tokens_input,
             tokens_output=result.tokens_output,
@@ -53,9 +53,9 @@ async def chat_bike_shop_public(
             llm_messages=llm_messages,
             declarations=declarations,
             handlers=handlers,
-            org_id=org_slug,
+            tenant_id=tenant_slug,
             failure_event="bike_shop_public_chat_failed",
-            failure_context={"org_slug": org_slug},
+            failure_context={"tenant_slug": tenant_slug},
             on_success=on_success,
         )
     )

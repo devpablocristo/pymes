@@ -19,8 +19,8 @@ import (
 type RepositoryPort interface {
 	coreinbox.Repository
 	GetUserIDByExternalID(externalID string) (uuid.UUID, bool)
-	GetOnlyUserIDByOrg(orgID uuid.UUID) (uuid.UUID, bool)
-	ListUserIDsByOrg(orgID uuid.UUID) ([]uuid.UUID, error)
+	GetOnlyUserIDByOrg(tenantID uuid.UUID) (uuid.UUID, bool)
+	ListUserIDsByOrg(tenantID uuid.UUID) ([]uuid.UUID, error)
 	ListOrgIDsWithUsers() ([]uuid.UUID, error)
 	ResolveApprovalNotifications(ctx context.Context, tenantID, approvalID, requestID string, readAt time.Time) (int64, error)
 }
@@ -62,29 +62,29 @@ func NewUsecases(repo RepositoryPort, opts ...Option) *Usecases {
 	return uc
 }
 
-func (u *Usecases) resolveUserID(orgID uuid.UUID, actor string) (uuid.UUID, bool) {
+func (u *Usecases) resolveUserID(tenantID uuid.UUID, actor string) (uuid.UUID, bool) {
 	if userID, ok := u.repo.GetUserIDByExternalID(actor); ok {
 		return userID, true
 	}
-	return u.repo.GetOnlyUserIDByOrg(orgID)
+	return u.repo.GetOnlyUserIDByOrg(tenantID)
 }
 
 func (u *Usecases) ListForActor(ctx context.Context, orgIDStr, actor string, limit int) ([]coredomain.Notification, int64, error) {
-	orgID, err := uuid.Parse(orgIDStr)
+	tenantID, err := uuid.Parse(orgIDStr)
 	if err != nil {
 		return nil, 0, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
 	}
-	userID, ok := u.resolveUserID(orgID, actor)
+	userID, ok := u.resolveUserID(tenantID, actor)
 	if !ok {
 		return nil, 0, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
-	pendingApprovals, approvalsFresh := u.syncPendingApprovals(ctx, orgID.String(), userID.String())
-	items, err := u.inbox.ListForRecipient(ctx, orgID.String(), userID.String(), approvalSyncLimit)
+	pendingApprovals, approvalsFresh := u.syncPendingApprovals(ctx, tenantID.String(), userID.String())
+	items, err := u.inbox.ListForRecipient(ctx, tenantID.String(), userID.String(), approvalSyncLimit)
 	if err != nil {
 		return nil, 0, err
 	}
-	items = u.filterResolvedApprovals(ctx, orgID.String(), userID.String(), items, pendingApprovals, approvalsFresh)
-	unread, err := u.inbox.CountUnread(ctx, orgID.String(), userID.String())
+	items = u.filterResolvedApprovals(ctx, tenantID.String(), userID.String(), items, pendingApprovals, approvalsFresh)
+	unread, err := u.inbox.CountUnread(ctx, tenantID.String(), userID.String())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -98,27 +98,27 @@ func (u *Usecases) ListForActor(ctx context.Context, orgIDStr, actor string, lim
 }
 
 func (u *Usecases) CountUnreadForActor(ctx context.Context, orgIDStr, actor string) (int64, error) {
-	orgID, err := uuid.Parse(orgIDStr)
+	tenantID, err := uuid.Parse(orgIDStr)
 	if err != nil {
 		return 0, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
 	}
-	userID, ok := u.resolveUserID(orgID, actor)
+	userID, ok := u.resolveUserID(tenantID, actor)
 	if !ok {
 		return 0, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
-	return u.inbox.CountUnread(ctx, orgID.String(), userID.String())
+	return u.inbox.CountUnread(ctx, tenantID.String(), userID.String())
 }
 
 func (u *Usecases) MarkReadForActor(ctx context.Context, orgIDStr, actor string, notifID uuid.UUID) (time.Time, error) {
-	orgID, err := uuid.Parse(orgIDStr)
+	tenantID, err := uuid.Parse(orgIDStr)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
 	}
-	userID, ok := u.resolveUserID(orgID, actor)
+	userID, ok := u.resolveUserID(tenantID, actor)
 	if !ok {
 		return time.Time{}, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
-	readAt, err := u.inbox.MarkRead(ctx, orgID.String(), userID.String(), notifID.String())
+	readAt, err := u.inbox.MarkRead(ctx, tenantID.String(), userID.String(), notifID.String())
 	if errors.Is(err, ErrNotFound) {
 		return time.Time{}, fmt.Errorf("notification: %w", httperrors.ErrNotFound)
 	}
@@ -126,11 +126,11 @@ func (u *Usecases) MarkReadForActor(ctx context.Context, orgIDStr, actor string,
 }
 
 func (u *Usecases) CreateForActor(ctx context.Context, orgIDStr, actor string, input CreateInput) (coredomain.Notification, error) {
-	orgID, err := uuid.Parse(strings.TrimSpace(orgIDStr))
+	tenantID, err := uuid.Parse(strings.TrimSpace(orgIDStr))
 	if err != nil {
 		return coredomain.Notification{}, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
 	}
-	userID, ok := u.resolveUserID(orgID, actor)
+	userID, ok := u.resolveUserID(tenantID, actor)
 	if !ok {
 		return coredomain.Notification{}, fmt.Errorf("user not found: %w", httperrors.ErrNotFound)
 	}
@@ -139,7 +139,7 @@ func (u *Usecases) CreateForActor(ctx context.Context, orgIDStr, actor string, i
 	}
 	return u.inbox.Create(ctx, coredomain.Notification{
 		ID:          input.ID,
-		TenantID:    orgID.String(),
+		TenantID:    tenantID.String(),
 		RecipientID: userID.String(),
 		Title:       input.Title,
 		Body:        input.Body,
@@ -153,18 +153,18 @@ func (u *Usecases) CreateForActor(ctx context.Context, orgIDStr, actor string, i
 func (u *Usecases) ApplyApprovalEvent(ctx context.Context, event ApprovalEvent) (int, error) {
 	switch normalizeApprovalEvent(event) {
 	case approvalEventPending:
-		orgID, err := uuid.Parse(strings.TrimSpace(event.OrgID))
+		tenantID, err := uuid.Parse(strings.TrimSpace(event.TenantID))
 		if err != nil {
 			return 0, fmt.Errorf("org id: %w", httperrors.ErrBadInput)
 		}
-		recipients, err := u.repo.ListUserIDsByOrg(orgID)
+		recipients, err := u.repo.ListUserIDsByOrg(tenantID)
 		if err != nil {
 			return 0, err
 		}
 		approval := approvalEventToPendingApproval(event)
 		affected := 0
 		for _, recipientID := range recipients {
-			u.applyApprovalSnapshot(ctx, orgID.String(), recipientID.String(), []PendingApproval{approval})
+			u.applyApprovalSnapshot(ctx, tenantID.String(), recipientID.String(), []PendingApproval{approval})
 			affected++
 		}
 		return affected, nil
@@ -177,7 +177,7 @@ func (u *Usecases) ApplyApprovalEvent(ctx context.Context, event ApprovalEvent) 
 		}
 		affected, err := u.repo.ResolveApprovalNotifications(
 			ctx,
-			strings.TrimSpace(event.OrgID),
+			strings.TrimSpace(event.TenantID),
 			strings.TrimSpace(event.ApprovalID),
 			strings.TrimSpace(event.RequestID),
 			readAt,
@@ -218,27 +218,27 @@ func (u *Usecases) SyncAllPendingApprovals(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	totalRecipients := 0
-	for _, orgID := range orgIDs {
-		tenantID := orgID.String()
-		selected := grouped[tenantID]
+	for _, tenantID := range orgIDs {
+		tenantIDStr := tenantID.String()
+		selected := grouped[tenantIDStr]
 		pending := make(map[string]struct{}, len(selected))
 		for _, approval := range selected {
 			if approvalID := strings.TrimSpace(approval.ID); approvalID != "" {
 				pending[approvalID] = struct{}{}
 			}
 		}
-		recipientIDs, err := u.repo.ListUserIDsByOrg(orgID)
+		recipientIDs, err := u.repo.ListUserIDsByOrg(tenantID)
 		if err != nil {
 			return totalRecipients, err
 		}
 		for _, recipientID := range recipientIDs {
 			recipientIDStr := recipientID.String()
-			u.applyApprovalSnapshot(ctx, tenantID, recipientIDStr, selected)
-			items, err := u.inbox.ListForRecipient(ctx, tenantID, recipientIDStr, approvalSyncLimit)
+			u.applyApprovalSnapshot(ctx, tenantIDStr, recipientIDStr, selected)
+			items, err := u.inbox.ListForRecipient(ctx, tenantIDStr, recipientIDStr, approvalSyncLimit)
 			if err != nil {
 				return totalRecipients, err
 			}
-			_ = u.filterResolvedApprovals(ctx, tenantID, recipientIDStr, items, pending, true)
+			_ = u.filterResolvedApprovals(ctx, tenantIDStr, recipientIDStr, items, pending, true)
 			totalRecipients++
 		}
 	}
@@ -295,11 +295,11 @@ func filterApprovalsForTenant(tenantID string, approvals []PendingApproval, incl
 	out := make([]PendingApproval, 0, len(approvals))
 	tenantID = strings.TrimSpace(tenantID)
 	for _, approval := range approvals {
-		orgID := strings.TrimSpace(approval.OrgID)
+		approvalTenantID := strings.TrimSpace(approval.TenantID)
 		switch {
-		case orgID == "" && includeOrgless:
+		case approvalTenantID == "" && includeOrgless:
 			out = append(out, approval)
-		case orgID == tenantID:
+		case approvalTenantID == tenantID:
 			out = append(out, approval)
 		}
 	}
@@ -309,11 +309,11 @@ func filterApprovalsForTenant(tenantID string, approvals []PendingApproval, incl
 func groupApprovalsByTenant(approvals []PendingApproval) map[string][]PendingApproval {
 	grouped := make(map[string][]PendingApproval)
 	for _, approval := range approvals {
-		orgID := strings.TrimSpace(approval.OrgID)
-		if orgID == "" {
+		tenantID := strings.TrimSpace(approval.TenantID)
+		if tenantID == "" {
 			continue
 		}
-		grouped[orgID] = append(grouped[orgID], approval)
+		grouped[tenantID] = append(grouped[tenantID], approval)
 	}
 	return grouped
 }

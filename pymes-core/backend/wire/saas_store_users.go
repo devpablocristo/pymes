@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	saasuserdomain "github.com/devpablocristo/core/saas/go/users/usecases/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -145,26 +144,43 @@ func (s *pymesSaaSStore) PatchUserPersonalFromRequest(ctx context.Context, exter
 	return s.db.WithContext(ctx).Model(&pymesUserRow{}).Where("id = ?", row.ID).Updates(updates).Error
 }
 
-func (s *pymesSaaSStore) FindUserByExternalID(ctx context.Context, externalID string) (saasuserdomain.User, bool, error) {
+func (s *pymesSaaSStore) FindUserByExternalID(ctx context.Context, externalID string) (tenantUserDTO, bool, error) {
 	var row pymesUserRow
 	err := s.db.WithContext(ctx).
 		Where("external_id = ?", strings.TrimSpace(externalID)).
 		Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return saasuserdomain.User{}, false, nil
+		return tenantUserDTO{}, false, nil
 	}
 	if err != nil {
-		return saasuserdomain.User{}, false, err
+		return tenantUserDTO{}, false, err
 	}
-	return userDomainFromRow(row), true, nil
+	return userDTOFromRow(row), true, nil
 }
 
-func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name string, avatarURL *string) (saasuserdomain.User, error) {
+func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name string, avatarURL *string) (tenantUserDTO, error) {
+	row, err := s.upsertUserTx(ctx, s.db.WithContext(ctx), externalID, email, name, avatarURL)
+	if err != nil {
+		return tenantUserDTO{}, err
+	}
+	return userDTOFromRow(row), nil
+}
+
+func (s *pymesSaaSStore) upsertUserTx(ctx context.Context, tx *gorm.DB, externalID, email, name string, avatarURL *string) (pymesUserRow, error) {
 	externalID = strings.TrimSpace(externalID)
 	email = strings.TrimSpace(email)
 	name = strings.TrimSpace(name)
+	if externalID == "" {
+		return pymesUserRow{}, fmt.Errorf("external_id required")
+	}
+	if email == "" {
+		email = placeholderClerkEmail(externalID)
+	}
+	if name == "" {
+		name = email
+	}
 	var row pymesUserRow
-	err := s.db.WithContext(ctx).Where("external_id = ?", externalID).Take(&row).Error
+	err := tx.WithContext(ctx).Where("external_id = ?", externalID).Take(&row).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		given, family := splitFullNameIntoParts(name)
@@ -181,13 +197,13 @@ func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name
 		if avatarURL != nil {
 			row.AvatarURL = strings.TrimSpace(*avatarURL)
 		}
-		if err := s.db.WithContext(ctx).Create(&row).Error; err != nil {
-			return saasuserdomain.User{}, err
+		if err := tx.WithContext(ctx).Create(&row).Error; err != nil {
+			return pymesUserRow{}, err
 		}
-		return userDomainFromRow(row), nil
+		return row, nil
 	}
 	if err != nil {
-		return saasuserdomain.User{}, err
+		return pymesUserRow{}, err
 	}
 	row.Email = email
 	given, family := splitFullNameIntoParts(name)
@@ -198,21 +214,10 @@ func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name
 		row.AvatarURL = strings.TrimSpace(*avatarURL)
 	}
 	row.UpdatedAt = now
-	if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
-		return saasuserdomain.User{}, err
+	if err := tx.WithContext(ctx).Save(&row).Error; err != nil {
+		return pymesUserRow{}, err
 	}
-	return userDomainFromRow(row), nil
-}
-
-func (s *pymesSaaSStore) SyncUser(ctx context.Context, externalID, email, name string, avatarURL *string) (saasuserdomain.User, error) {
-	return s.UpsertUser(ctx, externalID, email, name, avatarURL)
-}
-
-func (s *pymesSaaSStore) SoftDeleteUser(ctx context.Context, externalID string) error {
-	return s.db.WithContext(ctx).
-		Model(&pymesUserRow{}).
-		Where("external_id = ?", strings.TrimSpace(externalID)).
-		Update("deleted_at", time.Now().UTC()).Error
+	return row, nil
 }
 
 func (s *pymesSaaSStore) FindUserEmailByExternalID(ctx context.Context, externalID string) (string, bool, error) {

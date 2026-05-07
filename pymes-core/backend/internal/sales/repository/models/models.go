@@ -10,7 +10,7 @@ import (
 
 type SaleModel struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrgID         uuid.UUID  `gorm:"type:uuid;index;not null"`
+	TenantID      uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BranchID      *uuid.UUID `gorm:"type:uuid;index"`
 	Number        string     `gorm:"not null"`
 	CustomerID    *uuid.UUID `gorm:"column:party_id;type:uuid"`
@@ -28,7 +28,7 @@ type SaleModel struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	VoidedAt      *time.Time
-	Metadata      []byte         `gorm:"type:jsonb;not null;default:'{}'"`
+	Metadata      []byte `gorm:"type:jsonb;not null;default:'{}'"`
 }
 
 func (SaleModel) TableName() string { return "sales" }

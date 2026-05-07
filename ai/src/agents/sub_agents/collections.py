@@ -28,7 +28,7 @@ Responde siempre en espanol, claro y directo. No muestres JSON al usuario."""
 
 
 def build(client: BackendClient, auth: AuthContext) -> SubAgent:
-    async def generate_payment_link(*, org_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
+    async def generate_payment_link(*, tenant_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
         kind = reference_type.strip().lower()
         safe_reference_id = quote(reference_id.strip(), safe="")
         if kind == "sale":
@@ -37,7 +37,7 @@ def build(client: BackendClient, auth: AuthContext) -> SubAgent:
             return await client.request("POST", f"/v1/quotes/{safe_reference_id}/payment-link", auth=auth)
         return {"code": "invalid_reference_type", "message": "reference_type debe ser sale o quote"}
 
-    async def get_payment_status(*, org_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
+    async def get_payment_status(*, tenant_id: str, reference_type: str, reference_id: str) -> dict[str, Any]:
         kind = reference_type.strip().lower()
         safe_reference_id = quote(reference_id.strip(), safe="")
         if kind == "sale":
@@ -46,10 +46,10 @@ def build(client: BackendClient, auth: AuthContext) -> SubAgent:
             return await client.request("GET", f"/v1/quotes/{safe_reference_id}/payment-link", auth=auth)
         return {"code": "invalid_reference_type", "message": "reference_type debe ser sale o quote"}
 
-    async def send_payment_info(*, org_id: str, sale_id: str) -> dict[str, Any]:
+    async def send_payment_info(*, tenant_id: str, sale_id: str) -> dict[str, Any]:
         return await payments.send_payment_info(client, auth, sale_id=sale_id)
 
-    async def get_account_balances(*, org_id: str) -> dict[str, Any]:
+    async def get_account_balances(*, tenant_id: str) -> dict[str, Any]:
         return await accounts.get_account_balances(client, auth)
 
     tools = [

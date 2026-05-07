@@ -9,12 +9,14 @@ import (
 	"github.com/rs/zerolog/log"
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
+	"github.com/devpablocristo/pymes/medical/backend/internal/occupational_health/exams"
 	"github.com/devpablocristo/pymes/medical/backend/internal/shared/config"
 	"github.com/devpablocristo/pymes/medical/backend/internal/shared/pymescore"
 	"github.com/devpablocristo/pymes/medical/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalaudit"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
 )
 
@@ -35,11 +37,14 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	// Cliente HTTP hacia pymes-core — disponible para cuando se registren handlers
-	// que embeban dominios transversales.
-	_ = pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
-	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, nil)
-	_ = auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
+	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
+	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	auditLog := verticalaudit.NewLogger(logger)
+
+	examsRepo := exams.NewRepository(db)
+	examsUC := exams.NewUsecases(examsRepo, auditLog)
+	examsHandler := exams.NewHandler(examsUC)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -47,7 +52,10 @@ func InitializeApp() *app.App {
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")
-	_ = v1
+	authGroup := v1.Group("")
+	authGroup.Use(authMiddleware.RequireAuth())
+	medicalGroup := authGroup.Group("/medical")
+	examsHandler.RegisterRoutes(medicalGroup)
 
 	return &app.App{Router: router}
 }

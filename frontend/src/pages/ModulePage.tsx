@@ -30,7 +30,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
 
   useEffect(() => {
     if (sessionQuery.data) {
-      setRuntime((current) => ({ ...current, orgId: sessionQuery.data.auth.org_id }));
+      setRuntime((current) => ({ ...current, tenantId: sessionQuery.data.auth.tenant_id }));
     }
   }, [sessionQuery.data]);
 
@@ -55,7 +55,7 @@ function ModuleExplorerPage({ moduleId }: { moduleId: string }) {
   const headerActions = showExplorerChrome ? (
     <div className="module-runtime-card">
       <span>{t('module.runtime.activeOrg')}</span>
-      <strong>{runtime.orgId || t('module.runtime.resolving')}</strong>
+      <strong>{runtime.tenantId || t('module.runtime.resolving')}</strong>
       <small>
         {t('module.runtime.surfaces', { count: (module.datasets?.length ?? 0) + (module.actions?.length ?? 0) })}
       </small>

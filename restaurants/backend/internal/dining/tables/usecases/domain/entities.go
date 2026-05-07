@@ -8,7 +8,7 @@ import (
 
 type DiningTable struct {
 	ID         uuid.UUID
-	OrgID      uuid.UUID
+	TenantID   uuid.UUID
 	AreaID     uuid.UUID
 	Code       string
 	Label      string

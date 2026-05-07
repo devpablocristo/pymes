@@ -23,23 +23,23 @@ import (
 const maxImportRows = 10000
 
 type AuditPort interface {
-	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type RepositoryPort interface {
-	ImportCustomers(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
-	ImportProducts(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
-	ImportSuppliers(ctx context.Context, orgID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
-	ExportCustomers(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error)
-	ExportProducts(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error)
-	ExportSuppliers(ctx context.Context, orgID uuid.UUID) ([]string, [][]string, error)
-	ExportSales(ctx context.Context, orgID uuid.UUID, from, to *time.Time) ([]string, [][]string, error)
-	ExportCashflow(ctx context.Context, orgID uuid.UUID, from, to *time.Time) ([]string, [][]string, error)
+	ImportCustomers(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
+	ImportProducts(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
+	ImportSuppliers(ctx context.Context, tenantID uuid.UUID, rows []map[string]string, mode string) (ImportResult, error)
+	ExportCustomers(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error)
+	ExportProducts(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error)
+	ExportSuppliers(ctx context.Context, tenantID uuid.UUID) ([]string, [][]string, error)
+	ExportSales(ctx context.Context, tenantID uuid.UUID, from, to *time.Time) ([]string, [][]string, error)
+	ExportCashflow(ctx context.Context, tenantID uuid.UUID, from, to *time.Time) ([]string, [][]string, error)
 }
 
 // OptInPort permite registrar opt-in de WhatsApp para contactos importados.
 type OptInPort interface {
-	EnsureOptIn(ctx context.Context, orgID, partyID uuid.UUID, phone string) error
+	EnsureOptIn(ctx context.Context, tenantID, partyID uuid.UUID, phone string) error
 }
 
 type Usecases struct {
@@ -155,7 +155,7 @@ func (u *Usecases) Preview(ctx context.Context, entity, filename string, fileDat
 	return preview, nil
 }
 
-func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.UUID, previewID, mode, actor string) (ImportResult, error) {
+func (u *Usecases) ConfirmImport(ctx context.Context, entity string, tenantID uuid.UUID, previewID, mode, actor string) (ImportResult, error) {
 	entity = normalizeEntity(entity)
 	if previewID == "" {
 		return ImportResult{}, domainerr.Validation("preview_id is required")
@@ -171,11 +171,11 @@ func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.
 	var result ImportResult
 	switch entity {
 	case "customers":
-		result, err = u.repo.ImportCustomers(ctx, orgID, job.Rows, mode)
+		result, err = u.repo.ImportCustomers(ctx, tenantID, job.Rows, mode)
 	case "products":
-		result, err = u.repo.ImportProducts(ctx, orgID, job.Rows, mode)
+		result, err = u.repo.ImportProducts(ctx, tenantID, job.Rows, mode)
 	case "suppliers":
-		result, err = u.repo.ImportSuppliers(ctx, orgID, job.Rows, mode)
+		result, err = u.repo.ImportSuppliers(ctx, tenantID, job.Rows, mode)
 	default:
 		return ImportResult{}, domainerr.Validation("unsupported import entity")
 	}
@@ -187,14 +187,14 @@ func (u *Usecases) ConfirmImport(ctx context.Context, entity string, orgID uuid.
 	// Auto opt-in de WhatsApp para customers importados con teléfono
 	if entity == "customers" && u.optIn != nil && len(result.PartyPhones) > 0 {
 		for _, pp := range result.PartyPhones {
-			if optErr := u.optIn.EnsureOptIn(ctx, orgID, pp.PartyID, pp.Phone); optErr != nil {
+			if optErr := u.optIn.EnsureOptIn(ctx, tenantID, pp.PartyID, pp.Phone); optErr != nil {
 				slog.Warn("auto opt-in failed during import", "party_id", pp.PartyID, "error", optErr)
 			}
 		}
 	}
 
 	if u.audit != nil {
-		u.audit.Log(ctx, orgID.String(), actor, "dataio.import.confirmed", "dataio_preview", previewID, map[string]any{
+		u.audit.Log(ctx, tenantID.String(), actor, "dataio.import.confirmed", "dataio_preview", previewID, map[string]any{
 			"entity":  entity,
 			"mode":    mode,
 			"created": result.Created,
@@ -231,7 +231,7 @@ func (u *Usecases) Template(entity, format string) ([]byte, string, string, erro
 	return content, xlsxContentType, entity + "_template.xlsx", nil
 }
 
-func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, format string, from, to *time.Time) ([]byte, string, string, error) {
+func (u *Usecases) Export(ctx context.Context, entity string, tenantID uuid.UUID, format string, from, to *time.Time) ([]byte, string, string, error) {
 	entity = normalizeEntity(entity)
 	format = normalizeFormat(format)
 	if format == "" {
@@ -246,15 +246,15 @@ func (u *Usecases) Export(ctx context.Context, entity string, orgID uuid.UUID, f
 	var err error
 	switch entity {
 	case "customers":
-		headers, rows, err = u.repo.ExportCustomers(ctx, orgID)
+		headers, rows, err = u.repo.ExportCustomers(ctx, tenantID)
 	case "products":
-		headers, rows, err = u.repo.ExportProducts(ctx, orgID)
+		headers, rows, err = u.repo.ExportProducts(ctx, tenantID)
 	case "suppliers":
-		headers, rows, err = u.repo.ExportSuppliers(ctx, orgID)
+		headers, rows, err = u.repo.ExportSuppliers(ctx, tenantID)
 	case "sales":
-		headers, rows, err = u.repo.ExportSales(ctx, orgID, from, to)
+		headers, rows, err = u.repo.ExportSales(ctx, tenantID, from, to)
 	case "cashflow":
-		headers, rows, err = u.repo.ExportCashflow(ctx, orgID, from, to)
+		headers, rows, err = u.repo.ExportCashflow(ctx, tenantID, from, to)
 	default:
 		return nil, "", "", domainerr.Validation("unsupported export entity")
 	}

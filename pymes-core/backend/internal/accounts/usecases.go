@@ -11,8 +11,8 @@ import (
 )
 
 type RepositoryPort interface {
-	List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error)
-	ListMovements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
+	List(ctx context.Context, tenantID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error)
+	ListMovements(ctx context.Context, tenantID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error)
 	CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error)
 }
 
@@ -20,7 +20,7 @@ type Usecases struct{ repo RepositoryPort }
 
 func NewUsecases(repo RepositoryPort) *Usecases { return &Usecases{repo: repo} }
 
-func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
+func (u *Usecases) List(ctx context.Context, tenantID uuid.UUID, accountType, entityType string, onlyNonZero bool, limit int) ([]accountsdomain.Account, error) {
 	accountType = normalizeAccountType(accountType)
 	entityType = normalizeEntityType(entityType)
 	if accountType != "" && !isSupportedAccountType(accountType) {
@@ -32,20 +32,20 @@ func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, accountType, entit
 	if accountType != "" && entityType != "" && !isCompatibleAccountTypeAndEntityType(accountType, entityType) {
 		return nil, domainerr.Validation("type and entity_type are inconsistent")
 	}
-	return u.repo.List(ctx, orgID, accountType, entityType, onlyNonZero, limit)
+	return u.repo.List(ctx, tenantID, accountType, entityType, onlyNonZero, limit)
 }
 
-func (u *Usecases) Debtors(ctx context.Context, orgID uuid.UUID, limit int) ([]accountsdomain.Account, error) {
-	return u.repo.List(ctx, orgID, "receivable", "customer", true, limit)
+func (u *Usecases) Debtors(ctx context.Context, tenantID uuid.UUID, limit int) ([]accountsdomain.Account, error) {
+	return u.repo.List(ctx, tenantID, "receivable", "customer", true, limit)
 }
 
-func (u *Usecases) Movements(ctx context.Context, orgID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
-	return u.repo.ListMovements(ctx, orgID, accountID, limit)
+func (u *Usecases) Movements(ctx context.Context, tenantID, accountID uuid.UUID, limit int) ([]accountsdomain.Movement, error) {
+	return u.repo.ListMovements(ctx, tenantID, accountID, limit)
 }
 
 func (u *Usecases) CreateOrAdjust(ctx context.Context, in accountsdomain.Account, amount float64, description, actor string) (accountsdomain.Account, error) {
-	if in.OrgID == uuid.Nil {
-		return accountsdomain.Account{}, domainerr.Validation("org_id is required")
+	if in.TenantID == uuid.Nil {
+		return accountsdomain.Account{}, domainerr.Validation("tenant_id is required")
 	}
 	in.Type = normalizeAccountType(in.Type)
 	if !isSupportedAccountType(in.Type) {

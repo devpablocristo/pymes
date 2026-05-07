@@ -285,7 +285,7 @@ describe('billingHelpers', () => {
 
     expect(config.labelPluralCap).toBe('Notas de crédito');
     expect(config.emptyState).toBe('No hay notas de crédito emitidas.');
-    expect(config.allowEdit).toBe(true);
+    expect(config.allowEdit).toBe(false);
     expect(config.stateMachine).toMatchObject({
       field: 'status',
       states: [

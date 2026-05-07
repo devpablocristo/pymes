@@ -21,7 +21,7 @@ var (
 	ErrGatewayNotConnected = errors.New("payment gateway not connected")
 )
 
-type orgSlugRow struct {
+type tenantSlugRow struct {
 	ID uuid.UUID
 }
 
@@ -82,7 +82,7 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 			return id, nil
 		}
 	}
-	var row orgSlugRow
+	var row tenantSlugRow
 	err := r.db.WithContext(ctx).Table("tenants").Select("id").Where("slug = ?", trimmed).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

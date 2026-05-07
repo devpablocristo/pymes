@@ -177,6 +177,7 @@ describe('OnboardingPage scheduling setup', () => {
           scheduling_enabled: true,
           uses_billing: true,
         }),
+        {},
       );
     });
 
@@ -187,6 +188,7 @@ describe('OnboardingPage scheduling setup', () => {
         name: 'Principal',
         active: true,
       }),
+      {},
     );
     expect(profileMocks.syncTenantProfileFromSettings).toHaveBeenCalled();
     expect(navigationMocks.navigate).toHaveBeenCalledWith('/', { replace: true });
@@ -235,6 +237,7 @@ describe('OnboardingPage scheduling setup', () => {
           business_name: 'Bicimax',
           vertical: 'workshops',
         }),
+        {},
       );
     });
 

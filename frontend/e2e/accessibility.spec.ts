@@ -11,7 +11,7 @@ test.describe('Accessibility basics', () => {
   test('html lang está configurado', async ({ page }) => {
     await page.goto('/');
     const lang = await page.locator('html').getAttribute('lang');
-    expect(['es', 'en']).toContain(lang);
+    expect(['es', 'es-AR', 'en']).toContain(lang);
   });
 
   test('skip link existe', async ({ page }) => {

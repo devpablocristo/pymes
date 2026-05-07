@@ -35,6 +35,7 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpClient.Client))
 
 	orchestrationUC := orchestration.NewUsecases(cpClient)
 
@@ -52,7 +53,7 @@ func InitializeApp() *app.App {
 	publicHandler.RegisterRoutes(publicGroup)
 
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	beautyGroup := authGroup.Group("/beauty")
 	orchestrationHandler.RegisterRoutes(beautyGroup)

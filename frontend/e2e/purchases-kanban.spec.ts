@@ -77,8 +77,17 @@ async function installPurchasesApiMocks(page: Page) {
           auth: {
             tenant_id: 'e2e-org-001',
             tenant_name: 'E2E Test Tenant',
+            tenant_slug: 'e2e-test',
             product_role: 'admin',
             auth_method: 'api_key',
+          },
+          tenant: {
+            id: 'e2e-org-001',
+            slug: 'e2e-test',
+            name: 'E2E Test Tenant',
+          },
+          membership: {
+            role: 'admin',
           },
         }),
       });
@@ -164,7 +173,7 @@ async function installPurchasesApiMocks(page: Page) {
 }
 
 async function openPurchasesBoard(page: Page) {
-  await page.goto('/modules/purchases/board');
+  await page.goto('/e2e-test/purchases/board');
   const errorAlert = page.getByRole('alert');
   if (await errorAlert.isVisible().catch(() => false)) {
     throw new Error(`La vista de compras cayó al error boundary: ${await errorAlert.innerText()}`);
@@ -196,9 +205,7 @@ test.describe('Purchases Kanban', () => {
 
     const draftColumn = page.locator('.m-kanban__column-body[data-column="draft"]');
     const receivedColumn = page.locator('.m-kanban__column-body[data-column="received"]');
-    const draftCard = draftColumn
-      .locator('.m-kanban__card-shell[data-row-draggable="true"]')
-      .filter({ hasText: 'CPA-SEED-002' });
+    const draftCard = draftColumn.getByRole('button', { name: /CPA-SEED-002/ }).first();
 
     await expect(draftCard).toBeVisible();
     await dragCardToColumn(page, draftCard, receivedColumn);
@@ -219,9 +226,7 @@ test.describe('Purchases Kanban', () => {
 
     const receivedColumn = page.locator('.m-kanban__column-body[data-column="received"]');
     const voidedColumn = page.locator('.m-kanban__column-body[data-column="voided"]');
-    const receivedCard = receivedColumn
-      .locator('.m-kanban__card-shell[data-row-draggable="true"]')
-      .filter({ hasText: 'CPA-SEED-001' });
+    const receivedCard = receivedColumn.getByRole('button', { name: /CPA-SEED-001/ }).first();
 
     await expect(receivedCard).toBeVisible();
     await dragCardToColumn(page, receivedCard, voidedColumn);
@@ -244,9 +249,9 @@ test.describe('Purchases Kanban', () => {
     await receivedColumn.getByRole('button', { name: 'Añadir compra' }).click();
 
     await page.getByLabel('Proveedor').fill('Proveedor Kanban');
-    await page
-      .getByLabel('Items JSON')
-      .fill('[{"description":"Insumo e2e","quantity":1,"unit_cost":2500}]');
+    await page.getByLabel('Concepto').fill('Insumo e2e');
+    await page.getByLabel('Cantidad').fill('1');
+    await page.getByLabel('Importe unitario').fill('2500');
     await page.getByRole('button', { name: 'Crear' }).click();
 
     await expect(receivedColumn.getByText('Proveedor Kanban')).toBeVisible();

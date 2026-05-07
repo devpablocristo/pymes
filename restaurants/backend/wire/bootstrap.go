@@ -11,6 +11,7 @@ import (
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
+	"github.com/devpablocristo/pymes/pymes-core/shared/backend/pymescorehttp"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalaudit"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/verticalwire"
@@ -33,8 +34,10 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, nil)
+	cpHTTP := pymescorehttp.New(cfg.PymesCoreURL, cfg.InternalServiceToken)
+	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpHTTP)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpHTTP))
 	auditLog := verticalaudit.NewLogger(logger)
 
 	areasRepo := areas.NewRepository(db)
@@ -56,7 +59,7 @@ func InitializeApp() *app.App {
 
 	v1 := router.Group("/v1")
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	restaurantsGroup := authGroup.Group("/restaurants")
 	areasHandler.RegisterRoutes(restaurantsGroup)

@@ -163,7 +163,7 @@ export function ClerkOrganizationSwitcherSection({ t }: { t: (key: string) => st
       ]);
       const tenantSettings = await queryClient.fetchQuery({
         queryKey: queryKeys.tenant.settings,
-        queryFn: getTenantSettings,
+        queryFn: () => getTenantSettings(),
       });
       syncTenantProfileFromSettings(tenantSettings);
       navigate(tenantSettings.onboarding_completed_at ? '/' : '/onboarding', { replace: true });

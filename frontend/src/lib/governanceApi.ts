@@ -1,4 +1,4 @@
-import { request } from '@devpablocristo/core-authn/http/fetch';
+import { apiRequest } from './api';
 
 // --- Types ---
 
@@ -84,51 +84,51 @@ export interface WatcherResponse {
 // --- Policies ---
 
 export async function listPolicies(): Promise<PolicyListResponse> {
-  return request('/v1/governance/policies');
+  return apiRequest('/v1/governance/policies');
 }
 
 export async function createPolicy(req: CreatePolicyRequest): Promise<PolicyResponse> {
-  return request('/v1/governance/policies', { method: 'POST', body: req });
+  return apiRequest('/v1/governance/policies', { method: 'POST', body: req });
 }
 
 export async function updatePolicy(id: string, req: UpdatePolicyRequest): Promise<PolicyResponse> {
-  return request(`/v1/governance/policies/${id}`, { method: 'PATCH', body: req });
+  return apiRequest(`/v1/governance/policies/${id}`, { method: 'PATCH', body: req });
 }
 
 export async function deletePolicy(id: string): Promise<void> {
-  await request(`/v1/governance/policies/${id}`, { method: 'DELETE' });
+  await apiRequest(`/v1/governance/policies/${id}`, { method: 'DELETE' });
 }
 
 // --- Action Types ---
 
 export async function listActionTypes(): Promise<ActionTypeListResponse> {
-  return request('/v1/governance/action-types');
+  return apiRequest('/v1/governance/action-types');
 }
 
 // --- Approvals ---
 
 export async function listPendingApprovals(): Promise<ApprovalListResponse> {
-  return request('/v1/governance/approvals/pending');
+  return apiRequest('/v1/governance/approvals/pending');
 }
 
 export async function approveRequest(id: string, note: string): Promise<void> {
-  await request(`/v1/governance/approvals/${id}/approve`, { method: 'POST', body: { note } });
+  await apiRequest(`/v1/governance/approvals/${id}/approve`, { method: 'POST', body: { note } });
 }
 
 export async function rejectRequest(id: string, note: string): Promise<void> {
-  await request(`/v1/governance/approvals/${id}/reject`, { method: 'POST', body: { note } });
+  await apiRequest(`/v1/governance/approvals/${id}/reject`, { method: 'POST', body: { note } });
 }
 
 // --- Condition Templates ---
 
 export async function getConditionTemplates(actionType: string): Promise<{ templates: ConditionTemplate[] }> {
-  return request(`/v1/governance/condition-templates/${actionType}`);
+  return apiRequest(`/v1/governance/condition-templates/${actionType}`);
 }
 
 // --- Watchers ---
 
 export async function listWatchers(): Promise<{ watchers: WatcherResponse[] }> {
-  return request('/v1/governance/watchers');
+  return apiRequest('/v1/governance/watchers');
 }
 
 export async function updateWatcher(
@@ -136,5 +136,5 @@ export async function updateWatcher(
   config: Record<string, unknown>,
   enabled: boolean,
 ): Promise<WatcherResponse> {
-  return request(`/v1/governance/watchers/${id}`, { method: 'PATCH', body: { config, enabled } });
+  return apiRequest(`/v1/governance/watchers/${id}`, { method: 'PATCH', body: { config, enabled } });
 }

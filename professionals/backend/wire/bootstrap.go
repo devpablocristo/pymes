@@ -48,6 +48,7 @@ func InitializeApp() *app.App {
 	// Auth middleware shared with the other Go backends.
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpClient.Client))
 
 	// Audit logger (lightweight, log-only implementation)
 	auditLog := verticalaudit.NewLogger(logger)
@@ -91,7 +92,7 @@ func InitializeApp() *app.App {
 
 	// Auth-protected routes
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 
 	teachersGroup := authGroup.Group("/teachers")
 	profilesHandler.RegisterRoutes(teachersGroup)

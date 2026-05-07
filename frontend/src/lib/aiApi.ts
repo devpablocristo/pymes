@@ -1,4 +1,4 @@
-import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import { apiRequest, type TenantAwareRequestOptions } from './api';
 import type {
   CommercialChatRequest,
   InsightNotificationsResponse,
@@ -23,7 +23,7 @@ function resolveAiBaseURLs(): string[] {
 
 const aiBaseURLs = resolveAiBaseURLs();
 
-function aiOptions(options: RequestOptions = {}): RequestOptions {
+function aiOptions(options: TenantAwareRequestOptions = {}): TenantAwareRequestOptions {
   return { ...options, baseURLs: aiBaseURLs };
 }
 
@@ -46,7 +46,7 @@ export type {
 
 /** Asistente Pymes — un solo chat interno con router LLM y sub-agentes especializados. */
 export async function pymesAssistantChat(payload: CommercialChatRequest): Promise<PymesAssistantChatResponse> {
-  return request('/v1/chat', aiOptions({ method: 'POST', body: payload }));
+  return apiRequest('/v1/chat', aiOptions({ method: 'POST', body: payload }));
 }
 
 // ── Conversaciones persistidas ──
@@ -77,12 +77,12 @@ export type ConversationDetail = {
 
 /** Lista conversaciones del usuario autenticado. */
 export async function listConversations(limit = 50): Promise<{ items: ConversationSummary[] }> {
-  return request(`/v1/chat/conversations?limit=${limit}`, aiOptions());
+  return apiRequest(`/v1/chat/conversations?limit=${limit}`, aiOptions());
 }
 
 /** Carga una conversación con su historial de mensajes. */
 export async function getConversation(conversationId: string): Promise<ConversationDetail> {
-  return request(`/v1/chat/conversations/${conversationId}`, aiOptions());
+  return apiRequest(`/v1/chat/conversations/${conversationId}`, aiOptions());
 }
 
 export async function createInsightNotifications(payload?: {
@@ -92,5 +92,5 @@ export async function createInsightNotifications(payload?: {
   top_limit?: number;
   preferred_language?: 'es' | 'en';
 }): Promise<InsightNotificationsResponse> {
-  return request('/v1/notifications', aiOptions({ method: 'POST', body: payload ?? {} }));
+  return apiRequest('/v1/notifications', aiOptions({ method: 'POST', body: payload ?? {} }));
 }

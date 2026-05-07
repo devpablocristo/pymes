@@ -31,8 +31,8 @@ describe('CrudUiConfigurePage', () => {
     render(
       <MemoryRouter initialEntries={['/bicimax/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/:orgSlug/customers" element={<div>customers-home</div>} />
-          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
+          <Route path="/:tenantSlug/customers" element={<div>customers-home</div>} />
+          <Route path="/:tenantSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -58,8 +58,8 @@ describe('CrudUiConfigurePage', () => {
     render(
       <MemoryRouter initialEntries={['/bicimax/customers/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/:orgSlug/customers" element={<div>customers-home</div>} />
-          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
+          <Route path="/:tenantSlug/customers" element={<div>customers-home</div>} />
+          <Route path="/:tenantSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -74,7 +74,7 @@ describe('CrudUiConfigurePage', () => {
     render(
       <MemoryRouter initialEntries={['/bicimax/bike-work-orders/configure']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/:orgSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
+          <Route path="/:tenantSlug/:moduleId/configure" element={<CrudUiConfigurePage />} />
         </Routes>
       </MemoryRouter>,
     );

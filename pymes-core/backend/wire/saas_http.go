@@ -238,12 +238,18 @@ func handleSessionEnriched(w http.ResponseWriter, r *http.Request, store *pymesS
 		"external_id": principal.Actor,
 	}
 	if store != nil {
-		name, okName, err := store.GetTenantNameByID(r.Context(), principal.TenantID)
+		name, slug, okName, err := store.GetTenantNameSlugByID(r.Context(), principal.TenantID)
 		if err != nil {
 			slog.Warn("session tenant name lookup", "err", err, "tenant_id", principal.TenantID)
-		} else if okName && strings.TrimSpace(name) != "" {
-			auth["tenant_name"] = strings.TrimSpace(name)
-			tenant["name"] = strings.TrimSpace(name)
+		} else if okName {
+			if strings.TrimSpace(name) != "" {
+				auth["tenant_name"] = strings.TrimSpace(name)
+				tenant["name"] = strings.TrimSpace(name)
+			}
+			if strings.TrimSpace(slug) != "" {
+				auth["tenant_slug"] = strings.TrimSpace(slug)
+				tenant["slug"] = strings.TrimSpace(slug)
+			}
 		}
 		if settings, okSettings, err := store.loadTenantSettings(r.Context(), principal.TenantID); err != nil {
 			slog.Warn("session tenant settings lookup", "err", err, "tenant_id", principal.TenantID)

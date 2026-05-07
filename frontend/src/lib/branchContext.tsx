@@ -13,23 +13,26 @@ import {
   writeStoredBranchId,
 } from './branchSelectionStorage';
 import { BranchContext, type BranchContextValue } from './branchSelectionContext';
-import { queryKeys } from './queryKeys';
+import { queryKeys, tenantKey } from './queryKeys';
+import { useOptionalTenantAccess } from './tenantAccessContext';
 
 const schedulingClient = createSchedulingClient(apiRequest);
 const EMPTY_BRANCHES: Branch[] = [];
 
 export function BranchProvider({ children }: PropsWithChildren) {
+  const tenantAccess = useOptionalTenantAccess();
   const sessionQuery = useQuery({
-    queryKey: queryKeys.session.current,
-    queryFn: getSession,
+    queryKey: tenantAccess ? tenantKey(tenantAccess.tenantId, queryKeys.session.current) : queryKeys.session.current,
+    queryFn: () => getSession(),
+    enabled: !tenantAccess,
     staleTime: 60_000,
     retry: 1,
   });
 
-  const tenantId = sessionQuery.data?.auth.tenant_id ?? null;
+  const tenantId = tenantAccess?.tenantId ?? sessionQuery.data?.auth.tenant_id ?? null;
 
   const branchesQuery = useQuery<Branch[]>({
-    queryKey: queryKeys.scheduling.branches,
+    queryKey: tenantId ? tenantKey(tenantId, queryKeys.scheduling.branches) : queryKeys.scheduling.branches,
     queryFn: () => schedulingClient.listBranches(),
     enabled: Boolean(tenantId),
     staleTime: 60_000,
@@ -96,10 +99,10 @@ export function BranchProvider({ children }: PropsWithChildren) {
       selectedBranchId,
       selectedBranch,
       isLoading:
-        sessionQuery.isLoading ||
+        (!tenantAccess && sessionQuery.isLoading) ||
         branchesQuery.isLoading ||
         (Boolean(tenantId) && !selectionHydrated),
-      isError: sessionQuery.isError || branchesQuery.isError,
+      isError: (!tenantAccess && sessionQuery.isError) || branchesQuery.isError,
       error: (sessionQuery.error as Error | null) ?? (branchesQuery.error as Error | null) ?? null,
       setSelectedBranchId: setStoredBranchId,
     }),
@@ -109,6 +112,7 @@ export function BranchProvider({ children }: PropsWithChildren) {
       branchesQuery.error,
       branchesQuery.isError,
       branchesQuery.isLoading,
+      tenantAccess,
       tenantId,
       selectedBranch,
       selectedBranchId,

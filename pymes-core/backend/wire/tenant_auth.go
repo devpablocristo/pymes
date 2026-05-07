@@ -2,11 +2,13 @@ package wire
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
 	authn "github.com/devpablocristo/core/authn/go"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	"github.com/google/uuid"
 )
 
 type tenantPrincipal struct {
@@ -34,6 +36,10 @@ func contextWithTenantPrincipal(ctx context.Context, principal tenantPrincipal) 
 type tenantPrincipalVerifier interface {
 	Verify(ctx context.Context, credential string) (tenantPrincipal, error)
 }
+
+type tenantRefResolver func(ctx context.Context, ref string) (uuid.UUID, bool, error)
+
+const tenantSlugHeader = "X-Pymes-Tenant-Slug"
 
 func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -67,6 +73,56 @@ func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier
 			http.Error(w, "authentication required", http.StatusUnauthorized)
 		})
 	}
+}
+
+func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenantRefResolver) func(http.Handler) http.Handler {
+	if authMW == nil || resolve == nil {
+		return authMW
+	}
+	return func(next http.Handler) http.Handler {
+		return authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			principal, ok := tenantPrincipalFromContext(r.Context())
+			if !ok {
+				writeTenantJSONError(w, http.StatusUnauthorized, "authentication_required", "authentication required")
+				return
+			}
+			if !tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(tenantSlugHeader), principal, resolve, w) {
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
+	}
+}
+
+func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal tenantPrincipal, resolve tenantRefResolver, w http.ResponseWriter) bool {
+	slug := strings.TrimSpace(rawSlug)
+	authMethod := strings.TrimSpace(principal.AuthMethod)
+	if slug == "" {
+		if authMethod == "api_key" {
+			return true
+		}
+		writeTenantJSONError(w, http.StatusForbidden, "tenant_slug_required", "tenant slug header is required")
+		return false
+	}
+	resolvedTenantID, ok, err := resolve(ctx, slug)
+	if err != nil {
+		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
+		return false
+	}
+	if !ok || !strings.EqualFold(strings.TrimSpace(principal.TenantID), resolvedTenantID.String()) {
+		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
+		return false
+	}
+	return true
+}
+
+func writeTenantJSONError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code":    code,
+		"message": message,
+	})
 }
 
 func writeTenantAuthError(w http.ResponseWriter, err error) {

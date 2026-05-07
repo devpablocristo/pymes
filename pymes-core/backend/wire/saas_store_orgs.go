@@ -11,27 +11,37 @@ import (
 
 // GetTenantNameByID devuelve el nombre legible del tenant para el UUID interno.
 func (s *pymesSaaSStore) GetTenantNameByID(ctx context.Context, tenantID string) (string, bool, error) {
+	name, _, ok, err := s.GetTenantNameSlugByID(ctx, tenantID)
+	return name, ok, err
+}
+
+// GetTenantNameSlugByID devuelve nombre y slug del tenant para el UUID interno.
+func (s *pymesSaaSStore) GetTenantNameSlugByID(ctx context.Context, tenantID string) (string, string, bool, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return "", false, nil
+		return "", "", false, nil
 	}
 	id, err := uuid.Parse(tenantID)
 	if err != nil {
-		return "", false, nil
+		return "", "", false, nil
 	}
 	var row pymesTenantRow
 	err = s.db.WithContext(ctx).Where("id = ?", id).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", false, nil
+		return "", "", false, nil
 	}
 	if err != nil {
-		return "", false, err
+		return "", "", false, err
 	}
 	name := strings.TrimSpace(row.Name)
-	if name == "" {
-		return "", false, nil
+	slug := ""
+	if row.Slug != nil {
+		slug = strings.TrimSpace(*row.Slug)
 	}
-	return name, true, nil
+	if name == "" && slug == "" {
+		return "", "", false, nil
+	}
+	return name, slug, true, nil
 }
 
 func (s *pymesSaaSStore) ResolveTenantIDByExternalRef(ctx context.Context, ref string) (string, bool, error) {

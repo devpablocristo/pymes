@@ -1,4 +1,4 @@
-import { request, type RequestOptions } from '@devpablocristo/core-authn/http/fetch';
+import { apiRequest, type TenantAwareRequestOptions } from './api';
 
 type VerticalRequestConfig = {
   envVar: string;
@@ -77,10 +77,10 @@ export function createVerticalRequest(config: VerticalRequestConfig) {
     config.timeoutMessage ??
     'El servidor tardó demasiado en responder. Comprobá que el backend vertical esté en marcha y el puerto en VITE_*_API_URL.';
 
-  return async function verticalRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return async function verticalRequest<T>(path: string, options: TenantAwareRequestOptions = {}): Promise<T> {
     const run = async (): Promise<T> => {
       try {
-        return await request<T>(path, { ...options, baseURLs });
+        return await apiRequest<T>(path, { ...options, baseURLs });
       } catch (error) {
         if (error instanceof Error) {
           throw new Error(normalizeErrorMessage(error.message, config.translateError));

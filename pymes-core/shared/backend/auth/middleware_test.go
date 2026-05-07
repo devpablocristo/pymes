@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	ctxkeys "github.com/devpablocristo/core/security/go/contextkeys"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -17,6 +20,15 @@ type stubAPIKeyResolver struct {
 
 func (s stubAPIKeyResolver) ResolveAPIKey(string) (ResolvedKey, bool) {
 	return s.key, s.ok
+}
+
+type stubTenantRefResolver struct {
+	tenantID string
+	err      error
+}
+
+func (s stubTenantRefResolver) ResolveTenantID(context.Context, string) (string, error) {
+	return s.tenantID, s.err
 }
 
 func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
@@ -72,6 +84,85 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	}
 	if len(got.Scopes) != 2 {
 		t.Fatalf("expected 2 scopes, got %#v", got.Scopes)
+	}
+}
+
+func TestRequireTenantSlugBindingRequiresHeaderForJWT(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(ctxkeys.CtxKeyOrgID, "tenant-1")
+		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
+	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-1"}))
+	router.GET("/protected", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/protected", nil))
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), "tenant_slug_required") {
+		t.Fatalf("expected tenant_slug_required body, got %s", recorder.Body.String())
+	}
+}
+
+func TestRequireTenantSlugBindingRejectsMismatch(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(ctxkeys.CtxKeyOrgID, "tenant-1")
+		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
+	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-2"}))
+	router.GET("/protected", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set(TenantSlugHeader, "medlab")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), "tenant_mismatch") {
+		t.Fatalf("expected tenant_mismatch body, got %s", recorder.Body.String())
+	}
+}
+
+func TestRequireTenantSlugBindingAllowsMatchingSlug(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(ctxkeys.CtxKeyOrgID, "tenant-1")
+		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
+		c.Next()
+	})
+	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-1"}))
+	router.GET("/protected", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set(TenantSlugHeader, "bicimax")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, recorder.Code, recorder.Body.String())
 	}
 }
 

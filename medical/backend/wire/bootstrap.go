@@ -40,6 +40,7 @@ func InitializeApp() *app.App {
 	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
+	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreOrgRefResolver(cpClient.Client))
 	auditLog := verticalaudit.NewLogger(logger)
 
 	examsRepo := exams.NewRepository(db)
@@ -53,7 +54,7 @@ func InitializeApp() *app.App {
 
 	v1 := router.Group("/v1")
 	authGroup := v1.Group("")
-	authGroup.Use(authMiddleware.RequireAuth())
+	authGroup.Use(authMiddleware.RequireAuth(), tenantSlugBinding)
 	medicalGroup := authGroup.Group("/medical")
 	examsHandler.RegisterRoutes(medicalGroup)
 

@@ -46,8 +46,17 @@ export async function mockApiForE2E(page: Page) {
           auth: {
             tenant_id: 'e2e-org-001',
             tenant_name: 'E2E Test Tenant',
+            tenant_slug: 'e2e-test',
             product_role: 'admin',
             auth_method: 'api_key',
+          },
+          tenant: {
+            id: 'e2e-org-001',
+            slug: 'e2e-test',
+            name: 'E2E Test Tenant',
+          },
+          membership: {
+            role: 'admin',
           },
         }),
       });
@@ -106,8 +115,17 @@ export async function mockApiWithOnboardingDone(page: Page) {
           auth: {
             tenant_id: 'e2e-org-001',
             tenant_name: 'E2E Test Tenant',
+            tenant_slug: 'e2e-test',
             product_role: 'admin',
             auth_method: 'api_key',
+          },
+          tenant: {
+            id: 'e2e-org-001',
+            slug: 'e2e-test',
+            name: 'E2E Test Tenant',
+          },
+          membership: {
+            role: 'admin',
           },
         }),
       });

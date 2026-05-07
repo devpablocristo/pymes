@@ -121,6 +121,13 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY="${FRONTEND_CLERK_PUBLISHABLE_KEY}" \
           npm run build
 
+      - name: Validate generated Firebase config
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+
       - name: Write Firebase target config
         run: |
           cat > .firebaserc <<EOF
@@ -144,6 +151,7 @@ jobs:
         run: |
           npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
             --project "${GCP_PROJECT_ID}" \
+            --config firebase.generated.json \
             --only hosting \
             --non-interactive
 

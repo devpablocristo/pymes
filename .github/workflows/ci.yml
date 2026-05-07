@@ -16,6 +16,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  infra-registry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate declarative vertical registry
+        run: |
+          python3 -m pip install --user pyyaml
+          python3 scripts/infra/validate_verticals.py
+          python3 scripts/infra/generate_firebase.py --check
+      - id: matrix
+        name: Generate deployable vertical matrix
+        run: |
+          set -euo pipefail
+          matrix="$(python3 scripts/infra/generate_vertical_matrix.py --mode deploy)"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          MATRIX="$matrix" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          matrix = json.loads(os.environ["MATRIX"])
+          if not matrix.get("include"):
+              print("deploy matrix is empty", file=sys.stderr)
+              sys.exit(1)
+          print(f"deploy matrix contains {len(matrix['include'])} verticals")
+          PY
+
   pymes-core-backend:
     runs-on: ubuntu-latest
     steps:
@@ -155,6 +186,7 @@ jobs:
           VITE_WORKSHOPS_API_URL: ${{ secrets.VITE_WORKSHOPS_API_URL_DEV }}
           VITE_BEAUTY_API_URL: ${{ secrets.VITE_BEAUTY_API_URL_DEV }}
           VITE_RESTAURANTS_API_URL: ${{ secrets.VITE_RESTAURANTS_API_URL_DEV }}
+          VITE_MEDICAL_API_URL: ${{ secrets.VITE_MEDICAL_API_URL_DEV }}
         run: npm run build
 
       # Hosting DEV: solo en merge/push a `develop` vía `.github/workflows/deploy-dev-frontend.yml`
@@ -184,6 +216,24 @@ jobs:
         run: docker build -f ai/Dockerfile.prod -t pymes-ai-prod-ci .
       - name: Smoke AI production image imports
         run: docker run --rm -e GEMINI_API_KEY=ci-placeholder-not-used pymes-ai-prod-ci python -c "import src.main"
+
+  vertical-docker-prod-builds:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs:
+      - infra-registry
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.infra-registry.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.id }} production image
+        run: |
+          docker build \
+            -f "${{ matrix.path }}/${{ matrix.dockerfile }}" \
+            -t "${{ matrix.service }}-prod-ci" \
+            ..
 
   governance-notifications-e2e:
     name: governance-notifications-e2e

@@ -1,0 +1,28 @@
+# Build de producción para Cloud Run de la vertical professionals.
+# Contexto esperado: directorio que contiene `pymes/`.
+
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOPROXY=https://proxy.golang.org,direct
+
+WORKDIR /workspace
+
+COPY pymes /workspace/pymes
+WORKDIR /workspace/pymes
+
+RUN go mod download
+RUN go build -trimpath -ldflags="-s -w" -o /out/pymes-professionals ./professionals/backend/cmd/local
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /out/pymes-professionals /pymes-professionals
+
+ENV PORT=8080
+EXPOSE 8080
+
+USER nonroot:nonroot
+ENTRYPOINT ["/pymes-professionals"]

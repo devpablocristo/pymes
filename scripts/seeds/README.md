@@ -6,7 +6,7 @@ Este flujo deja datos demo coherentes para las pantallas operativas del panel.
 
 - `make seed-clear`: limpia datos demo/operativos y preserva bootstrap de tenant, org, usuarios, miembros, settings y API keys.
 - `make seed-clear-verify`: valida que las pantallas operativas hayan quedado vacias sin borrar bootstrap.
-- `make seed`: carga datos base, demo core, agenda, verticales y governance demo.
+- `make seed`: carga datos base, demo core, agenda, verticales y governance demo en el tenant seleccionado.
 - `make seed-verify`: valida conteos por DB y por API contra el contrato central.
 - `make seed-reset`: ejecuta clear, seed y verify en ese orden.
 
@@ -25,7 +25,9 @@ Los pagos se validan por DB porque la pantalla/API visible lista pagos asociados
 
 ## Variables utiles
 
-- `PYMES_SEED_DEMO_TENANT_EXTERNAL_ID`: tenant/org externo usado como demo.
+- `DEFAULT_SEED_TENANT_SLUG`: slug local por defecto dentro de `scripts/seeds/lib.sh`. Default: `medlab`.
+- `PYMES_SEED_DEMO_TENANT_SLUG`: equivalente para llamar scripts directamente.
+- `PYMES_SEED_DEMO_TENANT_EXTERNAL_ID`: selector legacy/CI/GCP por identificador externo cuando no se usa slug.
 - `SEED_VERIFY_API_KEY`: API key para checks HTTP (default: `VITE_API_KEY` o `psk_local_admin`).
 - `SEED_VERIFY_CORE_URL`, `SEED_VERIFY_WORKSHOPS_URL`, `SEED_VERIFY_PROFESSIONALS_URL`, `SEED_VERIFY_RESTAURANTS_URL`: URLs de backends.
 - `SEED_VERIFY_SKIP_API=1`: ejecuta solo checks DB.

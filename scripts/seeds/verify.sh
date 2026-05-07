@@ -19,7 +19,7 @@ if [[ "${1:-}" == "--cleared" ]]; then
 fi
 
 ensure_pymes_seed_db_ready
-require_seed_tenant_external_id
+require_seed_tenant_selector
 TARGET_TENANT_UUID="$(resolve_target_tenant_uuid)"
 
 week_from="$(date -u -d '1 day ago' +%Y-%m-%dT00:00:00Z)"

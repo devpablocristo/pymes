@@ -52,7 +52,7 @@ describe('CrudUiConfigurePage', () => {
     expect(screen.getByText('Paginación')).toBeInTheDocument();
     expect(screen.getByText('Acciones CSV')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
-    expect(await screen.findByRole('button', { name: 'Volver a clientes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Clientes' })).toBeInTheDocument();
   });
 
   it('navigates with the header menu back action inside the tenant scope', async () => {
@@ -66,7 +66,7 @@ describe('CrudUiConfigurePage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Volver a clientes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Clientes' }));
 
     expect(await screen.findByText('customers-home')).toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe('CrudUiConfigurePage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
-    expect(await screen.findByRole('button', { name: 'Volver a órdenes de trabajo' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Órdenes de trabajo' })).toBeInTheDocument();
   });
 
   it('renders nested resource configuration without the parent view switch/header menu', async () => {
@@ -131,6 +131,6 @@ describe('CrudUiConfigurePage', () => {
     expect(screen.queryByRole('navigation', { name: 'Vistas de medicina laboral' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Abrir menú' })).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
-    expect(await screen.findByRole('button', { name: 'Volver a medicina laboral' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Medicina laboral' })).toBeInTheDocument();
   });
 });

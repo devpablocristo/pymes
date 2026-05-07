@@ -18,6 +18,10 @@ export type PageLayoutProps = {
 
 export function PageLayout({ title, lead, actions, inlineActions, menuItems, banner, className, children }: PageLayoutProps) {
   const contextualMenuItems = useHeaderMenuItems();
+  const headerMenuItems = [...contextualMenuItems, ...(menuItems ?? [])].filter((item, index, items) => {
+    const key = `${item.label}:${item.href}`;
+    return items.findIndex((candidate) => `${candidate.label}:${candidate.href}` === key) === index;
+  });
   const stackClass = ['page-stack', className].filter(Boolean).join(' ');
   const pageSearch = usePageSearchShellControl();
   const hasSearch = pageSearch.visible;
@@ -44,7 +48,7 @@ export function PageLayout({ title, lead, actions, inlineActions, menuItems, ban
   return (
     <div className={stackClass}>
       <div className="page-layout__header-top-row">
-        <HeaderMenu items={[...contextualMenuItems, ...(menuItems ?? [])]} />
+        <HeaderMenu items={headerMenuItems} />
       </div>
       <CrudPageShell
         title={title}

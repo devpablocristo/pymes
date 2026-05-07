@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CrudUiConfigurePage } from './CrudUiConfigurePage';
+import { CrudModuleSection } from '../modules/crud/CrudModuleSection';
 import type { CrudPageConfig } from '../components/CrudPage';
 
 const loadLazyCrudPageConfigMock = vi.fn<(resourceId: string) => Promise<CrudPageConfig<{ id: string }> | null>>();
@@ -81,5 +82,55 @@ describe('CrudUiConfigurePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
     expect(await screen.findByRole('button', { name: 'Volver a órdenes de trabajo' })).toBeInTheDocument();
+  });
+
+  it('renders nested resource configuration without the parent view switch/header menu', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={['/medlab/medical/occupational-health/exams/configure']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route
+            path="/:tenantSlug/medical/occupational-health/exams"
+            element={
+              <CrudModuleSection
+                modes={[
+                  { path: '/medlab/medical/occupational-health/exams/list', label: 'Lista' },
+                  { path: '/medlab/medical/occupational-health/exams/gallery', label: 'Galería' },
+                  { path: '/medlab/medical/occupational-health/exams/board', label: 'Tablero' },
+                ]}
+                groupAriaLabel="Vistas de medicina laboral"
+                actionLink={{
+                  to: '/medlab/medical/occupational-health/exams/configure',
+                  label: 'Configurar',
+                  hideWhenActivePattern: '/medlab/medical/occupational-health/exams/configure',
+                  activeReplacement: {
+                    to: '/medlab/medical/occupational-health/exams/list',
+                    label: 'Volver a medicina laboral',
+                  },
+                }}
+              />
+            }
+          >
+            <Route
+              path="configure"
+              element={
+                <CrudUiConfigurePage
+                  resourceId="occupationalHealthExams"
+                  backPath="/medical/occupational-health/exams/list"
+                />
+              }
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Vistas de medicina laboral' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Vistas de medicina laboral' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Abrir menú' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    expect(await screen.findByRole('button', { name: 'Volver a medicina laboral' })).toBeInTheDocument();
   });
 });

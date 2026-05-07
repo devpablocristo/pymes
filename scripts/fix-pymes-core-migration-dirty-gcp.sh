@@ -112,7 +112,8 @@ check_clean() {
 
 repair_known_dev_dirty() {
   local version dirty has_tenants has_orgs
-  read -r version dirty < <("${psql_cmd[@]}" -Atq -c "SELECT version, dirty FROM pymes_core_schema_migrations LIMIT 1;")
+  version="$("${psql_cmd[@]}" -Atq -c "SELECT version FROM pymes_core_schema_migrations LIMIT 1;")"
+  dirty="$("${psql_cmd[@]}" -Atq -c "SELECT dirty FROM pymes_core_schema_migrations LIMIT 1;")"
   has_tenants="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.tenants') IS NOT NULL;")"
   has_orgs="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.orgs') IS NOT NULL;")"
 

@@ -196,14 +196,6 @@ jobs:
           secret_flags="${secret_flags},GOVERNANCE_API_KEY=${SECRET_GOVERNANCE_API_KEY_NAME}:latest"
           echo "SECRET_FLAGS=$secret_flags" >> "$GITHUB_ENV"
 
-      - name: Drop legacy JWT_ISSUER secret binding
-        run: |
-          set -euo pipefail
-          gcloud run services update "$SERVICE_NAME" \
-            --project="$GCP_PROJECT_ID" \
-            --region="$GCP_REGION" \
-            --remove-secrets="JWT_ISSUER" || true
-
       - name: Deploy to Cloud Run (DEV)
         run: |
           set -euo pipefail
@@ -238,7 +230,8 @@ jobs:
             --max-instances=1 \
             --timeout=300 \
             --set-env-vars="${env_vars}" \
-            --set-secrets="${SECRET_FLAGS}"
+            --remove-secrets="JWT_ISSUER" \
+            --update-secrets="${SECRET_FLAGS}"
 
       - name: Resolve service URL
         run: |

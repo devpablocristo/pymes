@@ -5,10 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
 import {
   createSchedulingBranch,
+  createSchedulingBranchWithSetupKey,
   createTenant,
   listSchedulingBranches,
+  listSchedulingBranchesWithSetupKey,
   listTenants,
   updateTenantSettings,
+  updateTenantSettingsWithSetupKey,
 } from '../lib/api';
 import { formatClerkAPIUserMessage } from '../lib/clerkErrors';
 import { useI18n } from '../lib/i18n';
@@ -157,9 +160,21 @@ function resolveDefaultBranchTimezone(): string {
   return timezone || 'UTC';
 }
 
-async function ensureDefaultBranchExists(tenantSlug?: string): Promise<void> {
+function slugifyTenantNameForOnboarding(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+async function ensureDefaultBranchExists(tenantSlug?: string, setupAPIKey?: string): Promise<void> {
   const options = tenantSlug ? { tenantSlug } : {};
-  const current = await listSchedulingBranches(options);
+  const current = setupAPIKey && tenantSlug
+    ? await listSchedulingBranchesWithSetupKey(setupAPIKey, tenantSlug)
+    : await listSchedulingBranches(options);
   if ((current.items ?? []).length > 0) {
     return;
   }
@@ -170,9 +185,15 @@ async function ensureDefaultBranchExists(tenantSlug?: string): Promise<void> {
     active: true,
   };
   try {
-    await createSchedulingBranch(payload, options);
+    if (setupAPIKey && tenantSlug) {
+      await createSchedulingBranchWithSetupKey(payload, setupAPIKey, tenantSlug);
+    } else {
+      await createSchedulingBranch(payload, options);
+    }
   } catch (error) {
-    const refreshed = await listSchedulingBranches(options);
+    const refreshed = setupAPIKey && tenantSlug
+      ? await listSchedulingBranchesWithSetupKey(setupAPIKey, tenantSlug)
+      : await listSchedulingBranches(options);
     if ((refreshed.items ?? []).length > 0) {
       return;
     }
@@ -316,6 +337,7 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     setFinishError('');
     setFinishing(true);
     let tenantSlugForSetup = '';
+    let setupAPIKey = '';
 
     if (clerkBridges) {
       if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
@@ -326,12 +348,13 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
       try {
         const name = profile.businessName.trim();
         let activeClerkOrgID = clerkBridges.organization?.id ?? '';
-        if (!clerkBridges.organization) {
-          const created = await createTenant({ name });
+        const requestedTenantSlug = slugifyTenantNameForOnboarding(name);
+        const activeTenantSlug = clerkBridges.organization?.slug?.trim() ?? '';
+        if (!clerkBridges.organization || (requestedTenantSlug && activeTenantSlug !== requestedTenantSlug)) {
+          const created = await createTenant({ name, slug: requestedTenantSlug || undefined });
           activeClerkOrgID = created.clerk_org_id;
           tenantSlugForSetup = created.slug ?? '';
-          await clerkBridges.setActive({ organization: created.clerk_org_id });
-          await clerkBridges.afterSetActiveOrg?.();
+          setupAPIKey = created.raw_key ?? '';
         } else {
           tenantSlugForSetup = clerkBridges.organization.slug ?? '';
         }
@@ -344,6 +367,10 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         if (!tenantSlugForSetup) {
           throw new Error('No se pudo resolver el slug del tenant activo.');
         }
+        if (activeClerkOrgID) {
+          await clerkBridges.setActive({ organization: activeClerkOrgID });
+          await clerkBridges.afterSetActiveOrg?.();
+        }
       } catch (err) {
         setFinishError(formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')));
         setFinishing(false);
@@ -352,8 +379,8 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     }
 
     try {
-      await ensureDefaultBranchExists(tenantSlugForSetup);
-      const updated = await updateTenantSettings({
+      await ensureDefaultBranchExists(tenantSlugForSetup, setupAPIKey);
+      const tenantSettingsPatch = {
         business_name: profile.businessName,
         team_size: profile.teamSize,
         sells: profile.sells,
@@ -364,13 +391,20 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         payment_method: profile.paymentMethod,
         vertical: profile.vertical,
         onboarding_completed_at: profile.completedAt,
-      }, tenantSlugForSetup ? { tenantSlug: tenantSlugForSetup } : {});
+      };
+      const updated = setupAPIKey && tenantSlugForSetup
+        ? await updateTenantSettingsWithSetupKey(tenantSettingsPatch, setupAPIKey, tenantSlugForSetup)
+        : await updateTenantSettings(tenantSettingsPatch, tenantSlugForSetup ? { tenantSlug: tenantSlugForSetup } : {});
       queryClient.setQueryData(queryKeys.tenant.settings, updated);
       const syncedProfile = syncTenantProfileFromSettings(updated);
       saveTenantProfile({
         ...(syncedProfile ?? profile),
         ...(profile.subVertical ? { subVertical: profile.subVertical } : {}),
       });
+      if (clerkBridges && tenantSlugForSetup) {
+        window.location.assign(`/${tenantSlugForSetup}/dashboard`);
+        return;
+      }
       navigate('/', { replace: true });
     } catch (err) {
       setFinishError(

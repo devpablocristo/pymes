@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	authn "github.com/devpablocristo/core/authn/go"
+	"github.com/devpablocristo/core/config/go/envconfig"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
@@ -177,8 +178,11 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		CreatedBy: user.ExternalID,
 	})
 	if err != nil {
-		httperr.WriteFrom(w, err)
-		return
+		if !envconfig.IsLocal(store.environment) {
+			httperr.WriteFrom(w, err)
+			return
+		}
+		slog.Warn("clerk organization create failed in local environment; creating tenant with local membership only", "err", err, "slug", slug)
 	}
 	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, clerkOrg.ID, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 	if err != nil {

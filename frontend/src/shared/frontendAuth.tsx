@@ -36,7 +36,7 @@ function ClerkAuthTokenBridge({ registerProviders }: { registerProviders: TokenP
   const { getToken } = useAuth();
 
   useEffect(() => {
-    const provider = createClerkTokenProvider(getToken);
+    const provider = createClerkTokenProvider(() => getToken({ skipCache: true }));
     registerProviders.forEach((registerProvider) => registerProvider(provider));
   }, [getToken, registerProviders]);
 

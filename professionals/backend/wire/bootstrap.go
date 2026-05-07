@@ -48,7 +48,10 @@ func InitializeApp() *app.App {
 	// Auth middleware shared with the other Go backends.
 	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
-	tenantSlugBinding := auth.RequireTenantSlugBinding(verticalwire.NewCoreTenantRefResolver(cpClient.Client))
+	tenantSlugBinding := auth.RequireTenantSlugBinding(
+		verticalwire.NewCoreTenantRefResolver(cpClient.Client),
+		verticalwire.NewTenantMembershipResolver(db),
+	)
 
 	// Audit logger (lightweight, log-only implementation)
 	auditLog := verticalaudit.NewLogger(logger)
@@ -80,7 +83,10 @@ func InitializeApp() *app.App {
 	// Router
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(ginmw.NewCORS(ginmw.CORSConfig{Origins: []string{"http://localhost:5174", "http://localhost:5181", cfg.FrontendURL}}))
+	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
+		Origins:      []string{"http://localhost:5174", "http://localhost:5181", cfg.FrontendURL},
+		AllowHeaders: []string{auth.TenantSlugHeader},
+	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error { return store.Ping(ctx, db) })
 
 	v1 := router.Group("/v1")

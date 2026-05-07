@@ -73,6 +73,67 @@ async function requestResponse(path: string, options: TenantAwareRequestOptions 
   return coreRequestResponse(path, withTenantSlugHeader(options));
 }
 
+function resolveAPIBaseURL(): string {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  if (typeof window === 'undefined') {
+    return 'http://localhost:8100';
+  }
+  return `${window.location.protocol}//${window.location.hostname || 'localhost'}:8100`;
+}
+
+async function readSetupKeyError(response: Response): Promise<Error> {
+  const text = await response.text().catch(() => response.statusText);
+  if (!text) {
+    return new Error(response.statusText || `HTTP ${response.status}`);
+  }
+  try {
+    const body = JSON.parse(text) as { error?: string | { message?: string; code?: string }; message?: string };
+    if (body.error && typeof body.error === 'object') {
+      return new Error(body.error.message || body.error.code || text);
+    }
+    if (typeof body.error === 'string') {
+      return new Error(body.error);
+    }
+    if (body.message) {
+      return new Error(body.message);
+    }
+  } catch {
+    // keep raw text below
+  }
+  return new Error(text);
+}
+
+async function requestWithTenantSetupKey<T = unknown>(
+  path: string,
+  apiKey: string,
+  tenantSlug: string,
+  options: Pick<TenantAwareRequestOptions, 'method' | 'body'> = {},
+): Promise<T> {
+  const response = await fetch(`${resolveAPIBaseURL()}${path}`, {
+    method: options.method ?? 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-KEY': apiKey,
+      [TENANT_SLUG_HEADER]: tenantSlug,
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  if (!response.ok) {
+    throw await readSetupKeyError(response);
+  }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as T;
+  }
+  return (await response.text()) as T;
+}
+
 function normalizeTenantSettings(settings: TenantSettings): TenantSettings {
   return {
     ...settings,
@@ -101,6 +162,20 @@ export async function updateTenantSettings(
   return normalizeTenantSettings(response);
 }
 
+export async function updateTenantSettingsWithSetupKey(
+  payload: TenantSettingsUpdatePayload,
+  apiKey: string,
+  tenantSlug: string,
+): Promise<TenantSettings> {
+  const response = await requestWithTenantSetupKey<TenantSettings>(
+    '/v1/admin/tenant-settings',
+    apiKey,
+    tenantSlug,
+    { method: 'PATCH', body: payload },
+  );
+  return normalizeTenantSettings(response);
+}
+
 export type SchedulingBranchSummary = {
   id: string;
   code: string;
@@ -114,6 +189,13 @@ export async function listSchedulingBranches(options: TenantAwareRequestOptions 
   return request('/v1/scheduling/branches', options);
 }
 
+export async function listSchedulingBranchesWithSetupKey(
+  apiKey: string,
+  tenantSlug: string,
+): Promise<{ items: SchedulingBranchSummary[] }> {
+  return requestWithTenantSetupKey('/v1/scheduling/branches', apiKey, tenantSlug);
+}
+
 export async function createSchedulingBranch(payload: {
   code: string;
   name: string;
@@ -122,6 +204,19 @@ export async function createSchedulingBranch(payload: {
   active?: boolean;
 }, options: TenantAwareRequestOptions = {}): Promise<SchedulingBranchSummary> {
   return request('/v1/scheduling/branches', { ...options, method: 'POST', body: payload });
+}
+
+export async function createSchedulingBranchWithSetupKey(payload: {
+  code: string;
+  name: string;
+  timezone: string;
+  address?: string;
+  active?: boolean;
+}, apiKey: string, tenantSlug: string): Promise<SchedulingBranchSummary> {
+  return requestWithTenantSetupKey('/v1/scheduling/branches', apiKey, tenantSlug, {
+    method: 'POST',
+    body: payload,
+  });
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {

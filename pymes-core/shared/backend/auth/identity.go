@@ -26,6 +26,10 @@ type TenantRefResolver interface {
 	ResolveTenantID(ctx context.Context, ref string) (string, error)
 }
 
+type TenantMembershipResolver interface {
+	FindActiveMembershipRole(ctx context.Context, tenantID, actor string) (string, bool, error)
+}
+
 // IdentityConfig alinea verticales con core/saas: claims configurables + resolución de org externa.
 type IdentityConfig struct {
 	Issuer            string

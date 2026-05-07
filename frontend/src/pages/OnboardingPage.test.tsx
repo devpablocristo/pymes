@@ -11,8 +11,11 @@ import { OnboardingPage } from './OnboardingPage';
 const apiMocks = vi.hoisted(() => ({
   createTenant: vi.fn<() => Promise<{ tenant_id: string; clerk_org_id: string }>>(),
   updateTenantSettings: vi.fn<() => Promise<TenantSettings>>(),
+  updateTenantSettingsWithSetupKey: vi.fn<() => Promise<TenantSettings>>(),
   listSchedulingBranches: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
+  listSchedulingBranchesWithSetupKey: vi.fn<() => Promise<{ items: Array<Record<string, unknown>> }>>(),
   createSchedulingBranch: vi.fn<() => Promise<Record<string, unknown>>>(),
+  createSchedulingBranchWithSetupKey: vi.fn<() => Promise<Record<string, unknown>>>(),
 }));
 
 const navigationMocks = vi.hoisted(() => ({
@@ -31,8 +34,11 @@ vi.mock('../lib/auth', () => ({
 vi.mock('../lib/api', () => ({
   createTenant: (...args: unknown[]) => apiMocks.createTenant(...args),
   updateTenantSettings: (...args: unknown[]) => apiMocks.updateTenantSettings(...args),
+  updateTenantSettingsWithSetupKey: (...args: unknown[]) => apiMocks.updateTenantSettingsWithSetupKey(...args),
   listSchedulingBranches: (...args: unknown[]) => apiMocks.listSchedulingBranches(...args),
+  listSchedulingBranchesWithSetupKey: (...args: unknown[]) => apiMocks.listSchedulingBranchesWithSetupKey(...args),
   createSchedulingBranch: (...args: unknown[]) => apiMocks.createSchedulingBranch(...args),
+  createSchedulingBranchWithSetupKey: (...args: unknown[]) => apiMocks.createSchedulingBranchWithSetupKey(...args),
 }));
 
 vi.mock('../lib/tenantProfile', async () => {
@@ -128,14 +134,25 @@ function renderOnboardingPage() {
 describe('OnboardingPage scheduling setup', () => {
   beforeEach(() => {
     apiMocks.updateTenantSettings.mockReset();
+    apiMocks.updateTenantSettingsWithSetupKey.mockReset();
     apiMocks.createTenant.mockReset();
     apiMocks.listSchedulingBranches.mockReset();
+    apiMocks.listSchedulingBranchesWithSetupKey.mockReset();
     apiMocks.createSchedulingBranch.mockReset();
+    apiMocks.createSchedulingBranchWithSetupKey.mockReset();
     navigationMocks.navigate.mockReset();
     profileMocks.syncTenantProfileFromSettings.mockReset();
     profileMocks.saveTenantProfile.mockReset();
     apiMocks.listSchedulingBranches.mockResolvedValue({ items: [] });
+    apiMocks.listSchedulingBranchesWithSetupKey.mockResolvedValue({ items: [] });
     apiMocks.createSchedulingBranch.mockResolvedValue({
+      id: 'branch-principal',
+      code: 'principal',
+      name: 'Principal',
+      timezone: 'UTC',
+      active: true,
+    });
+    apiMocks.createSchedulingBranchWithSetupKey.mockResolvedValue({
       id: 'branch-principal',
       code: 'principal',
       name: 'Principal',

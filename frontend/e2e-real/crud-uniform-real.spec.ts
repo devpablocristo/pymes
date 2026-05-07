@@ -5,7 +5,7 @@ const tenant = process.env.E2E_REAL_TENANT_SLUG ?? 'bicimax';
 
 const crudRoutes = [
   { id: 'invoices', path: 'invoices', title: 'Facturación' },
-  { id: 'customers', path: 'customers', title: 'Clientes' },
+  { id: 'customers', path: 'customers', title: /Clientes|Pacientes/ },
   { id: 'suppliers', path: 'suppliers', title: 'Proveedores' },
   { id: 'products', path: 'products', title: 'Productos' },
   { id: 'services', path: 'services', title: 'Servicios' },

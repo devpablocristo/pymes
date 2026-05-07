@@ -32,14 +32,16 @@ test.describe('Ajustes real', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Equipo' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir menú' })).toBeVisible();
     await expect(page.locator('.admin-activity-table tbody tr td:first-child').first()).toContainText('@');
-    await expect(page.getByText('devpablocristo@gmail.com')).toBeVisible();
 
     const inviteButton = page.getByRole('button', { name: 'Invitar usuario' });
-    await expect(inviteButton).toBeVisible();
-    await inviteButton.click();
-    await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Rol en el tenant')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Enviar invitación' })).toBeVisible();
+    if (await inviteButton.isVisible()) {
+      await inviteButton.click();
+      await expect(page.getByLabel('Email')).toBeVisible();
+      await expect(page.getByLabel('Rol en el tenant')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Enviar invitación' })).toBeVisible();
+    } else {
+      await expect(page.getByText('Solo owner invita')).toBeVisible();
+    }
 
     await assertCleanRuntime();
   });

@@ -1,24 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-const loginEmail = process.env.E2E_REAL_CLERK_EMAIL ?? 'devpablocristo@gmail.com';
-const loginPassword = process.env.E2E_REAL_CLERK_PASSWORD ?? '12345';
-
-async function loginWithClerk(page: Page) {
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  if (!page.url().includes('/login')) return;
-
-  const emailInput = page.locator('input[name="identifier"], input[name="emailAddress"], input[type="email"]').first();
-  await expect(emailInput).toBeVisible({ timeout: 30_000 });
-  await emailInput.fill(loginEmail);
-  await page.getByRole('button', { name: /^(continuar|continue)$/i }).first().click();
-
-  const passwordInput = page.locator('input[name="password"]:not([aria-hidden="true"])').first();
-  await expect(passwordInput).toBeVisible({ timeout: 30_000 });
-  await expect(passwordInput).toBeEnabled({ timeout: 30_000 });
-  await passwordInput.fill(loginPassword);
-  await page.getByRole('button', { name: /^(continuar|continue)$/i }).first().click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 60_000 });
-}
+const tenant = process.env.E2E_REAL_TENANT_SLUG ?? 'bicimax';
 
 test.describe('Medical real MedLab', () => {
   test('abre examenes laborales sin failed fetch ni errores HTTP visibles', async ({ page }, testInfo) => {
@@ -39,8 +21,7 @@ test.describe('Medical real MedLab', () => {
       }
     });
 
-    await loginWithClerk(page);
-    await page.goto('/medlab/medical/occupational-health/exams/list', { waitUntil: 'domcontentloaded' });
+    await page.goto(`/${tenant}/medical/occupational-health/exams/list`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Medicina laboral' })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('Failed to fetch')).toHaveCount(0, { timeout: 20_000 });
     await expect(page.locator('body')).not.toContainText(/failed to fetch|forbidden|tenant slug/i, { timeout: 20_000 });

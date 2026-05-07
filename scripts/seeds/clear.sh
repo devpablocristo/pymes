@@ -44,7 +44,7 @@ BEGIN
         JOIN pg_namespace nsp ON nsp.oid = cls.relnamespace
         WHERE cls.relkind = 'r'
           AND (
-            nsp.nspname IN ('workshops', 'professionals', 'restaurant')
+            nsp.nspname IN ('workshops', 'professionals', 'restaurant', 'medical')
             OR (
                 nsp.nspname = 'public'
                 AND (

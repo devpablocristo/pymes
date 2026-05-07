@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/devpablocristo/core/http/go/pagination"
+	utils "github.com/devpablocristo/core/validate/go/stringutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 
 	"github.com/devpablocristo/pymes/medical/backend/internal/occupational_health/exams/repository/models"
@@ -35,7 +37,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Exam, int
 	}
 	if search := strings.TrimSpace(p.Search); search != "" {
 		like := "%" + search + "%"
-		q = q.Where("(patient_name ILIKE ? OR patient_document ILIKE ? OR employer_name ILIKE ? OR notes ILIKE ?)", like, like, like, like)
+		q = q.Where("(patient_name ILIKE ? OR patient_document ILIKE ? OR employer_name ILIKE ? OR client_name ILIKE ? OR payment_method ILIKE ? OR notes ILIKE ? OR ? = ANY(tags))", like, like, like, like, like, like, search)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -60,12 +62,17 @@ func (r *Repository) Create(ctx context.Context, in domain.Exam) (domain.Exam, e
 		PatientName:     in.PatientName,
 		PatientDocument: in.PatientDocument,
 		EmployerName:    in.EmployerName,
+		ClientName:      in.ClientName,
+		PaymentMethod:   in.PaymentMethod,
 		ExamType:        in.ExamType,
 		Status:          in.Status,
 		ScheduledAt:     in.ScheduledAt,
 		CompletedAt:     in.CompletedAt,
 		Result:          in.Result,
 		Notes:           in.Notes,
+		IsFavorite:      in.IsFavorite,
+		Tags:            pq.StringArray(utils.NormalizeTags(in.Tags)),
+		ImageURLs:       pq.StringArray(normalizeStringSlice(in.ImageURLs)),
 		CreatedBy:       in.CreatedBy,
 		UpdatedBy:       in.UpdatedBy,
 		CreatedAt:       now,
@@ -92,12 +99,17 @@ func (r *Repository) Update(ctx context.Context, in domain.Exam) (domain.Exam, e
 			"patient_name":     in.PatientName,
 			"patient_document": in.PatientDocument,
 			"employer_name":    in.EmployerName,
+			"client_name":      in.ClientName,
+			"payment_method":   in.PaymentMethod,
 			"exam_type":        in.ExamType,
 			"status":           in.Status,
 			"scheduled_at":     in.ScheduledAt,
 			"completed_at":     in.CompletedAt,
 			"result":           in.Result,
 			"notes":            in.Notes,
+			"is_favorite":      in.IsFavorite,
+			"tags":             pq.StringArray(utils.NormalizeTags(in.Tags)),
+			"image_urls":       pq.StringArray(normalizeStringSlice(in.ImageURLs)),
 			"updated_by":       in.UpdatedBy,
 			"updated_at":       time.Now().UTC(),
 		})
@@ -161,18 +173,40 @@ func toDomain(row models.ExamModel) domain.Exam {
 		PatientName:     row.PatientName,
 		PatientDocument: row.PatientDocument,
 		EmployerName:    row.EmployerName,
+		ClientName:      row.ClientName,
+		PaymentMethod:   row.PaymentMethod,
 		ExamType:        row.ExamType,
 		Status:          row.Status,
 		ScheduledAt:     row.ScheduledAt,
 		CompletedAt:     row.CompletedAt,
 		Result:          row.Result,
 		Notes:           row.Notes,
+		IsFavorite:      row.IsFavorite,
+		Tags:            append([]string(nil), row.Tags...),
+		ImageURLs:       append([]string(nil), row.ImageURLs...),
 		CreatedBy:       row.CreatedBy,
 		UpdatedBy:       row.UpdatedBy,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 		DeletedAt:       deletedAt,
 	}
+}
+
+func normalizeStringSlice(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 var _ RepositoryPort = (*Repository)(nil)

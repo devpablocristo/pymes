@@ -42,11 +42,16 @@ export async function createOccupationalHealthExam(data: {
   patient_name: string;
   patient_document?: string;
   employer_name?: string;
+  client_name?: string;
+  payment_method?: string;
   exam_type?: OccupationalExamType;
   status?: OccupationalExamStatus;
   scheduled_at?: string | null;
   result?: string;
   notes?: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  image_urls?: string[];
 }): Promise<OccupationalHealthExam> {
   return medicalRequest('/v1/medical/occupational-health/exams', { method: 'POST', body: data });
 }
@@ -57,12 +62,17 @@ export async function updateOccupationalHealthExam(
     patient_name: string;
     patient_document: string;
     employer_name: string;
+    client_name: string;
+    payment_method: string;
     exam_type: OccupationalExamType;
     status: OccupationalExamStatus;
     scheduled_at: string | null;
     completed_at: string | null;
     result: string;
     notes: string;
+    is_favorite: boolean;
+    tags: string[];
+    image_urls: string[];
   }>,
 ): Promise<OccupationalHealthExam> {
   return medicalRequest(`/v1/medical/occupational-health/exams/${id}`, { method: 'PATCH', body: data });

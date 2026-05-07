@@ -103,7 +103,12 @@ export function SettingsHubPage() {
         onBack={goBackToGrid}
         backLabel={activeSectionCard ? '← Volver a Ajustes' : 'Volver'}
       >
-        <SettingsHubSectionContent section={section} isAccountAdmin={isAccountAdmin} />
+        <SettingsHubSectionContent
+          section={section}
+          isAccountAdmin={isAccountAdmin}
+          tenantId={sessionQuery.data?.auth.tenant_id}
+          membershipRole={sessionQuery.data?.membership?.role}
+        />
       </SectionHubPage>
     </div>
   );

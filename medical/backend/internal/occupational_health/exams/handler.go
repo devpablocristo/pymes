@@ -85,11 +85,16 @@ func (h *Handler) Create(c *gin.Context) {
 		PatientName:     req.PatientName,
 		PatientDocument: req.PatientDocument,
 		EmployerName:    req.EmployerName,
+		ClientName:      req.ClientName,
+		PaymentMethod:   req.PaymentMethod,
 		ExamType:        req.ExamType,
 		Status:          req.Status,
 		ScheduledAt:     scheduledAt,
 		Result:          req.Result,
 		Notes:           req.Notes,
+		IsFavorite:      req.IsFavorite,
+		Tags:            req.Tags,
+		ImageURLs:       req.ImageURLs,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -133,12 +138,17 @@ func (h *Handler) Update(c *gin.Context) {
 		PatientName:     req.PatientName,
 		PatientDocument: req.PatientDocument,
 		EmployerName:    req.EmployerName,
+		ClientName:      req.ClientName,
+		PaymentMethod:   req.PaymentMethod,
 		ExamType:        req.ExamType,
 		Status:          req.Status,
 		ScheduledAt:     scheduledAt,
 		CompletedAt:     completedAt,
 		Result:          req.Result,
 		Notes:           req.Notes,
+		IsFavorite:      req.IsFavorite,
+		Tags:            req.Tags,
+		ImageURLs:       req.ImageURLs,
 	}, auth.GetAuthContext(c).Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -221,12 +231,17 @@ func toResponse(item domain.Exam) dto.ExamResponse {
 		PatientName:     item.PatientName,
 		PatientDocument: item.PatientDocument,
 		EmployerName:    item.EmployerName,
+		ClientName:      item.ClientName,
+		PaymentMethod:   item.PaymentMethod,
 		ExamType:        item.ExamType,
 		Status:          item.Status,
 		ScheduledAt:     formatTime(item.ScheduledAt),
 		CompletedAt:     formatTime(item.CompletedAt),
 		Result:          item.Result,
 		Notes:           item.Notes,
+		IsFavorite:      item.IsFavorite,
+		Tags:            append([]string(nil), item.Tags...),
+		ImageURLs:       append([]string(nil), item.ImageURLs...),
 		CreatedAt:       item.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:       item.UpdatedAt.Format(time.RFC3339),
 	}

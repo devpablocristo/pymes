@@ -18,6 +18,7 @@ export type SettingsSection =
   | null
   | 'branches'
   | 'profile'
+  | 'team'
   | 'rbac'
   | 'audit'
   | 'notifications'
@@ -34,6 +35,7 @@ export type SettingsSectionCard = SectionHubSection<Exclude<SettingsSection, nul
 
 export const SETTING_SECTIONS: SettingsSectionCard[] = [
   { id: 'profile', label: 'Perfil', desc: 'Datos personales y cuenta', icon: createElement(IconUsers) },
+  { id: 'team', label: 'Equipo', desc: 'Invitar usuarios y ver miembros del tenant', icon: createElement(IconUsers) },
   { id: 'branches', label: 'Sucursales', desc: 'Sucursal principal del tenant', icon: createElement(IconBuilding) },
   { id: 'workspace', label: 'Negocio', desc: 'Razón social, monedas, IVA, prefijos', icon: createElement(IconBuilding) },
   { id: 'rbac', label: 'Roles y permisos', desc: 'Accesos administrativos y catálogo RBAC', icon: createElement(IconEdit) },

@@ -9,8 +9,24 @@ import {
 } from '../../lib/medicalApi';
 import type { OccupationalExamStatus, OccupationalExamType, OccupationalHealthExam } from '../../lib/medicalTypes';
 import { PymesSimpleCrudListModeContent } from '../../crud/PymesSimpleCrudListModeContent';
-import { asOptionalString, asString, formatDate, toDateTimeInput, toRFC3339 } from '../../crud/resourceConfigs.shared';
-import { buildFullyConnectedStatusStateMachine, buildStandardCrudViewModes } from '../crud';
+import { paymentMethodOptions } from '../../lib/formPresets';
+import {
+  asBoolean,
+  asOptionalString,
+  asString,
+  formatDate,
+  toDateTimeInput,
+  toRFC3339,
+} from '../../crud/resourceConfigs.shared';
+import {
+  buildFullyConnectedStatusStateMachine,
+  buildStandardCrudViewModes,
+  buildStandardInternalFields,
+  formatCrudLinkedEntityImageUrlsToForm,
+  formatTagCsv,
+  parseCrudLinkedEntityImageUrlList,
+  parseTagCsv,
+} from '../crud';
 
 export const occupationalExamTypeLabels: Record<OccupationalExamType, string> = {
   pre_employment: 'Preocupacional',
@@ -44,11 +60,16 @@ function toExamBody(values: Record<string, CrudFieldValue | undefined>) {
     patient_name: asString(values.patient_name).trim(),
     patient_document: asOptionalString(values.patient_document) ?? '',
     employer_name: asOptionalString(values.employer_name) ?? '',
+    client_name: asOptionalString(values.client_name) ?? '',
+    payment_method: asOptionalString(values.payment_method) ?? '',
     exam_type: (asOptionalString(values.exam_type) ?? 'pre_employment') as OccupationalExamType,
     status: (asOptionalString(values.status) ?? 'pending') as OccupationalExamStatus,
     scheduled_at: toRFC3339(values.scheduled_at) ?? null,
     result: asOptionalString(values.result) ?? '',
     notes: asOptionalString(values.notes) ?? '',
+    is_favorite: asBoolean(values.is_favorite),
+    tags: parseTagCsv(values.tags),
+    image_urls: parseCrudLinkedEntityImageUrlList(asString(values.image_urls)),
   };
 }
 
@@ -115,15 +136,32 @@ export function createOccupationalHealthExamsCrudConfig(): CrudPageConfig<Occupa
     columns: [
       { key: 'patient_name', header: 'Trabajador', className: 'cell-name' },
       { key: 'patient_document', header: 'Documento', render: (_value, row) => row.patient_document.trim() || '—' },
+      { key: 'client_name', header: 'Cliente', render: (_value, row) => row.client_name.trim() || '—' },
       { key: 'employer_name', header: 'Empresa', render: (_value, row) => row.employer_name.trim() || '—' },
+      {
+        key: 'payment_method',
+        header: 'Cobro',
+        render: (_value, row) =>
+          paymentMethodOptions.find((option) => option.value === row.payment_method)?.label ??
+          (row.payment_method.trim() || '—'),
+      },
       { key: 'exam_type', header: 'Tipo', render: (_value, row) => occupationalExamTypeLabels[row.exam_type] ?? row.exam_type },
       { key: 'status', header: 'Estado', render: (_value, row) => examStatusBadge(row.status) },
       { key: 'scheduled_at', header: 'Fecha', render: (value) => formatDate(String(value ?? '')) },
     ],
     formFields: [
+      ...buildStandardInternalFields({ tagsPlaceholder: 'preocupacional, urgente, seguimiento', includeNotes: false }),
+      { key: 'image_urls', label: 'Imágenes', type: 'textarea', rows: 3, fullWidth: true },
       { key: 'patient_name', label: 'Trabajador', required: true, placeholder: 'Nombre completo' },
       { key: 'patient_document', label: 'Documento', placeholder: 'DNI / CUIL' },
+      { key: 'client_name', label: 'Cliente', placeholder: 'Cliente solicitante' },
       { key: 'employer_name', label: 'Empresa', placeholder: 'Empresa cliente' },
+      {
+        key: 'payment_method',
+        label: 'Método de cobro',
+        type: 'select',
+        options: [{ value: '', label: 'Sin definir' }, ...paymentMethodOptions],
+      },
       {
         key: 'exam_type',
         label: 'Tipo de examen',
@@ -164,24 +202,32 @@ export function createOccupationalHealthExamsCrudConfig(): CrudPageConfig<Occupa
       [
         row.patient_name,
         row.patient_document,
+        row.client_name,
         row.employer_name,
+        row.payment_method,
         occupationalExamTypeLabels[row.exam_type],
         occupationalExamStatusLabels[row.status],
         row.result,
         row.notes,
+        formatTagCsv(row.tags),
+        ...(row.image_urls ?? []),
       ].filter(Boolean).join(' '),
     toFormValues: (row) => ({
       patient_name: row?.patient_name ?? '',
       patient_document: row?.patient_document ?? '',
+      client_name: row?.client_name ?? '',
       employer_name: row?.employer_name ?? '',
+      payment_method: row?.payment_method ?? '',
       exam_type: row?.exam_type ?? 'pre_employment',
       status: row?.status ?? 'pending',
       scheduled_at: toDateTimeInput(row?.scheduled_at ?? undefined),
       result: row?.result ?? '',
       notes: row?.notes ?? '',
+      is_favorite: row?.is_favorite ?? false,
+      tags: formatTagCsv(row?.tags),
+      image_urls: formatCrudLinkedEntityImageUrlsToForm(row?.image_urls),
     }) as CrudFormValues,
     toBody: toExamBody,
     isValid: (values) => asString(values.patient_name).trim().length >= 2,
-    featureFlags: { standardAnnotations: false, standardMedia: false, tagPills: false },
   };
 }

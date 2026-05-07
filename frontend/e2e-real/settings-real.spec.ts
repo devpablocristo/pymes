@@ -24,4 +24,21 @@ test.describe('Ajustes real', () => {
 
     await assertCleanRuntime();
   });
+
+  test('muestra Equipo y abre el formulario para invitar usuarios al tenant', async ({ page }, testInfo) => {
+    const assertCleanRuntime = installRuntimeGuards(page, testInfo);
+
+    await page.goto(`/${tenant}/settings?section=team`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Equipo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Abrir menú' })).toBeVisible();
+
+    const inviteButton = page.getByRole('button', { name: 'Invitar usuario' });
+    await expect(inviteButton).toBeVisible();
+    await inviteButton.click();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Rol en el tenant')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enviar invitación' })).toBeVisible();
+
+    await assertCleanRuntime();
+  });
 });

@@ -39,12 +39,17 @@ type UpdateInput struct {
 	PatientName     *string
 	PatientDocument *string
 	EmployerName    *string
+	ClientName      *string
+	PaymentMethod   *string
 	ExamType        *string
 	Status          *string
 	ScheduledAt     **time.Time
 	CompletedAt     **time.Time
 	Result          *string
 	Notes           *string
+	IsFavorite      *bool
+	Tags            *[]string
+	ImageURLs       *[]string
 }
 
 type RepositoryPort interface {
@@ -113,6 +118,12 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 	if in.EmployerName != nil {
 		current.EmployerName = *in.EmployerName
 	}
+	if in.ClientName != nil {
+		current.ClientName = *in.ClientName
+	}
+	if in.PaymentMethod != nil {
+		current.PaymentMethod = *in.PaymentMethod
+	}
 	if in.ExamType != nil {
 		current.ExamType = *in.ExamType
 	}
@@ -130,6 +141,15 @@ func (u *Usecases) Update(ctx context.Context, tenantID, id uuid.UUID, in Update
 	}
 	if in.Notes != nil {
 		current.Notes = *in.Notes
+	}
+	if in.IsFavorite != nil {
+		current.IsFavorite = *in.IsFavorite
+	}
+	if in.Tags != nil {
+		current.Tags = append([]string(nil), (*in.Tags)...)
+	}
+	if in.ImageURLs != nil {
+		current.ImageURLs = append([]string(nil), (*in.ImageURLs)...)
 	}
 	current.UpdatedBy = actor
 	if err := normalizeAndValidate(&current); err != nil {
@@ -189,10 +209,14 @@ func normalizeAndValidate(in *domain.Exam) error {
 	in.PatientName = strings.TrimSpace(in.PatientName)
 	in.PatientDocument = strings.TrimSpace(in.PatientDocument)
 	in.EmployerName = strings.TrimSpace(in.EmployerName)
+	in.ClientName = strings.TrimSpace(in.ClientName)
+	in.PaymentMethod = strings.TrimSpace(in.PaymentMethod)
 	in.ExamType = strings.TrimSpace(in.ExamType)
 	in.Status = strings.TrimSpace(in.Status)
 	in.Result = strings.TrimSpace(in.Result)
 	in.Notes = strings.TrimSpace(in.Notes)
+	in.Tags = normalizeStringList(in.Tags)
+	in.ImageURLs = normalizeStringList(in.ImageURLs)
 	if in.PatientName == "" {
 		return fmt.Errorf("patient_name required: %w", httperrors.ErrBadInput)
 	}
@@ -213,6 +237,23 @@ func normalizeAndValidate(in *domain.Exam) error {
 		in.CompletedAt = &now
 	}
 	return nil
+}
+
+func normalizeStringList(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }
 
 func validExamType(value string) bool {

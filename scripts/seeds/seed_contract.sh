@@ -35,6 +35,7 @@ SEED_DB_CHECKS=(
   "professionalsSpecialties|$SEED_MIN_VISIBLE|SELECT count(*) FROM professionals.specialties WHERE tenant_id = '__ORG_ID__'::uuid"
   "professionalsIntakes|$SEED_MIN_VISIBLE|SELECT count(*) FROM professionals.intakes WHERE tenant_id = '__ORG_ID__'::uuid"
   "professionalsSessions|$SEED_MIN_VISIBLE|SELECT count(*) FROM professionals.sessions WHERE tenant_id = '__ORG_ID__'::uuid"
+  "medicalOccupationalHealthExams|$SEED_MIN_VISIBLE|SELECT count(*) FROM medical.occupational_health_exams WHERE tenant_id = '__ORG_ID__'::uuid AND deleted_at IS NULL"
 )
 
 # Format: name|min|base-env-var|path
@@ -66,4 +67,5 @@ SEED_API_CHECKS=(
   "professionalsSpecialties|$SEED_MIN_VISIBLE|SEED_VERIFY_PROFESSIONALS_URL|/v1/teachers/specialties?limit=50"
   "professionalsIntakes|$SEED_MIN_VISIBLE|SEED_VERIFY_PROFESSIONALS_URL|/v1/teachers/intakes?limit=50"
   "professionalsSessions|$SEED_MIN_VISIBLE|SEED_VERIFY_PROFESSIONALS_URL|/v1/teachers/sessions?limit=50"
+  "medicalOccupationalHealthExams|$SEED_MIN_VISIBLE|SEED_VERIFY_MEDICAL_URL|/v1/medical/occupational-health/exams?limit=50"
 )

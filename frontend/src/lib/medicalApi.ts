@@ -28,10 +28,12 @@ export const medicalRequest = createVerticalRequest({
 export async function listOccupationalHealthExams(filters: {
   search?: string;
   status?: string;
+  archived?: boolean;
 } = {}): Promise<{ items: OccupationalHealthExam[]; total: number }> {
   const params = new URLSearchParams();
   if (filters.search?.trim()) params.set('search', filters.search.trim());
   if (filters.status?.trim()) params.set('status', filters.status.trim());
+  if (filters.archived) params.set('archived', 'true');
   const query = params.toString();
   return medicalRequest(`/v1/medical/occupational-health/exams${query ? `?${query}` : ''}`);
 }
@@ -68,4 +70,12 @@ export async function updateOccupationalHealthExam(
 
 export async function archiveOccupationalHealthExam(id: string): Promise<void> {
   await medicalRequest(`/v1/medical/occupational-health/exams/${id}`, { method: 'DELETE' });
+}
+
+export async function restoreOccupationalHealthExam(id: string): Promise<void> {
+  await medicalRequest(`/v1/medical/occupational-health/exams/${id}/restore`, { method: 'POST', body: {} });
+}
+
+export async function hardDeleteOccupationalHealthExam(id: string): Promise<void> {
+  await medicalRequest(`/v1/medical/occupational-health/exams/${id}/hard`, { method: 'DELETE' });
 }

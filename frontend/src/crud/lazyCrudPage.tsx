@@ -7,6 +7,7 @@ type CrudModule =
   | typeof import('./resourceConfigs.governance')
   | typeof import('./resourceConfigs.control')
   | typeof import('./resourceConfigs.professionals')
+  | typeof import('./resourceConfigs.medical')
   | typeof import('./resourceConfigs.workshops')
   | typeof import('./resourceConfigs.restaurants');
 
@@ -17,6 +18,7 @@ type CrudLazyChunk =
   | 'governance'
   | 'control'
   | 'professionals'
+  | 'medical'
   | 'workshops'
   | 'restaurants'
   | 'common';
@@ -54,6 +56,8 @@ const CONTROL_CRUD_IDS = new Set<string>(['webhooks']);
 
 const PROFESSIONALS_CRUD_IDS = new Set<string>(['professionals', 'specialties', 'intakes', 'sessions']);
 
+const MEDICAL_CRUD_IDS = new Set<string>(['occupationalHealthExams']);
+
 const WORKSHOPS_CRUD_IDS = new Set<string>(['workshopVehicles', 'carWorkOrders', 'bikeWorkOrders']);
 
 const RESTAURANTS_CRUD_IDS = new Set<string>(['restaurantDiningAreas', 'restaurantDiningTables']);
@@ -64,6 +68,7 @@ function resolveCrudLazyChunk(resourceId: string): CrudLazyChunk {
   if (GOVERNANCE_CRUD_IDS.has(resourceId)) return 'governance';
   if (CONTROL_CRUD_IDS.has(resourceId)) return 'control';
   if (PROFESSIONALS_CRUD_IDS.has(resourceId)) return 'professionals';
+  if (MEDICAL_CRUD_IDS.has(resourceId)) return 'medical';
   if (WORKSHOPS_CRUD_IDS.has(resourceId)) return 'workshops';
   if (RESTAURANTS_CRUD_IDS.has(resourceId)) return 'restaurants';
   return 'common';
@@ -93,6 +98,9 @@ function loadCrudModule(resourceId: string): Promise<CrudModule> {
       break;
     case 'professionals':
       promise = import('./resourceConfigs.professionals');
+      break;
+    case 'medical':
+      promise = import('./resourceConfigs.medical');
       break;
     case 'workshops':
       promise = import('./resourceConfigs.workshops');

@@ -1,2 +1,1 @@
-export { OccupationalHealthExamsPage } from './OccupationalHealthExamsPage';
-
+export { createOccupationalHealthExamsCrudConfig } from './occupationalHealthExamCrudConfig';

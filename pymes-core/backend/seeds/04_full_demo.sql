@@ -179,49 +179,51 @@ BEGIN
             notes = EXCLUDED.notes,
             updated_at = now();
 
-    INSERT INTO procurement_policies (
-        id, tenant_id, name, expression, effect, priority, mode, enabled,
-        action_filter, system_filter, created_at, updated_at
-    )
-    VALUES
-        (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/1'),
-            v_org,
-            'Auto aprobar compras chicas',
-            'request.estimated_total <= 15000',
-            'allow',
-            10,
-            'enforce',
-            true,
-            'procurement.submit',
-            'pymes',
-            now(),
-            now()
-        ),
-        (
-            uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/2'),
-            v_org,
-            'Escalar compras medianas',
-            'request.estimated_total > 15000',
-            'require_approval',
-            20,
-            'enforce',
-            true,
-            'procurement.submit',
-            'pymes',
-            now(),
-            now()
+    IF to_regclass('public.procurement_policies') IS NOT NULL THEN
+        INSERT INTO procurement_policies (
+            id, tenant_id, name, expression, effect, priority, mode, enabled,
+            action_filter, system_filter, created_at, updated_at
         )
-    ON CONFLICT (id) DO UPDATE
-        SET name = EXCLUDED.name,
-            expression = EXCLUDED.expression,
-            effect = EXCLUDED.effect,
-            priority = EXCLUDED.priority,
-            mode = EXCLUDED.mode,
-            enabled = EXCLUDED.enabled,
-            action_filter = EXCLUDED.action_filter,
-            system_filter = EXCLUDED.system_filter,
-            updated_at = now();
+        VALUES
+            (
+                uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/1'),
+                v_org,
+                'Auto aprobar compras chicas',
+                'request.estimated_total <= 15000',
+                'allow',
+                10,
+                'enforce',
+                true,
+                'procurement.submit',
+                'pymes',
+                now(),
+                now()
+            ),
+            (
+                uuid_generate_v5(v_org, 'pymes-seed/v1/procurement-policy/2'),
+                v_org,
+                'Escalar compras medianas',
+                'request.estimated_total > 15000',
+                'require_approval',
+                20,
+                'enforce',
+                true,
+                'procurement.submit',
+                'pymes',
+                now(),
+                now()
+            )
+        ON CONFLICT (id) DO UPDATE
+            SET name = EXCLUDED.name,
+                expression = EXCLUDED.expression,
+                effect = EXCLUDED.effect,
+                priority = EXCLUDED.priority,
+                mode = EXCLUDED.mode,
+                enabled = EXCLUDED.enabled,
+                action_filter = EXCLUDED.action_filter,
+                system_filter = EXCLUDED.system_filter,
+                updated_at = now();
+    END IF;
 
     INSERT INTO procurement_requests (
         id, tenant_id, requester_actor, title, description, category, status,

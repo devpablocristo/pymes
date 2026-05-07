@@ -59,8 +59,9 @@ BEGIN
 
     INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at)
     VALUES (v_org, v_user, 'admin', now())
-    ON CONFLICT (tenant_id, user_id) DO UPDATE
-        SET role = EXCLUDED.role;
+    ON CONFLICT (tenant_id, user_id) WHERE status = 'active' DO UPDATE
+        SET role = EXCLUDED.role,
+            updated_at = now();
 
     INSERT INTO tenant_settings (tenant_id, plan_code)
     VALUES (v_org, 'starter')

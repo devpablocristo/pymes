@@ -27,9 +27,6 @@ export const InviteAcceptPage = lazy(() =>
 export const RestaurantTableSessionsPage = lazy(() =>
   import('../pages/RestaurantTableSessionsPage').then((mod) => ({ default: mod.RestaurantTableSessionsPage })),
 );
-export const OccupationalHealthExamsPage = lazy(() =>
-  import('../modules/medical').then((mod) => ({ default: mod.OccupationalHealthExamsPage })),
-);
 export const SignupPage = lazy(() => import('../pages/SignupPage').then((mod) => ({ default: mod.SignupPage })));
 export const AutomationRulesPage = lazy(() => import('../pages/AutomationRulesPage'));
 export const CustomerMessagingCampaignsPage = lazy(() =>

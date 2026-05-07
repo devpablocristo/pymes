@@ -32,6 +32,7 @@ type ListParams struct {
 	Limit    int
 	Search   string
 	Status   string
+	Archived bool
 }
 
 type UpdateInput struct {
@@ -52,6 +53,8 @@ type RepositoryPort interface {
 	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Exam, error)
 	Update(ctx context.Context, in domain.Exam) (domain.Exam, error)
 	Archive(ctx context.Context, tenantID, id uuid.UUID) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
 }
 
 type AuditPort interface {
@@ -151,6 +154,28 @@ func (u *Usecases) Archive(ctx context.Context, tenantID, id uuid.UUID, actor st
 		return err
 	}
 	u.log(ctx, tenantID, actor, "medical.occupational_exam.archived", id, nil)
+	return nil
+}
+
+func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("occupational exam not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	u.log(ctx, tenantID, actor, "medical.occupational_exam.restored", id, nil)
+	return nil
+}
+
+func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("occupational exam not found: %w", httperrors.ErrNotFound)
+		}
+		return err
+	}
+	u.log(ctx, tenantID, actor, "medical.occupational_exam.hard_deleted", id, nil)
 	return nil
 }
 

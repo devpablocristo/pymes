@@ -15,20 +15,20 @@ BEGIN
 
     SELECT id INTO v_branch
       FROM scheduling_branches
-     WHERE tenant_id = v_org
+     WHERE org_id = v_org
      ORDER BY created_at
      LIMIT 1;
 
     SELECT id INTO v_sched_service
       FROM scheduling_services
-     WHERE tenant_id = v_org
+     WHERE org_id = v_org
        AND active = true
      ORDER BY CASE WHEN code = 'general_consultation' THEN 0 ELSE 1 END, code
      LIMIT 1;
 
     SELECT id INTO v_sched_resource
       FROM scheduling_resources
-     WHERE tenant_id = v_org
+     WHERE org_id = v_org
        AND active = true
      ORDER BY code
      LIMIT 1;
@@ -1140,7 +1140,7 @@ BEGIN
 
     -- Agenda: 10 turnos por sucursal activa para que cualquier filtro tenga datos.
     IF v_sched_service IS NOT NULL THEN
-        INSERT INTO scheduling_resources (id, tenant_id, branch_id, code, name, kind, capacity, timezone, active)
+        INSERT INTO scheduling_resources (id, org_id, branch_id, code, name, kind, capacity, timezone, active)
         SELECT
             uuid_generate_v5(v_org, 'modules-scheduling/v2/resource/' || br.code || '/demo'),
             v_org,
@@ -1152,12 +1152,12 @@ BEGIN
             br.timezone,
             true
         FROM scheduling_branches br
-        WHERE br.tenant_id = v_org
+        WHERE br.org_id = v_org
           AND br.active = true
           AND NOT EXISTS (
               SELECT 1
               FROM scheduling_resources existing
-              WHERE existing.tenant_id = v_org
+              WHERE existing.org_id = v_org
                 AND existing.branch_id = br.id
                 AND existing.active = true
           )
@@ -1171,23 +1171,23 @@ BEGIN
         INSERT INTO scheduling_service_resources (service_id, resource_id)
         SELECT v_sched_service, r.id
         FROM scheduling_resources r
-        WHERE r.tenant_id = v_org
+        WHERE r.org_id = v_org
           AND r.active = true
           AND EXISTS (
               SELECT 1
               FROM scheduling_branches br
               WHERE br.id = r.branch_id
-                AND br.tenant_id = v_org
+                AND br.org_id = v_org
                 AND br.active = true
           )
         ON CONFLICT (service_id, resource_id) DO NOTHING;
 
         DELETE FROM scheduling_bookings
-         WHERE tenant_id = v_org
+         WHERE org_id = v_org
            AND created_by = 'seed';
 
         INSERT INTO scheduling_bookings (
-            id, tenant_id, branch_id, service_id, resource_id, party_id, reference,
+            id, org_id, branch_id, service_id, resource_id, party_id, reference,
             customer_name, customer_phone, customer_email, status, source,
             start_at, end_at, occupies_from, occupies_until, notes, metadata,
             created_by, confirmed_at, created_at, updated_at
@@ -1229,14 +1229,14 @@ BEGIN
         JOIN LATERAL (
             SELECT r.id
             FROM scheduling_resources r
-            WHERE r.tenant_id = v_org
+            WHERE r.org_id = v_org
               AND r.branch_id = br.id
               AND r.active = true
             ORDER BY r.code
             LIMIT 1
         ) r ON true
         CROSS JOIN generate_series(1, 10) AS gs
-        WHERE br.tenant_id = v_org
+        WHERE br.org_id = v_org
           AND br.active = true
         ON CONFLICT (id) DO UPDATE
             SET party_id = EXCLUDED.party_id,

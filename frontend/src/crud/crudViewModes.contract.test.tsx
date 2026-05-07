@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getCrudPageConfig as getCommercialCrudPageConfig } from './resourceConfigs.commercial';
 import { getCrudPageConfig as getControlCrudPageConfig } from './resourceConfigs.control';
 import { getCrudPageConfig as getGovernanceCrudPageConfig } from './resourceConfigs.governance';
+import { getCrudPageConfig as getMedicalCrudPageConfig } from './resourceConfigs.medical';
 import { getCrudPageConfig as getOperationsCrudPageConfig } from './resourceConfigs.operations';
 import { getCrudPageConfig as getProfessionalsCrudPageConfig } from './resourceConfigs.professionals';
 import { getCrudPageConfig as getRestaurantsCrudPageConfig } from './resourceConfigs.restaurants';
@@ -53,6 +54,11 @@ const domains: CrudDomain[] = [
     name: 'professionals',
     getConfig: getProfessionalsCrudPageConfig,
     resources: ['professionals', 'specialties', 'intakes', 'sessions'],
+  },
+  {
+    name: 'medical',
+    getConfig: getMedicalCrudPageConfig,
+    resources: ['occupationalHealthExams'],
   },
   {
     name: 'workshops',

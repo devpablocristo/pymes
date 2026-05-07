@@ -17,8 +17,10 @@ type ExamResponse struct {
 }
 
 type ListExamsResponse struct {
-	Items []ExamResponse `json:"items"`
-	Total int64          `json:"total"`
+	Items      []ExamResponse `json:"items"`
+	Total      int64          `json:"total"`
+	HasMore    bool           `json:"has_more"`
+	NextCursor *string        `json:"next_cursor"`
 }
 
 type CreateExamRequest struct {

@@ -23,7 +23,13 @@ func NewRepository(db *gorm.DB) *Repository {
 
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.Exam, int64, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	q := r.db.WithContext(ctx).Model(&models.ExamModel{}).Where("tenant_id = ? AND deleted_at IS NULL", p.TenantID)
+	deletedClause := "deleted_at IS NULL"
+	base := r.db.WithContext(ctx).Model(&models.ExamModel{})
+	if p.Archived {
+		deletedClause = "deleted_at IS NOT NULL"
+		base = base.Unscoped()
+	}
+	q := base.Where("tenant_id = ? AND "+deletedClause, p.TenantID)
 	if status := strings.TrimSpace(p.Status); status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -108,6 +114,32 @@ func (r *Repository) Archive(ctx context.Context, tenantID, id uuid.UUID) error 
 	res := r.db.WithContext(ctx).Model(&models.ExamModel{}).
 		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL", tenantID, id).
 		Updates(map[string]any{"deleted_at": time.Now().UTC(), "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Unscoped().Model(&models.ExamModel{}).
+		Where("tenant_id = ? AND id = ? AND deleted_at IS NOT NULL", tenantID, id).
+		Updates(map[string]any{"deleted_at": nil, "updated_at": time.Now().UTC()})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Unscoped().
+		Where("tenant_id = ? AND id = ?", tenantID, id).
+		Delete(&models.ExamModel{})
 	if res.Error != nil {
 		return res.Error
 	}

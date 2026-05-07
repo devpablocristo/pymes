@@ -22,7 +22,7 @@ BEGIN
         RETURN;
     END IF;
 
-    INSERT INTO scheduling_branches (id, tenant_id, code, name, timezone, address, active)
+    INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active)
     VALUES (v_branch, v_org, 'central', 'Sucursal Central', 'America/Argentina/Tucuman', 'Casa central demo', true)
     ON CONFLICT (id) DO UPDATE
         SET name = EXCLUDED.name,
@@ -31,7 +31,7 @@ BEGIN
             active = EXCLUDED.active,
             updated_at = now();
 
-    INSERT INTO scheduling_branches (id, tenant_id, code, name, timezone, address, active)
+    INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active)
     VALUES
         (v_branch_norte, v_org, 'norte', 'Sucursal Norte', 'America/Argentina/Tucuman', 'Sede norte demo', true),
         (v_branch_sur, v_org, 'sur', 'Sucursal Sur', 'America/Argentina/Tucuman', 'Sede sur demo', true)
@@ -43,7 +43,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO scheduling_services (
-        id, tenant_id, code, name, description, fulfillment_mode,
+        id, org_id, code, name, description, fulfillment_mode,
         default_duration_minutes, buffer_before_minutes, buffer_after_minutes,
         slot_granularity_minutes, max_concurrent_bookings, min_cancel_notice_minutes,
         allow_waitlist, active
@@ -67,7 +67,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO scheduling_services (
-        id, tenant_id, code, name, description, fulfillment_mode,
+        id, org_id, code, name, description, fulfillment_mode,
         default_duration_minutes, buffer_before_minutes, buffer_after_minutes,
         slot_granularity_minutes, max_concurrent_bookings, min_cancel_notice_minutes,
         allow_waitlist, active
@@ -90,7 +90,7 @@ BEGIN
             active = EXCLUDED.active,
             updated_at = now();
 
-    INSERT INTO scheduling_resources (id, tenant_id, branch_id, code, name, kind, capacity, timezone, active)
+    INSERT INTO scheduling_resources (id, org_id, branch_id, code, name, kind, capacity, timezone, active)
     VALUES
         (v_resource, v_org, v_branch, 'professional_1', 'Profesional Demo', 'professional', 1, 'America/Argentina/Tucuman', true),
         (v_resource2, v_org, v_branch, 'professional_2', 'Profesional Demo 2', 'professional', 1, 'America/Argentina/Tucuman', true),
@@ -118,7 +118,7 @@ BEGIN
     ON CONFLICT (service_id, resource_id) DO NOTHING;
 
     INSERT INTO scheduling_queues (
-        id, tenant_id, branch_id, service_id, code, name, status, strategy,
+        id, org_id, branch_id, service_id, code, name, status, strategy,
         ticket_prefix, last_issued_number, avg_service_seconds, allow_remote_join
     )
     VALUES (
@@ -137,7 +137,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO scheduling_queues (
-        id, tenant_id, branch_id, service_id, code, name, status, strategy,
+        id, org_id, branch_id, service_id, code, name, status, strategy,
         ticket_prefix, last_issued_number, avg_service_seconds, allow_remote_join
     )
     VALUES
@@ -161,14 +161,14 @@ BEGIN
             updated_at = now();
 
     DELETE FROM scheduling_availability_rules
-    WHERE tenant_id = v_org
+    WHERE org_id = v_org
       AND (
         branch_id IN (v_branch, v_branch_norte, v_branch_sur)
         OR resource_id IN (v_resource, v_resource2, v_resource3)
       );
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'branch/weekday/' || gs::text || '/am'),
@@ -187,7 +187,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'norte/branch/weekday/' || gs::text || '/am'),
@@ -206,7 +206,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'sur/branch/weekday/' || gs::text || '/am'),
@@ -225,7 +225,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'resource/weekday/' || gs::text || '/am'),
@@ -244,7 +244,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'professional-2/resource/weekday/' || gs::text || '/am'),
@@ -263,7 +263,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_availability_rules (
-        id, tenant_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
+        id, org_id, branch_id, resource_id, kind, weekday, start_time, end_time, slot_granularity_minutes, active
     )
     SELECT
         uuid_generate_v5(v_org, v_rule_base || 'professional-3/resource/weekday/' || gs::text || '/am'),
@@ -282,7 +282,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 
     INSERT INTO scheduling_services (
-        id, tenant_id, code, name, description, fulfillment_mode,
+        id, org_id, code, name, description, fulfillment_mode,
         default_duration_minutes, buffer_before_minutes, buffer_after_minutes,
         slot_granularity_minutes, max_concurrent_bookings, min_cancel_notice_minutes,
         allow_waitlist, active, metadata
@@ -306,7 +306,7 @@ BEGIN
     ON CONFLICT (service_id, resource_id) DO NOTHING;
 
     INSERT INTO scheduling_bookings (
-        id, tenant_id, branch_id, service_id, resource_id, party_id, reference,
+        id, org_id, branch_id, service_id, resource_id, party_id, reference,
         customer_name, customer_phone, customer_email, status, source,
         start_at, end_at, occupies_from, occupies_until, notes, metadata,
         created_by, confirmed_at, created_at, updated_at
@@ -368,7 +368,7 @@ BEGIN
             updated_at = now();
 
     INSERT INTO scheduling_queue_tickets (
-        id, tenant_id, queue_id, branch_id, service_id,
+        id, org_id, queue_id, branch_id, service_id,
         customer_name, customer_phone, number, display_code, status, priority, source,
         requested_at, created_at, updated_at
     )

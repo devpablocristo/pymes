@@ -37,8 +37,8 @@ func InitializeApp() *app.App {
 		logger.Fatal().Err(err).Msg("failed to run database migrations")
 	}
 
-	_ = pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
-	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, nil)
+	cpClient := pymescore.NewClient(cfg.PymesCoreURL, cfg.InternalServiceToken)
+	identityResolver := verticalwire.BuildIdentityResolver(cfg, logger, cpClient.Client)
 	authMiddleware := auth.NewAuthMiddleware(identityResolver, verticalwire.NewAPIKeyResolver(db), cfg.AuthEnableJWT, cfg.AuthAllowAPIKey)
 	auditLog := verticalaudit.NewLogger(logger)
 

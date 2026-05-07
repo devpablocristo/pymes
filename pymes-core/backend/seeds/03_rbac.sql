@@ -111,9 +111,11 @@ BEGIN
     -- tanto con Clerk (admins vienen de webhooks/onboarding) como con cualquier
     -- otro provisionamiento manual.
     INSERT INTO user_roles (user_id, tenant_id, role_id, assigned_by)
-    SELECT om.user_id, v_org, r_admin, 'seed'
+    SELECT DISTINCT om.user_id, v_org, r_admin, 'seed'
     FROM tenant_memberships om
-    WHERE om.tenant_id = v_org AND om.role IN ('admin', 'owner')
+    WHERE om.tenant_id = v_org
+      AND om.status = 'active'
+      AND om.role IN ('admin', 'owner')
     ON CONFLICT (user_id, tenant_id) DO UPDATE
         SET role_id = EXCLUDED.role_id,
             assigned_by = EXCLUDED.assigned_by,

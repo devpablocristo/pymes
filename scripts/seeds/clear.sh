@@ -11,6 +11,21 @@ run_pymes_sql_inline "
 -- Preservar bootstrap del tenant: filas base en tenants/users/memberships/settings/api keys.
 -- Solo se limpian tablas de CRUD/demo. tenant_memberships.party_id referencia
 -- parties, por eso se desacopla antes del clear.
+DO \$\$
+DECLARE
+    v_table text;
+BEGIN
+    FOR v_table IN
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE table_schema = 'restaurant'
+          AND column_name = 'org_id'
+        ORDER BY table_name
+    LOOP
+        EXECUTE format('ALTER TABLE restaurant.%I RENAME COLUMN org_id TO tenant_id', v_table);
+    END LOOP;
+END \$\$;
+
 UPDATE tenant_memberships
    SET party_id = NULL
  WHERE party_id IS NOT NULL;
@@ -95,7 +110,7 @@ END \$\$;
 
 DELETE FROM parties;
 
-INSERT INTO scheduling_branches (id, tenant_id, code, name, timezone, address, active, created_at, updated_at)
+INSERT INTO scheduling_branches (id, org_id, code, name, timezone, address, active, created_at, updated_at)
 SELECT
     uuid_generate_v5(o.id, 'pymes-bootstrap/scheduling/branch/principal'),
     o.id,
@@ -110,7 +125,7 @@ FROM tenants o
 WHERE NOT EXISTS (
     SELECT 1
     FROM scheduling_branches sb
-    WHERE sb.tenant_id = o.id
+    WHERE sb.org_id = o.id
 );
 "
 

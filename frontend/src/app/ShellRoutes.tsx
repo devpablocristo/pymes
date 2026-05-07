@@ -12,11 +12,11 @@ import {
   DashboardVisualPage,
   ModulePage,
   NotificationsCenterPage,
-  OccupationalHealthExamsPage,
   RestaurantTableSessionsPage,
   SettingsHubPage,
   ConfiguredCrudModePage,
   ConfiguredCrudRouteModePage,
+  ConfiguredCrudNestedRouteModePage,
   UnifiedChatPage,
   CustomerMessagingCampaignsPage,
   CustomerMessagingInboxPage,
@@ -59,6 +59,25 @@ function InventorySectionLayout({ slug }: { slug: string }) {
   );
 }
 
+function MedicalOccupationalHealthExamsSectionLayout({ slug }: { slug: string }) {
+  const baseRoute = `/${slug}/medical/occupational-health/exams`;
+  return (
+    <ConfiguredCrudSectionPage
+      resourceId="occupationalHealthExams"
+      baseRoute={baseRoute}
+      actionLink={{
+        to: `${baseRoute}/configure`,
+        label: 'Configurar',
+        hideWhenActivePattern: `${baseRoute}/configure`,
+        activeReplacement: {
+          to: `${baseRoute}/list`,
+          label: 'Volver a medicina laboral',
+        },
+      }}
+    />
+  );
+}
+
 /** Raíz: resuelve el slug del tenant activo y redirige al dashboard; si no hay profile, a /onboarding. */
 function RootTenantRedirect() {
   const slug = useTenantSlug();
@@ -93,7 +112,17 @@ function TenantScopedRoutes() {
       <Route path="customer-messaging/inbox" element={<CustomerMessagingInboxPage />} />
       <Route path="watcher-config" element={<WatcherConfigPage />} />
       <Route path="restaurants/dining/sessions" element={<RestaurantTableSessionsPage />} />
-      <Route path="medical/occupational-health/exams" element={<OccupationalHealthExamsPage />} />
+      <Route path="medical/occupational-health/exams" element={<MedicalOccupationalHealthExamsSectionLayout slug={slug} />}>
+        <Route
+          index
+          element={<ConfiguredCrudIndexRedirect resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+        <Route path="configure" element={<CrudUiConfigurePage />} />
+        <Route
+          path=":modePath"
+          element={<ConfiguredCrudNestedRouteModePage resourceId="occupationalHealthExams" baseRoute={`/${slug}/medical/occupational-health/exams`} />}
+        />
+      </Route>
 
       {/* inventory: sección con sus propios routes */}
       <Route path="inventory" element={<InventorySectionLayout slug={slug} />}>

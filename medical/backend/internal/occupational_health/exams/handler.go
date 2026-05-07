@@ -22,6 +22,8 @@ type usecasesPort interface {
 	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Exam, error)
 	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Exam, error)
 	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -40,6 +42,8 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.PATCH(base+"/:id", h.Update)
 	group.DELETE(base+"/:id", h.Archive)
 	group.POST(base+"/:id/archive", h.Archive)
+	group.POST(base+"/:id/restore", h.Restore)
+	group.DELETE(base+"/:id/hard", h.HardDelete)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -53,12 +57,13 @@ func (h *Handler) List(c *gin.Context) {
 		Limit:    limit,
 		Search:   c.Query("search"),
 		Status:   c.Query("status"),
+		Archived: c.Query("archived") == "true",
 	})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ListExamsResponse{Items: toResponses(items), Total: total})
+	c.JSON(http.StatusOK, dto.ListExamsResponse{Items: toResponses(items), Total: total, HasMore: int64(len(items)) < total})
 }
 
 func (h *Handler) Create(c *gin.Context) {
@@ -151,7 +156,31 @@ func (h *Handler) Archive(c *gin.Context) {
 		httperrors.Respond(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (h *Handler) Restore(c *gin.Context) {
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (h *Handler) HardDelete(c *gin.Context) {
+	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	if !ok {
+		return
+	}
+	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+		httperrors.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func parseOptionalTime(c *gin.Context, value *string, field string) (*time.Time, bool) {

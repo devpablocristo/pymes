@@ -54,9 +54,6 @@ func (s *pymesSaaSStore) ListTenantInvitations(ctx context.Context, tenantID str
 }
 
 func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, actorExternalID, email, role string) (tenantInvitationDTO, error) {
-	if s.clerk == nil {
-		return tenantInvitationDTO{}, domainerr.Unavailable("clerk backend client is not configured")
-	}
 	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
 	if err != nil {
 		return tenantInvitationDTO{}, domainerr.Validation("invalid tenant_id")
@@ -77,6 +74,7 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
+	clerkTenantID := clerkTenantIDFromTenant(tenant)
 	token, tokenHash, err := generateInviteToken()
 	if err != nil {
 		return tenantInvitationDTO{}, err
@@ -98,9 +96,16 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	if err := s.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return tenantInvitationDTO{}, tenantInviteCreateError(err)
 	}
+	if clerkTenantID == "" {
+		return tenantInvitationDTOFromRow(row), nil
+	}
+	if s.clerk == nil {
+		_ = s.db.WithContext(ctx).Delete(&pymesTenantInvitationRow{}, "id = ?", row.ID).Error
+		return tenantInvitationDTO{}, domainerr.Unavailable("clerk backend client is not configured")
+	}
 	redirectURL := s.inviteRedirectURL(token)
 	clerkInvite, err := s.clerk.CreateOrganizationInvitation(ctx, clerkCreateOrganizationInvitationInput{
-		OrganizationID: clerkTenantIDFromTenant(tenant),
+		OrganizationID: clerkTenantID,
 		InviterUserID:  strings.TrimSpace(actorExternalID),
 		Email:          email,
 		Role:           clerkRoleFromTenantRole(role),
@@ -133,9 +138,6 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 }
 
 func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token string, user clerkAuthenticatedUser) (tenantInvitationDTO, string, error) {
-	if s.clerk == nil {
-		return tenantInvitationDTO{}, "", domainerr.Unavailable("clerk backend client is not configured")
-	}
 	tokenHash := hashInviteToken(strings.TrimSpace(token))
 	if tokenHash == "" {
 		return tenantInvitationDTO{}, "", domainerr.Validation("invite token is required")
@@ -191,15 +193,17 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 			return err
 		}
 		clerkTenantID = clerkTenantIDFromTenant(tenant)
-		if clerkTenantID == "" {
-			return domainerr.BusinessRule("tenant is not linked to a Clerk organization")
-		}
-		ok, err := s.clerk.UserHasOrganizationMembership(ctx, clerkTenantID, user.ExternalID)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return domainerr.Forbidden("clerk organization membership is required")
+		if clerkTenantID != "" {
+			if s.clerk == nil {
+				return domainerr.Unavailable("clerk backend client is not configured")
+			}
+			ok, err := s.clerk.UserHasOrganizationMembership(ctx, clerkTenantID, user.ExternalID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return domainerr.Forbidden("clerk organization membership is required")
+			}
 		}
 		localUser, err := s.upsertUserTx(ctx, tx, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 		if err != nil {
@@ -287,9 +291,6 @@ func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, tenantID, i
 }
 
 func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {
-	if s.clerk == nil {
-		return tenantInvitationDTO{}, domainerr.Unavailable("clerk backend client is not configured")
-	}
 	actor, err := s.requireTenantOwner(ctx, tenantID, actorExternalID)
 	if err != nil {
 		return tenantInvitationDTO{}, err
@@ -306,8 +307,31 @@ func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, i
 		return tenantInvitationDTO{}, err
 	}
 	redirectURL := s.inviteRedirectURL(token)
+	clerkTenantID := clerkTenantIDFromTenant(tenant)
+	if clerkTenantID == "" {
+		now := time.Now().UTC()
+		expiresAt := now.Add(tenantInviteTTL)
+		if err := s.db.WithContext(ctx).Model(&pymesTenantInvitationRow{}).Where("id = ?", row.ID).Updates(map[string]any{
+			"token_hash":          tokenHash,
+			"clerk_invitation_id": nil,
+			"invited_by_user_id":  actor.ID,
+			"expires_at":          expiresAt,
+			"updated_at":          now,
+		}).Error; err != nil {
+			return tenantInvitationDTO{}, err
+		}
+		row.TokenHash = tokenHash
+		row.ClerkInvitationID = nil
+		row.InvitedByUserID = actor.ID
+		row.ExpiresAt = expiresAt
+		row.UpdatedAt = now
+		return tenantInvitationDTOFromRow(row), nil
+	}
+	if s.clerk == nil {
+		return tenantInvitationDTO{}, domainerr.Unavailable("clerk backend client is not configured")
+	}
 	clerkInvite, err := s.clerk.CreateOrganizationInvitation(ctx, clerkCreateOrganizationInvitationInput{
-		OrganizationID: clerkTenantIDFromTenant(tenant),
+		OrganizationID: clerkTenantID,
 		InviterUserID:  strings.TrimSpace(actorExternalID),
 		Email:          row.EmailNormalized,
 		Role:           clerkRoleFromTenantRole(row.Role),
@@ -409,9 +433,6 @@ func (s *pymesSaaSStore) getTenantRow(ctx context.Context, tenantUUID uuid.UUID)
 			return pymesTenantRow{}, domainerr.NotFound("tenant not found")
 		}
 		return pymesTenantRow{}, err
-	}
-	if clerkTenantIDFromTenant(row) == "" {
-		return pymesTenantRow{}, domainerr.BusinessRule("tenant is not linked to a Clerk organization")
 	}
 	return row, nil
 }

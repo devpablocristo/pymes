@@ -184,6 +184,84 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	}
 }
 
+func TestCreateTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+
+	invite, err := store.CreateTenantInvitation(ctx, tenantID, "user_owner", "admin@medlab.test", "admin")
+	if err != nil {
+		t.Fatalf("CreateTenantInvitation() error = %v", err)
+	}
+	if invite.Status != "pending" {
+		t.Fatalf("invite status = %q, want pending", invite.Status)
+	}
+	if invite.ClerkInvitationID != nil {
+		t.Fatalf("ClerkInvitationID = %q, want nil for local fallback tenant", *invite.ClerkInvitationID)
+	}
+}
+
+func TestAcceptTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+	owner, ok, err := store.LocalUserByExternalID(ctx, "user_owner")
+	if err != nil {
+		t.Fatalf("LocalUserByExternalID() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("LocalUserByExternalID() ok = false, want true")
+	}
+	token := "local-invite-token-test"
+	now := time.Now().UTC()
+	if err := db.Create(&pymesTenantInvitationRow{
+		ID:              uuid.New(),
+		TenantID:        uuid.MustParse(tenantID),
+		EmailNormalized: "new@medlab.test",
+		Role:            "member",
+		Status:          "pending",
+		TokenHash:       hashInviteToken(token),
+		InvitedByUserID: owner.ID,
+		ExpiresAt:       now.Add(time.Hour),
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}).Error; err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+
+	accepted, clerkTenantID, err := store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+		ExternalID: "user_new",
+		Email:      "new@medlab.test",
+		Name:       "New Member",
+	})
+	if err != nil {
+		t.Fatalf("AcceptTenantInvitation() error = %v", err)
+	}
+	if accepted.Status != "accepted" {
+		t.Fatalf("accepted status = %q, want accepted", accepted.Status)
+	}
+	if clerkTenantID != "" {
+		t.Fatalf("clerkTenantID = %q, want empty for local fallback tenant", clerkTenantID)
+	}
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
+	if err != nil {
+		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
+	}
+	if !ok || role != "member" {
+		t.Fatalf("accepted role = %q ok=%v, want member true", role, ok)
+	}
+}
+
 func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)

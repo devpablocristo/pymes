@@ -31,6 +31,8 @@ test.describe('Ajustes real', () => {
     await page.goto(`/${tenant}/settings?section=team`);
     await expect(page.getByRole('heading', { level: 1, name: 'Equipo' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir menú' })).toBeVisible();
+    await expect(page.locator('.admin-activity-table tbody tr td:first-child').first()).toContainText('@');
+    await expect(page.getByText('devpablocristo@gmail.com')).toBeVisible();
 
     const inviteButton = page.getByRole('button', { name: 'Invitar usuario' });
     await expect(inviteButton).toBeVisible();

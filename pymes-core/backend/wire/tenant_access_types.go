@@ -23,14 +23,14 @@ type createdTenantAPIKey struct {
 type rotatedTenantAPIKey = createdTenantAPIKey
 
 type tenantUserDTO struct {
-	ID         string
-	ExternalID string
-	Email      string
-	Name       string
-	AvatarURL  *string
-	DeletedAt  *time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID         string     `json:"id"`
+	ExternalID string     `json:"external_id"`
+	Email      string     `json:"email"`
+	Name       string     `json:"name"`
+	AvatarURL  *string    `json:"avatar_url,omitempty"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 type tenantMemberDTO struct {
@@ -38,6 +38,7 @@ type tenantMemberDTO struct {
 	TenantID string        `json:"tenant_id"`
 	UserID   string        `json:"user_id"`
 	Role     string        `json:"role"`
+	Status   string        `json:"status"`
 	JoinedAt time.Time     `json:"joined_at"`
 	User     tenantUserDTO `json:"user"`
 }

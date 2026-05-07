@@ -36,6 +36,7 @@ func memberDTOFromRow(row pymesTenantMembershipRow) tenantMemberDTO {
 		TenantID: row.TenantID.String(),
 		UserID:   row.UserID.String(),
 		Role:     row.Role,
+		Status:   row.Status,
 		JoinedAt: row.CreatedAt,
 		User:     userDTOFromRow(row.User),
 	}

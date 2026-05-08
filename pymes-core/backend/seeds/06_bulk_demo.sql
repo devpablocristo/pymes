@@ -4,13 +4,25 @@
 DO $$
 DECLARE
     v_tenant uuid := '__SEED_TENANT_ID__';
-    local_user uuid := '00000000-0000-0000-0000-000000000002';
+    local_user uuid;
     v_branch uuid;
     v_sched_service uuid;
     v_sched_resource uuid;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
         RETURN;
+    END IF;
+
+    SELECT user_id INTO local_user
+      FROM tenant_memberships
+     WHERE tenant_id = v_tenant
+       AND role = 'owner'
+       AND status = 'active'
+     ORDER BY created_at
+     LIMIT 1;
+
+    IF local_user IS NULL THEN
+        RAISE EXCEPTION 'pymes bulk seed: expected active owner membership for tenant %', v_tenant;
     END IF;
 
     SELECT id INTO v_branch

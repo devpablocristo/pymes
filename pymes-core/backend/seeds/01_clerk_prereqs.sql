@@ -75,48 +75,6 @@ BEGIN
             removed_at = NULL,
             updated_at = now();
 
-    SELECT id INTO v_user
-    FROM users
-    WHERE external_id = 'user_local_admin'
-    LIMIT 1;
-
-    IF v_user IS NULL THEN
-        INSERT INTO users (
-            id, external_id, email, name, avatar_url, phone,
-            given_name, family_name, created_at, updated_at
-        )
-        VALUES (
-            '00000000-0000-0000-0000-000000000002',
-            'user_local_admin',
-            'admin@local.dev',
-            'Local Admin',
-            '',
-            '+5493810000000',
-            'Local',
-            'Admin',
-            now(),
-            now()
-        )
-        RETURNING id INTO v_user;
-    ELSE
-        UPDATE users
-           SET email = 'admin@local.dev',
-               name = 'Local Admin',
-               avatar_url = '',
-               phone = '+5493810000000',
-               given_name = 'Local',
-               family_name = 'Admin',
-               deleted_at = NULL,
-               updated_at = now()
-         WHERE id = v_user;
-    END IF;
-
-    INSERT INTO tenant_memberships (tenant_id, user_id, role, created_at)
-    VALUES (v_tenant, v_user, 'admin', now())
-    ON CONFLICT (tenant_id, user_id) WHERE status = 'active' DO UPDATE
-        SET role = EXCLUDED.role,
-            updated_at = now();
-
     INSERT INTO tenant_settings (tenant_id, plan_code)
     VALUES (v_tenant, 'starter')
     ON CONFLICT (tenant_id) DO NOTHING;

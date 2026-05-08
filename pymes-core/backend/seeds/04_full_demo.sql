@@ -4,7 +4,7 @@
 DO $$
 DECLARE
     v_tenant uuid := '__SEED_TENANT_ID__';
-    local_user uuid := '00000000-0000-0000-0000-000000000002';
+    local_user uuid;
     c1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/1');
     c2 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/customer/2');
     s1 uuid := uuid_generate_v5(v_tenant, 'pymes-seed/v1/supplier/1');
@@ -49,6 +49,18 @@ BEGIN
         RETURN;
     END IF;
 
+    SELECT user_id INTO local_user
+      FROM tenant_memberships
+     WHERE tenant_id = v_tenant
+       AND role = 'owner'
+       AND status = 'active'
+     ORDER BY created_at
+     LIMIT 1;
+
+    IF local_user IS NULL THEN
+        RAISE EXCEPTION 'pymes full seed: expected active owner membership for tenant %', v_tenant;
+    END IF;
+
     SELECT id INTO svc1 FROM services WHERE tenant_id = v_tenant AND code = 'DEMO-SVC-001' AND deleted_at IS NULL LIMIT 1;
     SELECT id INTO svc2 FROM services WHERE tenant_id = v_tenant AND code = 'DEMO-SVC-002' AND deleted_at IS NULL LIMIT 1;
     IF svc1 IS NULL OR svc2 IS NULL THEN
@@ -85,12 +97,6 @@ BEGIN
     ON CONFLICT (party_id, tenant_id, role) DO UPDATE
         SET is_active = EXCLUDED.is_active,
             metadata = EXCLUDED.metadata;
-
-    UPDATE tenant_memberships
-       SET party_id = emp_party,
-           role = 'admin'
-     WHERE tenant_id = v_tenant
-       AND user_id = local_user;
 
     INSERT INTO price_list_items (price_list_id, product_id, price)
     VALUES
@@ -342,7 +348,7 @@ BEGIN
             NULL,
             md5(v_tenant::text || ':audit:1'),
             now() - interval '5 days',
-            'user', local_user, 'Local Admin'
+            'user', local_user, 'Tenant Owner'
         ),
         (
             uuid_generate_v5(v_tenant, 'pymes-seed/v1/audit/2'),
@@ -351,7 +357,7 @@ BEGIN
             md5(v_tenant::text || ':audit:1'),
             md5(v_tenant::text || ':audit:2'),
             now() - interval '3 days',
-            'user', local_user, 'Local Admin'
+            'user', local_user, 'Tenant Owner'
         )
     ON CONFLICT (id) DO UPDATE
         SET action = EXCLUDED.action,

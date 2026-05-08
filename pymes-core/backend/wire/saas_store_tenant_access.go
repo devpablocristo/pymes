@@ -109,6 +109,7 @@ func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, tenantID, userI
 		var row pymesTenantMembershipRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("tenant_id = ? AND user_id = ? AND status = 'active'", tenantUUID, userUUID).
+			Preload("User").
 			Take(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domainerr.NotFound("member not found")
@@ -117,6 +118,22 @@ func (s *pymesSaaSStore) RemoveTenantMember(ctx context.Context, tenantID, userI
 		}
 		if row.Role == "owner" {
 			return domainerr.BusinessRule("owner must transfer ownership before removal")
+		}
+		var tenant pymesTenantRow
+		if err := tx.Where("id = ?", tenantUUID).Take(&tenant).Error; err != nil {
+			return err
+		}
+		if s.clerk != nil {
+			clerkTenantID := clerkTenantIDFromTenant(tenant)
+			userExternalID := strings.TrimSpace(row.User.ExternalID)
+			if clerkTenantID == "" {
+				return domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
+			}
+			if userExternalID != "" {
+				if err := s.clerk.DeleteOrganizationMembership(ctx, clerkTenantID, userExternalID); err != nil {
+					return err
+				}
+			}
 		}
 		now := time.Now().UTC()
 		return tx.Model(&pymesTenantMembershipRow{}).Where("id = ?", row.ID).Updates(map[string]any{

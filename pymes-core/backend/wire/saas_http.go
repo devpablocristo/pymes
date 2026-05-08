@@ -113,8 +113,9 @@ func registerPublic(mux *http.ServeMux, pattern string, next http.HandlerFunc) {
 }
 
 type createTenantRequest struct {
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	Name       string `json:"name"`
+	Slug       string `json:"slug"`
+	ClerkOrgID string `json:"clerk_org_id"`
 }
 
 type createAPIKeyRequest struct {
@@ -178,20 +179,36 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 			httperr.WriteFrom(w, domainerr.Conflict("tenant slug already exists"))
 			return
 		}
+		clerkOrgID := clerkTenantIDFromTenant(existing)
+		if clerkOrgID == "" {
+			httperr.WriteFrom(w, domainerr.Unavailable("tenant provisioning is missing its Clerk organization"))
+			return
+		}
+		if store.clerk != nil {
+			member, err := store.clerk.UserHasOrganizationMembership(r.Context(), clerkOrgID, user.ExternalID)
+			if err != nil {
+				httperr.WriteFrom(w, err)
+				return
+			}
+			if !member {
+				httperr.WriteFrom(w, domainerr.Forbidden("clerk tenant organization membership is required"))
+				return
+			}
+		}
 		created, err := store.CreateAPIKey(r.Context(), existing.ID.String(), "onboarding setup", nil)
 		if err != nil {
 			httperr.WriteFrom(w, err)
 			return
 		}
-		writeCreateTenantResponse(w, http.StatusOK, existing.ID.String(), store.clerkPymesOrganizationID(), slug, created.Secret, "", created.APIKey)
+		writeCreateTenantResponse(w, http.StatusOK, existing.ID.String(), clerkOrgID, slug, created.Secret, "", created.APIKey)
 		return
 	}
-	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, "", user.ExternalID, user.Email, user.Name, user.AvatarURL)
+	tenantID, clerkOrgID, rawKey, key, scopes, err := store.CreateTenantWithClerkOrganization(r.Context(), name, slug, strings.TrimSpace(req.ClerkOrgID), user.ExternalID, user.Email, user.Name, user.AvatarURL)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
-	writeCreateTenantResponse(w, http.StatusCreated, tenantID, store.clerkPymesOrganizationID(), slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
+	writeCreateTenantResponse(w, http.StatusCreated, tenantID, clerkOrgID, slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
 		ID:        key.ID.String(),
 		TenantID:  tenantID,
 		Name:      key.Name,

@@ -17,10 +17,24 @@ import (
 const clerkBackendAPIBaseURL = "https://api.clerk.com/v1"
 
 type clerkTenantClient interface {
+	CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error)
 	CreateOrganizationInvitation(ctx context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error)
 	GetUser(ctx context.Context, userID string) (clerkUserProfile, error)
+	DeleteOrganization(ctx context.Context, organizationID string) error
+	DeleteOrganizationMembership(ctx context.Context, organizationID, userID string) error
 	RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error
 	UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error)
+}
+
+type clerkCreateOrganizationInput struct {
+	Name           string
+	CreatedBy      string
+	PublicMetadata map[string]any
+}
+
+type clerkOrganization struct {
+	ID   string
+	Name string
 }
 
 type clerkUserProfile struct {
@@ -78,6 +92,30 @@ func newClerkBackendClient(secretKey string) clerkTenantClient {
 		baseURL:    clerkBackendAPIBaseURL,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+func (c *clerkBackendClient) CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error) {
+	payload := map[string]any{
+		"name":       strings.TrimSpace(input.Name),
+		"created_by": strings.TrimSpace(input.CreatedBy),
+	}
+	if len(input.PublicMetadata) > 0 {
+		payload["public_metadata"] = input.PublicMetadata
+	}
+	var out struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := c.doJSON(ctx, http.MethodPost, "/organizations", payload, &out); err != nil {
+		return clerkOrganization{}, err
+	}
+	if strings.TrimSpace(out.ID) == "" {
+		return clerkOrganization{}, domainerr.UpstreamError("clerk organization response missing id")
+	}
+	return clerkOrganization{
+		ID:   strings.TrimSpace(out.ID),
+		Name: strings.TrimSpace(out.Name),
+	}, nil
 }
 
 func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error) {
@@ -159,6 +197,23 @@ func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkU
 		Name:      strings.TrimSpace(out.Username),
 		ImageURL:  imageURL,
 	}, nil
+}
+
+func (c *clerkBackendClient) DeleteOrganization(ctx context.Context, organizationID string) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return nil
+	}
+	return c.doJSON(ctx, http.MethodDelete, "/organizations/"+url.PathEscape(organizationID), nil, nil)
+}
+
+func (c *clerkBackendClient) DeleteOrganizationMembership(ctx context.Context, organizationID, userID string) error {
+	organizationID = strings.TrimSpace(organizationID)
+	userID = strings.TrimSpace(userID)
+	if organizationID == "" || userID == "" {
+		return nil
+	}
+	return c.doJSON(ctx, http.MethodDelete, "/organizations/"+url.PathEscape(organizationID)+"/memberships/"+url.PathEscape(userID), nil, nil)
 }
 
 func (c *clerkBackendClient) RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error {

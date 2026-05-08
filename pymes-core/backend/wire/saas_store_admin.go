@@ -12,13 +12,62 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *pymesSaaSStore) CreateOrgWithDefaultKey(ctx context.Context, name, slug, actor string) (string, string, pymesTenantAPIKeyRow, []string, error) {
-	return s.CreateTenantWithOwner(ctx, name, slug, strings.TrimSpace(slug), actor, "", "", nil)
+func (s *pymesSaaSStore) CreateTenantWithClerkOrganization(ctx context.Context, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName string, avatarURL *string) (string, string, string, pymesTenantAPIKeyRow, []string, error) {
+	name = strings.TrimSpace(name)
+	slug = strings.TrimSpace(slug)
+	clerkTenantID = strings.TrimSpace(clerkTenantID)
+	ownerExternalID = strings.TrimSpace(ownerExternalID)
+	if name == "" {
+		return "", "", "", pymesTenantAPIKeyRow{}, nil, fmt.Errorf("name is required")
+	}
+	if slug == "" {
+		slug = slugifyTenantName(name)
+	}
+	createdClerkOrg := false
+	if clerkTenantID == "" {
+		if s.clerk == nil {
+			return "", "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Unavailable("clerk backend client is not configured")
+		}
+		org, err := s.clerk.CreateOrganization(ctx, clerkCreateOrganizationInput{
+			Name:      name,
+			CreatedBy: ownerExternalID,
+			PublicMetadata: map[string]any{
+				"pymes_tenant_slug": slug,
+			},
+		})
+		if err != nil {
+			return "", "", "", pymesTenantAPIKeyRow{}, nil, err
+		}
+		clerkTenantID = strings.TrimSpace(org.ID)
+		createdClerkOrg = true
+	} else if s.clerk != nil && ownerExternalID != "" {
+		ok, err := s.clerk.UserHasOrganizationMembership(ctx, clerkTenantID, ownerExternalID)
+		if err != nil {
+			return "", "", "", pymesTenantAPIKeyRow{}, nil, err
+		}
+		if !ok {
+			return "", "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Forbidden("user is not a member of the Clerk organization")
+		}
+	}
+	tenantID, rawKey, key, scopes, err := s.CreateTenantWithOwner(ctx, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName, avatarURL)
+	if err != nil {
+		if createdClerkOrg && s.clerk != nil {
+			_ = s.clerk.DeleteOrganization(ctx, clerkTenantID)
+		}
+		return "", "", "", pymesTenantAPIKeyRow{}, nil, err
+	}
+	return tenantID, clerkTenantID, rawKey, key, scopes, nil
 }
 
 func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName string, avatarURL *string) (string, string, pymesTenantAPIKeyRow, []string, error) {
 	now := time.Now().UTC()
 	clerkTenantID = strings.TrimSpace(clerkTenantID)
+	if clerkTenantID == "" {
+		return "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Validation("clerk organization is required")
+	}
+	if !strings.HasPrefix(clerkTenantID, "org_") {
+		return "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Validation("clerk organization id must start with org_")
+	}
 	org := pymesTenantRow{
 		ID:         uuid.New(),
 		Name:       strings.TrimSpace(name),

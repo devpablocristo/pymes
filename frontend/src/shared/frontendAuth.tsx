@@ -92,8 +92,21 @@ function ClerkProtectedRoute({ children }: PropsWithChildren) {
 export function SharedLoginPage() {
   const { t } = useI18n();
   const location = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
   const redirectUrl = authRedirectURLFromLocation(location);
   if (clerkEnabled) {
+    if (isClerkOrganizationTaskPath(location.pathname)) {
+      if (!isLoaded) {
+        return (
+          <div className="auth-layout">
+            <div className="spinner" aria-label="Cargando" />
+          </div>
+        );
+      }
+      if (isSignedIn) {
+        return <Navigate to="/onboarding" replace />;
+      }
+    }
     return (
       <div className="auth-layout">
         <SignIn
@@ -122,8 +135,21 @@ export function SharedLoginPage() {
 export function SharedSignupPage() {
   const { t } = useI18n();
   const location = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
   const redirectUrl = authRedirectURLFromLocation(location);
   if (clerkEnabled) {
+    if (isClerkOrganizationTaskPath(location.pathname)) {
+      if (!isLoaded) {
+        return (
+          <div className="auth-layout">
+            <div className="spinner" aria-label="Cargando" />
+          </div>
+        );
+      }
+      if (isSignedIn) {
+        return <Navigate to="/onboarding" replace />;
+      }
+    }
     return (
       <div className="auth-layout">
         <SignUp
@@ -147,6 +173,11 @@ export function SharedSignupPage() {
       </div>
     </div>
   );
+}
+
+function isClerkOrganizationTaskPath(pathname: string): boolean {
+  const path = pathname.toLowerCase();
+  return path.includes('/tasks/choose-organization') || path.includes('/tasks/create-organization');
 }
 
 function authRedirectURLFromLocation(location: ReturnType<typeof useLocation>): string {

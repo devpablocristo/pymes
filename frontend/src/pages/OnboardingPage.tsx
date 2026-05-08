@@ -1,15 +1,15 @@
-import { useClerk, useOrganization, useSession, useUser } from '@clerk/react';
+import { useClerk, useSession, useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clerkEnabled } from '../lib/auth';
 import {
   createSchedulingBranch,
   createSchedulingBranchWithSetupKey,
   createTenant,
+  listTenants,
   listSchedulingBranches,
   listSchedulingBranchesWithSetupKey,
-  listTenants,
   updateTenantSettings,
   updateTenantSettingsWithSetupKey,
 } from '../lib/api';
@@ -27,6 +27,24 @@ import {
   type TenantProfile,
   type VerticalType,
 } from '../lib/tenantProfile';
+
+const existingTenantLookupTimeoutMs = 15_000;
+
+function withExistingTenantLookupTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error('tenant_lookup_timeout')), existingTenantLookupTimeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
 
 type VerticalGroup = 'commercial' | 'professionals' | 'workshops' | 'beauty' | 'restaurants' | 'medical';
 type OnboardingSubVerticalOption = {
@@ -229,18 +247,14 @@ const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
 
 type ClerkOnboardingBridges = {
   loaded: boolean;
-  setActive: (params: { organization: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  setActiveOrganization: (organizationID: string) => Promise<void>;
   user: { name: string; email: string } | null;
-  organization: { id: string; slug?: string } | null;
-  orgLoaded: boolean;
-  afterSetActiveOrg?: () => Promise<void>;
 };
 
 function OnboardingPageClerkBridge() {
   const clerk = useClerk();
   const { session } = useSession();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
   const { user } = useUser();
   const userEmail = user?.primaryEmailAddress?.emailAddress?.trim() ?? '';
   const userName =
@@ -250,16 +264,14 @@ function OnboardingPageClerkBridge() {
 
   const bridges: ClerkOnboardingBridges = {
     loaded: clerk.loaded,
-    setActive: (params) => clerk.setActive(params),
     signOut: () => clerk.signOut({ redirectUrl: '/login' }),
+    // Resuelve la task `choose-organization` de Clerk activando la org recién creada
+    // antes del redirect al dashboard. Sin esto, `taskUrls` rebota a /onboarding.
+    setActiveOrganization: async (organizationID: string) => {
+      await clerk.setActive({ organization: organizationID });
+      await session?.reload().catch(() => undefined);
+    },
     user: user ? { name: userName, email: userEmail } : null,
-    organization: organization ? { id: organization.id, slug: organization.slug ?? undefined } : null,
-    orgLoaded,
-    afterSetActiveOrg: session
-      ? async () => {
-          await session.reload();
-        }
-      : undefined,
   };
 
   return <OnboardingPageInner clerkBridges={bridges} />;
@@ -292,6 +304,41 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState('');
+  const [checkingExistingTenant, setCheckingExistingTenant] = useState(Boolean(clerkBridges));
+  const hasClerkBridge = Boolean(clerkBridges);
+  const clerkBridgeLoaded = clerkBridges?.loaded ?? false;
+
+  useEffect(() => {
+    if (!hasClerkBridge) {
+      setCheckingExistingTenant(false);
+      return;
+    }
+    if (!clerkBridgeLoaded) {
+      return;
+    }
+    let cancelled = false;
+    setCheckingExistingTenant(true);
+    void withExistingTenantLookupTimeout(listTenants())
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        const tenant = (result.items ?? []).find((item) => item.slug && item.clerk_org_id);
+        if (tenant?.slug && tenant.clerk_org_id) {
+          window.location.assign(`/${tenant.slug}/dashboard?activate_org=${encodeURIComponent(tenant.clerk_org_id)}`);
+          return;
+        }
+        setCheckingExistingTenant(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCheckingExistingTenant(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clerkBridgeLoaded, hasClerkBridge]);
 
   const resolvedVertical: VerticalType | '' = verticalGroup
     ? SUB_VERTICAL_KEYS[verticalGroup]
@@ -319,8 +366,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     4: true,
   };
 
-  const clerkReady = !clerkBridges || (clerkBridges.loaded && clerkBridges.orgLoaded);
+  const clerkReady = !clerkBridges || clerkBridges.loaded;
   const canFinishStep4 = canNext[4] && !finishing && clerkReady;
+
+  if (checkingExistingTenant) {
+    return (
+      <div className="onboarding-layout">
+        <div className="spinner" aria-label="Cargando" />
+      </div>
+    );
+  }
 
   function next() {
     if (step < 4) setStep((step + 1) as Step);
@@ -359,38 +414,26 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     setFinishing(true);
     let tenantSlugForSetup = '';
     let setupAPIKey = '';
+    let activeClerkOrgID = '';
 
     if (clerkBridges) {
-      if (!clerkBridges.loaded || !clerkBridges.orgLoaded) {
+      if (!clerkBridges.loaded) {
         setFinishError(t('onboarding.clerk.sessionNotReady'));
         setFinishing(false);
         return;
       }
       try {
         const name = profile.businessName.trim();
-        let activeClerkOrgID = clerkBridges.organization?.id ?? '';
         const requestedTenantSlug = slugifyTenantNameForOnboarding(name);
-        const activeTenantSlug = clerkBridges.organization?.slug?.trim() ?? '';
-        if (!clerkBridges.organization || (requestedTenantSlug && activeTenantSlug !== requestedTenantSlug)) {
-          const created = await createTenant({ name, slug: requestedTenantSlug || undefined });
-          activeClerkOrgID = created.clerk_org_id;
-          tenantSlugForSetup = created.slug ?? '';
-          setupAPIKey = created.raw_key ?? '';
-        } else {
-          tenantSlugForSetup = clerkBridges.organization.slug ?? '';
-        }
-        if (!tenantSlugForSetup && activeClerkOrgID) {
-          const tenants = await listTenants();
-          tenantSlugForSetup =
-            tenants.items.find((tenant) => tenant.clerk_org_id === activeClerkOrgID)?.slug ??
-            '';
-        }
+        const created = await createTenant({
+          name,
+          slug: requestedTenantSlug || undefined,
+        });
+        activeClerkOrgID = created.clerk_org_id;
+        tenantSlugForSetup = created.slug ?? '';
+        setupAPIKey = created.raw_key ?? '';
         if (!tenantSlugForSetup) {
           throw new Error('No se pudo resolver el slug del tenant activo.');
-        }
-        if (activeClerkOrgID) {
-          await clerkBridges.setActive({ organization: activeClerkOrgID });
-          await clerkBridges.afterSetActiveOrg?.();
         }
       } catch (err) {
         setFinishError(formatClerkAPIUserMessage(err, t('onboarding.clerk.organizationFailed')));
@@ -423,7 +466,20 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         ...(profile.subVertical ? { subVertical: profile.subVertical } : {}),
       });
       if (clerkBridges && tenantSlugForSetup) {
-        window.location.assign(`/${tenantSlugForSetup}/dashboard`);
+        if (activeClerkOrgID) {
+          // Activar la org en la sesión Clerk antes del refresh resuelve la task
+          // `choose-organization`; si fallara, `activate_org` en la URL la recupera.
+          try {
+            await clerkBridges.setActiveOrganization(activeClerkOrgID);
+          } catch {
+            // ignorar — el fallback de `activate_org` cubre el caso
+          }
+        }
+        const dashboardPath = `/${tenantSlugForSetup}/dashboard`;
+        const target = activeClerkOrgID
+          ? `${dashboardPath}?activate_org=${encodeURIComponent(activeClerkOrgID)}`
+          : dashboardPath;
+        window.location.assign(target);
         return;
       }
       navigate('/', { replace: true });

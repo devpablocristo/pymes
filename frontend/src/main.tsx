@@ -74,7 +74,12 @@ const app = (
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   clerkEnabled ? (
-    <ClerkProvider publishableKey={clerkPublishableKey} localization={esMX} appearance={clerkAppearance}>
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      localization={esMX}
+      appearance={clerkAppearance}
+      taskUrls={{ 'choose-organization': '/onboarding' }}
+    >
       {app}
     </ClerkProvider>
   ) : (

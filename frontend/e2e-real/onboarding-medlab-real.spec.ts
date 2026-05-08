@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs/promises';
 
 const tenantName = process.env.E2E_REAL_ONBOARDING_TENANT_NAME ?? `MedLab ${Date.now()}`;
 const loginEmail = process.env.E2E_REAL_CLERK_EMAIL ?? 'devpablocristo@gmail.com';
-const loginPassword = process.env.E2E_REAL_CLERK_PASSWORD ?? '12345';
+const loginPassword = process.env.E2E_REAL_CLERK_PASSWORD ?? '';
+const loginEmailCode = process.env.E2E_REAL_CLERK_CODE ?? '';
+const loginEmailCodeFile = process.env.E2E_REAL_CLERK_CODE_FILE ?? '';
 const expectedSlug = tenantName
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -18,6 +21,66 @@ const forbiddenDuringFinish = [
 ];
 
 async function loginWithClerk(page: import('@playwright/test').Page) {
+  const waitForEmailCode = async () => {
+    if (loginEmailCode.trim()) {
+      return loginEmailCode.trim();
+    }
+    if (!loginEmailCodeFile.trim()) {
+      throw new Error('Clerk requested an email verification code. Set E2E_REAL_CLERK_CODE or E2E_REAL_CLERK_CODE_FILE and rerun.');
+    }
+    const deadline = Date.now() + 10 * 60_000;
+    while (Date.now() < deadline) {
+      const code = await fs
+        .readFile(loginEmailCodeFile, 'utf8')
+        .then((value) => value.trim())
+        .catch(() => '');
+      if (/^\d{6}$/.test(code)) {
+        return code;
+      }
+      await page.waitForTimeout(1000);
+    }
+    throw new Error(`Timed out waiting for Clerk code file: ${loginEmailCodeFile}`);
+  };
+
+  const completeEmailCodeIfPresent = async (timeout = 5_000) => {
+    const hasCodeScreen = await page
+      .waitForFunction(
+        () => {
+          const text = document.body.innerText;
+          const codeLikeInput = Array.from(document.querySelectorAll('input')).some((input) => {
+            const label = `${input.getAttribute('aria-label') ?? ''} ${input.getAttribute('name') ?? ''} ${
+              input.getAttribute('autocomplete') ?? ''
+            }`;
+            return /verification|code|codigo|código|one-time/i.test(label);
+          });
+          return /Revise su correo electrónico|Check your email|verification code|código/i.test(text) || codeLikeInput;
+        },
+        undefined,
+        { timeout },
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!hasCodeScreen) {
+      return false;
+    }
+    const code = await waitForEmailCode();
+    const codeInput = page.getByRole('textbox', { name: 'Enter verification code' }).first();
+    await codeInput.click();
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+    await page.keyboard.press('Backspace');
+    await codeInput.pressSequentially(code, { delay: 35 });
+    const leftLogin = page
+      .waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 90_000 })
+      .then(() => true)
+      .catch(() => false);
+    const continueButton = page.getByRole('button', { name: /^(continuar|continue)$/i }).first();
+    if (await continueButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await continueButton.click().catch(() => undefined);
+    }
+    await expect(await leftLogin, 'Clerk should leave the login flow after entering the email code').toBe(true);
+    return true;
+  };
+
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   if (!page.url().includes('/login')) {
     return;
@@ -30,8 +93,31 @@ async function loginWithClerk(page: import('@playwright/test').Page) {
   const firstContinue = page.getByRole('button', { name: /^(continuar|continue)$/i }).first();
   await firstContinue.click();
 
+  if (await completeEmailCodeIfPresent(10_000)) {
+    return;
+  }
+
+  const otherMethod = page.getByRole('link', { name: /usar otro método|use another method/i }).first();
+  if (await otherMethod.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await otherMethod.click();
+    if (await completeEmailCodeIfPresent(loginEmailCode.trim() ? 30_000 : 10_000)) {
+      return;
+    }
+    const passwordMethod = page.getByRole('button', { name: /contraseña|password/i }).first();
+    if (await passwordMethod.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await passwordMethod.click();
+    }
+  }
+
+  if (await completeEmailCodeIfPresent(loginEmailCode.trim() ? 30_000 : 2_000)) {
+    return;
+  }
+
   const passwordInput = page.locator('input[name="password"]:not([aria-hidden="true"])').first();
   await expect(passwordInput).toBeVisible({ timeout: 30_000 });
+  if (!loginPassword.trim()) {
+    throw new Error('Clerk requested a password. Set E2E_REAL_CLERK_PASSWORD explicitly or use an email-code flow.');
+  }
   await expect(passwordInput).toBeEnabled({ timeout: 30_000 });
   await passwordInput.fill(loginPassword);
 

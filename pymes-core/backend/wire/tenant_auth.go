@@ -118,19 +118,7 @@ func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal t
 	if strings.EqualFold(strings.TrimSpace(principal.TenantID), resolvedTenantID.String()) {
 		return principal, true
 	}
-	if authMethod == "jwt" && membership != nil {
-		role, member, accessErr := membership(ctx, resolvedTenantID, principal.Actor)
-		if accessErr != nil {
-			writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
-			return tenantPrincipal{}, false
-		}
-		if member {
-			bound := principal
-			bound.TenantID = resolvedTenantID.String()
-			bound.Role = role
-			return bound, true
-		}
-	}
+	_ = membership
 	writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
 	return tenantPrincipal{}, false
 }

@@ -186,7 +186,7 @@ func TestTenantSlugBindingRejectsSlugMismatch(t *testing.T) {
 	}
 }
 
-func TestTenantSlugBindingAllowsRequestedTenantWhenUserHasLocalMembership(t *testing.T) {
+func TestTenantSlugBindingRejectsRequestedTenantWhenActiveClerkOrgDiffers(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
@@ -205,19 +205,11 @@ func TestTenantSlugBindingAllowsRequestedTenantWhenUserHasLocalMembership(t *tes
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
-
-	var auth handlers.AuthContext
-	if err := json.Unmarshal(rec.Body.Bytes(), &auth); err != nil {
-		t.Fatal(err)
-	}
-	if auth.TenantID != "00000000-0000-0000-0000-000000000002" {
-		t.Fatalf("unexpected tenant id %q", auth.TenantID)
-	}
-	if auth.Role != "owner" {
-		t.Fatalf("unexpected role %q", auth.Role)
+	if !strings.Contains(rec.Body.String(), "tenant_mismatch") {
+		t.Fatalf("expected tenant_mismatch body, got %s", rec.Body.String())
 	}
 }
 

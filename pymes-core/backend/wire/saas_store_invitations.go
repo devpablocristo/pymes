@@ -127,9 +127,9 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	if err != nil {
 		return tenantInvitationDTO{}, err
 	}
-	clerkTenantID, err := s.requireClerkPymesOrganizationID()
-	if err != nil {
-		return tenantInvitationDTO{}, err
+	clerkTenantID := clerkTenantIDFromTenant(tenant)
+	if clerkTenantID == "" {
+		return tenantInvitationDTO{}, domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
 	}
 	tenantSlug := tenantRowSlug(tenant)
 	token, tokenHash, err := generateInviteToken()
@@ -205,11 +205,8 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 		return tenantInvitationDTO{}, "", domainerr.Validation("authenticated user email is required")
 	}
 	var accepted tenantInvitationDTO
-	clerkTenantID, err := s.requireClerkPymesOrganizationID()
-	if err != nil {
-		return tenantInvitationDTO{}, "", err
-	}
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var clerkTenantID string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invite pymesTenantInvitationRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("token_hash = ?", tokenHash).
@@ -230,6 +227,14 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 			if existingUser.ExternalID != strings.TrimSpace(user.ExternalID) {
 				return domainerr.Conflict("invite already used")
 			}
+			var tenant pymesTenantRow
+			if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
+				return err
+			}
+			clerkTenantID = clerkTenantIDFromTenant(tenant)
+			if clerkTenantID == "" {
+				return domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
+			}
 			if s.clerk == nil {
 				return domainerr.Unavailable("clerk backend client is not configured")
 			}
@@ -238,7 +243,7 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 				return err
 			}
 			if !ok {
-				return domainerr.Forbidden("clerk pymes organization membership is required")
+				return domainerr.Forbidden("clerk tenant organization membership is required")
 			}
 			accepted = tenantInvitationDTOFromRow(invite)
 			return nil
@@ -261,6 +266,10 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 		if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
 			return err
 		}
+		clerkTenantID = clerkTenantIDFromTenant(tenant)
+		if clerkTenantID == "" {
+			return domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
+		}
 		if s.clerk == nil {
 			return domainerr.Unavailable("clerk backend client is not configured")
 		}
@@ -269,7 +278,7 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 			return err
 		}
 		if !ok {
-			return domainerr.Forbidden("clerk pymes organization membership is required")
+			return domainerr.Forbidden("clerk tenant organization membership is required")
 		}
 		localUser, err := s.upsertUserTx(ctx, tx, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 		if err != nil {
@@ -336,15 +345,14 @@ func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, tenantID, i
 		return tenantInvitationDTOFromRow(row), nil
 	}
 	if s.clerk != nil && row.ClerkInvitationID != nil && strings.TrimSpace(*row.ClerkInvitationID) != "" {
-		clerkTenantID := s.clerkPymesOrganizationID()
-		if clerkTenantID == "" {
-			clerkTenantID = clerkTenantIDFromTenant(tenant)
+		clerkTenantID := clerkTenantIDFromTenant(tenant)
+		if clerkTenantID != "" {
+			_ = s.clerk.RevokeOrganizationInvitation(ctx, clerkRevokeOrganizationInvitationInput{
+				OrganizationID:   clerkTenantID,
+				InvitationID:     *row.ClerkInvitationID,
+				RequestingUserID: strings.TrimSpace(actorExternalID),
+			})
 		}
-		_ = s.clerk.RevokeOrganizationInvitation(ctx, clerkRevokeOrganizationInvitationInput{
-			OrganizationID:   clerkTenantID,
-			InvitationID:     *row.ClerkInvitationID,
-			RequestingUserID: strings.TrimSpace(actorExternalID),
-		})
 	}
 	now := time.Now().UTC()
 	if err := s.db.WithContext(ctx).Model(&pymesTenantInvitationRow{}).Where("id = ?", row.ID).Updates(map[string]any{
@@ -377,9 +385,9 @@ func (s *pymesSaaSStore) ResendTenantInvitation(ctx context.Context, tenantID, i
 		return tenantInvitationDTO{}, err
 	}
 	redirectURL := s.inviteRedirectURL(token)
-	clerkTenantID, err := s.requireClerkPymesOrganizationID()
-	if err != nil {
-		return tenantInvitationDTO{}, err
+	clerkTenantID := clerkTenantIDFromTenant(tenant)
+	if clerkTenantID == "" {
+		return tenantInvitationDTO{}, domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
 	}
 	if s.clerk == nil {
 		return tenantInvitationDTO{}, domainerr.Unavailable("clerk backend client is not configured")
@@ -529,21 +537,6 @@ func (s *pymesSaaSStore) inviteRedirectURL(token string) string {
 	q.Set("token", token)
 	u.RawQuery = q.Encode()
 	return u.String()
-}
-
-func (s *pymesSaaSStore) clerkPymesOrganizationID() string {
-	if s == nil {
-		return ""
-	}
-	return strings.TrimSpace(s.clerkPymesOrgID)
-}
-
-func (s *pymesSaaSStore) requireClerkPymesOrganizationID() (string, error) {
-	clerkOrgID := s.clerkPymesOrganizationID()
-	if clerkOrgID == "" {
-		return "", domainerr.Unavailable("CLERK_PYMES_ORG_ID is required for tenant invitations")
-	}
-	return clerkOrgID, nil
 }
 
 func tenantInvitationDTOFromRow(row pymesTenantInvitationRow) tenantInvitationDTO {

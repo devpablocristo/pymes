@@ -39,7 +39,6 @@ jobs:
       CLOUDSQL_INSTANCE: pymes-dev-352318:us-central1:pymes-dev-db
       JWKS_URL: https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json
       JWT_ISSUER: https://selected-tick-48.clerk.accounts.dev
-      CLERK_PYMES_ORG_ID: ${{ vars.CLERK_PYMES_ORG_ID || 'org_3BGpccLTlKu8qo6pSNekrUDEANC' }}
       GOVERNANCE_URL: ${{ vars.DEV_GOVERNANCE_URL || 'https://governance-dev-mxk6wlxnsq-uc.a.run.app' }}
       SECRET_DATABASE_URL_NAME: DATABASE_URL
       SECRET_CLERK_SECRET_KEY_NAME: CLERK_SECRET_KEY
@@ -210,9 +209,6 @@ jobs:
           fi
           if [[ -n "${JWT_ISSUER}" ]]; then
             env_vars="${env_vars},JWT_ISSUER=${JWT_ISSUER}"
-          fi
-          if [[ -n "${CLERK_PYMES_ORG_ID}" ]]; then
-            env_vars="${env_vars},CLERK_PYMES_ORG_ID=${CLERK_PYMES_ORG_ID}"
           fi
           if [[ -n "${GOVERNANCE_URL}" ]]; then
             env_vars="${env_vars},GOVERNANCE_URL=${GOVERNANCE_URL}"

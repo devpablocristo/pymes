@@ -90,7 +90,6 @@ func InitializeApp() *app.App {
 		Environment:           cfg.Environment,
 		ClerkSecretKey:        cfg.ClerkSecretKey,
 		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,
-		ClerkPymesOrgID:       cfg.ClerkPymesOrgID,
 		JWKSURL:               cfg.JWKSURL,
 		JWTIssuer:             cfg.JWTIssuer,
 		JWTAudience:           cfg.JWTAudience,
@@ -304,6 +303,7 @@ func InitializeApp() *app.App {
 
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(gin.Logger())
 	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
 		Origins:      []string{cfg.FrontendURL},
 		AllowHeaders: []string{tenantSlugHeader},

@@ -28,7 +28,6 @@ type Config struct {
 	AuthAllowAPIKey                  bool
 	ClerkSecretKey                   string
 	ClerkWebhookSecret               string
-	ClerkPymesOrgID                  string
 	StripeSecretKey                  string
 	StripeWebhookSecret              string
 	NotificationBackend              string
@@ -86,7 +85,6 @@ func LoadFromEnv() Config {
 		AuthAllowAPIKey:                  envconfig.Bool("AUTH_ALLOW_API_KEY", true),
 		ClerkSecretKey:                   envconfig.Get("CLERK_SECRET_KEY", ""),
 		ClerkWebhookSecret:               envconfig.Get("CLERK_WEBHOOK_SECRET", ""),
-		ClerkPymesOrgID:                  envconfig.Get("CLERK_PYMES_ORG_ID", ""),
 		StripeSecretKey:                  envconfig.Get("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:              envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
 		NotificationBackend:              envconfig.Get("NOTIFICATION_BACKEND", "noop"),

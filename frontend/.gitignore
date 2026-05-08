@@ -1,3 +1,4 @@
 .tsbuildinfo
 .vite/
 coverage/
+.tmp-*

@@ -152,11 +152,9 @@ export function App() {
           path="/invite/accept"
           element={
             <StrictDevShell>
-              <ProtectedRoute>
-                <Suspended>
-                  <InviteAcceptPage />
-                </Suspended>
-              </ProtectedRoute>
+              <Suspended>
+                <InviteAcceptPage />
+              </Suspended>
             </StrictDevShell>
           }
         />

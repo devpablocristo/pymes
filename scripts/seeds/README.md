@@ -28,6 +28,7 @@ Los pagos se validan por DB porque la pantalla/API visible lista pagos asociados
 - `DEFAULT_SEED_TENANT_SLUG`: slug local por defecto dentro de `scripts/seeds/lib.sh`. Default: `medlab`.
 - `PYMES_SEED_DEMO_TENANT_SLUG`: equivalente para llamar scripts directamente.
 - `PYMES_SEED_DEMO_TENANT_EXTERNAL_ID`: selector legacy/CI/GCP por identificador externo cuando no se usa slug.
+- `PYMES_SEED_OWNER_EXTERNAL_ID`, `PYMES_SEED_OWNER_EMAIL`, `PYMES_SEED_OWNER_GIVEN_NAME`, `PYMES_SEED_OWNER_FAMILY_NAME`: owner real del tenant semilla. Defaults locales: `devpablocristo@gmail.com`.
 - `SEED_VERIFY_API_KEY`: API key para checks HTTP (default: `VITE_API_KEY` o `psk_local_admin`).
 - `SEED_VERIFY_CORE_URL`, `SEED_VERIFY_WORKSHOPS_URL`, `SEED_VERIFY_PROFESSIONALS_URL`, `SEED_VERIFY_RESTAURANTS_URL`: URLs de backends.
 - `SEED_VERIFY_SKIP_API=1`: ejecuta solo checks DB.

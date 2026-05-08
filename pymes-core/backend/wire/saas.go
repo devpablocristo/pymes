@@ -27,6 +27,7 @@ type SaaSConfig struct {
 
 	ClerkSecretKey     string
 	ClerkWebhookSecret string
+	ClerkPymesOrgID    string
 	Environment        string
 
 	JWKSURL        string
@@ -60,6 +61,7 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 
 	store := newPymesSaaSStore(db, log, saasDefaultAPIKeyScopes())
 	store.clerk = newClerkBackendClient(strings.TrimSpace(cfg.ClerkSecretKey))
+	store.clerkPymesOrgID = strings.TrimSpace(cfg.ClerkPymesOrgID)
 	store.frontendURL = strings.TrimSpace(cfg.FrontendURL)
 	store.environment = envconfig.NormalizeEnv(cfg.Environment)
 
@@ -141,6 +143,14 @@ func (v *jwtPrincipalVerifier) Verify(ctx context.Context, credential string) (t
 	rawTenant := firstTenantClaim(claims, valueOrDefault(v.cfg.JWTTenantClaim, "tenant_id"), "tenant_id", "o.id")
 	if rawTenant == "" {
 		return tenantPrincipal{}, domainerr.Forbidden("tenant claim is required")
+	}
+	if globalOrgID := strings.TrimSpace(v.cfg.ClerkPymesOrgID); globalOrgID != "" && strings.EqualFold(strings.TrimSpace(rawTenant), globalOrgID) {
+		return tenantPrincipal{
+			TenantID:   globalOrgID,
+			Actor:      actor,
+			Scopes:     scopesFromClaims(claims, valueOrDefault(v.cfg.JWTScopesClaim, "scopes")),
+			AuthMethod: "jwt",
+		}, nil
 	}
 	tenantID := rawTenant
 	if _, parseErr := uuid.Parse(tenantID); parseErr != nil {

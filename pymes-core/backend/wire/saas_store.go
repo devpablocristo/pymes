@@ -11,6 +11,7 @@ type pymesSaaSStore struct {
 	logger           *slog.Logger
 	defaultKeyScopes []string
 	clerk            clerkTenantClient
+	clerkPymesOrgID  string
 	frontendURL      string
 	environment      string
 }

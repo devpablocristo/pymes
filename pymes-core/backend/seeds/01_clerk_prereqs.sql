@@ -5,6 +5,7 @@
 DO $$
 DECLARE
     v_tenant uuid := '__SEED_TENANT_ID__';
+    v_owner uuid;
     v_user uuid;
 BEGIN
     INSERT INTO tenants (id, external_id, name, slug, created_at, updated_at)
@@ -20,6 +21,58 @@ BEGIN
         SET name = EXCLUDED.name,
             slug = EXCLUDED.slug,
             external_id = COALESCE(EXCLUDED.external_id, tenants.external_id),
+            updated_at = now();
+
+    SELECT id INTO v_owner
+    FROM users
+    WHERE external_id = '__SEED_OWNER_EXTERNAL_ID__'
+    LIMIT 1;
+
+    IF v_owner IS NULL THEN
+        INSERT INTO users (
+            id, external_id, email, name, avatar_url, phone,
+            given_name, family_name, created_at, updated_at
+        )
+        VALUES (
+            gen_random_uuid(),
+            '__SEED_OWNER_EXTERNAL_ID__',
+            '__SEED_OWNER_EMAIL__',
+            trim('__SEED_OWNER_GIVEN_NAME__' || ' ' || '__SEED_OWNER_FAMILY_NAME__'),
+            '',
+            '',
+            '__SEED_OWNER_GIVEN_NAME__',
+            '__SEED_OWNER_FAMILY_NAME__',
+            now(),
+            now()
+        )
+        RETURNING id INTO v_owner;
+    ELSE
+        UPDATE users
+           SET email = '__SEED_OWNER_EMAIL__',
+               name = trim('__SEED_OWNER_GIVEN_NAME__' || ' ' || '__SEED_OWNER_FAMILY_NAME__'),
+               avatar_url = '',
+               given_name = '__SEED_OWNER_GIVEN_NAME__',
+               family_name = '__SEED_OWNER_FAMILY_NAME__',
+               deleted_at = NULL,
+               updated_at = now()
+         WHERE id = v_owner;
+    END IF;
+
+    UPDATE tenant_memberships
+       SET status = 'removed',
+           removed_at = COALESCE(removed_at, now()),
+           updated_at = now()
+     WHERE tenant_id = v_tenant
+       AND role = 'owner'
+       AND status = 'active'
+       AND user_id <> v_owner;
+
+    INSERT INTO tenant_memberships (tenant_id, user_id, role, status, removed_at, created_at, updated_at)
+    VALUES (v_tenant, v_owner, 'owner', 'active', NULL, now(), now())
+    ON CONFLICT (tenant_id, user_id) WHERE status = 'active' DO UPDATE
+        SET role = 'owner',
+            status = 'active',
+            removed_at = NULL,
             updated_at = now();
 
     SELECT id INTO v_user

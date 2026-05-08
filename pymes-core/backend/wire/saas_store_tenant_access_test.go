@@ -3,6 +3,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,23 +12,120 @@ import (
 )
 
 type fakeClerkTenantClient struct {
-	membershipOK bool
+	membershipOK    bool
+	createInviteErr error
+	getUserErr      error
+	userProfile     clerkUserProfile
+	lastInviteInput clerkCreateOrganizationInvitationInput
+	createInviteN   int
+	getUserN        int
 }
 
-func (f fakeClerkTenantClient) CreateOrganization(_ context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error) {
-	return clerkOrganization{ID: "org_" + input.Slug}, nil
-}
-
-func (f fakeClerkTenantClient) CreateOrganizationInvitation(_ context.Context, _ clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error) {
+func (f *fakeClerkTenantClient) CreateOrganizationInvitation(_ context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error) {
+	f.lastInviteInput = input
+	f.createInviteN++
+	if f.createInviteErr != nil {
+		return clerkOrganizationInvitation{}, f.createInviteErr
+	}
 	return clerkOrganizationInvitation{ID: "clerk_invite_test"}, nil
 }
 
-func (f fakeClerkTenantClient) RevokeOrganizationInvitation(_ context.Context, _ clerkRevokeOrganizationInvitationInput) error {
+func (f *fakeClerkTenantClient) GetUser(_ context.Context, userID string) (clerkUserProfile, error) {
+	f.getUserN++
+	if f.getUserErr != nil {
+		return clerkUserProfile{}, f.getUserErr
+	}
+	if strings.TrimSpace(f.userProfile.ID) == "" {
+		f.userProfile.ID = userID
+	}
+	return f.userProfile, nil
+}
+
+func (f *fakeClerkTenantClient) RevokeOrganizationInvitation(_ context.Context, _ clerkRevokeOrganizationInvitationInput) error {
 	return nil
 }
 
-func (f fakeClerkTenantClient) UserHasOrganizationMembership(_ context.Context, _, _ string) (bool, error) {
+func (f *fakeClerkTenantClient) UserHasOrganizationMembership(_ context.Context, _, _ string) (bool, error) {
 	return f.membershipOK, nil
+}
+
+func TestEnrichAuthenticatedClerkUserFetchesRealClerkProfile(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	clerk := &fakeClerkTenantClient{userProfile: clerkUserProfile{
+		Email:     " devpablocristo@gmail.com ",
+		FirstName: "Pablo",
+		LastName:  "Cristo",
+		ImageURL:  "https://img.test/avatar.png",
+	}}
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = clerk
+
+	user := store.enrichAuthenticatedClerkUser(context.Background(), clerkAuthenticatedUser{
+		ExternalID: "user_3AXavi5Algpygf3F8NxLWf5r88I",
+		Email:      placeholderClerkEmail("user_3AXavi5Algpygf3F8NxLWf5r88I"),
+		Name:       placeholderClerkEmail("user_3AXavi5Algpygf3F8NxLWf5r88I"),
+	})
+
+	if clerk.getUserN != 1 {
+		t.Fatalf("GetUser calls = %d, want 1", clerk.getUserN)
+	}
+	if user.Email != "devpablocristo@gmail.com" {
+		t.Fatalf("email = %q, want real Clerk email", user.Email)
+	}
+	if user.Name != "Pablo Cristo" {
+		t.Fatalf("name = %q, want Clerk display name", user.Name)
+	}
+	if user.AvatarURL == nil || *user.AvatarURL != "https://img.test/avatar.png" {
+		t.Fatalf("avatar = %#v, want Clerk image", user.AvatarURL)
+	}
+}
+
+func TestUpsertUserDoesNotOverwriteRealProfileWithPlaceholder(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	ctx := context.Background()
+
+	if _, err := store.upsertUserTx(ctx, db, "user_owner", "devpablocristo@gmail.com", "Pablo Cristo", nil); err != nil {
+		t.Fatalf("initial upsertUserTx() error = %v", err)
+	}
+	row, err := store.upsertUserTx(ctx, db, "user_owner", placeholderClerkEmail("user_owner"), "", nil)
+	if err != nil {
+		t.Fatalf("placeholder upsertUserTx() error = %v", err)
+	}
+	if row.Email != "devpablocristo@gmail.com" {
+		t.Fatalf("email = %q, want original real email", row.Email)
+	}
+	if row.Name != "Pablo Cristo" || row.GivenName != "Pablo" || row.FamilyName != "Cristo" {
+		t.Fatalf("name fields = %q/%q/%q, want original profile", row.Name, row.GivenName, row.FamilyName)
+	}
+}
+
+func TestUpsertUserRelinksVerifiedEmailWhenClerkUserIDChanges(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	ctx := context.Background()
+
+	original, err := store.upsertUserTx(ctx, db, "user_old", "tucbox@gmail.com", "Tuc Box", nil)
+	if err != nil {
+		t.Fatalf("initial upsertUserTx() error = %v", err)
+	}
+	updated, err := store.upsertUserTx(ctx, db, "user_new", "tucbox@gmail.com", "Tuc Box", nil)
+	if err != nil {
+		t.Fatalf("relink upsertUserTx() error = %v", err)
+	}
+	if updated.ID != original.ID {
+		t.Fatalf("user id = %s, want existing id %s", updated.ID, original.ID)
+	}
+	if updated.ExternalID != "user_new" {
+		t.Fatalf("external_id = %q, want user_new", updated.ExternalID)
+	}
+	var count int64
+	if err := db.Model(&pymesUserRow{}).Where("email = ?", "tucbox@gmail.com").Count(&count).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("users with email = %d, want 1", count)
+	}
 }
 
 func TestFindActiveMembershipRoleByExternalUserUsesLocalRole(t *testing.T) {
@@ -127,7 +225,8 @@ func TestTransferTenantOwnershipKeepsExactlyOneOwner(t *testing.T) {
 func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
-	store.clerk = fakeClerkTenantClient{membershipOK: true}
+	store.clerk = &fakeClerkTenantClient{membershipOK: true}
+	store.clerkPymesOrgID = "org_pymes"
 	ctx := context.Background()
 
 	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
@@ -172,8 +271,8 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	if accepted.Status != "accepted" {
 		t.Fatalf("accepted status = %q, want accepted", accepted.Status)
 	}
-	if clerkTenantID != "org_bicimax" {
-		t.Fatalf("clerkTenantID = %q, want org_bicimax", clerkTenantID)
+	if clerkTenantID != "org_pymes" {
+		t.Fatalf("clerkTenantID = %q, want org_pymes", clerkTenantID)
 	}
 	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
 	if err != nil {
@@ -184,9 +283,83 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 	}
 }
 
-func TestCreateTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
+func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = &fakeClerkTenantClient{membershipOK: true}
+	store.clerkPymesOrgID = "org_pymes"
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+	oldUser, err := store.upsertUserTx(ctx, db, "user_old", "tucbox@gmail.com", "Tuc Box", nil)
+	if err != nil {
+		t.Fatalf("upsert old user: %v", err)
+	}
+	if _, err := store.UpsertTenantMember(ctx, tenantID, oldUser.ID.String(), "member"); err != nil {
+		t.Fatalf("UpsertTenantMember() error = %v", err)
+	}
+	if err := store.RemoveTenantMember(ctx, tenantID, oldUser.ID.String()); err != nil {
+		t.Fatalf("RemoveTenantMember() error = %v", err)
+	}
+	owner, ok, err := store.LocalUserByExternalID(ctx, "user_owner")
+	if err != nil || !ok {
+		t.Fatalf("LocalUserByExternalID() = ok %v err %v", ok, err)
+	}
+	token := "invite-token-relink"
+	now := time.Now().UTC()
+	row := pymesTenantInvitationRow{
+		ID:                uuid.New(),
+		TenantID:          uuid.MustParse(tenantID),
+		EmailNormalized:   "tucbox@gmail.com",
+		Role:              "admin",
+		Status:            "pending",
+		TokenHash:         hashInviteToken(token),
+		ClerkInvitationID: stringPtr("clerk_invite_test"),
+		InvitedByUserID:   owner.ID,
+		ExpiresAt:         now.Add(time.Hour),
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(&row).Error; err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+
+	accepted, _, err := store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+		ExternalID: "user_new",
+		Email:      "tucbox@gmail.com",
+		Name:       "Tuc Box",
+	})
+	if err != nil {
+		t.Fatalf("AcceptTenantInvitation() error = %v", err)
+	}
+	if accepted.Status != "accepted" {
+		t.Fatalf("accepted status = %q, want accepted", accepted.Status)
+	}
+	var user pymesUserRow
+	if err := db.Where("email = ?", "tucbox@gmail.com").Take(&user).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+	if user.ID != oldUser.ID || user.ExternalID != "user_new" {
+		t.Fatalf("user = id %s external %q, want id %s external user_new", user.ID, user.ExternalID, oldUser.ID)
+	}
+	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
+	if err != nil {
+		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
+	}
+	if !ok || role != "admin" {
+		t.Fatalf("accepted role = %q ok=%v, want admin true", role, ok)
+	}
+}
+
+func TestCreateTenantInvitationUsesGlobalPymesClerkOrganization(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	clerk := &fakeClerkTenantClient{}
+	store.clerk = clerk
+	store.clerkPymesOrgID = "org_pymes"
 	ctx := context.Background()
 
 	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
@@ -201,14 +374,103 @@ func TestCreateTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
 	if invite.Status != "pending" {
 		t.Fatalf("invite status = %q, want pending", invite.Status)
 	}
-	if invite.ClerkInvitationID != nil {
-		t.Fatalf("ClerkInvitationID = %q, want nil for local fallback tenant", *invite.ClerkInvitationID)
+	if invite.ClerkInvitationID == nil || *invite.ClerkInvitationID != "clerk_invite_test" {
+		t.Fatalf("ClerkInvitationID = %v, want clerk_invite_test", invite.ClerkInvitationID)
+	}
+	if clerk.createInviteN != 1 {
+		t.Fatalf("CreateOrganizationInvitation calls = %d, want 1", clerk.createInviteN)
+	}
+	if clerk.lastInviteInput.OrganizationID != "org_pymes" {
+		t.Fatalf("OrganizationID = %q, want org_pymes", clerk.lastInviteInput.OrganizationID)
+	}
+	if clerk.lastInviteInput.Email != "admin@medlab.test" {
+		t.Fatalf("Email = %q", clerk.lastInviteInput.Email)
+	}
+	if clerk.lastInviteInput.Role != "org:member" {
+		t.Fatalf("Role = %q, want org:member", clerk.lastInviteInput.Role)
+	}
+	if got := clerk.lastInviteInput.PublicMetadata["pymes_tenant_id"]; got != tenantID {
+		t.Fatalf("pymes_tenant_id metadata = %v, want %s", got, tenantID)
+	}
+	if got := clerk.lastInviteInput.PublicMetadata["pymes_tenant_slug"]; got != "medlab" {
+		t.Fatalf("pymes_tenant_slug metadata = %v, want medlab", got)
+	}
+	if got := clerk.lastInviteInput.PublicMetadata["pymes_role"]; got != "admin" {
+		t.Fatalf("pymes_role metadata = %v, want admin", got)
 	}
 }
 
-func TestAcceptTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
+func TestPreviewTenantInvitationReturnsTenantDestinationWithoutAccepting(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = &fakeClerkTenantClient{}
+	store.clerkPymesOrgID = "org_pymes"
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+	invite, err := store.CreateTenantInvitation(ctx, tenantID, "user_owner", "tucbox@gmail.com", "member")
+	if err != nil {
+		t.Fatalf("CreateTenantInvitation() error = %v", err)
+	}
+	token := strings.TrimPrefix(strings.TrimSpace(store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL), "http://localhost:5173/invite/accept?token=")
+	if token == "" {
+		t.Fatalf("redirect url = %q, missing token", store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL)
+	}
+
+	preview, err := store.PreviewTenantInvitation(ctx, token)
+	if err != nil {
+		t.Fatalf("PreviewTenantInvitation() error = %v", err)
+	}
+	if preview.TenantID != tenantID || preview.TenantSlug != "medlab" || preview.TenantName != "MedLab" {
+		t.Fatalf("preview tenant = id %q slug %q name %q, want %q medlab MedLab", preview.TenantID, preview.TenantSlug, preview.TenantName, tenantID)
+	}
+	if preview.Email != "tucbox@gmail.com" || preview.Role != "member" || preview.Status != "pending" {
+		t.Fatalf("preview invite = email %q role %q status %q", preview.Email, preview.Role, preview.Status)
+	}
+	var row pymesTenantInvitationRow
+	if err := db.Where("id = ?", invite.ID).Take(&row).Error; err != nil {
+		t.Fatalf("load invite: %v", err)
+	}
+	if row.Status != "pending" || row.AcceptedAt != nil || row.AcceptedByUserID != nil {
+		t.Fatalf("row after preview = status %q accepted_at %v accepted_by %v, want untouched pending", row.Status, row.AcceptedAt, row.AcceptedByUserID)
+	}
+}
+
+func TestCreateTenantInvitationDoesNotLeavePendingInviteWhenClerkFails(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = &fakeClerkTenantClient{createInviteErr: errors.New("clerk down")}
+	store.clerkPymesOrgID = "org_pymes"
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
+	if err != nil {
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
+	}
+
+	_, err = store.CreateTenantInvitation(ctx, tenantID, "user_owner", "admin@medlab.test", "admin")
+	if err == nil {
+		t.Fatal("CreateTenantInvitation() error = nil, want clerk error")
+	}
+	var count int64
+	if err := db.Model(&pymesTenantInvitationRow{}).
+		Where("tenant_id = ? AND email_normalized = ? AND status = 'pending'", uuid.MustParse(tenantID), "admin@medlab.test").
+		Count(&count).Error; err != nil {
+		t.Fatalf("count invites: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("pending invites = %d, want 0", count)
+	}
+}
+
+func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = &fakeClerkTenantClient{membershipOK: true}
+	store.clerkPymesOrgID = "org_pymes"
 	ctx := context.Background()
 
 	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
@@ -222,7 +484,7 @@ func TestAcceptTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
 	if !ok {
 		t.Fatal("LocalUserByExternalID() ok = false, want true")
 	}
-	token := "local-invite-token-test"
+	token := "local-only-invite-token-test"
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
 		ID:              uuid.New(),
@@ -239,33 +501,67 @@ func TestAcceptTenantInvitationAllowsLocalFallbackTenant(t *testing.T) {
 		t.Fatalf("create invite: %v", err)
 	}
 
-	accepted, clerkTenantID, err := store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	_, _, err = store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
 		ExternalID: "user_new",
 		Email:      "new@medlab.test",
 		Name:       "New Member",
 	})
+	if !errors.Is(err, domainerr.Conflict("")) {
+		t.Fatalf("AcceptTenantInvitation() error = %v, want conflict", err)
+	}
+}
+
+func TestAcceptTenantInvitationRequiresGlobalPymesClerkMembership(t *testing.T) {
+	db := newTestSaaSStoreDB(t)
+	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
+	store.clerk = &fakeClerkTenantClient{membershipOK: false}
+	store.clerkPymesOrgID = "org_pymes"
+	ctx := context.Background()
+
+	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "", "user_owner", "owner@medlab.test", "Owner", nil)
 	if err != nil {
-		t.Fatalf("AcceptTenantInvitation() error = %v", err)
+		t.Fatalf("CreateTenantWithOwner() error = %v", err)
 	}
-	if accepted.Status != "accepted" {
-		t.Fatalf("accepted status = %q, want accepted", accepted.Status)
-	}
-	if clerkTenantID != "" {
-		t.Fatalf("clerkTenantID = %q, want empty for local fallback tenant", clerkTenantID)
-	}
-	role, ok, err := store.FindActiveMembershipRoleByExternalUser(ctx, tenantID, "user_new")
+	owner, ok, err := store.LocalUserByExternalID(ctx, "user_owner")
 	if err != nil {
-		t.Fatalf("FindActiveMembershipRoleByExternalUser() error = %v", err)
+		t.Fatalf("LocalUserByExternalID() error = %v", err)
 	}
-	if !ok || role != "member" {
-		t.Fatalf("accepted role = %q ok=%v, want member true", role, ok)
+	if !ok {
+		t.Fatal("LocalUserByExternalID() ok = false, want true")
+	}
+	token := "pymes-membership-required-token-test"
+	now := time.Now().UTC()
+	if err := db.Create(&pymesTenantInvitationRow{
+		ID:                uuid.New(),
+		TenantID:          uuid.MustParse(tenantID),
+		EmailNormalized:   "new@medlab.test",
+		Role:              "member",
+		Status:            "pending",
+		TokenHash:         hashInviteToken(token),
+		ClerkInvitationID: stringPtr("clerk_invite_test"),
+		InvitedByUserID:   owner.ID,
+		ExpiresAt:         now.Add(time.Hour),
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}).Error; err != nil {
+		t.Fatalf("create invite: %v", err)
+	}
+
+	_, _, err = store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+		ExternalID: "user_new",
+		Email:      "new@medlab.test",
+		Name:       "New Member",
+	})
+	if !errors.Is(err, domainerr.Forbidden("")) {
+		t.Fatalf("AcceptTenantInvitation() error = %v, want forbidden", err)
 	}
 }
 
 func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
-	store.clerk = fakeClerkTenantClient{membershipOK: true}
+	store.clerk = &fakeClerkTenantClient{membershipOK: true}
+	store.clerkPymesOrgID = "org_pymes"
 	ctx := context.Background()
 
 	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "Bicimax", "bicimax", "org_bicimax", "user_owner", "owner@bicimax.test", "Owner", nil)
@@ -282,16 +578,17 @@ func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 	token := "invite-token-mismatch"
 	now := time.Now().UTC()
 	if err := db.Create(&pymesTenantInvitationRow{
-		ID:              uuid.New(),
-		TenantID:        uuid.MustParse(tenantID),
-		EmailNormalized: "expected@bicimax.test",
-		Role:            "admin",
-		Status:          "pending",
-		TokenHash:       hashInviteToken(token),
-		InvitedByUserID: owner.ID,
-		ExpiresAt:       now.Add(time.Hour),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                uuid.New(),
+		TenantID:          uuid.MustParse(tenantID),
+		EmailNormalized:   "expected@bicimax.test",
+		Role:              "admin",
+		Status:            "pending",
+		TokenHash:         hashInviteToken(token),
+		ClerkInvitationID: stringPtr("clerk_invite_test"),
+		InvitedByUserID:   owner.ID,
+		ExpiresAt:         now.Add(time.Hour),
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}).Error; err != nil {
 		t.Fatalf("create invite: %v", err)
 	}

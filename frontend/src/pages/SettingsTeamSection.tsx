@@ -4,6 +4,7 @@ import {
   createTenantInvite,
   listTenantInvites,
   listTenantMembers,
+  removeTenantMember,
   resendTenantInvite,
   revokeTenantInvite,
   type TenantInvitation,
@@ -17,11 +18,27 @@ type SettingsTeamSectionProps = {
   membershipRole?: string;
 };
 
-function memberLabel(member: TenantMemberRow): string {
-  const name = member.user?.name?.trim();
-  const email = member.user?.email?.trim();
-  if (name && email) return `${name} (${email})`;
-  return name || email || member.user_id;
+function memberNameParts(member: TenantMemberRow): { firstName: string; lastName: string; email: string } {
+  const email = member.user?.email?.trim() || '—';
+  const rawGivenName = member.user?.given_name?.trim() || '';
+  const rawFamilyName = member.user?.family_name?.trim() || '';
+  const givenName = rawGivenName && !isPlaceholderClerkName(rawGivenName) ? rawGivenName : '';
+  const familyName = rawFamilyName && !isPlaceholderClerkName(rawFamilyName) ? rawFamilyName : '';
+  if (givenName || familyName) {
+    return { firstName: givenName || '—', lastName: familyName || '—', email };
+  }
+
+  const fullName = member.user?.name?.trim() || '';
+  if (!fullName || isPlaceholderClerkName(fullName)) {
+    return { firstName: '—', lastName: '—', email };
+  }
+  const [firstName, ...rest] = fullName.split(/\s+/);
+  return { firstName: firstName || '—', lastName: rest.join(' ') || '—', email };
+}
+
+function isPlaceholderClerkName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return normalized.endsWith('@users.clerk.placeholder') || normalized.startsWith('user_');
 }
 
 function roleLabel(role: string | undefined): string {
@@ -56,7 +73,6 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member');
   const canManageInvites = membershipRole === 'owner';
@@ -77,7 +93,6 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
     onSuccess: async () => {
       setInviteEmail('');
       setInviteRole('member');
-      setInviteOpen(false);
       setSuccess('Invitación enviada.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) }),
@@ -99,10 +114,17 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
       await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.invites(tenantId) });
     },
   });
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: string) => removeTenantMember(tenantId, userId),
+    onSuccess: async () => {
+      setSuccess('Usuario eliminado del tenant.');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.rbac.members(tenantId) });
+    },
+  });
 
   const members = membersQuery.data?.items ?? [];
-  const invites = invitesQuery.data?.items ?? [];
-  const busy = inviteMutation.isPending || revokeMutation.isPending || resendMutation.isPending;
+  const invites = (invitesQuery.data?.items ?? []).filter((invite) => invite.status === 'pending');
+  const busy = inviteMutation.isPending || revokeMutation.isPending || resendMutation.isPending || removeMemberMutation.isPending;
   const loadError = membersQuery.error || invitesQuery.error;
 
   async function handleInviteSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -122,37 +144,32 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
     }
   }
 
+  async function handleRemoveMember(member: TenantMemberRow): Promise<void> {
+    const email = member.user?.email?.trim();
+    const name = [member.user?.given_name, member.user?.family_name].map((part) => part?.trim()).filter(Boolean).join(' ');
+    const fallbackName = member.user?.name?.trim();
+    const label = email || name || (fallbackName && !isPlaceholderClerkName(fallbackName) ? fallbackName : '') || 'este usuario';
+    if (!window.confirm(`¿Eliminar a ${label} del tenant?`)) {
+      return;
+    }
+    try {
+      setError('');
+      setSuccess('');
+      await removeMemberMutation.mutateAsync(member.user_id);
+    } catch (err) {
+      setError(formatFetchErrorForUser(err, 'No se pudo eliminar el usuario.'));
+    }
+  }
+
   return (
     <section className="card admin-settings-section">
-      <div className="card-header">
-        <div>
-          <h2>Equipo</h2>
-          <p className="admin-settings-hint u-m-0">Miembros del tenant actual e invitaciones pendientes.</p>
-        </div>
-        {canManageInvites ? (
-          <button
-            type="button"
-            className="btn-primary btn-sm"
-            onClick={() => {
-              setInviteOpen((open) => !open);
-              setError('');
-              setSuccess('');
-            }}
-          >
-            Invitar usuario
-          </button>
-        ) : (
-          <span className="badge badge-neutral">Solo owner invita</span>
-        )}
-      </div>
-
       {error ? <p className="form-error">{error}</p> : null}
       {success ? <p className="form-success">{success}</p> : null}
       {!error && loadError ? (
         <p className="form-error">{formatFetchErrorForUser(loadError, 'No se pudo cargar el equipo.')}</p>
       ) : null}
 
-      {inviteOpen && canManageInvites ? (
+      {canManageInvites ? (
         <form className="admin-settings-grid admin-rbac-assign-form" onSubmit={(event) => void handleInviteSubmit(event)}>
           <div className="form-group">
             <label htmlFor="settings-team-invite-email">Email</label>
@@ -183,9 +200,6 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
             <button type="submit" className="btn-primary btn-sm" disabled={busy}>
               {inviteMutation.isPending ? 'Enviando…' : 'Enviar invitación'}
             </button>
-            <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={() => setInviteOpen(false)}>
-              Cancelar
-            </button>
           </div>
         </form>
       ) : null}
@@ -197,23 +211,48 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
           <table className="admin-activity-table">
             <thead>
               <tr>
-                <th>Miembro</th>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Email</th>
                 <th>Rol</th>
                 <th>Estado</th>
+                {canManageInvites ? <th>Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
-                <tr key={member.id}>
-                  <td>{memberLabel(member)}</td>
-                  <td>
-                    <code className="admin-code">{roleLabel(member.role)}</code>
-                  </td>
-                  <td>
-                    <code className="admin-code">{member.status ?? 'active'}</code>
-                  </td>
-                </tr>
-              ))}
+              {members.map((member) => {
+                const name = memberNameParts(member);
+                const canRemoveMember = canManageInvites && member.role !== 'owner';
+                return (
+                  <tr key={member.id}>
+                    <td>{name.firstName}</td>
+                    <td>{name.lastName}</td>
+                    <td>{name.email}</td>
+                    <td>
+                      <code className="admin-code">{roleLabel(member.role)}</code>
+                    </td>
+                    <td>
+                      <code className="admin-code">{member.status ?? 'active'}</code>
+                    </td>
+                    {canManageInvites ? (
+                      <td>
+                        {canRemoveMember ? (
+                          <button
+                            type="button"
+                            className="btn-sm btn-danger"
+                            disabled={busy}
+                            onClick={() => void handleRemoveMember(member)}
+                          >
+                            Eliminar
+                          </button>
+                        ) : (
+                          <span className="text-secondary">—</span>
+                        )}
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -224,7 +263,7 @@ export function SettingsTeamSection({ tenantId, membershipRole }: SettingsTeamSe
           <h3>Invitaciones</h3>
           {invitesQuery.isLoading ? <p className="text-secondary">Cargando invitaciones…</p> : null}
           {!invitesQuery.isLoading && invites.length === 0 ? (
-            <p className="text-secondary">No hay invitaciones pendientes o recientes.</p>
+            <p className="text-secondary">No hay invitaciones pendientes.</p>
           ) : null}
           {invites.length > 0 ? (
             <div className="admin-activity-wrap">

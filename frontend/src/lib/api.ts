@@ -319,11 +319,15 @@ export type TenantMemberRow = {
   role?: string;
   status?: string;
   joined_at?: string;
-  user?: { id?: string; email?: string; name?: string };
+  user?: { id?: string; email?: string; name?: string; given_name?: string; family_name?: string };
 };
 
 export async function listTenantMembers(tenantId: string): Promise<{ items: TenantMemberRow[] }> {
   return request(`/v1/tenants/${tenantId}/members`);
+}
+
+export async function removeTenantMember(tenantId: string, userId: string): Promise<void> {
+  await request(`/v1/tenants/${tenantId}/members/${userId}`, { method: 'DELETE' });
 }
 
 export type TenantInvitation = {
@@ -340,6 +344,16 @@ export type TenantInvitation = {
   revoked_at?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type TenantInvitationPreview = {
+  tenant_id: string;
+  tenant_slug: string;
+  tenant_name: string;
+  email: string;
+  role: string;
+  status: TenantInvitation['status'];
+  expires_at: string;
 };
 
 export async function listTenantInvites(tenantId: string): Promise<{ items: TenantInvitation[] }> {
@@ -361,8 +375,12 @@ export async function resendTenantInvite(inviteId: string): Promise<{ invite: Te
   return request(`/v1/tenant-invites/${inviteId}/resend`, { method: 'POST', body: {} });
 }
 
-export async function acceptTenantInvite(token: string): Promise<{ invite: TenantInvitation; clerk_org_id: string }> {
-  return request('/v1/tenant-invites/accept', { method: 'POST', body: { token } });
+export async function acceptTenantInvite(token: string): Promise<{ invite: TenantInvitation; clerk_org_id: string; tenant_slug?: string }> {
+  return request('/v1/tenant-invites/accept', { method: 'POST', body: { token }, skipTenantSlug: true });
+}
+
+export async function previewTenantInvite(token: string): Promise<{ invite: TenantInvitationPreview }> {
+  return request(`/v1/tenant-invites/preview?token=${encodeURIComponent(token)}`, { skipTenantSlug: true });
 }
 
 export type RbacRoleSummary = {

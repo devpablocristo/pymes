@@ -113,3 +113,18 @@ func placeholderClerkEmail(externalID string) string {
 	}
 	return fmt.Sprintf("%s@users.clerk.placeholder", ext)
 }
+
+func isPlaceholderClerkEmail(email string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@users.clerk.placeholder")
+}
+
+func isSyntheticClerkName(name, externalID string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || isPlaceholderClerkEmail(name) {
+		return true
+	}
+	if externalID != "" && name == strings.TrimSpace(externalID) {
+		return true
+	}
+	return strings.EqualFold(name, "User")
+}

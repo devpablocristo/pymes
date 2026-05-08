@@ -90,6 +90,7 @@ func InitializeApp() *app.App {
 		Environment:           cfg.Environment,
 		ClerkSecretKey:        cfg.ClerkSecretKey,
 		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,
+		ClerkPymesOrgID:       cfg.ClerkPymesOrgID,
 		JWKSURL:               cfg.JWKSURL,
 		JWTIssuer:             cfg.JWTIssuer,
 		JWTAudience:           cfg.JWTAudience,

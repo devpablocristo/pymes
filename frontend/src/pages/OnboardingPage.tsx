@@ -1,4 +1,4 @@
-import { useClerk, useOrganization, useSession } from '@clerk/react';
+import { useClerk, useOrganization, useSession, useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { useI18n } from '../lib/i18n';
 import { queryKeys } from '../lib/queryKeys';
 import {
   saveTenantProfile,
+  clearTenantProfile,
   syncTenantProfileFromSettings,
   type PaymentMethod,
   type SellsType,
@@ -229,6 +230,8 @@ const PAYMENT_KEYS: { value: PaymentMethod; labelKey: string }[] = [
 type ClerkOnboardingBridges = {
   loaded: boolean;
   setActive: (params: { organization: string }) => Promise<void>;
+  signOut: () => Promise<void>;
+  user: { name: string; email: string } | null;
   organization: { id: string; slug?: string } | null;
   orgLoaded: boolean;
   afterSetActiveOrg?: () => Promise<void>;
@@ -238,10 +241,18 @@ function OnboardingPageClerkBridge() {
   const clerk = useClerk();
   const { session } = useSession();
   const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress?.trim() ?? '';
+  const userName =
+    user?.fullName?.trim() ||
+    [user?.firstName, user?.lastName].map((part) => part?.trim()).filter(Boolean).join(' ') ||
+    userEmail;
 
   const bridges: ClerkOnboardingBridges = {
     loaded: clerk.loaded,
     setActive: (params) => clerk.setActive(params),
+    signOut: () => clerk.signOut({ redirectUrl: '/login' }),
+    user: user ? { name: userName, email: userEmail } : null,
     organization: organization ? { id: organization.id, slug: organization.slug ?? undefined } : null,
     orgLoaded,
     afterSetActiveOrg: session
@@ -317,6 +328,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
 
   function back() {
     if (step > 1) setStep((step - 1) as Step);
+  }
+
+  async function handleSignOut(): Promise<void> {
+    clearTenantProfile();
+    queryClient.clear();
+    if (clerkBridges) {
+      await clerkBridges.signOut();
+      return;
+    }
+    navigate('/login', { replace: true });
   }
 
   async function finish() {
@@ -426,6 +447,16 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
         <div className="onboarding-header">
           <h1>{t('onboarding.header.title')}</h1>
           <p>{t('onboarding.header.subtitle')}</p>
+          <div className="onboarding-account-panel" aria-label="Usuario actual">
+            <div>
+              <span>Estás logueado como</span>
+              <strong>{clerkBridges?.user?.name || 'Usuario actual'}</strong>
+              <small>{clerkBridges?.user?.email || 'Sin email disponible'}</small>
+            </div>
+            <button type="button" className="onboarding-signout" onClick={() => void handleSignOut()}>
+              Cerrar sesión
+            </button>
+          </div>
           <div className="onboarding-progress">
             {[1, 2, 3, 4].map((s) => (
               <span key={s} className={`onboarding-dot${s === step ? ' active' : ''}${s < step ? ' done' : ''}`} />

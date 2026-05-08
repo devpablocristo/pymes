@@ -27,6 +27,8 @@ type tenantUserDTO struct {
 	ExternalID string     `json:"external_id"`
 	Email      string     `json:"email"`
 	Name       string     `json:"name"`
+	GivenName  string     `json:"given_name,omitempty"`
+	FamilyName string     `json:"family_name,omitempty"`
 	AvatarURL  *string    `json:"avatar_url,omitempty"`
 	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`

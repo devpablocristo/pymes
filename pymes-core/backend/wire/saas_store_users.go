@@ -166,9 +166,39 @@ func (s *pymesSaaSStore) UpsertUser(ctx context.Context, externalID, email, name
 	return userDTOFromRow(row), nil
 }
 
+func (s *pymesSaaSStore) enrichAuthenticatedClerkUser(ctx context.Context, user clerkAuthenticatedUser) clerkAuthenticatedUser {
+	user.ExternalID = strings.TrimSpace(user.ExternalID)
+	if user.ExternalID == "" || s == nil || s.clerk == nil {
+		return user
+	}
+	needsClerk := normalizeEmail(user.Email) == "" ||
+		isPlaceholderClerkEmail(user.Email) ||
+		isSyntheticClerkName(user.Name, user.ExternalID) ||
+		user.AvatarURL == nil ||
+		strings.TrimSpace(*user.AvatarURL) == ""
+	if !needsClerk {
+		return user
+	}
+	profile, err := s.clerk.GetUser(ctx, user.ExternalID)
+	if err != nil {
+		s.logger.Warn("clerk user enrichment failed", "user_id", user.ExternalID, "err", err)
+		return user
+	}
+	if email := normalizeEmail(profile.Email); email != "" {
+		user.Email = email
+	}
+	if name := profile.DisplayName(); name != "" {
+		user.Name = name
+	}
+	if imageURL := strings.TrimSpace(profile.ImageURL); imageURL != "" {
+		user.AvatarURL = &imageURL
+	}
+	return user
+}
+
 func (s *pymesSaaSStore) upsertUserTx(ctx context.Context, tx *gorm.DB, externalID, email, name string, avatarURL *string) (pymesUserRow, error) {
 	externalID = strings.TrimSpace(externalID)
-	email = strings.TrimSpace(email)
+	email = normalizeEmail(email)
 	name = strings.TrimSpace(name)
 	if externalID == "" {
 		return pymesUserRow{}, fmt.Errorf("external_id required")
@@ -183,6 +213,28 @@ func (s *pymesSaaSStore) upsertUserTx(ctx context.Context, tx *gorm.DB, external
 	err := tx.WithContext(ctx).Where("external_id = ?", externalID).Take(&row).Error
 	now := time.Now().UTC()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if email != "" && !isPlaceholderClerkEmail(email) {
+			err = tx.WithContext(ctx).Where("lower(trim(email)) = ?", email).Take(&row).Error
+			if err == nil {
+				row.ExternalID = externalID
+				given, family := splitFullNameIntoParts(name)
+				row.Email = email
+				row.GivenName = given
+				row.FamilyName = family
+				row.Name = joinDisplayName(given, family)
+				if avatarURL != nil {
+					row.AvatarURL = strings.TrimSpace(*avatarURL)
+				}
+				row.UpdatedAt = now
+				if err := tx.WithContext(ctx).Save(&row).Error; err != nil {
+					return pymesUserRow{}, err
+				}
+				return row, nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return pymesUserRow{}, err
+			}
+		}
 		given, family := splitFullNameIntoParts(name)
 		row = pymesUserRow{
 			ID:         uuid.New(),
@@ -204,6 +256,21 @@ func (s *pymesSaaSStore) upsertUserTx(ctx context.Context, tx *gorm.DB, external
 	}
 	if err != nil {
 		return pymesUserRow{}, err
+	}
+	if isPlaceholderClerkEmail(email) && strings.TrimSpace(row.Email) != "" && !isPlaceholderClerkEmail(row.Email) {
+		email = normalizeEmail(row.Email)
+	}
+	if isSyntheticClerkName(name, externalID) {
+		existingName := strings.TrimSpace(joinDisplayName(row.GivenName, row.FamilyName))
+		if existingName == "" {
+			existingName = strings.TrimSpace(row.Name)
+		}
+		if !isSyntheticClerkName(existingName, externalID) {
+			name = existingName
+		}
+	}
+	if name == "" {
+		name = email
 	}
 	row.Email = email
 	given, family := splitFullNameIntoParts(name)

@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	authn "github.com/devpablocristo/core/authn/go"
-	"github.com/devpablocristo/core/config/go/envconfig"
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/devpablocristo/core/http/go/httperr"
 	saasbilling "github.com/devpablocristo/core/saas/go/billing"
@@ -39,6 +37,9 @@ func registerPymesSaaSRoutes(
 	})
 	registerPublic(mux, "POST /tenant-invites/accept", func(w http.ResponseWriter, r *http.Request) {
 		handleAcceptTenantInvite(w, r, store, httpAuth)
+	})
+	registerPublic(mux, "GET /tenant-invites/preview", func(w http.ResponseWriter, r *http.Request) {
+		handlePreviewTenantInvite(w, r, store)
 	})
 
 	// Sesión de producto: envuelve el Principal del kernel con tenant_id + product_role.
@@ -154,6 +155,7 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		httperr.WriteFrom(w, err)
 		return
 	}
+	user = store.enrichAuthenticatedClerkUser(r.Context(), user)
 	var req createTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
@@ -181,33 +183,15 @@ func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 			httperr.WriteFrom(w, err)
 			return
 		}
-		writeCreateTenantResponse(w, http.StatusOK, existing.ID.String(), optionalString(existing.ClerkOrgID), slug, created.Secret, "", created.APIKey)
+		writeCreateTenantResponse(w, http.StatusOK, existing.ID.String(), store.clerkPymesOrganizationID(), slug, created.Secret, "", created.APIKey)
 		return
 	}
-	if store.clerk == nil {
-		httperr.WriteFrom(w, domainerr.Unavailable("clerk backend client is not configured"))
-		return
-	}
-	clerkOrgID := ""
-	clerkOrg, err := store.clerk.CreateOrganization(r.Context(), clerkCreateOrganizationInput{
-		Name:      name,
-		Slug:      slug,
-		CreatedBy: user.ExternalID,
-	})
-	if err != nil {
-		if !envconfig.IsLocal(store.environment) {
-			httperr.WriteFrom(w, err)
-			return
-		}
-		slog.Warn("clerk organization create failed in local environment; creating tenant with local membership only", "err", err, "slug", slug)
-	}
-	clerkOrgID = strings.TrimSpace(clerkOrg.ID)
-	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, clerkOrgID, user.ExternalID, user.Email, user.Name, user.AvatarURL)
+	tenantID, rawKey, key, scopes, err := store.CreateTenantWithOwner(r.Context(), name, slug, "", user.ExternalID, user.Email, user.Name, user.AvatarURL)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
-	writeCreateTenantResponse(w, http.StatusCreated, tenantID, clerkOrgID, slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
+	writeCreateTenantResponse(w, http.StatusCreated, tenantID, store.clerkPymesOrganizationID(), slug, rawKey, key.KeyPrefix, tenantAPIKeyDTO{
 		ID:        key.ID.String(),
 		TenantID:  tenantID,
 		Name:      key.Name,
@@ -230,13 +214,6 @@ func writeCreateTenantResponse(w http.ResponseWriter, status int, tenantID, cler
 			"created_at": key.CreatedAt,
 		},
 	})
-}
-
-func optionalString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return strings.TrimSpace(*value)
 }
 
 func handleListMyTenants(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
@@ -346,23 +323,13 @@ func loadMeProfile(ctx context.Context, r *http.Request, principal tenantPrincip
 	if err != nil {
 		return nil, err
 	}
-	if principal.AuthMethod == "jwt" && !ok && strings.TrimSpace(httpAuth.JWKSURL) != "" {
-		raw, bearerOK := authn.BearerToken(r.Header.Get("Authorization"))
-		if bearerOK && strings.TrimSpace(raw) != "" {
-			if claims, vErr := verifyJWTClaimsMap(ctx, raw, httpAuth.JWKSURL, httpAuth.JWTIssuer); vErr == nil {
-				if sub := stringClaim(claims, "sub"); sub != "" && sub == strings.TrimSpace(principal.Actor) {
-					email := clerkEmailFromClaims(claims)
-					name := clerkDisplayNameFromClaims(claims)
-					if email == "" {
-						email = placeholderClerkEmail(principal.Actor)
-					}
-					if name == "" {
-						name = "User"
-					}
-					user, err = store.UpsertUser(ctx, principal.Actor, email, name, nil)
-					ok = err == nil
-				}
-			}
+	needsProfileHydration := !ok || isPlaceholderClerkEmail(user.Email) || isSyntheticClerkName(user.Name, principal.Actor)
+	if principal.AuthMethod == "jwt" && needsProfileHydration && strings.TrimSpace(httpAuth.JWKSURL) != "" {
+		authUser, authErr := authenticatedClerkUser(ctx, r.Header.Get("Authorization"), httpAuth)
+		if authErr == nil && strings.TrimSpace(authUser.ExternalID) == strings.TrimSpace(principal.Actor) {
+			authUser = store.enrichAuthenticatedClerkUser(ctx, authUser)
+			user, err = store.UpsertUser(ctx, authUser.ExternalID, authUser.Email, authUser.Name, authUser.AvatarURL)
+			ok = err == nil
 		}
 	}
 	var userPayload any
@@ -482,12 +449,28 @@ func handleCreateTenantInvite(w http.ResponseWriter, r *http.Request, store *pym
 	httperr.WriteJSON(w, http.StatusCreated, map[string]any{"invite": item})
 }
 
+func handlePreviewTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	token := strings.TrimSpace(r.URL.Query().Get("token"))
+	item, err := store.PreviewTenantInvitation(r.Context(), token)
+	if err != nil {
+		var de domainerr.Error
+		if errors.As(err, &de) && de.Message() == "invite_expired" {
+			httperr.Write(w, http.StatusGone, "invite_expired", "invite_expired")
+			return
+		}
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item})
+}
+
 func handleAcceptTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
 	user, err := authenticatedClerkUser(r.Context(), r.Header.Get("Authorization"), httpAuth)
 	if err != nil {
 		httperr.WriteFrom(w, err)
 		return
 	}
+	user = store.enrichAuthenticatedClerkUser(r.Context(), user)
 	var req tenantInviteAcceptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httperr.BadRequest(w, "invalid request body")
@@ -503,7 +486,12 @@ func handleAcceptTenantInvite(w http.ResponseWriter, r *http.Request, store *pym
 		httperr.WriteFrom(w, err)
 		return
 	}
-	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item, "clerk_org_id": clerkTenantID})
+	_, tenantSlug, _, err := store.GetTenantNameSlugByID(r.Context(), item.TenantID)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item, "clerk_org_id": clerkTenantID, "tenant_slug": tenantSlug})
 }
 
 func handleRevokeTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {

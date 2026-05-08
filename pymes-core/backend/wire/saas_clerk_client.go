@@ -17,20 +17,28 @@ import (
 const clerkBackendAPIBaseURL = "https://api.clerk.com/v1"
 
 type clerkTenantClient interface {
-	CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error)
 	CreateOrganizationInvitation(ctx context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error)
+	GetUser(ctx context.Context, userID string) (clerkUserProfile, error)
 	RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error
 	UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error)
 }
 
-type clerkCreateOrganizationInput struct {
+type clerkUserProfile struct {
+	ID        string
+	Email     string
+	FirstName string
+	LastName  string
 	Name      string
-	Slug      string
-	CreatedBy string
+	ImageURL  string
 }
 
-type clerkOrganization struct {
-	ID string
+func (p clerkUserProfile) DisplayName() string {
+	if name := strings.TrimSpace(p.Name); name != "" {
+		return name
+	}
+	first := strings.TrimSpace(p.FirstName)
+	last := strings.TrimSpace(p.LastName)
+	return strings.TrimSpace(strings.TrimSpace(first) + " " + strings.TrimSpace(last))
 }
 
 type clerkCreateOrganizationInvitationInput struct {
@@ -72,26 +80,6 @@ func newClerkBackendClient(secretKey string) clerkTenantClient {
 	}
 }
 
-func (c *clerkBackendClient) CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error) {
-	payload := map[string]any{
-		"name":       strings.TrimSpace(input.Name),
-		"created_by": strings.TrimSpace(input.CreatedBy),
-	}
-	if slug := strings.TrimSpace(input.Slug); slug != "" {
-		payload["slug"] = slug
-	}
-	var out struct {
-		ID string `json:"id"`
-	}
-	if err := c.doJSON(ctx, http.MethodPost, "/organizations", payload, &out); err != nil {
-		return clerkOrganization{}, err
-	}
-	if strings.TrimSpace(out.ID) == "" {
-		return clerkOrganization{}, domainerr.UpstreamError("clerk organization response missing id")
-	}
-	return clerkOrganization{ID: strings.TrimSpace(out.ID)}, nil
-}
-
 func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error) {
 	tenantID := strings.TrimSpace(input.OrganizationID)
 	payload := map[string]any{
@@ -114,6 +102,9 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 	if err := c.doJSON(ctx, http.MethodPost, "/organizations/"+url.PathEscape(tenantID)+"/invitations", payload, &out); err != nil {
 		return clerkOrganizationInvitation{}, err
 	}
+	if strings.TrimSpace(out.ID) == "" {
+		return clerkOrganizationInvitation{}, domainerr.UpstreamError("clerk invitation response missing id")
+	}
 	expiresAt := parseClerkTime(out.ExpiresAt)
 	if expiresAt == nil {
 		expiresAt = parseClerkTime(out.ExpiresAtCamel)
@@ -122,6 +113,51 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 		ID:        strings.TrimSpace(out.ID),
 		URL:       strings.TrimSpace(out.URL),
 		ExpiresAt: expiresAt,
+	}, nil
+}
+
+func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkUserProfile, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return clerkUserProfile{}, domainerr.Validation("clerk user_id is required")
+	}
+	var out struct {
+		ID                    string `json:"id"`
+		FirstName             string `json:"first_name"`
+		LastName              string `json:"last_name"`
+		Username              string `json:"username"`
+		ImageURL              string `json:"image_url"`
+		ProfileImageURL       string `json:"profile_image_url"`
+		PrimaryEmailAddressID string `json:"primary_email_address_id"`
+		EmailAddresses        []struct {
+			ID           string `json:"id"`
+			EmailAddress string `json:"email_address"`
+		} `json:"email_addresses"`
+	}
+	if err := c.doJSON(ctx, http.MethodGet, "/users/"+url.PathEscape(userID), nil, &out); err != nil {
+		return clerkUserProfile{}, err
+	}
+	email := ""
+	for _, item := range out.EmailAddresses {
+		if strings.TrimSpace(item.ID) == strings.TrimSpace(out.PrimaryEmailAddressID) {
+			email = strings.TrimSpace(item.EmailAddress)
+			break
+		}
+	}
+	if email == "" && len(out.EmailAddresses) > 0 {
+		email = strings.TrimSpace(out.EmailAddresses[0].EmailAddress)
+	}
+	imageURL := strings.TrimSpace(out.ImageURL)
+	if imageURL == "" {
+		imageURL = strings.TrimSpace(out.ProfileImageURL)
+	}
+	return clerkUserProfile{
+		ID:        strings.TrimSpace(out.ID),
+		Email:     normalizeEmail(email),
+		FirstName: strings.TrimSpace(out.FirstName),
+		LastName:  strings.TrimSpace(out.LastName),
+		Name:      strings.TrimSpace(out.Username),
+		ImageURL:  imageURL,
 	}, nil
 }
 
@@ -170,7 +206,13 @@ func (c *clerkBackendClient) doJSON(ctx context.Context, method, path string, pa
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return domainerr.UpstreamError(fmt.Sprintf("clerk returned %d", resp.StatusCode))
+		message := clerkErrorMessage(data)
+		if message == "" {
+			message = fmt.Sprintf("clerk returned %d", resp.StatusCode)
+		} else {
+			message = fmt.Sprintf("clerk returned %d: %s", resp.StatusCode, message)
+		}
+		return domainerr.UpstreamError(message)
 	}
 	if out == nil || len(data) == 0 {
 		return nil
@@ -179,6 +221,35 @@ func (c *clerkBackendClient) doJSON(ctx context.Context, method, path string, pa
 		return domainerr.UpstreamError("invalid clerk response")
 	}
 	return nil
+}
+
+func clerkErrorMessage(data []byte) string {
+	var out struct {
+		Message string `json:"message"`
+		Errors  []struct {
+			Message     string `json:"message"`
+			LongMessage string `json:"long_message"`
+			Code        string `json:"code"`
+		} `json:"errors"`
+	}
+	if len(data) == 0 || json.Unmarshal(data, &out) != nil {
+		return ""
+	}
+	if msg := strings.TrimSpace(out.Message); msg != "" {
+		return msg
+	}
+	for _, item := range out.Errors {
+		if msg := strings.TrimSpace(item.LongMessage); msg != "" {
+			return msg
+		}
+		if msg := strings.TrimSpace(item.Message); msg != "" {
+			return msg
+		}
+		if code := strings.TrimSpace(item.Code); code != "" {
+			return code
+		}
+	}
+	return ""
 }
 
 func parseClerkTime(raw any) *time.Time {

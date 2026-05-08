@@ -157,12 +157,7 @@ func normalizeInviteRole(role string) string {
 }
 
 func clerkRoleFromTenantRole(role string) string {
-	switch normalizeTenantRole(role) {
-	case "admin", "owner":
-		return "org:admin"
-	default:
-		return "org:member"
-	}
+	return "org:member"
 }
 
 func (s *pymesSaaSStore) acceptPendingInviteForWebhook(ctx context.Context, tenantUUID uuid.UUID, user pymesUserRow, email string) (tenantMemberDTO, bool, error) {

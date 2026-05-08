@@ -23,6 +23,8 @@ func userDTOFromRow(row pymesUserRow) tenantUserDTO {
 		ExternalID: row.ExternalID,
 		Email:      row.Email,
 		Name:       row.Name,
+		GivenName:  row.GivenName,
+		FamilyName: row.FamilyName,
 		AvatarURL:  avatarURL,
 		DeletedAt:  row.DeletedAt,
 		CreatedAt:  row.CreatedAt,

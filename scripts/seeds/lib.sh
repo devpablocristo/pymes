@@ -28,6 +28,14 @@ GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-postgres}"
 # Cambiar acá si querés que `make seed` apunte a otro tenant por defecto.
 DEFAULT_SEED_TENANT_SLUG="${DEFAULT_SEED_TENANT_SLUG:-medlab}"
 
+# Owner local del tenant semilla. Estos defaults evitan que `make seed`
+# deje como owner a usuarios placeholder de Clerk.
+DEFAULT_SEED_OWNER_EXTERNAL_ID="${DEFAULT_SEED_OWNER_EXTERNAL_ID:-user_3AXavi5Algpygf3F8NxLWf5r88I}"
+DEFAULT_SEED_OWNER_EMAIL="${DEFAULT_SEED_OWNER_EMAIL:-devpablocristo@gmail.com}"
+DEFAULT_SEED_OWNER_GIVEN_NAME="${DEFAULT_SEED_OWNER_GIVEN_NAME:-Pablo}"
+DEFAULT_SEED_OWNER_FAMILY_NAME="${DEFAULT_SEED_OWNER_FAMILY_NAME:-Cristo}"
+export DEFAULT_SEED_OWNER_EXTERNAL_ID DEFAULT_SEED_OWNER_EMAIL DEFAULT_SEED_OWNER_GIVEN_NAME DEFAULT_SEED_OWNER_FAMILY_NAME
+
 dc() {
   (cd "$ROOT_DIR" && ${DOCKER_COMPOSE} "$@")
 }
@@ -362,6 +370,10 @@ replacements = {
     "__SEED_TENANT_EXTERNAL_ID__": sql_escape(os.environ.get("SEED_TENANT_EXTERNAL_ID", "")),
     "__SEED_TENANT_NAME__": sql_escape(os.environ.get("SEED_TENANT_NAME", "")),
     "__SEED_TENANT_SLUG__": sql_escape(os.environ.get("SEED_TENANT_SLUG", "")),
+    "__SEED_OWNER_EXTERNAL_ID__": sql_escape(os.environ.get("PYMES_SEED_OWNER_EXTERNAL_ID", os.environ.get("DEFAULT_SEED_OWNER_EXTERNAL_ID", ""))),
+    "__SEED_OWNER_EMAIL__": sql_escape(os.environ.get("PYMES_SEED_OWNER_EMAIL", os.environ.get("DEFAULT_SEED_OWNER_EMAIL", ""))),
+    "__SEED_OWNER_GIVEN_NAME__": sql_escape(os.environ.get("PYMES_SEED_OWNER_GIVEN_NAME", os.environ.get("DEFAULT_SEED_OWNER_GIVEN_NAME", ""))),
+    "__SEED_OWNER_FAMILY_NAME__": sql_escape(os.environ.get("PYMES_SEED_OWNER_FAMILY_NAME", os.environ.get("DEFAULT_SEED_OWNER_FAMILY_NAME", ""))),
 }
 for placeholder, value in replacements.items():
     body = body.replace(placeholder, value)

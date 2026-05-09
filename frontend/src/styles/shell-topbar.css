@@ -248,6 +248,14 @@ main.app-shell-main {
   color: var(--color-on-primary) !important;
 }
 
+/* Focus contrastante sobre el fondo azul de la topbar:
+   el outline global usa --color-primary, que es invisible acá. */
+.topbar-icon-btn:focus-visible,
+.page-layout__header-top-row .theme-toggle:focus-visible {
+  outline: 2px solid var(--color-on-primary) !important;
+  outline-offset: 2px !important;
+}
+
 .topbar-notification-dot {
   position: absolute !important;
   top: 6px !important;

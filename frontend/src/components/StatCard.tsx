@@ -29,12 +29,14 @@ type StatCardProps = {
  */
 export function StatCard({ label, value, sub, tone = 'blue', icon, loading }: StatCardProps) {
   return (
-    <div className="dash__stat-card">
-      <div className={`dash__stat-icon dash__stat-icon--${tone}`}>
+    <div className="dash__stat-card" role="group" aria-label={label}>
+      <div className={`dash__stat-icon dash__stat-icon--${tone}`} aria-hidden="true">
         {loading ? '…' : icon ?? label.charAt(0)}
       </div>
       <div className="dash__stat-info">
-        <div className="dash__stat-value">{loading ? <span className="spinner" /> : value}</div>
+        <div className="dash__stat-value">
+          {loading ? <span className="spinner" aria-label="Cargando" /> : value}
+        </div>
         <div className="dash__stat-label">{label}</div>
         {sub ? <div className="dash__stat-trend dash__stat-trend--muted">{sub}</div> : null}
       </div>

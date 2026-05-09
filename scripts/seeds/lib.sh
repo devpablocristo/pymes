@@ -26,7 +26,7 @@ GOVERNANCE_DB_USER="${GOVERNANCE_DB_USER:-postgres}"
 
 # Tenant local que reciben `make seed`, `make seed-verify` y `make seed-reset`.
 # Cambiar acá si querés que `make seed` apunte a otro tenant por defecto.
-DEFAULT_SEED_TENANT_SLUG="${DEFAULT_SEED_TENANT_SLUG:-medlab}"
+DEFAULT_SEED_TENANT_SLUG="${DEFAULT_SEED_TENANT_SLUG:-medlablocal}"
 
 # Owner local del tenant semilla. Estos defaults evitan que `make seed`
 # deje como owner a usuarios placeholder de Clerk.

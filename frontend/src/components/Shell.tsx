@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../shared/frontendShell';
 import { dotIcon } from './ShellIcons';
+import { ThemeToggle } from './ThemeToggle';
 import { loadModuleCatalog } from '../lib/moduleCatalogLoader';
 import { useI18n } from '../lib/i18n';
 import { getVisibleModuleIds } from '../lib/profileFilters';
@@ -253,6 +254,11 @@ export function Shell({ children }: { children: ReactNode }) {
       sections={sections}
       searchPlaceholder={t('shell.search.placeholder')}
       skipLinkLabel={t('shell.skipLink')}
+      footerContent={
+        <div className="sidebar-footer-controls">
+          <ThemeToggle />
+        </div>
+      }
     >
       {children}
     </AppShell>

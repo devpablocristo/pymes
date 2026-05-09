@@ -1,0 +1,152 @@
+/* ── NotificationsDropdown — campana con panel flotante ── */
+
+/* Contenedor raíz: âncla el panel flotante */
+.notif-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Badge numérico sobre la campana */
+.notif-dropdown__dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: #fb977d;
+  border: 2px solid #0085db;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Panel flotante */
+.notif-dropdown__panel {
+  position: fixed;
+  top: 68px;   /* topbar 58px + 10px gap */
+  right: 16px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 88px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(0, 100, 200, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0, 60, 140, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+  overflow: hidden;
+  animation: notif-panel-in 0.18s ease;
+}
+
+@keyframes notif-panel-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* Cabecera del panel */
+.notif-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid #eef2f7;
+  flex-shrink: 0;
+}
+
+.notif-dropdown__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.notif-dropdown__title .ti {
+  font-size: 18px;
+  color: #0085db;
+}
+
+/* Badge de conteo en el header */
+.notif-dropdown__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: #0085db;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Botón cerrar */
+.notif-dropdown__close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f0f5fb;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.notif-dropdown__close:hover {
+  background: #e2eaf4;
+  color: #1e293b;
+}
+
+.notif-dropdown__close .ti {
+  font-size: 16px;
+}
+
+/* Cuerpo con scroll */
+.notif-dropdown__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  overscroll-behavior: contain;
+}
+
+/* Ajustes para el NotificationFeed dentro del panel */
+.notif-dropdown__body .notifications-feed {
+  --m-notification-feed-paper: #fff;
+}
+
+/* Elimina el summary card de la parte superior (el panel ya tiene header) */
+.notif-dropdown__body .m-notification-feed__summary {
+  display: none !important;
+}
+
+/* Las cards ocupan todo el ancho del panel */
+.notif-dropdown__body .m-notification-feed__card {
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+/* Scrollbar sutil */
+.notif-dropdown__body::-webkit-scrollbar {
+  width: 4px;
+}
+.notif-dropdown__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.notif-dropdown__body::-webkit-scrollbar-thumb {
+  background: #d1dae6;
+  border-radius: 9999px;
+}

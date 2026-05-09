@@ -154,28 +154,10 @@
   border-color: color-mix(in srgb, var(--color-accent-pink) 22%, transparent);
 }
 
-.cht__msg-badge--employees {
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-  color: var(--color-alert-warning-text);
-  border-color: color-mix(in srgb, var(--color-warning) 22%, transparent);
-}
-
 .cht__msg-badge--insight_chat {
   background: color-mix(in srgb, var(--color-accent-indigo) 16%, transparent);
   color: var(--color-accent-indigo);
   border-color: color-mix(in srgb, var(--color-accent-indigo) 26%, transparent);
-}
-
-.cht__msg-badge--deterministic {
-  background: color-mix(in srgb, var(--color-success) 14%, transparent);
-  color: var(--color-alert-success-text);
-  border-color: color-mix(in srgb, var(--color-success) 24%, transparent);
-}
-
-.cht__msg-badge--gemini {
-  background: color-mix(in srgb, var(--color-accent-indigo) 14%, transparent);
-  color: var(--color-accent-indigo);
-  border-color: color-mix(in srgb, var(--color-accent-indigo) 24%, transparent);
 }
 
 .cht__msg-badge--general,
@@ -205,34 +187,7 @@
 }
 
 .cht__block-text {
-  white-space: normal;
-}
-
-.cht__markdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.cht__markdown p,
-.cht__markdown ul,
-.cht__markdown ol,
-.cht__markdown pre,
-.cht__markdown blockquote {
-  margin: 0;
-}
-
-.cht__markdown ul,
-.cht__markdown ol {
-  padding-left: 1.35rem;
-}
-
-.cht__markdown li + li {
-  margin-top: var(--space-1);
-}
-
-.cht__markdown strong {
-  font-weight: var(--font-weight-bold);
+  white-space: pre-wrap;
 }
 
 .cht__block-actions {

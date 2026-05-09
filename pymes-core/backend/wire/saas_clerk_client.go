@@ -187,10 +187,9 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 		payload["public_metadata"] = input.PublicMetadata
 	}
 	var out struct {
-		ID             string `json:"id"`
-		URL            string `json:"url"`
-		ExpiresAt      any    `json:"expires_at"`
-		ExpiresAtCamel any    `json:"expiresAt"`
+		ID        string `json:"id"`
+		URL       string `json:"url"`
+		ExpiresAt any    `json:"expires_at"`
 	}
 	if err := c.doJSON(ctx, http.MethodPost, "/organizations/"+url.PathEscape(tenantID)+"/invitations", payload, &out); err != nil {
 		return clerkOrganizationInvitation{}, err
@@ -198,14 +197,14 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 	if strings.TrimSpace(out.ID) == "" {
 		return clerkOrganizationInvitation{}, domainerr.UpstreamError("clerk invitation response missing id")
 	}
-	expiresAt := parseClerkTime(out.ExpiresAt)
-	if expiresAt == nil {
-		expiresAt = parseClerkTime(out.ExpiresAtCamel)
-	}
+	// Clerk Backend API responde siempre snake_case (`expires_at`). El TTL
+	// local del row (tenantInviteTTL en saas_store_invitations.go) es la
+	// fuente de verdad, así que si por alguna razón Clerk no devuelve el
+	// campo, el row mantiene su propio expires_at sin romper nada.
 	return clerkOrganizationInvitation{
 		ID:        strings.TrimSpace(out.ID),
 		URL:       strings.TrimSpace(out.URL),
-		ExpiresAt: expiresAt,
+		ExpiresAt: parseClerkTime(out.ExpiresAt),
 	}, nil
 }
 

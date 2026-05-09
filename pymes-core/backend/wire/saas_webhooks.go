@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -203,44 +202,3 @@ func (s *pymesSaaSStore) recordClerkWebhookEvent(ctx context.Context, svixID, ev
 		Create(&row).Error
 }
 
-// markClerkWebhookEventProcessed transiciona el evento a `processed`. Útil
-// para el dispatch de fases siguientes; expuesto ya para que los handlers
-// por evento lo llamen al cerrar exitosamente.
-func (s *pymesSaaSStore) markClerkWebhookEventProcessed(ctx context.Context, svixID string) error {
-	if s == nil || s.db == nil {
-		return errors.New("store not initialized")
-	}
-	now := time.Now()
-	return s.db.WithContext(ctx).
-		Model(&clerkWebhookEventRow{}).
-		Where("svix_id = ?", svixID).
-		Updates(map[string]any{
-			"status":       "processed",
-			"processed_at": now,
-			"updated_at":   now,
-		}).Error
-}
-
-// markClerkWebhookEventFailed marca un evento como `failed` con detalle.
-// Permite al operador inspeccionar tabla `webhook_events_clerk` para
-// diagnóstico, y SVIX reintenta automáticamente según política Clerk.
-func (s *pymesSaaSStore) markClerkWebhookEventFailed(ctx context.Context, svixID, message string) error {
-	if s == nil || s.db == nil {
-		return errors.New("store not initialized")
-	}
-	if len(message) > 1024 {
-		message = message[:1024]
-	}
-	now := time.Now()
-	return s.db.WithContext(ctx).
-		Model(&clerkWebhookEventRow{}).
-		Where("svix_id = ?", svixID).
-		Updates(map[string]any{
-			"status":        "failed",
-			"error_message": message,
-			"updated_at":    now,
-		}).Error
-}
-
-// Compile-time guard: gorm import is used.
-var _ = gorm.ErrRecordNotFound

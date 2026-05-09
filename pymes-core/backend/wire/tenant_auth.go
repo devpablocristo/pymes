@@ -3,6 +3,7 @@ package wire
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -137,9 +138,14 @@ func writeTenantAuthError(w http.ResponseWriter, err error) {
 		http.Error(w, "authentication failed", http.StatusUnauthorized)
 		return
 	}
+	// No exponer err.Error() al cliente: puede contener detalles internos del
+	// JWT verifier o JWKS (CLAUDE.md sec 8). Loguear el detalle y devolver
+	// un mensaje genérico al caller HTTP.
 	if domainerr.IsForbidden(err) {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		slog.Default().Warn("tenant auth forbidden", "error", err.Error())
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	http.Error(w, err.Error(), http.StatusUnauthorized)
+	slog.Default().Warn("tenant auth unauthorized", "error", err.Error())
+	http.Error(w, "authentication failed", http.StatusUnauthorized)
 }

@@ -435,8 +435,8 @@ func handleSetInitialPassword(w http.ResponseWriter, r *http.Request, store *pym
 		httperr.BadRequest(w, "invalid request body")
 		return
 	}
-	if len(req.Password) < 8 {
-		httperr.BadRequest(w, "password must be at least 8 characters")
+	if validErr := validateInitialPassword(req.Password); validErr != nil {
+		httperr.WriteFrom(w, validErr)
 		return
 	}
 	profile, getErr := store.clerk.GetUser(r.Context(), clerkUserID)
@@ -457,7 +457,28 @@ func handleSetInitialPassword(w http.ResponseWriter, r *http.Request, store *pym
 		httperr.WriteFrom(w, setErr)
 		return
 	}
+	// Audit-log: el endpoint es público (autentica vía JWT manual) y permite
+	// cambiar credenciales. Dejamos rastro de quién lo invocó para que un
+	// posible abuso (JWT robado de invitado pre-password) sea detectable.
+	store.logger.Info("user.password.set_initial",
+		"clerk_user_id", clerkUserID,
+		"ip", clientIPFromRequest(r),
+		"user_agent", r.Header.Get("User-Agent"),
+	)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// clientIPFromRequest extrae la IP del cliente respetando X-Forwarded-For
+// (típicamente seteado por el reverse proxy) y cae a r.RemoteAddr si no
+// está. Devuelve la primera IP del XFF (la más cercana al cliente).
+func clientIPFromRequest(r *http.Request) string {
+	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+		if idx := strings.IndexByte(xff, ','); idx > 0 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return xff
+	}
+	return r.RemoteAddr
 }
 
 func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
@@ -684,10 +705,11 @@ func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *p
 	// Redirigir al dashboard del tenant. `activate_org` deja que App.tsx
 	// haga `setActive` con la org recién agregada y resuelva la task
 	// `choose-organization` de Clerk. Si el invitado no tiene password
-	// configurado en Clerk (típico de users que entraron solo via ticket
-	// de invitation), agregamos `require_password=1` para que el frontend
-	// fuerce un setPassword antes de mostrar el dashboard — sin esto el
-	// invitado quedaba sin poder loguearse en /login con email+password.
+	// configurado en Clerk (típico de users que entraron solo via ticket),
+	// el frontend lo detecta directamente con `user.passwordEnabled === false`
+	// del SDK Clerk y muestra `RequirePasswordView` antes del dashboard —
+	// no hace falta propagar un query flag, que de hecho se perdía cuando
+	// el flow pasaba por OnboardingPage.
 	dest := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
 	if dest == "" {
 		dest = "http://localhost:5173"
@@ -696,19 +718,13 @@ func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *p
 	if strings.TrimSpace(clerkOrgID) != "" {
 		params.Set("activate_org", clerkOrgID)
 	}
-	if !profile.PasswordEnabled {
-		params.Set("require_password", "1")
-	}
 	target := dest + "/" + slug + "/dashboard"
 	if encoded := params.Encode(); encoded != "" {
 		target += "?" + encoded
 	}
-	store.logger.Info("invite exchange redirect",
+	store.logger.Debug("invite exchange redirect",
 		"tenant_slug", slug,
-		"clerk_user_id", clerkUserID,
 		"password_enabled", profile.PasswordEnabled,
-		"require_password", !profile.PasswordEnabled,
-		"target", target,
 	)
 	http.Redirect(w, r, target, http.StatusFound)
 }

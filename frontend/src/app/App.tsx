@@ -78,22 +78,12 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
     return new URLSearchParams(location.search).get('activate_org')?.trim() ?? '';
   }, [location.search]);
   const requirePasswordSetup = useMemo(() => {
-    // Detectamos por DOS vías:
-    // 1. Query `require_password=1` que setea el backend en /v1/tenant-invites/exchange.
-    //    Este path se PIERDE si Clerk task `choose-organization` redirige al user
-    //    por /onboarding antes de llegar al dashboard (OnboardingPage no preserva
-    //    el query al hacer window.location.assign).
-    // 2. user.passwordEnabled === false desde el SDK Clerk (lectura directa, robusta).
-    //    Esto cubre el caso donde el query se perdió Y cualquier otro flow donde
-    //    el invitado entró sin setear password.
-    if (new URLSearchParams(location.search).get('require_password') === '1') {
-      return true;
-    }
-    if (userLoaded && user && user.passwordEnabled === false) {
-      return true;
-    }
-    return false;
-  }, [location.search, userLoaded, user]);
+    // Detección directa via SDK Clerk: si el invitado entró por ticket no
+    // tiene password seteada y `passwordEnabled` es false. Forzamos el
+    // setup antes de mostrar el dashboard, sino no podría loguearse en
+    // /login con email+password después.
+    return Boolean(userLoaded && user && user.passwordEnabled === false);
+  }, [userLoaded, user]);
   const hasTenantSlugInPath = useMemo(() => {
     const firstSegment = location.pathname.split('/').find((part) => part.trim() !== '')?.trim() ?? '';
     return Boolean(firstSegment && !['login', 'signup', 'invite', 'onboarding'].includes(firstSegment));
@@ -229,10 +219,6 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
   }
 
   if (requirePasswordSetup && isSignedIn) {
-    console.info('[RequireActiveTenant] mostrando RequirePasswordView', {
-      pathname: location.pathname,
-      search: location.search,
-    });
     return (
       <RequirePasswordView
         onDone={() => {
@@ -247,18 +233,6 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
         }}
       />
     );
-  }
-  if (requirePasswordSetup) {
-    // Diagnóstico: el query está pero algo bloquea el render (típico:
-    // !isSignedIn por race en Clerk). Lo logueamos y dejamos que la app
-    // siga al render normal — sin pantalla de password el invite quedaría
-    // funcionalmente roto, pero al menos no se rompe la UI.
-    console.warn('[RequireActiveTenant] require_password=1 pero render bloqueado', {
-      isSignedIn,
-      authLoaded,
-      pendingActivateOrgID,
-      switchingTenantID,
-    });
   }
 
   if (hasTenantSlugInPath) {

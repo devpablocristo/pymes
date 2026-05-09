@@ -12,9 +12,14 @@ import (
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// pgUniqueViolationCode es el SQLSTATE de Postgres para violación de
+// constraint UNIQUE (incluye unique index parciales).
+const pgUniqueViolationCode = "23505"
 
 const tenantInviteTTL = 7 * 24 * time.Hour
 
@@ -506,8 +511,12 @@ func tenantInviteCreateError(err error) error {
 	if err == nil {
 		return nil
 	}
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "idx_tenant_invitations_pending_email") || strings.Contains(msg, "unique constraint") {
+	// Detectar UNIQUE violation por SQLSTATE en vez de string-matching del mensaje:
+	// el driver pgx envuelve constraint violations en *pgconn.PgError con Code 23505.
+	// Funciona tanto para el unique index parcial `idx_tenant_invitations_pending_email`
+	// como para cualquier otro UNIQUE de la tabla.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolationCode {
 		return domainerr.Conflict("pending_invite_exists")
 	}
 	return err

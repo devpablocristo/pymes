@@ -251,3 +251,31 @@ a.sidebar-link[aria-current='page'] {
   border-color: var(--color-primary);
   background: var(--color-surface);
 }
+
+/* ── ThemeToggle dentro del sidebar footer (estilo neutro) ── */
+.sidebar-footer-controls .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  color: var(--color-sidebar-text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sidebar-footer-controls .theme-toggle:hover {
+  background: var(--color-sidebar-active);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.sidebar-footer-controls .theme-toggle:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}

@@ -225,7 +225,7 @@ main.app-shell-main {
 }
 
 .topbar-icon-btn,
-.theme-toggle {
+.page-layout__header-top-row .theme-toggle {
   width: 38px !important;
   height: 38px !important;
   border-radius: 50% !important;
@@ -243,7 +243,7 @@ main.app-shell-main {
 }
 
 .topbar-icon-btn:hover,
-.theme-toggle:hover {
+.page-layout__header-top-row .theme-toggle:hover {
   background: rgba(255, 255, 255, 0.30) !important;
   color: var(--color-on-primary) !important;
 }

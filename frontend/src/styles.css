@@ -22,6 +22,7 @@
 @import './styles/sections.css';
 @import './styles/base.css';
 @import './styles/shell-sidebar.css';
+@import './styles/shell-topbar.css';
 @import './styles/profile.css';
 @import './styles/onboarding.css';
 @import './styles/weekly-calendar.css';

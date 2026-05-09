@@ -1,10 +1,147 @@
-/* ── Sidebar footer (pymes-specific) ── */
+/* ── Shell sidebar — card flotante (Phase 2 migration de Wooko) ──
+ *
+ * Override sobre @devpablocristo/modules-ui-page-shell (que renderiza
+ * div.app-layout > aside.sidebar + main.main-content). El sidebar pasa de
+ * barra a borde a tarjeta flotante con margenes 16px y radius 18px.
+ *
+ * Notas:
+ * - Los `!important` son necesarios porque la lib externa también usa CSS
+ *   variables y override de specificidad. Mantener sólo donde haga falta.
+ * - Sin overrides del brand (`.sidebar-brand h1 { font-size: 0 }`): eso
+ *   requiere logo SVG inyectado por el shell, todavía no aplicable.
+ */
+
+/* Contenedor principal — sin gaps + bg de la página */
+.app-layout {
+  gap: 0 !important;
+  background: var(--color-bg);
+}
+
+/* Sidebar como tarjeta flotante */
+aside.sidebar {
+  margin: 16px 0 16px 16px !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-z1) !important;
+  border: 1px solid var(--color-sidebar-border, var(--color-border)) !important;
+  height: calc(100vh - 32px) !important;
+  min-height: calc(100vh - 32px) !important;
+  max-height: calc(100vh - 32px) !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Brand: fijo en top + separador inferior sutil */
+.sidebar-brand {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-bg);
+}
+
+.sidebar-brand small {
+  color: var(--color-text-muted) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+/* Search: estilo input plano sobre fondo gris claro */
+.sidebar-search-input {
+  background: #f7f9fa !important;
+  border: 1px solid rgba(151, 151, 151, 0.26) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--text-sm) !important;
+  color: var(--color-sidebar-text) !important;
+}
+
+.sidebar-search-input:focus {
+  outline: none !important;
+  border-color: var(--color-primary) !important;
+  background: var(--color-surface) !important;
+}
+
+/* Nav: scrollable con padding propio */
+nav.sidebar-nav {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 4px 10px 20px 16px !important;
+}
+
+/* WebKit — scrollbar fino, transparente por default, visible en hover */
+nav.sidebar-nav::-webkit-scrollbar {
+  width: 4px !important;
+  background: transparent !important;
+}
+nav.sidebar-nav::-webkit-scrollbar-button {
+  height: 0 !important;
+  width: 0 !important;
+}
+nav.sidebar-nav::-webkit-scrollbar-track,
+nav.sidebar-nav::-webkit-scrollbar-track-piece,
+nav.sidebar-nav::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+nav.sidebar-nav::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border-radius: 4px !important;
+  transition: background 0.25s ease !important;
+}
+aside.sidebar:hover nav.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(180, 198, 215, 0.55) !important;
+}
+
+/* Section labels — caps tracking */
+.sidebar-section-label {
+  font-size: var(--text-2xs) !important;
+  font-weight: var(--font-weight-bold) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: var(--color-text-muted) !important;
+  padding: 14px 14px 4px 8px !important;
+}
+
+/* Nav links — pill suave, hover y active definidos por tokens del sidebar */
+a.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 10px 14px 10px 10px !important;
+  border-radius: 10px !important;
+  font-size: var(--text-md) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  color: var(--color-sidebar-text) !important;
+  text-decoration: none !important;
+  transition: background 0.15s, color 0.15s !important;
+  margin: 0 !important;
+  line-height: 1.3;
+}
+
+a.sidebar-link:hover {
+  background: var(--color-sidebar-hover) !important;
+  color: var(--color-text) !important;
+}
+
+a.sidebar-link.active,
+a.sidebar-link[aria-current='page'] {
+  background: var(--color-sidebar-active) !important;
+  color: var(--color-sidebar-text-active) !important;
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+/* ── Sidebar footer (pymes-specific): controles de language/branch/org ──
+ * Heredado del shell anterior; mantener para que Clerk + idioma + sucursal
+ * sigan visibles en el footer. */
 .sidebar-footer-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
   width: 100%;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-bg);
 }
 
 .shell-clerk-auth {
@@ -14,6 +151,9 @@
   gap: var(--space-3);
   width: 100%;
   min-width: 0;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-bg);
 }
 
 .shell-org-switcher-root {
@@ -24,6 +164,11 @@
 .shell-org-switcher-trigger {
   width: 100%;
   max-width: 100%;
+  background: var(--color-sidebar-hover) !important;
+  border: 1px solid transparent !important;
+  color: var(--color-sidebar-text) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--text-xs) !important;
 }
 
 .shell-product-role {
@@ -44,9 +189,9 @@
   width: auto;
   min-width: calc(var(--space-5) * 5);
   max-width: calc(var(--space-5) * 7);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-sidebar-text-active);
+  background: var(--color-sidebar-hover);
+  border: 1px solid transparent;
+  color: var(--color-sidebar-text);
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
   font: inherit;
@@ -54,8 +199,8 @@
 
 .language-selector-input:focus {
   outline: none;
-  border-color: rgba(96, 165, 250, 0.65);
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+  border-color: var(--color-primary);
+  background: var(--color-surface);
 }
 
 .shell-branch-switcher {
@@ -77,19 +222,19 @@
 }
 
 .shell-branch-switcher-label {
-  font-size: var(--text-2xs, 0.625rem);
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-text-muted, #64748b);
-  font-weight: 600;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-bold);
 }
 
 .shell-branch-switcher-input {
   width: 100%;
   min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-sidebar-text-active);
+  background: var(--color-sidebar-hover);
+  border: 1px solid transparent;
+  color: var(--color-sidebar-text);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-2);
   font: inherit;
@@ -100,8 +245,9 @@
   padding: var(--space-3) var(--space-3);
 }
 
-.shell-branch-switcher-input:focus {
+.shell-branch-switcher-input:focus,
+.shell-org-switcher-trigger:focus {
   outline: none;
-  border-color: rgba(96, 165, 250, 0.65);
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+  border-color: var(--color-primary);
+  background: var(--color-surface);
 }

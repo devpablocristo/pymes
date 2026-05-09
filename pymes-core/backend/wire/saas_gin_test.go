@@ -13,6 +13,7 @@ import (
 
 	ginmw "github.com/devpablocristo/core/http/gin/go"
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/shared/handlers"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 )
 
 type scopedAPIKeyVerifier struct{}
@@ -173,7 +174,7 @@ func TestTenantSlugBindingRejectsSlugMismatch(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/invoices", nil)
 	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set(tenantSlugHeader, "medlab")
+	req.Header.Set(sharedauth.TenantSlugHeader, "medlab")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -200,7 +201,7 @@ func TestTenantSlugBindingRejectsRequestedTenantWhenActiveClerkOrgDiffers(t *tes
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set(tenantSlugHeader, "medlab")
+	req.Header.Set(sharedauth.TenantSlugHeader, "medlab")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -227,7 +228,7 @@ func TestTenantSlugBindingAllowsMatchingSlug(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/invoices", nil)
 	req.Header.Set("Authorization", "Bearer test")
-	req.Header.Set(tenantSlugHeader, "bicimax")
+	req.Header.Set(sharedauth.TenantSlugHeader, "bicimax")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)

@@ -9,6 +9,7 @@ import (
 
 	authn "github.com/devpablocristo/core/authn/go"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/google/uuid"
 )
 
@@ -40,8 +41,6 @@ type tenantPrincipalVerifier interface {
 
 type tenantRefResolver func(ctx context.Context, ref string) (uuid.UUID, bool, error)
 type tenantMembershipResolver func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error)
-
-const tenantSlugHeader = "X-Pymes-Tenant-Slug"
 
 func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -88,7 +87,7 @@ func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenan
 				writeTenantJSONError(w, http.StatusUnauthorized, "authentication_required", "authentication required")
 				return
 			}
-			bound, ok := tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(tenantSlugHeader), principal, resolve, membership, w)
+			bound, ok := tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(sharedauth.TenantSlugHeader), principal, resolve, membership, w)
 			if !ok {
 				return
 			}

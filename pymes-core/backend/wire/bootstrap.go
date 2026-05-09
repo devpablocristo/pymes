@@ -64,6 +64,7 @@ import (
 	"github.com/devpablocristo/pymes/pymes-core/backend/internal/timeline"
 	"github.com/devpablocristo/pymes/pymes-core/backend/migrations"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/app"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/devpablocristo/pymes/pymes-core/shared/backend/store"
 )
 
@@ -307,7 +308,7 @@ func InitializeApp() *app.App {
 	router.Use(gin.Logger())
 	router.Use(ginmw.NewCORS(ginmw.CORSConfig{
 		Origins:      []string{cfg.FrontendURL},
-		AllowHeaders: []string{tenantSlugHeader},
+		AllowHeaders: []string{sharedauth.TenantSlugHeader},
 	}))
 	ginmw.RegisterHealthEndpoints(router, func(ctx context.Context) error {
 		return store.Ping(ctx, db)

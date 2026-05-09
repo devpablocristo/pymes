@@ -200,6 +200,23 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	return tenantInvitationDTOFromRow(row), nil
 }
 
+// inviteAcceptSnapshot captura el estado de una invitación leído bajo lock
+// en una transacción corta y read-only. Permite hacer las llamadas HTTP a
+// Clerk fuera del lock y persistir los cambios locales en una segunda
+// transacción acotada — evita mantener el FOR UPDATE durante I/O externo.
+type inviteAcceptSnapshot struct {
+	Invite        pymesTenantInvitationRow
+	Tenant        pymesTenantRow
+	Inviter       pymesUserRow // sólo si HasInviter == true
+	HasInviter    bool
+	ClerkTenantID string
+
+	// Branch "ya aceptada por este mismo user": no hay nada que persistir,
+	// sólo verificar contra Clerk en fase 2 y devolver el dto.
+	AlreadyAccepted bool
+	AcceptedDTO     tenantInvitationDTO
+}
+
 func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, clerkTicket string, user clerkAuthenticatedUser) (tenantInvitationDTO, string, error) {
 	tokenHash := hashInviteToken(strings.TrimSpace(token))
 	if tokenHash == "" {
@@ -209,8 +226,39 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, cler
 	if email == "" {
 		return tenantInvitationDTO{}, "", domainerr.Validation("authenticated user email is required")
 	}
-	var accepted tenantInvitationDTO
-	var clerkTenantID string
+	if s.clerk == nil {
+		return tenantInvitationDTO{}, "", domainerr.Unavailable("clerk backend client is not configured")
+	}
+
+	// Phase 1: snapshot bajo lock (sin HTTP). Valida estado de la invitación
+	// y pre-carga tenant + inviter para evitar SELECTs adicionales luego.
+	snap, err := s.readInviteAcceptSnapshot(ctx, tokenHash, email, user)
+	if err != nil {
+		return tenantInvitationDTO{}, "", err
+	}
+
+	// Phase 2: HTTP a Clerk fuera del lock. Las acciones son idempotentes
+	// (Clerk responde codes específicos cuando algo ya existe / fue aceptado).
+	if err := s.applyClerkAcceptSideEffects(ctx, snap, user, clerkTicket); err != nil {
+		return tenantInvitationDTO{}, "", err
+	}
+
+	// El branch "ya aceptada por este user" no escribe nada en local.
+	if snap.AlreadyAccepted {
+		return snap.AcceptedDTO, snap.ClerkTenantID, nil
+	}
+
+	// Phase 3: persistir cambios locales en otra tx corta.
+	return s.persistInviteAccept(ctx, snap, user)
+}
+
+// readInviteAcceptSnapshot ejecuta la validación de estado de la invitación
+// bajo SELECT FOR UPDATE. La tx es read-only excepto por el caso `expired`
+// (que necesita escribir el flag). Cuando la invitación ya fue aceptada
+// por el mismo user, devuelve un snapshot con AlreadyAccepted=true y el
+// dto listo para retornar tras la verificación HTTP.
+func (s *pymesSaaSStore) readInviteAcceptSnapshot(ctx context.Context, tokenHash, email string, user clerkAuthenticatedUser) (inviteAcceptSnapshot, error) {
+	var snap inviteAcceptSnapshot
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var invite pymesTenantInvitationRow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -221,6 +269,8 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, cler
 			}
 			return err
 		}
+		snap.Invite = invite
+
 		if invite.Status == "accepted" {
 			if invite.AcceptedByUserID == nil {
 				return domainerr.Conflict("invite already used")
@@ -236,21 +286,13 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, cler
 			if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
 				return err
 			}
-			clerkTenantID = clerkTenantIDFromTenant(tenant)
-			if clerkTenantID == "" {
+			snap.Tenant = tenant
+			snap.ClerkTenantID = clerkTenantIDFromTenant(tenant)
+			if snap.ClerkTenantID == "" {
 				return domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
 			}
-			if s.clerk == nil {
-				return domainerr.Unavailable("clerk backend client is not configured")
-			}
-			ok, err := s.clerk.UserHasOrganizationMembership(ctx, clerkTenantID, user.ExternalID)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return domainerr.Forbidden("clerk tenant organization membership is required")
-			}
-			accepted = tenantInvitationDTOFromRow(invite)
+			snap.AlreadyAccepted = true
+			snap.AcceptedDTO = tenantInvitationDTOFromRow(invite)
 			return nil
 		}
 		if invite.Status == "revoked" {
@@ -271,47 +313,107 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, cler
 		if err := tx.Where("id = ?", invite.TenantID).Take(&tenant).Error; err != nil {
 			return err
 		}
-		clerkTenantID = clerkTenantIDFromTenant(tenant)
-		if clerkTenantID == "" {
+		snap.Tenant = tenant
+		snap.ClerkTenantID = clerkTenantIDFromTenant(tenant)
+		if snap.ClerkTenantID == "" {
 			return domainerr.Unavailable("tenant provisioning is missing its Clerk organization")
 		}
-		if s.clerk == nil {
-			return domainerr.Unavailable("clerk backend client is not configured")
+		// Pre-cargar inviter sólo si vamos a necesitarlo en el fallback
+		// sin ticket (revoke + create membership). Mantener best-effort:
+		// si la fila no existe seguimos sin él (igual que el código previo).
+		var inviter pymesUserRow
+		if err := tx.Where("id = ?", invite.InvitedByUserID).Take(&inviter).Error; err == nil {
+			snap.Inviter = inviter
+			snap.HasInviter = true
 		}
-		ok, err := s.clerk.UserHasOrganizationMembership(ctx, clerkTenantID, user.ExternalID)
-		if err != nil {
+		return nil
+	})
+	if err != nil {
+		return inviteAcceptSnapshot{}, err
+	}
+	return snap, nil
+}
+
+// applyClerkAcceptSideEffects ejecuta las llamadas HTTP a Clerk necesarias
+// para que la membership exista en la organization Clerk. Corre fuera de
+// tx — los métodos del cliente son idempotentes y la fase 3 re-valida el
+// estado local antes de escribir.
+func (s *pymesSaaSStore) applyClerkAcceptSideEffects(ctx context.Context, snap inviteAcceptSnapshot, user clerkAuthenticatedUser, clerkTicket string) error {
+	ok, err := s.clerk.UserHasOrganizationMembership(ctx, snap.ClerkTenantID, user.ExternalID)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	// Caso "ya aceptada en Pymes pero sin membership en Clerk": no podemos
+	// reconciliar desde acá (no tenemos ticket fresco). Mantenemos el
+	// comportamiento previo: forbidden para que el caller refresque el flow.
+	if snap.AlreadyAccepted {
+		return domainerr.Forbidden("clerk tenant organization membership is required")
+	}
+	// Happy path: el user aceptó la invitación pero no quedó como miembro
+	// de la org Clerk — típicamente porque tenía sesión activa al abrir el
+	// link y el __clerk_ticket no se procesó client-side ("You're already
+	// signed in" del SDK). Procesamos el ticket server-side contra el FAPI;
+	// eso marca la invitation como `accepted` y agrega al user a la org en
+	// una sola llamada. Sin ticket, fallback a revoke+create directo.
+	if clerkTicket != "" {
+		return s.clerk.AcceptOrganizationInvitationTicket(ctx, clerkTicket)
+	}
+	if snap.Invite.ClerkInvitationID != nil {
+		if invID := strings.TrimSpace(*snap.Invite.ClerkInvitationID); invID != "" && snap.HasInviter {
+			_ = s.clerk.RevokeOrganizationInvitation(ctx, clerkRevokeOrganizationInvitationInput{
+				OrganizationID:   snap.ClerkTenantID,
+				InvitationID:     invID,
+				RequestingUserID: strings.TrimSpace(snap.Inviter.ExternalID),
+			})
+		}
+		return s.clerk.CreateOrganizationMembership(ctx, snap.ClerkTenantID, user.ExternalID, clerkRoleFromTenantRole(snap.Invite.Role))
+	}
+	return nil
+}
+
+// persistInviteAccept escribe la membership local + marca la invitación
+// como aceptada, dentro de una tx corta con FOR UPDATE. Re-valida el
+// estado de la invitación: si entre la fase 1 y ahora otra request la
+// completó (race), retorna el dto resultante en vez de duplicar el write.
+func (s *pymesSaaSStore) persistInviteAccept(ctx context.Context, snap inviteAcceptSnapshot, user clerkAuthenticatedUser) (tenantInvitationDTO, string, error) {
+	var accepted tenantInvitationDTO
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var invite pymesTenantInvitationRow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", snap.Invite.ID).
+			Take(&invite).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domainerr.NotFound("invite not found")
+			}
 			return err
 		}
-		if !ok {
-			// El user aceptó la invitación Pymes pero no quedó como miembro de la org
-			// Clerk: típicamente porque ya tenía sesión activa al abrir el link y el
-			// __clerk_ticket no se procesó client-side ("You're already signed in" del SDK).
-			// Si el frontend nos mandó el ticket, lo procesamos contra la Frontend API
-			// de Clerk server-side: eso marca la invitation como `accepted` y agrega al
-			// user a la org en una sola llamada (a diferencia de revoke+create directo,
-			// que deja la invitation `revoked` y Clerk auto-revierte la membership).
-			if clerkTicket != "" {
-				if err := s.clerk.AcceptOrganizationInvitationTicket(ctx, clerkTicket); err != nil {
-					return err
-				}
-			} else if invite.ClerkInvitationID != nil {
-				// Fallback sin ticket: revoke pending + create membership directa.
-				// La invitation queda `revoked` (no `accepted`) pero la membership existe.
-				if invID := strings.TrimSpace(*invite.ClerkInvitationID); invID != "" {
-					var inviter pymesUserRow
-					if err := tx.Where("id = ?", invite.InvitedByUserID).Take(&inviter).Error; err == nil {
-						_ = s.clerk.RevokeOrganizationInvitation(ctx, clerkRevokeOrganizationInvitationInput{
-							OrganizationID:   clerkTenantID,
-							InvitationID:     invID,
-							RequestingUserID: strings.TrimSpace(inviter.ExternalID),
-						})
-					}
-				}
-				if err := s.clerk.CreateOrganizationMembership(ctx, clerkTenantID, user.ExternalID, clerkRoleFromTenantRole(invite.Role)); err != nil {
-					return err
-				}
+		// Race window: otra request pudo haber aceptado la invitación entre
+		// fase 1 y fase 3. Si el accepted_by_user_id matchea al user actual,
+		// devolvemos el dto sin duplicar writes. Si fue otro user, conflict.
+		if invite.Status == "accepted" {
+			if invite.AcceptedByUserID == nil {
+				return domainerr.Conflict("invite already used")
 			}
+			var existingUser pymesUserRow
+			if err := tx.Where("id = ?", *invite.AcceptedByUserID).Take(&existingUser).Error; err != nil {
+				return err
+			}
+			if existingUser.ExternalID != strings.TrimSpace(user.ExternalID) {
+				return domainerr.Conflict("invite already used")
+			}
+			accepted = tenantInvitationDTOFromRow(invite)
+			return nil
 		}
+		if invite.Status == "revoked" {
+			return domainerr.Forbidden("invite revoked")
+		}
+		if invite.Status == "expired" {
+			return domainerr.BusinessRule("invite_expired")
+		}
+
 		localUser, err := s.upsertUserTx(ctx, tx, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 		if err != nil {
 			return err
@@ -362,7 +464,7 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, cler
 	if err != nil {
 		return tenantInvitationDTO{}, "", err
 	}
-	return accepted, clerkTenantID, nil
+	return accepted, snap.ClerkTenantID, nil
 }
 
 func (s *pymesSaaSStore) RevokeTenantInvitation(ctx context.Context, tenantID, inviteID, actorExternalID string) (tenantInvitationDTO, error) {

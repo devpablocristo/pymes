@@ -258,13 +258,6 @@
   min-width: 0;
 }
 
-.form-success {
-  margin: var(--space-2) 0;
-  color: var(--color-success);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
 .stg__crud-cell-name {
   font-weight: var(--font-weight-semibold);
 }

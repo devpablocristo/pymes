@@ -32,16 +32,34 @@ import (
 //
 // Tolerancia temporal: rechazamos timestamps con drift > 5 minutos.
 const (
-	clerkWebhookMaxBodySize       = 1 << 20 // 1 MiB
-	clerkWebhookMaxClockDrift     = 5 * time.Minute
-	clerkWebhookSecretPrefix      = "whsec_"
-	clerkWebhookSignatureScheme   = "v1"
-	clerkWebhookHeaderID          = "svix-id"
-	clerkWebhookHeaderTimestamp   = "svix-timestamp"
-	clerkWebhookHeaderSignature   = "svix-signature"
-	clerkWebhookEventStatusOK     = "processed"
-	clerkWebhookEventStatusIgnore = "ignored"
+	clerkWebhookMaxBodySize     = 1 << 20 // 1 MiB
+	clerkWebhookMaxClockDrift   = 5 * time.Minute
+	clerkWebhookSecretPrefix    = "whsec_"
+	clerkWebhookSignatureScheme = "v1"
+	clerkWebhookHeaderID        = "svix-id"
+	clerkWebhookHeaderTimestamp = "svix-timestamp"
+	clerkWebhookHeaderSignature = "svix-signature"
 )
+
+// knownClerkWebhookEventTypes lista los `event_type` que el dispatch
+// reconoce explícitamente. Sirve para diferenciar — vía nivel de log —
+// los eventos que estamos preparados para procesar (Phase 6.5 Part 2)
+// de los que Clerk podría empezar a mandar y nadie está esperando.
+//
+// Si Clerk envía un tipo nuevo, el handler lo persiste igual (idempotencia
+// + auditoría) pero se loguea WARN en vez de INFO para que el operador
+// note que falta dispatch. Cuando se agregue handler real para un tipo,
+// agregar acá + el branch correspondiente en el switch del handler.
+var knownClerkWebhookEventTypes = map[string]struct{}{
+	"user.created":                    {},
+	"user.updated":                    {},
+	"user.deleted":                    {},
+	"organization.deleted":            {},
+	"organizationMembership.created":  {},
+	"organizationMembership.deleted":  {},
+	"organizationInvitation.accepted": {},
+	"organizationInvitation.revoked":  {},
+}
 
 var (
 	errClerkWebhookSecretNotConfigured = errors.New("clerk webhook secret is not configured")
@@ -166,10 +184,21 @@ func handleClerkWebhook(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		return
 	}
 
-	store.logger.Info("clerk webhook received",
-		"svix_id", msgID,
-		"event_type", eventType,
-	)
+	// Dispatch básico: por ahora sólo ramificamos el nivel de log. Cuando
+	// agreguemos handlers reales (Phase 6.5 Part 2), reemplazar este branch
+	// por un switch que llame al handler correspondiente y use
+	// markClerkWebhookEvent{Processed,Failed} para transicionar el estado.
+	if _, known := knownClerkWebhookEventTypes[eventType]; known {
+		store.logger.Info("clerk webhook received",
+			"svix_id", msgID,
+			"event_type", eventType,
+		)
+	} else {
+		store.logger.Warn("clerk webhook received with unknown event_type",
+			"svix_id", msgID,
+			"event_type", eventType,
+		)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -69,6 +69,15 @@ func registerPymesSaaSRoutes(
 	registerProtected(mux, authMW, "PATCH /users/me/profile", func(w http.ResponseWriter, r *http.Request) {
 		handlePatchMeProfile(w, r, store, httpAuth)
 	})
+	// Set inicial de password vía backend (Clerk SDK frontend rechaza el cambio
+	// sin elevated auth para users que llegaron por ticket). El handler usa el
+	// secret key de Clerk para PATCH /users/{id}, gateado a users que NO tienen
+	// password configurado todavía. Es PÚBLICO (sin slug binding) porque la
+	// pantalla aparece antes de que haya un tenant activo confirmado en el
+	// frontend; valida el JWT manualmente contra JWKS para autenticar.
+	registerPublic(mux, "POST /users/me/set-initial-password", func(w http.ResponseWriter, r *http.Request) {
+		handleSetInitialPassword(w, r, store, httpAuth)
+	})
 	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
 	})
@@ -394,6 +403,63 @@ func handleGetMe(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, 
 	writeEnrichedMeProfile(w, r.Context(), store, profile)
 }
 
+type setInitialPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+// handleSetInitialPassword fija una password al user actual vía Clerk Backend
+// API. Solo permitido cuando el user todavía NO tiene password configurado —
+// pensado para invitados que llegaron por ticket. Si ya tiene password debe
+// usar el flow normal de Clerk (que requiere elevated auth).
+//
+// Endpoint público sin slug binding: la pantalla aparece antes de que haya
+// tenant activo confirmado en frontend, así que validamos JWT manualmente
+// contra JWKS (mismo patrón que `accept invite`).
+func handleSetInitialPassword(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
+	user, err := authenticatedClerkUser(r.Context(), r.Header.Get("Authorization"), httpAuth)
+	if err != nil {
+		httperr.WriteFrom(w, err)
+		return
+	}
+	clerkUserID := strings.TrimSpace(user.ExternalID)
+	if clerkUserID == "" {
+		httperr.Unauthorized(w, "missing clerk user id")
+		return
+	}
+	if store.clerk == nil {
+		httperr.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "clerk_unavailable", "message": "clerk client not configured"})
+		return
+	}
+	var req setInitialPasswordRequest
+	if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
+		httperr.BadRequest(w, "invalid request body")
+		return
+	}
+	if len(req.Password) < 8 {
+		httperr.BadRequest(w, "password must be at least 8 characters")
+		return
+	}
+	profile, getErr := store.clerk.GetUser(r.Context(), clerkUserID)
+	if getErr != nil {
+		store.logger.Error("set initial password: get user failed", "clerk_user_id", clerkUserID, "err", getErr.Error())
+		httperr.WriteFrom(w, getErr)
+		return
+	}
+	if profile.PasswordEnabled {
+		httperr.WriteJSON(w, http.StatusConflict, map[string]string{
+			"code":    "password_already_set",
+			"message": "user already has a password configured",
+		})
+		return
+	}
+	if setErr := store.clerk.SetUserPassword(r.Context(), clerkUserID, req.Password); setErr != nil {
+		store.logger.Error("set initial password: clerk patch failed", "clerk_user_id", clerkUserID, "err", setErr.Error())
+		httperr.WriteFrom(w, setErr)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func handlePatchMeProfile(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
 	principal, ok := tenantPrincipalFromContext(r.Context())
 	if !ok {
@@ -617,15 +683,33 @@ func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *p
 
 	// Redirigir al dashboard del tenant. `activate_org` deja que App.tsx
 	// haga `setActive` con la org recién agregada y resuelva la task
-	// `choose-organization` de Clerk.
+	// `choose-organization` de Clerk. Si el invitado no tiene password
+	// configurado en Clerk (típico de users que entraron solo via ticket
+	// de invitation), agregamos `require_password=1` para que el frontend
+	// fuerce un setPassword antes de mostrar el dashboard — sin esto el
+	// invitado quedaba sin poder loguearse en /login con email+password.
 	dest := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
 	if dest == "" {
 		dest = "http://localhost:5173"
 	}
-	target := dest + "/" + slug + "/dashboard"
+	params := url.Values{}
 	if strings.TrimSpace(clerkOrgID) != "" {
-		target += "?activate_org=" + url.QueryEscape(clerkOrgID)
+		params.Set("activate_org", clerkOrgID)
 	}
+	if !profile.PasswordEnabled {
+		params.Set("require_password", "1")
+	}
+	target := dest + "/" + slug + "/dashboard"
+	if encoded := params.Encode(); encoded != "" {
+		target += "?" + encoded
+	}
+	store.logger.Info("invite exchange redirect",
+		"tenant_slug", slug,
+		"clerk_user_id", clerkUserID,
+		"password_enabled", profile.PasswordEnabled,
+		"require_password", !profile.PasswordEnabled,
+		"target", target,
+	)
 	http.Redirect(w, r, target, http.StatusFound)
 }
 

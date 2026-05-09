@@ -92,6 +92,10 @@ func (f *fakeClerkTenantClient) UserHasOrganizationMembership(_ context.Context,
 	return f.membershipOK, nil
 }
 
+func (f *fakeClerkTenantClient) SetUserPassword(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func TestEnrichAuthenticatedClerkUserFetchesRealClerkProfile(t *testing.T) {
 	db := newTestSaaSStoreDB(t)
 	clerk := &fakeClerkTenantClient{userProfile: clerkUserProfile{

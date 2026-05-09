@@ -383,6 +383,14 @@ export async function previewTenantInvite(token: string): Promise<{ invite: Tena
   return request(`/v1/tenant-invites/preview?token=${encodeURIComponent(token)}`, { skipTenantSlug: true });
 }
 
+export async function setInitialPassword(password: string): Promise<void> {
+  await request('/v1/users/me/set-initial-password', {
+    method: 'POST',
+    body: { password },
+    skipTenantSlug: true,
+  });
+}
+
 export type RbacRoleSummary = {
   id: string;
   name: string;

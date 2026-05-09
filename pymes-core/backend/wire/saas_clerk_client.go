@@ -27,6 +27,7 @@ type clerkTenantClient interface {
 	RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error
 	UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error)
 	AcceptOrganizationInvitationTicket(ctx context.Context, ticket string) error
+	SetUserPassword(ctx context.Context, userID, password string) error
 }
 
 type clerkCreateOrganizationInput struct {
@@ -41,12 +42,13 @@ type clerkOrganization struct {
 }
 
 type clerkUserProfile struct {
-	ID        string
-	Email     string
-	FirstName string
-	LastName  string
-	Name      string
-	ImageURL  string
+	ID              string
+	Email           string
+	FirstName       string
+	LastName        string
+	Name            string
+	ImageURL        string
+	PasswordEnabled bool
 }
 
 func (p clerkUserProfile) DisplayName() string {
@@ -205,6 +207,7 @@ func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkU
 		Username              string `json:"username"`
 		ImageURL              string `json:"image_url"`
 		ProfileImageURL       string `json:"profile_image_url"`
+		PasswordEnabled       bool   `json:"password_enabled"`
 		PrimaryEmailAddressID string `json:"primary_email_address_id"`
 		EmailAddresses        []struct {
 			ID           string `json:"id"`
@@ -229,13 +232,32 @@ func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkU
 		imageURL = strings.TrimSpace(out.ProfileImageURL)
 	}
 	return clerkUserProfile{
-		ID:        strings.TrimSpace(out.ID),
-		Email:     normalizeEmail(email),
-		FirstName: strings.TrimSpace(out.FirstName),
-		LastName:  strings.TrimSpace(out.LastName),
-		Name:      strings.TrimSpace(out.Username),
-		ImageURL:  imageURL,
+		ID:              strings.TrimSpace(out.ID),
+		Email:           normalizeEmail(email),
+		FirstName:       strings.TrimSpace(out.FirstName),
+		LastName:        strings.TrimSpace(out.LastName),
+		Name:            strings.TrimSpace(out.Username),
+		ImageURL:        imageURL,
+		PasswordEnabled: out.PasswordEnabled,
 	}, nil
+}
+
+// SetUserPassword fija una password al user vía Clerk Backend API. Pensado
+// para el flow de "primer setup" del invitado que entró por ticket — el SDK
+// frontend rechaza el cambio sin elevated auth, así que delegamos al backend
+// con secret key. Si el user YA tiene password, Clerk respondería 422
+// (validación contra cambios sin current_password); el flow lo previene
+// gateando contra `password_enabled` en el caller.
+func (c *clerkBackendClient) SetUserPassword(ctx context.Context, userID, password string) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return domainerr.Validation("clerk user_id is required")
+	}
+	if len(password) < 8 {
+		return domainerr.Validation("password must be at least 8 characters")
+	}
+	payload := map[string]any{"password": password}
+	return c.doJSON(ctx, http.MethodPatch, "/users/"+url.PathEscape(userID), payload, nil)
 }
 
 func (c *clerkBackendClient) DeleteOrganization(ctx context.Context, organizationID string) error {

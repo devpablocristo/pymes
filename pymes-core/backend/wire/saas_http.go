@@ -710,10 +710,7 @@ func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *p
 	// del SDK Clerk y muestra `RequirePasswordView` antes del dashboard —
 	// no hace falta propagar un query flag, que de hecho se perdía cuando
 	// el flow pasaba por OnboardingPage.
-	dest := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
-	if dest == "" {
-		dest = "http://localhost:5173"
-	}
+	dest := store.resolvedFrontendURL()
 	params := url.Values{}
 	if strings.TrimSpace(clerkOrgID) != "" {
 		params.Set("activate_org", clerkOrgID)
@@ -733,10 +730,7 @@ func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *p
 // maneja signup nuevo via Clerk SDK). Mantiene la compatibilidad cuando no
 // podemos procesar el ticket server-side.
 func redirectInviteFallback(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, token, reason string) {
-	base := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
-	if base == "" {
-		base = "http://localhost:5173"
-	}
+	base := store.resolvedFrontendURL()
 	dest, err := url.Parse(base + "/invite/accept")
 	if err != nil {
 		http.Redirect(w, r, base+"/invite/accept", http.StatusFound)

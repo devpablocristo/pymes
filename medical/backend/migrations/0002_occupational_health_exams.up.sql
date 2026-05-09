@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS medical.occupational_health_exams (
     id uuid PRIMARY KEY,
-    tenant_id uuid NOT NULL,
+    org_id uuid NOT NULL,
     patient_name text NOT NULL,
     patient_document text NOT NULL DEFAULT '',
     employer_name text NOT NULL DEFAULT '',
@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS medical.occupational_health_exams (
 );
 
 CREATE INDEX IF NOT EXISTS idx_oh_exams_tenant_status
-    ON medical.occupational_health_exams (tenant_id, status)
+    ON medical.occupational_health_exams (org_id, status)
     WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_oh_exams_tenant_scheduled
-    ON medical.occupational_health_exams (tenant_id, scheduled_at DESC NULLS LAST)
+    ON medical.occupational_health_exams (org_id, scheduled_at DESC NULLS LAST)
     WHERE deleted_at IS NULL;
 

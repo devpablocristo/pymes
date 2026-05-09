@@ -24,6 +24,7 @@ type SaaSConfig struct {
 	StripePriceGrowth     string
 	StripePriceEnterprise string
 	FrontendURL           string
+	PublicBaseURL         string
 
 	ClerkSecretKey     string
 	ClerkWebhookSecret string
@@ -59,9 +60,11 @@ func SetupSaaS(db *gorm.DB, cfg SaaSConfig, log *slog.Logger) (*SaaSServices, er
 	}
 
 	store := newPymesSaaSStore(db, log, saasDefaultAPIKeyScopes())
-	store.clerk = newClerkBackendClient(strings.TrimSpace(cfg.ClerkSecretKey))
+	store.clerk = newClerkBackendClient(strings.TrimSpace(cfg.ClerkSecretKey), strings.TrimSpace(cfg.JWKSURL))
 	store.frontendURL = strings.TrimSpace(cfg.FrontendURL)
+	store.publicBaseURL = strings.TrimSpace(cfg.PublicBaseURL)
 	store.environment = envconfig.NormalizeEnv(cfg.Environment)
+	store.clerkWebhookSecret = strings.TrimSpace(cfg.ClerkWebhookSecret)
 
 	var jwtVerifier tenantPrincipalVerifier
 	if cfg.AuthEnableJWT && strings.TrimSpace(cfg.JWKSURL) != "" {

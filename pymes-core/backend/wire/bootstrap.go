@@ -87,6 +87,7 @@ func InitializeApp() *app.App {
 		StripePriceGrowth:     cfg.StripePriceGrowth,
 		StripePriceEnterprise: cfg.StripePriceEnterprise,
 		FrontendURL:           cfg.FrontendURL,
+		PublicBaseURL:         cfg.PublicBaseURL,
 		Environment:           cfg.Environment,
 		ClerkSecretKey:        cfg.ClerkSecretKey,
 		ClerkWebhookSecret:    cfg.ClerkWebhookSecret,

@@ -319,12 +319,22 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
     let cancelled = false;
     setCheckingExistingTenant(true);
     void withExistingTenantLookupTimeout(listTenants())
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled) {
           return;
         }
         const tenant = (result.items ?? []).find((item) => item.slug && item.clerk_org_id);
         if (tenant?.slug && tenant.clerk_org_id) {
+          // CRÍTICO: resolver la task `choose-organization` de Clerk activando
+          // la org ANTES del redirect. Si no, ClerkProvider con `taskUrls` ve la
+          // task pendiente al recargar y rebota de vuelta a /onboarding (loop
+          // infinito que ve el user invitado al primer login).
+          try {
+            await clerkBridges?.setActiveOrganization(tenant.clerk_org_id);
+          } catch {
+            // si falla setActive, el `activate_org` en el query del redirect
+            // es el segundo intento desde RequireActiveTenant.
+          }
           window.location.assign(`/${tenant.slug}/dashboard?activate_org=${encodeURIComponent(tenant.clerk_org_id)}`);
           return;
         }

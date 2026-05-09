@@ -19,11 +19,14 @@ const clerkBackendAPIBaseURL = "https://api.clerk.com/v1"
 type clerkTenantClient interface {
 	CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error)
 	CreateOrganizationInvitation(ctx context.Context, input clerkCreateOrganizationInvitationInput) (clerkOrganizationInvitation, error)
+	CreateOrganizationMembership(ctx context.Context, organizationID, userID, role string) error
 	GetUser(ctx context.Context, userID string) (clerkUserProfile, error)
+	GetUserIDByEmail(ctx context.Context, email string) (string, error)
 	DeleteOrganization(ctx context.Context, organizationID string) error
 	DeleteOrganizationMembership(ctx context.Context, organizationID, userID string) error
 	RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error
 	UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error)
+	AcceptOrganizationInvitationTicket(ctx context.Context, ticket string) error
 }
 
 type clerkCreateOrganizationInput struct {
@@ -77,21 +80,39 @@ type clerkRevokeOrganizationInvitationInput struct {
 }
 
 type clerkBackendClient struct {
-	secretKey  string
-	baseURL    string
-	httpClient *http.Client
+	secretKey       string
+	baseURL         string
+	frontendBaseURL string
+	httpClient      *http.Client
 }
 
-func newClerkBackendClient(secretKey string) clerkTenantClient {
+func newClerkBackendClient(secretKey, jwksURL string) clerkTenantClient {
 	secretKey = strings.TrimSpace(secretKey)
 	if secretKey == "" {
 		return nil
 	}
 	return &clerkBackendClient{
-		secretKey:  secretKey,
-		baseURL:    clerkBackendAPIBaseURL,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		secretKey:       secretKey,
+		baseURL:         clerkBackendAPIBaseURL,
+		frontendBaseURL: deriveClerkFrontendBaseURL(jwksURL),
+		httpClient:      &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+// deriveClerkFrontendBaseURL extracts the FAPI base URL (e.g.
+// "https://selected-tick-48.clerk.accounts.dev") from the configured JWKS_URL
+// (e.g. "https://selected-tick-48.clerk.accounts.dev/.well-known/jwks.json").
+// Returns "" if the JWKS URL is empty or malformed; callers must handle that.
+func deriveClerkFrontendBaseURL(jwksURL string) string {
+	jwksURL = strings.TrimSpace(jwksURL)
+	if jwksURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(jwksURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func (c *clerkBackendClient) CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error) {
@@ -154,6 +175,24 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 	}, nil
 }
 
+func (c *clerkBackendClient) GetUserIDByEmail(ctx context.Context, email string) (string, error) {
+	email = normalizeEmail(email)
+	if email == "" {
+		return "", nil
+	}
+	var users []struct {
+		ID string `json:"id"`
+	}
+	q := "/users?email_address=" + url.QueryEscape(email) + "&limit=1"
+	if err := c.doJSON(ctx, http.MethodGet, q, nil, &users); err != nil {
+		return "", err
+	}
+	if len(users) == 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(users[0].ID), nil
+}
+
 func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkUserProfile, error) {
 	userID = strings.TrimSpace(userID)
 	if userID == "" {
@@ -213,7 +252,14 @@ func (c *clerkBackendClient) DeleteOrganizationMembership(ctx context.Context, o
 	if organizationID == "" || userID == "" {
 		return nil
 	}
-	return c.doJSON(ctx, http.MethodDelete, "/organizations/"+url.PathEscape(organizationID)+"/memberships/"+url.PathEscape(userID), nil, nil)
+	err := c.doJSON(ctx, http.MethodDelete, "/organizations/"+url.PathEscape(organizationID)+"/memberships/"+url.PathEscape(userID), nil, nil)
+	if err != nil && strings.Contains(err.Error(), "clerk returned 404") {
+		// Idempotente: si la membership no existe en Clerk (drift Clerk↔Pymes),
+		// igual completamos la baja en Pymes. Sin esto, el botón Eliminar tiraba
+		// 502 cuando la membership ya había sido removida fuera de banda.
+		return nil
+	}
+	return err
 }
 
 func (c *clerkBackendClient) RevokeOrganizationInvitation(ctx context.Context, input clerkRevokeOrganizationInvitationInput) error {
@@ -223,20 +269,90 @@ func (c *clerkBackendClient) RevokeOrganizationInvitation(ctx context.Context, i
 	return c.doJSON(ctx, http.MethodPost, "/organizations/"+url.PathEscape(tenantID)+"/invitations/"+url.PathEscape(invID)+"/revoke", payload, nil)
 }
 
-func (c *clerkBackendClient) UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error) {
-	u := "/organizations/" + url.PathEscape(strings.TrimSpace(organizationID)) + "/memberships"
-	q := url.Values{}
-	q.Set("limit", "1")
-	q.Add("user_id[]", strings.TrimSpace(userID))
-	var out struct {
-		Data            []json.RawMessage `json:"data"`
-		TotalCount      int               `json:"total_count"`
-		TotalCountCamel int               `json:"totalCount"`
+func (c *clerkBackendClient) CreateOrganizationMembership(ctx context.Context, organizationID, userID, role string) error {
+	organizationID = strings.TrimSpace(organizationID)
+	userID = strings.TrimSpace(userID)
+	role = strings.TrimSpace(role)
+	if organizationID == "" || userID == "" || role == "" {
+		return nil
 	}
-	if err := c.doJSON(ctx, http.MethodGet, u+"?"+q.Encode(), nil, &out); err != nil {
+	payload := map[string]any{"user_id": userID, "role": role}
+	return c.doJSON(ctx, http.MethodPost, "/organizations/"+url.PathEscape(organizationID)+"/memberships", payload, nil)
+}
+
+// AcceptOrganizationInvitationTicket processes an organization invitation ticket
+// against the Frontend API of Clerk. This is what the Clerk JS SDK does
+// internally when it sees `__clerk_ticket=...` in the URL: it POSTs to
+// `/v1/client/sign_ins?strategy=ticket&ticket=...` on the FAPI host. The call
+// requires no authentication (FAPI is public). On success the invitation moves
+// to status `accepted` and the user becomes a member of the organization.
+//
+// We need this server-side because when the invited user already has an active
+// Clerk session in the browser, the SDK shows "You're already signed in" and
+// never processes the ticket. By calling this endpoint from the backend with
+// only the ticket (extracted from the email link), we bypass the SDK entirely.
+//
+// Returns nil if the ticket was already accepted (idempotent), so callers can
+// invoke this safely even when the membership might already exist.
+func (c *clerkBackendClient) AcceptOrganizationInvitationTicket(ctx context.Context, ticket string) error {
+	ticket = strings.TrimSpace(ticket)
+	if ticket == "" {
+		return nil
+	}
+	if strings.TrimSpace(c.frontendBaseURL) == "" {
+		return domainerr.Unavailable("clerk frontend api base url is not configured")
+	}
+	endpoint := strings.TrimRight(c.frontendBaseURL, "/") + "/v1/client/sign_ins?strategy=ticket&ticket=" + url.QueryEscape(ticket) + "&_clerk_js_version=6.8.0"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domainerr.UpstreamError("clerk frontend api request failed")
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	// 400 with code `organization_invitation_already_accepted` is expected on
+	// retries — the ticket only consumes once. Treat it as success.
+	if resp.StatusCode == http.StatusBadRequest && bytes.Contains(data, []byte("organization_invitation_already_accepted")) {
+		return nil
+	}
+	message := clerkErrorMessage(data)
+	if message == "" {
+		message = fmt.Sprintf("clerk frontend api returned %d", resp.StatusCode)
+	}
+	return domainerr.UpstreamError(message)
+}
+
+func (c *clerkBackendClient) UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	userID = strings.TrimSpace(userID)
+	if organizationID == "" || userID == "" {
+		return false, nil
+	}
+	// Consultamos desde la perspectiva del usuario: el filter `user_id[]` en
+	// `/organizations/{id}/memberships` no aplica filtro y devuelve todos los
+	// miembros, lo que daría falsos positivos.
+	var out struct {
+		Data []struct {
+			Organization struct {
+				ID string `json:"id"`
+			} `json:"organization"`
+		} `json:"data"`
+	}
+	if err := c.doJSON(ctx, http.MethodGet, "/users/"+url.PathEscape(userID)+"/organization_memberships?limit=200", nil, &out); err != nil {
 		return false, err
 	}
-	return out.TotalCount > 0 || out.TotalCountCamel > 0 || len(out.Data) > 0, nil
+	for _, m := range out.Data {
+		if strings.TrimSpace(m.Organization.ID) == organizationID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *clerkBackendClient) doJSON(ctx context.Context, method, path string, payload any, out any) error {

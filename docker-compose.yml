@@ -49,6 +49,10 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/pymes?sslmode=disable
       SMTP_HOST: mailhog
       FRONTEND_URL: http://localhost:5180
+      # URL pública del backend que el browser puede alcanzar. Lo usamos para
+      # construir el `redirect_url` de invitations Clerk: el ticket viaja al
+      # backend para procesarse server-side via FAPI y luego redirigir al frontend.
+      PUBLIC_BASE_URL: http://localhost:8100
       PAYMENT_GATEWAY_MODE: demo
       # Aplica SQL embebido en pymes-core/backend/seeds/ tras migrar (org local, demo comercial, etc.)
       PYMES_SEED_DEMO: "false"

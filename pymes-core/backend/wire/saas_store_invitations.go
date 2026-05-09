@@ -195,7 +195,7 @@ func (s *pymesSaaSStore) CreateTenantInvitation(ctx context.Context, tenantID, a
 	return tenantInvitationDTOFromRow(row), nil
 }
 
-func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token string, user clerkAuthenticatedUser) (tenantInvitationDTO, string, error) {
+func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token, clerkTicket string, user clerkAuthenticatedUser) (tenantInvitationDTO, string, error) {
 	tokenHash := hashInviteToken(strings.TrimSpace(token))
 	if tokenHash == "" {
 		return tenantInvitationDTO{}, "", domainerr.Validation("invite token is required")
@@ -278,7 +278,34 @@ func (s *pymesSaaSStore) AcceptTenantInvitation(ctx context.Context, token strin
 			return err
 		}
 		if !ok {
-			return domainerr.Forbidden("clerk tenant organization membership is required")
+			// El user aceptó la invitación Pymes pero no quedó como miembro de la org
+			// Clerk: típicamente porque ya tenía sesión activa al abrir el link y el
+			// __clerk_ticket no se procesó client-side ("You're already signed in" del SDK).
+			// Si el frontend nos mandó el ticket, lo procesamos contra la Frontend API
+			// de Clerk server-side: eso marca la invitation como `accepted` y agrega al
+			// user a la org en una sola llamada (a diferencia de revoke+create directo,
+			// que deja la invitation `revoked` y Clerk auto-revierte la membership).
+			if clerkTicket != "" {
+				if err := s.clerk.AcceptOrganizationInvitationTicket(ctx, clerkTicket); err != nil {
+					return err
+				}
+			} else if invite.ClerkInvitationID != nil {
+				// Fallback sin ticket: revoke pending + create membership directa.
+				// La invitation queda `revoked` (no `accepted`) pero la membership existe.
+				if invID := strings.TrimSpace(*invite.ClerkInvitationID); invID != "" {
+					var inviter pymesUserRow
+					if err := tx.Where("id = ?", invite.InvitedByUserID).Take(&inviter).Error; err == nil {
+						_ = s.clerk.RevokeOrganizationInvitation(ctx, clerkRevokeOrganizationInvitationInput{
+							OrganizationID:   clerkTenantID,
+							InvitationID:     invID,
+							RequestingUserID: strings.TrimSpace(inviter.ExternalID),
+						})
+					}
+				}
+				if err := s.clerk.CreateOrganizationMembership(ctx, clerkTenantID, user.ExternalID, clerkRoleFromTenantRole(invite.Role)); err != nil {
+					return err
+				}
+			}
 		}
 		localUser, err := s.upsertUserTx(ctx, tx, user.ExternalID, user.Email, user.Name, user.AvatarURL)
 		if err != nil {
@@ -524,14 +551,20 @@ func (s *pymesSaaSStore) getTenantRow(ctx context.Context, tenantUUID uuid.UUID)
 	return row, nil
 }
 
+// inviteRedirectURL es lo que pasamos a Clerk como `redirect_url` cuando creamos
+// la invitation. Clerk apendea `__clerk_ticket=...&__clerk_status=...` y manda el
+// email. Apuntamos al BACKEND (no al frontend) para procesar el ticket server-side
+// y resolver el caso "user invitado ya tiene sesión Clerk activa": el SDK frontend
+// no procesa el ticket en ese caso, y Clerk no expone una API de "accept invitation",
+// así que replicamos el POST FAPI desde el backend.
 func (s *pymesSaaSStore) inviteRedirectURL(token string) string {
-	base := strings.TrimRight(strings.TrimSpace(s.frontendURL), "/")
+	base := strings.TrimRight(strings.TrimSpace(s.publicBaseURL), "/")
 	if base == "" {
-		base = "http://localhost:5173"
+		base = "http://localhost:8080"
 	}
-	u, err := url.Parse(base + "/invite/accept")
+	u, err := url.Parse(base + "/v1/tenant-invites/exchange")
 	if err != nil {
-		return base + "/invite/accept?token=" + url.QueryEscape(token)
+		return base + "/v1/tenant-invites/exchange?token=" + url.QueryEscape(token)
 	}
 	q := u.Query()
 	q.Set("token", token)

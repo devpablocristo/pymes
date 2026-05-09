@@ -1,5 +1,5 @@
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAuth, useOrganizationList, useSession } from '@clerk/react';
+import { useAuth, useClerk, useOrganizationList, useSession } from '@clerk/react';
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AuthTokenBridge } from '../components/AuthTokenBridge';
@@ -51,6 +51,7 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const clerk = useClerk();
   const { isLoaded: authLoaded, isSignedIn, orgId } = useAuth();
   const { session } = useSession();
   const {
@@ -62,6 +63,7 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
   });
   const [switchingTenantID, setSwitchingTenantID] = useState('');
   const [activationError, setActivationError] = useState('');
+  const [wrongAccountForActivate, setWrongAccountForActivate] = useState(false);
   const activateFromURLInFlightRef = useRef(false);
   const memberships = useMemo(() => userMemberships.data ?? [], [userMemberships.data]);
   const pendingActivateOrgID = useMemo(() => {
@@ -104,6 +106,7 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
     }
     activateFromURLInFlightRef.current = true;
     setActivationError('');
+    setWrongAccountForActivate(false);
     void activateTenant(pendingActivateOrgID)
       .then(() => {
         navigate(
@@ -157,11 +160,40 @@ function RequireActiveTenant({ children }: { children: ReactNode }) {
   ]);
 
   if (activationError && pendingActivateOrgID) {
+    const isMemberOfPending = listLoaded
+      ? memberships.some((m) => (m.organization?.id ?? '') === pendingActivateOrgID)
+      : true;
+    const looksLikeWrongAccount = listLoaded && !userMemberships.isLoading && !isMemberOfPending;
+    const handleSignOutAndRetry = (): void => {
+      const returnTo = location.pathname + location.search + location.hash;
+      void clerk.signOut({ redirectUrl: returnTo }).catch(() => {
+        window.location.assign(returnTo);
+      });
+    };
+    if (looksLikeWrongAccount || wrongAccountForActivate) {
+      return (
+        <main className="auth-page">
+          <section className="auth-card" role="alert">
+            <h1>Esta invitación es para otra cuenta</h1>
+            <p className="text-muted">
+              La sesión actual no pertenece al tenant solicitado. Cerrá sesión y
+              volvé a abrir el link de la invitación con la cuenta correcta.
+            </p>
+            <button type="button" className="btn-primary" onClick={handleSignOutAndRetry}>
+              Cerrar sesión y reintentar
+            </button>
+          </section>
+        </main>
+      );
+    }
     return (
       <main className="auth-page">
         <section className="auth-card" role="alert">
           <h1>No se pudo activar el tenant</h1>
           <p className="text-muted">{activationError}</p>
+          <button type="button" className="btn-secondary" onClick={handleSignOutAndRetry}>
+            Cerrar sesión
+          </button>
         </section>
       </main>
     );

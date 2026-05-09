@@ -3,6 +3,7 @@ package wire
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,18 @@ func (f *fakeClerkTenantClient) DeleteOrganizationMembership(_ context.Context, 
 
 func (f *fakeClerkTenantClient) RevokeOrganizationInvitation(_ context.Context, _ clerkRevokeOrganizationInvitationInput) error {
 	return nil
+}
+
+func (f *fakeClerkTenantClient) CreateOrganizationMembership(_ context.Context, _, _, _ string) error {
+	return nil
+}
+
+func (f *fakeClerkTenantClient) AcceptOrganizationInvitationTicket(_ context.Context, _ string) error {
+	return nil
+}
+
+func (f *fakeClerkTenantClient) GetUserIDByEmail(_ context.Context, _ string) (string, error) {
+	return "", nil
 }
 
 func (f *fakeClerkTenantClient) UserHasOrganizationMembership(_ context.Context, _, _ string) (bool, error) {
@@ -366,7 +379,7 @@ func TestAcceptTenantInvitationCreatesMembershipForCorrectTenant(t *testing.T) {
 		t.Fatalf("create invite: %v", err)
 	}
 
-	accepted, clerkTenantID, err := store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	accepted, clerkTenantID, err := store.AcceptTenantInvitation(ctx, token, "", clerkAuthenticatedUser{
 		ExternalID: "user_new",
 		Email:      "new@bicimax.test",
 		Name:       "New Member",
@@ -432,7 +445,7 @@ func TestAcceptTenantInvitationRelinksExistingEmailAndReactivatesMembership(t *t
 		t.Fatalf("create invite: %v", err)
 	}
 
-	accepted, _, err := store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	accepted, _, err := store.AcceptTenantInvitation(ctx, token, "", clerkAuthenticatedUser{
 		ExternalID: "user_new",
 		Email:      "tucbox@gmail.com",
 		Name:       "Tuc Box",
@@ -518,9 +531,17 @@ func TestPreviewTenantInvitationReturnsTenantDestinationWithoutAccepting(t *test
 	if err != nil {
 		t.Fatalf("CreateTenantInvitation() error = %v", err)
 	}
-	token := strings.TrimPrefix(strings.TrimSpace(store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL), "http://localhost:5173/invite/accept?token=")
+	// El redirect_url ahora apunta al backend exchange endpoint (Phase 6.1):
+	// `${publicBaseURL}/v1/tenant-invites/exchange?token=<token>`. El backend
+	// procesa el ticket server-side cuando el SDK frontend no puede.
+	rawRedirect := store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL
+	parsed, err := url.Parse(rawRedirect)
+	if err != nil {
+		t.Fatalf("parse redirect url %q: %v", rawRedirect, err)
+	}
+	token := parsed.Query().Get("token")
 	if token == "" {
-		t.Fatalf("redirect url = %q, missing token", store.clerk.(*fakeClerkTenantClient).lastInviteInput.RedirectURL)
+		t.Fatalf("redirect url = %q, missing token query param", rawRedirect)
 	}
 
 	preview, err := store.PreviewTenantInvitation(ctx, token)
@@ -602,7 +623,7 @@ func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
 		t.Fatalf("create invite: %v", err)
 	}
 
-	_, _, err = store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	_, _, err = store.AcceptTenantInvitation(ctx, token, "", clerkAuthenticatedUser{
 		ExternalID: "user_new",
 		Email:      "new@medlab.test",
 		Name:       "New Member",
@@ -612,10 +633,16 @@ func TestAcceptTenantInvitationRejectsLocalOnlyPendingInvite(t *testing.T) {
 	}
 }
 
-func TestAcceptTenantInvitationRequiresTenantClerkMembership(t *testing.T) {
+func TestAcceptTenantInvitationCreatesMissingClerkMembership(t *testing.T) {
+	// Cuando el user invitado todavía no tiene membership en Clerk org, el
+	// store debe completar el flow server-side: revoke de la invitation
+	// pendiente + create membership Clerk + create membership local. Esto es
+	// el fallback que cierra el caso "user con sesión activa, SDK frontend
+	// no procesó el ticket" sin abandonar la invitation en estado raro.
 	db := newTestSaaSStoreDB(t)
 	store := newPymesSaaSStore(db, testSaaSStoreLogger(), nil)
-	store.clerk = &fakeClerkTenantClient{membershipOK: false}
+	fakeClerk := &fakeClerkTenantClient{membershipOK: false}
+	store.clerk = fakeClerk
 	ctx := context.Background()
 
 	tenantID, _, _, _, err := store.CreateTenantWithOwner(ctx, "MedLab", "medlab", "org_medlab", "user_owner", "owner@medlab.test", "Owner", nil)
@@ -647,13 +674,19 @@ func TestAcceptTenantInvitationRequiresTenantClerkMembership(t *testing.T) {
 		t.Fatalf("create invite: %v", err)
 	}
 
-	_, _, err = store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	invite, clerkOrgID, err := store.AcceptTenantInvitation(ctx, token, "", clerkAuthenticatedUser{
 		ExternalID: "user_new",
 		Email:      "new@medlab.test",
 		Name:       "New Member",
 	})
-	if !errors.Is(err, domainerr.Forbidden("")) {
-		t.Fatalf("AcceptTenantInvitation() error = %v, want forbidden", err)
+	if err != nil {
+		t.Fatalf("AcceptTenantInvitation() error = %v, want nil (fallback creates membership)", err)
+	}
+	if invite.Status != "accepted" {
+		t.Fatalf("invite.Status = %q, want accepted", invite.Status)
+	}
+	if clerkOrgID != "org_medlab" {
+		t.Fatalf("clerkOrgID = %q, want org_medlab", clerkOrgID)
 	}
 }
 
@@ -692,7 +725,7 @@ func TestAcceptTenantInvitationRejectsEmailMismatch(t *testing.T) {
 		t.Fatalf("create invite: %v", err)
 	}
 
-	_, _, err = store.AcceptTenantInvitation(ctx, token, clerkAuthenticatedUser{
+	_, _, err = store.AcceptTenantInvitation(ctx, token, "", clerkAuthenticatedUser{
 		ExternalID: "user_wrong",
 		Email:      "wrong@bicimax.test",
 		Name:       "Wrong User",

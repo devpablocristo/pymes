@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/devpablocristo/core/errors/go/domainerr"
@@ -40,6 +41,21 @@ func registerPymesSaaSRoutes(
 	})
 	registerPublic(mux, "GET /tenant-invites/preview", func(w http.ResponseWriter, r *http.Request) {
 		handlePreviewTenantInvite(w, r, store)
+	})
+	// El email de invitación apunta a este endpoint (a través del `redirect_url`
+	// que pasamos a Clerk al crear la invitation). Aceptamos el ticket
+	// server-side via FAPI — esto cubre el caso "user invitado ya tiene sesión
+	// Clerk activa", donde el SDK frontend no procesa el ticket — y luego
+	// redirigimos al dashboard del tenant.
+	registerPublic(mux, "GET /tenant-invites/exchange", func(w http.ResponseWriter, r *http.Request) {
+		handleExchangeTenantInvite(w, r, store)
+	})
+	// Webhook receiver de Clerk. Verifica firma SVIX, persiste el evento en
+	// `webhook_events_clerk` (idempotente por svix_id) y deja el dispatch a
+	// fases siguientes (Phase 6.5+). Sin auth porque la firma SVIX es la
+	// autorización (validada server-side con CLERK_WEBHOOK_SECRET).
+	registerPublic(mux, "POST /webhooks/clerk", func(w http.ResponseWriter, r *http.Request) {
+		handleClerkWebhook(w, r, store)
 	})
 
 	// Sesión de producto: envuelve el Principal del kernel con tenant_id + product_role.
@@ -147,7 +163,8 @@ type tenantOwnershipTransferRequest struct {
 }
 
 type tenantInviteAcceptRequest struct {
-	Token string `json:"token"`
+	Token       string `json:"token"`
+	ClerkTicket string `json:"clerk_ticket"`
 }
 
 func handleCreateTenant(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, httpAuth pymesSaaSHTTPAuth) {
@@ -493,7 +510,7 @@ func handleAcceptTenantInvite(w http.ResponseWriter, r *http.Request, store *pym
 		httperr.BadRequest(w, "invalid request body")
 		return
 	}
-	item, clerkTenantID, err := store.AcceptTenantInvitation(r.Context(), req.Token, user)
+	item, clerkTenantID, err := store.AcceptTenantInvitation(r.Context(), req.Token, strings.TrimSpace(req.ClerkTicket), user)
 	if err != nil {
 		var de domainerr.Error
 		if errors.As(err, &de) && de.Message() == "invite_expired" {
@@ -509,6 +526,139 @@ func handleAcceptTenantInvite(w http.ResponseWriter, r *http.Request, store *pym
 		return
 	}
 	httperr.WriteJSON(w, http.StatusOK, map[string]any{"invite": item, "clerk_org_id": clerkTenantID, "tenant_slug": tenantSlug})
+}
+
+// handleExchangeTenantInvite es el endpoint público al que Clerk redirige el
+// link del email (vía el `redirect_url` que pasamos al crear la invitation).
+// Procesa el `__clerk_ticket` server-side contra la Frontend API de Clerk —
+// esto resuelve el caso "user invitado ya tiene sesión Clerk activa", donde
+// el SDK frontend no procesa el ticket — y luego redirige al dashboard del
+// tenant. Si no hay ticket o algo falla, hace fallback al flow viejo del
+// frontend (`/invite/accept?token=...`) para mantener compatibilidad.
+func handleExchangeTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
+	ctx := r.Context()
+	q := r.URL.Query()
+	ticket := strings.TrimSpace(q.Get("__clerk_ticket"))
+	token := strings.TrimSpace(q.Get("token"))
+	if token == "" {
+		redirectInviteFallback(w, r, store, "", "missing_token")
+		return
+	}
+	if ticket == "" {
+		// No hay ticket: signup nuevo lo maneja el frontend. Redirigimos al
+		// flow viejo (Clerk SDK procesa el flujo de signup).
+		redirectInviteFallback(w, r, store, token, "")
+		return
+	}
+
+	preview, err := store.PreviewTenantInvitation(ctx, token)
+	if err != nil {
+		redirectInviteFallback(w, r, store, token, "preview_failed")
+		return
+	}
+	if store.clerk == nil {
+		redirectInviteFallback(w, r, store, token, "clerk_unavailable")
+		return
+	}
+
+	// Buscar el user en Clerk por email. Si no existe, dejamos el flow legacy
+	// (signup vía `<SignIn>` del SDK) para crearlo.
+	clerkUserID, err := store.clerk.GetUserIDByEmail(ctx, preview.Email)
+	if err != nil {
+		redirectInviteFallback(w, r, store, token, "clerk_user_lookup_failed")
+		return
+	}
+	if clerkUserID == "" {
+		redirectInviteFallback(w, r, store, token, "")
+		return
+	}
+
+	// Procesar el ticket server-side: marca la invitation Clerk como
+	// `accepted` y agrega al user a la org.
+	if err := store.clerk.AcceptOrganizationInvitationTicket(ctx, ticket); err != nil {
+		redirectInviteFallback(w, r, store, token, "ticket_failed")
+		return
+	}
+
+	// Hidratar perfil del user para el upsert local.
+	profile, err := store.clerk.GetUser(ctx, clerkUserID)
+	if err != nil {
+		redirectInviteFallback(w, r, store, token, "profile_failed")
+		return
+	}
+	var avatar *string
+	if v := strings.TrimSpace(profile.ImageURL); v != "" {
+		avatar = &v
+	}
+	user := clerkAuthenticatedUser{
+		ExternalID: clerkUserID,
+		Email:      profile.Email,
+		Name:       profile.DisplayName(),
+		AvatarURL:  avatar,
+	}
+	if strings.TrimSpace(user.Email) == "" {
+		user.Email = preview.Email
+	}
+
+	// Aceptar en Pymes (crea row en `tenant_memberships`, marca invitation
+	// `accepted`). Pasamos también el ticket por si la membership de Clerk
+	// no se reflejó aún y el `UserHasOrganizationMembership` devuelve false:
+	// el método interno re-procesa el ticket idempotentemente.
+	item, clerkOrgID, err := store.AcceptTenantInvitation(ctx, token, ticket, user)
+	if err != nil {
+		redirectInviteFallback(w, r, store, token, "accept_failed")
+		return
+	}
+	_, slug, _, err := store.GetTenantNameSlugByID(ctx, item.TenantID)
+	if err != nil || strings.TrimSpace(slug) == "" {
+		redirectInviteFallback(w, r, store, token, "tenant_lookup_failed")
+		return
+	}
+
+	// Redirigir al dashboard del tenant. `activate_org` deja que App.tsx
+	// haga `setActive` con la org recién agregada y resuelva la task
+	// `choose-organization` de Clerk.
+	dest := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
+	if dest == "" {
+		dest = "http://localhost:5173"
+	}
+	target := dest + "/" + slug + "/dashboard"
+	if strings.TrimSpace(clerkOrgID) != "" {
+		target += "?activate_org=" + url.QueryEscape(clerkOrgID)
+	}
+	http.Redirect(w, r, target, http.StatusFound)
+}
+
+// redirectInviteFallback envía el browser al flow viejo del frontend (que
+// maneja signup nuevo via Clerk SDK). Mantiene la compatibilidad cuando no
+// podemos procesar el ticket server-side.
+func redirectInviteFallback(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore, token, reason string) {
+	base := strings.TrimRight(strings.TrimSpace(store.frontendURL), "/")
+	if base == "" {
+		base = "http://localhost:5173"
+	}
+	dest, err := url.Parse(base + "/invite/accept")
+	if err != nil {
+		http.Redirect(w, r, base+"/invite/accept", http.StatusFound)
+		return
+	}
+	q := dest.Query()
+	if token != "" {
+		q.Set("token", token)
+	}
+	// Reenvía los params de Clerk para que el SDK frontend procese el flujo
+	// (signup nuevo o intento alternativo).
+	if v := strings.TrimSpace(r.URL.Query().Get("__clerk_ticket")); v != "" {
+		q.Set("__clerk_ticket", v)
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("__clerk_status")); v != "" {
+		q.Set("__clerk_status", v)
+	}
+	if reason != "" {
+		q.Set("exchange_error", reason)
+	}
+	dest.RawQuery = q.Encode()
+	http.Redirect(w, r, dest.String(), http.StatusFound)
 }
 
 func handleRevokeTenantInvite(w http.ResponseWriter, r *http.Request, store *pymesSaaSStore) {
@@ -572,7 +722,13 @@ func handleRemoveTenantMember(w http.ResponseWriter, r *http.Request, store *pym
 	if !ok {
 		return
 	}
-	if err := store.RemoveTenantMember(r.Context(), tenantID, strings.TrimSpace(r.PathValue("user_id"))); err != nil {
+	userID := strings.TrimSpace(r.PathValue("user_id"))
+	if err := store.RemoveTenantMember(r.Context(), tenantID, userID); err != nil {
+		store.logger.Error("remove tenant member failed",
+			"tenant_id", tenantID,
+			"user_id", userID,
+			"err", err.Error(),
+		)
 		httperr.WriteFrom(w, err)
 		return
 	}

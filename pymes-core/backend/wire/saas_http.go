@@ -78,22 +78,22 @@ func registerPymesSaaSRoutes(
 	registerPublic(mux, "POST /users/me/set-initial-password", func(w http.ResponseWriter, r *http.Request) {
 		handleSetInitialPassword(w, r, store, httpAuth)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/members", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/members", func(w http.ResponseWriter, r *http.Request) {
 		handleListMembers(w, r, store)
 	})
-	registerProtected(mux, authMW, "PATCH /tenants/{tenant_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "PATCH /tenants/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleUpdateTenantMember(w, r, store)
 	})
-	registerProtected(mux, authMW, "DELETE /tenants/{tenant_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "DELETE /tenants/{org_id}/members/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleRemoveTenantMember(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/ownership/transfer", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{org_id}/ownership/transfer", func(w http.ResponseWriter, r *http.Request) {
 		handleTransferTenantOwnership(w, r, store)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
 		handleListTenantInvites(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/invites", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{org_id}/invites", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateTenantInvite(w, r, store)
 	})
 	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/revoke", func(w http.ResponseWriter, r *http.Request) {
@@ -102,16 +102,16 @@ func registerPymesSaaSRoutes(
 	registerProtected(mux, authMW, "POST /tenant-invites/{invite_id}/resend", func(w http.ResponseWriter, r *http.Request) {
 		handleResendTenantInvite(w, r, store)
 	})
-	registerProtected(mux, authMW, "GET /tenants/{tenant_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "GET /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleListAPIKeys(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{org_id}/api-keys", func(w http.ResponseWriter, r *http.Request) {
 		handleCreateAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "DELETE /tenants/{tenant_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "DELETE /tenants/{org_id}/api-keys/{key_id}", func(w http.ResponseWriter, r *http.Request) {
 		handleDeleteAPIKey(w, r, store)
 	})
-	registerProtected(mux, authMW, "POST /tenants/{tenant_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
+	registerProtected(mux, authMW, "POST /tenants/{org_id}/api-keys/{key_id}/rotate", func(w http.ResponseWriter, r *http.Request) {
 		handleRotateAPIKey(w, r, store)
 	})
 	registerProtected(mux, authMW, "GET /billing/status", func(w http.ResponseWriter, r *http.Request) {

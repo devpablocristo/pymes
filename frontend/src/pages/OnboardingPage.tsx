@@ -331,9 +331,10 @@ function OnboardingPageInner({ clerkBridges }: { clerkBridges: ClerkOnboardingBr
           // infinito que ve el user invitado al primer login).
           try {
             await clerkBridges?.setActiveOrganization(tenant.clerk_org_id);
-          } catch {
+          } catch (err) {
             // si falla setActive, el `activate_org` en el query del redirect
             // es el segundo intento desde RequireActiveTenant.
+            console.warn('[OnboardingPage] setActiveOrganization failed; relying on activate_org fallback', err);
           }
           window.location.assign(`/${tenant.slug}/dashboard?activate_org=${encodeURIComponent(tenant.clerk_org_id)}`);
           return;

@@ -2,6 +2,7 @@ package wire
 
 import (
 	"log/slog"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -26,4 +27,12 @@ func newPymesSaaSStore(db *gorm.DB, logger *slog.Logger, defaultKeyScopes []stri
 		logger:           logger,
 		defaultKeyScopes: append([]string(nil), defaultKeyScopes...),
 	}
+}
+
+// resolvedFrontendURL devuelve la URL del frontend lista para concatenar
+// con un path (sin trailing slash). El config ya garantiza un valor por
+// default; este helper sólo normaliza el formato y centraliza la lectura
+// para evitar duplicación de TrimRight + fallback en cada caller.
+func (s *pymesSaaSStore) resolvedFrontendURL() string {
+	return strings.TrimRight(strings.TrimSpace(s.frontendURL), "/")
 }

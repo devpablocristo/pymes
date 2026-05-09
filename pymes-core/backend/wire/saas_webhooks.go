@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -33,16 +32,34 @@ import (
 //
 // Tolerancia temporal: rechazamos timestamps con drift > 5 minutos.
 const (
-	clerkWebhookMaxBodySize       = 1 << 20 // 1 MiB
-	clerkWebhookMaxClockDrift     = 5 * time.Minute
-	clerkWebhookSecretPrefix      = "whsec_"
-	clerkWebhookSignatureScheme   = "v1"
-	clerkWebhookHeaderID          = "svix-id"
-	clerkWebhookHeaderTimestamp   = "svix-timestamp"
-	clerkWebhookHeaderSignature   = "svix-signature"
-	clerkWebhookEventStatusOK     = "processed"
-	clerkWebhookEventStatusIgnore = "ignored"
+	clerkWebhookMaxBodySize     = 1 << 20 // 1 MiB
+	clerkWebhookMaxClockDrift   = 5 * time.Minute
+	clerkWebhookSecretPrefix    = "whsec_"
+	clerkWebhookSignatureScheme = "v1"
+	clerkWebhookHeaderID        = "svix-id"
+	clerkWebhookHeaderTimestamp = "svix-timestamp"
+	clerkWebhookHeaderSignature = "svix-signature"
 )
+
+// knownClerkWebhookEventTypes lista los `event_type` que el dispatch
+// reconoce explícitamente. Sirve para diferenciar — vía nivel de log —
+// los eventos que estamos preparados para procesar (Phase 6.5 Part 2)
+// de los que Clerk podría empezar a mandar y nadie está esperando.
+//
+// Si Clerk envía un tipo nuevo, el handler lo persiste igual (idempotencia
+// + auditoría) pero se loguea WARN en vez de INFO para que el operador
+// note que falta dispatch. Cuando se agregue handler real para un tipo,
+// agregar acá + el branch correspondiente en el switch del handler.
+var knownClerkWebhookEventTypes = map[string]struct{}{
+	"user.created":                    {},
+	"user.updated":                    {},
+	"user.deleted":                    {},
+	"organization.deleted":            {},
+	"organizationMembership.created":  {},
+	"organizationMembership.deleted":  {},
+	"organizationInvitation.accepted": {},
+	"organizationInvitation.revoked":  {},
+}
 
 var (
 	errClerkWebhookSecretNotConfigured = errors.New("clerk webhook secret is not configured")
@@ -167,10 +184,21 @@ func handleClerkWebhook(w http.ResponseWriter, r *http.Request, store *pymesSaaS
 		return
 	}
 
-	store.logger.Info("clerk webhook received",
-		"svix_id", msgID,
-		"event_type", eventType,
-	)
+	// Dispatch básico: por ahora sólo ramificamos el nivel de log. Cuando
+	// agreguemos handlers reales (Phase 6.5 Part 2), reemplazar este branch
+	// por un switch que llame al handler correspondiente y use
+	// markClerkWebhookEvent{Processed,Failed} para transicionar el estado.
+	if _, known := knownClerkWebhookEventTypes[eventType]; known {
+		store.logger.Info("clerk webhook received",
+			"svix_id", msgID,
+			"event_type", eventType,
+		)
+	} else {
+		store.logger.Warn("clerk webhook received with unknown event_type",
+			"svix_id", msgID,
+			"event_type", eventType,
+		)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -203,44 +231,3 @@ func (s *pymesSaaSStore) recordClerkWebhookEvent(ctx context.Context, svixID, ev
 		Create(&row).Error
 }
 
-// markClerkWebhookEventProcessed transiciona el evento a `processed`. Útil
-// para el dispatch de fases siguientes; expuesto ya para que los handlers
-// por evento lo llamen al cerrar exitosamente.
-func (s *pymesSaaSStore) markClerkWebhookEventProcessed(ctx context.Context, svixID string) error {
-	if s == nil || s.db == nil {
-		return errors.New("store not initialized")
-	}
-	now := time.Now()
-	return s.db.WithContext(ctx).
-		Model(&clerkWebhookEventRow{}).
-		Where("svix_id = ?", svixID).
-		Updates(map[string]any{
-			"status":       "processed",
-			"processed_at": now,
-			"updated_at":   now,
-		}).Error
-}
-
-// markClerkWebhookEventFailed marca un evento como `failed` con detalle.
-// Permite al operador inspeccionar tabla `webhook_events_clerk` para
-// diagnóstico, y SVIX reintenta automáticamente según política Clerk.
-func (s *pymesSaaSStore) markClerkWebhookEventFailed(ctx context.Context, svixID, message string) error {
-	if s == nil || s.db == nil {
-		return errors.New("store not initialized")
-	}
-	if len(message) > 1024 {
-		message = message[:1024]
-	}
-	now := time.Now()
-	return s.db.WithContext(ctx).
-		Model(&clerkWebhookEventRow{}).
-		Where("svix_id = ?", svixID).
-		Updates(map[string]any{
-			"status":        "failed",
-			"error_message": message,
-			"updated_at":    now,
-		}).Error
-}
-
-// Compile-time guard: gorm import is used.
-var _ = gorm.ErrRecordNotFound

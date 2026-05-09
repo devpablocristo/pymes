@@ -3,11 +3,13 @@ package wire
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	authn "github.com/devpablocristo/core/authn/go"
 	"github.com/devpablocristo/core/errors/go/domainerr"
+	sharedauth "github.com/devpablocristo/pymes/pymes-core/shared/backend/auth"
 	"github.com/google/uuid"
 )
 
@@ -39,8 +41,6 @@ type tenantPrincipalVerifier interface {
 
 type tenantRefResolver func(ctx context.Context, ref string) (uuid.UUID, bool, error)
 type tenantMembershipResolver func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error)
-
-const tenantSlugHeader = "X-Pymes-Tenant-Slug"
 
 func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -87,7 +87,7 @@ func withTenantSlugBinding(authMW func(http.Handler) http.Handler, resolve tenan
 				writeTenantJSONError(w, http.StatusUnauthorized, "authentication_required", "authentication required")
 				return
 			}
-			bound, ok := tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(tenantSlugHeader), principal, resolve, membership, w)
+			bound, ok := tenantSlugMatchesPrincipal(r.Context(), r.Header.Get(sharedauth.TenantSlugHeader), principal, resolve, membership, w)
 			if !ok {
 				return
 			}
@@ -137,9 +137,14 @@ func writeTenantAuthError(w http.ResponseWriter, err error) {
 		http.Error(w, "authentication failed", http.StatusUnauthorized)
 		return
 	}
+	// No exponer err.Error() al cliente: puede contener detalles internos del
+	// JWT verifier o JWKS (CLAUDE.md sec 8). Loguear el detalle y devolver
+	// un mensaje genérico al caller HTTP.
 	if domainerr.IsForbidden(err) {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		slog.Default().Warn("tenant auth forbidden", "error", err.Error())
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	http.Error(w, err.Error(), http.StatusUnauthorized)
+	slog.Default().Warn("tenant auth unauthorized", "error", err.Error())
+	http.Error(w, "authentication failed", http.StatusUnauthorized)
 }

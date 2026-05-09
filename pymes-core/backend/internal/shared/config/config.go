@@ -88,7 +88,7 @@ func LoadFromEnv() Config {
 		StripeSecretKey:                  envconfig.Get("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:              envconfig.Get("STRIPE_WEBHOOK_SECRET", ""),
 		NotificationBackend:              envconfig.Get("NOTIFICATION_BACKEND", "noop"),
-		FrontendURL:                      envconfig.Get("FRONTEND_URL", "http://localhost:5173"),
+		FrontendURL:                      envconfig.Get("FRONTEND_URL", "http://localhost:5180"),
 		PublicBaseURL:                    envconfig.Get("PUBLIC_BASE_URL", "http://localhost:8080"),
 		AWSRegion:                        envconfig.Get("AWS_REGION", "us-east-1"),
 		AWSSesFromEmail:                  envconfig.Get("AWS_SES_FROM_EMAIL", ""),

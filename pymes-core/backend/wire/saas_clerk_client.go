@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,37 @@ import (
 )
 
 const clerkBackendAPIBaseURL = "https://api.clerk.com/v1"
+
+// clerkJSVersion es el query param `_clerk_js_version` que el FAPI exige
+// para procesar `sign_ins?strategy=ticket`. Lo emulamos tal como lo manda
+// el SDK frontend; si Clerk deprecara la versión hay que bumpearla acá.
+const clerkJSVersion = "6.8.0"
+
+// clerkAPIError es el error tipado que devuelven los métodos del cliente
+// Clerk cuando la API responde con status >= 400. Permite a los callers
+// ramificar con errors.As en vez de string matching sobre el mensaje.
+//
+// Wraps domainerr.UpstreamError vía Unwrap, así errors.Is/IsKind contra
+// domainerr siguen funcionando para callers que solo necesitan el kind.
+type clerkAPIError struct {
+	StatusCode int
+	// Code es Errors[0].Code de la API de Clerk si la respuesta fue parseable.
+	// Vacío si Clerk no devolvió un código (ej. error de red, body no-JSON).
+	Code  string
+	inner domainerr.Error
+}
+
+func (e *clerkAPIError) Error() string { return e.inner.Error() }
+func (e *clerkAPIError) Unwrap() error { return e.inner }
+
+// asClerkAPIError extrae un *clerkAPIError de la cadena de wrapping, si existe.
+func asClerkAPIError(err error) (*clerkAPIError, bool) {
+	var apiErr *clerkAPIError
+	if errors.As(err, &apiErr) {
+		return apiErr, true
+	}
+	return nil, false
+}
 
 type clerkTenantClient interface {
 	CreateOrganization(ctx context.Context, input clerkCreateOrganizationInput) (clerkOrganization, error)
@@ -155,10 +187,9 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 		payload["public_metadata"] = input.PublicMetadata
 	}
 	var out struct {
-		ID             string `json:"id"`
-		URL            string `json:"url"`
-		ExpiresAt      any    `json:"expires_at"`
-		ExpiresAtCamel any    `json:"expiresAt"`
+		ID        string `json:"id"`
+		URL       string `json:"url"`
+		ExpiresAt any    `json:"expires_at"`
 	}
 	if err := c.doJSON(ctx, http.MethodPost, "/organizations/"+url.PathEscape(tenantID)+"/invitations", payload, &out); err != nil {
 		return clerkOrganizationInvitation{}, err
@@ -166,14 +197,14 @@ func (c *clerkBackendClient) CreateOrganizationInvitation(ctx context.Context, i
 	if strings.TrimSpace(out.ID) == "" {
 		return clerkOrganizationInvitation{}, domainerr.UpstreamError("clerk invitation response missing id")
 	}
-	expiresAt := parseClerkTime(out.ExpiresAt)
-	if expiresAt == nil {
-		expiresAt = parseClerkTime(out.ExpiresAtCamel)
-	}
+	// Clerk Backend API responde siempre snake_case (`expires_at`). El TTL
+	// local del row (tenantInviteTTL en saas_store_invitations.go) es la
+	// fuente de verdad, así que si por alguna razón Clerk no devuelve el
+	// campo, el row mantiene su propio expires_at sin romper nada.
 	return clerkOrganizationInvitation{
 		ID:        strings.TrimSpace(out.ID),
 		URL:       strings.TrimSpace(out.URL),
-		ExpiresAt: expiresAt,
+		ExpiresAt: parseClerkTime(out.ExpiresAt),
 	}, nil
 }
 
@@ -242,6 +273,21 @@ func (c *clerkBackendClient) GetUser(ctx context.Context, userID string) (clerkU
 	}, nil
 }
 
+// minInitialPasswordLength es la longitud mínima del primer password setup
+// para invitados. Coincide con la default de Clerk Dashboard; si lo cambias
+// acá hay que alinearlo en el dashboard también.
+const minInitialPasswordLength = 8
+
+// validateInitialPassword chequea la política mínima del primer password
+// setup. Devuelve un domainerr.Validation listo para devolver al caller.
+// Centraliza la regla para que cliente Clerk y handler HTTP no la dupliquen.
+func validateInitialPassword(password string) error {
+	if len(password) < minInitialPasswordLength {
+		return domainerr.Validation(fmt.Sprintf("password must be at least %d characters", minInitialPasswordLength))
+	}
+	return nil
+}
+
 // SetUserPassword fija una password al user vía Clerk Backend API. Pensado
 // para el flow de "primer setup" del invitado que entró por ticket — el SDK
 // frontend rechaza el cambio sin elevated auth, así que delegamos al backend
@@ -253,8 +299,8 @@ func (c *clerkBackendClient) SetUserPassword(ctx context.Context, userID, passwo
 	if userID == "" {
 		return domainerr.Validation("clerk user_id is required")
 	}
-	if len(password) < 8 {
-		return domainerr.Validation("password must be at least 8 characters")
+	if err := validateInitialPassword(password); err != nil {
+		return err
 	}
 	payload := map[string]any{"password": password}
 	return c.doJSON(ctx, http.MethodPatch, "/users/"+url.PathEscape(userID), payload, nil)
@@ -275,7 +321,7 @@ func (c *clerkBackendClient) DeleteOrganizationMembership(ctx context.Context, o
 		return nil
 	}
 	err := c.doJSON(ctx, http.MethodDelete, "/organizations/"+url.PathEscape(organizationID)+"/memberships/"+url.PathEscape(userID), nil, nil)
-	if err != nil && strings.Contains(err.Error(), "clerk returned 404") {
+	if apiErr, ok := asClerkAPIError(err); ok && apiErr.StatusCode == http.StatusNotFound {
 		// Idempotente: si la membership no existe en Clerk (drift Clerk↔Pymes),
 		// igual completamos la baja en Pymes. Sin esto, el botón Eliminar tiraba
 		// 502 cuando la membership ya había sido removida fuera de banda.
@@ -324,7 +370,7 @@ func (c *clerkBackendClient) AcceptOrganizationInvitationTicket(ctx context.Cont
 	if strings.TrimSpace(c.frontendBaseURL) == "" {
 		return domainerr.Unavailable("clerk frontend api base url is not configured")
 	}
-	endpoint := strings.TrimRight(c.frontendBaseURL, "/") + "/v1/client/sign_ins?strategy=ticket&ticket=" + url.QueryEscape(ticket) + "&_clerk_js_version=6.8.0"
+	endpoint := strings.TrimRight(c.frontendBaseURL, "/") + "/v1/client/sign_ins?strategy=ticket&ticket=" + url.QueryEscape(ticket) + "&_clerk_js_version=" + clerkJSVersion
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
 		return err
@@ -339,15 +385,20 @@ func (c *clerkBackendClient) AcceptOrganizationInvitationTicket(ctx context.Cont
 		return nil
 	}
 	// 400 with code `organization_invitation_already_accepted` is expected on
-	// retries — the ticket only consumes once. Treat it as success.
-	if resp.StatusCode == http.StatusBadRequest && bytes.Contains(data, []byte("organization_invitation_already_accepted")) {
+	// retries — el ticket sólo se consume una vez. Tratamos como éxito.
+	code := clerkErrorCode(data)
+	if resp.StatusCode == http.StatusBadRequest && code == "organization_invitation_already_accepted" {
 		return nil
 	}
 	message := clerkErrorMessage(data)
 	if message == "" {
 		message = fmt.Sprintf("clerk frontend api returned %d", resp.StatusCode)
 	}
-	return domainerr.UpstreamError(message)
+	return &clerkAPIError{
+		StatusCode: resp.StatusCode,
+		Code:       code,
+		inner:      domainerr.UpstreamError(message),
+	}
 }
 
 func (c *clerkBackendClient) UserHasOrganizationMembership(ctx context.Context, organizationID, userID string) (bool, error) {
@@ -405,7 +456,11 @@ func (c *clerkBackendClient) doJSON(ctx context.Context, method, path string, pa
 		} else {
 			message = fmt.Sprintf("clerk returned %d: %s", resp.StatusCode, message)
 		}
-		return domainerr.UpstreamError(message)
+		return &clerkAPIError{
+			StatusCode: resp.StatusCode,
+			Code:       clerkErrorCode(data),
+			inner:      domainerr.UpstreamError(message),
+		}
 	}
 	if out == nil || len(data) == 0 {
 		return nil
@@ -414,6 +469,25 @@ func (c *clerkBackendClient) doJSON(ctx context.Context, method, path string, pa
 		return domainerr.UpstreamError("invalid clerk response")
 	}
 	return nil
+}
+
+// clerkErrorCode extrae el primer Errors[].Code de un response de error Clerk.
+// Vacío si el body no parsea como JSON o no incluye códigos.
+func clerkErrorCode(data []byte) string {
+	var out struct {
+		Errors []struct {
+			Code string `json:"code"`
+		} `json:"errors"`
+	}
+	if len(data) == 0 || json.Unmarshal(data, &out) != nil {
+		return ""
+	}
+	for _, item := range out.Errors {
+		if code := strings.TrimSpace(item.Code); code != "" {
+			return code
+		}
+	}
+	return ""
 }
 
 func clerkErrorMessage(data []byte) string {

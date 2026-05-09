@@ -1,0 +1,3 @@
+-- 0017_business_insights.down.sql
+DROP TRIGGER IF EXISTS trg_pymes_business_insight_candidates_updated_at ON pymes_business_insight_candidates;
+DROP TABLE IF EXISTS pymes_business_insight_candidates;

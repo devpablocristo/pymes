@@ -27,7 +27,7 @@ func NewRepository(db *gorm.DB) *Repository {
 func (r *Repository) Add(in domain.LogInput) domain.Entry {
 	var lastEntry models.AuditLogModel
 	prevHash := ""
-	if err := r.db.Where("tenant_id = ?", in.TenantID).Order("created_at DESC").First(&lastEntry).Error; err == nil {
+	if err := r.db.Where("org_id = ?", in.OrgID).Order("created_at DESC").First(&lastEntry).Error; err == nil {
 		prevHash = lastEntry.Hash
 	}
 
@@ -42,7 +42,7 @@ func (r *Repository) Add(in domain.LogInput) domain.Entry {
 
 	m := models.AuditLogModel{
 		ID:           uuid.New(),
-		TenantID:     in.TenantID,
+		OrgID:     in.OrgID,
 		Actor:        strings.TrimSpace(in.Actor.Raw),
 		ActorType:    actorType,
 		ActorID:      in.Actor.ID,
@@ -62,14 +62,14 @@ func (r *Repository) Add(in domain.LogInput) domain.Entry {
 	return auditToDomain(m)
 }
 
-func (r *Repository) Verify(tenantID uuid.UUID) domain.VerifyResult {
+func (r *Repository) Verify(orgID uuid.UUID) domain.VerifyResult {
 	var rows []models.AuditLogModel
-	r.db.Where("tenant_id = ?", tenantID).
+	r.db.Where("org_id = ?", orgID).
 		Order("created_at ASC, id ASC").
 		Find(&rows)
 
 	result := domain.VerifyResult{
-		TenantID:    tenantID,
+		OrgID:    orgID,
 		Verified:    true,
 		CheckedRows: len(rows),
 		Message:     "audit chain verified",
@@ -106,12 +106,12 @@ func (r *Repository) Verify(tenantID uuid.UUID) domain.VerifyResult {
 	return result
 }
 
-func (r *Repository) List(tenantID uuid.UUID, limit int) []domain.Entry {
+func (r *Repository) List(orgID uuid.UUID, limit int) []domain.Entry {
 	if limit <= 0 {
 		limit = 200
 	}
 	var rows []models.AuditLogModel
-	r.db.Where("tenant_id = ?", tenantID).
+	r.db.Where("org_id = ?", orgID).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&rows)
@@ -123,12 +123,12 @@ func (r *Repository) List(tenantID uuid.UUID, limit int) []domain.Entry {
 	return result
 }
 
-func (r *Repository) ExportCSV(tenantID uuid.UUID) (string, error) {
-	entries := r.List(tenantID, 0)
+func (r *Repository) ExportCSV(orgID uuid.UUID) (string, error) {
+	entries := r.List(orgID, 0)
 
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	if err := w.Write([]string{"id", "tenant_id", "actor", "actor_type", "actor_id", "actor_label", "action", "resource_type", "resource_id", "prev_hash", "hash", "created_at", "payload"}); err != nil {
+	if err := w.Write([]string{"id", "org_id", "actor", "actor_type", "actor_id", "actor_label", "action", "resource_type", "resource_id", "prev_hash", "hash", "created_at", "payload"}); err != nil {
 		return "", err
 	}
 	for _, e := range entries {
@@ -138,7 +138,7 @@ func (r *Repository) ExportCSV(tenantID uuid.UUID) (string, error) {
 			actorID = e.ActorID.String()
 		}
 		if err := w.Write([]string{
-			e.ID.String(), e.TenantID.String(), e.Actor, e.ActorType, actorID, e.ActorLabel, e.Action,
+			e.ID.String(), e.OrgID.String(), e.Actor, e.ActorType, actorID, e.ActorLabel, e.Action,
 			e.ResourceType, e.ResourceID, e.PrevHash, e.Hash,
 			e.CreatedAt.Format(time.RFC3339), string(payload),
 		}); err != nil {
@@ -156,7 +156,7 @@ func auditToDomain(m models.AuditLogModel) domain.Entry {
 	}
 	return domain.Entry{
 		ID:           m.ID,
-		TenantID:     m.TenantID,
+		OrgID:     m.OrgID,
 		Actor:        m.Actor,
 		ActorType:    m.ActorType,
 		ActorID:      m.ActorID,
@@ -185,7 +185,7 @@ func normalizeActorType(raw string) string {
 func computeAuditHashV2(m models.AuditLogModel) string {
 	parts := []string{
 		m.PrevHash,
-		m.TenantID.String(),
+		m.OrgID.String(),
 		strings.TrimSpace(m.Actor),
 		strings.TrimSpace(m.ActorType),
 		strings.TrimSpace(m.Action),

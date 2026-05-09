@@ -15,16 +15,16 @@ type controlPlanePort interface {
 	CreateBooking(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateQuote(ctx context.Context, payload map[string]any) (map[string]any, error)
 	CreateSale(ctx context.Context, payload map[string]any) (map[string]any, error)
-	CreateSalePaymentLink(ctx context.Context, tenantID, saleID string) (map[string]any, error)
+	CreateSalePaymentLink(ctx context.Context, orgID, saleID string) (map[string]any, error)
 }
 
 type workOrderPort interface {
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.WorkOrder, error)
-	SaveIntegrations(ctx context.Context, tenantID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error)
+	SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string, actor string) (domain.WorkOrder, error)
 }
 
 type auditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -37,17 +37,17 @@ func NewUsecases(cp controlPlanePort, orders workOrderPort, audit auditPort) *Us
 	return &Usecases{cp: cp, orders: orders, audit: audit}
 }
 
-func (u *Usecases) CreateBooking(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error) {
-	if strings.TrimSpace(tenantID) == "" {
+func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
+	if strings.TrimSpace(orgID) == "" {
 		return nil, fmt.Errorf("tenant_id is required: %w", httperrors.ErrBadInput)
 	}
 	out := copyMap(payload)
-	out["tenant_id"] = tenantID
+	out["org_id"] = orgID
 	return u.cp.CreateBooking(ctx, out)
 }
 
-func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
@@ -56,7 +56,7 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, tenantID string
 		return nil, err
 	}
 	payload := map[string]any{
-		"tenant_id":     tenantID,
+		"org_id":     orgID,
 		"customer_name": fallback(order.CustomerName, order.AssetLabel),
 		"notes":         order.Notes,
 		"items":         toCommercialItems(order.Items),
@@ -75,13 +75,13 @@ func (u *Usecases) CreateQuoteFromWorkOrder(ctx context.Context, tenantID string
 		_, _ = u.orders.SaveIntegrations(ctx, tenantUUID, workOrderID, quoteID, nil, nil, actor)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID, actor, "work_order.quote_created", "work_order", workOrderID.String(), map[string]any{"quote": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.quote_created", "work_order", workOrderID.String(), map[string]any{"quote": result})
 	}
 	return result, nil
 }
 
-func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
@@ -90,7 +90,7 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, tenantID string,
 		return nil, err
 	}
 	payload := map[string]any{
-		"tenant_id":      tenantID,
+		"org_id":      orgID,
 		"customer_name":  fallback(order.CustomerName, order.AssetLabel),
 		"payment_method": "transfer",
 		"notes":          order.Notes,
@@ -113,13 +113,13 @@ func (u *Usecases) CreateSaleFromWorkOrder(ctx context.Context, tenantID string,
 		_, _ = u.orders.SaveIntegrations(ctx, tenantUUID, workOrderID, nil, saleID, &status, actor)
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID, actor, "work_order.sale_created", "work_order", workOrderID.String(), map[string]any{"sale": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.sale_created", "work_order", workOrderID.String(), map[string]any{"sale": result})
 	}
 	return result, nil
 }
 
-func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, tenantID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
-	tenantUUID, err := uuid.Parse(strings.TrimSpace(tenantID))
+func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, orgID string, workOrderID uuid.UUID, actor string) (map[string]any, error) {
+	tenantUUID, err := uuid.Parse(strings.TrimSpace(orgID))
 	if err != nil {
 		return nil, fmt.Errorf("tenant_id is invalid: %w", httperrors.ErrBadInput)
 	}
@@ -129,7 +129,7 @@ func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, tenantID 
 	}
 	saleID := order.SaleID
 	if saleID == nil {
-		saleResult, err := u.CreateSaleFromWorkOrder(ctx, tenantID, workOrderID, actor)
+		saleResult, err := u.CreateSaleFromWorkOrder(ctx, orgID, workOrderID, actor)
 		if err != nil {
 			return nil, err
 		}
@@ -138,12 +138,12 @@ func (u *Usecases) CreatePaymentLinkFromWorkOrder(ctx context.Context, tenantID 
 	if saleID == nil {
 		return nil, fmt.Errorf("sale_id is required: %w", httperrors.ErrBadInput)
 	}
-	result, err := u.cp.CreateSalePaymentLink(ctx, tenantID, saleID.String())
+	result, err := u.cp.CreateSalePaymentLink(ctx, orgID, saleID.String())
 	if err != nil {
 		return nil, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID, actor, "work_order.payment_link_created", "work_order", workOrderID.String(), map[string]any{"payment_link": result})
+		u.audit.Log(ctx, orgID, actor, "work_order.payment_link_created", "work_order", workOrderID.String(), map[string]any{"payment_link": result})
 	}
 	return result, nil
 }

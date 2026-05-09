@@ -16,10 +16,10 @@ import (
 )
 
 type usecasesPort interface {
-	GetBootstrap(ctx context.Context, tenantID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
-	GetTenantSettings(ctx context.Context, tenantID string) (admindomain.TenantSettings, error)
-	UpdateTenantSettings(ctx context.Context, tenantID string, patch admindomain.TenantSettingsPatch, actor *string) (admindomain.TenantSettings, error)
-	ListActivity(ctx context.Context, tenantID string, limit int) ([]admindomain.ActivityEvent, error)
+	GetBootstrap(ctx context.Context, orgID string, role string, scopes []string, actor string, authMethod string) (map[string]any, error)
+	GetTenantSettings(ctx context.Context, orgID string) (admindomain.TenantSettings, error)
+	UpdateTenantSettings(ctx context.Context, orgID string, patch admindomain.TenantSettingsPatch, actor *string) (admindomain.TenantSettings, error)
+	ListActivity(ctx context.Context, orgID string, limit int) ([]admindomain.ActivityEvent, error)
 }
 
 type Handler struct {
@@ -47,7 +47,7 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin permissions required")
 		return
 	}
-	payload, err := h.uc.GetBootstrap(c.Request.Context(), authCtx.TenantID, authCtx.Role, authCtx.Scopes, authCtx.Actor, authCtx.AuthMethod)
+	payload, err := h.uc.GetBootstrap(c.Request.Context(), authCtx.OrgID, authCtx.Role, authCtx.Scopes, authCtx.Actor, authCtx.AuthMethod)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -57,7 +57,7 @@ func (h *Handler) GetBootstrap(c *gin.Context) {
 
 func (h *Handler) GetTenantSettings(c *gin.Context) {
 	authCtx := handlers.GetAuthContext(c)
-	settings, err := h.uc.GetTenantSettings(c.Request.Context(), authCtx.TenantID)
+	settings, err := h.uc.GetTenantSettings(c.Request.Context(), authCtx.OrgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -96,7 +96,7 @@ func (h *Handler) UpdateTenantSettings(c *gin.Context) {
 		}
 	}
 	schedulingEnabled := req.SchedulingEnabled
-	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.TenantID, admindomain.TenantSettingsPatch{
+	updated, err := h.uc.UpdateTenantSettings(c.Request.Context(), authCtx.OrgID, admindomain.TenantSettingsPatch{
 		PlanCode:                req.PlanCode,
 		HardLimits:              req.HardLimits,
 		Currency:                req.Currency,
@@ -151,7 +151,7 @@ func (h *Handler) ListActivity(c *gin.Context) {
 		httperrors.Write(c, http.StatusForbidden, "FORBIDDEN", "admin read permission required")
 		return
 	}
-	items, err := h.uc.ListActivity(c.Request.Context(), authCtx.TenantID, 200)
+	items, err := h.uc.ListActivity(c.Request.Context(), authCtx.OrgID, 200)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

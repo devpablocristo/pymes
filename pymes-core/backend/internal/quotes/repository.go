@@ -51,12 +51,12 @@ type ServiceSnapshot struct {
 	TaxRate   *float64
 }
 
-func (r *Repository) GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
+func (r *Repository) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 	var row ProductSnapshot
 	err := r.db.WithContext(ctx).
 		Table("products").
 		Select("id, name, price, tax_rate").
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", tenantID, productID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, productID).
 		Take(&row).Error
 	if err != nil {
 		return ProductSnapshot{}, err
@@ -64,12 +64,12 @@ func (r *Repository) GetProductSnapshot(ctx context.Context, tenantID, productID
 	return row, nil
 }
 
-func (r *Repository) GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
 	var row ServiceSnapshot
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, sale_price as price, cost_price, tax_rate").
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", tenantID, serviceID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, serviceID).
 		Take(&row).Error
 	if err != nil {
 		return ServiceSnapshot{}, err
@@ -77,12 +77,12 @@ func (r *Repository) GetServiceSnapshot(ctx context.Context, tenantID, serviceID
 	return row, nil
 }
 
-func (r *Repository) GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error) {
+func (r *Repository) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, quotePrefix string, err error) {
 	var row tenantBusinessSettings
 	err = r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -106,7 +106,7 @@ type CreateItemInput struct {
 }
 
 type CreateInput struct {
-	TenantID     uuid.UUID
+	OrgID     uuid.UUID
 	BranchID     *uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -126,7 +126,7 @@ type CreateInput struct {
 func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Quote, error) {
 	var out quotedomain.Quote
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.TenantID)
+		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.OrgID)
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 		number := fmt.Sprintf("%s-%05d", tenant.QuotePrefix, tenant.NextQuoteNumber)
 		quoteRow := models.QuoteModel{
 			ID:           uuid.New(),
-			TenantID:     in.TenantID,
+			OrgID:     in.OrgID,
 			BranchID:     in.BranchID,
 			Number:       number,
 			CustomerID:   in.CustomerID,
@@ -178,7 +178,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 			}
 		}
 
-		if err := tx.Table("tenant_settings").Where("tenant_id = ?", in.TenantID).
+		if err := tx.Table("tenant_settings").Where("org_id = ?", in.OrgID).
 			Updates(map[string]any{
 				"next_quote_number": tenant.NextQuoteNumber + 1,
 				"updated_at":        gorm.Expr("now()"),
@@ -196,7 +196,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (quotedomain.Qu
 }
 
 type ListParams struct {
-	TenantID   uuid.UUID
+	OrgID   uuid.UUID
 	BranchID   *uuid.UUID
 	Limit      int
 	After      *uuid.UUID
@@ -209,7 +209,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("tenant_id = ? AND archived_at IS NULL", p.TenantID)
+	q := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if p.BranchID != nil && *p.BranchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
 	}
@@ -258,8 +258,8 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]quotedomain.Quot
 }
 
 // ListArchived devuelve presupuestos con archivo lógico (misma convención que clientes/proveedores).
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
-	q := r.db.WithContext(ctx).Where("tenant_id = ? AND archived_at IS NOT NULL", tenantID)
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error) {
+	q := r.db.WithContext(ctx).Where("org_id = ? AND archived_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -278,9 +278,9 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branc
 	return out, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
 	var quoteRow models.QuoteModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, quoteID).Take(&quoteRow).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, quoteID).Take(&quoteRow).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, gorm.ErrRecordNotFound
 		}
@@ -295,7 +295,7 @@ func (r *Repository) GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (
 }
 
 type UpdateInput struct {
-	TenantID     uuid.UUID
+	OrgID     uuid.UUID
 	ID           uuid.UUID
 	CustomerID   *uuid.UUID
 	CustomerName string
@@ -315,7 +315,7 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 	var out quotedomain.Quote
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing models.QuoteModel
-		if err := tx.Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).Take(&existing).Error; err != nil {
+		if err := tx.Where("org_id = ? AND id = ?", in.OrgID, in.ID).Take(&existing).Error; err != nil {
 			return err
 		}
 		if existing.Status != "draft" {
@@ -337,7 +337,7 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 			"updated_at":  gorm.Expr("now()"),
 		}
 		if err := tx.Model(&models.QuoteModel{}).
-			Where("tenant_id = ? AND id = ? AND status = 'draft'", in.TenantID, in.ID).
+			Where("org_id = ? AND id = ? AND status = 'draft'", in.OrgID, in.ID).
 			Updates(updates).Error; err != nil {
 			return err
 		}
@@ -366,7 +366,7 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 			}
 		}
 
-		q, err := getByIDWithTx(ctx, tx, in.TenantID, in.ID)
+		q, err := getByIDWithTx(ctx, tx, in.OrgID, in.ID)
 		if err != nil {
 			return err
 		}
@@ -379,9 +379,9 @@ func (r *Repository) UpdateDraft(ctx context.Context, in UpdateInput) (quotedoma
 	return out, nil
 }
 
-func (r *Repository) DeleteDraft(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (r *Repository) DeleteDraft(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	res := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id = ? AND status = 'draft'", tenantID, quoteID).
+		Where("org_id = ? AND id = ? AND status = 'draft'", orgID, quoteID).
 		Delete(&models.QuoteModel{})
 	if res.Error != nil {
 		return res.Error
@@ -389,7 +389,7 @@ func (r *Repository) DeleteDraft(ctx context.Context, tenantID, quoteID uuid.UUI
 	if res.RowsAffected == 0 {
 		var exists int64
 		if err := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
-			Where("tenant_id = ? AND id = ?", tenantID, quoteID).Count(&exists).Error; err != nil {
+			Where("org_id = ? AND id = ?", orgID, quoteID).Count(&exists).Error; err != nil {
 			return err
 		}
 		if exists > 0 {
@@ -400,9 +400,9 @@ func (r *Repository) DeleteDraft(ctx context.Context, tenantID, quoteID uuid.UUI
 	return nil
 }
 
-func (r *Repository) Archive(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (r *Repository) Archive(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
-		Where("tenant_id = ? AND id = ? AND archived_at IS NULL", tenantID, quoteID).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, quoteID).
 		Updates(map[string]any{"archived_at": gorm.Expr("now()"), "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -413,9 +413,9 @@ func (r *Repository) Archive(ctx context.Context, tenantID, quoteID uuid.UUID) e
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
-		Where("tenant_id = ? AND id = ? AND archived_at IS NOT NULL", tenantID, quoteID).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, quoteID).
 		Updates(map[string]any{"archived_at": nil, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return res.Error
@@ -426,12 +426,12 @@ func (r *Repository) Restore(ctx context.Context, tenantID, quoteID uuid.UUID) e
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, quoteID uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Solo se permite hard delete de presupuestos archivados.
 		var count int64
 		if err := tx.Model(&models.QuoteModel{}).
-			Where("tenant_id = ? AND id = ? AND archived_at IS NOT NULL", tenantID, quoteID).
+			Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, quoteID).
 			Count(&count).Error; err != nil {
 			return err
 		}
@@ -442,13 +442,13 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID
 		if err := tx.Where("quote_id = ?", quoteID).Delete(&models.QuoteItemModel{}).Error; err != nil {
 			return err
 		}
-		return tx.Where("tenant_id = ? AND id = ?", tenantID, quoteID).Delete(&models.QuoteModel{}).Error
+		return tx.Where("org_id = ? AND id = ?", orgID, quoteID).Delete(&models.QuoteModel{}).Error
 	})
 }
 
-func (r *Repository) SetStatus(ctx context.Context, tenantID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
+func (r *Repository) SetStatus(ctx context.Context, orgID, quoteID uuid.UUID, status string) (quotedomain.Quote, error) {
 	res := r.db.WithContext(ctx).Model(&models.QuoteModel{}).
-		Where("tenant_id = ? AND id = ?", tenantID, quoteID).
+		Where("org_id = ? AND id = ?", orgID, quoteID).
 		Updates(map[string]any{"status": status, "updated_at": gorm.Expr("now()")})
 	if res.Error != nil {
 		return quotedomain.Quote{}, res.Error
@@ -456,18 +456,18 @@ func (r *Repository) SetStatus(ctx context.Context, tenantID, quoteID uuid.UUID,
 	if res.RowsAffected == 0 {
 		return quotedomain.Quote{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, tenantID, quoteID)
+	return r.GetByID(ctx, orgID, quoteID)
 }
 
-func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) (tenantBusinessSettings, error) {
+func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantBusinessSettings, error) {
 	var tenant tenantBusinessSettings
 	err := tx.WithContext(ctx).Table("tenant_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
-		Where("tenant_id = ?", tenantID).Take(&tenant).Error
+		Where("org_id = ?", orgID).Take(&tenant).Error
 	if err == nil {
 		tenant = normalizeSettings(tenant)
-		return r.syncNextQuoteNumber(ctx, tx, tenantID, tenant)
+		return r.syncNextQuoteNumber(ctx, tx, orgID, tenant)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return tenantBusinessSettings{}, err
@@ -475,38 +475,38 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 
 	if err := tx.WithContext(ctx).Exec(`
 		INSERT INTO tenant_settings (
-			tenant_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
+			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
 			next_quote_number, next_sale_number, allow_negative_stock, created_at, updated_at
 		)
 		VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'PRE', 'VTA', 1, 1, true, now(), now())
-		ON CONFLICT (tenant_id) DO NOTHING
-	`, tenantID).Error; err != nil {
+		ON CONFLICT (org_id) DO NOTHING
+	`, orgID).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 	if err := tx.WithContext(ctx).Table("tenant_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, quote_prefix, next_quote_number").
-		Where("tenant_id = ?", tenantID).Take(&tenant).Error; err != nil {
+		Where("org_id = ?", orgID).Take(&tenant).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 	tenant = normalizeSettings(tenant)
-	return r.syncNextQuoteNumber(ctx, tx, tenantID, tenant)
+	return r.syncNextQuoteNumber(ctx, tx, orgID, tenant)
 }
 
-func (r *Repository) syncNextQuoteNumber(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, tenant tenantBusinessSettings) (tenantBusinessSettings, error) {
+func (r *Repository) syncNextQuoteNumber(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, tenant tenantBusinessSettings) (tenantBusinessSettings, error) {
 	pattern := fmt.Sprintf("%s-%%", tenant.QuotePrefix)
 	var maxExisting int
 	if err := tx.WithContext(ctx).
 		Table("quotes").
 		Select("COALESCE(MAX(CAST(right(number, 5) AS INTEGER)), 0)").
-		Where("tenant_id = ? AND number LIKE ?", tenantID, pattern).
+		Where("org_id = ? AND number LIKE ?", orgID, pattern).
 		Scan(&maxExisting).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 	if tenant.NextQuoteNumber <= maxExisting {
 		tenant.NextQuoteNumber = maxExisting + 1
 		if err := tx.WithContext(ctx).Table("tenant_settings").
-			Where("tenant_id = ?", tenantID).
+			Where("org_id = ?", orgID).
 			Updates(map[string]any{
 				"next_quote_number": tenant.NextQuoteNumber,
 				"updated_at":        gorm.Expr("now()"),
@@ -534,9 +534,9 @@ func normalizeSettings(in tenantBusinessSettings) tenantBusinessSettings {
 	return out
 }
 
-func getByIDWithTx(ctx context.Context, tx *gorm.DB, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error) {
+func getByIDWithTx(ctx context.Context, tx *gorm.DB, orgID, quoteID uuid.UUID) (quotedomain.Quote, error) {
 	var quoteRow models.QuoteModel
-	if err := tx.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, quoteID).Take(&quoteRow).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, quoteID).Take(&quoteRow).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return quotedomain.Quote{}, gorm.ErrRecordNotFound
 		}
@@ -567,7 +567,7 @@ func quoteToDomain(quoteRow models.QuoteModel, itemRows []models.QuoteItemModel)
 	}
 	return quotedomain.Quote{
 		ID:           quoteRow.ID,
-		TenantID:     quoteRow.TenantID,
+		OrgID:     quoteRow.OrgID,
 		BranchID:     quoteRow.BranchID,
 		Number:       quoteRow.Number,
 		CustomerID:   quoteRow.CustomerID,
@@ -641,9 +641,9 @@ func truthyMetadataQuotes(v any) bool {
 }
 
 // PatchAnnotations actualiza etiquetas, metadata y campos de texto permitidos fuera del borrador.
-func (r *Repository) PatchAnnotations(ctx context.Context, tenantID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error) {
+func (r *Repository) PatchAnnotations(ctx context.Context, orgID, id uuid.UUID, patch QuotePatchFields) (quotedomain.Quote, error) {
 	var row models.QuoteModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		return quotedomain.Quote{}, err
 	}
 	updates := map[string]any{"updated_at": gorm.Expr("now()")}
@@ -664,12 +664,12 @@ func (r *Repository) PatchAnnotations(ctx context.Context, tenantID, id uuid.UUI
 		updates["party_name"] = strings.TrimSpace(*patch.CustomerName)
 	}
 	if len(updates) == 1 {
-		return r.GetByID(ctx, tenantID, id)
+		return r.GetByID(ctx, orgID, id)
 	}
-	if err := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("tenant_id = ? AND id = ?", tenantID, id).Updates(updates).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&models.QuoteModel{}).Where("org_id = ? AND id = ?", orgID, id).Updates(updates).Error; err != nil {
 		return quotedomain.Quote{}, err
 	}
-	return r.GetByID(ctx, tenantID, id)
+	return r.GetByID(ctx, orgID, id)
 }
 
 func coalesce(v, def string) string {

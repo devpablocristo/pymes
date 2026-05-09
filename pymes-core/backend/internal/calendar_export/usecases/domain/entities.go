@@ -18,7 +18,7 @@ import (
 // IssueResult, después de la creación.
 type Token struct {
 	ID         uuid.UUID
-	TenantID   uuid.UUID
+	OrgID   uuid.UUID
 	CreatedBy  string
 	Name       string
 	TokenHash  string

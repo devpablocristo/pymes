@@ -60,10 +60,10 @@ func TestNormalizeArgentinaPhone(t *testing.T) {
 func TestCreateNormalizesPhone(t *testing.T) {
 	repo := &customersRepoStub{}
 	uc := NewUsecases(repo, nil)
-	tenantID := uuid.New()
+	orgID := uuid.New()
 
 	_, err := uc.Create(context.Background(), customerdomain.Customer{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Name:     "Cliente Demo",
 		Type:     "person",
 		Phone:    "0381 555-1234",
@@ -77,12 +77,12 @@ func TestCreateNormalizesPhone(t *testing.T) {
 }
 
 func TestUpdateNormalizesPhone(t *testing.T) {
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	customerID := uuid.New()
 	repo := &customersRepoStub{
 		current: customerdomain.Customer{
 			ID:       customerID,
-			TenantID: tenantID,
+			OrgID: orgID,
 			Name:     "Cliente Demo",
 			Type:     "person",
 			Phone:    "3815550000",
@@ -91,7 +91,7 @@ func TestUpdateNormalizesPhone(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 	phone := "0381 555-9999"
 
-	_, err := uc.Update(context.Background(), tenantID, customerID, UpdateInput{
+	_, err := uc.Update(context.Background(), orgID, customerID, UpdateInput{
 		Phone: &phone,
 	}, "tester")
 	if err != nil {

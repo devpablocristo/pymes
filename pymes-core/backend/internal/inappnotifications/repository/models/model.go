@@ -9,7 +9,7 @@ import (
 // InAppNotificationModel fila GORM de la bandeja propia de Pymes.
 type InAppNotificationModel struct {
 	ID          uuid.UUID  `gorm:"column:id;type:uuid;primaryKey"`
-	TenantID    uuid.UUID  `gorm:"column:tenant_id;type:uuid;not null"`
+	OrgID    uuid.UUID  `gorm:"column:org_id;type:uuid;not null"`
 	UserID      uuid.UUID  `gorm:"column:user_id;type:uuid;not null"`
 	Title       string     `gorm:"column:title;not null"`
 	Body        string     `gorm:"column:body;not null"`

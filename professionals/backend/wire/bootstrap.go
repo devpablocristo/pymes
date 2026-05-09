@@ -122,12 +122,12 @@ type cpOrgResolver struct {
 	client *pymescore.Client
 }
 
-func (r *cpOrgResolver) ResolveTenantID(ctx context.Context, tenantSlug string) (uuid.UUID, error) {
+func (r *cpOrgResolver) ResolveOrgID(ctx context.Context, tenantSlug string) (uuid.UUID, error) {
 	result, err := r.client.GetBusinessInfo(ctx, tenantSlug)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	orgIDStr, ok := result["tenant_id"].(string)
+	orgIDStr, ok := result["org_id"].(string)
 	if !ok {
 		return uuid.Nil, fmt.Errorf("tenant_id not found in business info response")
 	}

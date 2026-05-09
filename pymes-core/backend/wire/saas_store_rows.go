@@ -16,7 +16,7 @@ type pymesTenantRow struct {
 	UpdatedAt  time.Time `gorm:"column:updated_at"`
 }
 
-func (pymesTenantRow) TableName() string { return "tenants" }
+func (pymesTenantRow) TableName() string { return "orgs" }
 
 type pymesUserRow struct {
 	ID         uuid.UUID  `gorm:"column:id"`
@@ -36,7 +36,7 @@ func (pymesUserRow) TableName() string { return "users" }
 
 type pymesTenantMembershipRow struct {
 	ID        uuid.UUID    `gorm:"column:id"`
-	TenantID  uuid.UUID    `gorm:"column:tenant_id"`
+	OrgID  uuid.UUID    `gorm:"column:org_id"`
 	UserID    uuid.UUID    `gorm:"column:user_id"`
 	Role      string       `gorm:"column:role"`
 	Status    string       `gorm:"column:status"`
@@ -47,11 +47,11 @@ type pymesTenantMembershipRow struct {
 	User      pymesUserRow `gorm:"foreignKey:UserID;references:ID"`
 }
 
-func (pymesTenantMembershipRow) TableName() string { return "tenant_memberships" }
+func (pymesTenantMembershipRow) TableName() string { return "org_members" }
 
 type pymesTenantAPIKeyRow struct {
 	ID         uuid.UUID  `gorm:"column:id"`
-	TenantID   uuid.UUID  `gorm:"column:tenant_id"`
+	OrgID   uuid.UUID  `gorm:"column:org_id"`
 	Name       string     `gorm:"column:name"`
 	APIKeyHash string     `gorm:"column:api_key_hash"`
 	KeyPrefix  string     `gorm:"column:key_prefix"`
@@ -60,7 +60,7 @@ type pymesTenantAPIKeyRow struct {
 	CreatedAt  time.Time  `gorm:"column:created_at"`
 }
 
-func (pymesTenantAPIKeyRow) TableName() string { return "tenant_api_keys" }
+func (pymesTenantAPIKeyRow) TableName() string { return "org_api_keys" }
 
 type pymesTenantAPIKeyScopeRow struct {
 	ID       uuid.UUID `gorm:"column:id"`
@@ -71,7 +71,7 @@ type pymesTenantAPIKeyScopeRow struct {
 func (pymesTenantAPIKeyScopeRow) TableName() string { return "tenant_api_key_scopes" }
 
 type pymesTenantSettingsRow struct {
-	TenantID              uuid.UUID  `gorm:"column:tenant_id"`
+	OrgID              uuid.UUID  `gorm:"column:org_id"`
 	PlanCode              string     `gorm:"column:plan_code"`
 	HardLimits            []byte     `gorm:"column:hard_limits"`
 	HardLimitsJSON        []byte     `gorm:"column:hard_limits_json"`
@@ -96,11 +96,11 @@ type pymesUsageCounterRow struct {
 	Period      string `gorm:"column:period"`
 }
 
-func (pymesUsageCounterRow) TableName() string { return "tenant_usage_counters" }
+func (pymesUsageCounterRow) TableName() string { return "org_usage_counters" }
 
 type pymesTenantInvitationRow struct {
 	ID                uuid.UUID    `gorm:"column:id"`
-	TenantID          uuid.UUID    `gorm:"column:tenant_id"`
+	OrgID          uuid.UUID    `gorm:"column:org_id"`
 	EmailNormalized   string       `gorm:"column:email_normalized"`
 	Role              string       `gorm:"column:role"`
 	Status            string       `gorm:"column:status"`

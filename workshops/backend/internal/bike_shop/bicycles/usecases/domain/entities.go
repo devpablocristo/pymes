@@ -9,7 +9,7 @@ import (
 
 type Bicycle struct {
 	ID              uuid.UUID
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	CustomerID      *uuid.UUID
 	CustomerName    string
 	FrameNumber     string

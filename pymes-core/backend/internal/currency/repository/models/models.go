@@ -8,7 +8,7 @@ import (
 
 type ExchangeRateModel struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID `gorm:"type:uuid;index;not null"`
 	FromCurrency string
 	ToCurrency   string
 	RateType     string

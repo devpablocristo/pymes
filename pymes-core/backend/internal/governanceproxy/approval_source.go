@@ -50,7 +50,7 @@ func (s *PendingApprovalSource) ListPendingApprovals(ctx context.Context) ([]ina
 	for _, approval := range approvals {
 		out = append(out, inappnotifications.PendingApproval{
 			ID:             approval.ID,
-			TenantID:       approval.TenantID,
+			OrgID:       approval.OrgID,
 			RequestID:      approval.RequestID,
 			ActionType:     approval.ActionType,
 			TargetResource: approval.TargetResource,

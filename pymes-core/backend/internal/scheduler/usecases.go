@@ -20,7 +20,7 @@ import (
 
 type RepositoryPort interface {
 	ListAutoFetchRateOrgs(ctx context.Context) ([]uuid.UUID, error)
-	UpsertExchangeRate(ctx context.Context, tenantID uuid.UUID, fromCurrency, toCurrency, rateType string, buyRate, sellRate float64, source string, rateDate time.Time) error
+	UpsertExchangeRate(ctx context.Context, orgID uuid.UUID, fromCurrency, toCurrency, rateType string, buyRate, sellRate float64, source string, rateDate time.Time) error
 	ListDueRecurring(ctx context.Context, day time.Time) ([]RecurringDue, error)
 	ApplyRecurringExpense(ctx context.Context, item RecurringDue, paidAt, nextDue time.Time) error
 	ListDueSchedulingReminders(ctx context.Context, now time.Time, limit int) ([]SchedulingReminderDue, error)
@@ -38,8 +38,8 @@ type PaymentGatewayTaskPort interface {
 
 type SchedulingTaskPort interface {
 	ExpireOverdueHolds(ctx context.Context, limit int) ([]schedulingdomain.Booking, error)
-	CreateBookingActionTokens(ctx context.Context, tenantID, bookingID uuid.UUID, ttl time.Duration) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error)
-	MarkBookingReminderSent(ctx context.Context, tenantID, bookingID uuid.UUID, sentAt time.Time) (schedulingdomain.Booking, error)
+	CreateBookingActionTokens(ctx context.Context, orgID, bookingID uuid.UUID, ttl time.Duration) (map[schedulingdomain.BookingActionType]schedulingdomain.BookingActionToken, error)
+	MarkBookingReminderSent(ctx context.Context, orgID, bookingID uuid.UUID, sentAt time.Time) (schedulingdomain.Booking, error)
 	ProcessWaitlistAvailability(ctx context.Context, now time.Time, limit int) ([]schedulingdomain.WaitlistEntry, error)
 }
 
@@ -60,7 +60,7 @@ type Usecases struct {
 
 type RecurringDue struct {
 	ID            uuid.UUID
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	Description   string
 	Amount        float64
 	Currency      string
@@ -72,7 +72,7 @@ type RecurringDue struct {
 }
 
 type SchedulingReminderDue struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	TenantSlug    string
 	BookingID     uuid.UUID
 	CustomerName  string
@@ -233,7 +233,7 @@ func (u *Usecases) sendSchedulingReminders(ctx context.Context) (int, error) {
 		if strings.TrimSpace(item.CustomerEmail) == "" {
 			continue
 		}
-		tokens, err := u.scheduling.CreateBookingActionTokens(ctx, item.TenantID, item.BookingID, 72*time.Hour)
+		tokens, err := u.scheduling.CreateBookingActionTokens(ctx, item.OrgID, item.BookingID, 72*time.Hour)
 		if err != nil {
 			return sent, err
 		}
@@ -241,7 +241,7 @@ func (u *Usecases) sendSchedulingReminders(ctx context.Context) (int, error) {
 		if err := u.emailSender.Send(ctx, item.CustomerEmail, subject, htmlBody, textBody); err != nil {
 			return sent, err
 		}
-		if _, err := u.scheduling.MarkBookingReminderSent(ctx, item.TenantID, item.BookingID, now); err != nil {
+		if _, err := u.scheduling.MarkBookingReminderSent(ctx, item.OrgID, item.BookingID, now); err != nil {
 			return sent, err
 		}
 		sent++
@@ -304,9 +304,9 @@ func (u *Usecases) syncRates(ctx context.Context) (int, error) {
 	}
 	today := time.Now().UTC()
 	updated := 0
-	for _, tenantID := range tenants {
+	for _, orgID := range tenants {
 		for _, rate := range rates {
-			if err := u.repo.UpsertExchangeRate(ctx, tenantID, "USD", "ARS", rate.RateType, rate.BuyRate, rate.SellRate, "api", today); err != nil {
+			if err := u.repo.UpsertExchangeRate(ctx, orgID, "USD", "ARS", rate.RateType, rate.BuyRate, rate.SellRate, "api", today); err != nil {
 				return updated, err
 			}
 			updated++

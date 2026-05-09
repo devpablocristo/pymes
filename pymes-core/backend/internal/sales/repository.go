@@ -50,12 +50,12 @@ type ServiceSnapshot struct {
 	TaxRate   *float64
 }
 
-func (r *Repository) GetProductSnapshot(ctx context.Context, tenantID, productID uuid.UUID) (ProductSnapshot, error) {
+func (r *Repository) GetProductSnapshot(ctx context.Context, orgID, productID uuid.UUID) (ProductSnapshot, error) {
 	var row ProductSnapshot
 	err := r.db.WithContext(ctx).
 		Table("products").
 		Select("id, name, price, cost_price, tax_rate, track_stock").
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", tenantID, productID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, productID).
 		Take(&row).Error
 	if err != nil {
 		return ProductSnapshot{}, err
@@ -63,12 +63,12 @@ func (r *Repository) GetProductSnapshot(ctx context.Context, tenantID, productID
 	return row, nil
 }
 
-func (r *Repository) GetServiceSnapshot(ctx context.Context, tenantID, serviceID uuid.UUID) (ServiceSnapshot, error) {
+func (r *Repository) GetServiceSnapshot(ctx context.Context, orgID, serviceID uuid.UUID) (ServiceSnapshot, error) {
 	var row ServiceSnapshot
 	err := r.db.WithContext(ctx).
 		Table("services").
 		Select("id, name, sale_price as price, cost_price, tax_rate").
-		Where("tenant_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", tenantID, serviceID).
+		Where("org_id = ? AND id = ? AND deleted_at IS NULL AND is_active = true", orgID, serviceID).
 		Take(&row).Error
 	if err != nil {
 		return ServiceSnapshot{}, err
@@ -76,12 +76,12 @@ func (r *Repository) GetServiceSnapshot(ctx context.Context, tenantID, serviceID
 	return row, nil
 }
 
-func (r *Repository) GetTenantSettings(ctx context.Context, tenantID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error) {
+func (r *Repository) GetTenantSettings(ctx context.Context, orgID uuid.UUID) (currency string, taxRate float64, salePrefix string, err error) {
 	var row tenantBusinessSettings
 	err = r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -105,7 +105,7 @@ type CreateItemInput struct {
 }
 
 type CreateInput struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	CustomerID    *uuid.UUID
 	CustomerName  string
@@ -124,7 +124,7 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
-	TenantID   uuid.UUID
+	OrgID   uuid.UUID
 	ID         uuid.UUID
 	IsFavorite *bool
 	Tags       *[]string
@@ -134,7 +134,7 @@ type UpdateInput struct {
 func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sale, error) {
 	var out saledomain.Sale
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.TenantID)
+		tenant, err := r.getOrCreateTenantSettingsForUpdate(ctx, tx, in.OrgID)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 
 		saleRow := models.SaleModel{
 			ID:            uuid.New(),
-			TenantID:      in.TenantID,
+			OrgID:      in.OrgID,
 			BranchID:      in.BranchID,
 			Number:        number,
 			CustomerID:    in.CustomerID,
@@ -189,7 +189,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 		}
 
 		if err := tx.Table("tenant_settings").
-			Where("tenant_id = ?", in.TenantID).
+			Where("org_id = ?", in.OrgID).
 			Updates(map[string]any{
 				"next_sale_number": tenant.NextSaleNumber + 1,
 				"updated_at":       gorm.Expr("now()"),
@@ -207,7 +207,7 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (saledomain.Sal
 }
 
 type ListParams struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	BranchID      *uuid.UUID
 	Limit         int
 	After         *uuid.UUID
@@ -220,7 +220,7 @@ type ListParams struct {
 func (r *Repository) List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 100})
 
-	q := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("tenant_id = ?", p.TenantID)
+	q := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ?", p.OrgID)
 	if p.BranchID != nil && *p.BranchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
 	}
@@ -268,9 +268,9 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]saledomain.Sale,
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	var saleRow models.SaleModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, saleID).Take(&saleRow).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, saleID).Take(&saleRow).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saledomain.Sale{}, gorm.ErrRecordNotFound
 		}
@@ -295,10 +295,10 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (saledomain.Sal
 		updates["notes"] = strings.TrimSpace(*in.Notes)
 	}
 	if len(updates) == 0 {
-		return r.GetByID(ctx, in.TenantID, in.ID)
+		return r.GetByID(ctx, in.OrgID, in.ID)
 	}
 	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
-		Where("tenant_id = ? AND id = ?", in.TenantID, in.ID).
+		Where("org_id = ? AND id = ?", in.OrgID, in.ID).
 		Updates(updates)
 	if res.Error != nil {
 		return saledomain.Sale{}, res.Error
@@ -306,32 +306,32 @@ func (r *Repository) Update(ctx context.Context, in UpdateInput) (saledomain.Sal
 	if res.RowsAffected == 0 {
 		return saledomain.Sale{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) Void(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error) {
+func (r *Repository) Void(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error) {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.SaleModel{}).
-		Where("tenant_id = ? AND id = ? AND status <> 'voided'", tenantID, saleID).
+		Where("org_id = ? AND id = ? AND status <> 'voided'", orgID, saleID).
 		Updates(map[string]any{"status": "voided", "voided_at": now})
 	if res.Error != nil {
 		return saledomain.Sale{}, res.Error
 	}
 	if res.RowsAffected == 0 {
 		// Either already voided or does not exist. Fetch to disambiguate.
-		out, err := r.GetByID(ctx, tenantID, saleID)
+		out, err := r.GetByID(ctx, orgID, saleID)
 		if err != nil {
 			return saledomain.Sale{}, err
 		}
 		return out, nil
 	}
-	return r.GetByID(ctx, tenantID, saleID)
+	return r.GetByID(ctx, orgID, saleID)
 }
 
 // PatchSale actualiza campos editables desde el CRUD (no líneas ni totales).
-func (r *Repository) PatchSale(ctx context.Context, tenantID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error) {
+func (r *Repository) PatchSale(ctx context.Context, orgID, saleID uuid.UUID, in SalePatchFields) (saledomain.Sale, error) {
 	var row models.SaleModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, saleID).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, saleID).Take(&row).Error; err != nil {
 		return saledomain.Sale{}, err
 	}
 	updates := map[string]any{}
@@ -358,25 +358,25 @@ func (r *Repository) PatchSale(ctx context.Context, tenantID, saleID uuid.UUID, 
 		updates["branch_id"] = in.BranchID
 	}
 	if len(updates) == 0 {
-		return r.GetByID(ctx, tenantID, saleID)
+		return r.GetByID(ctx, orgID, saleID)
 	}
-	if err := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("tenant_id = ? AND id = ?", tenantID, saleID).Updates(updates).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&models.SaleModel{}).Where("org_id = ? AND id = ?", orgID, saleID).Updates(updates).Error; err != nil {
 		return saledomain.Sale{}, err
 	}
-	return r.GetByID(ctx, tenantID, saleID)
+	return r.GetByID(ctx, orgID, saleID)
 }
 
-func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID) (tenantBusinessSettings, error) {
+func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) (tenantBusinessSettings, error) {
 	var tenant tenantBusinessSettings
 	err := tx.WithContext(ctx).
 		Table("tenant_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&tenant).Error
 	if err == nil {
 		tenant = normalizeSettings(tenant)
-		return r.syncNextSaleNumber(ctx, tx, tenantID, tenant)
+		return r.syncNextSaleNumber(ctx, tx, orgID, tenant)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return tenantBusinessSettings{}, err
@@ -385,12 +385,12 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 	// Bootstrap tenant settings if missing for restored or seeded tenants.
 	if err := tx.WithContext(ctx).Exec(`
 		INSERT INTO tenant_settings (
-			tenant_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
+			org_id, plan_code, hard_limits, currency, tax_rate, quote_prefix, sale_prefix,
 			next_quote_number, next_sale_number, allow_negative_stock, created_at, updated_at
 		)
 		VALUES (?, 'starter', '{}'::jsonb, 'ARS', 21.0, 'PRE', 'VTA', 1, 1, true, now(), now())
-		ON CONFLICT (tenant_id) DO NOTHING
-	`, tenantID).Error; err != nil {
+		ON CONFLICT (org_id) DO NOTHING
+	`, orgID).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 
@@ -398,28 +398,28 @@ func (r *Repository) getOrCreateTenantSettingsForUpdate(ctx context.Context, tx 
 		Table("tenant_settings").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Select("currency, tax_rate, sale_prefix, next_sale_number").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&tenant).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 	tenant = normalizeSettings(tenant)
-	return r.syncNextSaleNumber(ctx, tx, tenantID, tenant)
+	return r.syncNextSaleNumber(ctx, tx, orgID, tenant)
 }
 
-func (r *Repository) syncNextSaleNumber(ctx context.Context, tx *gorm.DB, tenantID uuid.UUID, tenant tenantBusinessSettings) (tenantBusinessSettings, error) {
+func (r *Repository) syncNextSaleNumber(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, tenant tenantBusinessSettings) (tenantBusinessSettings, error) {
 	pattern := fmt.Sprintf("%s-%%", tenant.SalePrefix)
 	var maxExisting int
 	if err := tx.WithContext(ctx).
 		Table("sales").
 		Select("COALESCE(MAX(CAST(right(number, 5) AS INTEGER)), 0)").
-		Where("tenant_id = ? AND number LIKE ?", tenantID, pattern).
+		Where("org_id = ? AND number LIKE ?", orgID, pattern).
 		Scan(&maxExisting).Error; err != nil {
 		return tenantBusinessSettings{}, err
 	}
 	if tenant.NextSaleNumber <= maxExisting {
 		tenant.NextSaleNumber = maxExisting + 1
 		if err := tx.WithContext(ctx).Table("tenant_settings").
-			Where("tenant_id = ?", tenantID).
+			Where("org_id = ?", orgID).
 			Updates(map[string]any{
 				"next_sale_number": tenant.NextSaleNumber,
 				"updated_at":       gorm.Expr("now()"),
@@ -466,7 +466,7 @@ func saleToDomain(saleRow models.SaleModel, itemRows []models.SaleItemModel) sal
 	}
 	return saledomain.Sale{
 		ID:            saleRow.ID,
-		TenantID:      saleRow.TenantID,
+		OrgID:      saleRow.OrgID,
 		BranchID:      saleRow.BranchID,
 		Number:        saleRow.Number,
 		CustomerID:    saleRow.CustomerID,

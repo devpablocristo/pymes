@@ -95,7 +95,7 @@ type tenantPublicRegistrars struct {
 }
 
 func registerTenantPublicRoutes(v1 *gin.RouterGroup, registrars tenantPublicRegistrars) {
-	public := v1.Group("/public/:tenant_id")
+	public := v1.Group("/public/:org_id")
 	public.Use(ginmw.NewRateLimit(30))
 	public.Use(ginmw.NewBodySizeLimit(64 << 10))
 	if registrars.api != nil {

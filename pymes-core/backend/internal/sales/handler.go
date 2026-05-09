@@ -20,8 +20,8 @@ type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]saledomain.Sale, int64, bool, *uuid.UUID, error)
 	Create(ctx context.Context, in CreateSaleInput) (saledomain.Sale, error)
 	Update(ctx context.Context, in UpdateSaleInput) (saledomain.Sale, error)
-	GetByID(ctx context.Context, tenantID, saleID uuid.UUID) (saledomain.Sale, error)
-	Void(ctx context.Context, tenantID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
+	GetByID(ctx context.Context, orgID, saleID uuid.UUID) (saledomain.Sale, error)
+	Void(ctx context.Context, orgID, saleID uuid.UUID, actor string) (saledomain.Sale, error)
 }
 
 type Handler struct {
@@ -40,7 +40,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -82,7 +82,7 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID:      tenantID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		Limit:         limit,
 		After:         after,
@@ -112,7 +112,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -188,7 +188,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.Create(c.Request.Context(), CreateSaleInput{
-		TenantID:      tenantID,
+		OrgID:      orgID,
 		BranchID:      branchID,
 		CustomerID:    customerID,
 		CustomerName:  req.CustomerName,
@@ -209,7 +209,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -219,7 +219,7 @@ func (h *Handler) Get(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -229,7 +229,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -245,7 +245,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateSaleInput{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		ID:         id,
 		IsFavorite: req.IsFavorite,
 		Tags:       req.Tags,
@@ -261,7 +261,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Void(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -272,7 +272,7 @@ func (h *Handler) Void(c *gin.Context) {
 		return
 	}
 
-	out, err := h.uc.Void(c.Request.Context(), tenantID, id, a.Actor)
+	out, err := h.uc.Void(c.Request.Context(), orgID, id, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -287,7 +287,7 @@ func toSaleResponse(in saledomain.Sale) dto.SaleResponse {
 	}
 	resp := dto.SaleResponse{
 		ID:            in.ID.String(),
-		TenantID:      in.TenantID.String(),
+		OrgID:      in.OrgID.String(),
 		Number:        in.Number,
 		CustomerName:  in.CustomerName,
 		Status:        in.Status,

@@ -38,9 +38,9 @@ func (f *fakeRepo) Create(_ context.Context, in domain.Specialty) (domain.Specia
 	return in, nil
 }
 
-func (f *fakeRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.Specialty, error) {
+func (f *fakeRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.Specialty, error) {
 	s, ok := f.specialties[id]
-	if !ok || s.TenantID != tenantID {
+	if !ok || s.OrgID != orgID {
 		return domain.Specialty{}, gorm.ErrRecordNotFound
 	}
 	return s, nil
@@ -54,9 +54,9 @@ func (f *fakeRepo) Update(_ context.Context, in domain.Specialty) (domain.Specia
 	return in, nil
 }
 
-func (f *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
 	s, ok := f.specialties[id]
-	if !ok || s.TenantID != tenantID {
+	if !ok || s.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	if s.DeletedAt == nil {
@@ -67,9 +67,9 @@ func (f *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (f *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
 	s, ok := f.specialties[id]
-	if !ok || s.TenantID != tenantID {
+	if !ok || s.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	s.DeletedAt = nil
@@ -77,9 +77,9 @@ func (f *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (f *fakeRepo) Delete(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
 	s, ok := f.specialties[id]
-	if !ok || s.TenantID != tenantID || s.DeletedAt == nil {
+	if !ok || s.OrgID != orgID || s.DeletedAt == nil {
 		return gorm.ErrRecordNotFound
 	}
 	delete(f.specialties, id)
@@ -109,7 +109,7 @@ func TestCreate_HappyPath(t *testing.T) {
 	uc := NewUsecases(repo, audit)
 
 	out, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Code:     "TRAU",
 		Name:     "Traumatología",
 	}, "tester")
@@ -130,7 +130,7 @@ func TestCreate_CodeTooShort(t *testing.T) {
 	uc := NewUsecases(newFakeRepo(), nil)
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Code:     "X",
 		Name:     "Válido",
 	}, "tester")
@@ -148,7 +148,7 @@ func TestCreate_NameTooShort(t *testing.T) {
 	uc := NewUsecases(newFakeRepo(), nil)
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Code:     "OK",
 		Name:     "A",
 	}, "tester")
@@ -168,7 +168,7 @@ func TestCreate_DuplicateCode(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	_, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 		Code:     "DUP",
 		Name:     "Duplicado",
 	}, "tester")
@@ -186,9 +186,9 @@ func TestGetByID_HappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Code:     "ORT",
 		Name:     "Ortodoncia",
 	}, "tester")
@@ -196,7 +196,7 @@ func TestGetByID_HappyPath(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	got, err := uc.GetByID(context.Background(), tenantID, created.ID)
+	got, err := uc.GetByID(context.Background(), orgID, created.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,9 +224,9 @@ func TestUpdate_HappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Code:     "FIS",
 		Name:     "Fisioterapia",
 	}, "tester")
@@ -235,7 +235,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	}
 
 	newName := "Fisioterapia Deportiva"
-	updated, err := uc.Update(context.Background(), tenantID, created.ID, UpdateInput{
+	updated, err := uc.Update(context.Background(), orgID, created.ID, UpdateInput{
 		Name: &newName,
 	}, "tester")
 	if err != nil {
@@ -265,9 +265,9 @@ func TestUpdate_DuplicateCode(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Code:     "ABC",
 		Name:     "Original",
 	}, "tester")
@@ -278,7 +278,7 @@ func TestUpdate_DuplicateCode(t *testing.T) {
 	// Ahora simular que el código ya existe
 	repo.codeExists = true
 	newCode := "TAKEN"
-	_, err = uc.Update(context.Background(), tenantID, created.ID, UpdateInput{Code: &newCode}, "tester")
+	_, err = uc.Update(context.Background(), orgID, created.ID, UpdateInput{Code: &newCode}, "tester")
 	if err == nil {
 		t.Fatal("expected conflict error")
 	}
@@ -293,9 +293,9 @@ func TestAssignProfessionals_HappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.Specialty{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Code:     "PSI",
 		Name:     "Psicología",
 	}, "tester")
@@ -304,7 +304,7 @@ func TestAssignProfessionals_HappyPath(t *testing.T) {
 	}
 
 	profileIDs := []uuid.UUID{uuid.New(), uuid.New()}
-	err = uc.AssignProfessionals(context.Background(), tenantID, created.ID, profileIDs, "tester")
+	err = uc.AssignProfessionals(context.Background(), orgID, created.ID, profileIDs, "tester")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

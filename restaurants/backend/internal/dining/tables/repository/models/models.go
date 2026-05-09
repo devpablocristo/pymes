@@ -9,7 +9,7 @@ import (
 
 type DiningTableModel struct {
 	ID         uuid.UUID      `gorm:"column:id;type:uuid;primaryKey"`
-	TenantID   uuid.UUID      `gorm:"column:tenant_id;type:uuid;not null;index"`
+	OrgID   uuid.UUID      `gorm:"column:org_id;type:uuid;not null;index"`
 	AreaID     uuid.UUID      `gorm:"column:area_id;type:uuid;not null;index"`
 	Code       string         `gorm:"column:code;not null"`
 	Label      string         `gorm:"column:label;not null;default:''"`

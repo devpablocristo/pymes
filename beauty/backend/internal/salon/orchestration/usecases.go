@@ -20,12 +20,12 @@ func NewUsecases(cp controlPlanePort) *Usecases {
 	return &Usecases{cp: cp}
 }
 
-func (u *Usecases) CreateBooking(ctx context.Context, tenantID string, payload map[string]any) (map[string]any, error) {
-	if strings.TrimSpace(tenantID) == "" {
+func (u *Usecases) CreateBooking(ctx context.Context, orgID string, payload map[string]any) (map[string]any, error) {
+	if strings.TrimSpace(orgID) == "" {
 		return nil, fmt.Errorf("tenant_id is required: %w", httperrors.ErrBadInput)
 	}
 	out := copyMap(payload)
-	out["tenant_id"] = tenantID
+	out["org_id"] = orgID
 	return u.cp.CreateBooking(ctx, out)
 }
 

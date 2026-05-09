@@ -22,12 +22,12 @@ import (
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Intake, error)
 	Create(ctx context.Context, in domain.Intake, actor string) (domain.Intake, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Intake, error)
-	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error)
-	Submit(ctx context.Context, tenantID, id uuid.UUID, actor string) (domain.Intake, error)
-	Archive(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Delete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Intake, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Intake, error)
+	Submit(ctx context.Context, orgID, id uuid.UUID, actor string) (domain.Intake, error)
+	Archive(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -61,12 +61,12 @@ func (h *Handler) ListArchived(c *gin.Context) {
 }
 
 func (h *Handler) list(c *gin.Context, forceArchived bool) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
 	items, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Archived: forceArchived || c.Query("archived") == "true",
 	})
 	if err != nil {
@@ -81,11 +81,11 @@ func (h *Handler) list(c *gin.Context, forceArchived bool) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -98,11 +98,11 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func (h *Handler) Archive(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Archive(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -110,11 +110,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -122,11 +122,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Delete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Delete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -135,7 +135,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -154,7 +154,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	intake := domain.Intake{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		ProfileID:  profileID,
 		Status:     domain.IntakeStatusDraft,
 		IsFavorite: isFavorite,
@@ -192,7 +192,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -227,7 +227,7 @@ func (h *Handler) Update(c *gin.Context) {
 			return
 		}
 	}
-	out, err := h.uc.Update(c.Request.Context(), tenantID, id, input, a.Actor)
+	out, err := h.uc.Update(c.Request.Context(), orgID, id, input, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -237,11 +237,11 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Submit(c *gin.Context) {
 	a := auth.GetAuthContext(c)
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.Submit(c.Request.Context(), tenantID, id, a.Actor)
+	out, err := h.uc.Submit(c.Request.Context(), orgID, id, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -256,7 +256,7 @@ func toIntakeItem(in domain.Intake) dto.IntakeItem {
 	}
 	item := dto.IntakeItem{
 		ID:         in.ID.String(),
-		TenantID:   in.TenantID.String(),
+		OrgID:   in.OrgID.String(),
 		ProfileID:  in.ProfileID.String(),
 		Status:     in.Status,
 		IsFavorite: in.IsFavorite,

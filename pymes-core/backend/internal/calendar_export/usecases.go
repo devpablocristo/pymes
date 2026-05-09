@@ -31,16 +31,16 @@ import (
 // Definido acá (no en el módulo scheduling) para respetar ISP: el módulo
 // scheduling no tiene por qué saber que existe calendar_export.
 type SchedulingPort interface {
-	ListBookings(ctx context.Context, tenantID uuid.UUID, filter schedulingdomain.ListBookingsFilter) ([]schedulingdomain.Booking, error)
-	ListCalendarEvents(ctx context.Context, tenantID uuid.UUID, filter schedulingdomain.ListCalendarEventsFilter) ([]schedulingdomain.CalendarEvent, error)
+	ListBookings(ctx context.Context, orgID uuid.UUID, filter schedulingdomain.ListBookingsFilter) ([]schedulingdomain.Booking, error)
+	ListCalendarEvents(ctx context.Context, orgID uuid.UUID, filter schedulingdomain.ListCalendarEventsFilter) ([]schedulingdomain.CalendarEvent, error)
 }
 
 // RepositoryPort abstrae al adapter de DB para que el usecase no dependa de
 // GORM. Sirve también para tests con fakes.
 type RepositoryPort interface {
 	CreateToken(ctx context.Context, t domain.Token) (domain.Token, error)
-	ListByCreator(ctx context.Context, tenantID uuid.UUID, createdBy string) ([]domain.Token, error)
-	RevokeToken(ctx context.Context, tenantID uuid.UUID, createdBy string, id uuid.UUID) error
+	ListByCreator(ctx context.Context, orgID uuid.UUID, createdBy string) ([]domain.Token, error)
+	RevokeToken(ctx context.Context, orgID uuid.UUID, createdBy string, id uuid.UUID) error
 	FindActiveByHash(ctx context.Context, hash string) (domain.Token, error)
 	TouchLastUsed(ctx context.Context, id uuid.UUID, at time.Time) error
 }
@@ -94,9 +94,9 @@ func NewUsecases(repo RepositoryPort, scheduling SchedulingPort, cfg Config) *Us
 // IssueToken genera un token nuevo y devuelve el plaintext UNA SOLA VEZ.
 // El plaintext es 32 bytes random codificados en hex (256 bits de entropía).
 // Suficiente para que un atacante no pueda enumerarlos por fuerza bruta.
-func (u *Usecases) IssueToken(ctx context.Context, tenantID uuid.UUID, actor, name string) (domain.IssueResult, error) {
-	if tenantID == uuid.Nil {
-		return domain.IssueResult{}, errors.New("calendar_export: tenant_id is required")
+func (u *Usecases) IssueToken(ctx context.Context, orgID uuid.UUID, actor, name string) (domain.IssueResult, error) {
+	if orgID == uuid.Nil {
+		return domain.IssueResult{}, errors.New("calendar_export: org_id is required")
 	}
 	plaintext, err := generateTokenPlaintext()
 	if err != nil {
@@ -105,7 +105,7 @@ func (u *Usecases) IssueToken(ctx context.Context, tenantID uuid.UUID, actor, na
 	hash := hashToken(plaintext)
 	token := domain.Token{
 		ID:        uuid.New(),
-		TenantID:  tenantID,
+		OrgID:  orgID,
 		CreatedBy: strings.TrimSpace(actor),
 		Name:      strings.TrimSpace(name),
 		TokenHash: hash,
@@ -120,16 +120,16 @@ func (u *Usecases) IssueToken(ctx context.Context, tenantID uuid.UUID, actor, na
 
 // ListMyTokens devuelve todos los tokens (activos y revocados) que el actor
 // emitió en su org. Ordenados por created_at desc en el repo.
-func (u *Usecases) ListMyTokens(ctx context.Context, tenantID uuid.UUID, actor string) ([]domain.Token, error) {
-	return u.repo.ListByCreator(ctx, tenantID, strings.TrimSpace(actor))
+func (u *Usecases) ListMyTokens(ctx context.Context, orgID uuid.UUID, actor string) ([]domain.Token, error) {
+	return u.repo.ListByCreator(ctx, orgID, strings.TrimSpace(actor))
 }
 
 // RevokeToken marca un token como revocado. Sólo el creador puede revocarlo.
-func (u *Usecases) RevokeToken(ctx context.Context, tenantID uuid.UUID, actor string, id uuid.UUID) error {
+func (u *Usecases) RevokeToken(ctx context.Context, orgID uuid.UUID, actor string, id uuid.UUID) error {
 	if id == uuid.Nil {
 		return errors.New("calendar_export: id is required")
 	}
-	return u.repo.RevokeToken(ctx, tenantID, strings.TrimSpace(actor), id)
+	return u.repo.RevokeToken(ctx, orgID, strings.TrimSpace(actor), id)
 }
 
 // RenderFeed es el path público: dado un plaintext, valida que exista un token
@@ -176,7 +176,7 @@ func (u *Usecases) buildCalendar(ctx context.Context, token domain.Token) (ics.C
 	// ListBookingsBetween al módulo scheduling para reemplazar este loop.
 	for day := startOfDay(from); !day.After(to); day = day.AddDate(0, 0, 1) {
 		dayCopy := day
-		bookings, err := u.scheduling.ListBookings(ctx, token.TenantID, schedulingdomain.ListBookingsFilter{
+		bookings, err := u.scheduling.ListBookings(ctx, token.OrgID, schedulingdomain.ListBookingsFilter{
 			Date:  &dayCopy,
 			Limit: 500,
 		})
@@ -189,7 +189,7 @@ func (u *Usecases) buildCalendar(ctx context.Context, token domain.Token) (ics.C
 	}
 
 	// Calendar events: este sí soporta from/to en una sola query.
-	internalEvents, err := u.scheduling.ListCalendarEvents(ctx, token.TenantID, schedulingdomain.ListCalendarEventsFilter{
+	internalEvents, err := u.scheduling.ListCalendarEvents(ctx, token.OrgID, schedulingdomain.ListCalendarEventsFilter{
 		From: &from,
 		To:   &to,
 	})

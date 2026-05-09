@@ -70,20 +70,20 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error) {
+func (r *Repository) ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
 		return uuid.Nil, ErrNotFound
 	}
 	if id, err := uuid.Parse(trimmed); err == nil {
 		var exists uuid.UUID
-		err = r.db.WithContext(ctx).Table("tenants").Select("id").Where("id = ?", id).Take(&exists).Error
+		err = r.db.WithContext(ctx).Table("orgs").Select("id").Where("id = ?", id).Take(&exists).Error
 		if err == nil {
 			return id, nil
 		}
 	}
 	var row tenantSlugRow
-	err := r.db.WithContext(ctx).Table("tenants").Select("id").Where("slug = ?", trimmed).Take(&row).Error
+	err := r.db.WithContext(ctx).Table("orgs").Select("id").Where("slug = ?", trimmed).Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return uuid.Nil, ErrNotFound
@@ -93,9 +93,9 @@ func (r *Repository) ResolveTenantID(ctx context.Context, ref string) (uuid.UUID
 	return row.ID, nil
 }
 
-func (r *Repository) GetPlanCode(ctx context.Context, tenantID uuid.UUID) string {
+func (r *Repository) GetPlanCode(ctx context.Context, orgID uuid.UUID) string {
 	var plan string
-	if err := r.db.WithContext(ctx).Table("tenant_settings").Select("plan_code").Where("tenant_id = ?", tenantID).Take(&plan).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table("tenant_settings").Select("plan_code").Where("org_id = ?", orgID).Take(&plan).Error; err != nil {
 		return "starter"
 	}
 	plan = strings.TrimSpace(strings.ToLower(plan))
@@ -105,12 +105,12 @@ func (r *Repository) GetPlanCode(ctx context.Context, tenantID uuid.UUID) string
 	return plan
 }
 
-func (r *Repository) GetBankInfo(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
+func (r *Repository) GetBankInfo(ctx context.Context, orgID uuid.UUID) (gatewaydomain.BankInfo, bool, error) {
 	var row bankInfoRow
 	if err := r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("bank_holder, bank_cbu, bank_alias, bank_name").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return gatewaydomain.BankInfo{}, false, nil
@@ -127,12 +127,12 @@ func (r *Repository) GetBankInfo(ctx context.Context, tenantID uuid.UUID) (gatew
 	return info, hasAny, nil
 }
 
-func (r *Repository) GetWhatsAppTransferTemplate(ctx context.Context, tenantID uuid.UUID) string {
+func (r *Repository) GetWhatsAppTransferTemplate(ctx context.Context, orgID uuid.UUID) string {
 	var tpl string
 	err := r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("wa_payment_template").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&tpl).Error
 	if err != nil || strings.TrimSpace(tpl) == "" {
 		return "Podes transferir a:\nAlias: {bank_alias}\nCBU: {bank_cbu}\nTitular: {bank_holder}\nBanco: {bank_name}\nMonto: {total}"
@@ -140,12 +140,12 @@ func (r *Repository) GetWhatsAppTransferTemplate(ctx context.Context, tenantID u
 	return tpl
 }
 
-func (r *Repository) GetWhatsAppLinkTemplate(ctx context.Context, tenantID uuid.UUID) string {
+func (r *Repository) GetWhatsAppLinkTemplate(ctx context.Context, orgID uuid.UUID) string {
 	var tpl string
 	err := r.db.WithContext(ctx).
 		Table("tenant_settings").
 		Select("wa_payment_link_template").
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Take(&tpl).Error
 	if err != nil || strings.TrimSpace(tpl) == "" {
 		return "Hola {party_name}, podes pagar {total} de tu compra {number} con este link: {payment_url}"
@@ -153,10 +153,10 @@ func (r *Repository) GetWhatsAppLinkTemplate(ctx context.Context, tenantID uuid.
 	return tpl
 }
 
-func (r *Repository) GetConnection(ctx context.Context, tenantID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error) {
+func (r *Repository) GetConnection(ctx context.Context, orgID uuid.UUID) (gatewaydomain.PaymentGatewayConnection, error) {
 	var row models.PaymentGatewayConnectionModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND is_active = true", tenantID).
+		Where("org_id = ? AND is_active = true", orgID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -212,7 +212,7 @@ func (r *Repository) ListActiveConnections(ctx context.Context) ([]gatewaydomain
 func (r *Repository) SaveConnection(ctx context.Context, in gatewaydomain.PaymentGatewayConnection) error {
 	now := time.Now().UTC()
 	row := models.PaymentGatewayConnectionModel{
-		TenantID:              in.TenantID,
+		OrgID:              in.OrgID,
 		Provider:              coalesce(in.Provider, "mercadopago"),
 		ExternalUserID:        strings.TrimSpace(in.ExternalUserID),
 		AccessTokenEncrypted:  strings.TrimSpace(in.AccessToken),
@@ -224,7 +224,7 @@ func (r *Repository) SaveConnection(ctx context.Context, in gatewaydomain.Paymen
 	}
 	return r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "tenant_id"}},
+			Columns: []clause.Column{{Name: "org_id"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"provider":                row.Provider,
 				"external_user_id":        row.ExternalUserID,
@@ -238,18 +238,18 @@ func (r *Repository) SaveConnection(ctx context.Context, in gatewaydomain.Paymen
 		Create(&row).Error
 }
 
-func (r *Repository) Disconnect(ctx context.Context, tenantID uuid.UUID) error {
+func (r *Repository) Disconnect(ctx context.Context, orgID uuid.UUID) error {
 	return r.db.WithContext(ctx).
 		Model(&models.PaymentGatewayConnectionModel{}).
-		Where("tenant_id = ?", tenantID).
+		Where("org_id = ?", orgID).
 		Updates(map[string]any{"is_active": false, "updated_at": gorm.Expr("now()")}).Error
 }
 
-func (r *Repository) CountMonthlyPreferences(ctx context.Context, tenantID uuid.UUID, since time.Time) (int64, error) {
+func (r *Repository) CountMonthlyPreferences(ctx context.Context, orgID uuid.UUID, since time.Time) (int64, error) {
 	var n int64
 	err := r.db.WithContext(ctx).
 		Table("payment_preferences").
-		Where("tenant_id = ? AND created_at >= ?", tenantID, since.UTC()).
+		Where("org_id = ? AND created_at >= ?", orgID, since.UTC()).
 		Count(&n).Error
 	return n, err
 }
@@ -257,7 +257,7 @@ func (r *Repository) CountMonthlyPreferences(ctx context.Context, tenantID uuid.
 func (r *Repository) SavePreference(ctx context.Context, in gatewaydomain.PaymentPreference) (gatewaydomain.PaymentPreference, error) {
 	row := models.PaymentPreferenceModel{
 		ID:              uuid.New(),
-		TenantID:        in.TenantID,
+		OrgID:        in.OrgID,
 		Provider:        coalesce(in.Provider, "mercadopago"),
 		ExternalID:      strings.TrimSpace(in.ExternalID),
 		ReferenceType:   strings.TrimSpace(in.ReferenceType),
@@ -278,10 +278,10 @@ func (r *Repository) SavePreference(ctx context.Context, in gatewaydomain.Paymen
 	return toPreferenceDomain(row), nil
 }
 
-func (r *Repository) GetLatestPreference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error) {
+func (r *Repository) GetLatestPreference(ctx context.Context, orgID uuid.UUID, refType string, refID uuid.UUID) (gatewaydomain.PaymentPreference, error) {
 	var row models.PaymentPreferenceModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND reference_type = ? AND reference_id = ?", tenantID, strings.TrimSpace(refType), refID).
+		Where("org_id = ? AND reference_type = ? AND reference_id = ?", orgID, strings.TrimSpace(refType), refID).
 		Order("created_at DESC").
 		Take(&row).Error
 	if err != nil {
@@ -308,7 +308,7 @@ func (r *Repository) GetPreferenceByExternalID(ctx context.Context, provider, ex
 	return toPreferenceDomain(row), nil
 }
 
-func (r *Repository) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error) {
+func (r *Repository) GetSaleSnapshot(ctx context.Context, orgID, saleID uuid.UUID) (gatewaydomain.SaleSnapshot, error) {
 	var row saleSnapshotRow
 	err := r.db.WithContext(ctx).
 		Table("sales s").
@@ -320,8 +320,8 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.
 			s.total,
 			s.currency
 		`).
-		Joins("LEFT JOIN parties p ON p.id = s.party_id AND p.tenant_id = s.tenant_id").
-		Where("s.tenant_id = ? AND s.id = ?", tenantID, saleID).
+		Joins("LEFT JOIN parties p ON p.id = s.party_id AND p.org_id = s.org_id").
+		Where("s.org_id = ? AND s.id = ?", orgID, saleID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -332,12 +332,12 @@ func (r *Repository) GetSaleSnapshot(ctx context.Context, tenantID, saleID uuid.
 	return gatewaydomain.SaleSnapshot(row), nil
 }
 
-func (r *Repository) GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error) {
+func (r *Repository) GetQuoteSnapshot(ctx context.Context, orgID, quoteID uuid.UUID) (gatewaydomain.QuoteSnapshot, error) {
 	var row quoteSnapshotRow
 	err := r.db.WithContext(ctx).
 		Table("quotes").
 		Select("id, number, COALESCE(party_name, '') AS customer_name, total, currency").
-		Where("tenant_id = ? AND id = ?", tenantID, quoteID).
+		Where("org_id = ? AND id = ?", orgID, quoteID).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -349,7 +349,7 @@ func (r *Repository) GetQuoteSnapshot(ctx context.Context, tenantID, quoteID uui
 }
 
 type ProcessSalePaymentInput struct {
-	TenantID      uuid.UUID
+	OrgID      uuid.UUID
 	SaleID        uuid.UUID
 	Amount        float64
 	ExternalPayID string
@@ -362,7 +362,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 		var pref models.PaymentPreferenceModel
 		if err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND reference_type = 'sale' AND reference_id = ?", in.TenantID, in.SaleID).
+			Where("org_id = ? AND reference_type = 'sale' AND reference_id = ?", in.OrgID, in.SaleID).
 			Order("created_at DESC").
 			Take(&pref).Error; err != nil {
 			return err
@@ -376,7 +376,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 			Clauses(clause.Locking{Strength: "UPDATE"}).
 			Table("sales").
 			Select("branch_id, number, total, amount_paid, currency, payment_method").
-			Where("tenant_id = ? AND id = ?", in.TenantID, in.SaleID).
+			Where("org_id = ? AND id = ?", in.OrgID, in.SaleID).
 			Take(&sale).Error; err != nil {
 			return err
 		}
@@ -417,7 +417,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 
 		var existing int64
 		if err := tx.Table("payments").
-			Where("tenant_id = ? AND reference_type = 'sale' AND reference_id = ? AND method = 'mercadopago' AND notes = ?", in.TenantID, in.SaleID, note).
+			Where("org_id = ? AND reference_type = 'sale' AND reference_id = ? AND method = 'mercadopago' AND notes = ?", in.OrgID, in.SaleID, note).
 			Count(&existing).Error; err != nil {
 			return err
 		}
@@ -426,9 +426,9 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 		}
 
 		if err := tx.Exec(`
-			INSERT INTO payments (id, tenant_id, reference_type, reference_id, method, amount, notes, received_at, created_by, created_at)
+			INSERT INTO payments (id, org_id, reference_type, reference_id, method, amount, notes, received_at, created_by, created_at)
 			VALUES (gen_random_uuid(), ?, 'sale', ?, 'mercadopago', ?, ?, ?, 'payment-gateway:webhook', now())
-		`, in.TenantID, in.SaleID, applied, note, paidAt).Error; err != nil {
+		`, in.OrgID, in.SaleID, applied, note, paidAt).Error; err != nil {
 			return err
 		}
 
@@ -444,20 +444,20 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 			        WHEN payment_method = 'cash' THEN 'mixed'
 			        ELSE payment_method
 			    END
-			WHERE tenant_id = ? AND id = ?
-		`, applied, applied, applied, in.TenantID, in.SaleID).Error; err != nil {
+			WHERE org_id = ? AND id = ?
+		`, applied, applied, applied, in.OrgID, in.SaleID).Error; err != nil {
 			return err
 		}
 
 		if err := tx.Exec(`
 			INSERT INTO cash_movements (
-				id, tenant_id, branch_id, type, amount, currency, category, description,
+				id, org_id, branch_id, type, amount, currency, category, description,
 				payment_method, reference_type, reference_id, created_by, created_at
 			) VALUES (
 				gen_random_uuid(), ?, ?, 'income', ?, ?, 'sale', ?,
 				'mercadopago', 'sale', ?, 'payment-gateway:webhook', now()
 			)
-		`, in.TenantID, sale.BranchID, applied, coalesce(sale.Currency, "ARS"), note, in.SaleID).Error; err != nil {
+		`, in.OrgID, sale.BranchID, applied, coalesce(sale.Currency, "ARS"), note, in.SaleID).Error; err != nil {
 			return err
 		}
 
@@ -467,7 +467,7 @@ func (r *Repository) ProcessApprovedSalePayment(ctx context.Context, in ProcessS
 
 func (r *Repository) MarkPreferenceApproved(
 	ctx context.Context,
-	tenantID uuid.UUID,
+	orgID uuid.UUID,
 	refType string,
 	refID uuid.UUID,
 	payerID string,
@@ -477,7 +477,7 @@ func (r *Repository) MarkPreferenceApproved(
 		var pref models.PaymentPreferenceModel
 		if err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("tenant_id = ? AND reference_type = ? AND reference_id = ?", tenantID, strings.TrimSpace(refType), refID).
+			Where("org_id = ? AND reference_type = ? AND reference_id = ?", orgID, strings.TrimSpace(refType), refID).
 			Order("created_at DESC").
 			Take(&pref).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -569,7 +569,7 @@ func (r *Repository) MarkWebhookEventError(ctx context.Context, id uuid.UUID, er
 
 func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.PaymentGatewayConnection {
 	return gatewaydomain.PaymentGatewayConnection{
-		TenantID:       in.TenantID,
+		OrgID:       in.OrgID,
 		Provider:       in.Provider,
 		ExternalUserID: in.ExternalUserID,
 		AccessToken:    in.AccessTokenEncrypted,
@@ -584,7 +584,7 @@ func toConnectionDomain(in models.PaymentGatewayConnectionModel) gatewaydomain.P
 func toPreferenceDomain(in models.PaymentPreferenceModel) gatewaydomain.PaymentPreference {
 	return gatewaydomain.PaymentPreference{
 		ID:              in.ID,
-		TenantID:        in.TenantID,
+		OrgID:        in.OrgID,
 		Provider:        in.Provider,
 		ExternalID:      in.ExternalID,
 		ReferenceType:   in.ReferenceType,

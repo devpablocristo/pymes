@@ -36,7 +36,7 @@ type UpdateRequest struct {
 // PolicyResponse política de procurement (CEL / governance).
 type PolicyResponse struct {
 	ID           uuid.UUID `json:"id"`
-	TenantID     uuid.UUID `json:"tenant_id"`
+	OrgID     uuid.UUID `json:"org_id"`
 	Name         string    `json:"name"`
 	Expression   string    `json:"expression"`
 	Effect       string    `json:"effect"`
@@ -73,7 +73,7 @@ type UpdatePolicyRequest struct {
 
 type RequestResponse struct {
 	ID             uuid.UUID       `json:"id"`
-	TenantID       uuid.UUID       `json:"tenant_id"`
+	OrgID       uuid.UUID       `json:"org_id"`
 	RequesterActor string          `json:"requester_actor"`
 	Title          string          `json:"title"`
 	Description    string          `json:"description"`

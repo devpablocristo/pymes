@@ -17,7 +17,7 @@ type fakeRepo struct {
 	businessInfo BusinessInfo
 }
 
-func (f *fakeRepo) ResolveTenantID(_ context.Context, _ string) (uuid.UUID, error) {
+func (f *fakeRepo) ResolveOrgID(_ context.Context, _ string) (uuid.UUID, error) {
 	return uuid.MustParse("00000000-0000-0000-0000-000000000001"), nil
 }
 
@@ -54,7 +54,7 @@ func TestHandlerGetAvailabilityForwardsSchedulingSelectors(t *testing.T) {
 	handler := NewHandler(repo)
 
 	router := gin.New()
-	group := router.Group("/v1/public/:tenant_id")
+	group := router.Group("/v1/public/:org_id")
 	handler.RegisterRoutes(group)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/public/demo-org/availability?date=2026-04-07&duration=30&branch_id=00000000-0000-0000-0000-000000000010&service_id=00000000-0000-0000-0000-000000000020&resource_id=00000000-0000-0000-0000-000000000030", nil)
@@ -82,7 +82,7 @@ func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &fakeRepo{
 		businessInfo: BusinessInfo{
-			TenantID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			OrgID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			Name:              "Demo Org",
 			Slug:              "demo-org",
 			BusinessName:      "Demo Scheduling",
@@ -92,7 +92,7 @@ func TestHandlerGetBusinessInfoReturnsSchedulingEnabled(t *testing.T) {
 	handler := NewHandler(repo)
 
 	router := gin.New()
-	group := router.Group("/v1/public/:tenant_id")
+	group := router.Group("/v1/public/:org_id")
 	handler.RegisterRoutes(group)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/public/demo-org/info", nil)

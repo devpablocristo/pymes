@@ -19,9 +19,9 @@ import (
 
 type RepositoryPort interface {
 	Create(ctx context.Context, in attachmentdomain.Attachment) (attachmentdomain.Attachment, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (attachmentdomain.Attachment, error)
-	Delete(ctx context.Context, tenantID, id uuid.UUID) error
-	ListByEntity(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	ListByEntity(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error)
 }
 
 type Usecases struct {
@@ -36,11 +36,11 @@ func NewUsecases(repo RepositoryPort, rootPath string) *Usecases {
 	return &Usecases{repo: repo, rootPath: rootPath}
 }
 
-func (u *Usecases) RequestUpload(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, fileName, contentType string, sizeBytes int64) (attachmentdomain.UploadRequest, error) {
-	if tenantID == uuid.Nil || entityID == uuid.Nil || strings.TrimSpace(entityType) == "" {
-		return attachmentdomain.UploadRequest{}, domainerr.Validation("tenant_id, entity_type and entity_id are required")
+func (u *Usecases) RequestUpload(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, fileName, contentType string, sizeBytes int64) (attachmentdomain.UploadRequest, error) {
+	if orgID == uuid.Nil || entityID == uuid.Nil || strings.TrimSpace(entityType) == "" {
+		return attachmentdomain.UploadRequest{}, domainerr.Validation("org_id, entity_type and entity_id are required")
 	}
-	storageKey := filepath.Join(tenantID.String(), strings.TrimSpace(entityType), entityID.String(), uuid.NewString()+"-"+sanitizeFileName(fileName))
+	storageKey := filepath.Join(orgID.String(), strings.TrimSpace(entityType), entityID.String(), uuid.NewString()+"-"+sanitizeFileName(fileName))
 	if err := os.MkdirAll(filepath.Dir(u.absolutePath(storageKey)), 0o755); err != nil {
 		return attachmentdomain.UploadRequest{}, err
 	}
@@ -85,8 +85,8 @@ func (u *Usecases) UploadContent(ctx context.Context, storageKey string, body io
 	return err
 }
 
-func (u *Usecases) GetDownloadLink(ctx context.Context, tenantID, id uuid.UUID) (attachmentdomain.Attachment, attachmentdomain.DownloadLink, error) {
-	item, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetDownloadLink(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, attachmentdomain.DownloadLink, error) {
+	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return attachmentdomain.Attachment{}, attachmentdomain.DownloadLink{}, domainerr.NotFoundf("attachment", id.String())
@@ -97,8 +97,8 @@ func (u *Usecases) GetDownloadLink(ctx context.Context, tenantID, id uuid.UUID) 
 	return item, attachmentdomain.DownloadLink{URL: "/v1/attachments/" + id.String() + "/download", ExpiresAt: now.Add(15 * time.Minute)}, nil
 }
 
-func (u *Usecases) OpenContent(ctx context.Context, tenantID, id uuid.UUID) (attachmentdomain.Attachment, *os.File, error) {
-	item, _, err := u.GetDownloadLink(ctx, tenantID, id)
+func (u *Usecases) OpenContent(ctx context.Context, orgID, id uuid.UUID) (attachmentdomain.Attachment, *os.File, error) {
+	item, _, err := u.GetDownloadLink(ctx, orgID, id)
 	if err != nil {
 		return attachmentdomain.Attachment{}, nil, err
 	}
@@ -109,8 +109,8 @@ func (u *Usecases) OpenContent(ctx context.Context, tenantID, id uuid.UUID) (att
 	return item, file, nil
 }
 
-func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
-	item, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	item, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("attachment", id.String())
@@ -118,11 +118,11 @@ func (u *Usecases) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 		return err
 	}
 	_ = os.Remove(u.absolutePath(item.StorageKey))
-	return u.repo.Delete(ctx, tenantID, id)
+	return u.repo.Delete(ctx, orgID, id)
 }
 
-func (u *Usecases) ListByEntity(ctx context.Context, tenantID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error) {
-	return u.repo.ListByEntity(ctx, tenantID, strings.TrimSpace(entityType), entityID, limit)
+func (u *Usecases) ListByEntity(ctx context.Context, orgID uuid.UUID, entityType string, entityID uuid.UUID, limit int) ([]attachmentdomain.Attachment, error) {
+	return u.repo.ListByEntity(ctx, orgID, strings.TrimSpace(entityType), entityID, limit)
 }
 
 func (u *Usecases) absolutePath(storageKey string) string {

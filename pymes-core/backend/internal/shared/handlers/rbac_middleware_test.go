@@ -15,9 +15,9 @@ type fakeChecker struct {
 	allow bool
 }
 
-func (f fakeChecker) HasPermission(ctx context.Context, tenantID, actor, role string, scopes []string, authMethod, resource, action string) bool {
+func (f fakeChecker) HasPermission(ctx context.Context, orgID, actor, role string, scopes []string, authMethod, resource, action string) bool {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = actor
 	_ = role
 	_ = scopes

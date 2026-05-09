@@ -39,12 +39,12 @@ func copyPrincipalToGin(c *gin.Context, reqCtx context.Context) {
 	authMethod := strings.TrimSpace(principal.AuthMethod)
 
 	var tenantIDStr string
-	if id, err := uuid.Parse(strings.TrimSpace(principal.TenantID)); err == nil {
+	if id, err := uuid.Parse(strings.TrimSpace(principal.OrgID)); err == nil {
 		tenantIDStr = id.String()
 		c.Set(ctxkeys.CtxKeyOrgID, tenantIDStr)
 		c.Set(ctxkeys.CtxKeyTenantID, tenantIDStr)
-	} else if strings.TrimSpace(principal.TenantID) != "" {
-		tenantIDStr = strings.TrimSpace(principal.TenantID)
+	} else if strings.TrimSpace(principal.OrgID) != "" {
+		tenantIDStr = strings.TrimSpace(principal.OrgID)
 		c.Set(ctxkeys.CtxKeyOrgID, tenantIDStr)
 		c.Set(ctxkeys.CtxKeyTenantID, tenantIDStr)
 	}

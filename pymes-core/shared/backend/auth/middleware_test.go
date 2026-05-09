@@ -22,13 +22,13 @@ func (s stubAPIKeyResolver) ResolveAPIKey(string) (ResolvedKey, bool) {
 	return s.key, s.ok
 }
 
-type stubTenantRefResolver struct {
-	tenantID string
+type stubOrgRefResolver struct {
+	orgID string
 	err      error
 }
 
-func (s stubTenantRefResolver) ResolveTenantID(context.Context, string) (string, error) {
-	return s.tenantID, s.err
+func (s stubOrgRefResolver) ResolveOrgID(context.Context, string) (string, error) {
+	return s.orgID, s.err
 }
 
 func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
@@ -36,12 +36,12 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	keyID := uuid.MustParse("00000000-0000-0000-0000-000000000010")
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000020")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000020")
 	middleware := NewAuthMiddleware(nil, stubAPIKeyResolver{
 		ok: true,
 		key: ResolvedKey{
 			ID:       keyID,
-			TenantID: tenantID,
+			OrgID: orgID,
 			Scopes:   []string{"customers:read", "customers:write"},
 		},
 	}, false, true)
@@ -76,8 +76,8 @@ func TestRequireAuthAPIKeyUsesServiceIdentity(t *testing.T) {
 	if got.Role != "service" {
 		t.Fatalf("expected service role, got %q", got.Role)
 	}
-	if got.TenantID != tenantID.String() {
-		t.Fatalf("expected org %q, got %q", tenantID.String(), got.TenantID)
+	if got.OrgID != orgID.String() {
+		t.Fatalf("expected org %q, got %q", orgID.String(), got.OrgID)
 	}
 	if got.AuthMethod != "api_key" {
 		t.Fatalf("expected auth method api_key, got %q", got.AuthMethod)
@@ -97,7 +97,7 @@ func TestRequireTenantSlugBindingRequiresHeaderForJWT(t *testing.T) {
 		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
 		c.Next()
 	})
-	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-1"}))
+	router.Use(RequireTenantSlugBinding(stubOrgRefResolver{orgID: "tenant-1"}))
 	router.GET("/protected", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
@@ -123,7 +123,7 @@ func TestRequireTenantSlugBindingRejectsMismatch(t *testing.T) {
 		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
 		c.Next()
 	})
-	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-2"}))
+	router.Use(RequireTenantSlugBinding(stubOrgRefResolver{orgID: "tenant-2"}))
 	router.GET("/protected", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
@@ -151,7 +151,7 @@ func TestRequireTenantSlugBindingAllowsMatchingSlug(t *testing.T) {
 		c.Set(ctxkeys.CtxKeyAuthMethod, "jwt")
 		c.Next()
 	})
-	router.Use(RequireTenantSlugBinding(stubTenantRefResolver{tenantID: "tenant-1"}))
+	router.Use(RequireTenantSlugBinding(stubOrgRefResolver{orgID: "tenant-1"}))
 	router.GET("/protected", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})

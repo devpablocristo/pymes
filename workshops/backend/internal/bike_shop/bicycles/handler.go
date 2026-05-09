@@ -20,13 +20,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]domain.Bicycle, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID) ([]domain.Bicycle, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Bicycle, error)
 	Create(ctx context.Context, in domain.Bicycle, actor string) (domain.Bicycle, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Bicycle, error)
-	Update(ctx context.Context, tenantID, id uuid.UUID, in UpdateInput, actor string) (domain.Bicycle, error)
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Bicycle, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput, actor string) (domain.Bicycle, error)
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct {
@@ -51,7 +51,7 @@ func (h *Handler) RegisterRoutes(authGroup *gin.RouterGroup) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -61,7 +61,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Limit:    limit,
 		After:    after,
 		Search:   c.Query("search"),
@@ -78,11 +78,11 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) ListArchived(c *gin.Context) {
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), tenantID)
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -93,7 +93,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	authCtx := auth.GetAuthContext(c)
-	tenantID, ok := verticalgin.ParseAuthTenantID(c)
+	orgID, ok := verticalgin.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -107,7 +107,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.Create(c.Request.Context(), domain.Bicycle{
-		TenantID:        tenantID,
+		OrgID:        orgID,
 		CustomerID:      vertvalues.ParseOptionalUUID(req.CustomerID),
 		CustomerName:    req.CustomerName,
 		FrameNumber:     req.FrameNumber,
@@ -130,11 +130,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -143,7 +143,7 @@ func (h *Handler) Get(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
@@ -152,7 +152,7 @@ func (h *Handler) Update(c *gin.Context) {
 		verticalgin.WriteValidation(c, "invalid request body")
 		return
 	}
-	out, err := h.uc.Update(c.Request.Context(), tenantID, id, UpdateInput{
+	out, err := h.uc.Update(c.Request.Context(), orgID, id, UpdateInput{
 		CustomerID:      req.CustomerID,
 		CustomerName:    req.CustomerName,
 		FrameNumber:     req.FrameNumber,
@@ -175,11 +175,11 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -191,11 +191,11 @@ func (h *Handler) Archive(c *gin.Context) {
 }
 
 func (h *Handler) Restore(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -203,11 +203,11 @@ func (h *Handler) Restore(c *gin.Context) {
 }
 
 func (h *Handler) HardDelete(c *gin.Context) {
-	tenantID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := verticalgin.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, auth.GetAuthContext(c).Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, auth.GetAuthContext(c).Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -229,7 +229,7 @@ func toBicycleItem(item domain.Bicycle) dto.BicycleItem {
 	}
 	result := dto.BicycleItem{
 		ID:              item.ID.String(),
-		TenantID:        item.TenantID.String(),
+		OrgID:        item.OrgID.String(),
 		CustomerName:    item.CustomerName,
 		FrameNumber:     item.FrameNumber,
 		Brand:           item.Brand,

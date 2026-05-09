@@ -8,7 +8,7 @@ import (
 
 type StockLevel struct {
 	ProductID   uuid.UUID  `json:"product_id"`
-	TenantID    uuid.UUID  `json:"tenant_id"`
+	OrgID    uuid.UUID  `json:"org_id"`
 	BranchID    *uuid.UUID `json:"branch_id,omitempty"`
 	ProductName string     `json:"product_name"`
 	SKU         string     `json:"sku,omitempty"`
@@ -21,7 +21,7 @@ type StockLevel struct {
 
 type StockMovement struct {
 	ID          uuid.UUID  `json:"id"`
-	TenantID    uuid.UUID  `json:"tenant_id"`
+	OrgID    uuid.UUID  `json:"org_id"`
 	BranchID    *uuid.UUID `json:"branch_id,omitempty"`
 	ProductID   uuid.UUID  `json:"product_id"`
 	ProductName string     `json:"product_name"`

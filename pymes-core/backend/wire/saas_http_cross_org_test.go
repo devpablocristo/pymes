@@ -11,7 +11,7 @@ type crossOrgJWTVerifier struct{}
 
 func (crossOrgJWTVerifier) Verify(_ context.Context, _ string) (tenantPrincipal, error) {
 	return tenantPrincipal{
-		TenantID:   "org-a",
+		OrgID:   "org-a",
 		Actor:      "user-1",
 		Role:       "admin",
 		Scopes:     []string{"admin:console:write"},

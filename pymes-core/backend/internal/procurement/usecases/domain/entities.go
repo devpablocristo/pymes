@@ -20,7 +20,7 @@ const (
 
 type ProcurementRequest struct {
 	ID             uuid.UUID
-	TenantID       uuid.UUID
+	OrgID       uuid.UUID
 	RequesterActor string
 	Title          string
 	Description    string

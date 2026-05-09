@@ -14,7 +14,7 @@ import (
 )
 
 type tenantPrincipal struct {
-	TenantID   string
+	OrgID   string
 	Actor      string
 	Role       string
 	Scopes     []string
@@ -40,7 +40,7 @@ type tenantPrincipalVerifier interface {
 }
 
 type tenantRefResolver func(ctx context.Context, ref string) (uuid.UUID, bool, error)
-type tenantMembershipResolver func(ctx context.Context, tenantID uuid.UUID, actor string) (string, bool, error)
+type tenantMembershipResolver func(ctx context.Context, orgID uuid.UUID, actor string) (string, bool, error)
 
 func newTenantAuthMiddleware(jwtVerifier, apiKeyVerifier tenantPrincipalVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -106,7 +106,7 @@ func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal t
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_slug_required", "tenant slug header is required")
 		return tenantPrincipal{}, false
 	}
-	resolvedTenantID, ok, err := resolve(ctx, slug)
+	resolvedOrgID, ok, err := resolve(ctx, slug)
 	if err != nil {
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
 		return tenantPrincipal{}, false
@@ -115,7 +115,7 @@ func tenantSlugMatchesPrincipal(ctx context.Context, rawSlug string, principal t
 		writeTenantJSONError(w, http.StatusForbidden, "tenant_mismatch", "tenant slug is not valid for this session")
 		return tenantPrincipal{}, false
 	}
-	if strings.EqualFold(strings.TrimSpace(principal.TenantID), resolvedTenantID.String()) {
+	if strings.EqualFold(strings.TrimSpace(principal.OrgID), resolvedOrgID.String()) {
 		return principal, true
 	}
 	_ = membership

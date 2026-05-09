@@ -33,7 +33,7 @@ func (r *Repository) UpsertConnection(ctx context.Context, conn domain.Connectio
 	now := time.Now().UTC()
 	row := models.CalendarSyncConnectionModel{
 		ID:                    conn.ID,
-		TenantID:              conn.TenantID,
+		OrgID:              conn.OrgID,
 		CreatedBy:             conn.CreatedBy,
 		Provider:              string(conn.Provider),
 		ProviderAccountEmail:  conn.ProviderAccountEmail,
@@ -50,7 +50,7 @@ func (r *Repository) UpsertConnection(ctx context.Context, conn domain.Connectio
 	// Buscar existente activa o revocada para este (org, creator, provider).
 	var existing models.CalendarSyncConnectionModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND created_by = ? AND provider = ?", conn.TenantID, conn.CreatedBy, string(conn.Provider)).
+		Where("org_id = ? AND created_by = ? AND provider = ?", conn.OrgID, conn.CreatedBy, string(conn.Provider)).
 		Take(&existing).Error
 	if err == nil {
 		// Update in place: conserva ID y created_at originales.
@@ -98,10 +98,10 @@ func (r *Repository) UpsertConnection(ctx context.Context, conn domain.Connectio
 
 // ListByCreator devuelve todas las conexiones (activas y revocadas) que el
 // usuario emitió en su org. Útil para mostrar la sección "mis integraciones".
-func (r *Repository) ListByCreator(ctx context.Context, tenantID uuid.UUID, createdBy string) ([]domain.Connection, error) {
+func (r *Repository) ListByCreator(ctx context.Context, orgID uuid.UUID, createdBy string) ([]domain.Connection, error) {
 	var rows []models.CalendarSyncConnectionModel
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND created_by = ?", tenantID, createdBy).
+		Where("org_id = ? AND created_by = ?", orgID, createdBy).
 		Order("created_at DESC").
 		Find(&rows).Error
 	if err != nil {
@@ -116,11 +116,11 @@ func (r *Repository) ListByCreator(ctx context.Context, tenantID uuid.UUID, crea
 
 // RevokeConnection marca como revocada. Defensa: sólo el creador puede
 // revocar su propia conexión.
-func (r *Repository) RevokeConnection(ctx context.Context, tenantID uuid.UUID, createdBy string, id uuid.UUID) error {
+func (r *Repository) RevokeConnection(ctx context.Context, orgID uuid.UUID, createdBy string, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).
 		Model(&models.CalendarSyncConnectionModel{}).
-		Where("tenant_id = ? AND created_by = ? AND id = ? AND revoked_at IS NULL", tenantID, createdBy, id).
+		Where("org_id = ? AND created_by = ? AND id = ? AND revoked_at IS NULL", orgID, createdBy, id).
 		Updates(map[string]any{"revoked_at": now, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -136,7 +136,7 @@ func (r *Repository) RevokeConnection(ctx context.Context, tenantID uuid.UUID, c
 func (r *Repository) CreateOAuthState(ctx context.Context, st domain.OAuthState) error {
 	row := models.CalendarSyncOAuthStateModel{
 		State:     st.State,
-		TenantID:  st.TenantID,
+		OrgID:  st.OrgID,
 		CreatedBy: st.CreatedBy,
 		Provider:  string(st.Provider),
 		ExpiresAt: st.ExpiresAt,
@@ -181,7 +181,7 @@ func (r *Repository) PurgeExpiredOAuthStates(ctx context.Context) error {
 func toDomainConnection(row models.CalendarSyncConnectionModel) domain.Connection {
 	return domain.Connection{
 		ID:                    row.ID,
-		TenantID:              row.TenantID,
+		OrgID:              row.OrgID,
 		CreatedBy:             row.CreatedBy,
 		Provider:              domain.Provider(row.Provider),
 		ProviderAccountEmail:  row.ProviderAccountEmail,
@@ -203,7 +203,7 @@ func toDomainConnection(row models.CalendarSyncConnectionModel) domain.Connectio
 func toDomainOAuthState(row models.CalendarSyncOAuthStateModel) domain.OAuthState {
 	return domain.OAuthState{
 		State:     row.State,
-		TenantID:  row.TenantID,
+		OrgID:  row.OrgID,
 		CreatedBy: row.CreatedBy,
 		Provider:  domain.Provider(row.Provider),
 		ExpiresAt: row.ExpiresAt,

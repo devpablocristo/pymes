@@ -10,18 +10,18 @@ import (
 )
 
 // GetTenantNameByID devuelve el nombre legible del tenant para el UUID interno.
-func (s *pymesSaaSStore) GetTenantNameByID(ctx context.Context, tenantID string) (string, bool, error) {
-	name, _, ok, err := s.GetTenantNameSlugByID(ctx, tenantID)
+func (s *pymesSaaSStore) GetTenantNameByID(ctx context.Context, orgID string) (string, bool, error) {
+	name, _, ok, err := s.GetTenantNameSlugByID(ctx, orgID)
 	return name, ok, err
 }
 
 // GetTenantNameSlugByID devuelve nombre y slug del tenant para el UUID interno.
-func (s *pymesSaaSStore) GetTenantNameSlugByID(ctx context.Context, tenantID string) (string, string, bool, error) {
-	tenantID = strings.TrimSpace(tenantID)
-	if tenantID == "" {
+func (s *pymesSaaSStore) GetTenantNameSlugByID(ctx context.Context, orgID string) (string, string, bool, error) {
+	orgID = strings.TrimSpace(orgID)
+	if orgID == "" {
 		return "", "", false, nil
 	}
-	id, err := uuid.Parse(tenantID)
+	id, err := uuid.Parse(orgID)
 	if err != nil {
 		return "", "", false, nil
 	}
@@ -49,11 +49,11 @@ func (s *pymesSaaSStore) ResolveTenantIDByExternalRef(ctx context.Context, ref s
 	if ref == "" {
 		return "", false, nil
 	}
-	if tenantID, ok, err := s.findTenantIDByUUID(ctx, ref); ok || err != nil {
-		return tenantID, ok, err
+	if orgID, ok, err := s.findTenantIDByUUID(ctx, ref); ok || err != nil {
+		return orgID, ok, err
 	}
-	if tenantID, ok, err := s.findTenantIDByExternalRef(ctx, ref); ok || err != nil {
-		return tenantID, ok, err
+	if orgID, ok, err := s.findTenantIDByExternalRef(ctx, ref); ok || err != nil {
+		return orgID, ok, err
 	}
 	return "", false, nil
 }

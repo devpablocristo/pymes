@@ -15,20 +15,20 @@ import (
 )
 
 type RepositoryPort interface {
-	List(ctx context.Context, tenantID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error)
+	List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error)
 	Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (recurringdomain.RecurringExpense, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (recurringdomain.RecurringExpense, error)
 	Update(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error)
-	Deactivate(ctx context.Context, tenantID, id uuid.UUID) error
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID) error
-	GetCurrency(ctx context.Context, tenantID uuid.UUID) string
+	Deactivate(ctx context.Context, orgID, id uuid.UUID) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID) error
+	Restore(ctx context.Context, orgID, id uuid.UUID) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID) error
+	GetCurrency(ctx context.Context, orgID uuid.UUID) string
 }
 
 type AuditPort interface {
-	Log(ctx context.Context, tenantID string, actor, action, resourceType, resourceID string, payload map[string]any)
+	Log(ctx context.Context, orgID string, actor, action, resourceType, resourceID string, payload map[string]any)
 }
 
 type Usecases struct {
@@ -40,16 +40,16 @@ func NewUsecases(repo RepositoryPort, audit AuditPort) *Usecases {
 	return &Usecases{repo: repo, audit: audit}
 }
 
-func (u *Usecases) List(ctx context.Context, tenantID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
-	return u.repo.List(ctx, tenantID, activeOnly, limit)
+func (u *Usecases) List(ctx context.Context, orgID uuid.UUID, activeOnly bool, limit int) ([]recurringdomain.RecurringExpense, error) {
+	return u.repo.List(ctx, orgID, activeOnly, limit)
 }
 
-func (u *Usecases) ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error) {
-	return u.repo.ListArchived(ctx, tenantID, limit)
+func (u *Usecases) ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]recurringdomain.RecurringExpense, error) {
+	return u.repo.ListArchived(ctx, orgID, limit)
 }
 
 func (u *Usecases) Create(ctx context.Context, in recurringdomain.RecurringExpense) (recurringdomain.RecurringExpense, error) {
-	prepared, err := prepareRecurring(in, true, u.repo.GetCurrency(ctx, in.TenantID))
+	prepared, err := prepareRecurring(in, true, u.repo.GetCurrency(ctx, in.OrgID))
 	if err != nil {
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -61,13 +61,13 @@ func (u *Usecases) Create(ctx context.Context, in recurringdomain.RecurringExpen
 		return recurringdomain.RecurringExpense{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.TenantID.String(), in.CreatedBy, "recurring_expense.created", "recurring_expense", out.ID.String(), map[string]any{"amount": out.Amount})
+		u.audit.Log(ctx, in.OrgID.String(), in.CreatedBy, "recurring_expense.created", "recurring_expense", out.ID.String(), map[string]any{"amount": out.Amount})
 	}
 	return out, nil
 }
 
-func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (recurringdomain.RecurringExpense, error) {
-	out, err := u.repo.GetByID(ctx, tenantID, id)
+func (u *Usecases) GetByID(ctx context.Context, orgID, id uuid.UUID) (recurringdomain.RecurringExpense, error) {
+	out, err := u.repo.GetByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return recurringdomain.RecurringExpense{}, domainerr.NotFoundf("recurring_expense", id.String())
@@ -78,7 +78,7 @@ func (u *Usecases) GetByID(ctx context.Context, tenantID, id uuid.UUID) (recurri
 }
 
 func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpense, actor string) (recurringdomain.RecurringExpense, error) {
-	current, err := u.repo.GetByID(ctx, in.TenantID, in.ID)
+	current, err := u.repo.GetByID(ctx, in.OrgID, in.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return recurringdomain.RecurringExpense{}, domainerr.NotFoundf("recurring_expense", in.ID.String())
@@ -89,7 +89,7 @@ func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpen
 		return recurringdomain.RecurringExpense{}, err
 	}
 	mergeRecurring(&current, in)
-	current, err = prepareRecurring(current, false, u.repo.GetCurrency(ctx, current.TenantID))
+	current, err = prepareRecurring(current, false, u.repo.GetCurrency(ctx, current.OrgID))
 	if err != nil {
 		return recurringdomain.RecurringExpense{}, err
 	}
@@ -98,59 +98,59 @@ func (u *Usecases) Update(ctx context.Context, in recurringdomain.RecurringExpen
 		return recurringdomain.RecurringExpense{}, err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, in.TenantID.String(), actor, "recurring_expense.updated", "recurring_expense", out.ID.String(), map[string]any{"amount": out.Amount})
+		u.audit.Log(ctx, in.OrgID.String(), actor, "recurring_expense.updated", "recurring_expense", out.ID.String(), map[string]any{"amount": out.Amount})
 	}
 	return out, nil
 }
 
-func (u *Usecases) Deactivate(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Deactivate(ctx, tenantID, id); err != nil {
+func (u *Usecases) Deactivate(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Deactivate(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "recurring_expense.deactivated", "recurring_expense", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.deactivated", "recurring_expense", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.SoftDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.SoftDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "recurring_expense.archived", "recurring_expense", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.archived", "recurring_expense", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.Restore(ctx, tenantID, id); err != nil {
+func (u *Usecases) Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.Restore(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "recurring_expense.restored", "recurring_expense", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.restored", "recurring_expense", id.String(), nil)
 	}
 	return nil
 }
 
-func (u *Usecases) HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error {
-	if err := u.repo.HardDelete(ctx, tenantID, id); err != nil {
+func (u *Usecases) HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error {
+	if err := u.repo.HardDelete(ctx, orgID, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domainerr.NotFoundf("recurring_expense", id.String())
 		}
 		return err
 	}
 	if u.audit != nil {
-		u.audit.Log(ctx, tenantID.String(), actor, "recurring_expense.hard_deleted", "recurring_expense", id.String(), nil)
+		u.audit.Log(ctx, orgID.String(), actor, "recurring_expense.hard_deleted", "recurring_expense", id.String(), nil)
 	}
 	return nil
 }
@@ -160,8 +160,8 @@ var allowedFrequencies = map[string]struct{}{
 }
 
 func prepareRecurring(in recurringdomain.RecurringExpense, creating bool, defaultCurrency string) (recurringdomain.RecurringExpense, error) {
-	if creating && in.TenantID == uuid.Nil {
-		return recurringdomain.RecurringExpense{}, domainerr.Validation("tenant_id is required")
+	if creating && in.OrgID == uuid.Nil {
+		return recurringdomain.RecurringExpense{}, domainerr.Validation("org_id is required")
 	}
 	if strings.TrimSpace(in.Description) == "" {
 		return recurringdomain.RecurringExpense{}, domainerr.Validation("description is required")

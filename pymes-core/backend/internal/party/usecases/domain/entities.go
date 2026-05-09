@@ -16,7 +16,7 @@ type Address struct {
 
 type Party struct {
 	ID           uuid.UUID          `json:"id"`
-	TenantID     uuid.UUID          `json:"tenant_id"`
+	OrgID     uuid.UUID          `json:"org_id"`
 	PartyType    string             `json:"party_type"`
 	DisplayName  string             `json:"display_name"`
 	Email        string             `json:"email,omitempty"`
@@ -57,7 +57,7 @@ type PartyAgent struct {
 type PartyRole struct {
 	ID          uuid.UUID      `json:"id"`
 	PartyID     uuid.UUID      `json:"party_id"`
-	TenantID    uuid.UUID      `json:"tenant_id"`
+	OrgID    uuid.UUID      `json:"org_id"`
 	Role        string         `json:"role"`
 	IsActive    bool           `json:"is_active"`
 	PriceListID *uuid.UUID     `json:"price_list_id,omitempty"`
@@ -67,7 +67,7 @@ type PartyRole struct {
 
 type PartyRelationship struct {
 	ID               uuid.UUID      `json:"id"`
-	TenantID         uuid.UUID      `json:"tenant_id"`
+	OrgID         uuid.UUID      `json:"org_id"`
 	FromPartyID      uuid.UUID      `json:"from_party_id"`
 	ToPartyID        uuid.UUID      `json:"to_party_id"`
 	RelationshipType string         `json:"relationship_type"`

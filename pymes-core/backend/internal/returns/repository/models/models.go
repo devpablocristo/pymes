@@ -9,7 +9,7 @@ import (
 
 type ReturnModel struct {
 	ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	TenantID     uuid.UUID      `gorm:"type:uuid;index;not null"`
+	OrgID     uuid.UUID      `gorm:"type:uuid;index;not null"`
 	Number       string         `gorm:"not null"`
 	SaleID       uuid.UUID      `gorm:"type:uuid;not null"`
 	Reason       string         `gorm:"not null"`
@@ -44,7 +44,7 @@ func (ReturnItemModel) TableName() string { return "return_items" }
 
 type CreditNoteModel struct {
 	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID   uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID   uuid.UUID  `gorm:"type:uuid;index;not null"`
 	Number     string     `gorm:"not null"`
 	PartyID    uuid.UUID  `gorm:"column:party_id;type:uuid;not null"`
 	ReturnID   *uuid.UUID `gorm:"type:uuid"`

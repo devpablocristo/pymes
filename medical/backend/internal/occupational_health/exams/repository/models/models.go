@@ -10,7 +10,7 @@ import (
 
 type ExamModel struct {
 	ID              uuid.UUID      `gorm:"column:id;type:uuid;primaryKey"`
-	TenantID        uuid.UUID      `gorm:"column:tenant_id;type:uuid;index"`
+	OrgID        uuid.UUID      `gorm:"column:org_id;type:uuid;index"`
 	PatientName     string         `gorm:"column:patient_name"`
 	PatientDocument string         `gorm:"column:patient_document"`
 	EmployerName    string         `gorm:"column:employer_name"`

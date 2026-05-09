@@ -29,7 +29,7 @@ func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 // List devuelve una página de OTs no archivadas, opcionalmente filtradas por asset_type/status/search.
 func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder, int64, bool, *uuid.UUID, error) {
 	limit := pagination.NormalizeLimit(p.Limit, pagination.Config{DefaultLimit: 20, MaxLimit: 250})
-	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("tenant_id = ? AND archived_at IS NULL", p.TenantID)
+	q := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND archived_at IS NULL", p.OrgID)
 	if p.BranchID != nil && *p.BranchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *p.BranchID)
 	}
@@ -63,7 +63,7 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	}
 	out := make([]domain.WorkOrder, 0, len(rows))
 	for _, row := range rows {
-		items, err := r.loadItems(ctx, row.TenantID, row.ID)
+		items, err := r.loadItems(ctx, row.OrgID, row.ID)
 		if err != nil {
 			return nil, 0, false, nil, err
 		}
@@ -77,10 +77,10 @@ func (r *Repository) List(ctx context.Context, p ListParams) ([]domain.WorkOrder
 	return out, total, hasMore, next, nil
 }
 
-func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
+func (r *Repository) ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID, assetType string) ([]domain.WorkOrder, error) {
 	q := r.db.WithContext(ctx).
 		Model(&models.WorkOrderModel{}).
-		Where("tenant_id = ? AND archived_at IS NOT NULL", tenantID)
+		Where("org_id = ? AND archived_at IS NOT NULL", orgID)
 	if branchID != nil && *branchID != uuid.Nil {
 		q = q.Where("(branch_id = ? OR branch_id IS NULL)", *branchID)
 	}
@@ -93,7 +93,7 @@ func (r *Repository) ListArchived(ctx context.Context, tenantID uuid.UUID, branc
 	}
 	out := make([]domain.WorkOrder, 0, len(rows))
 	for _, row := range rows {
-		items, err := r.loadItems(ctx, row.TenantID, row.ID)
+		items, err := r.loadItems(ctx, row.OrgID, row.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +107,7 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 		metadata, _ := json.Marshal(in.Metadata)
 		row := models.WorkOrderModel{
 			ID:               uuid.New(),
-			TenantID:         in.TenantID,
+			OrgID:         in.OrgID,
 			BranchID:         in.BranchID,
 			Number:           in.Number,
 			AssetType:        in.AssetType,
@@ -143,23 +143,23 @@ func (r *Repository) Create(ctx context.Context, in domain.WorkOrder) (domain.Wo
 		if err := tx.Create(&row).Error; err != nil {
 			return err
 		}
-		return r.replaceItems(ctx, tx, in.TenantID, in.ID, in.Items)
+		return r.replaceItems(ctx, tx, in.OrgID, in.ID, in.Items)
 	})
 	if err != nil {
 		return domain.WorkOrder{}, err
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.WorkOrder, error) {
+func (r *Repository) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.WorkOrder, error) {
 	var row models.WorkOrderModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return domain.WorkOrder{}, gorm.ErrRecordNotFound
 		}
 		return domain.WorkOrder{}, err
 	}
-	items, err := r.loadItems(ctx, tenantID, id)
+	items, err := r.loadItems(ctx, orgID, id)
 	if err != nil {
 		return domain.WorkOrder{}, err
 	}
@@ -198,22 +198,22 @@ func (r *Repository) Update(ctx context.Context, in domain.WorkOrder) (domain.Wo
 			"tags":              pq.StringArray(utils.NormalizeTags(in.Tags)),
 			"updated_at":        time.Now().UTC(),
 		}
-		res := tx.Model(&models.WorkOrderModel{}).Where("tenant_id = ? AND id = ? AND archived_at IS NULL", in.TenantID, in.ID).Updates(updates)
+		res := tx.Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", in.OrgID, in.ID).Updates(updates)
 		if res.Error != nil {
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
 		}
-		return r.replaceItems(ctx, tx, in.TenantID, in.ID, in.Items)
+		return r.replaceItems(ctx, tx, in.OrgID, in.ID, in.Items)
 	})
 	if err != nil {
 		return domain.WorkOrder{}, err
 	}
-	return r.GetByID(ctx, in.TenantID, in.ID)
+	return r.GetByID(ctx, in.OrgID, in.ID)
 }
 
-func (r *Repository) SaveIntegrations(ctx context.Context, tenantID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error) {
+func (r *Repository) SaveIntegrations(ctx context.Context, orgID, id uuid.UUID, quoteID, saleID *uuid.UUID, status *string) (domain.WorkOrder, error) {
 	updates := map[string]any{"updated_at": time.Now().UTC()}
 	if quoteID != nil {
 		updates["quote_id"] = quoteID
@@ -224,20 +224,20 @@ func (r *Repository) SaveIntegrations(ctx context.Context, tenantID, id uuid.UUI
 	if status != nil {
 		updates["status"] = *status
 	}
-	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("tenant_id = ? AND id = ? AND archived_at IS NULL", tenantID, id).Updates(updates)
+	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).Updates(updates)
 	if res.Error != nil {
 		return domain.WorkOrder{}, res.Error
 	}
 	if res.RowsAffected == 0 {
 		return domain.WorkOrder{}, gorm.ErrRecordNotFound
 	}
-	return r.GetByID(ctx, tenantID, id)
+	return r.GetByID(ctx, orgID, id)
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
-		Where("tenant_id = ? AND id = ? AND archived_at IS NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NULL", orgID, id).
 		Updates(map[string]any{"archived_at": now, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -248,10 +248,10 @@ func (r *Repository) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.WorkOrderModel{}).
-		Where("tenant_id = ? AND id = ? AND archived_at IS NOT NULL", tenantID, id).
+		Where("org_id = ? AND id = ? AND archived_at IS NOT NULL", orgID, id).
 		Updates(map[string]any{"archived_at": nil, "updated_at": now})
 	if res.Error != nil {
 		return res.Error
@@ -262,9 +262,9 @@ func (r *Repository) Restore(ctx context.Context, tenantID, id uuid.UUID) error 
 	return nil
 }
 
-func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (r *Repository) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	var row models.WorkOrderModel
-	if err := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Take(&row).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Take(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return gorm.ErrRecordNotFound
 		}
@@ -276,7 +276,7 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	if row.QuoteID != nil || row.SaleID != nil {
 		return ErrWorkOrderHasIntegrations
 	}
-	res := r.db.WithContext(ctx).Where("tenant_id = ? AND id = ?", tenantID, id).Delete(&models.WorkOrderModel{})
+	res := r.db.WithContext(ctx).Where("org_id = ? AND id = ?", orgID, id).Delete(&models.WorkOrderModel{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -286,15 +286,15 @@ func (r *Repository) HardDelete(ctx context.Context, tenantID, id uuid.UUID) err
 	return nil
 }
 
-func (r *Repository) replaceItems(ctx context.Context, tx *gorm.DB, tenantID, workOrderID uuid.UUID, items []domain.WorkOrderItem) error {
-	if err := tx.WithContext(ctx).Where("tenant_id = ? AND work_order_id = ?", tenantID, workOrderID).Delete(&models.WorkOrderItemModel{}).Error; err != nil {
+func (r *Repository) replaceItems(ctx context.Context, tx *gorm.DB, orgID, workOrderID uuid.UUID, items []domain.WorkOrderItem) error {
+	if err := tx.WithContext(ctx).Where("org_id = ? AND work_order_id = ?", orgID, workOrderID).Delete(&models.WorkOrderItemModel{}).Error; err != nil {
 		return err
 	}
 	for index, item := range items {
 		metadata, _ := json.Marshal(item.Metadata)
 		row := models.WorkOrderItemModel{
 			ID:          uuid.New(),
-			TenantID:    tenantID,
+			OrgID:    orgID,
 			WorkOrderID: workOrderID,
 			ItemType:    item.ItemType,
 			ServiceID:   item.ServiceID,
@@ -315,10 +315,10 @@ func (r *Repository) replaceItems(ctx context.Context, tx *gorm.DB, tenantID, wo
 	return nil
 }
 
-func (r *Repository) loadItems(ctx context.Context, tenantID, workOrderID uuid.UUID) ([]domain.WorkOrderItem, error) {
+func (r *Repository) loadItems(ctx context.Context, orgID, workOrderID uuid.UUID) ([]domain.WorkOrderItem, error) {
 	var rows []models.WorkOrderItemModel
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND work_order_id = ?", tenantID, workOrderID).
+		Where("org_id = ? AND work_order_id = ?", orgID, workOrderID).
 		Order("sort_order ASC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -340,7 +340,7 @@ func itemToDomain(row models.WorkOrderItemModel) domain.WorkOrderItem {
 	}
 	return domain.WorkOrderItem{
 		ID:          row.ID,
-		TenantID:    row.TenantID,
+		OrgID:    row.OrgID,
 		WorkOrderID: row.WorkOrderID,
 		ItemType:    row.ItemType,
 		ServiceID:   row.ServiceID,
@@ -366,7 +366,7 @@ func toDomain(row models.WorkOrderModel, items []domain.WorkOrderItem) domain.Wo
 	}
 	return domain.WorkOrder{
 		ID:               row.ID,
-		TenantID:         row.TenantID,
+		OrgID:         row.OrgID,
 		BranchID:         row.BranchID,
 		Number:           row.Number,
 		AssetType:        row.AssetType,

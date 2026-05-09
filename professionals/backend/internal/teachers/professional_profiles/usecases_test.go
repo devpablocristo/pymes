@@ -38,17 +38,17 @@ func (f *fakeRepo) Create(_ context.Context, in domain.ProfessionalProfile) (dom
 	return in, nil
 }
 
-func (f *fakeRepo) GetByID(_ context.Context, tenantID, id uuid.UUID) (domain.ProfessionalProfile, error) {
+func (f *fakeRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (domain.ProfessionalProfile, error) {
 	p, ok := f.profiles[id]
-	if !ok || p.TenantID != tenantID {
+	if !ok || p.OrgID != orgID {
 		return domain.ProfessionalProfile{}, gorm.ErrRecordNotFound
 	}
 	return p, nil
 }
 
-func (f *fakeRepo) GetBySlug(_ context.Context, tenantID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
+func (f *fakeRepo) GetBySlug(_ context.Context, orgID uuid.UUID, slug string) (domain.ProfessionalProfile, error) {
 	for _, p := range f.profiles {
-		if p.TenantID == tenantID && p.PublicSlug == slug {
+		if p.OrgID == orgID && p.PublicSlug == slug {
 			return p, nil
 		}
 	}
@@ -67,9 +67,9 @@ func (f *fakeRepo) Update(_ context.Context, in domain.ProfessionalProfile) (dom
 	return in, nil
 }
 
-func (f *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Archive(_ context.Context, orgID, id uuid.UUID) error {
 	p, ok := f.profiles[id]
-	if !ok || p.TenantID != tenantID {
+	if !ok || p.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	if p.DeletedAt == nil {
@@ -80,9 +80,9 @@ func (f *fakeRepo) Archive(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (f *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Restore(_ context.Context, orgID, id uuid.UUID) error {
 	p, ok := f.profiles[id]
-	if !ok || p.TenantID != tenantID {
+	if !ok || p.OrgID != orgID {
 		return gorm.ErrRecordNotFound
 	}
 	p.DeletedAt = nil
@@ -90,19 +90,19 @@ func (f *fakeRepo) Restore(_ context.Context, tenantID, id uuid.UUID) error {
 	return nil
 }
 
-func (f *fakeRepo) Delete(_ context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Delete(_ context.Context, orgID, id uuid.UUID) error {
 	p, ok := f.profiles[id]
-	if !ok || p.TenantID != tenantID || p.DeletedAt == nil {
+	if !ok || p.OrgID != orgID || p.DeletedAt == nil {
 		return gorm.ErrRecordNotFound
 	}
 	delete(f.profiles, id)
 	return nil
 }
 
-func (f *fakeRepo) ListPublic(_ context.Context, tenantID uuid.UUID) ([]domain.ProfessionalProfile, error) {
+func (f *fakeRepo) ListPublic(_ context.Context, orgID uuid.UUID) ([]domain.ProfessionalProfile, error) {
 	var out []domain.ProfessionalProfile
 	for _, p := range f.profiles {
-		if p.TenantID == tenantID && p.IsPublic {
+		if p.OrgID == orgID && p.IsPublic {
 			out = append(out, p)
 		}
 	}
@@ -122,10 +122,10 @@ func TestCreate_HappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, &fakeAudit{})
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	partyID := uuid.New()
 	out, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID: tenantID,
+		OrgID: orgID,
 		PartyID:  partyID,
 		Headline: "Dr. García",
 	}, "tester")
@@ -150,7 +150,7 @@ func TestCreate_MissingPartyID(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID: uuid.New(),
+		OrgID: uuid.New(),
 	}, "tester")
 
 	if err == nil {
@@ -168,7 +168,7 @@ func TestCreate_DuplicateSlug(t *testing.T) {
 	uc := NewUsecases(repo, nil)
 
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID:   uuid.New(),
+		OrgID:   uuid.New(),
 		PartyID:    uuid.New(),
 		PublicSlug: "duplicated",
 	}, "tester")
@@ -200,16 +200,16 @@ func TestGetByID_HappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID: tenantID,
+		OrgID: orgID,
 		PartyID:  uuid.New(),
 	}, "tester")
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 
-	got, err := uc.GetByID(context.Background(), tenantID, created.ID)
+	got, err := uc.GetByID(context.Background(), orgID, created.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,9 +224,9 @@ func TestUpdate_HappyPath(t *testing.T) {
 	audit := &fakeAudit{}
 	uc := NewUsecases(repo, audit)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID: tenantID,
+		OrgID: orgID,
 		PartyID:  uuid.New(),
 		Headline: "Original",
 	}, "tester")
@@ -235,7 +235,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 	}
 
 	newBio := "Especialista en traumatología"
-	updated, err := uc.Update(context.Background(), tenantID, created.ID, UpdateInput{
+	updated, err := uc.Update(context.Background(), orgID, created.ID, UpdateInput{
 		Bio: &newBio,
 	}, "tester")
 	if err != nil {
@@ -266,9 +266,9 @@ func TestGetBySlug_NotPublic(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	created, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "private-prof",
 		IsPublic:   false,
@@ -278,7 +278,7 @@ func TestGetBySlug_NotPublic(t *testing.T) {
 	}
 	_ = created
 
-	_, err = uc.GetBySlug(context.Background(), tenantID, "private-prof")
+	_, err = uc.GetBySlug(context.Background(), orgID, "private-prof")
 	if err == nil {
 		t.Fatal("expected not found for non-public profile")
 	}
@@ -292,9 +292,9 @@ func TestGetBySlug_HappyPath(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "dr-garcia",
 		IsPublic:   true,
@@ -303,7 +303,7 @@ func TestGetBySlug_HappyPath(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	got, err := uc.GetBySlug(context.Background(), tenantID, "dr-garcia")
+	got, err := uc.GetBySlug(context.Background(), orgID, "dr-garcia")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -317,10 +317,10 @@ func TestListPublic(t *testing.T) {
 	repo := newFakeRepo()
 	uc := NewUsecases(repo, nil)
 
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	// Crear uno público y uno privado
 	_, err := uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "public-one",
 		IsPublic:   true,
@@ -331,7 +331,7 @@ func TestListPublic(t *testing.T) {
 
 	repo.slugExists = false
 	_, err = uc.Create(context.Background(), domain.ProfessionalProfile{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		PartyID:    uuid.New(),
 		PublicSlug: "private-one",
 		IsPublic:   false,
@@ -340,7 +340,7 @@ func TestListPublic(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	list, err := uc.ListPublic(context.Background(), tenantID)
+	list, err := uc.ListPublic(context.Background(), orgID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

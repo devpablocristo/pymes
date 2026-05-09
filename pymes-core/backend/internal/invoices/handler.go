@@ -19,13 +19,13 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]invdomain.Invoice, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, limit int) ([]invdomain.Invoice, error)
-	GetByID(ctx context.Context, tenantID, id uuid.UUID) (invdomain.Invoice, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, limit int) ([]invdomain.Invoice, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (invdomain.Invoice, error)
 	Create(ctx context.Context, in CreateInput) (invdomain.Invoice, error)
 	Update(ctx context.Context, in UpdateInput) (invdomain.Invoice, error)
-	SoftDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, id uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, tenantID, id uuid.UUID, actor string) error
+	SoftDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, id uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, id uuid.UUID, actor string) error
 }
 
 type Handler struct{ uc usecasesPort }
@@ -49,7 +49,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -60,7 +60,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Limit:    limit,
 		After:    after,
 		Status:   c.Query("status"),
@@ -81,13 +81,13 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "20", pagination.Config{DefaultLimit: 20, MaxLimit: 100})
-	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, limit)
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, limit)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -101,7 +101,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -135,7 +135,7 @@ func (h *Handler) Create(c *gin.Context) {
 		})
 	}
 	out, err := h.uc.Create(c.Request.Context(), CreateInput{
-		TenantID:        tenantID,
+		OrgID:        orgID,
 		Number:          req.Number,
 		PartyID:         partyID,
 		CustomerName:    req.CustomerName,
@@ -158,11 +158,11 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) Get(c *gin.Context) {
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, id)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -172,7 +172,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
@@ -182,7 +182,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	out, err := h.uc.Update(c.Request.Context(), UpdateInput{
-		TenantID:        tenantID,
+		OrgID:        orgID,
 		ID:              id,
 		Status:          req.Status,
 		DiscountPercent: req.DiscountPercent,
@@ -203,11 +203,11 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.SoftDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
+	if err := h.uc.SoftDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -220,11 +220,11 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, id, a.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -233,11 +233,11 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, id, ok := parseTenantAndID(c)
+	orgID, id, ok := parseTenantAndID(c)
 	if !ok {
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), tenantID, id, a.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, id, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -246,7 +246,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 
 func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return uuid.Nil, uuid.Nil, false
@@ -256,7 +256,7 @@ func parseTenantAndID(c *gin.Context) (uuid.UUID, uuid.UUID, bool) {
 		handlers.WriteValidation(c, "invalid id")
 		return uuid.Nil, uuid.Nil, false
 	}
-	return tenantID, id, true
+	return orgID, id, true
 }
 
 func toInvoiceResponse(in invdomain.Invoice) dto.InvoiceResponse {
@@ -279,7 +279,7 @@ func toInvoiceResponse(in invdomain.Invoice) dto.InvoiceResponse {
 	}
 	resp := dto.InvoiceResponse{
 		ID:              in.ID.String(),
-		TenantID:        in.TenantID.String(),
+		OrgID:        in.OrgID.String(),
 		Number:          in.Number,
 		CustomerName:    in.CustomerName,
 		IssuedDate:      in.IssuedDate.UTC().Format("2006-01-02"),

@@ -8,7 +8,7 @@ import (
 
 type Intake struct {
 	ID              uuid.UUID
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	BookingID       *uuid.UUID
 	ProfileID       uuid.UUID
 	CustomerPartyID *uuid.UUID

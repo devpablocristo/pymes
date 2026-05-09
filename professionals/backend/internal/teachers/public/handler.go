@@ -19,12 +19,12 @@ import (
 )
 
 type profilePort interface {
-	ListPublic(ctx context.Context, tenantID uuid.UUID) ([]profdomain.ProfessionalProfile, error)
-	GetBySlug(ctx context.Context, tenantID uuid.UUID, slug string) (profdomain.ProfessionalProfile, error)
+	ListPublic(ctx context.Context, orgID uuid.UUID) ([]profdomain.ProfessionalProfile, error)
+	GetBySlug(ctx context.Context, orgID uuid.UUID, slug string) (profdomain.ProfessionalProfile, error)
 }
 
 type serviceLinkPort interface {
-	ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]sldomain.ServiceLink, error)
+	ListByTenant(ctx context.Context, orgID uuid.UUID) ([]sldomain.ServiceLink, error)
 }
 
 type bookingPort interface {
@@ -33,7 +33,7 @@ type bookingPort interface {
 }
 
 type tenantResolver interface {
-	ResolveTenantID(ctx context.Context, tenantSlug string) (uuid.UUID, error)
+	ResolveOrgID(ctx context.Context, tenantSlug string) (uuid.UUID, error)
 }
 
 type Handler struct {
@@ -74,18 +74,18 @@ func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 	}
 
 	// Try parsing as UUID first; public routes also accept the stable slug form.
-	if tenantID, err := uuid.Parse(tenantSlug); err == nil {
-		return tenantID, true
+	if orgID, err := uuid.Parse(tenantSlug); err == nil {
+		return orgID, true
 	}
 
 	// Then try slug resolution via pymes-core
 	if h.tenants != nil {
-		tenantID, err := h.tenants.ResolveTenantID(c.Request.Context(), tenantSlug)
+		orgID, err := h.tenants.ResolveOrgID(c.Request.Context(), tenantSlug)
 		if err != nil {
 			verticalgin.WriteError(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
 			return uuid.Nil, false
 		}
-		return tenantID, true
+		return orgID, true
 	}
 
 	verticalgin.WriteValidation(c, "invalid tenant identifier")
@@ -93,11 +93,11 @@ func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 }
 
 func (h *Handler) ListProfessionals(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
-	profiles, err := h.profiles.ListPublic(c.Request.Context(), tenantID)
+	profiles, err := h.profiles.ListPublic(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -110,7 +110,7 @@ func (h *Handler) ListProfessionals(c *gin.Context) {
 }
 
 func (h *Handler) GetProfessional(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
@@ -119,7 +119,7 @@ func (h *Handler) GetProfessional(c *gin.Context) {
 		verticalgin.WriteValidation(c, "slug is required")
 		return
 	}
-	profile, err := h.profiles.GetBySlug(c.Request.Context(), tenantID, slug)
+	profile, err := h.profiles.GetBySlug(c.Request.Context(), orgID, slug)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -128,11 +128,11 @@ func (h *Handler) GetProfessional(c *gin.Context) {
 }
 
 func (h *Handler) ListCatalog(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveTenantID(c)
 	if !ok {
 		return
 	}
-	links, err := h.serviceLinks.ListByTenant(c.Request.Context(), tenantID)
+	links, err := h.serviceLinks.ListByTenant(c.Request.Context(), orgID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return

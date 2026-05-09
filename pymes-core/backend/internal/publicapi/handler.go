@@ -17,12 +17,12 @@ import (
 )
 
 type repositoryPort interface {
-	ResolveTenantID(ctx context.Context, ref string) (uuid.UUID, error)
-	GetBusinessInfo(ctx context.Context, tenantID uuid.UUID) (BusinessInfo, error)
-	ListPublicServiceCatalog(ctx context.Context, tenantID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error)
-	GetAvailability(ctx context.Context, tenantID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error)
-	Book(ctx context.Context, tenantID uuid.UUID, payload map[string]any) (BookingPublic, error)
-	ListByPhone(ctx context.Context, tenantID uuid.UUID, phone string, limit int) ([]BookingPublic, error)
+	ResolveOrgID(ctx context.Context, ref string) (uuid.UUID, error)
+	GetBusinessInfo(ctx context.Context, orgID uuid.UUID) (BusinessInfo, error)
+	ListPublicServiceCatalog(ctx context.Context, orgID uuid.UUID, vertical, segment, search string, limit int) ([]PublicServiceCatalogItem, error)
+	GetAvailability(ctx context.Context, orgID uuid.UUID, query AvailabilityQuery) ([]AvailabilitySlot, error)
+	Book(ctx context.Context, orgID uuid.UUID, payload map[string]any) (BookingPublic, error)
+	ListByPhone(ctx context.Context, orgID uuid.UUID, phone string, limit int) ([]BookingPublic, error)
 }
 
 type Handler struct {
@@ -41,8 +41,8 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/my-bookings", h.GetMyBookings)
 }
 
-func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
-	tenantID, err := h.repo.ResolveTenantID(c.Request.Context(), c.Param("tenant_id"))
+func (h *Handler) resolveOrgID(c *gin.Context) (uuid.UUID, bool) {
+	orgID, err := h.repo.ResolveOrgID(c.Request.Context(), c.Param("org_id"))
 	if err != nil {
 		if errors.Is(err, ErrTenantNotFound) {
 			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
@@ -51,16 +51,16 @@ func (h *Handler) resolveTenantID(c *gin.Context) (uuid.UUID, bool) {
 		httperrors.Write(c, http.StatusInternalServerError, "INTERNAL", "failed to resolve tenant")
 		return uuid.Nil, false
 	}
-	return tenantID, true
+	return orgID, true
 }
 
 func (h *Handler) GetBusinessInfo(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
 
-	info, err := h.repo.GetBusinessInfo(c.Request.Context(), tenantID)
+	info, err := h.repo.GetBusinessInfo(c.Request.Context(), orgID)
 	if err != nil {
 		if errors.Is(err, ErrTenantNotFound) {
 			httperrors.Write(c, http.StatusNotFound, "NOT_FOUND", "tenant not found")
@@ -76,14 +76,14 @@ func (h *Handler) GetBusinessInfo(c *gin.Context) {
 // GetPublicServiceCatalog devuelve el catálogo rico desde public.services con filtros
 // opcionales por vertical/segment (almacenados en metadata jsonb).
 func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
 	limit := handlers.ParseLimitQuery(c, "limit", "100", pagination.Config{DefaultLimit: 100, MaxLimit: 200})
 	items, err := h.repo.ListPublicServiceCatalog(
 		c.Request.Context(),
-		tenantID,
+		orgID,
 		strings.TrimSpace(c.Query("vertical")),
 		strings.TrimSpace(c.Query("segment")),
 		strings.TrimSpace(c.Query("search")),
@@ -97,7 +97,7 @@ func (h *Handler) GetPublicServiceCatalog(c *gin.Context) {
 }
 
 func (h *Handler) GetAvailability(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
@@ -129,7 +129,7 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 		return
 	}
 
-	slots, err := h.repo.GetAvailability(c.Request.Context(), tenantID, AvailabilityQuery{
+	slots, err := h.repo.GetAvailability(c.Request.Context(), orgID, AvailabilityQuery{
 		Date:       day.UTC(),
 		Duration:   duration,
 		BranchID:   branchID,
@@ -170,7 +170,7 @@ func (h *Handler) GetAvailability(c *gin.Context) {
 }
 
 func (h *Handler) BookScheduling(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
@@ -184,7 +184,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 		payload = map[string]any{}
 	}
 
-	booking, err := h.repo.Book(c.Request.Context(), tenantID, payload)
+	booking, err := h.repo.Book(c.Request.Context(), orgID, payload)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidInput):
@@ -212,7 +212,7 @@ func (h *Handler) BookScheduling(c *gin.Context) {
 }
 
 func (h *Handler) GetMyBookings(c *gin.Context) {
-	tenantID, ok := h.resolveTenantID(c)
+	orgID, ok := h.resolveOrgID(c)
 	if !ok {
 		return
 	}
@@ -223,7 +223,7 @@ func (h *Handler) GetMyBookings(c *gin.Context) {
 		return
 	}
 
-	items, err := h.repo.ListByPhone(c.Request.Context(), tenantID, phone, 20)
+	items, err := h.repo.ListByPhone(c.Request.Context(), orgID, phone, 20)
 	if err != nil {
 		if errors.Is(err, ErrInvalidInput) {
 			handlers.WriteValidation(c, "invalid phone")

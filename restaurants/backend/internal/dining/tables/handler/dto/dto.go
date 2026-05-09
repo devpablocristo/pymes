@@ -2,7 +2,7 @@ package dto
 
 type DiningTableItem struct {
 	ID         string         `json:"id"`
-	TenantID   string         `json:"tenant_id"`
+	OrgID   string         `json:"org_id"`
 	AreaID     string         `json:"area_id"`
 	Code       string         `json:"code"`
 	Label      string         `json:"label"`

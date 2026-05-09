@@ -3,13 +3,13 @@ package wire
 import "time"
 
 type tenantAPIKeyPrincipal struct {
-	TenantID string
+	OrgID string
 	Scopes   []string
 }
 
 type tenantAPIKeyDTO struct {
 	ID        string
-	TenantID  string
+	OrgID  string
 	Name      string
 	Scopes    []string
 	CreatedAt time.Time
@@ -37,7 +37,7 @@ type tenantUserDTO struct {
 
 type tenantMemberDTO struct {
 	ID       string        `json:"id"`
-	TenantID string        `json:"tenant_id"`
+	OrgID string        `json:"org_id"`
 	UserID   string        `json:"user_id"`
 	Role     string        `json:"role"`
 	Status   string        `json:"status"`

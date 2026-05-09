@@ -11,11 +11,11 @@ import (
 )
 
 func (h *Handler) ListCampaigns(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	campaigns, err := h.uc.ListCampaigns(c.Request.Context(), tenantID, 100)
+	campaigns, err := h.uc.ListCampaigns(c.Request.Context(), orgID, 100)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -28,7 +28,7 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 }
 
 func (h *Handler) CreateCampaign(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -38,7 +38,7 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 		writeBadRequest(c, "invalid request body")
 		return
 	}
-	campaign, err := h.uc.CreateCampaign(c.Request.Context(), tenantID, body.Name, body.TemplateName, body.TemplateLanguage, body.TagFilter, auth.Actor, body.TemplateParams)
+	campaign, err := h.uc.CreateCampaign(c.Request.Context(), orgID, body.Name, body.TemplateName, body.TemplateLanguage, body.TagFilter, auth.Actor, body.TemplateParams)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -47,16 +47,16 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 }
 
 func (h *Handler) GetCampaignDetail(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	campaign, err := h.uc.GetCampaign(c.Request.Context(), tenantID, id)
+	campaign, err := h.uc.GetCampaign(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
-	recipients, err := h.uc.GetCampaignRecipients(c.Request.Context(), tenantID, id)
+	recipients, err := h.uc.GetCampaignRecipients(c.Request.Context(), orgID, id)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -69,11 +69,11 @@ func (h *Handler) GetCampaignDetail(c *gin.Context) {
 }
 
 func (h *Handler) SendCampaign(c *gin.Context) {
-	tenantID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
+	orgID, id, ok := handlers.ParseAuthTenantAndParamID(c, "id", "id")
 	if !ok {
 		return
 	}
-	if err := h.uc.SendCampaign(c.Request.Context(), tenantID, id); err != nil {
+	if err := h.uc.SendCampaign(c.Request.Context(), orgID, id); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}

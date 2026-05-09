@@ -299,7 +299,7 @@ func InitializeApp() *app.App {
 	publicSchedulingHandler := schedulingpublichttp.NewHandler(publicAPIRepo, func(err error) bool { return err == publicapi.ErrTenantNotFound })
 	var resolveTenantRefFn func(context.Context, string) (uuid.UUID, bool, error)
 	if saasSvc != nil {
-		resolveTenantRefFn = saasSvc.ResolveTenantRef
+		resolveTenantRefFn = saasSvc.ResolveOrgRef
 	}
 	internalAPIHandler := internalapi.NewHandler(adminUC, partyUC, customersUC, productsUC, servicesUC, quotesUC, salesUC, paymentGatewayUC, newInternalAPIKeyResolver(db), inAppNotifUC, customerMessagingUC, resolveTenantRefFn)
 

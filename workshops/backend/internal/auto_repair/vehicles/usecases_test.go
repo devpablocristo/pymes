@@ -21,9 +21,9 @@ func (f *fakeRepo) List(ctx context.Context, p ListParams) ([]domain.Vehicle, in
 	return nil, 0, false, nil, nil
 }
 
-func (f *fakeRepo) ListArchived(ctx context.Context, tenantID uuid.UUID) ([]domain.Vehicle, error) {
+func (f *fakeRepo) ListArchived(ctx context.Context, orgID uuid.UUID) ([]domain.Vehicle, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	return nil, nil
 }
 
@@ -34,9 +34,9 @@ func (f *fakeRepo) Create(ctx context.Context, in domain.Vehicle) (domain.Vehicl
 	return in, nil
 }
 
-func (f *fakeRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (domain.Vehicle, error) {
+func (f *fakeRepo) GetByID(ctx context.Context, orgID, id uuid.UUID) (domain.Vehicle, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return domain.Vehicle{}, errors.New("not implemented")
 }
@@ -46,23 +46,23 @@ func (f *fakeRepo) Update(ctx context.Context, in domain.Vehicle) (domain.Vehicl
 	return in, nil
 }
 
-func (f *fakeRepo) SoftDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) SoftDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return nil
 }
 
-func (f *fakeRepo) Restore(ctx context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) Restore(ctx context.Context, orgID, id uuid.UUID) error {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return nil
 }
 
-func (f *fakeRepo) HardDelete(ctx context.Context, tenantID, id uuid.UUID) error {
+func (f *fakeRepo) HardDelete(ctx context.Context, orgID, id uuid.UUID) error {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	return nil
 }
@@ -73,9 +73,9 @@ type fakeCP struct {
 	err      error
 }
 
-func (f *fakeCP) GetCustomer(ctx context.Context, tenantID, customerID string) (map[string]any, error) {
+func (f *fakeCP) GetCustomer(ctx context.Context, orgID, customerID string) (map[string]any, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = customerID
 	if f.customer == nil {
 		return nil, f.err
@@ -83,9 +83,9 @@ func (f *fakeCP) GetCustomer(ctx context.Context, tenantID, customerID string) (
 	return f.customer, nil
 }
 
-func (f *fakeCP) GetParty(ctx context.Context, tenantID, partyID string) (map[string]any, error) {
+func (f *fakeCP) GetParty(ctx context.Context, orgID, partyID string) (map[string]any, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = partyID
 	if f.err != nil {
 		return nil, f.err
@@ -97,11 +97,11 @@ func TestCreateAutofillsCustomerNameFromPymesCore(t *testing.T) {
 	repo := &fakeRepo{}
 	cp := &fakeCP{customer: map[string]any{"name": "Juan Perez"}}
 	uc := NewUsecases(repo, nil, cp)
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	customerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	out, err := uc.Create(context.Background(), domain.Vehicle{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		CustomerID:   &customerID,
 		LicensePlate: "ab123cd",
 		Make:         "Toyota",
@@ -126,11 +126,11 @@ func TestCreateRejectsInvalidCustomerReference(t *testing.T) {
 	repo := &fakeRepo{}
 	cp := &fakeCP{err: errors.New("not found")}
 	uc := NewUsecases(repo, nil, cp)
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	orgID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	customerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	_, err := uc.Create(context.Background(), domain.Vehicle{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		CustomerID:   &customerID,
 		LicensePlate: "AB123CD",
 		Make:         "Ford",

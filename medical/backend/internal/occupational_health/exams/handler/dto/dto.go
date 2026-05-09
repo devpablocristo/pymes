@@ -2,7 +2,7 @@ package dto
 
 type ExamResponse struct {
 	ID              string   `json:"id"`
-	TenantID        string   `json:"tenant_id"`
+	OrgID        string   `json:"org_id"`
 	PatientName     string   `json:"patient_name"`
 	PatientDocument string   `json:"patient_document"`
 	EmployerName    string   `json:"employer_name"`

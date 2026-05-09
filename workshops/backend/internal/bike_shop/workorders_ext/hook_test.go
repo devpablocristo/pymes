@@ -17,9 +17,9 @@ type fakeBicycleLookup struct {
 	err     error
 }
 
-func (f *fakeBicycleLookup) GetByID(ctx context.Context, tenantID, id uuid.UUID) (bicyclesdomain.Bicycle, error) {
+func (f *fakeBicycleLookup) GetByID(ctx context.Context, orgID, id uuid.UUID) (bicyclesdomain.Bicycle, error) {
 	_ = ctx
-	_ = tenantID
+	_ = orgID
 	_ = id
 	if f.err != nil {
 		return bicyclesdomain.Bicycle{}, f.err
@@ -39,7 +39,7 @@ func TestHookBeforeCreateSyncsBicycleData(t *testing.T) {
 		},
 	})
 	wo := &workordersdomain.WorkOrder{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		AssetID:   uuid.New(),
 		AssetType: "bicycle",
 	}
@@ -61,7 +61,7 @@ func TestHookBeforeCreateSyncsBicycleData(t *testing.T) {
 func TestHookBeforeCreateRejectsUnknownBicycle(t *testing.T) {
 	hook := New(&fakeBicycleLookup{err: httperrors.ErrNotFound})
 	wo := &workordersdomain.WorkOrder{
-		TenantID:  uuid.New(),
+		OrgID:  uuid.New(),
 		AssetID:   uuid.New(),
 		AssetType: "bicycle",
 	}

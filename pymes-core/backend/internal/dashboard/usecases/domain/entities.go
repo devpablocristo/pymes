@@ -7,7 +7,7 @@ import (
 )
 
 type Viewer struct {
-	TenantID uuid.UUID
+	OrgID uuid.UUID
 	BranchID *uuid.UUID
 	Actor    string
 	Role     string

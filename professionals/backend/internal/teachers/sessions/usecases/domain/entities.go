@@ -8,7 +8,7 @@ import (
 
 type Session struct {
 	ID              uuid.UUID
-	TenantID        uuid.UUID
+	OrgID        uuid.UUID
 	BookingID       uuid.UUID
 	ProfileID       uuid.UUID
 	CustomerPartyID *uuid.UUID
@@ -25,7 +25,7 @@ type Session struct {
 
 type SessionNote struct {
 	ID        uuid.UUID
-	TenantID  uuid.UUID
+	OrgID  uuid.UUID
 	SessionID uuid.UUID
 	NoteType  string
 	Title     string

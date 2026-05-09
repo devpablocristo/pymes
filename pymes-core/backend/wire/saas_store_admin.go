@@ -49,14 +49,14 @@ func (s *pymesSaaSStore) CreateTenantWithClerkOrganization(ctx context.Context, 
 			return "", "", "", pymesTenantAPIKeyRow{}, nil, domainerr.Forbidden("user is not a member of the Clerk organization")
 		}
 	}
-	tenantID, rawKey, key, scopes, err := s.CreateTenantWithOwner(ctx, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName, avatarURL)
+	orgID, rawKey, key, scopes, err := s.CreateTenantWithOwner(ctx, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName, avatarURL)
 	if err != nil {
 		if createdClerkOrg && s.clerk != nil {
 			_ = s.clerk.DeleteOrganization(ctx, clerkTenantID)
 		}
 		return "", "", "", pymesTenantAPIKeyRow{}, nil, err
 	}
-	return tenantID, clerkTenantID, rawKey, key, scopes, nil
+	return orgID, clerkTenantID, rawKey, key, scopes, nil
 }
 
 func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, clerkTenantID, ownerExternalID, ownerEmail, ownerName string, avatarURL *string) (string, string, pymesTenantAPIKeyRow, []string, error) {
@@ -86,7 +86,7 @@ func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, 
 	}
 	key := pymesTenantAPIKeyRow{
 		ID:         uuid.New(),
-		TenantID:   org.ID,
+		OrgID:   org.ID,
 		Name:       "default",
 		APIKeyHash: keyHash,
 		KeyPrefix:  keyPrefix,
@@ -105,7 +105,7 @@ func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, 
 			}
 			member := pymesTenantMembershipRow{
 				ID:        uuid.New(),
-				TenantID:  org.ID,
+				OrgID:  org.ID,
 				UserID:    user.ID,
 				Role:      "owner",
 				Status:    "active",
@@ -117,7 +117,7 @@ func (s *pymesSaaSStore) CreateTenantWithOwner(ctx context.Context, name, slug, 
 			}
 		}
 		settings := pymesTenantSettingsRow{
-			TenantID:       org.ID,
+			OrgID:       org.ID,
 			PlanCode:       "starter",
 			BillingStatus:  "trialing",
 			Status:         "active",

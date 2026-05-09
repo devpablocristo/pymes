@@ -24,7 +24,7 @@ func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 
 	entry := domain.Entry{
 		ID:           uuid.New(),
-		TenantID:     in.TenantID,
+		OrgID:     in.OrgID,
 		Actor:        in.Actor.Raw,
 		ActorType:    in.Actor.Type,
 		ActorID:      in.Actor.ID,
@@ -40,10 +40,10 @@ func (m *mockAuditRepo) Add(in domain.LogInput) domain.Entry {
 	return entry
 }
 
-func (m *mockAuditRepo) List(tenantID uuid.UUID, limit int) []domain.Entry {
+func (m *mockAuditRepo) List(orgID uuid.UUID, limit int) []domain.Entry {
 	var result []domain.Entry
 	for _, e := range m.entries {
-		if e.TenantID == tenantID {
+		if e.OrgID == orgID {
 			result = append(result, e)
 		}
 	}
@@ -53,21 +53,21 @@ func (m *mockAuditRepo) List(tenantID uuid.UUID, limit int) []domain.Entry {
 	return result
 }
 
-func (m *mockAuditRepo) ExportCSV(tenantID uuid.UUID) (string, error) {
+func (m *mockAuditRepo) ExportCSV(orgID uuid.UUID) (string, error) {
 	return "id,action\n", nil
 }
 
-func (m *mockAuditRepo) Verify(tenantID uuid.UUID) domain.VerifyResult {
-	return domain.VerifyResult{TenantID: tenantID, Verified: true, CheckedRows: len(m.entries), Message: "ok"}
+func (m *mockAuditRepo) Verify(orgID uuid.UUID) domain.VerifyResult {
+	return domain.VerifyResult{OrgID: orgID, Verified: true, CheckedRows: len(m.entries), Message: "ok"}
 }
 
 func TestAuditLog(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 	ctx := context.Background()
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	uc.Log(ctx, tenantID, "admin", "create", "user", "u1", map[string]any{"email": "test@test.com"})
+	uc.Log(ctx, orgID, "admin", "create", "user", "u1", map[string]any{"email": "test@test.com"})
 
 	if len(repo.entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(repo.entries))
@@ -85,7 +85,7 @@ func TestAuditLog(t *testing.T) {
 	}
 }
 
-func TestAuditLog_InvalidTenantID(t *testing.T) {
+func TestAuditLog_InvalidOrgID(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 
@@ -99,12 +99,12 @@ func TestAuditList(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 	ctx := context.Background()
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	uc.Log(ctx, tenantID, "admin", "create", "user", "u1", nil)
-	uc.Log(ctx, tenantID, "admin", "update", "user", "u1", nil)
+	uc.Log(ctx, orgID, "admin", "create", "user", "u1", nil)
+	uc.Log(ctx, orgID, "admin", "update", "user", "u1", nil)
 
-	entries, err := uc.List(ctx, tenantID, 10)
+	entries, err := uc.List(ctx, orgID, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestAuditList(t *testing.T) {
 	}
 }
 
-func TestAuditList_InvalidTenantID(t *testing.T) {
+func TestAuditList_InvalidOrgID(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 
@@ -126,9 +126,9 @@ func TestAuditList_InvalidTenantID(t *testing.T) {
 func TestAuditExport_CSV(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	format, content, err := uc.Export(context.Background(), tenantID, "csv")
+	format, content, err := uc.Export(context.Background(), orgID, "csv")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,11 +144,11 @@ func TestAuditExport_JSONL(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 	ctx := context.Background()
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	uc.Log(ctx, tenantID, "admin", "create", "user", "u1", map[string]any{"k": "v"})
+	uc.Log(ctx, orgID, "admin", "create", "user", "u1", map[string]any{"k": "v"})
 
-	format, content, err := uc.Export(ctx, tenantID, "jsonl")
+	format, content, err := uc.Export(ctx, orgID, "jsonl")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,9 +163,9 @@ func TestAuditExport_JSONL(t *testing.T) {
 func TestAuditExport_UnsupportedFormat(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	_, _, err := uc.Export(context.Background(), tenantID, "xml")
+	_, _, err := uc.Export(context.Background(), orgID, "xml")
 	if err == nil {
 		t.Error("expected error for unsupported format")
 	}
@@ -175,11 +175,11 @@ func TestAuditHashChain(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
 	ctx := context.Background()
-	tenantID := uuid.New().String()
+	orgID := uuid.New().String()
 
-	uc.Log(ctx, tenantID, "admin", "first", "user", "u1", nil)
-	uc.Log(ctx, tenantID, "admin", "second", "user", "u2", nil)
-	uc.Log(ctx, tenantID, "admin", "third", "user", "u3", nil)
+	uc.Log(ctx, orgID, "admin", "first", "user", "u1", nil)
+	uc.Log(ctx, orgID, "admin", "second", "user", "u2", nil)
+	uc.Log(ctx, orgID, "admin", "third", "user", "u3", nil)
 
 	for i := 1; i < len(repo.entries); i++ {
 		if repo.entries[i].PrevHash != repo.entries[i-1].Hash {
@@ -191,11 +191,11 @@ func TestAuditHashChain(t *testing.T) {
 func TestAuditLogWithActor_Service(t *testing.T) {
 	repo := &mockAuditRepo{}
 	uc := NewUsecases(repo)
-	tenantID := uuid.New()
+	orgID := uuid.New()
 	serviceID := uuid.New()
 
 	uc.LogWithActor(context.Background(), domain.LogInput{
-		TenantID: tenantID,
+		OrgID: orgID,
 		Actor: domain.ActorRef{
 			Raw:   "mercadopago_webhook",
 			Type:  "service",

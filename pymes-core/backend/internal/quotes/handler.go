@@ -23,17 +23,17 @@ import (
 
 type usecasesPort interface {
 	List(ctx context.Context, p ListParams) ([]quotedomain.Quote, int64, bool, *uuid.UUID, error)
-	ListArchived(ctx context.Context, tenantID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
+	ListArchived(ctx context.Context, orgID uuid.UUID, branchID *uuid.UUID) ([]quotedomain.Quote, error)
 	Create(ctx context.Context, in CreateQuoteInput) (quotedomain.Quote, error)
-	GetByID(ctx context.Context, tenantID, quoteID uuid.UUID) (quotedomain.Quote, error)
+	GetByID(ctx context.Context, orgID, quoteID uuid.UUID) (quotedomain.Quote, error)
 	Update(ctx context.Context, in UpdateQuoteInput) (quotedomain.Quote, error)
-	Archive(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error
-	Restore(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error
-	HardDelete(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) error
-	Send(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
-	Accept(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
-	Reject(ctx context.Context, tenantID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
-	ToSale(ctx context.Context, tenantID, quoteID uuid.UUID, paymentMethod, notes, actor string) (salesdomain.Sale, error)
+	Archive(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	Restore(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	HardDelete(ctx context.Context, orgID, quoteID uuid.UUID, actor string) error
+	Send(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
+	Accept(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
+	Reject(ctx context.Context, orgID, quoteID uuid.UUID, actor string) (quotedomain.Quote, error)
+	ToSale(ctx context.Context, orgID, quoteID uuid.UUID, paymentMethod, notes, actor string) (salesdomain.Sale, error)
 }
 
 type Handler struct {
@@ -63,7 +63,7 @@ func (h *Handler) RegisterRoutes(auth *gin.RouterGroup, rbac *handlers.RBACMiddl
 
 func (h *Handler) List(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -104,7 +104,7 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	items, total, hasMore, next, err := h.uc.List(c.Request.Context(), ListParams{
-		TenantID:   tenantID,
+		OrgID:   orgID,
 		BranchID:   branchID,
 		Limit:      limit,
 		After:      after,
@@ -133,7 +133,7 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) ListArchived(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -147,7 +147,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 		}
 		branchID = &id
 	}
-	items, err := h.uc.ListArchived(c.Request.Context(), tenantID, branchID)
+	items, err := h.uc.ListArchived(c.Request.Context(), orgID, branchID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -165,7 +165,7 @@ func (h *Handler) ListArchived(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -206,7 +206,7 @@ func (h *Handler) Create(c *gin.Context) {
 		isFavorite = *req.IsFavorite
 	}
 	out, err := h.uc.Create(c.Request.Context(), CreateQuoteInput{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		BranchID:     branchID,
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
@@ -226,7 +226,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) Get(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -236,7 +236,7 @@ func (h *Handler) Get(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	out, err := h.uc.GetByID(c.Request.Context(), tenantID, quoteID)
+	out, err := h.uc.GetByID(c.Request.Context(), orgID, quoteID)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -246,7 +246,7 @@ func (h *Handler) Get(c *gin.Context) {
 
 func (h *Handler) Update(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -292,7 +292,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 
 	out, err := h.uc.Update(c.Request.Context(), UpdateQuoteInput{
-		TenantID:     tenantID,
+		OrgID:     orgID,
 		ID:           quoteID,
 		CustomerID:   customerID,
 		CustomerName: req.CustomerName,
@@ -312,7 +312,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -323,7 +323,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.uc.Archive(c.Request.Context(), tenantID, quoteID, a.Actor); err != nil {
+	if err := h.uc.Archive(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -336,7 +336,7 @@ func (h *Handler) Archive(c *gin.Context) {
 
 func (h *Handler) Restore(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -346,7 +346,7 @@ func (h *Handler) Restore(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.Restore(c.Request.Context(), tenantID, quoteID, a.Actor); err != nil {
+	if err := h.uc.Restore(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -355,7 +355,7 @@ func (h *Handler) Restore(c *gin.Context) {
 
 func (h *Handler) HardDelete(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -365,7 +365,7 @@ func (h *Handler) HardDelete(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid id")
 		return
 	}
-	if err := h.uc.HardDelete(c.Request.Context(), tenantID, quoteID, a.Actor); err != nil {
+	if err := h.uc.HardDelete(c.Request.Context(), orgID, quoteID, a.Actor); err != nil {
 		httperrors.Respond(c, err)
 		return
 	}
@@ -386,7 +386,7 @@ func (h *Handler) Reject(c *gin.Context) {
 
 func (h *Handler) transition(c *gin.Context, action string) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -400,11 +400,11 @@ func (h *Handler) transition(c *gin.Context, action string) {
 	var out quotedomain.Quote
 	switch action {
 	case "send":
-		out, err = h.uc.Send(c.Request.Context(), tenantID, quoteID, a.Actor)
+		out, err = h.uc.Send(c.Request.Context(), orgID, quoteID, a.Actor)
 	case "accept":
-		out, err = h.uc.Accept(c.Request.Context(), tenantID, quoteID, a.Actor)
+		out, err = h.uc.Accept(c.Request.Context(), orgID, quoteID, a.Actor)
 	case "reject":
-		out, err = h.uc.Reject(c.Request.Context(), tenantID, quoteID, a.Actor)
+		out, err = h.uc.Reject(c.Request.Context(), orgID, quoteID, a.Actor)
 	}
 	if err != nil {
 		httperrors.Respond(c, err)
@@ -415,7 +415,7 @@ func (h *Handler) transition(c *gin.Context, action string) {
 
 func (h *Handler) ToSale(c *gin.Context) {
 	a := handlers.GetAuthContext(c)
-	tenantID, err := uuid.Parse(a.TenantID)
+	orgID, err := uuid.Parse(a.OrgID)
 	if err != nil {
 		handlers.WriteValidation(c, "invalid tenant")
 		return
@@ -430,7 +430,7 @@ func (h *Handler) ToSale(c *gin.Context) {
 		handlers.WriteValidation(c, "invalid request body")
 		return
 	}
-	saleOut, err := h.uc.ToSale(c.Request.Context(), tenantID, quoteID, req.PaymentMethod, req.Notes, a.Actor)
+	saleOut, err := h.uc.ToSale(c.Request.Context(), orgID, quoteID, req.PaymentMethod, req.Notes, a.Actor)
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -450,7 +450,7 @@ func toQuoteResponse(in quotedomain.Quote) dto.QuoteResponse {
 	}
 	resp := dto.QuoteResponse{
 		ID:           in.ID.String(),
-		TenantID:     in.TenantID.String(),
+		OrgID:     in.OrgID.String(),
 		Number:       in.Number,
 		CustomerName: in.CustomerName,
 		Status:       in.Status,

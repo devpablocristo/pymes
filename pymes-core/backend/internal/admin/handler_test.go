@@ -122,7 +122,7 @@ func performTenantSettingsUpdate(t *testing.T, uc usecasesPort, body string) *ht
 
 func baseTenantSettings() admindomain.TenantSettings {
 	return admindomain.TenantSettings{
-		TenantID:                uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		OrgID:                uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		PlanCode:                "starter",
 		HardLimits:              map[string]any{},
 		BillingStatus:           "trialing",

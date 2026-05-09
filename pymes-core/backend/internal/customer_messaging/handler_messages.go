@@ -15,7 +15,7 @@ import (
 )
 
 func (h *Handler) SendText(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -30,7 +30,7 @@ func (h *Handler) SendText(c *gin.Context) {
 		writeBadRequest(c, "invalid party_id")
 		return
 	}
-	msg, err := h.uc.SendText(c.Request.Context(), domain.SendTextRequest{TenantID: tenantID, PartyID: partyID, Body: body.Body, Actor: auth.Actor})
+	msg, err := h.uc.SendText(c.Request.Context(), domain.SendTextRequest{OrgID: orgID, PartyID: partyID, Body: body.Body, Actor: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -39,7 +39,7 @@ func (h *Handler) SendText(c *gin.Context) {
 }
 
 func (h *Handler) SendTemplate(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -54,7 +54,7 @@ func (h *Handler) SendTemplate(c *gin.Context) {
 		writeBadRequest(c, "invalid party_id")
 		return
 	}
-	msg, err := h.uc.SendTemplate(c.Request.Context(), domain.SendTemplateRequest{TenantID: tenantID, PartyID: partyID, TemplateName: body.TemplateName, Language: body.Language, Params: body.Params, Actor: auth.Actor})
+	msg, err := h.uc.SendTemplate(c.Request.Context(), domain.SendTemplateRequest{OrgID: orgID, PartyID: partyID, TemplateName: body.TemplateName, Language: body.Language, Params: body.Params, Actor: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -63,7 +63,7 @@ func (h *Handler) SendTemplate(c *gin.Context) {
 }
 
 func (h *Handler) SendMedia(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -78,7 +78,7 @@ func (h *Handler) SendMedia(c *gin.Context) {
 		writeBadRequest(c, "invalid party_id")
 		return
 	}
-	msg, err := h.uc.SendMedia(c.Request.Context(), domain.SendMediaRequest{TenantID: tenantID, PartyID: partyID, MediaType: domain.MessageType(body.MediaType), MediaURL: body.MediaURL, Caption: body.Caption, Actor: auth.Actor})
+	msg, err := h.uc.SendMedia(c.Request.Context(), domain.SendMediaRequest{OrgID: orgID, PartyID: partyID, MediaType: domain.MessageType(body.MediaType), MediaURL: body.MediaURL, Caption: body.Caption, Actor: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -87,7 +87,7 @@ func (h *Handler) SendMedia(c *gin.Context) {
 }
 
 func (h *Handler) SendInteractive(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
@@ -106,7 +106,7 @@ func (h *Handler) SendInteractive(c *gin.Context) {
 	for _, b := range body.Buttons {
 		buttons = append(buttons, domain.InteractiveButton{ID: b.ID, Title: b.Title})
 	}
-	msg, err := h.uc.SendInteractive(c.Request.Context(), domain.SendInteractiveRequest{TenantID: tenantID, PartyID: partyID, Body: body.Body, Buttons: buttons, Actor: auth.Actor})
+	msg, err := h.uc.SendInteractive(c.Request.Context(), domain.SendInteractiveRequest{OrgID: orgID, PartyID: partyID, Body: body.Body, Buttons: buttons, Actor: auth.Actor})
 	if err != nil {
 		httperrors.Respond(c, err)
 		return
@@ -115,11 +115,11 @@ func (h *Handler) SendInteractive(c *gin.Context) {
 }
 
 func (h *Handler) ListMessages(c *gin.Context) {
-	tenantID, ok := handlers.ParseAuthTenantID(c)
+	orgID, ok := handlers.ParseAuthTenantID(c)
 	if !ok {
 		return
 	}
-	filter := domain.MessageFilter{TenantID: tenantID}
+	filter := domain.MessageFilter{OrgID: orgID}
 	if pid := strings.TrimSpace(c.Query("party_id")); pid != "" {
 		id, err := uuid.Parse(pid)
 		if err != nil {

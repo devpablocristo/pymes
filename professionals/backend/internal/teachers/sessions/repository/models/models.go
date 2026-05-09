@@ -8,7 +8,7 @@ import (
 
 type SessionModel struct {
 	ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	TenantID        uuid.UUID  `gorm:"type:uuid;index;not null"`
+	OrgID        uuid.UUID  `gorm:"type:uuid;index;not null"`
 	BookingID       uuid.UUID  `gorm:"type:uuid;not null;column:booking_id"`
 	ProfileID       uuid.UUID  `gorm:"type:uuid;not null"`
 	CustomerPartyID *uuid.UUID `gorm:"type:uuid"`
@@ -27,7 +27,7 @@ func (SessionModel) TableName() string { return "professionals.sessions" }
 
 type SessionNoteModel struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID  uuid.UUID `gorm:"type:uuid;not null"`
+	OrgID  uuid.UUID `gorm:"type:uuid;not null"`
 	SessionID uuid.UUID `gorm:"type:uuid;not null"`
 	NoteType  string    `gorm:"not null;default:general"`
 	Title     string

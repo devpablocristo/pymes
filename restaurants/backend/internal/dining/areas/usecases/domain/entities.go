@@ -8,7 +8,7 @@ import (
 
 type DiningArea struct {
 	ID         uuid.UUID
-	TenantID   uuid.UUID
+	OrgID   uuid.UUID
 	Name       string
 	SortOrder  int
 	IsFavorite bool

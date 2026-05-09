@@ -17,12 +17,17 @@
   background: var(--color-bg);
 }
 
-/* Sidebar como tarjeta flotante */
+/* Sidebar como tarjeta flotante.
+ * `background` y `color` explícitos vía tokens — la lib externa
+ * (@devpablocristo/modules-ui-page-shell) hardcodea blanco y nunca
+ * respetó el token de dark mode. Acá lo forzamos a seguir el token. */
 aside.sidebar {
   margin: 16px 0 16px 16px !important;
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-z1) !important;
   border: 1px solid var(--color-sidebar-border, var(--color-border)) !important;
+  background: var(--color-sidebar) !important;
+  color: var(--color-sidebar-text) !important;
   height: calc(100vh - 32px) !important;
   min-height: calc(100vh - 32px) !important;
   max-height: calc(100vh - 32px) !important;
@@ -32,10 +37,15 @@ aside.sidebar {
   flex-direction: column !important;
 }
 
-/* Brand: fijo en top + separador inferior sutil */
+/* Brand: título usa token, separador inferior sutil */
 .sidebar-brand {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--color-bg);
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-bg));
+}
+
+.sidebar-brand h1,
+.sidebar-brand .sidebar-brand-title {
+  color: var(--color-sidebar-text-active) !important;
 }
 
 .sidebar-brand small {
@@ -45,10 +55,10 @@ aside.sidebar {
   font-weight: var(--font-weight-medium) !important;
 }
 
-/* Search: estilo input plano sobre fondo gris claro */
+/* Search: input que respeta surface/border tokens (dark-aware) */
 .sidebar-search-input {
-  background: #f7f9fa !important;
-  border: 1px solid rgba(151, 151, 151, 0.26) !important;
+  background: var(--color-surface-hover) !important;
+  border: 1px solid var(--color-border) !important;
   border-radius: var(--radius-sm) !important;
   font-size: var(--text-sm) !important;
   color: var(--color-sidebar-text) !important;

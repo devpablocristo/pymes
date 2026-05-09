@@ -135,6 +135,19 @@ import { Skeleton } from '../components/Skeleton';
 <Skeleton variant="rect" width="100%" height={180} />
 ```
 
+### `<StatCard />`
+
+KPI card reusable para dashboards. Estilo unificado con `.dash__stat-*`. Tonos: `blue | green | purple | red | amber`.
+
+```tsx
+import { StatCard } from '../components/StatCard';
+
+<StatCard label="Pacientes" value="124" sub="este mes" tone="blue" />
+<StatCard label="Ventas" value={total} tone="green" loading={isLoading} />
+```
+
+A11y: `role="group"` + `aria-label={label}`, icono decorativo `aria-hidden`.
+
 ### `<NotificationsDropdown />`
 
 Campana con panel desplegable. Embebe `NotificationsCenterPage` en modo `embedded`. Conteo unread con badge, refetch 60s, cierra con click fuera o Escape.
@@ -199,12 +212,12 @@ Ver `.claude/plans/tengo-un-bug-en-melodic-river.md` (sección 5 / 6 / 11) para 
 | 3 — UI kit + reskin masivo CSS (12 archivos) | ✅ |
 | 4 — Iconos (no-op: ShellIcons custom + Tabler para nuevos) | ✅ |
 | 5/6/8 — Auth/Onboarding/Settings CSS | ✅ (cubierto en 3) |
-| 7 — Dashboard StatCard + montaje ThemeToggle | parcial (toggle montado en sidebar; StatCard pendiente) |
+| 7 — Dashboard StatCard + montaje ThemeToggle | ✅ (StatCard extraído a `components/StatCard.tsx`) |
 | 9 — EmptyState + Skeleton components | ✅ |
 | 10 — Módulos verticales (CSS swap) | ✅ (CSS); TSX-side review pendiente |
 | 11 — Cherry-pick (NotificationsDropdown + Reports + SettingsMenu) | ✅ |
 | 12 — Animaciones + microinteracciones | ✅ (tokens + transitions ya en CSS) |
-| 13 — A11y + Lighthouse audit | pendiente |
+| 13 — A11y baseline | ✅ baseline (StatCard semantics, focus contrast en topbar). Lighthouse run + axe-core en Playwright pendientes para CI. |
 | 14 — Cleanup + este doc | ✅ |
 
 ## Convenciones de bug-fixing visual

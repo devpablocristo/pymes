@@ -16,6 +16,7 @@ import {
 } from '../dashboard/utils/format';
 import { PageLayout } from '../components/PageLayout';
 import { usePageSearch } from '../components/PageSearch';
+import { StatCard, type StatCardTone } from '../components/StatCard';
 import { formatFetchErrorForUser } from '../lib/formatFetchError';
 import { useI18n } from '../lib/i18n';
 import { BranchSchedulingDaySummary } from '../modules/scheduling/BranchSchedulingDaySummary';
@@ -65,35 +66,35 @@ function StatCards() {
     return <DashboardSectionError message={formatFetchErrorForUser(loadError, t('dashboard.errors.load'))} />;
   }
 
-  const stats = [
+  const stats: Array<{ label: string; value: string; sub: string; tone: StatCardTone; loading: boolean }> = [
     {
       label: t('dashboard.visual.sales'),
       value: sales.data ? formatDashboardMoney(sales.data.total_sales, language) : '—',
       sub: sales.data && typeof sales.data.count_sales === 'number'
         ? `${sales.data.count_sales} ${t('dashboard.visual.operations')}`
         : '',
-      tone: 'blue' as const,
+      tone: 'blue',
       loading: sales.isLoading,
     },
     {
       label: t('dashboard.visual.averageTicket'),
       value: sales.data ? formatDashboardMoney(sales.data.average_ticket, language) : '—',
       sub: sales.data?.period ?? '',
-      tone: 'green' as const,
+      tone: 'green',
       loading: sales.isLoading,
     },
     {
       label: t('dashboard.visual.income'),
       value: cashflow.data ? formatDashboardMoney(cashflow.data.total_income, language) : '—',
       sub: cashflow.data?.period ?? '',
-      tone: 'purple' as const,
+      tone: 'purple',
       loading: cashflow.isLoading,
     },
     {
       label: t('dashboard.visual.expense'),
       value: cashflow.data ? formatDashboardMoney(cashflow.data.total_expense, language) : '—',
       sub: cashflow.data?.period ?? '',
-      tone: 'red' as const,
+      tone: 'red',
       loading: cashflow.isLoading,
     },
     {
@@ -102,7 +103,7 @@ function StatCards() {
       sub: quotes.data && typeof quotes.data.accepted === 'number'
         ? `${quotes.data.accepted} ${t('dashboard.visual.accepted')}`
         : '',
-      tone: 'amber' as const,
+      tone: 'amber',
       loading: quotes.isLoading,
     },
   ];
@@ -110,14 +111,14 @@ function StatCards() {
   return (
     <div className="dash__stats">
       {stats.map((s) => (
-        <div key={s.label} className="dash__stat-card">
-          <div className={`dash__stat-icon dash__stat-icon--${s.tone}`}>{s.loading ? '…' : s.label.charAt(0)}</div>
-          <div className="dash__stat-info">
-            <div className="dash__stat-value">{s.loading ? <span className="spinner" /> : s.value}</div>
-            <div className="dash__stat-label">{s.label}</div>
-            {s.sub && <div className="dash__stat-trend dash__stat-trend--muted">{s.sub}</div>}
-          </div>
-        </div>
+        <StatCard
+          key={s.label}
+          label={s.label}
+          value={s.value}
+          sub={s.sub || undefined}
+          tone={s.tone}
+          loading={s.loading}
+        />
       ))}
     </div>
   );

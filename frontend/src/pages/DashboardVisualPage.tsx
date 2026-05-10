@@ -937,8 +937,8 @@ export function DashboardVisualPage() {
       className="dash"
       title={
         <>
-          Dashboard
-          <small className="topbar-breadcrumb">Inicio</small>
+          Inicio
+          <small className="topbar-breadcrumb">Dashboard</small>
         </>
       }
     >

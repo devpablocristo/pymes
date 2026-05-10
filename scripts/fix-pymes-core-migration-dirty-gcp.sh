@@ -97,6 +97,14 @@ show_status() {
 }
 
 check_clean() {
+  # Si la tabla aún no existe (DB recién reseteada o nueva), no hay nada que chequear:
+  # el runner del backend la crea en su primer arranque cuando aplica 0001.
+  local table_exists
+  table_exists="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.pymes_core_schema_migrations') IS NOT NULL;" 2>/dev/null || echo f)"
+  if [[ "$table_exists" != "t" ]]; then
+    echo "OK: pymes_core_schema_migrations no existe — DB fresca, el backend la creará en su primer arranque."
+    return
+  fi
   local dirty_rows
   dirty_rows="$("${psql_cmd[@]}" -Atq -c "SELECT 'pymes_core:' || version FROM pymes_core_schema_migrations WHERE dirty IS TRUE;" || true)"
   dirty_rows="${dirty_rows}"$'\n'"$("${psql_cmd[@]}" -Atq -c "SELECT 'post_scheduling:' || version FROM pymes_core_post_scheduling_schema_migrations WHERE dirty IS TRUE;" 2>/dev/null || true)"
@@ -111,6 +119,13 @@ check_clean() {
 }
 
 repair_known_dev_dirty() {
+  # Si la tabla aún no existe (DB fresca post-reset), no hay nada para reparar.
+  local table_exists
+  table_exists="$("${psql_cmd[@]}" -Atq -c "SELECT to_regclass('public.pymes_core_schema_migrations') IS NOT NULL;" 2>/dev/null || echo f)"
+  if [[ "$table_exists" != "t" ]]; then
+    echo "OK: pymes_core_schema_migrations no existe — DB fresca, nada para reparar."
+    return
+  fi
   local version dirty has_tenants has_orgs
   version="$("${psql_cmd[@]}" -Atq -c "SELECT version FROM pymes_core_schema_migrations LIMIT 1;")"
   dirty="$("${psql_cmd[@]}" -Atq -c "SELECT dirty FROM pymes_core_schema_migrations LIMIT 1;")"

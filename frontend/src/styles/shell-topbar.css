@@ -73,7 +73,7 @@ main.app-shell-main {
   border-radius: 16px !important;
   box-shadow: 0 2px 20px rgba(0, 100, 200, 0.18) !important;
   border: 1px solid rgba(0, 100, 200, 0.12) !important;
-  padding: 14px 155px 14px 24px !important; /* right: espacio para íconos absolutos */
+  padding: 14px 205px 14px 24px !important; /* right: espacio para acciones absolutas */
   min-height: 58px !important;
   width: 100% !important;
   box-sizing: border-box !important;

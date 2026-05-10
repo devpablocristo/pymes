@@ -181,6 +181,21 @@ export function CrudResourceShellHeader<T extends { id: string }>({
     <div className="crud-resource-shell-header page-stack">
       <div className="page-layout__header-top-row">
         <div className="topbar-actions">
+          {contextualMenuItems.map((item) => (
+            <button
+              key={`${item.label}:${item.href}`}
+              type="button"
+              className="topbar-icon-btn"
+              aria-label={item.label}
+              title={item.label}
+              onClick={() => {
+                item.onSelect?.();
+                navigate(item.href);
+              }}
+            >
+              <i className={`ti ti-${topbarContextualIcon(item.label)}`} aria-hidden="true" />
+            </button>
+          ))}
           <NotificationsDropdown />
           <button
             type="button"
@@ -204,4 +219,15 @@ export function CrudResourceShellHeader<T extends { id: string }>({
       </CrudPageShell>
     </div>
   );
+}
+
+function topbarContextualIcon(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized.startsWith('configurar')) {
+    return 'adjustments-horizontal';
+  }
+  if (normalized.startsWith('volver')) {
+    return 'arrow-left';
+  }
+  return 'dots';
 }

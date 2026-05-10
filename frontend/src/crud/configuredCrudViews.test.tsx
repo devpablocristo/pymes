@@ -85,7 +85,7 @@ describe('configuredCrudViews', () => {
     expect(await screen.findByText('board-screen')).toBeInTheDocument();
   });
 
-  it('updates visible tabs when CRUD UI preferences change', async () => {
+  it('keeps legacy section tabs out of the standalone band', async () => {
     render(
       <MemoryRouter initialEntries={['/modules/inventory/list']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
@@ -101,9 +101,10 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(await screen.findByText('list-screen')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
 
     writeCrudUiConfigState({
       inventory: { enabledViewModeIds: ['list', 'kanban'], defaultViewModeId: 'kanban' },
@@ -112,8 +113,8 @@ describe('configuredCrudViews', () => {
     await waitFor(() => {
       expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
   });
 
   it('auto-recovers when preferences have empty enabledViewModeIds (shows all views)', async () => {
@@ -134,7 +135,8 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
+    expect(await screen.findByText('list-screen')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
   });
 
   it('invalidates a custom mode page when that mode is disabled by preferences', async () => {
@@ -296,9 +298,10 @@ describe('configuredCrudViews', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: 'Lista' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Galería' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tablero' })).toBeInTheDocument();
+    expect(await screen.findByText('bike-list-screen')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lista' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Galería' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tablero' })).not.toBeInTheDocument();
   });
 
   it('redirects dedicated nested CRUD routes to the first active mode when the current path is disabled', async () => {

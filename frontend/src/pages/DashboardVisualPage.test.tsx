@@ -124,8 +124,17 @@ describe('DashboardVisualPage', () => {
       if (String(path).includes('/v1/dashboard-data/sales-summary')) {
         return Promise.resolve({});
       }
+      if (String(path).includes('/v1/dashboard-data/recent-sales')) {
+        return Promise.resolve({ items: [{ id: 'sale-without-customer', total: 1200, status: 'paid' }] });
+      }
+      if (String(path).includes('/v1/dashboard-data/top-customers')) {
+        return Promise.resolve({ items: [{ id: 'customer-without-name', visit_count: 2 }] });
+      }
+      if (String(path).includes('/v1/purchases')) {
+        return Promise.resolve({ items: [{ id: 'purchase-without-supplier', amount: 900, status: 'pending' }] });
+      }
       if (String(path).includes('/v1/accounts/debtors')) {
-        return Promise.resolve({ items: [] });
+        return Promise.resolve({ items: [{ party_id: 'debtor-without-name', total_debt: 500 }] });
       }
       return Promise.resolve({ items: [] });
     });

@@ -577,12 +577,17 @@ const AVATAR_PALETTES = [
   { bg: '#f0edff', color: '#7c5cbf' },
 ];
 
-function initials(name: string) {
-  return name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || '?';
+function displayName(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '—';
 }
 
-function avatarPalette(name: string) {
-  const code = (name.charCodeAt(0) || 0) + (name.charCodeAt(1) || 0);
+function initials(name: unknown) {
+  return displayName(name).split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase() || '?';
+}
+
+function avatarPalette(name: unknown) {
+  const safeName = displayName(name);
+  const code = (safeName.charCodeAt(0) || 0) + (safeName.charCodeAt(1) || 0);
   return AVATAR_PALETTES[code % AVATAR_PALETTES.length];
 }
 
@@ -632,7 +637,7 @@ function RecentSales() {
             </thead>
             <tbody>
               {items.slice(0, 6).map((s: DashItem) => {
-                const name = s.customer_name ?? s.party_name ?? '—';
+                const name = displayName(s.customer_name ?? s.party_name);
                 const pal  = avatarPalette(name);
                 return (
                   <tr key={s.id ?? s.number}>
@@ -732,7 +737,7 @@ function FrequentCustomers() {
           <div className="spinner" />
         ) : (
           items.slice(0, 5).map((c: DashItem, i: number) => {
-            const name = c.name ?? c.customer_name ?? c.party_name ?? '—';
+            const name = displayName(c.name ?? c.customer_name ?? c.party_name);
             const pal  = avatarPalette(name);
             return (
               <div key={c.id ?? i} className="spike-row-item">
@@ -895,7 +900,7 @@ function RecentPurchases() {
             </thead>
             <tbody>
               {items.slice(0, 5).map((p: DashItem) => {
-                const name = p.supplier_name ?? p.party_name ?? p.contact_name ?? '—';
+                const name = displayName(p.supplier_name ?? p.party_name ?? p.contact_name);
                 const pal  = avatarPalette(name);
                 return (
                   <tr key={p.id ?? p.number}>
@@ -949,12 +954,13 @@ function Debtors() {
         <div className="spike-section-title" style={{ marginBottom: 12 }}>Con saldo pendiente</div>
         {isLoading ? <div className="spinner" /> : (
           items.slice(0, 5).map((d) => {
-            const pal = avatarPalette(d.party_name);
+            const name = displayName(d.party_name);
+            const pal = avatarPalette(name);
             return (
               <div key={d.party_id} className="spike-row-item">
-                <div className="spike-avatar-sm" style={{ background: pal.bg, color: pal.color }}>{initials(d.party_name)}</div>
+                <div className="spike-avatar-sm" style={{ background: pal.bg, color: pal.color }}>{initials(name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="spike-avatar-name">{d.party_name}</div>
+                  <div className="spike-avatar-name">{name}</div>
                   {d.oldest_date && <div className="spike-cell-meta">desde {formatDashboardShortDate(d.oldest_date, language)}</div>}
                 </div>
                 <div style={{ color: '#fb977d', fontWeight: 700, flexShrink: 0 }}>{formatDashboardMoney(d.total_debt, language)}</div>

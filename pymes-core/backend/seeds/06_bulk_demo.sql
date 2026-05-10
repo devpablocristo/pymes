@@ -336,7 +336,7 @@ BEGIN
         id, org_id, number, party_id, party_name, status, subtotal,
         tax_total, total, currency, notes, valid_until, created_by,
         discount_type, discount_value, discount_total, tags, metadata,
-        is_favorite, created_at, updated_at, archived_at
+        is_favorite, created_at, updated_at, deleted_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/quote/' || gs::text),
@@ -375,7 +375,7 @@ BEGIN
             metadata = EXCLUDED.metadata,
             is_favorite = EXCLUDED.is_favorite,
             updated_at = now(),
-            archived_at = NULL;
+            deleted_at = NULL;
 
     INSERT INTO quote_items (
         id, quote_id, product_id, service_id, description, quantity,
@@ -755,7 +755,7 @@ BEGIN
     INSERT INTO procurement_requests (
         id, org_id, requester_actor, title, description, category, status,
         estimated_total, currency, evaluation_json, purchase_id, created_at,
-        updated_at, archived_at
+        updated_at, deleted_at
     )
     SELECT
         uuid_generate_v5(v_tenant, 'pymes-seed/v2/procurement/' || gs::text),
@@ -782,7 +782,7 @@ BEGIN
             evaluation_json = EXCLUDED.evaluation_json,
             purchase_id = EXCLUDED.purchase_id,
             updated_at = now(),
-            archived_at = NULL;
+            deleted_at = NULL;
 
     INSERT INTO procurement_request_lines (id, request_id, description, product_id, quantity, unit_price_estimate, sort_order)
     SELECT

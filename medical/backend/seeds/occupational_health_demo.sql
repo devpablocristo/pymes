@@ -4,13 +4,13 @@ DO $$
 DECLARE
     v_tenant uuid := '__SEED_TENANT_ID__';
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant) THEN
+    IF NOT EXISTS (SELECT 1 FROM orgs WHERE id = v_tenant) THEN
         RETURN;
     END IF;
 
     INSERT INTO medical.occupational_health_exams (
         id,
-        tenant_id,
+        org_id,
         patient_name,
         patient_document,
         employer_name,

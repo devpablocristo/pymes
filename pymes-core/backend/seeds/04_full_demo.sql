@@ -233,7 +233,7 @@ BEGIN
 
     INSERT INTO procurement_requests (
         id, org_id, requester_actor, title, description, category, status,
-        estimated_total, currency, evaluation_json, purchase_id, created_at, updated_at, archived_at
+        estimated_total, currency, evaluation_json, purchase_id, created_at, updated_at, deleted_at
     )
     VALUES
         (
@@ -259,7 +259,7 @@ BEGIN
             evaluation_json = EXCLUDED.evaluation_json,
             purchase_id = EXCLUDED.purchase_id,
             updated_at = now(),
-            archived_at = EXCLUDED.archived_at;
+            deleted_at = EXCLUDED.deleted_at;
 
     INSERT INTO procurement_request_lines (
         id, request_id, description, product_id, quantity, unit_price_estimate, sort_order

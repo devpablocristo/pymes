@@ -176,6 +176,119 @@ ALTER TABLE tenant_settings
     ADD COLUMN IF NOT EXISTS vertical text NOT NULL DEFAULT '',
     ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz;
 
+-- ─── products / services (columnas operacionales faltantes) ───────────────
+-- products.type: el código asume Type string (legacy 0042/0045 split products
+-- vs services). En el schema squashed quedó implícito por tabla; el código
+-- aún emite/lee el campo. Default 'product' para compat.
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS type text NOT NULL DEFAULT 'product';
+
+-- ─── in_app_notifications: schema incompatible (user_id/kind/entity_*) ───
+-- El squash 0003 creó in_app_notifications con (actor_id, type, title, body)
+-- pero el código asume (user_id, kind, entity_type, entity_id, chat_context)
+-- y el TableName GORM es `pymes_in_app_notifications` (namespace pymes_).
+-- DROP+CREATE: tabla está vacía en bootstrap.
+DROP TABLE IF EXISTS in_app_notifications CASCADE;
+DROP TABLE IF EXISTS pymes_in_app_notifications CASCADE;
+
+CREATE TABLE pymes_in_app_notifications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    body text NOT NULL,
+    kind text NOT NULL,
+    entity_type text NOT NULL DEFAULT '',
+    entity_id text NOT NULL DEFAULT '',
+    chat_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+    read_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_pymes_in_app_notif_user_created
+    ON pymes_in_app_notifications(user_id, created_at DESC);
+CREATE INDEX idx_pymes_in_app_notif_org_unread
+    ON pymes_in_app_notifications(org_id, read_at) WHERE read_at IS NULL;
+
+-- ─── payments: ampliar check de method para incluir mercadopago ──────────
+ALTER TABLE payments
+    DROP CONSTRAINT IF EXISTS payments_method_check;
+ALTER TABLE payments
+    ADD CONSTRAINT payments_method_check
+    CHECK (method IN ('cash','card','transfer','check','other','credit_note','mercadopago'));
+
+-- ─── audit_log: rename payload_json→payload + columnas de actor/hash legacy ─
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='audit_log' AND column_name='payload_json'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='audit_log' AND column_name='payload'
+    ) THEN
+        ALTER TABLE audit_log RENAME COLUMN payload_json TO payload;
+    END IF;
+END $$;
+
+ALTER TABLE audit_log
+    ADD COLUMN IF NOT EXISTS actor_type text NOT NULL DEFAULT 'user',
+    ADD COLUMN IF NOT EXISTS actor_id uuid,
+    ADD COLUMN IF NOT EXISTS actor_label text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS hash_version int NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS payload_hash text NOT NULL DEFAULT '';
+
+-- ─── procurement (módulo no incluido en squash, pero código + seeds lo usan) ─
+CREATE TABLE IF NOT EXISTS procurement_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    requester_actor text NOT NULL,
+    title text NOT NULL,
+    description text NOT NULL DEFAULT '',
+    category text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'draft',
+    estimated_total numeric(18, 4) NOT NULL DEFAULT 0,
+    currency text NOT NULL DEFAULT 'ARS',
+    evaluation_json jsonb,
+    purchase_id uuid REFERENCES purchases(id) ON DELETE SET NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    deleted_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_org ON procurement_requests(org_id);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_status ON procurement_requests(org_id, status);
+CREATE INDEX IF NOT EXISTS idx_procurement_requests_deleted ON procurement_requests(org_id, deleted_at);
+
+CREATE TABLE IF NOT EXISTS procurement_request_lines (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id uuid NOT NULL REFERENCES procurement_requests(id) ON DELETE CASCADE,
+    description text NOT NULL DEFAULT '',
+    product_id uuid,
+    quantity numeric(18, 4) NOT NULL DEFAULT 1,
+    unit_price_estimate numeric(18, 4) NOT NULL DEFAULT 0,
+    sort_order int NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_procurement_request_lines_request ON procurement_request_lines(request_id);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_procurement_requests_updated_at') THEN
+        CREATE TRIGGER trg_procurement_requests_updated_at
+            BEFORE UPDATE ON procurement_requests
+            FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+END $$;
+
+-- ─── stock_levels: PK incompatible con branch_id NULL ─────────────────────
+-- El squash declaró PK (org_id, product_id, branch_id) pero branch_id es
+-- nullable y los seeds + código asumen "stock global cuando branch_id IS NULL".
+-- Reemplazamos la PK por unique partial índices.
+ALTER TABLE stock_levels DROP CONSTRAINT IF EXISTS stock_levels_pkey;
+ALTER TABLE stock_levels ALTER COLUMN branch_id DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_levels_global
+    ON stock_levels(org_id, product_id) WHERE branch_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_levels_branched
+    ON stock_levels(org_id, product_id, branch_id) WHERE branch_id IS NOT NULL;
+
 -- ─── tenant_invitations ────────────────────────────────────────────────────
 -- Schema actual de 0002 es incompatible con el código pymes (espera
 -- email_normalized, token_hash, status, clerk_invitation_id, invited_by_user_id,
